@@ -59,7 +59,13 @@ public client class DatabaseConnectionManager {
             log:printInfo("PostgreSQL Database initialized successfully.");
         } else {
             log:printInfo("Initializing H2 Database...");
-            self.dbClient = check new jdbc:Client("jdbc:h2:file:./database/icpdb;MODE=MySQL;AUTO_SERVER=TRUE", dbUser, dbPassword);
+            // Determine the appropriate init script based on database name
+            string initScript = dbName == "credentialsdb" ? 
+                "resources/db/init-scripts/credentials_h2_init.sql" : 
+                "resources/db/init-scripts/h2_init.sql";
+            string jdbcUrl = string `jdbc:h2:file:./database/${dbName};MODE=MySQL;AUTO_SERVER=TRUE;INIT=RUNSCRIPT FROM '${initScript}'`;
+            log:printInfo(string `Connecting to H2: ${jdbcUrl}`);
+            self.dbClient = check new jdbc:Client(jdbcUrl, dbUser, dbPassword);
             log:printInfo("H2 Database initialized successfully.");
         }
     }
