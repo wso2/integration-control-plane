@@ -93,7 +93,8 @@ services:
       - ./resources/observability/opensearch-observability-dashboard/config/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf
       - ./resources/observability/opensearch-observability-dashboard/config/fluent-bit/scripts:/fluent-bit/scripts
       - ./resources/observability/opensearch-observability-dashboard/logs/ballerina:/var/log/ballerina:ro
-      - ${MI_LOG_FILE_PATH}:/var/log/mi:ro
+      # Optional: Uncomment and set MI_LOG_FILE_PATH in .env to monitor MI logs
+      # - ${MI_LOG_FILE_PATH}:/var/log/mi:ro
       # Persist position database
       - fluent-bit-db:/fluent-bit/db
       # Persist buffer storage

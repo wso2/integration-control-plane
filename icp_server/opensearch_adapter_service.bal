@@ -19,6 +19,27 @@ import icp_server.types as types;
 import ballerina/http;
 import ballerina/log;
 
+// Column indices for log entry rows - used for deduplication
+const int COL_TIMESTAMP = 0;
+const int COL_LEVEL = 1;
+const int COL_LOG_ENTRY = 2;
+const int COL_CLASS = 3;
+const int COL_LOG_FILE_PATH = 4;
+const int COL_APP_NAME = 5;
+const int COL_MODULE = 6;
+const int COL_SERVICE_TYPE = 7;
+const int COL_APP = 8;
+const int COL_DEPLOYMENT = 9;
+const int COL_ARTIFACT_CONTAINER = 10;
+const int COL_PRODUCT = 11;
+const int COL_ICP_RUNTIME_ID = 12;
+const int COL_LOG_CONTEXT = 13;
+const int COL_COMPONENT_VERSION = 14;
+const int COL_COMPONENT_VERSION_ID = 15;
+// Internal fields for deduplication (not returned to client)
+const int COL_RAW_MESSAGE = 16;
+const int COL_RAW_TIME = 17;
+
 // OpenSearch response types
 type OpenSearchShards record {
     int total;
@@ -197,35 +218,61 @@ service /observability on openSerachObservabilityListener {
             string product = sourceData?.product ?: "";
             string icpRuntimeId = sourceData?.icp_runtimeId ?: "";
 
+            // Extract raw message and time for deduplication
+            string rawMessage = sourceData?.message ?: "";
+            string rawTime = sourceData?.time ?: timestamp;
+
             // Construct the full log entry string
             string logEntry = constructLogEntry(sourceData);
 
             json[] row = [
-                timestamp,
-                level,
-                logEntry,
-                'class,
-                logFilePath,
-                appName,
-                module,
-                serviceType,
-                app,
-                deployment,
-                artifactContainer,
-                product,
-                icpRuntimeId,
-                (), // LogContext - null for now
-                "",
-                ""
+                timestamp, // COL_TIMESTAMP (0)
+                level, // COL_LEVEL (1)
+                logEntry, // COL_LOG_ENTRY (2)
+                'class, // COL_CLASS (3)
+                logFilePath, // COL_LOG_FILE_PATH (4)
+                appName, // COL_APP_NAME (5)
+                module, // COL_MODULE (6)
+                serviceType, // COL_SERVICE_TYPE (7)
+                app, // COL_APP (8)
+                deployment, // COL_DEPLOYMENT (9)
+                artifactContainer, // COL_ARTIFACT_CONTAINER (10)
+                product, // COL_PRODUCT (11)
+                icpRuntimeId, // COL_ICP_RUNTIME_ID (12)
+                (), // COL_LOG_CONTEXT (13) - null for now
+                "", // COL_COMPONENT_VERSION (14)
+                "", // COL_COMPONENT_VERSION_ID (15)
+                rawMessage, // COL_RAW_MESSAGE (16) - for deduplication
+                rawTime // COL_RAW_TIME (17) - for deduplication
             ];
             rows.push(row);
         }
 
-        log:printInfo("Returning " + rows.length().toString() + " log entries");
+        // Deduplicate log entries before returning
+        json[][] deduplicatedRows = deduplicateLogEntries(rows);
+        int duplicatesRemoved = rows.length() - deduplicatedRows.length();
+        if duplicatesRemoved > 0 {
+            log:printInfo(string `Removed ${duplicatesRemoved} duplicate log entries`);
+        }
+
+        // Trim internal deduplication fields before returning to client
+        json[][] clientRows = [];
+        foreach json[] row in deduplicatedRows {
+            // Return only the first 16 columns (exclude COL_RAW_MESSAGE and COL_RAW_TIME)
+            json[] clientRow = [];
+            int i = 0;
+            while i <= COL_COMPONENT_VERSION_ID {
+                clientRow.push(row[i]);
+                i += 1;
+            }
+            clientRows.push(clientRow);
+        }
+
+        log:printInfo("Returning " + clientRows.length().toString() + " log entries");
 
         return {
             columns: columns,
-            rows: rows
+            rows: clientRows
         };
     }
 
@@ -498,6 +545,36 @@ function constructLogEntry(LogSource sourceData) returns string {
 
     // Construct the log entry in logfmt style
     return string `time=${time} level=${level}${serviceSpecificFields} message="${message}"${traceId}${spanId}${runtimeId}`;
+}
+
+// Helper function to deduplicate log entries based on composite key
+// Uses the same fields as Fluent Bit's generate_document_id to ensure consistent deduplication:
+// timestamp (raw time field) | message (raw message) | level | icp_runtimeId | log_file_path
+function deduplicateLogEntries(json[][] rows) returns json[][] {
+    map<boolean> seenEntries = {};
+    json[][] uniqueRows = [];
+
+    foreach json[] row in rows {
+        // Extract fields using named constants to avoid fragile positional indices
+        // Use raw fields that match Fluent Bit's composite key format
+        string rawTime = row[COL_RAW_TIME] is string ? <string>row[COL_RAW_TIME] : row[COL_RAW_TIME].toString();
+        string rawMessage = row[COL_RAW_MESSAGE] is string ? <string>row[COL_RAW_MESSAGE] : "";
+        string level = row[COL_LEVEL] is string ? <string>row[COL_LEVEL] : row[COL_LEVEL].toString();
+        string icpRuntimeId = row[COL_ICP_RUNTIME_ID] is string ? <string>row[COL_ICP_RUNTIME_ID] : "";
+        string logFilePath = row[COL_LOG_FILE_PATH] is string ? <string>row[COL_LOG_FILE_PATH] : "";
+
+        // Create composite key matching Fluent Bit's format:
+        // timestamp_str | message | level | runtime_id | log_file_path
+        string compositeKey = string `${rawTime}|${rawMessage}|${level}|${icpRuntimeId}|${logFilePath}`;
+
+        // Only add if we haven't seen this combination before
+        if !seenEntries.hasKey(compositeKey) {
+            seenEntries[compositeKey] = true;
+            uniqueRows.push(row);
+        }
+    }
+
+    return uniqueRows;
 }
 
 function getMetricQuery(types:MetricEntryRequest metricRequest) returns json|error {
