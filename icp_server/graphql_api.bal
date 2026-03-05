@@ -17,6 +17,7 @@
 import icp_server.auth;
 import icp_server.mi_management;
 import icp_server.storage;
+import icp_server.sync;
 import icp_server.types;
 import icp_server.utils;
 
@@ -354,135 +355,37 @@ isolated function updateLogLevelBI(types:UserContextV2 userContext, types:Update
     }
     string componentName = componentNameOpt;
     string logLevelStr = input.logLevel.toString();
-
-    // Phase 1: Validate permissions and collect unique components from input runtimeIds
-    map<types:Component> componentsToUpdate = {}; // Map of componentId -> Component
+    map<boolean> processed = {};
 
     foreach string runtimeId in input.runtimeIds {
-        // Fetch the runtime to get its context
         types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-
         if runtime is () {
-            log:printWarn(string `Runtime ${runtimeId} not found, skipping`);
             continue;
         }
 
-        // Build scope from runtime's context
         types:AccessScope scope = auth:buildScopeFromContext(
-                runtime.component.projectId,
-                runtime.component.id,
-                runtime.environment.id
-        );
-
-        // Check permission to manage this integration's runtime
+                runtime.component.projectId, runtime.component.id, runtime.environment.id);
         if !check auth:hasPermission(userContext.userId, auth:PERMISSION_INTEGRATION_MANAGE, scope) {
-            log:printWarn(string `User ${userContext.userId} lacks permission to manage runtime ${runtimeId}`);
             return error(string `Access denied: insufficient permissions to control log level on runtime ${runtimeId}`);
         }
 
-        // Collect unique components (will update log level for all runtimes in these components)
         string componentId = runtime.component.id;
-        if !componentsToUpdate.hasKey(componentId) {
-            componentsToUpdate[componentId] = runtime.component;
+        string envId = runtime.environment.id;
+        string key = componentId + ":" + envId;
+        if !processed.hasKey(key) {
+            processed[key] = true;
+            string qualName = types:qualifiedArtifactName(componentName, input?.componentPackage);
+            types:ReconcileArtifactKey artifact = {artifactName: qualName, artifactType: "log-level"};
+            log:printDebug("upsertReconcileDesiredState for log-level", componentId = componentId, envId = envId);
+            check storage:upsertReconcileDesiredState(componentId, envId, artifact,
+                {"logLevel": logLevelStr});
         }
     }
-
-    // Check if we have any valid components after validation
-    if componentsToUpdate.length() == 0 {
-        return {
-            success: false,
-            message: "No valid runtimes found to issue log level control commands",
-            commandIds: []
-        };
-    }
-
-    // Phase 2: Update intended state and create commands for ALL runtimes in each component
-    string[] commandIds = [];
-    int totalRuntimeCount = 0;
-    int successCount = 0;
-    int failedCount = 0;
-
-    foreach string componentId in componentsToUpdate.keys() {
-        types:Component component = componentsToUpdate.get(componentId);
-
-        // Update intended state for this component first
-        error? stateResult = storage:upsertBILogLevelIntendedState(
-                componentId,
-                componentName,
-                logLevelStr,
-                userContext.userId
-        );
-
-        if stateResult is error {
-            log:printError("Failed to update intended log level for component",
-                    componentId = componentId,
-                    componentName = componentName,
-                    'error = stateResult);
-            return error(string `Failed to persist intended state for component ${componentId}: ${stateResult.message()}`);
-        }
-
-        log:printInfo(string `Updated intended log level for ${componentName} to ${logLevelStr} in component ${componentId}`);
-
-        // Get ALL runtimes for this component (including offline ones)
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), (), component.projectId, componentId);
-
-        if runtimes.length() == 0 {
-            log:printWarn("No runtimes found for component", componentId = componentId);
-            continue;
-        }
-
-        log:printInfo("Creating log level control commands for all runtimes in component",
-                componentId = componentId,
-                componentName = componentName,
-                logLevel = logLevelStr,
-                runtimeCount = runtimes.length());
-
-        // Create control command for each runtime in the component
-        foreach types:Runtime runtime in runtimes {
-            totalRuntimeCount += 1;
-            boolean isRunning = runtime.status == types:RUNNING;
-
-            string|error cmdResult = storage:insertLogLevelControlCommand(
-                    runtime.runtimeId,
-                    componentName,
-                    logLevelStr,
-                    userContext.userId
-            );
-
-            if cmdResult is error {
-                failedCount += 1;
-                log:printError("Failed to insert log level control command for runtime",
-                        runtimeId = runtime.runtimeId,
-                        componentName = componentName,
-                        'error = cmdResult);
-            } else {
-                commandIds.push(cmdResult);
-                if isRunning {
-                    successCount += 1;
-                    log:printDebug("Log level control command created for running runtime",
-                            runtimeId = runtime.runtimeId,
-                            componentName = componentName,
-                            logLevel = logLevelStr,
-                            commandId = cmdResult);
-                } else {
-                    successCount += 1;
-                    log:printDebug("Log level control command queued for offline runtime",
-                            runtimeId = runtime.runtimeId,
-                            componentName = componentName,
-                            logLevel = logLevelStr,
-                            runtimeStatus = runtime.status,
-                            commandId = cmdResult);
-                }
-            }
-        }
-    }
-
-    string message = string `Updated log level for ${componentName} to ${logLevelStr} across ${componentsToUpdate.length()} component(s) and ${totalRuntimeCount} runtime(s). Commands sent: ${successCount}, failed: ${failedCount}`;
 
     return {
-        success: successCount > 0,
-        message: message,
-        commandIds: commandIds
+        success: true,
+        message: string `Log level for ${componentName} set to ${logLevelStr}`,
+        commandIds: []
     };
 }
 
@@ -543,25 +446,15 @@ isolated function updateLogLevelMI(types:UserContextV2 userContext, types:Update
     map<boolean> processedComponents = {};
 
     foreach types:ValidatedRuntime validated in validatedRuntimes {
-        // Persist intended state for this component first (once per component)
-        if !processedComponents.hasKey(validated.componentId) {
-            error? stateResult = storage:upsertMILoggerIntendedState(
-                    validated.componentId,
-                    loggerName,
-                    logLevelStr,
-                    userContext.userId
-            );
-
-            if stateResult is error {
-                log:printError("Failed to update intended logger state for component",
-                        componentId = validated.componentId,
-                        loggerName = loggerName,
-                        'error = stateResult);
-                return error(string `Failed to persist intended state for component ${validated.componentId}: ${stateResult.message()}`);
-            }
-
-            log:printInfo(string `Updated intended logger state for ${loggerName} to ${logLevelStr} in component ${validated.componentId}`);
-            processedComponents[validated.componentId] = true;
+        // Persist intended state via reconcile engine (once per component+env)
+        string envId = validated.runtime.environment.id;
+        string key = validated.componentId + ":" + envId;
+        if !processedComponents.hasKey(key) {
+            types:ReconcileArtifactKey artifact = {artifactName: loggerName, artifactType: "mi-logger"};
+            check storage:upsertReconcileDesiredState(validated.componentId, envId, artifact,
+                {"logLevel": logLevelStr});
+            log:printInfo(string `Updated reconcile desired state for MI logger ${loggerName} to ${logLevelStr} in component ${validated.componentId}`);
+            processedComponents[key] = true;
         }
 
         // Build management API base URL
@@ -1617,88 +1510,46 @@ service /graphql on graphqlListener {
         return {deleted: true, orphanedKeyId: orphanedKeyId, secretRevoked: secretRevoked};
     }
 
-    // Update listener state (enable/disable) by issuing control commands
-    isolated remote function updateListenerState(graphql:Context context, types:ListenerControlInput input) returns types:ListenerControlResponse|error {
+    // Update listener state (enable/disable) via reconcile engine
+    remote function updateListenerState(graphql:Context context, types:ListenerControlInput input) returns types:ListenerControlResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
+        log:printInfo(string `Processing listener state change request for listener ${input.listenerName} to ${input.action}`);
 
-        // Validate inputs
         if input.runtimeIds.length() == 0 {
             return error("At least one runtime ID must be provided");
         }
-
         if input.listenerName.trim().length() == 0 {
             return error("Listener name cannot be empty");
         }
 
-        string[] commandIds = [];
+        // Validate permissions and write desired state per component
         map<boolean> processedComponents = {};
-
-        // Process each runtime ID
         foreach string runtimeId in input.runtimeIds {
-            // Fetch the runtime to get its context
             types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-
             if runtime is () {
-                log:printWarn(string `Runtime ${runtimeId} not found, skipping`);
                 continue;
             }
 
-            // Build scope from runtime's context
             types:AccessScope scope = auth:buildScopeFromContext(
-                    runtime.component.projectId,
-                    runtime.component.id,
-                    runtime.environment.id
-            );
-
-            // Check permission to manage this integration's runtime
+                    runtime.component.projectId, runtime.component.id, runtime.environment.id);
             if !check auth:hasPermission(userContext.userId, auth:PERMISSION_INTEGRATION_MANAGE, scope) {
-                log:printWarn(string `User ${userContext.userId} lacks permission to manage runtime ${runtimeId}`);
                 return error(string `Access denied: insufficient permissions to control listener on runtime ${runtimeId}`);
             }
 
-            // Insert control command
-            string commandId = check storage:insertControlCommand(
-                    runtimeId,
-                    input.listenerName,
-                    input.action,
-                    userContext.userId
-            );
-
-            commandIds.push(commandId);
-            log:printInfo(string `Created control command ${commandId} for runtime ${runtimeId} to ${input.action} listener ${input.listenerName}`);
-
-            // Record intended state per component so all runtimes in the component will sync to the same state
             string componentId = runtime.component.id;
             if !processedComponents.hasKey(componentId) {
                 processedComponents[componentId] = true;
-                string actionStr = input.action.toString();
-                error? stateResult = storage:upsertBIArtifactIntendedState(
-                        componentId,
-                        input.listenerName,
-                        actionStr,
-                        userContext.userId
-                );
-
-                if stateResult is error {
-                    log:printWarn(string `Failed to update intended state for listener ${input.listenerName} in component ${componentId}`, stateResult);
-                } else {
-                    log:printInfo(string `Updated intended state for listener ${input.listenerName} to ${actionStr} in component ${componentId}`);
-                }
+                string envId = runtime.environment.id;
+                types:ReconcileArtifactKey artifact = {artifactName: input.listenerName, artifactType: "listener"};
+                check storage:upsertReconcileDesiredState(componentId, envId, artifact,
+                    {"status": input.action == types:START ? "enabled" : "disabled"});
             }
-        }
-
-        if commandIds.length() == 0 {
-            return {
-                success: false,
-                message: "No valid runtimes found to issue control commands",
-                commandIds: []
-            };
         }
 
         return {
             success: true,
-            message: string `Successfully created ${commandIds.length()} control command(s) to ${input.action} listener ${input.listenerName}`,
-            commandIds: commandIds
+            message: string `Listener ${input.listenerName} state change dispatched to ${input.runtimeIds.length()} runtime(s)`,
+            commandIds: []
         };
     }
 
@@ -1706,10 +1557,10 @@ service /graphql on graphqlListener {
     isolated remote function updateLogLevel(graphql:Context context, types:UpdateLogLevelInput input) returns types:UpdateLogLevelResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
-        // Validate inputs
         if input.runtimeIds.length() == 0 {
             return error("At least one runtime ID must be provided");
         }
+
 
         // Determine component type - use input if provided, otherwise lookup from first runtime
         types:RuntimeType componentType;
@@ -2286,7 +2137,7 @@ service /graphql on graphqlListener {
     }
 
     // Change artifact status (active/inactive) for all MI runtimes of a component
-    isolated remote function updateArtifactStatus(graphql:Context context, types:ArtifactStatusChangeInput input) returns types:ArtifactStatusChangeResponse|error {
+    remote function updateArtifactStatus(graphql:Context context, types:ArtifactStatusChangeInput input) returns types:ArtifactStatusChangeResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
         types:Component? component = check storage:getComponentById(input.componentId);
@@ -2295,18 +2146,12 @@ service /graphql on graphqlListener {
         }
 
         types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = input.componentId);
-
         if !check auth:hasAnyPermission(userContext.userId,
                 [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            log:printWarn("Attempt to change artifact status without permission",
-                    userId = userContext.userId, componentId = input.componentId, artifactName = input.artifactName);
             return error("Insufficient permissions to change artifact status");
         }
-        string normalizedType = input.artifactType;
 
-        // Get all MI runtimes for this component
         types:Runtime[] runtimes = check storage:getRuntimes((), "MI", (), component.projectId, input.componentId);
-
         if runtimes.length() == 0 {
             log:printWarn("No MI runtimes found for component", componentId = input.componentId);
             return {
@@ -2318,113 +2163,25 @@ service /graphql on graphqlListener {
             };
         }
 
-        log:printInfo("Creating MI control commands for artifact status change",
-                componentId = input.componentId,
-                artifactType = normalizedType,
-                artifactName = input.artifactName,
-                status = input.status,
-                runtimeCount = runtimes.length());
+        string envId = runtimes[0].environment.id;
+        string[] runtimeIds = from types:Runtime r in runtimes select r.runtimeId;
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
 
-        // Determine the action based on status
-        types:MIControlAction action = input.status == "active" ? types:ARTIFACT_ENABLE : types:ARTIFACT_DISABLE;
-
-        // Update intended state for this artifact in the component
-        string actionStr = action;
-        error? stateResult = storage:upsertMIArtifactIntendedStatus(
-                input.componentId,
-                input.artifactName,
-                normalizedType,
-                actionStr,
-                userContext.userId
-        );
-
-        if stateResult is error {
-            log:printWarn("Failed to update MI artifact intended status",
-                    componentId = input.componentId,
-                    artifactName = input.artifactName,
-                    artifactType = normalizedType,
-                    errorMessage = stateResult.message());
-        } else {
-            log:printInfo("Updated MI artifact intended status",
-                    componentId = input.componentId,
-                    artifactName = input.artifactName,
-                    artifactType = normalizedType,
-                    action = actionStr);
-        }
-
-        int successCount = 0;
-        int failedCount = 0;
-        string[] details = [];
-
-        // Insert MI control command for each runtime
-        foreach types:Runtime runtime in runtimes {
-            boolean isRunning = runtime.status == types:RUNNING;
-            string commandStatus = isRunning ? "sent" : "pending";
-
-            error? result = storage:insertMIControlCommand(
-                    runtime.runtimeId,
-                    input.componentId,
-                    input.artifactName,
-                    normalizedType,
-                    action,
-                    commandStatus,
-                    userContext.userId
-            );
-
-            if result is error {
-                failedCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: FAILED - ${result.message()}`;
-                details.push(detail);
-                log:printError("Failed to insert MI control command for runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName,
-                        errorMessage = result.message());
-            } else if isRunning {
-                // Runtime is online, fire the async HTTP request immediately (fire-and-forget)
-                storage:sendMIControlCommandAsync(
-                        runtime.runtimeId,
-                        normalizedType,
-                        input.artifactName,
-                        actionStr
-                );
-
-                successCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: Command sent`;
-                details.push(detail);
-                log:printDebug("MI control command sent for runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName);
-            } else {
-                // Runtime is offline, command queued as pending for delivery on next heartbeat
-                successCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: Command queued (runtime offline)`;
-                details.push(detail);
-                log:printDebug("MI control command queued for offline runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName);
-            }
-        }
-
-        types:Status overallStatus = successCount > 0 ? "SUCCESS" : "FAILED";
-        string message = string `Artifact status change sent to ${successCount} out of ${runtimes.length()} runtime(s)`;
-
-        log:printInfo("Artifact status change commands sent",
-                componentId = input.componentId,
-                artifactName = input.artifactName,
-                successCount = successCount,
-                failedCount = failedCount);
+        check storage:upsertReconcileDesiredState(input.componentId, envId, artifact,
+            {"status": input.status == "active" ? "enabled" : "disabled"});
+        error? e = sync:reconcileArtifactAllRuntimes(runtimeIds, input.componentId, envId, artifact, sync:dispatchMI);
 
         return {
-            status: overallStatus,
-            message: message,
-            successCount: successCount,
-            failedCount: failedCount,
-            details: details
+            status: e is () ? types:SUCCESS : types:FAILED,
+            message: string `Artifact status change dispatched to ${runtimeIds.length()} runtime(s)`,
+            successCount: e is () ? runtimeIds.length() : 0,
+            failedCount: e is () ? 0 : runtimeIds.length(),
+            details: []
         };
     }
 
     // Mutation to change artifact tracing (enable/disable)
-    isolated remote function updateArtifactTracingStatus(graphql:Context context, types:ArtifactTracingChangeInput input) returns types:ArtifactTracingChangeResponse|error {
+    remote function updateArtifactTracingStatus(graphql:Context context, types:ArtifactTracingChangeInput input) returns types:ArtifactTracingChangeResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
         types:Component? component = check storage:getComponentById(input.componentId);
@@ -2433,19 +2190,12 @@ service /graphql on graphqlListener {
         }
 
         types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = input.componentId);
-
         if !check auth:hasAnyPermission(userContext.userId,
                 [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            log:printWarn("Attempt to change artifact tracing without permission",
-                    userId = userContext.userId, componentId = input.componentId, artifactName = input.artifactName);
             return error("Insufficient permissions to change artifact tracing");
         }
 
-        string normalizedType = input.artifactType;
-
-        // Get all MI runtimes for this component
         types:Runtime[] runtimes = check storage:getRuntimes((), "MI", (), component.projectId, input.componentId);
-
         if runtimes.length() == 0 {
             log:printWarn("No MI runtimes found for component", componentId = input.componentId);
             return {
@@ -2457,113 +2207,25 @@ service /graphql on graphqlListener {
             };
         }
 
-        log:printInfo("Creating MI control commands for artifact tracing change",
-                componentId = input.componentId,
-                artifactType = normalizedType,
-                artifactName = input.artifactName,
-                trace = input.trace,
-                runtimeCount = runtimes.length());
+        string envId = runtimes[0].environment.id;
+        string[] runtimeIds = from types:Runtime r in runtimes select r.runtimeId;
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
 
-        // Determine the action based on trace
-        types:MIControlAction action = input.trace == "enable" ? types:ARTIFACT_ENABLE_TRACING : types:ARTIFACT_DISABLE_TRACING;
-
-        // Update intended state for this artifact in the component
-        string actionStr = action;
-        error? stateResult = storage:upsertMIArtifactIntendedTracing(
-                input.componentId,
-                input.artifactName,
-                normalizedType,
-                actionStr,
-                userContext.userId
-        );
-
-        if stateResult is error {
-            log:printWarn("Failed to update MI artifact intended tracing",
-                    componentId = input.componentId,
-                    artifactName = input.artifactName,
-                    artifactType = normalizedType,
-                    errorMessage = stateResult.message());
-        } else {
-            log:printInfo("Updated MI artifact intended tracing",
-                    componentId = input.componentId,
-                    artifactName = input.artifactName,
-                    artifactType = normalizedType,
-                    action = actionStr);
-        }
-
-        int successCount = 0;
-        int failedCount = 0;
-        string[] details = [];
-
-        // Insert MI control command for each runtime
-        foreach types:Runtime runtime in runtimes {
-            boolean isRunning = runtime.status == types:RUNNING;
-            string commandStatus = isRunning ? "sent" : "pending";
-
-            error? result = storage:insertMIControlCommand(
-                    runtime.runtimeId,
-                    input.componentId,
-                    input.artifactName,
-                    normalizedType,
-                    action,
-                    commandStatus,
-                    userContext.userId
-            );
-
-            if result is error {
-                failedCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: FAILED - ${result.message()}`;
-                details.push(detail);
-                log:printError("Failed to insert MI control command for runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName,
-                        errorMessage = result.message());
-            } else if isRunning {
-                // Runtime is online, fire the async HTTP request immediately (fire-and-forget)
-                storage:sendMIControlCommandAsync(
-                        runtime.runtimeId,
-                        normalizedType,
-                        input.artifactName,
-                        actionStr
-                );
-
-                successCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: Command sent`;
-                details.push(detail);
-                log:printDebug("MI control command sent for runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName);
-            } else {
-                // Runtime is offline, command queued as pending for delivery on next heartbeat
-                successCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: Command queued (runtime offline)`;
-                details.push(detail);
-                log:printDebug("MI control command queued for offline runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName);
-            }
-        }
-
-        types:Status overallStatus = successCount > 0 ? "SUCCESS" : "FAILED";
-        string message = string `Artifact tracing change sent to ${successCount} out of ${runtimes.length()} runtime(s)`;
-
-        log:printInfo("Artifact tracing change commands sent",
-                componentId = input.componentId,
-                artifactName = input.artifactName,
-                successCount = successCount,
-                failedCount = failedCount);
+        check storage:upsertReconcileDesiredState(input.componentId, envId, artifact,
+            {"tracing": input.trace == "enable" ? "enabled" : "disabled"});
+        error? e = sync:reconcileArtifactAllRuntimes(runtimeIds, input.componentId, envId, artifact, sync:dispatchMI);
 
         return {
-            status: overallStatus,
-            message: message,
-            successCount: successCount,
-            failedCount: failedCount,
-            details: details
+            status: e is () ? types:SUCCESS : types:FAILED,
+            message: string `Artifact tracing change dispatched to ${runtimeIds.length()} runtime(s)`,
+            successCount: e is () ? runtimeIds.length() : 0,
+            failedCount: e is () ? 0 : runtimeIds.length(),
+            details: []
         };
     }
 
     // Mutation to change artifact statistics (enable/disable)
-    isolated remote function updateArtifactStatisticsStatus(graphql:Context context, types:ArtifactStatisticsChangeInput input) returns types:ArtifactStatisticsChangeResponse|error {
+    remote function updateArtifactStatisticsStatus(graphql:Context context, types:ArtifactStatisticsChangeInput input) returns types:ArtifactStatisticsChangeResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
         types:Component? component = check storage:getComponentById(input.componentId);
@@ -2572,37 +2234,25 @@ service /graphql on graphqlListener {
         }
 
         types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = input.componentId);
-
         if !check auth:hasAnyPermission(userContext.userId,
                 [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            log:printWarn("Attempt to change artifact statistics without permission",
-                    userId = userContext.userId, componentId = input.componentId, artifactName = input.artifactName);
             return error("Insufficient permissions to change artifact statistics");
         }
 
         // Validate artifact type - statistics is only supported for specific artifact types
-        string normalizedType = input.artifactType;
-
         string[] supportedTypes = ["proxy-service", "endpoint", "api", "sequence", "inbound-endpoint", "template"];
         boolean isSupported = false;
         foreach string supportedType in supportedTypes {
-            if supportedType == normalizedType {
+            if supportedType == input.artifactType {
                 isSupported = true;
                 break;
             }
         }
         if !isSupported {
-            log:printWarn("Attempt to change statistics for unsupported artifact type",
-                    componentId = input.componentId,
-                    artifactType = input.artifactType,
-                    artifactName = input.artifactName,
-                    supportedTypes = supportedTypes.toString());
             return error(string `Artifact type '${input.artifactType}' does not support statistics. Supported types: ProxyService, Endpoint, RestApi, Sequence, InboundEndpoint, Template`);
         }
 
-        // Get all MI runtimes for this component
         types:Runtime[] runtimes = check storage:getRuntimes((), "MI", (), component.projectId, input.componentId);
-
         if runtimes.length() == 0 {
             log:printWarn("No MI runtimes found for component", componentId = input.componentId);
             return {
@@ -2614,108 +2264,20 @@ service /graphql on graphqlListener {
             };
         }
 
-        log:printInfo("Creating MI control commands for artifact statistics change",
-                componentId = input.componentId,
-                artifactType = normalizedType,
-                artifactName = input.artifactName,
-                statistics = input.statistics,
-                runtimeCount = runtimes.length());
+        string envId = runtimes[0].environment.id;
+        string[] runtimeIds = from types:Runtime r in runtimes select r.runtimeId;
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
 
-        // Determine the action based on statistics
-        types:MIControlAction action = input.statistics == "enable" ? types:ARTIFACT_ENABLE_STATISTICS : types:ARTIFACT_DISABLE_STATISTICS;
-
-        // Update intended state for this artifact in the component
-        string actionStr = action;
-        error? stateResult = storage:upsertMIArtifactIntendedStatistics(
-                input.componentId,
-                input.artifactName,
-                normalizedType,
-                actionStr,
-                userContext.userId
-        );
-
-        if stateResult is error {
-            log:printWarn("Failed to update MI artifact intended statistics",
-                    componentId = input.componentId,
-                    artifactName = input.artifactName,
-                    artifactType = normalizedType,
-                    errorMessage = stateResult.message());
-        } else {
-            log:printInfo("Updated MI artifact intended statistics",
-                    componentId = input.componentId,
-                    artifactName = input.artifactName,
-                    artifactType = normalizedType,
-                    action = actionStr);
-        }
-
-        int successCount = 0;
-        int failedCount = 0;
-        string[] details = [];
-
-        // Insert MI control command for each runtime
-        foreach types:Runtime runtime in runtimes {
-            boolean isRunning = runtime.status == types:RUNNING;
-            string commandStatus = isRunning ? "sent" : "pending";
-
-            error? result = storage:insertMIControlCommand(
-                    runtime.runtimeId,
-                    input.componentId,
-                    input.artifactName,
-                    normalizedType,
-                    action,
-                    commandStatus,
-                    userContext.userId
-            );
-
-            if result is error {
-                failedCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: FAILED - ${result.message()}`;
-                details.push(detail);
-                log:printError("Failed to insert MI control command for runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName,
-                        errorMessage = result.message());
-            } else if isRunning {
-                // Runtime is online, fire the async HTTP request immediately (fire-and-forget)
-                storage:sendMIControlCommandAsync(
-                        runtime.runtimeId,
-                        normalizedType,
-                        input.artifactName,
-                        actionStr
-                );
-
-                successCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: Command sent`;
-                details.push(detail);
-                log:printDebug("MI control command sent for runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName);
-            } else {
-                // Runtime is offline, command queued as pending for delivery on next heartbeat
-                successCount += 1;
-                string detail = string `Runtime ${runtime.runtimeId}: Command queued (runtime offline)`;
-                details.push(detail);
-                log:printDebug("MI control command queued for offline runtime",
-                        runtimeId = runtime.runtimeId,
-                        artifactName = input.artifactName);
-            }
-        }
-
-        types:Status overallStatus = successCount > 0 ? "SUCCESS" : "FAILED";
-        string message = string `Artifact statistics change sent to ${successCount} out of ${runtimes.length()} runtime(s)`;
-
-        log:printInfo("Artifact statistics change commands sent",
-                componentId = input.componentId,
-                artifactName = input.artifactName,
-                successCount = successCount,
-                failedCount = failedCount);
+        check storage:upsertReconcileDesiredState(input.componentId, envId, artifact,
+            {"statistics": input.statistics == "enable" ? "enabled" : "disabled"});
+        error? e = sync:reconcileArtifactAllRuntimes(runtimeIds, input.componentId, envId, artifact, sync:dispatchMI);
 
         return {
-            status: overallStatus,
-            message: message,
-            successCount: successCount,
-            failedCount: failedCount,
-            details: details
+            status: e is () ? types:SUCCESS : types:FAILED,
+            message: string `Artifact statistics change dispatched to ${runtimeIds.length()} runtime(s)`,
+            successCount: e is () ? runtimeIds.length() : 0,
+            failedCount: e is () ? 0 : runtimeIds.length(),
+            details: []
         };
     }
 

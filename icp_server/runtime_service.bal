@@ -15,6 +15,7 @@
 // under the License.
 
 import icp_server.storage as storage;
+import icp_server.sync;
 import icp_server.types as types;
 
 import ballerina/http;
@@ -44,7 +45,7 @@ service /icp on httpListener {
     }
 
     // Process heartbeat from runtime (M2: kid-based JWT validation + lazy binding)
-    isolated resource function post heartbeat(http:Request request, @http:Payload json heartbeatJson)
+    resource function post heartbeat(http:Request request, @http:Payload json heartbeatJson)
             returns types:HeartbeatResponse|http:Unauthorized|http:BadRequest|http:Conflict|error? {
         do {
             types:Heartbeat heartbeat = check heartbeatJson.cloneWithType(types:Heartbeat);
@@ -128,6 +129,22 @@ service /icp on httpListener {
             if keyIdErr is error {
                 log:printError(string `Failed to record keyId=${kid} on runtime=${heartbeat.runtime}`, 'error = keyIdErr);
             }
+
+            // Reconcile desired state against observed state written during heartbeat processing
+            types:ControlCommand[] reconcileCommands = sync:reconcileFromHeartbeat(
+                heartbeat.runtime, heartbeat.component, heartbeat.environment, heartbeat.runtimeType
+            );
+            log:printDebug(string `Reconciled ${reconcileCommands.length()} commands for runtime ${heartbeat.runtime}`);
+            // Merge reconcile commands into the response
+            types:ControlCommand[]? existing = heartbeatResponse.commands;
+            if existing is types:ControlCommand[] {
+                foreach types:ControlCommand cmd in reconcileCommands {
+                    existing.push(cmd);
+                }
+            } else {
+                heartbeatResponse.commands = reconcileCommands;
+            }
+
             log:printInfo(string `Heartbeat processed for runtime=${heartbeat.runtime}, kid=${kid}`);
             return heartbeatResponse;
 
@@ -142,7 +159,7 @@ service /icp on httpListener {
     }
 
     // Process delta heartbeat from runtime (M3: kid-based JWT validation)
-    isolated resource function post deltaHeartbeat(http:Request request, @http:Payload types:DeltaHeartbeat deltaHeartbeat)
+    resource function post deltaHeartbeat(http:Request request, @http:Payload types:DeltaHeartbeat deltaHeartbeat)
             returns types:HeartbeatResponse|http:Unauthorized|http:BadRequest|http:Conflict|error? {
         do {
             string|error jwtToken = extractBearerToken(request);
@@ -191,6 +208,21 @@ service /icp on httpListener {
             }
 
             types:HeartbeatResponse heartbeatResponse = check storage:processDeltaHeartbeat(deltaHeartbeat);
+
+            // If not requesting full heartbeat, reconcile from desired state
+            if !(heartbeatResponse.fullHeartbeatRequired ?: false) {
+                types:ControlCommand[] reconcileCommands = sync:reconcileDelta(deltaHeartbeat.runtime);
+                log:printDebug(string `Delta reconciliation generated ${reconcileCommands.length()} commands for runtime ${deltaHeartbeat.runtime}`);
+                types:ControlCommand[]? existing = heartbeatResponse.commands;
+                if existing is types:ControlCommand[] {
+                    foreach types:ControlCommand cmd in reconcileCommands {
+                        existing.push(cmd);
+                    }
+                } else {
+                    heartbeatResponse.commands = reconcileCommands;
+                }
+            }
+
             log:printInfo(string `Delta heartbeat processed for runtime=${deltaHeartbeat.runtime}, kid=${kid}`);
             return heartbeatResponse;
 
