@@ -8,6 +8,10 @@ type StateRow record {|
     string? state_value;
 |};
 
+type StateKeyRow record {|
+    string state_key;
+|};
+
 type RuntimeIdRow record {|
     string runtime_id;
 |};
@@ -85,6 +89,26 @@ public isolated function readReconcileBackoff(string runtimeId,
     return result;
 }
 
+public isolated function getInProgressFields(string runtimeId, string componentId, string envId,
+        types:ReconcileArtifactKey artifact) returns string[]|error {
+    log:printDebug("getInProgressFields", runtimeId = runtimeId, componentId = componentId,
+        envId = envId, artifactName = artifact.artifactName, artifactType = artifact.artifactType);
+    stream<StateKeyRow, sql:Error?> rows = dbClient->query(`
+        SELECT os.state_key FROM reconcile_observed_state os
+        JOIN reconcile_desired_state ds
+            ON os.component_id = ds.component_id AND os.env_id = ds.env_id
+            AND os.artifact_name = ds.artifact_name AND os.artifact_type = ds.artifact_type
+            AND os.state_key = ds.state_key
+        WHERE os.runtime_id = ${runtimeId}
+            AND os.component_id = ${componentId} AND os.env_id = ${envId}
+            AND os.artifact_name = ${artifact.artifactName} AND os.artifact_type = ${artifact.artifactType}
+            AND os.optimistic = TRUE AND os.state_value = ds.state_value
+    `);
+    string[] result = check from StateKeyRow row in rows select row.state_key;
+    log:printDebug("getInProgressFields done", count = result.length());
+    return result;
+}
+
 // === Upsert ===
 
 public isolated function upsertReconcileDesiredState(string componentId, string envId,
@@ -122,36 +146,36 @@ public isolated function upsertReconcileDesiredState(string componentId, string 
 }
 
 public isolated function upsertReconcileObservedState(string runtimeId, string componentId, string envId,
-        types:ReconcileArtifactKey artifact, map<string> state) returns error? {
+        types:ReconcileArtifactKey artifact, map<string> state, boolean optimistic = false) returns error? {
     foreach [string, string] [stateKey, stateValue] in state.entries() {
         log:printDebug("upsertReconcileObserved", runtimeId = runtimeId,
-            artifactName = artifact.artifactName, stateKey = stateKey, stateValue = stateValue);
+            artifactName = artifact.artifactName, stateKey = stateKey, stateValue = stateValue, optimistic = optimistic);
         if dbType == MSSQL || dbType == H2 {
             _ = check dbClient->execute(`
                 MERGE INTO reconcile_observed_state AS target
-                USING (VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}))
-                    AS source (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value)
+                USING (VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${optimistic}))
+                    AS source (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic)
                 ON (target.runtime_id = source.runtime_id AND target.artifact_name = source.artifact_name
                     AND target.artifact_type = source.artifact_type AND target.state_key = source.state_key)
                 WHEN MATCHED THEN UPDATE SET state_value = source.state_value, component_id = source.component_id,
-                    env_id = source.env_id, updated_at = CURRENT_TIMESTAMP
-                WHEN NOT MATCHED THEN INSERT (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value)
-                    VALUES (source.runtime_id, source.component_id, source.env_id, source.artifact_name, source.artifact_type, source.state_key, source.state_value);
+                    env_id = source.env_id, optimistic = source.optimistic, updated_at = CURRENT_TIMESTAMP
+                WHEN NOT MATCHED THEN INSERT (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic)
+                    VALUES (source.runtime_id, source.component_id, source.env_id, source.artifact_name, source.artifact_type, source.state_key, source.state_value, source.optimistic);
             `);
         } else if dbType == POSTGRESQL {
             _ = check dbClient->execute(`
-                INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value)
-                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue})
+                INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic)
+                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${optimistic})
                 ON CONFLICT (runtime_id, artifact_name, artifact_type, state_key) DO UPDATE SET
                     state_value = EXCLUDED.state_value, component_id = EXCLUDED.component_id,
-                    env_id = EXCLUDED.env_id, updated_at = CURRENT_TIMESTAMP
+                    env_id = EXCLUDED.env_id, optimistic = EXCLUDED.optimistic, updated_at = CURRENT_TIMESTAMP
             `);
         } else {
             _ = check dbClient->execute(`
-                INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value)
-                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue})
+                INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic)
+                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${optimistic})
                 ON DUPLICATE KEY UPDATE state_value = VALUES(state_value), component_id = VALUES(component_id),
-                    env_id = VALUES(env_id), updated_at = CURRENT_TIMESTAMP
+                    env_id = VALUES(env_id), optimistic = VALUES(optimistic), updated_at = CURRENT_TIMESTAMP
             `);
         }
     }
