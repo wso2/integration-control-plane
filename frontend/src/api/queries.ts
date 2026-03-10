@@ -257,28 +257,28 @@ const ARTIFACT_QUERY_MAP: Record<string, { queryName: string; field: string; fie
     queryName: 'restApisByEnvironmentAndComponent',
     field: 'restApisByEnvironmentAndComponent',
     fields: 'name, context, version, state',
-    gqlFields: 'name, context, version, state, tracing, statistics, carbonApp, url, runtimes { runtimeId, status }, resources { path, methods }',
+    gqlFields: 'name, context, version, state, stateInSync, tracing, tracingInSync, statistics, statisticsInSync, carbonApp, url, runtimes { runtimeId, status }, resources { path, methods }',
   },
-  ProxyService: { queryName: 'proxyServicesByEnvironmentAndComponent', field: 'proxyServicesByEnvironmentAndComponent', fields: 'name, state', gqlFields: 'name, state, tracing, statistics, carbonApp, endpoints, runtimes { runtimeId, status }' },
-  Endpoint: { queryName: 'endpointsByEnvironmentAndComponent', field: 'endpointsByEnvironmentAndComponent', fields: 'name, type, state', gqlFields: 'name, type, state, tracing, statistics, attributes { name, value }, runtimes { runtimeId, status }' },
+  ProxyService: { queryName: 'proxyServicesByEnvironmentAndComponent', field: 'proxyServicesByEnvironmentAndComponent', fields: 'name, state', gqlFields: 'name, state, stateInSync, tracing, tracingInSync, statistics, statisticsInSync, carbonApp, endpoints, runtimes { runtimeId, status }' },
+  Endpoint: { queryName: 'endpointsByEnvironmentAndComponent', field: 'endpointsByEnvironmentAndComponent', fields: 'name, type, state', gqlFields: 'name, type, state, stateInSync, tracing, tracingInSync, statistics, statisticsInSync, attributes { name, value }, runtimes { runtimeId, status }' },
   InboundEndpoint: {
     queryName: 'inboundEndpointsByEnvironmentAndComponent',
     field: 'inboundEndpointsByEnvironmentAndComponent',
     fields: 'name, protocol',
-    gqlFields: 'name, protocol, sequence, onError, state, tracing, statistics, carbonApp, runtimes { runtimeId, status }',
+    gqlFields: 'name, protocol, sequence, onError, state, stateInSync, tracing, tracingInSync, statistics, carbonApp, runtimes { runtimeId, status }',
   },
-  Sequence: { queryName: 'sequencesByEnvironmentAndComponent', field: 'sequencesByEnvironmentAndComponent', fields: 'name, type, container, state', gqlFields: 'name, type, container, state, tracing, statistics, runtimes { runtimeId, status }' },
-  Task: { queryName: 'tasksByEnvironmentAndComponent', field: 'tasksByEnvironmentAndComponent', fields: 'name, group, state', gqlFields: 'name, class, group, state, carbonApp, runtimes { runtimeId, status }' },
-  LocalEntry: { queryName: 'localEntriesByEnvironmentAndComponent', field: 'localEntriesByEnvironmentAndComponent', fields: 'name, type', gqlFields: 'name, type, value, state, runtimes { runtimeId, status }' },
+  Sequence: { queryName: 'sequencesByEnvironmentAndComponent', field: 'sequencesByEnvironmentAndComponent', fields: 'name, type, container, state', gqlFields: 'name, type, container, state, stateInSync, tracing, tracingInSync, statistics, statisticsInSync, runtimes { runtimeId, status }' },
+  Task: { queryName: 'tasksByEnvironmentAndComponent', field: 'tasksByEnvironmentAndComponent', fields: 'name, group, state', gqlFields: 'name, class, group, state, stateInSync, carbonApp, runtimes { runtimeId, status }' },
+  LocalEntry: { queryName: 'localEntriesByEnvironmentAndComponent', field: 'localEntriesByEnvironmentAndComponent', fields: 'name, type', gqlFields: 'name, type, value, state, stateInSync, runtimes { runtimeId, status }' },
   CarbonApp: { queryName: 'carbonAppsByEnvironmentAndComponent', field: 'carbonAppsByEnvironmentAndComponent', fields: 'name, version', gqlFields: 'name, version, state, artifacts { name, type }, runtimes { runtimeId, status }' },
-  Connector: { queryName: 'connectorsByEnvironmentAndComponent', field: 'connectorsByEnvironmentAndComponent', fields: 'name, package, state', gqlFields: 'name, package, version, state, runtimes { runtimeId, status }' },
+  Connector: { queryName: 'connectorsByEnvironmentAndComponent', field: 'connectorsByEnvironmentAndComponent', fields: 'name, package, state', gqlFields: 'name, package, version, state, stateInSync, runtimes { runtimeId, status }' },
   RegistryResource: { queryName: 'registryResourcesByEnvironmentAndComponent', field: 'registryResourcesByEnvironmentAndComponent', fields: 'name, type', gqlFields: 'name, type, runtimes { runtimeId, status }' },
-  Listener: { queryName: 'listenersByEnvironmentAndComponent', field: 'listenersByEnvironmentAndComponent', fields: 'name, package, protocol, host, port, state', gqlFields: 'name, package, protocol, host, port, state, runtimes { runtimeId, status }' },
+  Listener: { queryName: 'listenersByEnvironmentAndComponent', field: 'listenersByEnvironmentAndComponent', fields: 'name, package, protocol, host, port, state', gqlFields: 'name, package, protocol, host, port, state, stateInSync, runtimes { runtimeId, status }' },
   Service: {
     queryName: 'servicesByEnvironmentAndComponent',
     field: 'servicesByEnvironmentAndComponent',
     fields: 'name, package, basePath, type',
-    gqlFields: 'name, package, basePath, type, runtimes { runtimeId, status }, resources { path, method, url, methods }',
+    gqlFields: 'name, package, basePath, type, state, stateInSync, runtimes { runtimeId, status }, resources { path, method, url, methods }',
   },
   Automation: {
     queryName: 'automationsByEnvironmentAndComponent',
@@ -290,13 +290,13 @@ const ARTIFACT_QUERY_MAP: Record<string, { queryName: string; field: string; fie
     queryName: 'messageStoresByEnvironmentAndComponent',
     field: 'messageStoresByEnvironmentAndComponent',
     fields: 'name, type, size',
-    gqlFields: 'name, type, size, carbonApp, runtimes { runtimeId, status }',
+    gqlFields: 'name, type, size, state, stateInSync, carbonApp, runtimes { runtimeId, status }',
   },
   MessageProcessor: {
     queryName: 'messageProcessorsByEnvironmentAndComponent',
     field: 'messageProcessorsByEnvironmentAndComponent',
     fields: 'name, type, state',
-    gqlFields: 'name, type, state, tracing, carbonApp, runtimes { runtimeId, status }',
+    gqlFields: 'name, type, state, stateInSync, tracing, carbonApp, runtimes { runtimeId, status }',
   },
   Template: {
     queryName: 'templatesByEnvironmentAndComponent',
@@ -308,7 +308,7 @@ const ARTIFACT_QUERY_MAP: Record<string, { queryName: string; field: string; fie
     queryName: 'dataServicesByEnvironmentAndComponent',
     field: 'dataServicesByEnvironmentAndComponent',
     fields: 'name, state',
-    gqlFields: 'name, description, state, carbonApp, runtimes { runtimeId, status }',
+    gqlFields: 'name, description, state, stateInSync, carbonApp, runtimes { runtimeId, status }',
   },
   DataSource: {
     queryName: 'dataSourcesByEnvironmentAndComponent',
@@ -317,6 +317,8 @@ const ARTIFACT_QUERY_MAP: Record<string, { queryName: string; field: string; fie
     gqlFields: 'name, type, driver, url, username, state, runtimes { runtimeId, status }',
   },
 };
+
+const IN_SYNC_KEYS = ['stateInSync', 'tracingInSync', 'statisticsInSync'] as const;
 
 export function useArtifacts(artifactType: string, envId: string, componentId: string, options?: { enabled?: boolean }) {
   const mapping = ARTIFACT_QUERY_MAP[artifactType];
@@ -331,6 +333,14 @@ export function useArtifacts(artifactType: string, envId: string, componentId: s
       return data[mapping.field] ?? [];
     },
     enabled: !!artifactType && !!envId && !!componentId && !!mapping && (options?.enabled ?? true),
+    refetchInterval: (query) => {
+      const artifacts = query.state.data;
+      if (!artifacts) return false;
+      const syncing = artifacts.some((a) =>
+        IN_SYNC_KEYS.some((k) => a[k] === false),
+      );
+      return syncing ? 1000 : false;
+    },
   });
 }
 

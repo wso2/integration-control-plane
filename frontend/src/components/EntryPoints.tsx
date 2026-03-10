@@ -30,13 +30,11 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
-  FormControlLabel,
   IconButton,
   InputAdornment,
   Snackbar,
   Alert,
   Stack,
-  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -52,6 +50,7 @@ import { ArtifactTypeSelector } from './ArtifactDetail';
 import Authorized from './Authorized';
 import { Permissions } from '../constants/permissions';
 import { ENTRY_POINT_CONFIG, ENTRY_POINT_DETAIL_TABS, type SelectedArtifact, type TabProps } from './artifact-config';
+import SyncSwitch from './SyncSwitch';
 
 function EntryPointDetail({ selected, onOpenDrawerTab }: { selected: SelectedArtifact; onOpenDrawerTab: (tab: string) => void }) {
   const [tracingEnabled, setTracingEnabled] = useState(false);
@@ -268,39 +267,24 @@ function EntryPointDetail({ selected, onOpenDrawerTab }: { selected: SelectedArt
           {carbonApp && <Chip label={`C-App: ${carbonApp}`} size="small" variant="outlined" sx={{ bgcolor: '#e8eaf6', color: '#3949ab', fontSize: 11 }} />}
           {carbonApp && <Divider orientation="vertical" flexItem />}
           {showStatusToggle && (
-            <FormControlLabel
-              control={<Switch name="status" size="small" checked={statusEnabled} onChange={(e) => handleToggleStatus(e.target.checked)} disabled={updateArtifactStatus.isPending} />}
-              label="Status"
-              labelPlacement="start"
-              sx={{ m: 0, gap: 1 }}
-            />
+            <SyncSwitch name="status" label="Status" checked={statusEnabled} inSync={artifact.stateInSync as boolean | null} onChange={handleToggleStatus} disabled={updateArtifactStatus.isPending} />
           )}
           {showStatusToggle && showTracingToggle && <Divider orientation="vertical" flexItem />}
           {showTracingToggle && (
-            <FormControlLabel control={<Switch size="small" checked={tracingEnabled} onChange={(e) => handleToggleTracing(e.target.checked)} disabled={updateTracingStatus.isPending} />} label="Tracing" labelPlacement="start" sx={{ m: 0, gap: 1 }} />
+            <SyncSwitch label="Tracing" checked={tracingEnabled} inSync={artifact.tracingInSync as boolean | null} onChange={handleToggleTracing} disabled={updateTracingStatus.isPending} />
           )}
           {showTracingToggle && showStatisticsToggle && <Divider orientation="vertical" flexItem />}
           {showStatisticsToggle && (
-            <FormControlLabel
-              control={<Switch size="small" checked={statisticsEnabled} onChange={(e) => handleToggleStatistics(e.target.checked)} disabled={updateStatisticsStatus.isPending} />}
-              label="Statistics"
-              labelPlacement="start"
-              sx={{ m: 0, gap: 1 }}
-            />
+            <SyncSwitch label="Statistics" checked={statisticsEnabled} inSync={artifact.statisticsInSync as boolean | null} onChange={handleToggleStatistics} disabled={updateStatisticsStatus.isPending} />
           )}
           {(showTracingToggle || showStatisticsToggle) && showListenerToggle && <Divider orientation="vertical" flexItem />}
           {showListenerToggle && (
-            <FormControlLabel control={<Switch size="small" checked={listenerEnabled} onChange={(e) => handleToggleListener(e.target.checked)} disabled={updateListenerState.isPending} />} label="State" labelPlacement="start" sx={{ m: 0, gap: 1 }} />
+            <SyncSwitch label="State" checked={listenerEnabled} inSync={artifact.stateInSync as boolean | null} onChange={handleToggleListener} disabled={updateListenerState.isPending} />
           )}
           {showTaskToggle && (
             <>
               {hasPrecedingControls && <Divider orientation="vertical" flexItem />}
-              <FormControlLabel
-                control={<Switch size="small" checked={statusEnabled} onChange={(e) => handleToggleStatus(e.target.checked)} disabled={updateArtifactStatus.isPending || !hasRuntimes} />}
-                label="Status"
-                labelPlacement="start"
-                sx={{ m: 0, gap: 1 }}
-              />
+              <SyncSwitch label="Status" checked={statusEnabled} inSync={artifact.stateInSync as boolean | null} onChange={handleToggleStatus} disabled={updateArtifactStatus.isPending || !hasRuntimes} />
             </>
           )}
           {showTaskTrigger && (

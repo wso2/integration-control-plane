@@ -265,6 +265,11 @@ public type ReconcileBackoffRecord record {|
     int has_error;
     int next_attempt;
 |};
+
+public type ArtifactStateField record {|
+    string value;
+    boolean inSync;
+|};
 // === Configuration ===
 
 public type IcpServer record {|
@@ -568,11 +573,12 @@ public type Service record {
     @sql:Column {
         name: "service_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     @sql:Column {
         name: "service_type"
     }
-    string 'type = ""; // "API", "ProxyService", "DataService", "InboundEndpoint", "ScheduledTask"
+    string 'type = "";
     Resource[] resources;
     Listener[] listeners;
     string[] runtimeIds?;
@@ -621,7 +627,8 @@ public type Listener record {
     @sql:Column {
         name: "state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     string[] runtimeIds?;
     ArtifactRuntimeInfo[]? runtimes?;
 };
@@ -660,14 +667,17 @@ public type RestApi record {
     @sql:Column {
         name: "api_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
-    string tracing = "disabled"; // "enabled", "disabled"
-    string statistics = "disabled"; // "enabled", "disabled"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
+    string tracing = "disabled";
+    boolean? tracingInSync = ();
+    string statistics = "disabled";
+    boolean? statisticsInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
     string carbonApp?;
-    ApiResource[] resources = []; // API resources (path + methods)
+    ApiResource[] resources = [];
     string[] runtimeIds?;
     ArtifactRuntimeInfo[]? runtimes?;
 };
@@ -689,9 +699,12 @@ public type ProxyService record {
     @sql:Column {
         name: "proxy_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
-    string tracing = "disabled"; // "enabled", "disabled"
-    string statistics = "disabled"; // "enabled", "disabled"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
+    string tracing = "disabled";
+    boolean? tracingInSync = ();
+    string statistics = "disabled";
+    boolean? statisticsInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -710,9 +723,12 @@ public type Endpoint record {
     @sql:Column {
         name: "endpoint_state"
     }
-    ArtifactState state; // "enabled", "disabled"
-    string tracing = "disabled"; // "enabled", "disabled"
-    string statistics = "disabled"; // "enabled", "disabled"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
+    string tracing = "disabled";
+    boolean? tracingInSync = ();
+    string statistics = "disabled";
+    boolean? statisticsInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -752,8 +768,10 @@ public type InboundEndpoint record {
     @sql:Column {
         name: "inbound_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
-    string tracing = "disabled"; // "enabled", "disabled"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
+    string tracing = "disabled";
+    boolean? tracingInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -772,9 +790,12 @@ public type Sequence record {
     @sql:Column {
         name: "sequence_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
-    string tracing = "disabled"; // "enabled", "disabled"
-    string statistics = "disabled"; // "enabled", "disabled"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
+    string tracing = "disabled";
+    boolean? tracingInSync = ();
+    string statistics = "disabled";
+    boolean? statisticsInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -793,7 +814,8 @@ public type Task record {
     @sql:Column {
         name: "task_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -831,7 +853,8 @@ public type MessageStore record {
     @sql:Column {
         name: "store_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -850,7 +873,8 @@ public type MessageProcessor record {
     @sql:Column {
         name: "processor_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -869,7 +893,8 @@ public type LocalEntry record {
     @sql:Column {
         name: "entry_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -888,7 +913,8 @@ public type DataService record {
     @sql:Column {
         name: "dataservice_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     @sql:Column {
         name: "carbon_app"
     }
@@ -947,7 +973,8 @@ public type Connector record {
     @sql:Column {
         name: "connector_state"
     }
-    ArtifactState state = "enabled"; // "ENABLED", "DISABLED"
+    ArtifactState state = "enabled";
+    boolean? stateInSync = ();
     string[] runtimeIds?;
     ArtifactRuntimeInfo[]? runtimes?;
 };

@@ -8,10 +8,6 @@ type StateRow record {|
     string? state_value;
 |};
 
-type StateKeyRow record {|
-    string state_key;
-|};
-
 type RuntimeIdRow record {|
     string runtime_id;
 |};
@@ -89,23 +85,94 @@ public isolated function readReconcileBackoff(string runtimeId,
     return result;
 }
 
-public isolated function getInProgressFields(string runtimeId, string componentId, string envId,
-        types:ReconcileArtifactKey artifact) returns string[]|error {
-    log:printDebug("getInProgressFields", runtimeId = runtimeId, componentId = componentId,
-        envId = envId, artifactName = artifact.artifactName, artifactType = artifact.artifactType);
-    stream<StateKeyRow, sql:Error?> rows = dbClient->query(`
-        SELECT os.state_key FROM reconcile_observed_state os
-        JOIN reconcile_desired_state ds
-            ON os.component_id = ds.component_id AND os.env_id = ds.env_id
-            AND os.artifact_name = ds.artifact_name AND os.artifact_type = ds.artifact_type
-            AND os.state_key = ds.state_key
-        WHERE os.runtime_id = ${runtimeId}
-            AND os.component_id = ${componentId} AND os.env_id = ${envId}
-            AND os.artifact_name = ${artifact.artifactName} AND os.artifact_type = ${artifact.artifactType}
-            AND os.optimistic = TRUE AND os.state_value = ds.state_value
+// === Query ===
+
+type ObservedStateRow record {|
+    string artifact_name;
+    string artifact_type;
+    string state_key;
+    string? state_value;
+    boolean optimistic;
+|};
+
+// Returns reconcile-derived state for all artifacts in a component+environment.
+// Keyed by "artifactName|artifactType" -> stateKey -> {value, inSync}.
+public isolated function queryArtifactState(string componentId, string envId)
+        returns map<map<types:ArtifactStateField>>|error {
+    log:printDebug("queryArtifactState", componentId = componentId, envId = envId);
+
+    // 1. Read observed state (only RUNNING runtimes)
+    stream<ObservedStateRow, sql:Error?> obsRows = dbClient->query(`
+        SELECT os.artifact_name, os.artifact_type, os.state_key, os.state_value, os.optimistic
+        FROM reconcile_observed_state os
+        JOIN runtimes r ON r.runtime_id = os.runtime_id AND r.status = 'RUNNING'
+        WHERE os.component_id = ${componentId} AND os.env_id = ${envId}
     `);
-    string[] result = check from StateKeyRow row in rows select row.state_key;
-    log:printDebug("getInProgressFields done", count = result.length());
+
+    // Group: (artifactKey, stateKey) -> list of {value, optimistic}
+    map<map<[string, boolean][]>> groups = {};
+    check from ObservedStateRow row in obsRows
+        do {
+            string artKey = string `${row.artifact_name}|${row.artifact_type}`;
+            string val = row.state_value ?: "";
+            if !groups.hasKey(artKey) {
+                groups[artKey] = {};
+            }
+            map<[string, boolean][]> keyMap = <map<[string, boolean][]>>groups[artKey];
+            if !keyMap.hasKey(row.state_key) {
+                keyMap[row.state_key] = [];
+            }
+            [string, boolean][] entries = <[string, boolean][]>keyMap[row.state_key];
+            entries.push([val, row.optimistic]);
+        };
+
+    // 2. Read desired state for same scope
+    stream<record {|string artifact_name; string artifact_type; string state_key; string? state_value;|}, sql:Error?> desRows = dbClient->query(`
+        SELECT artifact_name, artifact_type, state_key, state_value
+        FROM reconcile_desired_state
+        WHERE component_id = ${componentId} AND env_id = ${envId}
+    `);
+    map<map<string>> desired = {};
+    check from var row in desRows
+        do {
+            string artKey = string `${row.artifact_name}|${row.artifact_type}`;
+            if !desired.hasKey(artKey) {
+                desired[artKey] = {};
+            }
+            map<string> m = <map<string>>desired[artKey];
+            m[row.state_key] = row.state_value ?: "";
+        };
+
+    // 3. Compute {value, inSync} per field
+    map<map<types:ArtifactStateField>> result = {};
+    foreach var [artKey, keyMap] in groups.entries() {
+        map<types:ArtifactStateField> fields = {};
+        foreach var [stateKey, entries] in keyMap.entries() {
+            string[] values = from var [v, _] in entries select v;
+            string[] sorted = values.sort();
+            string median = sorted[sorted.length() / 2];
+            boolean allAgree = sorted[0] == sorted[sorted.length() - 1];
+            boolean allConfirmed = (from var [_, opt] in entries where opt select opt).length() == 0;
+
+            // Determine inSync
+            map<string>? desiredForArt = desired[artKey];
+            string? desiredVal = desiredForArt is map<string> ? desiredForArt[stateKey] : ();
+            boolean inSync;
+            if desiredVal is string {
+                inSync = allAgree && allConfirmed && median == desiredVal;
+            } else {
+                inSync = allAgree;
+            }
+
+            fields[stateKey] = {value: median, inSync};
+            log:printDebug("queryArtifactState field", artKey = artKey, stateKey = stateKey,
+                value = median, inSync = inSync, runtimeCount = entries.length(),
+                allAgree = allAgree, allConfirmed = allConfirmed);
+        }
+        result[artKey] = fields;
+    }
+
+    log:printDebug("queryArtifactState done", artifactCount = result.length());
     return result;
 }
 
