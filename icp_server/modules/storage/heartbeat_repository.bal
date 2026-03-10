@@ -448,6 +448,12 @@ isolated function writeObservedStateMI(string runtimeId, string componentId, str
         check upsertReconcileObservedState(runtimeId, componentId, envId,
             {artifactName: conn.name, artifactType: "connector"}, state);
     }
+    // Message stores
+    foreach types:MessageStore store in <types:MessageStore[]>artifacts.messageStores {
+        map<string> state = {"status": store.state};
+        check upsertReconcileObservedState(runtimeId, componentId, envId,
+            {artifactName: store.name, artifactType: "message-store"}, state);
+    }
 }
 
 // Write observed state for BI artifacts from heartbeat.

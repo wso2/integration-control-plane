@@ -34,9 +34,7 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
-  FormControlLabel,
   Stack,
-  Switch,
   Tab,
   TablePagination,
   Tabs,
@@ -48,6 +46,7 @@ import { useArtifactTypes, useArtifacts, ARTIFACT_QUERY_MAP, type GqlArtifact } 
 import { useUpdateArtifactStatus, useUpdateListenerState } from '../api/mutations';
 import { useUpdateArtifactTracingStatus, useUpdateArtifactStatisticsStatus } from '../api/artifactToggleMutations';
 import SearchField from './SearchField';
+import SyncSwitch from './SyncSwitch';
 import {
   ArtifactSource,
   ArtifactApiDefinition,
@@ -263,54 +262,17 @@ function SelectedTypeArtifacts({ artifacts, artifactType, envId, componentId, qu
                   )}
                   {supportsToggle && (
                     <Grid size={{ xs: toggleColumnSize }}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            name="status"
-                            size="small"
-                            checked={enabled}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleToggle(a, enabled);
-                            }}
-                          />
-                        }
-                        label={
-                          <Typography variant="caption" color="text.secondary">
-                            Status
-                          </Typography>
-                        }
-                        labelPlacement="top"
-                        sx={{ m: 0, alignItems: 'flex-start' }}
-                      />
+                      <SyncSwitch name="status" label="Status" checked={enabled} inSync={a.stateInSync as boolean | null} labelPlacement="top" sx={{ alignItems: 'flex-start' }} onClick={(e) => { e.stopPropagation(); handleToggle(a, enabled); }} />
                     </Grid>
                   )}
                   {showStatistics && (
                     <Grid size={{ xs: toggleColumnSize }}>
-                      <FormControlLabel
-                        control={<Switch name="statistics" size="small" checked={statisticsEnabled} onClick={(e) => handleStatisticsToggle(a, statisticsEnabled, e)} />}
-                        label={
-                          <Typography variant="caption" color="text.secondary">
-                            Statistics
-                          </Typography>
-                        }
-                        labelPlacement="top"
-                        sx={{ m: 0, alignItems: 'flex-start' }}
-                      />
+                      <SyncSwitch name="statistics" label="Statistics" checked={statisticsEnabled} inSync={a.statisticsInSync as boolean | null} labelPlacement="top" sx={{ alignItems: 'flex-start' }} onClick={(e) => handleStatisticsToggle(a, statisticsEnabled, e)} />
                     </Grid>
                   )}
                   {showTracing && (
                     <Grid size={{ xs: toggleColumnSize }}>
-                      <FormControlLabel
-                        control={<Switch name="tracing" size="small" checked={tracingEnabled} onClick={(e) => handleTracingToggle(a, tracingEnabled, e)} />}
-                        label={
-                          <Typography variant="caption" color="text.secondary">
-                            Tracing
-                          </Typography>
-                        }
-                        labelPlacement="top"
-                        sx={{ m: 0, alignItems: 'flex-start' }}
-                      />
+                      <SyncSwitch name="tracing" label="Tracing" checked={tracingEnabled} inSync={a.tracingInSync as boolean | null} labelPlacement="top" sx={{ alignItems: 'flex-start' }} onClick={(e) => handleTracingToggle(a, tracingEnabled, e)} />
                     </Grid>
                   )}
                 </Grid>
