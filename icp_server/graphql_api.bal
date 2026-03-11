@@ -64,6 +64,37 @@ isolated function stateOf(map<map<types:ArtifactStateField>> sm, string name, st
     return fields is map<types:ArtifactStateField> ? fields[key] : ();
 }
 
+// Group runtimes by environment, upsert desired state per env, and reconcile.
+// Returns [successCount, failedCount] across all envs.
+function reconcilePerEnv(types:Runtime[] runtimes, string componentId,
+        types:ReconcileArtifactKey artifact, map<json> desiredProps,
+        types:DispatchFn dispatchFn) returns [int, int]|error {
+    map<string[]> envRuntimes = {};
+    foreach types:Runtime r in runtimes {
+        string envId = r.environment.id;
+        if envRuntimes.hasKey(envId) {
+            envRuntimes.get(envId).push(r.runtimeId);
+        } else {
+            envRuntimes[envId] = [r.runtimeId];
+        }
+    }
+
+    int successCount = 0;
+    int failedCount = 0;
+    foreach [string, string[]] [envId, runtimeIds] in envRuntimes.entries() {
+        log:printDebug("reconcilePerEnv upsert", componentId = componentId, envId = envId,
+            runtimeCount = runtimeIds.length());
+        check storage:upsertReconcileDesiredState(componentId, envId, artifact, desiredProps);
+        error? e = sync:reconcileArtifactAllRuntimes(runtimeIds, componentId, envId, artifact, dispatchFn);
+        if e is error {
+            failedCount += runtimeIds.length();
+        } else {
+            successCount += runtimeIds.length();
+        }
+    }
+    return [successCount, failedCount];
+}
+
 isolated function contextInit(http:RequestContext reqCtx, http:Request request) returns graphql:Context {
     string|error authorization = request.getHeader("Authorization");
     graphql:Context context = new;
@@ -925,8 +956,8 @@ service /graphql on graphqlListener {
             return error("Listener name cannot be empty");
         }
 
-        // Validate permissions and write desired state per component
-        map<boolean> processedComponents = {};
+        // Validate permissions and write desired state per (component, env)
+        map<boolean> processed = {};
         foreach string runtimeId in input.runtimeIds {
             types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
             if runtime is () {
@@ -940,10 +971,12 @@ service /graphql on graphqlListener {
             }
 
             string componentId = runtime.component.id;
-            if !processedComponents.hasKey(componentId) {
-                processedComponents[componentId] = true;
-                string envId = runtime.environment.id;
+            string envId = runtime.environment.id;
+            string key = componentId + ":" + envId;
+            if !processed.hasKey(key) {
+                processed[key] = true;
                 types:ReconcileArtifactKey artifact = {artifactName: input.listenerName, artifactType: "listener"};
+                log:printDebug("upsertReconcileDesiredState for listener", componentId = componentId, envId = envId);
                 check storage:upsertReconcileDesiredState(componentId, envId, artifact,
                     {"status": input.action == types:START ? "enabled" : "disabled"});
             }
@@ -972,7 +1005,7 @@ service /graphql on graphqlListener {
         }
 
         string logLevelStr = input.logLevel.toString();
-        map<boolean> processedComponents = {};
+        map<boolean> processed = {};
 
         foreach string runtimeId in input.runtimeIds {
             types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
@@ -987,10 +1020,12 @@ service /graphql on graphqlListener {
             }
 
             string componentId = runtime.component.id;
-            if !processedComponents.hasKey(componentId) {
-                processedComponents[componentId] = true;
-                string envId = runtime.environment.id;
+            string envId = runtime.environment.id;
+            string key = componentId + ":" + envId;
+            if !processed.hasKey(key) {
+                processed[key] = true;
                 types:ReconcileArtifactKey artifact = {artifactName: input.componentName, artifactType: "log-level"};
+                log:printDebug("upsertReconcileDesiredState for log-level", componentId = componentId, envId = envId);
                 check storage:upsertReconcileDesiredState(componentId, envId, artifact,
                     {"logLevel": logLevelStr});
             }
@@ -1560,20 +1595,15 @@ service /graphql on graphqlListener {
             return {status: "failed", message: "No MI runtimes found for this component", successCount: 0, failedCount: 0, details: []};
         }
 
-        string envId = runtimes[0].environment.id;
-        string[] runtimeIds = from types:Runtime r in runtimes select r.runtimeId;
         types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        map<json> desiredProps = {"status": input.status == "active" ? "enabled" : "disabled"};
+        [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
-        check storage:upsertReconcileDesiredState(input.componentId, envId, artifact,
-            {"status": input.status == "active" ? "enabled" : "disabled"});
-        error? e = sync:reconcileArtifactAllRuntimes(runtimeIds, input.componentId, envId, artifact, sync:dispatchMI);
-
-        string overallStatus = e is () ? "success" : "failed";
         return {
-            status: overallStatus,
-            message: string `Artifact status change dispatched to ${runtimeIds.length()} runtime(s)`,
-            successCount: e is () ? runtimeIds.length() : 0,
-            failedCount: e is () ? 0 : runtimeIds.length(),
+            status: counts[1] == 0 ? "success" : "failed",
+            message: string `Artifact status change dispatched to ${counts[0] + counts[1]} runtime(s)`,
+            successCount: counts[0],
+            failedCount: counts[1],
             details: []
         };
     }
@@ -1598,20 +1628,15 @@ service /graphql on graphqlListener {
             return {status: "failed", message: "No MI runtimes found for this component", successCount: 0, failedCount: 0, details: []};
         }
 
-        string envId = runtimes[0].environment.id;
-        string[] runtimeIds = from types:Runtime r in runtimes select r.runtimeId;
         types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        map<json> desiredProps = {"tracing": input.trace == "enable" ? "enabled" : "disabled"};
+        [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
-        check storage:upsertReconcileDesiredState(input.componentId, envId, artifact,
-            {"tracing": input.trace == "enable" ? "enabled" : "disabled"});
-        error? e = sync:reconcileArtifactAllRuntimes(runtimeIds, input.componentId, envId, artifact, sync:dispatchMI);
-
-        string overallStatus = e is () ? "success" : "failed";
         return {
-            status: overallStatus,
-            message: string `Artifact tracing change dispatched to ${runtimeIds.length()} runtime(s)`,
-            successCount: e is () ? runtimeIds.length() : 0,
-            failedCount: e is () ? 0 : runtimeIds.length(),
+            status: counts[1] == 0 ? "success" : "failed",
+            message: string `Artifact tracing change dispatched to ${counts[0] + counts[1]} runtime(s)`,
+            successCount: counts[0],
+            failedCount: counts[1],
             details: []
         };
     }
@@ -1631,15 +1656,8 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to change artifact statistics");
         }
 
-        // Validate artifact type - statistics is only supported for specific artifact types
         string[] supportedTypes = ["proxy-service", "endpoint", "api", "sequence", "inbound-endpoint", "template"];
-        boolean isSupported = false;
-        foreach string supportedType in supportedTypes {
-            if supportedType == input.artifactType {
-                isSupported = true;
-                break;
-            }
-        }
+        boolean isSupported = supportedTypes.indexOf(input.artifactType) != ();
         if !isSupported {
             return error(string `Artifact type '${input.artifactType}' does not support statistics. Supported types: ProxyService, Endpoint, RestApi, Sequence, InboundEndpoint, Template`);
         }
@@ -1649,20 +1667,15 @@ service /graphql on graphqlListener {
             return {status: "failed", message: "No MI runtimes found for this component", successCount: 0, failedCount: 0, details: []};
         }
 
-        string envId = runtimes[0].environment.id;
-        string[] runtimeIds = from types:Runtime r in runtimes select r.runtimeId;
         types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        map<json> desiredProps = {"statistics": input.statistics == "enable" ? "enabled" : "disabled"};
+        [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
-        check storage:upsertReconcileDesiredState(input.componentId, envId, artifact,
-            {"statistics": input.statistics == "enable" ? "enabled" : "disabled"});
-        error? e = sync:reconcileArtifactAllRuntimes(runtimeIds, input.componentId, envId, artifact, sync:dispatchMI);
-
-        string overallStatus = e is () ? "success" : "failed";
         return {
-            status: overallStatus,
-            message: string `Artifact statistics change dispatched to ${runtimeIds.length()} runtime(s)`,
-            successCount: e is () ? runtimeIds.length() : 0,
-            failedCount: e is () ? 0 : runtimeIds.length(),
+            status: counts[1] == 0 ? "success" : "failed",
+            message: string `Artifact statistics change dispatched to ${counts[0] + counts[1]} runtime(s)`,
+            successCount: counts[0],
+            failedCount: counts[1],
             details: []
         };
     }
