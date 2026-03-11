@@ -384,101 +384,70 @@ isolated function validateResourcesConsistency(types:Resource[] referenceResourc
     return ();
 }
 
-// Write observed state for MI artifacts from heartbeat.
 isolated function writeObservedStateMI(string runtimeId, string componentId, string envId,
         types:Artifacts artifacts) returns error? {
     log:printDebug(string `Writing MI observed state for runtime ${runtimeId}, component ${componentId}, environment ${envId}`);
-    // APIs
+    [types:ReconcileArtifactKey, map<string>][] entries = [];
     foreach types:RestApi api in <types:RestApi[]>artifacts.apis {
-        map<string> state = {"status": api.state, "tracing": api.tracing, "statistics": api.statistics};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: api.name, artifactType: "api"}, state);
+        entries.push([{artifactName: api.name, artifactType: "api"},
+            {"status": api.state, "tracing": api.tracing, "statistics": api.statistics}]);
     }
-    // Proxy services
     foreach types:ProxyService proxy in <types:ProxyService[]>artifacts.proxyServices {
-        map<string> state = {"status": proxy.state, "tracing": proxy.tracing, "statistics": proxy.statistics};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: proxy.name, artifactType: "proxy-service"}, state);
+        entries.push([{artifactName: proxy.name, artifactType: "proxy-service"},
+            {"status": proxy.state, "tracing": proxy.tracing, "statistics": proxy.statistics}]);
     }
-    // Endpoints
     foreach types:Endpoint ep in <types:Endpoint[]>artifacts.endpoints {
-        map<string> state = {"status": ep.state, "tracing": ep.tracing, "statistics": ep.statistics};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: ep.name, artifactType: "endpoint"}, state);
+        entries.push([{artifactName: ep.name, artifactType: "endpoint"},
+            {"status": ep.state, "tracing": ep.tracing, "statistics": ep.statistics}]);
     }
-    // Inbound endpoints
     foreach types:InboundEndpoint ie in <types:InboundEndpoint[]>artifacts.inboundEndpoints {
-        map<string> state = {"status": ie.state, "tracing": ie.tracing};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: ie.name, artifactType: "inbound-endpoint"}, state);
+        entries.push([{artifactName: ie.name, artifactType: "inbound-endpoint"},
+            {"status": ie.state, "tracing": ie.tracing}]);
     }
-    // Sequences
     foreach types:Sequence seq in <types:Sequence[]>artifacts.sequences {
-        map<string> state = {"status": seq.state, "tracing": seq.tracing, "statistics": seq.statistics};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: seq.name, artifactType: "sequence"}, state);
+        entries.push([{artifactName: seq.name, artifactType: "sequence"},
+            {"status": seq.state, "tracing": seq.tracing, "statistics": seq.statistics}]);
     }
-    // Tasks
     foreach types:Task task in <types:Task[]>artifacts.tasks {
-        map<string> state = {"status": task.state};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: task.name, artifactType: "task"}, state);
+        entries.push([{artifactName: task.name, artifactType: "task"}, {"status": task.state}]);
     }
-    // Message processors
     foreach types:MessageProcessor mp in <types:MessageProcessor[]>artifacts.messageProcessors {
-        map<string> state = {"status": mp.state};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: mp.name, artifactType: "message-processor"}, state);
+        entries.push([{artifactName: mp.name, artifactType: "message-processor"}, {"status": mp.state}]);
     }
-    // Local entries
     foreach types:LocalEntry le in <types:LocalEntry[]>artifacts.localEntries {
-        map<string> state = {"status": le.state};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: le.name, artifactType: "local-entry"}, state);
+        entries.push([{artifactName: le.name, artifactType: "local-entry"}, {"status": le.state}]);
     }
-    // Data services
     foreach types:DataService ds in <types:DataService[]>artifacts.dataServices {
-        map<string> state = {"status": ds.state};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: ds.name, artifactType: "data-service"}, state);
+        entries.push([{artifactName: ds.name, artifactType: "data-service"}, {"status": ds.state}]);
     }
-    // Connectors
     foreach types:Connector conn in <types:Connector[]>artifacts.connectors {
-        map<string> state = {"status": conn.state};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: conn.name, artifactType: "connector"}, state);
+        entries.push([{artifactName: conn.name, artifactType: "connector"}, {"status": conn.state}]);
     }
-    // Message stores
     foreach types:MessageStore store in <types:MessageStore[]>artifacts.messageStores {
-        map<string> state = {"status": store.state};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: store.name, artifactType: "message-store"}, state);
+        entries.push([{artifactName: store.name, artifactType: "message-store"}, {"status": store.state}]);
     }
+    check batchUpsertReconcileObservedState(runtimeId, componentId, envId, entries);
 }
 
-// Write observed state for BI artifacts from heartbeat.
 isolated function writeObservedStateBI(string runtimeId, string componentId, string envId,
         types:Artifacts artifacts, map<log:Level>? logLevels) returns error? {
-    // Services
+    log:printDebug(string `Writing BI observed state for runtime ${runtimeId}, component ${componentId}, environment ${envId}`);
+    [types:ReconcileArtifactKey, map<string>][] entries = [];
     foreach types:Service svc in artifacts.services {
-        map<string> state = {"status": svc.state.toLowerAscii()};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: svc.name, artifactType: "service"}, state);
+        entries.push([{artifactName: svc.name, artifactType: "service"},
+            {"status": svc.state.toLowerAscii()}]);
     }
-    // Listeners
     foreach types:Listener 'listener in artifacts.listeners {
-        map<string> state = {"status": 'listener.state.toLowerAscii()};
-        check upsertReconcileObservedState(runtimeId, componentId, envId,
-            {artifactName: 'listener.name, artifactType: "listener"}, state);
+        entries.push([{artifactName: 'listener.name, artifactType: "listener"},
+            {"status": 'listener.state.toLowerAscii()}]);
     }
-    // Log levels
     if logLevels is map<log:Level> {
         foreach var [componentName, logLevel] in logLevels.entries() {
-            map<string> state = {"logLevel": logLevel.toString()};
-            check upsertReconcileObservedState(runtimeId, componentId, envId,
-                {artifactName: componentName, artifactType: "log-level"}, state);
+            entries.push([{artifactName: componentName, artifactType: "log-level"},
+                {"logLevel": logLevel.toString()}]);
         }
     }
+    check batchUpsertReconcileObservedState(runtimeId, componentId, envId, entries);
 }
 
 

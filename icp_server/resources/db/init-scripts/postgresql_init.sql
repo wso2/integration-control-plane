@@ -1260,6 +1260,7 @@ CREATE TABLE reconcile_observed_state (
     state_key VARCHAR(255) NOT NULL,
     state_value VARCHAR(1024),
     optimistic BOOLEAN NOT NULL DEFAULT FALSE,
+    heartbeat_gen BIGINT NOT NULL DEFAULT 0,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (runtime_id, artifact_name, artifact_type, state_key)
 );

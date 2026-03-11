@@ -155,7 +155,7 @@ function doOptimisticUpdate(string runtimeId, string componentId, string envId,
     }
     log:printDebug("optimisticUpdate", runtimeId = runtimeId,
         artifactName = artifact.artifactName, keys = state.keys().toString());
-    check storage:upsertReconcileObservedState(runtimeId, componentId, envId, artifact, state, optimistic = true);
+    check storage:optimisticUpsertObservedState(runtimeId, componentId, envId, artifact, state);
 }
 
 function doClearConverged(string runtimeId, types:ReconcileArtifactKey artifact,

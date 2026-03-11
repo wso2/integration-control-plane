@@ -2053,6 +2053,7 @@ CREATE TABLE reconcile_observed_state (
     state_key NVARCHAR(255) NOT NULL,
     state_value NVARCHAR(1024) NULL,
     optimistic BIT NOT NULL DEFAULT 0,
+    heartbeat_gen BIGINT NOT NULL DEFAULT 0,
     updated_at DATETIME2 NOT NULL DEFAULT GETDATE(),
     PRIMARY KEY (runtime_id, artifact_name, artifact_type, state_key),
     INDEX idx_reconcile_observed_comp_env (component_id, env_id)
