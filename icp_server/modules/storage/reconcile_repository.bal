@@ -17,6 +17,10 @@ type ArtifactKeyRow record {|
     string artifact_type;
 |};
 
+type HeartbeatGenRow record {|
+    int gen;
+|};
+
 // === Read ===
 
 public isolated function readReconcileArtifactKeys(string componentId, string envId) returns types:ReconcileArtifactKey[]|error {
@@ -212,15 +216,15 @@ public isolated function upsertReconcileDesiredState(string componentId, string 
     }
 }
 
-public isolated function upsertReconcileObservedState(string runtimeId, string componentId, string envId,
-        types:ReconcileArtifactKey artifact, map<string> state, boolean optimistic = false) returns error? {
+public isolated function optimisticUpsertObservedState(string runtimeId, string componentId, string envId,
+        types:ReconcileArtifactKey artifact, map<string> state) returns error? {
     foreach [string, string] [stateKey, stateValue] in state.entries() {
-        log:printDebug("upsertReconcileObserved", runtimeId = runtimeId,
-            artifactName = artifact.artifactName, stateKey = stateKey, stateValue = stateValue, optimistic = optimistic);
+        log:printDebug("optimisticUpsertObservedState", runtimeId = runtimeId,
+            artifactName = artifact.artifactName, stateKey = stateKey, stateValue = stateValue);
         if dbType == MSSQL || dbType == H2 {
             _ = check dbClient->execute(`
                 MERGE INTO reconcile_observed_state AS target
-                USING (VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${optimistic}))
+                USING (VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${true}))
                     AS source (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic)
                 ON (target.runtime_id = source.runtime_id AND target.artifact_name = source.artifact_name
                     AND target.artifact_type = source.artifact_type AND target.state_key = source.state_key)
@@ -232,7 +236,7 @@ public isolated function upsertReconcileObservedState(string runtimeId, string c
         } else if dbType == POSTGRESQL {
             _ = check dbClient->execute(`
                 INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic)
-                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${optimistic})
+                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${true})
                 ON CONFLICT (runtime_id, artifact_name, artifact_type, state_key) DO UPDATE SET
                     state_value = EXCLUDED.state_value, component_id = EXCLUDED.component_id,
                     env_id = EXCLUDED.env_id, optimistic = EXCLUDED.optimistic, updated_at = CURRENT_TIMESTAMP
@@ -240,12 +244,86 @@ public isolated function upsertReconcileObservedState(string runtimeId, string c
         } else {
             _ = check dbClient->execute(`
                 INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic)
-                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${optimistic})
+                VALUES (${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType}, ${stateKey}, ${stateValue}, ${true})
                 ON DUPLICATE KEY UPDATE state_value = VALUES(state_value), component_id = VALUES(component_id),
                     env_id = VALUES(env_id), optimistic = VALUES(optimistic), updated_at = CURRENT_TIMESTAMP
             `);
         }
     }
+}
+
+public isolated function batchUpsertReconcileObservedState(string runtimeId, string componentId, string envId,
+        [types:ReconcileArtifactKey, map<string>][] artifacts) returns error? {
+    if artifacts.length() == 0 {
+        log:printDebug("batchUpsertReconcileObservedState: no entries, skipping", runtimeId = runtimeId);
+        return;
+    }
+
+    HeartbeatGenRow genRow = check dbClient->queryRow(`
+        SELECT COALESCE(MAX(heartbeat_gen), 0) + 1 AS gen
+        FROM reconcile_observed_state WHERE runtime_id = ${runtimeId}
+    `);
+    int nextGen = genRow.gen;
+    log:printDebug("batchUpsertReconcileObservedState", runtimeId = runtimeId, nextGen = nextGen,
+        artifactCount = artifacts.length());
+
+    sql:ParameterizedQuery values = ``;
+    boolean first = true;
+    foreach var [artifact, state] in artifacts {
+        foreach var [stateKey, stateValue] in state.entries() {
+            if !first {
+                values = sql:queryConcat(values, `, `);
+            }
+            values = sql:queryConcat(values,
+                `(${runtimeId}, ${componentId}, ${envId}, ${artifact.artifactName}, ${artifact.artifactType},
+                  ${stateKey}, ${stateValue}, ${false}, ${nextGen})`);
+            first = false;
+        }
+    }
+
+    if dbType == MSSQL || dbType == H2 {
+        _ = check dbClient->execute(sql:queryConcat(
+            `MERGE INTO reconcile_observed_state AS target
+             USING (VALUES `, values,
+            `) AS source (runtime_id, component_id, env_id, artifact_name, artifact_type, state_key, state_value, optimistic, heartbeat_gen)
+             ON (target.runtime_id = source.runtime_id AND target.artifact_name = source.artifact_name
+                 AND target.artifact_type = source.artifact_type AND target.state_key = source.state_key)
+             WHEN MATCHED THEN UPDATE SET state_value = source.state_value, component_id = source.component_id,
+                 env_id = source.env_id, optimistic = source.optimistic, heartbeat_gen = source.heartbeat_gen,
+                 updated_at = CURRENT_TIMESTAMP
+             WHEN NOT MATCHED THEN INSERT (runtime_id, component_id, env_id, artifact_name, artifact_type,
+                 state_key, state_value, optimistic, heartbeat_gen)
+                 VALUES (source.runtime_id, source.component_id, source.env_id, source.artifact_name,
+                         source.artifact_type, source.state_key, source.state_value, source.optimistic,
+                         source.heartbeat_gen);`
+        ));
+    } else if dbType == POSTGRESQL {
+        _ = check dbClient->execute(sql:queryConcat(
+            `INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name,
+                 artifact_type, state_key, state_value, optimistic, heartbeat_gen)
+             VALUES `, values,
+            ` ON CONFLICT (runtime_id, artifact_name, artifact_type, state_key) DO UPDATE SET
+                 state_value = EXCLUDED.state_value, component_id = EXCLUDED.component_id,
+                 env_id = EXCLUDED.env_id, optimistic = EXCLUDED.optimistic,
+                 heartbeat_gen = EXCLUDED.heartbeat_gen, updated_at = CURRENT_TIMESTAMP`
+        ));
+    } else {
+        _ = check dbClient->execute(sql:queryConcat(
+            `INSERT INTO reconcile_observed_state (runtime_id, component_id, env_id, artifact_name,
+                 artifact_type, state_key, state_value, optimistic, heartbeat_gen)
+             VALUES `, values,
+            ` ON DUPLICATE KEY UPDATE state_value = VALUES(state_value), component_id = VALUES(component_id),
+                 env_id = VALUES(env_id), optimistic = VALUES(optimistic),
+                 heartbeat_gen = VALUES(heartbeat_gen), updated_at = CURRENT_TIMESTAMP`
+        ));
+    }
+
+    sql:ExecutionResult pruneResult = check dbClient->execute(`
+        DELETE FROM reconcile_observed_state
+        WHERE runtime_id = ${runtimeId} AND heartbeat_gen < ${nextGen}
+    `);
+    log:printDebug("batchUpsertReconcileObservedState done", runtimeId = runtimeId,
+        prunedRows = pruneResult.affectedRowCount);
 }
 
 public isolated function upsertReconcileBackoff(string runtimeId, types:ReconcileArtifactKey artifact,
