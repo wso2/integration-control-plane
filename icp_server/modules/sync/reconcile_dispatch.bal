@@ -30,26 +30,28 @@ public function buildBICollector(types:ControlCommand[] commands) returns types:
     return function(string runtimeId, types:ReconcileArtifactKey artifact,
             types:ReconcileAction[] actions) returns error? {
         time:Utc now = time:utcNow();
+        // Extract the raw artifact name (without package prefix) for control commands
+        string rawName = types:rawArtifactName(artifact.artifactName);
         foreach types:ReconcileAction a in actions {
             if a.key == "status" {
                 types:ControlAction action = a.value == "enabled" ? types:START : types:STOP;
                 commands.push({
                     commandId: uuid:createType1AsString(),
                     runtimeId: runtimeId,
-                    targetArtifact: {name: artifact.artifactName},
+                    targetArtifact: {name: rawName},
                     action: action,
                     issuedAt: now,
                     status: types:PENDING
                 });
             } else if a.key == "logLevel" {
                 json payload = {
-                    "componentName": artifact.artifactName,
+                    "componentName": rawName,
                     "logLevel": a.value
                 };
                 commands.push({
                     commandId: uuid:createType1AsString(),
                     runtimeId: runtimeId,
-                    targetArtifact: {name: artifact.artifactName},
+                    targetArtifact: {name: rawName},
                     action: types:SET_LOGGER_LEVEL,
                     issuedAt: now,
                     status: types:PENDING,

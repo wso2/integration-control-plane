@@ -857,7 +857,8 @@ service /graphql on graphqlListener {
         if result.length() == 0 { return result; }
         map<map<types:ArtifactStateField>> sm = check storage:queryArtifactState(componentId, environmentId);
         foreach types:Service a in result {
-            types:ArtifactStateField? s = stateOf(sm, a.name, "service", "status");
+            string qualName = types:qualifiedArtifactName(a.name, a.package);
+            types:ArtifactStateField? s = stateOf(sm, qualName, "service", "status");
             if s is types:ArtifactStateField { a.state = <types:ArtifactState>s.value; a.stateInSync = s.inSync; }
         }
         return result;
@@ -916,7 +917,8 @@ service /graphql on graphqlListener {
         if result.length() == 0 { return result; }
         map<map<types:ArtifactStateField>> sm = check storage:queryArtifactState(componentId, environmentId);
         foreach types:Listener a in result {
-            types:ArtifactStateField? s = stateOf(sm, a.name, "listener", "status");
+            string qualName = types:qualifiedArtifactName(a.name, a.package);
+            types:ArtifactStateField? s = stateOf(sm, qualName, "listener", "status");
             if s is types:ArtifactStateField { a.state = <types:ArtifactState>s.value; a.stateInSync = s.inSync; }
         }
         return result;
@@ -1700,7 +1702,8 @@ service /graphql on graphqlListener {
             string key = componentId + ":" + envId;
             if !processed.hasKey(key) {
                 processed[key] = true;
-                types:ReconcileArtifactKey artifact = {artifactName: input.listenerName, artifactType: "listener"};
+                string qualName = types:qualifiedArtifactName(input.listenerName, input.listenerPackage);
+                types:ReconcileArtifactKey artifact = {artifactName: qualName, artifactType: "listener"};
                 log:printDebug("upsertReconcileDesiredState for listener", componentId = componentId, envId = envId);
                 check storage:upsertReconcileDesiredState(componentId, envId, artifact,
                     {"status": input.action == types:START ? "enabled" : "disabled"});

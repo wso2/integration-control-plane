@@ -434,11 +434,13 @@ isolated function writeObservedStateBI(string runtimeId, string componentId, str
     log:printDebug(string `Writing BI observed state for runtime ${runtimeId}, component ${componentId}, environment ${envId}`);
     [types:ReconcileArtifactKey, map<string>][] entries = [];
     foreach types:Service svc in artifacts.services {
-        entries.push([{artifactName: svc.name, artifactType: "service"},
+        string qualName = types:qualifiedArtifactName(svc.name, svc.package);
+        entries.push([{artifactName: qualName, artifactType: "service"},
             {"status": svc.state.toLowerAscii()}]);
     }
     foreach types:Listener 'listener in artifacts.listeners {
-        entries.push([{artifactName: 'listener.name, artifactType: "listener"},
+        string qualName = types:qualifiedArtifactName('listener.name, 'listener.package);
+        entries.push([{artifactName: qualName, artifactType: "listener"},
             {"status": 'listener.state.toLowerAscii()}]);
     }
     if logLevels is map<log:Level> {

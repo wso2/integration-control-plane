@@ -265,6 +265,26 @@ public type ReconcileArtifactKey record {|
     string artifactType;
 |};
 
+# Returns a qualified artifact name in the format `package:name` when the
+# package is non-empty, or just `name` otherwise.  Used to build unique
+# reconcile keys for BI artifacts that may share a name across packages.
+public isolated function qualifiedArtifactName(string name, string? package) returns string {
+    if package is string && package.length() > 0 {
+        return package + ":" + name;
+    }
+    return name;
+}
+
+# Extracts the raw artifact name from a potentially qualified name.
+# If the name contains a `:`, everything after the last `:` is the raw name.
+public isolated function rawArtifactName(string qualifiedName) returns string {
+    int? idx = qualifiedName.lastIndexOf(":");
+    if idx is int {
+        return qualifiedName.substring(idx + 1);
+    }
+    return qualifiedName;
+}
+
 public type DispatchFn function (string runtimeId, ReconcileArtifactKey artifact, ReconcileAction[] actions) returns error?;
 
 public type PartialDispatchDetail record {|
@@ -2297,6 +2317,7 @@ public type ArtifactTriggerResponse record {|
 public type ListenerControlInput record {|
     string[] runtimeIds;
     string listenerName;
+    string listenerPackage?;
     ControlAction action;
 |};
 
@@ -2311,6 +2332,7 @@ public type UpdateLogLevelInput record {|
     RuntimeType? componentType?; // Optional: if provided, skips runtime lookup
     // BI fields
     string? componentName?; // Required for BI, optional for MI
+    string? componentPackage?; // Optional: package qualifier for BI
     // MI fields
     string? loggerName?; // Required for MI, optional for BI
     string? loggerClass?; // Optional: only for adding new logger in MI
