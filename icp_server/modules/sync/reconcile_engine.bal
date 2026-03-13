@@ -119,6 +119,12 @@ public isolated function reconcileDeleteComponent(string componentId, string env
     check storage:deleteReconcileComponent(componentId, envId);
 }
 
+// Clean up all reconcile state for a permanently removed environment.
+public isolated function reconcileDeleteEnvironment(string envId) returns error? {
+    log:printDebug("reconcileDeleteEnvironment", envId = envId);
+    check storage:deleteReconcileEnvironment(envId);
+}
+
 // --- Internal helpers ---
 
 function doRecordAttempt(string runtimeId, types:ReconcileArtifactKey artifact,

@@ -418,3 +418,43 @@ public isolated function deleteReconcileComponent(string componentId, string env
         `);
     }
 }
+
+public isolated function deleteReconcileEnvironment(string envId) returns error? {
+    log:printDebug("deleteReconcileEnvironment", envId = envId);
+    _ = check dbClient->execute(`
+        DELETE FROM reconcile_desired_state WHERE env_id = ${envId}
+    `);
+    stream<RuntimeIdRow, sql:Error?> rtRows = dbClient->query(`
+        SELECT DISTINCT runtime_id FROM reconcile_observed_state
+        WHERE env_id = ${envId}
+    `);
+    string[] affectedRuntimes = check from RuntimeIdRow row in rtRows select row.runtime_id;
+    log:printDebug("deleteReconcileEnvironment affected runtimes", count = affectedRuntimes.length());
+    _ = check dbClient->execute(`
+        DELETE FROM reconcile_observed_state WHERE env_id = ${envId}
+    `);
+    foreach string rtId in affectedRuntimes {
+        _ = check dbClient->execute(`
+            DELETE FROM reconcile_backoff WHERE runtime_id = ${rtId}
+            AND NOT EXISTS (
+                SELECT 1 FROM reconcile_observed_state os
+                WHERE os.runtime_id = reconcile_backoff.runtime_id
+                AND os.artifact_name = reconcile_backoff.artifact_name
+                AND os.artifact_type = reconcile_backoff.artifact_type
+                AND os.state_key = reconcile_backoff.state_key
+            )
+        `);
+    }
+}
+
+public isolated function getReconcileEnvIdsForComponent(string componentId) returns string[]|error {
+    log:printDebug("getReconcileEnvIdsForComponent", componentId = componentId);
+    stream<record {|string env_id;|}, sql:Error?> rows = dbClient->query(`
+        SELECT DISTINCT env_id FROM reconcile_desired_state WHERE component_id = ${componentId}
+        UNION
+        SELECT DISTINCT env_id FROM reconcile_observed_state WHERE component_id = ${componentId}
+    `);
+    string[] result = check from var row in rows select row.env_id;
+    log:printDebug("getReconcileEnvIdsForComponent done", count = result.length());
+    return result;
+}

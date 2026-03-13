@@ -1655,6 +1655,7 @@ service /graphql on graphqlListener {
             }
         }
 
+        check sync:reconcileDeleteRuntime(runtimeId);
         check storage:deleteRuntime(runtimeId);
         log:printInfo(string `deleteRuntime: deleted runtimeId=${runtimeId}`, userId = userContext.userId);
 
@@ -1875,6 +1876,7 @@ service /graphql on graphqlListener {
             }
         }
 
+        check sync:reconcileDeleteEnvironment(environmentId);
         check storage:deleteEnvironment(environmentId);
         return true;
     }
@@ -2250,7 +2252,13 @@ service /graphql on graphqlListener {
             };
         }
 
-        // 4. Perform deletion
+        // 4. Clean up orphaned reconcile state for all linked environments
+        string[] reconcileEnvIds = check storage:getReconcileEnvIdsForComponent(componentId);
+        foreach string envId in reconcileEnvIds {
+            check sync:reconcileDeleteComponent(componentId, envId);
+        }
+
+        // 5. Perform deletion
         error? deleteResult = storage:deleteComponent(componentId);
         if deleteResult is error {
             return {
