@@ -98,63 +98,6 @@ isolated function fetchMILoggersByRuntime(string runtimeId, types:Runtime runtim
             managementUrl = baseUrl,
             loggerCount = loggersResponse.count);
 
-    // Reconcile loggers with intended state before returning
-    map<string>|error intendedLogLevels = storage:getMILoggerIntendedStatesForComponent(runtime.component.id);
-
-    if intendedLogLevels is error {
-        log:printError("Failed to fetch MI logger intended states for reconciliation",
-                componentId = runtime.component.id,
-                runtimeId = runtimeId,
-                'error = intendedLogLevels);
-        return error(string `Failed to fetch intended logger states for component ${runtime.component.id}: ${intendedLogLevels.message()}`);
-    }
-
-    if intendedLogLevels.length() > 0 {
-        // Compare and update any mismatched loggers
-        int updatedCount = 0;
-
-        foreach types:MgmtLoggerInfo loggerInfo in loggersResponse.list {
-            string loggerName = loggerInfo.loggerName;
-
-            if intendedLogLevels.hasKey(loggerName) {
-                string intendedLevel = intendedLogLevels.get(loggerName);
-                string currentLevel = loggerInfo.level.toUpperAscii();
-
-                if currentLevel != intendedLevel.toUpperAscii() {
-                    // Logger level mismatch - update it
-                    types:MgmtUpdateLoggerRequest updateRequest = {
-                        loggerName: loggerName,
-                        loggingLevel: intendedLevel
-                    };
-
-                    types:MgmtUpdateLoggerResponse|error updateResult = mi_management:updateLogger(
-                            mgmtClientResult,
-                            hmacToken,
-                            updateRequest
-                    );
-
-                    if updateResult is error {
-                        log:printError("Failed to reconcile MI logger via management API",
-                                runtimeId = runtimeId,
-                                loggerName = loggerName,
-                                intendedLevel = intendedLevel,
-                                currentLevel = currentLevel,
-                                'error = updateResult);
-                    } else {
-                        updatedCount += 1;
-                        log:printInfo(string `Reconciled MI logger ${loggerName} from ${currentLevel} to ${intendedLevel} on runtime ${runtimeId}`);
-                        // Update the logger info in the response so UI sees the updated value
-                        loggerInfo.level = intendedLevel;
-                    }
-                }
-            }
-        }
-
-        if updatedCount > 0 {
-            log:printInfo(string `MI logger reconciliation completed: updated ${updatedCount} logger(s) on runtime ${runtimeId}`);
-        }
-    }
-
     // Convert management API response to Logger type
     types:Logger[] loggers = [];
     foreach types:MgmtLoggerInfo loggerInfo in loggersResponse.list {
@@ -295,61 +238,6 @@ isolated function fetchMILoggersByEnvironmentAndComponent(string environmentId, 
                 runtimeId = runtime.runtimeId,
                 'error = loggersResponse);
             continue; // Skip this runtime and continue with others
-        }
-
-        // Reconcile loggers with intended state before processing
-        map<string>|error intendedLogLevels = storage:getMILoggerIntendedStatesForComponent(componentId);
-
-        if intendedLogLevels is error {
-            log:printError("Failed to fetch MI logger intended states for reconciliation in fetchMILoggersByEnvironmentAndComponent",
-                    componentId = componentId,
-                    runtimeId = runtime.runtimeId,
-                    'error = intendedLogLevels);
-            // Continue processing loggers without reconciliation
-        } else if intendedLogLevels.length() > 0 {
-            // Compare and update any mismatched loggers
-            int updatedCount = 0;
-
-            foreach types:MgmtLoggerInfo loggerInfo in loggersResponse.list {
-                string loggerName = loggerInfo.loggerName;
-
-                if intendedLogLevels.hasKey(loggerName) {
-                    string intendedLevel = intendedLogLevels.get(loggerName);
-                    string currentLevel = loggerInfo.level.toUpperAscii();
-
-                    if currentLevel != intendedLevel.toUpperAscii() {
-                        // Logger level mismatch - update it
-                        types:MgmtUpdateLoggerRequest updateRequest = {
-                            loggerName: loggerName,
-                            loggingLevel: intendedLevel
-                        };
-
-                        types:MgmtUpdateLoggerResponse|error updateResult = mi_management:updateLogger(
-                                mgmtClientResult,
-                                hmacToken,
-                                updateRequest
-                        );
-
-                        if updateResult is error {
-                            log:printError("Failed to reconcile MI logger via management API",
-                                    runtimeId = runtime.runtimeId,
-                                    loggerName = loggerName,
-                                    intendedLevel = intendedLevel,
-                                    currentLevel = currentLevel,
-                                    'error = updateResult);
-                        } else {
-                            updatedCount += 1;
-                            log:printInfo(string `Reconciled MI logger ${loggerName} from ${currentLevel} to ${intendedLevel} on runtime ${runtime.runtimeId}`);
-                            // Update the logger info so it's grouped correctly
-                            loggerInfo.level = intendedLevel;
-                        }
-                    }
-                }
-            }
-
-            if updatedCount > 0 {
-                log:printInfo(string `MI logger reconciliation completed: updated ${updatedCount} logger(s) on runtime ${runtime.runtimeId}`);
-            }
         }
 
         // Process each logger from this runtime
