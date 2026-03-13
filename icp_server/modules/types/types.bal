@@ -835,6 +835,7 @@ public type InboundEndpoint record {
         name: "statistics"
     }
     string statistics?;
+    boolean? statisticsInSync = ();
     @sql:Column {
         name: "on_error"
     }

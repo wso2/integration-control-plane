@@ -372,7 +372,7 @@ const ARTIFACT_QUERY_MAP: Record<string, { queryName: string; field: string; fie
     queryName: 'inboundEndpointsByEnvironmentAndComponent',
     field: 'inboundEndpointsByEnvironmentAndComponent',
     fields: 'name, protocol',
-    gqlFields: 'name, protocol, sequence, onError, state, stateInSync, tracing, tracingInSync, statistics, carbonApp, runtimes { runtimeId, status }',
+    gqlFields: 'name, protocol, sequence, onError, state, stateInSync, tracing, tracingInSync, statistics, statisticsInSync, carbonApp, runtimes { runtimeId, status }',
   },
   Sequence: { queryName: 'sequencesByEnvironmentAndComponent', field: 'sequencesByEnvironmentAndComponent', fields: 'name, type, container, state', gqlFields: 'name, type, container, state, stateInSync, tracing, tracingInSync, statistics, statisticsInSync, runtimes { runtimeId, status }' },
   Task: { queryName: 'tasksByEnvironmentAndComponent', field: 'tasksByEnvironmentAndComponent', fields: 'name, group, state', gqlFields: 'name, class, group, state, stateInSync, carbonApp, runtimes { runtimeId, status }' },

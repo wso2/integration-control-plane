@@ -1034,6 +1034,8 @@ service /graphql on graphqlListener {
             if s is types:ArtifactStateField { a.state = <types:ArtifactState>s.value; a.stateInSync = s.inSync; }
             types:ArtifactStateField? t = stateOf(sm, a.name, "inbound-endpoint", "tracing");
             if t is types:ArtifactStateField { a.tracing = t.value; a.tracingInSync = t.inSync; }
+            types:ArtifactStateField? st = stateOf(sm, a.name, "inbound-endpoint", "statistics");
+            if st is types:ArtifactStateField { a.statistics = st.value; a.statisticsInSync = st.inSync; }
         }
         return result;
     }

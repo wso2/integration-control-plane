@@ -402,7 +402,7 @@ isolated function writeObservedStateMI(string runtimeId, string componentId, str
     }
     foreach types:InboundEndpoint ie in <types:InboundEndpoint[]>artifacts.inboundEndpoints {
         entries.push([{artifactName: ie.name, artifactType: "inbound-endpoint"},
-            {"status": ie.state, "tracing": ie.tracing}]);
+            {"status": ie.state, "tracing": ie.tracing, "statistics": ie.statistics}]);
     }
     foreach types:Sequence seq in <types:Sequence[]>artifacts.sequences {
         entries.push([{artifactName: seq.name, artifactType: "sequence"},
