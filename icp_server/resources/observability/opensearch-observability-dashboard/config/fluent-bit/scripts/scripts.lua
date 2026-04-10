@@ -1,41 +1,31 @@
 -- Enhanced Lua Scripts for Fluent Bit - Ballerina Focus
 -- scripts/scripts.lua
 
-function extract_app_from_path(tag, timestamp, record)
+function process_bal_logs(tag, timestamp, record)
+    record["product"] = "ballerina integrator"
+
+    -- Extract app name from path: /var/log/bi/myapp/app.log → "myapp"
     if record["log_file_path"] then
-        local path = record["log_file_path"]
-        -- Extract application name from path like /var/log/ballerina/ballerina-app/app.log
-        local app_name = string.match(path, "/var/log/[^/]+/([^/]+)/")
-        if app_name then
-            record["app_name"] = app_name
-        else
-            record["app_name"] = "unknown"
-        end
-        
-        -- Extract service type from path
-        local service_type = string.match(path, "/var/log/([^/]+)/")
-        if service_type then
-            record["service_type"] = service_type
-        end
-    end
-    return 1, timestamp, record
-end
-
-function construct_bal_app_name(tag, timestamp, record)
-    local deployment = record["app_name"] or "unknown"
-    
-    local moduleName = record["module"]
-    if record["src.module"] then
-        moduleName = record["src.module"]
+        record["app_name"] = string.match(record["log_file_path"], "/var/log/[^/]+/([^/]+)/") or "unknown"
+    else
+        record["app_name"] = "unknown"
     end
 
+    -- Extract app_module from module (first segment before /)
+    if record["module"] then
+        record["app_module"] = string.match(record["module"], "^([^/]+)")
+    end
+
+    -- Construct display name: "deployment - module"
+    local deployment = record["app_name"]
+    local moduleName = record["src.module"] or record["module"]
     if moduleName then
         record["app"] = deployment .. " - " .. moduleName
     else
-        record["app"] = deployment 
+        record["app"] = deployment
     end
-    
     record["deployment"] = deployment
+
     return 1, timestamp, record
 end
 
@@ -74,24 +64,6 @@ function extract_bal_metrics_data(tag, timestamp, record)
     record["url"] = record["http.url"] or ""
     record["status_code_group"] = record["http.status_code_group"] or ""
 
-    return 1, timestamp, record
-end
-
-function enrich_bal_logs(tag, timestamp, record)
-    -- Add common fields for all Ballerina logs
-    record["product"] = "ballerina integrator"
-    
-    -- Extract module info if available
-    if record["module"] then
-        local module_parts = {}
-        for part in string.gmatch(record["module"], "[^/]+") do
-            table.insert(module_parts, part)
-        end
-        if #module_parts > 0 then
-            record["app_module"] = module_parts[1]
-        end
-    end
-    
     return 1, timestamp, record
 end
 
@@ -139,18 +111,44 @@ function simple_hash(str)
     return string.format("%08x%08x", hash1, hash2)
 end
 
--- ========== MI Metrics (synapse-analytics.log) ==========
-
--- Enrich MI metrics records with common metadata fields
-function enrich_mi_metrics(tag, timestamp, record)
-    record["product"] = "Micro Integrator"
-    record["service_type"] = "MI"
-    record["log_type"] = "metrics"
-
-    -- Ensure icp_runtimeId is always present (extracted by mi_metrics_json_extract parser)
-    if not record["icp_runtimeId"] or record["icp_runtimeId"] == "" then
-        record["icp_runtimeId"] = ""
+-- Parse SYNAPSE_ANALYTICS_DATA from MI carbon log message into structured fields
+function parse_mi_analytics(tag, timestamp, record)
+    local message = record["message"] or ""
+    local json_str = string.match(message, "^SYNAPSE_ANALYTICS_DATA%s+(.+)$")
+    if not json_str then
+        return 1, timestamp, record
     end
+
+    record["@timestamp"] = string.match(json_str, '"@timestamp"%s*:%s*"([^"]+)"')
+
+    record["serverInfo"] = {
+        hostname = string.match(json_str, '"hostname"%s*:%s*"([^"]+)"') or "",
+        serverName = string.match(json_str, '"serverName"%s*:%s*"([^"]+)"') or "",
+        id = string.match(json_str, '"id"%s*:%s*"([^"]+)"') or ""
+    }
+
+    local payload = {}
+    payload["entityType"] = string.match(json_str, '"entityType"%s*:%s*"([^"]+)"') or ""
+    local latency = string.match(json_str, '"latency"%s*:%s*(%d+)')
+    if latency then payload["latency"] = tonumber(latency) end
+    payload["failure"] = string.match(json_str, '"failure"%s*:%s*(%a+)') == "true"
+    payload["faultResponse"] = string.match(json_str, '"faultResponse"%s*:%s*(%a+)') == "true"
+
+    local api = string.match(json_str, '"api"%s*:%s*"([^"]+)"')
+    if api then
+        payload["apiDetails"] = {
+            api = api,
+            apiContext = string.match(json_str, '"apiContext"%s*:%s*"([^"]+)"') or "",
+            method = string.match(json_str, '"method"%s*:%s*"([^"]+)"') or "",
+            transport = string.match(json_str, '"transport"%s*:%s*"([^"]+)"') or "",
+            subRequestPath = string.match(json_str, '"subRequestPath"%s*:%s*"([^"]+)"') or ""
+        }
+    end
+
+    record["payload"] = payload
+    record["service_type"] = "MI"
+    record["product"] = "Micro Integrator"
+    record["message"] = nil
 
     return 1, timestamp, record
 end

@@ -1,26 +1,11 @@
 {
     "index_patterns": [
-        "ballerina-application-logs-*", "mi-application-logs-*"
+        "ballerina-application-logs-*", "ballerina-metrics-logs-*",
+        "mi-application-logs-*", "mi-metrics-logs-*"
     ],
     "template": {
         "mappings": {
             "properties": {
-                "kubernetes": {
-                    "type": "object",
-                    "properties": {
-                        "labels": {
-                            "type": "object",
-                            "properties": {
-                                "app": {
-                                    "type": "keyword"
-                                },
-                                "component": {
-                                    "type": "keyword"
-                                }
-                            }
-                        }
-                    }
-                },
                 "level": {
                     "type": "keyword"
                 },
