@@ -775,8 +775,25 @@ function constructLogEntry(LogSource sourceData) returns string {
         serviceSpecificFields = artifactContainer;
     }
 
+    // Append any extra fields from the open record (e.g. 'error', custom app fields)
+    // that are not already handled explicitly above.
+    string[] knownFields = ["time", "level", "message", "service_type", "module", "app_name",
+                            "artifact_container", "traceId", "spanId", "icp_runtimeId",
+                            "@timestamp", "log_file_path", "product", "deployment", "app",
+                            "app_module", "class", "icp.runtimeId"];
+    string extraFields = "";
+    map<anydata> sourceMap = <map<anydata>>sourceData;
+    foreach [string, anydata] [key, val] in sourceMap.entries() {
+        if knownFields.indexOf(key) is () {
+            string strVal = val.toString();
+            if strVal != "" && strVal != "()" {
+                extraFields += string ` ${key}=${strVal}`;
+            }
+        }
+    }
+
     // Construct the log entry in logfmt style
-    return string `time=${time} level=${level}${serviceSpecificFields} message="${message}"${traceId}${spanId}${runtimeId}`;
+    return string `time=${time} level=${level}${serviceSpecificFields} message="${message}"${traceId}${spanId}${runtimeId}${extraFields}`;
 }
 
 // Helper function to deduplicate log entries based on composite key
