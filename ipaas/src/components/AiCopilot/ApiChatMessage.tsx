@@ -20,9 +20,13 @@ import { Accordion, AccordionDetails, AccordionSummary, Box, Button, Divider, St
 import { AlertCircle, CheckCircle2, ChevronDown, Terminal } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import type { JSX } from 'react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light';
 import { prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
 import type { ApiChatExecutionResult } from '../../types/copilot';
+
+// Only JSON is ever rendered here (API execution payloads).
+SyntaxHighlighter.registerLanguage('json', json);
 
 interface ParsedResult {
   resource?: { method?: string; inputs?: { requestBody?: unknown } };

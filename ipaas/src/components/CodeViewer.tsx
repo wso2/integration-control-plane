@@ -19,8 +19,23 @@
 import { useCallback, useState, useMemo } from 'react';
 import { Box, Button, Stack, Typography } from '@wso2/oxygen-ui';
 import { Copy, Check } from '@wso2/oxygen-ui-icons-react';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import SyntaxHighlighter from 'react-syntax-highlighter/dist/esm/prism-light';
 import { prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
+import typescript from 'react-syntax-highlighter/dist/esm/languages/prism/typescript';
+
+// The light Prism build ships no languages by default — register only what
+// CodeViewerProps['language'] supports. 'markup' registers the 'xml' alias
+// itself; 'text' needs no registration (the library special-cases it as
+// plain, unhighlighted output).
+SyntaxHighlighter.registerLanguage('markup', markup);
+SyntaxHighlighter.registerLanguage('json', json);
+SyntaxHighlighter.registerLanguage('yaml', yaml);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
+SyntaxHighlighter.registerLanguage('typescript', typescript);
 
 const formatCode = (code: string, language: string): string => {
   if (!code) return 'No content available.';

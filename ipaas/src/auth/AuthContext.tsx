@@ -30,7 +30,6 @@ import {
   getRefreshToken,
   revokeToken,
   setOnAuthFailure,
-  generateAndSaveOIDCState,
   generatePKCE,
   saveCodeVerifier,
   getAndClearCodeVerifier,
@@ -40,6 +39,7 @@ import {
   saveOidcAuthMetadata,
   clearOidcAuthMetadata,
 } from './tokenManager';
+import { generateAndSaveOIDCState } from './oauthState';
 
 const USER_KEY = 'icp_user';
 

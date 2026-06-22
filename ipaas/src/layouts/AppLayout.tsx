@@ -47,7 +47,7 @@ import {
   useAppShell,
   useNotifications,
 } from '@wso2/oxygen-ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
@@ -109,19 +109,18 @@ import {
 import FeaturePreviewModal from '../components/FeaturePreview/FeaturePreviewModal';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
-import { useOrgs } from '../hooks/useOrg';
+import { useOrgs, useSwitchOrgToken } from '../hooks/useOrg';
 import { useBillingOrg } from '../hooks/useBillingOrg';
 import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useOrgPermissions } from '../hooks/useAuth';
-import { switchOrgToken } from '../auth/tokenManager';
 import { mockNotifications } from '../mock-data/mockNotifications';
 import { useScope, useResource, resourceUrl, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, type Resource } from '../nav';
 import { componentOverviewUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, profileUrl, projectHomeUrl, termsOfUseUrl } from '../paths';
 import { useAuth } from '../auth/AuthContext';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { CopilotContext, CopilotProvider } from '../contexts/CopilotContext';
-import CopilotDrawer from '../components/AiCopilot/CopilotDrawer';
+const CopilotDrawer = lazy(() => import('../components/AiCopilot/CopilotDrawer'));
 import { IS_WIP, IS_CLOUD } from '../features';
 import AIIcon from '../assets/icons/ai/AIIcon';
 import { ALL_USER_MGT_PERMISSIONS, Permissions } from '../constants/permissions';
@@ -326,6 +325,7 @@ function AppLayoutInner(): JSX.Element {
   const [orgSearch, setOrgSearch] = useState('');
   const orgSearchRef = useRef<HTMLInputElement>(null);
   const { data: orgsData = [] } = useOrgs();
+  const switchOrgTokenMutation = useSwitchOrgToken();
 
   const { notifications, actions: notifActions, unreadCount, unreadNotifications } = useNotifications({ initialNotifications: [...mockNotifications] });
   const alertNotifications = notifications.filter((n) => n.type === 'warning' || n.type === 'error');
@@ -646,7 +646,8 @@ function AppLayoutInner(): JSX.Element {
                         navigate(orgHomeUrl(o.handle));
                         return;
                       }
-                      switchOrgToken(o.handle)
+                      switchOrgTokenMutation
+                        .mutateAsync(o.handle)
                         .then(() => {
                           if (o.numericId > 0) {
                             window.API_CONFIG.asgardeoOrgNumericId = o.numericId;
@@ -1628,7 +1629,11 @@ function AppLayoutInner(): JSX.Element {
             }}>
             <Outlet />
           </Box>
-          {IS_WIP && <CopilotDrawer />}
+          {IS_WIP && (
+            <Suspense fallback={null}>
+              <CopilotDrawer />
+            </Suspense>
+          )}
         </Box>
       </AppShell.Main>
 

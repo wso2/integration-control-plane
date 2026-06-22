@@ -65,7 +65,7 @@ import { useDeleteComponent, useCreateComponent } from '../hooks/useComponents';
 import NotFound from '../components/NotFound';
 import { formatDistanceToNow } from '../utils/time';
 import { resourceUrl, broaden, narrow, newComponentUrl, type ProjectScope } from '../nav';
-import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/tokenManager';
+import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/oauthState';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth/AuthContext';
 import { componentOverviewUrl, importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, importComingSoonUrl, buildGitHubOAuthUrl } from '../paths';

@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UUID_RE } from '../utils/string';
 import { fetchProjects, fetchProject, fetchProjectContributors, fetchProjectComponentLabels, fetchProjectHandlerAvailability, createProject, createMonoRepoProject } from '#api/projects';
@@ -40,6 +41,19 @@ export function useProjects() {
     queryFn: () => fetchProjects(id),
     enabled: isOrgScopeReady(id),
   });
+}
+
+// Imperative fetcher for use in event flows (login callbacks, onboarding redirects)
+// outside the render cycle — shares cache with useProjects.
+export function useFetchProjects() {
+  const qc = useQueryClient();
+  return useCallback(() => {
+    const id = orgId();
+    return qc.fetchQuery({
+      queryKey: ['projects', id],
+      queryFn: () => fetchProjects(id),
+    });
+  }, [qc]);
 }
 
 export function useProjectsByOrg(orgHandle: string) {

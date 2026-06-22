@@ -11,25 +11,32 @@ Route-level components. Each file corresponds to one route. Same import rules as
 | Allowed | Not allowed |
 |---|---|
 | `src/hooks/*` | `src/api/*` |
-| `src/types/*` | `auth/tokenManager` (data functions — see exception below) |
+| `src/types/*` | `auth/tokenManager` (data/token access — see exception below) |
 | `src/constants/*` | `authenticatedFetch`, `getOrgUuidFromToken` |
 | `src/utils/*` | Any named HTTP client |
 | `src/components/*` | |
 | `src/contexts/*` | |
+| `auth/oauthState` (pure OAuth CSRF state — see below) | |
 | React Router (`useNavigate`, `useParams`) | |
 
 ---
 
 ## Accepted exception — OAuth CSRF helpers
 
-Three pages import directly from `auth/tokenManager`:
+`src/auth/oauthState.ts` is a separate module from `auth/tokenManager.ts`, holding only pure
+localStorage/sessionStorage CSRF-state helpers — no token or network access. Pages may import
+it directly:
 
 | Page | Imported symbols | Why |
 |---|---|---|
-| `Project.tsx`, `CreateIntegrationOptions.tsx` | `generateAndSaveGitHubState`, `validateAndClearGitHubState` | GitHub OAuth popup CSRF state — pure localStorage utilities, no network call |
+| `Project.tsx`, `CreateIntegrationOptions.tsx` | `generateAndSaveGitHubState`, `validateAndClearGitHubState` | GitHub OAuth popup CSRF state |
 | `OIDCCallback.tsx` | `validateAndClearOIDCState`, `getAndClearRedirectUrl` | OIDC redirect landing — one-shot state extraction on arrival |
 
-These are CSRF state helpers, not data access. All other `tokenManager` functions (`getOrgUuidFromToken`, `authenticatedFetch`) must go through hooks.
+`auth/tokenManager` itself (`getOrgUuidFromToken`, `authenticatedFetch`, ...) is never importable
+from pages — ESLint blocks the whole module, with no per-file exception. Because the CSRF
+helpers live in their own file, this is an allowlist by construction: a new function added to
+`tokenManager.ts` can't become reachable from a page without also being added to
+`oauthState.ts` first.
 
 ---
 

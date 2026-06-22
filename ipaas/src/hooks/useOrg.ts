@@ -19,6 +19,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createDefaultProject, fetchOrgComponentLimits, fetchOrgSubscriptions, fetchOrgs, fetchProjectsByOrgId, initOrg, registerUser, validateOrgName } from '#api/org';
+import { switchOrgToken } from '../auth/tokenManager';
 
 export function useOrgs() {
   return useQuery({
@@ -89,5 +90,13 @@ export function useValidateOrgName() {
 export function useRegisterUser() {
   return useMutation({
     mutationFn: ({ orgName, termsAccepted, serviceName }: { orgName: string; termsAccepted: boolean; serviceName: string }) => registerUser(orgName, termsAccepted, serviceName),
+  });
+}
+
+// Exchanges the current token for one scoped to a different org. Wraps
+// auth/tokenManager's switchOrgToken so UI code never imports it directly.
+export function useSwitchOrgToken() {
+  return useMutation({
+    mutationFn: (orgHandle: string) => switchOrgToken(orgHandle),
   });
 }

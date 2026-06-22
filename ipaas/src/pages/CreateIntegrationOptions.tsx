@@ -22,7 +22,7 @@ import { useState, type JSX } from 'react';
 import { useNavigate } from 'react-router';
 import { useCreateComponent } from '../hooks/useComponents';
 import { useChoreoSampleImages } from '../hooks/useRepository';
-import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/tokenManager';
+import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/oauthState';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth/AuthContext';
 import IDEMockup from '../components/IDEMockup/IDEMockup';

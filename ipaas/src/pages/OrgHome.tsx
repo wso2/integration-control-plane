@@ -23,8 +23,7 @@ import { Alert, Box, Button, ButtonBase, Card, CardContent, CircularProgress, Fo
 import { ArrowRight, Settings, Users } from '@wso2/oxygen-ui-icons-react';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useCreateDefaultProject, useFetchProjectsByOrgId, useInitOrg } from '../hooks/useOrg';
-import { useCreateProject } from '../hooks/useProjects';
-import { fetchProjects as fetchProjectsApi } from '#api/projects';
+import { useCreateProject, useFetchProjects } from '../hooks/useProjects';
 import { projectHomeUrl } from '../paths';
 import { IS_CLOUD } from '../features';
 import Projects from './Projects';
@@ -86,7 +85,8 @@ export default function OrgHome(): JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const fetchProjects = useFetchProjectsByOrgId();
+  const fetchProjectsByOrgId = useFetchProjectsByOrgId();
+  const fetchProjects = useFetchProjects();
   const initOrgMutation = useInitOrg();
   const createProjectMutation = useCreateDefaultProject();
   const createCloudProjectMutation = useCreateProject();
@@ -108,7 +108,7 @@ export default function OrgHome(): JSX.Element {
     // straight to the most recently updated project when one exists so
     // users land in a project view instead of the org-home spinner.
     if (IS_CLOUD) {
-      fetchProjectsApi(0)
+      fetchProjects()
         .then((projects) => {
           const usable = projects.filter((p) => p.handler);
           if (usable.length > 0) {
@@ -124,7 +124,7 @@ export default function OrgHome(): JSX.Element {
     }
 
     if (!orgNumericId) return; // wait for AppLayout's ID-recovery to complete
-    fetchProjects(orgNumericId)
+    fetchProjectsByOrgId(orgNumericId)
       .then((projects) => {
         if (projects.some((p) => p.handler)) {
           localStorage.setItem(PERSONA_KEY, 'developer');
@@ -134,7 +134,7 @@ export default function OrgHome(): JSX.Element {
         }
       })
       .catch(() => setStep('persona'));
-  }, [step, orgNumericId, fetchProjects, navigate, orgHandler]);
+  }, [step, orgNumericId, fetchProjects, fetchProjectsByOrgId, navigate, orgHandler]);
 
   if (step === 'checking') {
     return (

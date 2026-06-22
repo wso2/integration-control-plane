@@ -59,6 +59,17 @@ pnpm dev:cloud    # Cloud variant
 pnpm dev:icp      # ICP variant
 ```
 
+## Running unit tests
+
+```bash
+pnpm test         # run once (CI-friendly)
+pnpm test:watch   # watch mode
+```
+
+Vitest, no live backend or credentials needed. Co-located as `<file>.test.ts` next to the
+source file (e.g. `src/utils/identifyIntegration.test.ts`). `#api`/`#product` resolve to
+`wip` in tests, same as the IDE (see `vitest.config.ts`).
+
 ## Running e2e tests
 
 ```bash

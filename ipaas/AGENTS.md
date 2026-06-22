@@ -14,8 +14,8 @@ Every feature follows a strict four-layer separation. Violating these boundaries
 ┌─────────────────────────────────────────────────┐
 │  pages/   components/                           │  UI only
 │  Import from: hooks/, types/, constants/,       │
-│               utils/, assets/, auth/ (OAuth      │
-│               state utilities only — see below) │
+│               utils/, assets/, auth/oauthState   │
+│               (OAuth CSRF state — see below)     │
 └───────────────┬─────────────────────────────────┘
                 │ imports
 ┌───────────────▼─────────────────────────────────┐
@@ -42,20 +42,21 @@ utils/      ← same
 config/     ← same
 ```
 
-**The single most important rule**: components and pages must never import directly from `api/`, `auth/tokenManager` (data functions), or any backend transport. All data access goes through `hooks/`.
+**The single most important rule**: components and pages must never import directly from `api/`, `auth/tokenManager`, or any backend transport. All data access goes through `hooks/`.
 
 ---
 
 ## The one accepted exception
 
-`auth/tokenManager.ts` exports two categories of functions:
-
-| Category | Examples | Used in |
-|---|---|---|
-| OAuth CSRF state (pure local storage utilities) | `generateAndSaveGitHubState`, `validateAndClearGitHubState`, `validateAndClearOIDCState`, `getAndClearRedirectUrl` | pages — acceptable |
-| Token/data access | `getOrgUuidFromToken`, `authenticatedFetch` | hooks only, via `useOrgUuid()` |
-
-Pages may import the OAuth CSRF helpers directly because they are pure client-side state utilities with no cache semantics, not data access.
+OAuth CSRF state (pure local storage/sessionStorage utilities — no token or network access)
+lives in its own module, `auth/oauthState.ts`, separate from `auth/tokenManager.ts` (token/data
+access, e.g. `getOrgUuidFromToken`, `authenticatedFetch` — hooks only, via `useOrgUuid()`).
+Pages may import `auth/oauthState.ts` directly (`generateAndSaveGitHubState`,
+`validateAndClearGitHubState`, `validateAndClearOIDCState`, `getAndClearRedirectUrl`) because
+it holds nothing but pure client-side state utilities with no cache semantics, not data access.
+`auth/tokenManager.ts` itself stays off-limits to pages with no per-file exception — splitting
+the CSRF helpers into their own file makes this an allowlist by construction rather than an
+ESLint exception list that has to be kept in sync by hand.
 
 ---
 

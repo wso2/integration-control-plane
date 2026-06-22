@@ -1,0 +1,62 @@
+name: Checks
+
+# Lint, unit tests, and the type-check + build gate on every PR that touches
+# the ipaas frontend. Unlike the E2E workflows, none of this needs live
+# credentials or a reachable backend, so it runs on every push too for
+# branch-health visibility.
+#
+# Not yet a required status check. To make it required: add
+# "Checks / Lint, test, build check" to branch protection rules under
+# Settings → Branches → Required status checks.
+
+on:
+  pull_request:
+    branches:
+      - main
+      - devant-migration
+    paths:
+      - 'ipaas/**'
+  push:
+    branches:
+      - main
+      - devant-migration
+    paths:
+      - 'ipaas/**'
+
+jobs:
+  checks:
+    name: Lint, test, build check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: ipaas/pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: ipaas
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        working-directory: ipaas
+        run: pnpm lint
+
+      - name: Unit tests
+        working-directory: ipaas
+        run: pnpm test
+
+      - name: Type check + build
+        working-directory: ipaas
+        run: pnpm build:check

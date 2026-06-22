@@ -11,6 +11,8 @@
     "build:cloud": "PRODUCT=cloud vite build",
     "build:icp": "PRODUCT=icp vite build",
     "build:check": "tsc -b && PRODUCT=wip vite build",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
@@ -57,12 +59,14 @@
     "eslint-plugin-react-refresh": "0.4.24",
     "globals": "16.4.0",
     "googleapis": "^173.0.0",
+    "jsdom": "^29.1.1",
     "prettier": "^3.8.1",
     "rollup-plugin-visualizer": "6.0.5",
     "sass": "^1.99.0",
     "tsx": "^4.22.4",
     "typescript": "5.9.3",
     "typescript-eslint": "8.45.0",
-    "vite": "7.1.12"
+    "vite": "7.1.12",
+    "vitest": "^4.1.9"
   }
 }

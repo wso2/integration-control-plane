@@ -20,7 +20,7 @@ import { useState } from 'react';
 import { useObtainGithubToken } from './useRepository';
 import { GITHUB_AUTH } from '../constants/github';
 import { buildGitHubOAuthUrl } from '../paths';
-import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/tokenManager';
+import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/oauthState';
 import type { AuthStatus } from '../types/import';
 
 export interface UseGitHubAuthReturn {
