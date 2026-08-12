@@ -876,36 +876,6 @@ function AppLayoutInner(): JSX.Element {
                 </Sidebar.Item>
 
                 {!IS_CLOUD && (
-                  <Sidebar.Item id="org-develop">
-                    <Sidebar.ItemIcon>
-                      <Lightbulb size={20} />
-                    </Sidebar.ItemIcon>
-                    <Sidebar.ItemLabel>Develop</Sidebar.ItemLabel>
-                  </Sidebar.Item>
-                )}
-
-                <Sidebar.Item id="build">
-                  <Sidebar.ItemIcon>
-                    <Hammer size={20} />
-                  </Sidebar.ItemIcon>
-                  <Sidebar.ItemLabel>Build</Sidebar.ItemLabel>
-                </Sidebar.Item>
-
-                <Sidebar.Item id="org-deploy">
-                  <Sidebar.ItemIcon>
-                    <Rocket size={20} />
-                  </Sidebar.ItemIcon>
-                  <Sidebar.ItemLabel>Deploy</Sidebar.ItemLabel>
-                </Sidebar.Item>
-
-                <Sidebar.Item id="org-test">
-                  <Sidebar.ItemIcon>
-                    <FlaskConical size={20} />
-                  </Sidebar.ItemIcon>
-                  <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
-                </Sidebar.Item>
-
-                {!IS_CLOUD && (
                   <Sidebar.Item id="org-insights">
                     <Sidebar.ItemIcon>
                       <BarChart3 size={20} />
@@ -1114,50 +1084,50 @@ function AppLayoutInner(): JSX.Element {
 
                     <Sidebar.Category>
                       {!IS_CLOUD && (
-                      <Sidebar.Item id="develop">
-                        <Sidebar.ItemIcon>
-                          <Lightbulb size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Develop</Sidebar.ItemLabel>
-                        <Sidebar.Item id="integration">
+                        <Sidebar.Item id="develop">
                           <Sidebar.ItemIcon>
-                            <Workflow size={20} />
+                            <Lightbulb size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Integration</Sidebar.ItemLabel>
+                          <Sidebar.ItemLabel>Develop</Sidebar.ItemLabel>
+                          <Sidebar.Item id="integration">
+                            <Sidebar.ItemIcon>
+                              <Workflow size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Integration</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                          {isGenericService && (
+                            <Sidebar.Item id="api-info">
+                              <Sidebar.ItemIcon>
+                                <FileText size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>API Info</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                          {isGenericService && (
+                            <Sidebar.Item id="lifecycle">
+                              <Sidebar.ItemIcon>
+                                <Recycle size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Lifecycle</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                          {isGenericService && (
+                            <Sidebar.Item id="documents">
+                              <Sidebar.ItemIcon>
+                                <FileText size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Document</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                          {isGenericService && (
+                            <Sidebar.Item id="plans">
+                              <Sidebar.ItemIcon>
+                                <CreditCard size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Plans</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
                         </Sidebar.Item>
-                        {isGenericService && (
-                          <Sidebar.Item id="api-info">
-                            <Sidebar.ItemIcon>
-                              <FileText size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>API Info</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        )}
-                        {isGenericService && (
-                          <Sidebar.Item id="lifecycle">
-                            <Sidebar.ItemIcon>
-                              <Recycle size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Lifecycle</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        )}
-                        {isGenericService && (
-                          <Sidebar.Item id="documents">
-                            <Sidebar.ItemIcon>
-                              <FileText size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Document</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        )}
-                        {isGenericService && (
-                          <Sidebar.Item id="plans">
-                            <Sidebar.ItemIcon>
-                              <CreditCard size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Plans</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        )}
-                      </Sidebar.Item>
                       )}
 
                       <Sidebar.Item id="build">
@@ -1354,36 +1324,6 @@ function AppLayoutInner(): JSX.Element {
                     <LayoutDashboard size={20} />
                   </Sidebar.ItemIcon>
                   <Sidebar.ItemLabel>Overview</Sidebar.ItemLabel>
-                </Sidebar.Item>
-
-                {!IS_CLOUD && (
-                  <Sidebar.Item id="proj-develop">
-                    <Sidebar.ItemIcon>
-                      <Lightbulb size={20} />
-                    </Sidebar.ItemIcon>
-                    <Sidebar.ItemLabel>Develop</Sidebar.ItemLabel>
-                  </Sidebar.Item>
-                )}
-
-                <Sidebar.Item id="proj-build">
-                  <Sidebar.ItemIcon>
-                    <Hammer size={20} />
-                  </Sidebar.ItemIcon>
-                  <Sidebar.ItemLabel>Build</Sidebar.ItemLabel>
-                </Sidebar.Item>
-
-                <Sidebar.Item id="proj-deploy">
-                  <Sidebar.ItemIcon>
-                    <Rocket size={20} />
-                  </Sidebar.ItemIcon>
-                  <Sidebar.ItemLabel>Deploy</Sidebar.ItemLabel>
-                </Sidebar.Item>
-
-                <Sidebar.Item id="proj-test">
-                  <Sidebar.ItemIcon>
-                    <FlaskConical size={20} />
-                  </Sidebar.ItemIcon>
-                  <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
                 </Sidebar.Item>
 
                 {!IS_CLOUD && (
