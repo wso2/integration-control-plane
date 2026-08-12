@@ -67,7 +67,9 @@ export interface DeployEnvironmentCardProps {
   projectHandler: string;
   nextEnvId?: string;
   isPromotionTarget?: boolean;
-  onPromoteStarted?: () => void;
+  /** Receives the environment actually being promoted into — in cloud the pipeline
+   *  target, which is not necessarily `nextEnvId` — so callers can highlight it. */
+  onPromoteStarted?: (targetEnvId: string) => void;
   onPromoteSettled?: () => void;
 }
 

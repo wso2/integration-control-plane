@@ -26,7 +26,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import type { IntegrationType } from '../types/integration';
 import { useCommitHistory, useComponentRepository } from '../hooks/useRepository';
 import { useApimApi } from '../hooks/useApim';
-import { IS_WIP } from '../features';
+import { IS_CLOUD, IS_WIP } from '../features';
 import { useDeploymentStatus } from '../hooks/useDeployments';
 import BusinessInfo from '../components/BusinessInfo';
 import NotFound from '../components/NotFound';
@@ -224,9 +224,12 @@ export default function Component(scope: ComponentScope): JSX.Element {
                   apiId={component.apiId}
                   isBuildInProgress={isBuildInProgress}
                 />
-                {index < environments.length - 1 && (
+                {/* In cloud the pipeline decides whether this env promotes at all —
+                    including out of the last card — so PromoteButton renders null
+                    when there is no hop. Elsewhere, adjacency still gates it. */}
+                {(IS_CLOUD || index < environments.length - 1) && (
                   <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                    <PromoteButton orgHandler={scope.org} componentId={component.id} versionId={versionId} deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''} sourceEnvId={env.id} targetEnvId={environments[index + 1].id} />
+                    <PromoteButton orgHandler={scope.org} componentId={component.id} versionId={versionId} deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''} sourceEnvId={env.id} targetEnvId={environments[index + 1]?.id} />
                   </Box>
                 )}
               </Fragment>

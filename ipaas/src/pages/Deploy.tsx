@@ -146,8 +146,10 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
                   projectHandler={project?.handler ?? ''}
                   nextEnvId={nextEnv?.id}
                   isPromotionTarget={env.id === promotingToEnvId}
-                  onPromoteStarted={nextEnv ? () => setPromotingToEnvId(nextEnv.id) : undefined}
-                  onPromoteSettled={nextEnv ? () => setPromotingToEnvId(null) : undefined}
+                  // Highlight whichever env the promote actually targets — in cloud
+                  // that is the pipeline's target, not necessarily nextEnv.
+                  onPromoteStarted={(targetEnvId) => setPromotingToEnvId(targetEnvId)}
+                  onPromoteSettled={() => setPromotingToEnvId(null)}
                 />
               </Box>
             </Box>

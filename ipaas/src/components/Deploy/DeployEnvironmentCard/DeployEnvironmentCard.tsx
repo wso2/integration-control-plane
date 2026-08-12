@@ -288,7 +288,10 @@ export default function DeployEnvironmentCard({
   // to prevent both showing simultaneously when status transitions mid-flight (header scatter).
   const showStop = ((isActive || isError || isInProgress) && hasRelease && !isRedeployPending) || isStopPending;
   const showStart = (isSuspended && hasRelease && !isStopPending) || isRedeployPending;
-  const showPromote = !!nextEnvId;
+  // In cloud the pipeline decides whether this env promotes at all — including out
+  // of the last card, which has no nextEnvId — so PromoteButton renders null when
+  // there is no hop. Elsewhere, adjacency still gates it.
+  const showPromote = IS_CLOUD || !!nextEnvId;
 
   return (
     <>

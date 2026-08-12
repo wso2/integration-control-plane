@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { DeploymentPipeline, EnvTemplate, PromotionTreeNode } from '../types/deploymentPipeline';
-import { buildPromotionTree, flattenPromotionTree, PIPELINE_NAME_MAX_LENGTH, pinDefaultFirst, validatePipelineName } from './deploymentPipeline';
+import { buildPromotionTree, flattenPromotionTree, isEnvInPipeline, PIPELINE_NAME_MAX_LENGTH, pinDefaultFirst, promotionTargetsFor, validatePipelineName } from './deploymentPipeline';
 
 const makePipeline = (overrides: Partial<DeploymentPipeline>): DeploymentPipeline => ({
   id: 'p1',
@@ -193,5 +193,94 @@ describe('flattenPromotionTree', () => {
       { envTemplateId: 'e1', envName: 'Dev' },
       { envTemplateId: 'e2', envName: 'Prod' },
     ]);
+  });
+});
+
+// dev -> staging -> prod
+const linearTree: PromotionTreeNode = {
+  name: 'Root',
+  children: [
+    {
+      env_template_id: 'development',
+      env_name: 'Dev',
+      children: [{ env_template_id: 'staging', env_name: 'Staging', children: [{ env_template_id: 'production', env_name: 'Prod' }] }],
+    },
+  ],
+};
+
+describe('promotionTargetsFor', () => {
+  it('returns the next environment in a linear chain', () => {
+    expect(promotionTargetsFor(linearTree, 'development')).toEqual(['staging']);
+    expect(promotionTargetsFor(linearTree, 'staging')).toEqual(['production']);
+  });
+
+  it('returns every branch target, which flattenPromotionTree would collapse', () => {
+    const branching: PromotionTreeNode = {
+      name: 'Root',
+      children: [
+        {
+          env_template_id: 'development',
+          env_name: 'Dev',
+          children: [
+            { env_template_id: 'staging', env_name: 'Staging' },
+            { env_template_id: 'qa', env_name: 'QA' },
+          ],
+        },
+      ],
+    };
+    expect(promotionTargetsFor(branching, 'development')).toEqual(['staging', 'qa']);
+  });
+
+  it('returns nothing for the end of the chain', () => {
+    expect(promotionTargetsFor(linearTree, 'production')).toEqual([]);
+  });
+
+  it('returns nothing for an environment the pipeline does not reference', () => {
+    expect(promotionTargetsFor(linearTree, 'unknown')).toEqual([]);
+  });
+
+  it('handles an empty or absent pipeline', () => {
+    // A single-environment pipeline produces no promotion paths at all, which is
+    // what makes every hop invalid until the chain is extended.
+    expect(promotionTargetsFor({ name: 'Root', children: [] }, 'development')).toEqual([]);
+    expect(promotionTargetsFor(undefined, 'development')).toEqual([]);
+    expect(promotionTargetsFor(null, 'development')).toEqual([]);
+  });
+
+  it('falls back to env_name when a node carries no template id', () => {
+    const tree: PromotionTreeNode = {
+      name: 'Root',
+      children: [{ env_name: 'development', children: [{ env_name: 'production' }] }],
+    };
+    expect(promotionTargetsFor(tree, 'development')).toEqual(['production']);
+  });
+
+  it('terminates on a cyclic tree', () => {
+    const a: PromotionTreeNode = { env_template_id: 'a', env_name: 'A' };
+    const b: PromotionTreeNode = { env_template_id: 'b', env_name: 'B', children: [a] };
+    a.children = [b];
+    expect(promotionTargetsFor({ name: 'Root', children: [a] }, 'a')).toEqual(['b']);
+    expect(isEnvInPipeline({ name: 'Root', children: [a] }, 'b')).toBe(true);
+  });
+});
+
+describe('isEnvInPipeline', () => {
+  it('finds environments at any position in the chain', () => {
+    expect(isEnvInPipeline(linearTree, 'development')).toBe(true);
+    expect(isEnvInPipeline(linearTree, 'production')).toBe(true);
+  });
+
+  it('distinguishes "end of chain" from "not in the pipeline"', () => {
+    // Both have no targets, but only one warrants telling the user to edit the pipeline.
+    expect(promotionTargetsFor(linearTree, 'production')).toEqual([]);
+    expect(isEnvInPipeline(linearTree, 'production')).toBe(true);
+
+    expect(promotionTargetsFor(linearTree, 'unknown')).toEqual([]);
+    expect(isEnvInPipeline(linearTree, 'unknown')).toBe(false);
+  });
+
+  it('is false for an empty pipeline', () => {
+    expect(isEnvInPipeline({ name: 'Root', children: [] }, 'development')).toBe(false);
+    expect(isEnvInPipeline(undefined, 'development')).toBe(false);
   });
 });

@@ -129,14 +129,27 @@ const toDeploymentPipeline = (p: BffDeploymentPipeline): DeploymentPipeline => (
 });
 
 /**
- * Append `envSlug` to the end of the default pipeline's promotion chain, so a
- * freshly created environment is actually deployable — an environment that sits
- * outside every promotion path can never be promoted into.
+ * The environment to chain a brand-new one onto when the default pipeline has no
+ * promotion paths yet. A single-environment pipeline stores no paths at all — a
+ * path needs both ends — so the existing environment cannot be read back off the
+ * pipeline and has to come from the environment list. Only unambiguous when
+ * exactly one other environment exists.
+ */
+const soleOtherEnvironment = async (envSlug: string): Promise<string | undefined> => {
+  const others = items(await bff.get<ListResponse<{ name: string }>>('/environments')).filter((e) => e.name !== envSlug);
+  return others.length === 1 ? others[0].name : undefined;
+};
+
+/**
+ * Add `envSlug` to the default pipeline's promotion chain, so a freshly created
+ * environment is actually deployable — an environment outside every promotion
+ * path can never be promoted into, and the BFF rejects the attempt with a 403.
  *
- * The insertion point is the chain's terminal environment: the one promoted *to*
- * but never *from*. A pipeline with no paths, or a branching chain with several
- * terminals, is left untouched — there is no single correct place to insert and
- * guessing would rewrite a topology someone built deliberately.
+ * With an existing chain the insertion point is its terminal environment: the one
+ * promoted *to* but never *from*. With no paths at all the chain is seeded from
+ * the only other environment. Anything ambiguous — several terminals, or several
+ * candidate sources for a seed — is left untouched: there is no single correct
+ * answer and guessing would rewrite a topology someone built deliberately.
  *
  * Returns whether the pipeline was updated.
  */
@@ -149,11 +162,14 @@ export const appendEnvironmentToDefaultPipeline = async (envSlug: string): Promi
   const targets = new Set(paths.flatMap((p) => p.targetEnvironments));
   if (sources.has(envSlug) || targets.has(envSlug)) return false; // already in the chain
 
+  // Extend an existing chain from its single terminal; with no paths at all there
+  // is no terminal to read, so seed the chain from the only other environment.
   const terminals = [...targets].filter((t) => !sources.has(t));
-  if (terminals.length !== 1) return false;
+  const source = paths.length === 0 ? await soleOtherEnvironment(envSlug) : terminals.length === 1 ? terminals[0] : undefined;
+  if (!source) return false;
 
   await bff.put<BffDeploymentPipeline>(`/deploymentpipelines/${seg(pipeline.name)}`, {
-    promotionPaths: [...paths, { sourceEnvironment: terminals[0], targetEnvironments: [envSlug] }],
+    promotionPaths: [...paths, { sourceEnvironment: source, targetEnvironments: [envSlug] }],
   });
   return true;
 };

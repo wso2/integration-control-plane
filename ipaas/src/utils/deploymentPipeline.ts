@@ -81,3 +81,55 @@ export function flattenPromotionTree(tree: PromotionTreeNode | null | undefined)
   walk(tree?.children);
   return out;
 }
+
+/** A node's environment id. Matches the `env.templateId ?? env.id` join used elsewhere. */
+const nodeEnvId = (node: PromotionTreeNode): string | undefined => node.env_template_id ?? node.env_name;
+
+/**
+ * Visit every node below the synthetic Root, skipping any node already seen so a
+ * cyclic tree (see promotionPathsToTree's own cycle guard) cannot hang the walk.
+ */
+function walkPromotionNodes(tree: PromotionTreeNode | null | undefined, visit: (node: PromotionTreeNode, envId: string) => boolean | void): void {
+  const seen = new Set<string>();
+  const walk = (nodes: PromotionTreeNode[] | undefined): boolean => {
+    for (const node of nodes ?? []) {
+      const envId = nodeEnvId(node);
+      if (!envId || seen.has(envId)) continue;
+      seen.add(envId);
+      if (visit(node, envId) === true) return true;
+      if (walk(node.children)) return true;
+    }
+    return false;
+  };
+  walk(tree?.children);
+}
+
+/**
+ * The environments `envId` may be promoted to, per the pipeline.
+ *
+ * Deliberately walks the tree's edges rather than reusing flattenPromotionTree,
+ * which is a depth-first flatten that collapses branches and so loses exactly the
+ * source→target relationship this needs. An empty result means either "not in the
+ * pipeline" or "end of the chain" — use isEnvInPipeline to tell those apart, since
+ * they warrant different UI.
+ */
+export function promotionTargetsFor(tree: PromotionTreeNode | null | undefined, envId: string): string[] {
+  let targets: string[] = [];
+  walkPromotionNodes(tree, (node, id) => {
+    if (id !== envId) return;
+    targets = (node.children ?? []).map(nodeEnvId).filter((t): t is string => !!t);
+    return true;
+  });
+  return targets;
+}
+
+/** Whether the pipeline references `envId` at all, at any position in the chain. */
+export function isEnvInPipeline(tree: PromotionTreeNode | null | undefined, envId: string): boolean {
+  let found = false;
+  walkPromotionNodes(tree, (_node, id) => {
+    if (id !== envId) return;
+    found = true;
+    return true;
+  });
+  return found;
+}

@@ -22,6 +22,7 @@ import type { ReactNode } from 'react';
 import type { Component } from '../../../types/component';
 import type { Environment } from '../../../types/environment';
 import type { IntegrationIdentity, IntegrationModule } from '../../../types/integration';
+import { IS_CLOUD } from '../../../features';
 import PromoteButton from '../../EnvironmentCard/PromoteButton';
 import EnvCardShell from './EnvCardShell';
 
@@ -93,9 +94,12 @@ export default function OverviewShell({ component, identity, environments, versi
             isBuildInProgress={isBuildInProgress}
             module={module}
           />
-          {i < environments.length - 1 && (
+          {/* In cloud the pipeline decides whether this env promotes at all —
+              including out of the last card — so PromoteButton renders null when
+              there is no hop. Elsewhere, adjacency still gates it. */}
+          {(IS_CLOUD || i < environments.length - 1) && (
             <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-              <PromoteButton orgHandler={orgHandler} componentId={component.id} versionId={versionId} deploymentPipelineId={deploymentPipelineId} sourceEnvId={env.id} targetEnvId={environments[i + 1].id} />
+              <PromoteButton orgHandler={orgHandler} componentId={component.id} versionId={versionId} deploymentPipelineId={deploymentPipelineId} sourceEnvId={env.id} targetEnvId={environments[i + 1]?.id} />
             </Box>
           )}
         </Fragment>
