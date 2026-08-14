@@ -539,16 +539,24 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
     // Bare, reachable host/IP for this runtime process (optional; NULL when absent) - used by the Try-It proxy
     string? tryItHost = heartbeat?.tryItHost;
 
-    // Check if a stale OFFLINE runtime with the same component/env/name but different ID exists.
-    // Restricting to OFFLINE prevents live sibling replicas in multi-replica deployments from
-    // being mistakenly treated as "old restarted instances" and deleted.
+    // Check if a runtime with the same component/env/name but a different ID already exists.
+    // A restarting runtime generally comes back with a fresh ID (containers lose the persisted
+    // ID with their filesystem), so the old row has to be cleared out before the upsert.
     stream<record {|string runtime_id;|}, sql:Error?> existingByName;
     if runtimeName is string {
+        // Named runtimes are covered by uq_runtime_identity (component_id, environment_id, name),
+        // so at most one row can hold this name and it cannot belong to a live sibling replica.
+        // A differing ID here is therefore always a restarted instance. Matching only OFFLINE rows
+        // would leave a fast restart - a rolling update, eviction or reschedule - unable to
+        // register until the old row times out, because the INSERT below hits that constraint.
         existingByName = dbClient->query(`
             SELECT runtime_id FROM runtimes
-            WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name = ${runtimeName} AND status = 'OFFLINE'
+            WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name = ${runtimeName}
         `);
     } else {
+        // Unnamed runtimes are NOT covered by that constraint - NULLs compare as distinct - so
+        // live sibling replicas can legitimately share a NULL name here. Keep the OFFLINE guard
+        // so they are not mistaken for old restarted instances and deleted.
         existingByName = dbClient->query(`
             SELECT runtime_id FROM runtimes
             WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name IS NULL AND status = 'OFFLINE'

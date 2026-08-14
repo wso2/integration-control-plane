@@ -258,6 +258,54 @@ function testVmRestartCleansUpOfflineRecord() returns error? {
     cleanupRuntime(HB_RESTART_NEW_ID);
 }
 
+// =============================================================================
+// Test 4: Kubernetes rolling restart — the old record is still RUNNING
+//
+// A pod replaced faster than heartbeatTimeoutSeconds (any rolling update, eviction
+// or reschedule) comes back with a fresh UUID while its previous row is still
+// RUNNING. Restricting the cleanup query to OFFLINE rows left that row in place,
+// so the INSERT violated uq_runtime_identity (component_id, environment_id, name)
+// and the heartbeat was rejected — permanently for runtimes that do not retry.
+//
+// Named runtimes are safe to reclaim this way: the unique constraint guarantees no
+// live sibling can be holding the name. The null-name replica tests above cover the
+// case where siblings genuinely can, and that guard is retained.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testK8sRestartReplacesRunningRecord() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+
+    // Old instance registers and stays RUNNING — it is never marked OFFLINE, because
+    // the replacement comes up well inside the heartbeat timeout.
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    types:Runtime? seeded = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertNotEquals(seeded, (), "Old runtime should be seeded as RUNNING before the restart");
+
+    // Replacement instance: same name, fresh UUID, old row still RUNNING.
+    types:HeartbeatResponse response = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+    test:assertTrue(response.acknowledged,
+            "Restarted runtime must be acknowledged even though the old record is still RUNNING");
+
+    types:Runtime? oldRecord = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertEquals(oldRecord, (), "Superseded RUNNING record must be replaced, not left behind");
+
+    types:Runtime? newRuntime = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertNotEquals(newRuntime, (), "Restarted runtime must be registered under its new ID");
+}
+
+@test:AfterGroups {
+    value: ["heartbeat-restart"]
+}
+function afterHeartbeatRestartTests() {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+}
+
 @test:Config {
     groups: ["heartbeat", "mi-artifacts"]
 }
