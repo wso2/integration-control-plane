@@ -110,6 +110,14 @@ export default class AuthManager {
     }
 
     /**
+     * Clear the local dashboard session and show the access-denied page.
+     */
+    static redirectToUnauthorized() {
+        AuthManager.discardSession();
+        window.location.href = (window.contextPath || '') + '/unauthorized';
+    }
+
+    /**
      * Delete a browser cookie given its name
      * @param {String} name : Name of the cookie which need to be deleted
      */

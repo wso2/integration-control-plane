@@ -37,6 +37,12 @@ password = "wso2carbon"
 [user_access]
 make_non_admin_users_read_only = false
 
+# Restrict dashboard login to users with at least one of these roles. When SSO is
+# enabled, values are matched against the claim configured by
+# sso.admin_group_attribute. Leave empty to allow all authenticated users.
+#[console_access]
+#allowed_roles = "ICP-Admins,ICP-Viewers"
+
 # SSO configuration (disabled by default; remove the leading '#' to enable).
 # Audit logging records the initiating username from the access token.  For the
 # username to appear correctly (rather than an internal UUID) the IdP MUST include
@@ -58,6 +64,8 @@ make_non_admin_users_read_only = false
 ##introspection_endpoint = "https://<IS-host>:<port>/oauth2/introspect"
 ##user_info_endpoint = "https://<IS-host>:<port>/oauth2/userinfo"
 #jwt_issuer = "https://<IS-host>:<port>/oauth2/token"
+## Request the claims required for displaying the username and evaluating group access.
+#scope = ["openid", "profile", "groups"]
 #admin_group_attribute = "groups"
 #admin_groups = ["admin"]
 ## ID token claim used for the UI header username chip and audit log Initiator.

@@ -29,6 +29,8 @@ export const Constants = {
     PREFIX_USER_PASSWORD: "user/password",
     // Reason passed to the login page when a session can no longer be authenticated.
     SESSION_EXPIRED: "expired",
+    // Backend error returned when an authenticated SSO user is not allowed to enter ICP.
+    LOGIN_FORBIDDEN_ERROR: "LOGIN_FORBIDDEN",
     // Window event dispatched when the identity provider cannot be reached to validate the session.
     IDP_UNAVAILABLE_EVENT: "icp:idp-unavailable"
 };

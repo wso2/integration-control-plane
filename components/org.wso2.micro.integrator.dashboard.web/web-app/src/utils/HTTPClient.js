@@ -54,8 +54,10 @@ export default class HTTPClient {
      *    provider (e.g. the JWKS endpoint is unreachable or its certificate is
      *    not trusted). The session may well be valid, so we surface a notice
      *    instead of logging the user out (re-authenticating would not help).
-     *  - 403: the user is authenticated but not permitted to access the
-     *    resource. Leave it to the caller to display; never log the user out.
+     *  - 403 LOGIN_FORBIDDEN: the user authenticated successfully but is not
+     *    permitted to enter ICP. Clear the local session and show the access-denied page.
+     *  - Other 403 responses: the user may enter ICP but cannot access this
+     *    particular resource. Leave these to the caller to display.
      *  - 401, or an error with no HTTP response: the session could not be
      *    authenticated. On a 401 the Asgardeo SDK transparently attempts a
      *    silent token refresh before rejecting; when that refresh also fails
@@ -75,6 +77,9 @@ export default class HTTPClient {
             return Promise.reject(error);
         }
         if (status === 403) {
+            if (response?.data?.code === Constants.LOGIN_FORBIDDEN_ERROR) {
+                AuthManager.redirectToUnauthorized();
+            }
             return Promise.reject(error);
         }
         if (status === 401 || !response) {

@@ -446,6 +446,10 @@ public class DashboardServer {
                 Gson gson = new Gson();
                 adminGroups = gson.toJson(parseResult.get(SSOConstants.TOML_SSO_ADMIN_GROUPS));
             }
+            String allowedLoginRoles = "";
+            if (parseResult.get(SSOConstants.TOML_CONSOLE_ACCESS_ALLOWED_ROLES) instanceof String) {
+                allowedLoginRoles = (String) parseResult.get(SSOConstants.TOML_CONSOLE_ACCESS_ALLOWED_ROLES);
+            }
             String baseUrl = "";
             if (parseResult.get(SSOConstants.TOML_SSO_BASE_URL) instanceof String) {
                 baseUrl = (String) parseResult.get(SSOConstants.TOML_SSO_BASE_URL);
@@ -464,8 +468,8 @@ public class DashboardServer {
             if (parseResult.get(SSOConstants.TOML_SSO_USER_INFO_ENDPOINT) instanceof String) {
                 userInfoEndpoint = (String) parseResult.get(SSOConstants.TOML_SSO_USER_INFO_ENDPOINT);
             }
-            return new SSOConfig(oidcAgentConfig, adminGroupAttribute, adminGroups, wellKnownEndpointPath, baseUrl,
-                                 introspectionEndpoint, userInfoEndpoint);
+            return new SSOConfig(oidcAgentConfig, adminGroupAttribute, adminGroups, allowedLoginRoles,
+                                 wellKnownEndpointPath, baseUrl, introspectionEndpoint, userInfoEndpoint);
         }
         return null;
     }

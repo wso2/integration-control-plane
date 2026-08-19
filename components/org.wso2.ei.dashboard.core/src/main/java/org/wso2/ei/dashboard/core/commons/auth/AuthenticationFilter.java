@@ -77,6 +77,7 @@ public class AuthenticationFilter implements ContainerRequestFilter {
     private static final String MAKE_NON_ADMIN_USERS_READ_ONLY = "make_non_admin_users_read_only";
     private static final String ADMIN_ONLY_DENIAL = "Admin only resource";
     private static final String READ_ONLY_DENIAL = "Read only mode is enabled for non-admin users";
+    private static final String LOGIN_FORBIDDEN_ERROR = "LOGIN_FORBIDDEN";
     // Tracks SSO Bearer tokens that have already produced a login audit entry.
     // expireAfterAccess: an active session keeps the entry alive; eviction only happens on inactivity,
     // so a long-lived token does not generate repeated Login entries while it is in continuous use.
@@ -104,6 +105,12 @@ public class AuthenticationFilter implements ContainerRequestFilter {
             if (!securityHandler.isAuthenticated(config, token)) {
                 // The token is missing, expired or otherwise invalid: the session is dead.
                 abortWithUnauthorized(requestContext);
+                return;
+            }
+            if (isTokenBasedAuthentication(requestContext.getHeaderString(HttpHeaders.AUTHORIZATION))
+                    && !securityHandler.isLoginAllowed(config, token)) {
+                // Authentication succeeded, but the user has no role configured for console access.
+                abortWithLoginForbidden(requestContext);
                 return;
             }
         } catch (TokenValidationException e) {
@@ -214,14 +221,26 @@ public class AuthenticationFilter implements ContainerRequestFilter {
         abortWith(requestContext, Response.Status.FORBIDDEN, "Forbidden");
     }
 
+    private void abortWithLoginForbidden(ContainerRequestContext requestContext) {
+        abortWith(requestContext, Response.Status.FORBIDDEN, "Forbidden", LOGIN_FORBIDDEN_ERROR);
+    }
+
     private void abortWithServiceUnavailable(ContainerRequestContext requestContext) {
         abortWith(requestContext, Response.Status.SERVICE_UNAVAILABLE,
                 "Unable to validate the session with the identity provider");
     }
 
     private void abortWith(ContainerRequestContext requestContext, Response.Status status, String message) {
+        abortWith(requestContext, status, message, null);
+    }
+
+    private void abortWith(ContainerRequestContext requestContext, Response.Status status, String message,
+                           String errorCode) {
         Map<String, String> responseBody = new HashMap<>();
         responseBody.put("message", message);
+        if (errorCode != null) {
+            responseBody.put("code", errorCode);
+        }
         Response response = Response.status(status).entity(responseBody)
                 .header("content-type", "application/json").build();
         requestContext.abortWith(response);

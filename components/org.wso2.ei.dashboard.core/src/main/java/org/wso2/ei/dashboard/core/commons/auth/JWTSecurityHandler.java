@@ -102,6 +102,17 @@ public class JWTSecurityHandler implements SecurityHandler {
     }
 
     @Override
+    public boolean isLoginAllowed(SSOConfig ssoConfig, String token) {
+
+        if (!TokenUtils.hasConfiguredGroups(ssoConfig.getAllowedLoginRoles())) {
+            return true;
+        }
+        JsonElement tokenPayload = TokenUtils.getParsedToken(token);
+        JsonElement claimElement = tokenPayload.getAsJsonObject().get(ssoConfig.getAdminGroupAttribute());
+        return TokenUtils.isUserInAllowedGroup(claimElement, ssoConfig.getAllowedLoginRoles());
+    }
+
+    @Override
     public String getSubject(SSOConfig ssoConfig, String token) {
 
         try {

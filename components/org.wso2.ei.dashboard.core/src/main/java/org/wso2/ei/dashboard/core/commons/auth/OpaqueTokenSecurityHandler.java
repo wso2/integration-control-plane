@@ -20,7 +20,6 @@ package org.wso2.ei.dashboard.core.commons.auth;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import org.apache.http.HttpStatus;
@@ -30,6 +29,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.wso2.ei.dashboard.core.commons.Constants;
 import org.wso2.ei.dashboard.core.commons.utils.HttpUtils;
+import org.wso2.ei.dashboard.core.commons.utils.TokenUtils;
 import org.wso2.ei.dashboard.core.exception.DashboardServerException;
 import org.wso2.ei.dashboard.core.exception.ManagementApiException;
 import org.wso2.micro.integrator.dashboard.utils.SSOConfig;
@@ -48,8 +48,12 @@ import static org.wso2.ei.dashboard.core.commons.Constants.TOKEN_CACHE_TIMEOUT;
 public class OpaqueTokenSecurityHandler implements SecurityHandler {
 
     private static final Logger logger = LogManager.getLogger(OpaqueTokenSecurityHandler.class);
+    private static final long MAX_LOGIN_CLAIM_CACHE_SIZE = 10_000L;
     private static final Cache<String, Boolean> adminClaimMap =
             CacheBuilder.newBuilder().expireAfterWrite(TOKEN_CACHE_TIMEOUT, TimeUnit.MINUTES).build();
+    private static final Cache<String, Boolean> loginClaimMap =
+            CacheBuilder.newBuilder().maximumSize(MAX_LOGIN_CLAIM_CACHE_SIZE)
+                    .expireAfterWrite(TOKEN_CACHE_TIMEOUT, TimeUnit.MINUTES).build();
     private static final Cache<String, String> subjectCache =
             CacheBuilder.newBuilder().expireAfterWrite(TOKEN_CACHE_TIMEOUT, TimeUnit.MINUTES).build();
     private static final AtomicBoolean PREFERRED_USERNAME_MISSING_WARNED = new AtomicBoolean(false);
@@ -104,6 +108,22 @@ public class OpaqueTokenSecurityHandler implements SecurityHandler {
         return validateWithCache(token) || validateAdminWithUserInfoEndpoint(ssoConfig, token);
     }
 
+    @Override
+    public boolean isLoginAllowed(SSOConfig ssoConfig, String token) {
+
+        if (!TokenUtils.hasConfiguredGroups(ssoConfig.getAllowedLoginRoles())) {
+            return true;
+        }
+        Boolean cachedResult = loginClaimMap.getIfPresent(token);
+        if (cachedResult != null) {
+            return cachedResult;
+        }
+        JsonElement claimElement = getGroupClaimFromUserInfoEndpoint(ssoConfig, token);
+        boolean allowed = TokenUtils.isUserInAllowedGroup(claimElement, ssoConfig.getAllowedLoginRoles());
+        loginClaimMap.put(token, allowed);
+        return allowed;
+    }
+
     private boolean validateWithCache(String token) {
 
         if (adminClaimMap.getIfPresent(token) != null) {
@@ -114,6 +134,14 @@ public class OpaqueTokenSecurityHandler implements SecurityHandler {
 
     private boolean validateAdminWithUserInfoEndpoint(SSOConfig config, String token) {
 
+        JsonElement claimElement = getGroupClaimFromUserInfoEndpoint(config, token);
+        boolean isAdmin = TokenUtils.isUserInAllowedAdminGroup(claimElement, config.getAllowedAdminGroups());
+        adminClaimMap.put(token, isAdmin);
+        return isAdmin;
+    }
+
+    private JsonElement getGroupClaimFromUserInfoEndpoint(SSOConfig config, String token) {
+
         if (config.getUserInfoEndpoint() == null) {
             config.setUserInfoEndpoint(
                     getUserInfoEndpointFromWellKnownEndpoint(config.getWellKnownEndpoint()));
@@ -123,26 +151,17 @@ public class OpaqueTokenSecurityHandler implements SecurityHandler {
                      HttpUtils.doGet(token, config.getUserInfoEndpoint())) {
             int httpSc = httpResponse.getStatusLine().getStatusCode();
             if (httpSc == HttpStatus.SC_OK) {
-                JsonArray groupElement =
-                        HttpUtils.getJsonResponse(httpResponse).get(config.getAdminGroupAttribute()).getAsJsonArray();
-                for (JsonElement group : groupElement) {
-                    if (config.getAllowedAdminGroups().contains(group.getAsString())) {
-                        adminClaimMap.put(token, true);
-                        return true;
-                    }
-                }
-                adminClaimMap.put(token, false);
+                return HttpUtils.getJsonResponse(httpResponse).get(config.getAdminGroupAttribute());
             }
-            if (logger.isDebugEnabled()) {
-                logger.error("Error validating the token using userInfo endpoint. ",
-                        httpResponse.getStatusLine().getReasonPhrase());
-            }
-        } catch (IOException e) {
-            logger.error("Error validating the token using userInfo endpoint. ", e);
-        } catch (ManagementApiException e) {
-            throw new DashboardServerException("Error occurred while validating the admin. ", e);
+            String errorMessage = "UserInfo endpoint returned " + httpSc + ": "
+                    + httpResponse.getStatusLine().getReasonPhrase();
+            logger.error(errorMessage);
+            throw new TokenValidationException(errorMessage);
+        } catch (IOException | ManagementApiException | DashboardServerException e) {
+            logger.error("Unable to retrieve group membership from the UserInfo endpoint.", e);
+            throw new TokenValidationException(
+                    "Unable to retrieve group membership from the UserInfo endpoint", e);
         }
-        return false;
     }
 
     private String getUserInfoEndpointFromWellKnownEndpoint(String wellKnownEndpoint) {

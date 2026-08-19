@@ -35,6 +35,17 @@ public interface SecurityHandler {
     boolean isAuthenticated(SSOConfig ssoConfig, String token);
 
     /**
+     * Checks whether an authenticated user is permitted to access the dashboard.
+     * An empty {@code console_access.allowed_roles} configuration preserves the
+     * existing behavior and permits every authenticated user.
+     *
+     * @param ssoConfig SSOConfig
+     * @param token     authorization token
+     * @return true when dashboard access is allowed
+     */
+    boolean isLoginAllowed(SSOConfig ssoConfig, String token);
+
+    /**
      * Executes the authorization logic relevant to the handler.
      *
      * @param ssoConfig SSOConfig

@@ -44,7 +44,11 @@ function SSO() {
                     }
                 }
                 var userNameAttribute = window.sso.usernameAttribute
-                AuthManager.setUser({username: decodedIDToken[userNameAttribute], scope: scope, sso: true}, true);
+                var username = decodedIDToken[userNameAttribute]
+                    || decodedIDToken.preferred_username
+                    || decodedIDToken.username
+                    || decodedIDToken.sub;
+                AuthManager.setUser({username: username, scope: scope, sso: true}, true);
                 history.push("/");
             };
             getData();

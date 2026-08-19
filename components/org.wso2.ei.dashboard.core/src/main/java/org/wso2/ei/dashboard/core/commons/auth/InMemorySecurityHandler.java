@@ -36,6 +36,13 @@ public class InMemorySecurityHandler implements SecurityHandler {
     }
 
     @Override
+    public boolean isLoginAllowed(SSOConfig ssoConfig, String token) {
+
+        // Local user-store logins are checked before their token is issued.
+        return true;
+    }
+
+    @Override
     public boolean isAuthorized(SSOConfig ssoConfig, String token) {
 
         JsonElement jsonElementPayload = TokenUtils.getParsedToken(token);

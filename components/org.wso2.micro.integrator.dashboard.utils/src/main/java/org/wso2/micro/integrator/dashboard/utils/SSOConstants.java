@@ -30,6 +30,7 @@ public class SSOConstants {
     public static final String TOML_SSO_JWT_ISSUER = "sso.jwt_issuer";
     public static final String TOML_SSO_BASE_URL = "sso.base_url";
     public static final String TOML_SSO_ADDITIONAL_TRUSTED_AUDIENCE = "sso.additional_trusted_audience";
+    public static final String TOML_CONSOLE_ACCESS_ALLOWED_ROLES = "console_access.allowed_roles";
 
     // endpoints
     public static final String TOML_SSO_JWKS_ENDPOINT = "sso.jwks_endpoint";

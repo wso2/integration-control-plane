@@ -28,18 +28,20 @@ public class SSOConfig {
     private OIDCAgentConfig oidcAgentConfig;
     private String adminGroupAttribute;
     private String allowedAdminGroups;
+    private String allowedLoginRoles;
     private String wellKnownEndpoint;
     private String baseUrl;
     private String introspectionEndpoint;
     private String userInfoEndpoint;
 
     public SSOConfig(OIDCAgentConfig oidcAgentConfig, String adminGroupAttribute,
-                     String allowedAdminGroups, String wellKnownEndpoint, String baseUrl, String introspectionEndpoint,
-                     String userInfoEndpoint) {
+                     String allowedAdminGroups, String allowedLoginRoles, String wellKnownEndpoint, String baseUrl,
+                     String introspectionEndpoint, String userInfoEndpoint) {
 
         this.oidcAgentConfig = oidcAgentConfig;
         this.adminGroupAttribute = adminGroupAttribute;
         this.allowedAdminGroups = allowedAdminGroups;
+        this.allowedLoginRoles = allowedLoginRoles;
         this.wellKnownEndpoint = wellKnownEndpoint;
         this.baseUrl = baseUrl;
         this.introspectionEndpoint = introspectionEndpoint;
@@ -94,6 +96,16 @@ public class SSOConfig {
     public void setAllowedAdminGroups(String allowedAdminGroups) {
 
         this.allowedAdminGroups = allowedAdminGroups;
+    }
+
+    public String getAllowedLoginRoles() {
+
+        return allowedLoginRoles;
+    }
+
+    public void setAllowedLoginRoles(String allowedLoginRoles) {
+
+        this.allowedLoginRoles = allowedLoginRoles;
     }
 
     public String getIntrospectionEndpoint() {
