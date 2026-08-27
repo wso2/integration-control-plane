@@ -278,10 +278,16 @@ export const updateAutoDeployEnabled = (input: UpdateAutoDeployInput): Promise<{
 
 export const generateComponentEndpoints = (input: GenerateComponentEndpointsInput): Promise<EnvEndpoint[]> => bff.post<ListResponse<EnvEndpoint>>(`/components/${seg(input.componentId)}/endpoints/generate`, input).then(items);
 
-export const generateComponentEnvironmentJwtSecret = (componentId: string, environmentId: string): Promise<string> => bff.post<{ secret: string }>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/jwt-secret`).then((r) => r?.secret ?? '');
+// The per-environment JWT secret registers a self-hosted MI/BI runtime with the
+// ICP server; OpenChoreo has no equivalent. The BFF routes behind these were ICP
+// GraphQL mutations and have been removed.
+export const generateComponentEnvironmentJwtSecret = (_componentId: string, _environmentId: string): Promise<string> => {
+  throw new Error('[cloud] components.generateComponentEnvironmentJwtSecret: not implemented');
+};
 
-export const rotateComponentEnvironmentJwtSecret = (componentId: string, environmentId: string): Promise<string> =>
-  bff.put<{ secret: string }>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/jwt-secret/rotate`).then((r) => r?.secret ?? '');
+export const rotateComponentEnvironmentJwtSecret = (_componentId: string, _environmentId: string): Promise<string> => {
+  throw new Error('[cloud] components.rotateComponentEnvironmentJwtSecret: not implemented');
+};
 
 export const updateEndpoint = (input: { componentId: string; versionId: string; releaseId: string; endpointId: string; displayName: string; networkVisibilities: string[] }): Promise<object> =>
   bff.put<object>(`/components/${seg(input.componentId)}/endpoints/${seg(input.endpointId)}/visibility`, input);

@@ -54,9 +54,16 @@ export const fetchCloudDataPlanes = async (_orgUuid: string): Promise<CloudDataP
   }
 };
 
-export const fetchLoggers = (environmentId: string, componentId: string): Promise<Logger[]> => bff.get<ListResponse<Logger>>(`/components/${seg(componentId)}/loggers${q({ environment: environmentId })}`).then(items);
+// Per-runtime log-level control is an ICP feature — the BFF routes behind these
+// were ICP GraphQL calls and have been removed. OpenChoreo has no equivalent, and
+// nothing in this build renders a log-level control.
+export const fetchLoggers = (_environmentId: string, _componentId: string): Promise<Logger[]> => {
+  throw new Error('[cloud] environments.fetchLoggers: not implemented');
+};
 
-export const updateLogLevel = (input: UpdateLogLevelInput): Promise<{ success: boolean; message: string; commandIds: string[] }> => bff.put<{ success: boolean; message: string; commandIds: string[] }>(`/components/${seg(input.componentName)}/loggers`, input);
+export const updateLogLevel = (_input: UpdateLogLevelInput): Promise<{ success: boolean; message: string; commandIds: string[] }> => {
+  throw new Error('[cloud] environments.updateLogLevel: not implemented');
+};
 
 // Every environment must bind to a data plane. Omitting the ref makes OpenChoreo
 // look for a DataPlane named "default" in the namespace and fail with "DataPlane
