@@ -61,6 +61,9 @@ interface RuntimeConfig {
   INTEGRATION_BUILDER_LLM_MODEL?: string;
   INTEGRATION_BUILDER_MAX_TOKENS?: string;
   INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL?: string;
+  /** Which of the WIP tracking codes (GTM container, CookiePro domain script) to load — 'dev' | 'stage' | 'prod'. Unset/unrecognized defaults to 'dev'. */
+  TRACKING_ENV?: string;
+  MOESIF_APP_API_KEY?: string;
 }
 
 export interface ApiConfig {
@@ -126,6 +129,10 @@ export interface ApiConfig {
   integrationBuilderMaxTokens: number;
   /** AI Integration Builder central GraphQL URL for connectors. */
   integrationBuilderCentralGraphqlUrl: string;
+  /** Which of the WIP tracking codes (GTM container, CookiePro domain script) to load. */
+  trackingEnv: 'dev' | 'stage' | 'prod';
+  /** Moesif application-tracking app key (WIP product analytics, not the customer-facing API-traffic Moesif key under Settings). */
+  moesifAppApiKey?: string;
 }
 
 // Extend window interface
@@ -175,7 +182,14 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
   internalMarketplaceUrl: 'https://apis.preview-dv.choreo.dev/marketplace/0.1.0',
+  trackingEnv: 'dev',
+  moesifAppApiKey: 'eyJhcHAiOiIzOTE6Njg4IiwidmVyIjoiMi4xIiwib3JnIjoiMjYyOjgxMCIsImlhdCI6MTc4MDI3MjAwMH0.PkVCaZxNZNsZluB9t4W0cItGgez1khyaOS3Z-O_XTZg',
 };
+
+// Accepts only the recognized tracking-env values; anything else (including unset) falls back to 'dev'.
+function parseTrackingEnv(value: unknown): ApiConfig['trackingEnv'] {
+  return value === 'stage' || value === 'prod' ? value : 'dev';
+}
 
 /**
  * Load configuration from /config.json.
@@ -243,6 +257,8 @@ export async function loadConfig(): Promise<void> {
       integrationBuilderMaxTokens: parsePositiveInt(config.INTEGRATION_BUILDER_MAX_TOKENS, DEFAULT_CONFIG.integrationBuilderMaxTokens),
       integrationBuilderCentralGraphqlUrl: config.INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL || 'https://api.dev-central.ballerina.io/2.0/graphql',
       internalMarketplaceUrl: `${choreoBase}/marketplace/0.1.0`,
+      trackingEnv: parseTrackingEnv(config.TRACKING_ENV),
+      moesifAppApiKey: config.MOESIF_APP_API_KEY || DEFAULT_CONFIG.moesifAppApiKey,
     };
 
     console.info('✓ Runtime configuration loaded from config.json');

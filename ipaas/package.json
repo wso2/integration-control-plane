@@ -36,6 +36,7 @@
     "@wso2/oxygen-ui-icons-react": "^0.9.1",
     "graphql": "^16.14.2",
     "mermaid": "^11.14.0",
+    "moesif-browser-js": "1.10.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",

@@ -20,6 +20,11 @@ import path from 'path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // Mirrors vite.config.ts's PRODUCT define — without it, any test importing src/features.ts
+  // (directly or transitively) throws "__PRODUCT__ is not defined" instead of running.
+  define: {
+    __PRODUCT__: JSON.stringify('wip'),
+  },
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
