@@ -22,21 +22,30 @@ import ballerina/time;
 import ballerina/uuid;
 
 // ============================================================================
-// REQUEST CACHE — STORAGE
+// TUNNELED OPERATIONS — STORAGE
 // ============================================================================
-// Every piece of tunnel state lives in cache_entry and cache_operation_outbox, shared by
-// all ICP nodes, because the node that takes a user's data is usually not the node
-// that receives the runtime's next heartbeat. Nothing here may be cached in a
-// module-level variable: that would reintroduce node affinity, and the symptom (works on
-// one node, intermittently stuck on two) is expensive to diagnose.
+// Every piece of tunnel state lives in one table, tunneled_operation, shared by all ICP
+// nodes, because the node that takes a user's data is usually not the node that receives
+// the runtime's next heartbeat. Nothing here may be cached in a module-level variable:
+// that would reintroduce node affinity, and the symptom (works on one node, intermittently
+// stuck on two) is expensive to diagnose.
+//
+// A read and a mutation are the same thing here — an operation to run on a runtime whose
+// result is stored and polled for — so they share one table, one claim, one completion and
+// one sweep. `cacheable` is the whole of the difference the storage layer sees: a read is
+// coalesced onto a shared key and re-served while stale; a mutation is one row, one outcome,
+// addressed to one runtime. The read-only entry points (startCacheFetch, claimCacheRefresh,
+// recordCacheFetchResult) and the mutation ones (enqueueCacheOperation, completeCacheOperation)
+// stay distinct because their identity and fencing rules differ; everything else is shared.
 //
 // Two properties do the work that locking would otherwise be needed for:
 //
 //   1. Coalescing is the primary key. Concurrent identical reads race to INSERT the same
-//      cache_key; the loser reads the winner's row. No SELECT-then-INSERT window.
-//   2. Fencing is the fetch id. A result is only accepted by the attempt that is still
-//      current, so a late answer from a superseded or invalidated fetch is discarded
-//      rather than resurrecting state a mutation removed.
+//      op_id; the loser reads the winner's row. No SELECT-then-INSERT window.
+//   2. Fencing is the fetch token (reads) or the DELIVERED status (mutations). A result is
+//      only accepted from the attempt that still owns the row, so a late answer from a
+//      superseded or invalidated attempt is discarded rather than resurrecting state a
+//      mutation removed.
 //
 // Redelivery is safe because the bridge replays a command id it has already executed, so
 // a claim does not have to be exclusive across ICP nodes — two nodes handing out the same
@@ -47,32 +56,33 @@ import ballerina/uuid;
 // without a delivery-acknowledgement round trip.
 const int CACHE_REDELIVER_AFTER_SECONDS = 20;
 
-# Current epoch seconds, the unit every time column in these two tables uses.
+# Current epoch seconds, the unit every time column in this table uses.
 #
 # + return - Seconds since the Unix epoch
 public isolated function cacheNowEpoch() returns int => time:utcNow()[0];
 
-// ── Read cache ───────────────────────────────────────────────────────────────
-
-# Reads one cache row.
+# Reads one row — a read or a mutation — by its id, which is what the console polls.
 #
-# + cacheKey - The data's key: scope, operation, params and the caller's role set
-# + return - The row, `()` when nothing is cached, or an error
-public isolated function getCacheEntry(string cacheKey)
-        returns types:CacheEntry?|error {
-    types:CacheEntry|sql:Error row = dbClient->queryRow(`
-        SELECT cache_key, kind, owner, token, status, expires_at, claimed_at, data
-        FROM cache_entry
-        WHERE cache_key = ${cacheKey}
+# + opId - The read's cache key or the mutation's operation id
+# + return - The row, `()` when unknown, or an error
+public isolated function getTunneledOperation(string opId)
+        returns types:TunneledOperation?|error {
+    types:TunneledOperation|sql:Error row = dbClient->queryRow(`
+        SELECT op_id, kind, cacheable, owner, target, token, status,
+               issued_at, expires_at, claimed_at, delivered_at, completed_at, data, result
+        FROM tunneled_operation
+        WHERE op_id = ${opId}
     `);
     if row is sql:NoRowsError {
         return ();
     }
     if row is sql:Error {
-        return error(string `Failed to read a cache entry`, row);
+        return error(string `Failed to read a tunneled operation`, row);
     }
     return row;
 }
+
+// ── Reads ────────────────────────────────────────────────────────────────────
 
 # Creates a FETCHING row, claiming the right to fetch this data.
 #
@@ -92,9 +102,10 @@ public isolated function getCacheEntry(string cacheKey)
 public isolated function startCacheFetch(string cacheKey, string kind, string owner,
         string data, string token, int expiresAt) returns boolean|error {
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        INSERT INTO cache_entry (cache_key, kind, owner, data, token, status, expires_at)
-        VALUES (${cacheKey}, ${kind}, ${owner}, ${data}, ${token}, ${types:CACHE_FETCHING},
-                ${expiresAt})
+        INSERT INTO tunneled_operation (op_id, kind, cacheable, owner, data, token, status,
+                                        issued_at, expires_at)
+        VALUES (${cacheKey}, ${kind}, ${true}, ${owner}, ${data}, ${token},
+                ${types:CACHE_FETCHING}, ${cacheNowEpoch()}, ${expiresAt})
     `);
     if result is sql:Error {
         if classifySqlError(result) == DUPLICATE_KEY {
@@ -124,9 +135,9 @@ public isolated function startCacheFetch(string cacheKey, string kind, string ow
 public isolated function claimCacheRefresh(string cacheKey, string token, int expiresAt)
         returns boolean|error {
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        UPDATE cache_entry
+        UPDATE tunneled_operation
         SET token = ${token}, claimed_at = NULL, expires_at = ${expiresAt}
-        WHERE cache_key = ${cacheKey} AND token IS NULL
+        WHERE op_id = ${cacheKey} AND cacheable = ${true} AND token IS NULL
     `);
     if result is sql:Error {
         return error(string `Failed to claim a cache refresh`, result);
@@ -135,28 +146,39 @@ public isolated function claimCacheRefresh(string cacheKey, string token, int ex
     return affected is int && affected > 0;
 }
 
-# Records a fetched result, or discards it.
+# Records a fetched result — an answer or a failure — or discards it as superseded.
 #
-# The update is fenced on `token`: zero rows affected means the attempt was
-# invalidated by a mutation or superseded by a newer attempt, so its data describes a
-# world that no longer exists and must not be stored. This is what stops a late result
-# resurrecting a task somebody has completed.
+# The update is fenced on `token`: zero rows affected means the attempt was invalidated by a
+# mutation or superseded by a newer attempt, so its data describes a world that no longer
+# exists and must not be stored. This is what stops a late result resurrecting a task
+# somebody has completed.
+#
+# On success the answer replaces `data` and the row goes READY. On failure the row keeps any
+# data it already holds — a failed refresh is a reason to go on serving the last good answer,
+# not to throw it away — and goes FAILED only if it had never answered (was still FETCHING).
 #
 # + cacheKey - The data's key
 # + token - The attempt this result belongs to
-# + data - The response document
-# + expiresAt - Epoch seconds until the entry goes stale
-# + return - `true` when stored, `false` when discarded as superseded, or an error
-public isolated function completeCacheFetch(string cacheKey, string token,
-        string data, int expiresAt) returns boolean|error {
-    sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        UPDATE cache_entry
-        SET status = ${types:CACHE_READY}, data = ${data}, expires_at = ${expiresAt},
-            token = NULL, claimed_at = NULL
-        WHERE cache_key = ${cacheKey} AND token = ${token}
-    `);
+# + succeeded - Whether the runtime answered or failed
+# + payload - The response document (the answer, or the failure)
+# + expiresAt - Epoch seconds until the row goes stale (success) or is retried (failure)
+# + return - `true` when recorded, `false` when discarded as superseded, or an error
+public isolated function recordCacheFetchResult(string cacheKey, string token,
+        boolean succeeded, string payload, int expiresAt) returns boolean|error {
+    sql:ParameterizedQuery update = succeeded
+        ? `UPDATE tunneled_operation
+           SET status = ${types:CACHE_READY}, data = ${payload}, expires_at = ${expiresAt},
+               token = NULL, claimed_at = NULL
+           WHERE op_id = ${cacheKey} AND token = ${token}`
+        : `UPDATE tunneled_operation
+           SET status = CASE WHEN status = ${types:CACHE_FETCHING}
+                             THEN ${types:CACHE_FAILED} ELSE status END,
+               data = CASE WHEN status = ${types:CACHE_FETCHING} THEN ${payload} ELSE data END,
+               expires_at = ${expiresAt}, token = NULL, claimed_at = NULL
+           WHERE op_id = ${cacheKey} AND token = ${token}`;
+    sql:ExecutionResult|sql:Error result = dbClient->execute(update);
     if result is sql:Error {
-        return error(string `Failed to store a cache result`, result);
+        return error(string `Failed to record a cache fetch result`, result);
     }
     int? affected = result.affectedRowCount;
     boolean stored = affected is int && affected > 0;
@@ -165,33 +187,6 @@ public isolated function completeCacheFetch(string cacheKey, string token,
                 token = token);
     }
     return stored;
-}
-
-# Records that a fetch failed. Fenced exactly like a success.
-#
-# A row that already holds a data keeps it: a failed refresh is a reason to go on
-# serving the last good answer, not to throw it away.
-#
-# + cacheKey - The data's key
-# + token - The attempt this failure belongs to
-# + errorPayload - The failure as a response document
-# + expiresAt - Epoch seconds until the failed entry is retried
-# + return - `true` when recorded, `false` when discarded as superseded, or an error
-public isolated function failCacheFetch(string cacheKey, string token,
-        string errorPayload, int expiresAt) returns boolean|error {
-    sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        UPDATE cache_entry
-        SET status = CASE WHEN status = ${types:CACHE_FETCHING}
-                          THEN ${types:CACHE_FAILED} ELSE status END,
-            data = CASE WHEN status = ${types:CACHE_FETCHING} THEN ${errorPayload} ELSE data END,
-            expires_at = ${expiresAt}, token = NULL, claimed_at = NULL
-        WHERE cache_key = ${cacheKey} AND token = ${token}
-    `);
-    if result is sql:Error {
-        return error(string `Failed to record a cache failure`, result);
-    }
-    int? affected = result.affectedRowCount;
-    return affected is int && affected > 0;
 }
 
 # Marks a scope's live entries stale, without deleting them.
@@ -215,9 +210,10 @@ public isolated function staleCacheOwner(string owner, int liveHorizonSeconds)
         returns int|error {
     int now = cacheNowEpoch();
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        UPDATE cache_entry
+        UPDATE tunneled_operation
         SET expires_at = ${now}
-        WHERE owner = ${owner}
+        WHERE cacheable = ${true}
+          AND owner = ${owner}
           AND expires_at > ${now}
           AND expires_at < ${now + liveHorizonSeconds}
     `);
@@ -237,9 +233,9 @@ public isolated function staleCacheOwner(string owner, int liveHorizonSeconds)
 public isolated function expireCacheEntry(string cacheKey) returns error? {
     int now = cacheNowEpoch();
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        UPDATE cache_entry
+        UPDATE tunneled_operation
         SET expires_at = ${now}
-        WHERE cache_key = ${cacheKey} AND expires_at > ${now}
+        WHERE op_id = ${cacheKey} AND cacheable = ${true} AND expires_at > ${now}
     `);
     if result is sql:Error {
         return error(string `Failed to expire a cache entry`, result);
@@ -247,111 +243,108 @@ public isolated function expireCacheEntry(string cacheKey) returns error? {
     return ();
 }
 
-# Takes up to `count` reads a runtime should execute, oldest claim first.
+# Takes the work due for this runtime's heartbeat: its pending mutations first, then the
+# reads of its scope. Mutations outrank reads because a user waiting on an action outranks a
+# list refresh, so they are claimed first and delivered first.
 #
-# Rows already claimed are offered again only after `CACHE_REDELIVER_AFTER_SECONDS`, so
-# a dropped heartbeat response costs one delay rather than a stuck data. Redelivery is
-# safe because the bridge replays a command id it has already executed.
+# One claim, two rules, because a read and a mutation are addressed and fenced differently:
 #
-# + owner - The scope this runtime serves
-# + count - Hard cap on how many reads one heartbeat may carry
-# + return - The reads to send, or an error
-public isolated function claimCacheFetches(string owner, int count)
-        returns types:CachePendingFetch[]|error {
+#   - A mutation is addressed to THIS runtime and no other (the bridge's replay cache is per
+#     process, so the same command reaching two runtimes of one integration would execute
+#     twice) and claimed by flipping PENDING -> DELIVERED, so it is handed over once.
+#   - A read is addressed to a SCOPE (any runtime of the component can answer a namespace
+#     query) and merely stamped `claimed_at`, so a dropped response re-offers it after
+#     `CACHE_REDELIVER_AFTER_SECONDS` — a replay the bridge absorbs, not a second execution.
+#
+# Expired rows are filtered out here as well as swept, so neither a stale read nor a mutation
+# past its deadline is ever delivered.
+#
+# + runtimeId - The runtime whose heartbeat is being answered
+# + scopeKey - The scope that runtime serves, whose reads it may answer
+# + maxMutations - Hard cap on how many mutations one heartbeat may carry
+# + maxReads - Hard cap on how many reads one heartbeat may carry
+# + return - The work to send, mutations before reads, or an error
+public isolated function claimTunneledOperations(string runtimeId, string scopeKey,
+        int maxMutations, int maxReads) returns types:TunneledOperation[]|error {
     int now = cacheNowEpoch();
-    int redeliverBefore = now - CACHE_REDELIVER_AFTER_SECONDS;
-    sql:ParameterizedQuery query = `
-        SELECT cache_key, token, data
-        FROM cache_entry
-        WHERE owner = ${owner}
-          AND token IS NOT NULL
-          AND expires_at > ${now}
-          AND (claimed_at IS NULL OR claimed_at < ${redeliverBefore})
-        ORDER BY created_at
-    `;
-    query = appendLimitClause(query, count);
-    types:CachePendingFetch[] fetches = [];
-    do {
-        stream<types:CachePendingFetch, sql:Error?> rows = dbClient->query(query);
-        check from types:CachePendingFetch fetch in rows
-            do {
-                fetches.push(fetch);
-            };
-    } on fail error e {
-        return error("Failed to claim cache fetches", e);
+    types:TunneledOperation[] claimed = [];
+
+    if maxMutations > 0 {
+        sql:ParameterizedQuery mutations = `
+            SELECT op_id, kind, cacheable, owner, target, token, status,
+                   issued_at, expires_at, claimed_at, delivered_at, completed_at, data, result
+            FROM tunneled_operation
+            WHERE cacheable = ${false}
+              AND target = ${runtimeId}
+              AND status = ${types:CACHE_OP_PENDING}
+              AND expires_at > ${now}
+            ORDER BY issued_at
+        `;
+        check collectClaimed(appendLimitClause(mutations, maxMutations), claimed);
     }
-    foreach types:CachePendingFetch fetch in fetches {
-        // Best effort: a stamp that does not land means the fetch is offered once more,
-        // which the executing side absorbs as a replay.
-        sql:ExecutionResult|sql:Error stamp = dbClient->execute(`
-            UPDATE cache_entry SET claimed_at = ${now}
-            WHERE cache_key = ${fetch.cacheKey} AND token = ${fetch.token}
-        `);
-        if stamp is sql:Error {
-            log:printWarn("Failed to stamp a claimed cache fetch", stamp,
-                    cacheKey = fetch.cacheKey);
+
+    if maxReads > 0 {
+        int redeliverBefore = now - CACHE_REDELIVER_AFTER_SECONDS;
+        sql:ParameterizedQuery reads = `
+            SELECT op_id, kind, cacheable, owner, target, token, status,
+                   issued_at, expires_at, claimed_at, delivered_at, completed_at, data, result
+            FROM tunneled_operation
+            WHERE cacheable = ${true}
+              AND owner = ${scopeKey}
+              AND token IS NOT NULL
+              AND expires_at > ${now}
+              AND (claimed_at IS NULL OR claimed_at < ${redeliverBefore})
+            ORDER BY issued_at
+        `;
+        check collectClaimed(appendLimitClause(reads, maxReads), claimed);
+    }
+
+    foreach types:TunneledOperation op in claimed {
+        // A mutation is handed over once: flip it DELIVERED, fenced on PENDING so a second
+        // node cannot re-deliver it. A read is best-effort: a stamp that does not land means
+        // it is offered once more, which the executing side absorbs as a replay.
+        sql:ParameterizedQuery stamp = op.cacheable
+            ? `UPDATE tunneled_operation SET claimed_at = ${now}
+               WHERE op_id = ${op.opId} AND token = ${op.token}`
+            : `UPDATE tunneled_operation
+               SET status = ${types:CACHE_OP_DELIVERED}, delivered_at = ${now}
+               WHERE op_id = ${op.opId} AND status = ${types:CACHE_OP_PENDING}`;
+        sql:ExecutionResult|sql:Error marked = dbClient->execute(stamp);
+        if marked is sql:Error {
+            log:printWarn("Failed to stamp a claimed tunneled operation", marked,
+                    opId = op.opId);
         }
     }
-    return fetches;
+    return claimed;
 }
 
-# Gives up on fetches nobody answered before their deadline.
-#
-# Without this an unanswered fetch kept its token and was re-offered on every heartbeat until
-# the sweeper deleted the row - dozens of commands for one question nobody could answer - and
-# the caller polling it never got an answer at all, because a row with a token reads as "still
-# fetching". Failing it turns that into a reply.
-#
-# + failureData - What to record as the entry's answer, as JSON
-# + retryAfterSeconds - How long before the entry may be fetched again
-# + return - How many fetches were abandoned, or an error
-# Gives up on fetches nobody answered before their deadline.
-#
-# `data` is deliberately left alone. It holds the REQUEST that a retry needs in order to
-# build a command again, and an entry that has been answered before holds the last good
-# answer beside it — both worth more than a failure notice. `status` already says the fetch
-# failed, so writing a failure document over the request would trade a recoverable row for
-# an unrecoverable one: the retry would have nothing to ask. (It did exactly that once —
-# a wedged connection pool expired a fetch, and that view answered 504 from then on.)
-#
-# + retryAfterSeconds - How long the failed state stands before a read retries it
-# + return - How many fetches were given up on
-public isolated function abandonExpiredCacheFetches(int retryAfterSeconds)
-        returns int|error {
-    int now = cacheNowEpoch();
-    sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        UPDATE cache_entry
-        SET status = CASE WHEN status = ${types:CACHE_FETCHING}
-                          THEN ${types:CACHE_FAILED} ELSE status END,
-            token = NULL, claimed_at = NULL, expires_at = ${now + retryAfterSeconds}
-        WHERE token IS NOT NULL AND expires_at <= ${now}
-    `);
-    if result is sql:Error {
-        return error(string `Failed to abandon expired cache fetches`, result);
-    }
-    int? affected = result.affectedRowCount;
-    return affected is int ? affected : 0;
+// Runs a claim query and appends its rows to `into`, preserving the caller's order.
+isolated function collectClaimed(sql:ParameterizedQuery query,
+        types:TunneledOperation[] into) returns error? {
+    stream<types:TunneledOperation, sql:Error?> rows = dbClient->query(query);
+    check from types:TunneledOperation op in rows
+        do {
+            into.push(op);
+        };
 }
-
-// ── Operation outbox ──────────────────────────────────────────────────────────
 
 # Queues a mutation for delivery to one runtime.
 #
-# `operationId` is the caller's idempotency key, so a resubmitted click collides on the
-# primary key instead of becoming a second operation — the one duplicate the ICP can
-# genuinely prevent. Two *different* users acting on the same task are two operations by
-# design: one succeeds and the other must be told it lost.
+# `opId` is the caller's idempotency key, so a resubmitted click collides on the primary key
+# instead of becoming a second operation — the one duplicate the ICP can genuinely prevent.
+# Two *different* users acting on the same task are two operations by design: one succeeds
+# and the other must be told it lost.
 #
-# + operation - The row to queue, with its data and deadline already built
+# + operation - The row to queue, with its data and expiry (the delivery deadline) already built
 # + return - `true` when queued, `false` when this idempotency key already exists
-public isolated function enqueueCacheOperation(types:CacheOperation operation)
+public isolated function enqueueCacheOperation(types:TunneledOperation operation)
         returns boolean|error {
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        INSERT INTO cache_operation_outbox (operation_id, target, owner, kind, status,
-                                            issued_at, deadline, data)
-        VALUES (${operation.operationId}, ${operation.target}, ${operation.owner},
-                ${operation.kind}, ${types:CACHE_OP_PENDING}, ${operation.issuedAt},
-                ${operation.deadline}, ${operation.data})
+        INSERT INTO tunneled_operation (op_id, kind, cacheable, target, owner, status,
+                                        issued_at, expires_at, data)
+        VALUES (${operation.opId}, ${operation.kind}, ${false}, ${operation.target},
+                ${operation.owner}, ${types:CACHE_OP_PENDING}, ${operation.issuedAt},
+                ${operation.expiresAt}, ${operation.data})
     `);
     if result is sql:Error {
         if classifySqlError(result) == DUPLICATE_KEY {
@@ -360,74 +353,6 @@ public isolated function enqueueCacheOperation(types:CacheOperation operation)
         return error(string `Failed to queue an operation`, result);
     }
     return true;
-}
-
-# Reads one queued or finished mutation, which is what the console polls.
-#
-# + operationId - The operation's id
-# + return - The row, `()` when unknown, or an error
-public isolated function getCacheOperation(string operationId)
-        returns types:CacheOperation?|error {
-    types:CacheOperation|sql:Error row = dbClient->queryRow(`
-        SELECT operation_id, target, owner, kind, status, issued_at, deadline,
-               delivered_at, completed_at, data, result
-        FROM cache_operation_outbox
-        WHERE operation_id = ${operationId}
-    `);
-    if row is sql:NoRowsError {
-        return ();
-    }
-    if row is sql:Error {
-        return error(string `Failed to read an operation`, row);
-    }
-    return row;
-}
-
-# Takes up to `count` mutations addressed to this runtime, oldest first.
-#
-# Addressed to *this* runtime and no other: the bridge's replay cache is per process, so
-# the same command reaching two runtimes of one integration would execute twice. Expired
-# rows are filtered out here as well as swept, so a mutation whose deadline has passed is
-# never delivered.
-#
-# + runtimeId - The runtime whose heartbeat is being answered
-# + count - Hard cap on how many mutations one heartbeat may carry
-# + return - The mutations to send, or an error
-public isolated function claimCacheOperations(string runtimeId, int count)
-        returns types:CacheOperation[]|error {
-    int now = cacheNowEpoch();
-    sql:ParameterizedQuery query = `
-        SELECT operation_id, target, owner, kind, status, issued_at, deadline,
-               delivered_at, completed_at, data, result
-        FROM cache_operation_outbox
-        WHERE target = ${runtimeId}
-          AND status = ${types:CACHE_OP_PENDING}
-          AND deadline > ${now}
-        ORDER BY issued_at
-    `;
-    query = appendLimitClause(query, count);
-    types:CacheOperation[] operations = [];
-    do {
-        stream<types:CacheOperation, sql:Error?> rows = dbClient->query(query);
-        check from types:CacheOperation operation in rows
-            do {
-                operations.push(operation);
-            };
-    } on fail error e {
-        return error("Failed to claim operations", e);
-    }
-    foreach types:CacheOperation operation in operations {
-        sql:ExecutionResult|sql:Error marked = dbClient->execute(`
-            UPDATE cache_operation_outbox
-            SET status = ${types:CACHE_OP_DELIVERED}, delivered_at = ${now}
-            WHERE operation_id = ${operation.operationId} AND status = ${types:CACHE_OP_PENDING}
-        `);
-        if marked is sql:Error {
-            log:printWarn("Failed to mark a cached operation delivered", marked,
-                    operationId = operation.operationId);
-        }
-    }
-    return operations;
 }
 
 # Records a mutation's outcome, first write wins.
@@ -445,9 +370,9 @@ public isolated function claimCacheOperations(string runtimeId, int count)
 public isolated function completeCacheOperation(string operationId, string status,
         string result) returns boolean|error {
     sql:ExecutionResult|sql:Error updated = dbClient->execute(`
-        UPDATE cache_operation_outbox
+        UPDATE tunneled_operation
         SET status = ${status}, result = ${result}, completed_at = ${cacheNowEpoch()}
-        WHERE operation_id = ${operationId} AND status = ${types:CACHE_OP_DELIVERED}
+        WHERE op_id = ${operationId} AND status = ${types:CACHE_OP_DELIVERED}
     `);
     if updated is sql:Error {
         return error(string `Failed to record an operation outcome`, updated);
@@ -458,48 +383,68 @@ public isolated function completeCacheOperation(string operationId, string statu
 
 // ── Sweeper ──────────────────────────────────────────────────────────────────
 
-# Expires unconfirmed mutations and deletes what is no longer servable.
+# Gives up on dead work and deletes what is no longer servable, in one pass over the table.
 #
 # Every statement is idempotent and none depends on which node runs it, so both ICP nodes
-# sweeping is harmless and no leader election is needed.
+# sweeping is harmless and no leader election is needed. Order matters: unanswered reads are
+# failed and unconfirmed mutations expired BEFORE finished rows are deleted, so work that
+# timed out in this same pass still becomes a reply or a notification rather than vanishing.
 #
-# Order matters: mutations are expired before finished rows are deleted, so a mutation
-# that timed out in this same pass still becomes a notification rather than vanishing.
-#
-# + staleRetentionSeconds - How long past expiry a cache row stays servable
-# + completedRetentionSeconds - How long a recorded outcome stays readable by the console
-# + return - The operations this pass expired, so the caller can surface each one, or an error
-public isolated function sweepCacheTables(int staleRetentionSeconds,
-        int completedRetentionSeconds) returns types:CacheOperation[]|error {
+# + staleRetentionSeconds - How long past expiry a read row stays servable before deletion
+# + completedRetentionSeconds - How long a recorded mutation outcome stays readable by the console
+# + failedReadRetrySeconds - How long an abandoned read's FAILED state stands before a retry
+# + return - The mutations this pass expired, so the caller can surface each one, or an error
+public isolated function sweepTunneledOperations(int staleRetentionSeconds,
+        int completedRetentionSeconds, int failedReadRetrySeconds)
+        returns types:TunneledOperation[]|error {
     int now = cacheNowEpoch();
 
-    // Expire FIRST, stamping this sweep's own id, then read back only what this call
-    // transitioned. Reading first and expiring second let two nodes see the same rows before
-    // either UPDATE ran, so both returned them and both raised a notification for one
-    // operation — the exactly-once discipline that completeCacheOperation establishes for
-    // outcomes, undone by the sweep that reports them. Publish what you transitioned.
+    // 1. Reads nobody answered before their deadline. Left in flight they keep their token,
+    //    so every heartbeat re-offers them and every poll reads as "still fetching" — a
+    //    question asked dozens of times and never answered. Failing turns that into a reply.
+    //    `data` is left alone: it holds the request a retry needs, and `status` carries the
+    //    failure on its own. Overwriting it with a failure notice once made a row
+    //    unrecoverable — a wedged pool expired a fetch and that view answered 504 for as long
+    //    as the row lived, with nothing left to re-ask.
+    sql:ExecutionResult|sql:Error abandoned = dbClient->execute(`
+        UPDATE tunneled_operation
+        SET status = CASE WHEN status = ${types:CACHE_FETCHING}
+                          THEN ${types:CACHE_FAILED} ELSE status END,
+            token = NULL, claimed_at = NULL, expires_at = ${now + failedReadRetrySeconds}
+        WHERE cacheable = ${true} AND token IS NOT NULL AND expires_at <= ${now}
+    `);
+    if abandoned is sql:Error {
+        return error(string `Failed to abandon expired cache fetches`, abandoned);
+    }
+
+    // 2. Expire unconfirmed mutations FIRST, stamping this sweep's own id, then read back only
+    //    what this call transitioned. Reading first and expiring second let two nodes see the
+    //    same rows before either UPDATE ran, so both returned them and both raised a
+    //    notification for one operation — the exactly-once discipline that completeCacheOperation
+    //    establishes for outcomes, undone by the sweep that reports them. Publish what you
+    //    transitioned.
     string sweepId = uuid:createType4AsString();
     sql:ExecutionResult|sql:Error expired = dbClient->execute(`
-        UPDATE cache_operation_outbox
+        UPDATE tunneled_operation
         SET status = ${types:CACHE_OP_EXPIRED}, completed_at = ${now}, result = ${sweepId}
-        WHERE deadline < ${now}
+        WHERE cacheable = ${false} AND expires_at < ${now}
           AND status IN (${types:CACHE_OP_PENDING}, ${types:CACHE_OP_DELIVERED})
     `);
     if expired is sql:Error {
         return error(string `Failed to expire unconfirmed operations`, expired);
     }
     int? expiredCount = expired.affectedRowCount;
-    types:CacheOperation[] expiring = [];
+    types:TunneledOperation[] expiring = [];
     if expiredCount is int && expiredCount > 0 {
         log:printWarn(string `${expiredCount} operation(s) expired unconfirmed`);
         do {
-            stream<types:CacheOperation, sql:Error?> rows = dbClient->query(`
-                SELECT operation_id, target, owner, kind, status, issued_at, deadline,
-                       delivered_at, completed_at, data, result
-                FROM cache_operation_outbox
+            stream<types:TunneledOperation, sql:Error?> rows = dbClient->query(`
+                SELECT op_id, kind, cacheable, owner, target, token, status,
+                       issued_at, expires_at, claimed_at, delivered_at, completed_at, data, result
+                FROM tunneled_operation
                 WHERE status = ${types:CACHE_OP_EXPIRED} AND result = ${sweepId}
             `);
-            check from types:CacheOperation row in rows
+            check from types:TunneledOperation row in rows
                 do {
                     expiring.push(row);
                 };
@@ -508,20 +453,21 @@ public isolated function sweepCacheTables(int staleRetentionSeconds,
         }
     }
 
-    // 2. Cache rows past the window in which they would still have been served.
+    // 3. Read rows past the window in which they would still have been served.
     sql:ExecutionResult|sql:Error dropped = dbClient->execute(`
-        DELETE FROM cache_entry WHERE expires_at < ${now - staleRetentionSeconds}
+        DELETE FROM tunneled_operation
+        WHERE cacheable = ${true} AND expires_at < ${now - staleRetentionSeconds}
     `);
     if dropped is sql:Error {
         return error(string `Failed to sweep the cache`, dropped);
     }
 
-    // 3. Mutations whose outcome is recorded elsewhere (audit log for a success, an
+    // 4. Mutations whose outcome is recorded elsewhere (audit log for a success, an
     //    unresolved system event for a failure), and which the console has had time to
     //    read. FAILED and EXPIRED rows stay until their notification is resolved.
     sql:ExecutionResult|sql:Error finished = dbClient->execute(`
-        DELETE FROM cache_operation_outbox
-        WHERE status = ${types:CACHE_OP_COMPLETED}
+        DELETE FROM tunneled_operation
+        WHERE cacheable = ${false} AND status = ${types:CACHE_OP_COMPLETED}
           AND completed_at < ${now - completedRetentionSeconds}
     `);
     if finished is sql:Error {

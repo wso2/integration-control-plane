@@ -783,65 +783,59 @@ CREATE TRIGGER update_bi_workflow_metadata_updated_at BEFORE UPDATE ON bi_workfl
 
 
 -- ============================================================================
--- REQUEST CACHE (derived state, shared across ICP nodes)
+-- TUNNELED OPERATIONS (derived state, shared across ICP nodes)
 -- ============================================================================
--- Two generic tables: one caching the answers to read requests, one queueing the
--- operations that change something. Neither knows what a workflow is — `kind` says what a
--- row is about and `data` carries the rest, so a second feature needing the same shape adds
--- a kind rather than a table.
+-- One generic table for the work the control plane tunnels to a runtime over its heartbeat:
+-- a read whose answer is cached and re-served while it refreshes, or a mutation whose outcome
+-- is queued and polled for. It knows nothing of workflows — `kind` says what a row is about,
+-- `cacheable` which of the two it is, and `data` carries the rest, so a second feature
+-- needing the same shape adds a kind rather than a table.
 --
--- The `cache_` prefix is the contract: this is DERIVED state. An upgrade may drop and
--- recreate these tables, and nothing in them needs migrating — losing a row costs one
--- refetch, or one caller being told their operation was never confirmed.
+-- This is DERIVED state. An upgrade may drop and recreate the table, and nothing in it needs
+-- migrating — losing a row costs one refetch, or one caller being told their operation was
+-- never confirmed.
 --
 -- What earns a column is what a WHERE clause needs; everything else lives in `data`. The ICP
 -- supports five database engines, and portable JSON predicates across them do not exist:
---   cache_key   the request's identity, COMPUTED - sha256(kind|owner|request|identity), so
---               the parts that make a request unique never become columns
---   owner       the scope a row belongs to; what a delivery claim filters on
---   token       the in-flight attempt, which fences a late answer from a superseded one
+--   op_id       the row's identity: a read's COMPUTED key sha256(kind|owner|request|identity),
+--               or a mutation's caller/decision-derived id, so a resubmission collides
+--   cacheable   read (re-served while stale) vs mutation (one row, one outcome)
+--   owner       the scope a row belongs to; what a read claim filters on
+--   target      the runtime a mutation is addressed to (null for a read — any runtime answers)
+--   token       a read's in-flight attempt, which fences a late answer from a superseded one
 --   expires_at  epoch SECONDS, not a timestamp: every read, claim and sweep compares it, and
 --               integers compare identically on all five engines while timestamp arithmetic
---               needs four different implementations (see storage/database_dialect.bal)
+--               needs four different implementations (see storage/database_dialect.bal). It is
+--               the current phase's deadline — a read's staleness horizon, a mutation's
+--               delivery deadline
 --
--- Neither table has a foreign key, deliberately: a K8S deployment DELETEs runtime rows when
--- they go offline, and ON DELETE CASCADE would discard the record of an operation whose
--- outcome nobody has established - which is the one thing here worth keeping.
+-- No foreign key, deliberately: a K8S deployment DELETEs runtime rows when they go offline,
+-- and ON DELETE CASCADE would discard the record of an operation whose outcome nobody has
+-- established - the one thing here worth keeping.
 
-CREATE TABLE cache_entry (
-    cache_key VARCHAR(64) NOT NULL,
+CREATE TABLE tunneled_operation (
+    op_id VARCHAR(100) NOT NULL,
     kind VARCHAR(64) NOT NULL,
+    cacheable BOOLEAN NOT NULL,
     owner VARCHAR(200) NOT NULL,
+    target VARCHAR(36),
     token VARCHAR(36),
     status VARCHAR(16) NOT NULL,
+    issued_at BIGINT NOT NULL,
     expires_at BIGINT NOT NULL,
     claimed_at BIGINT,
-    data TEXT,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (cache_key)
-);
-
-CREATE INDEX idx_cache_entry_claim ON cache_entry (owner, token, claimed_at);
-CREATE INDEX idx_cache_entry_expiry ON cache_entry (expires_at);
-
-CREATE TABLE cache_operation_outbox (
-    operation_id VARCHAR(100) NOT NULL,
-    target VARCHAR(36) NOT NULL,
-    owner VARCHAR(200) NOT NULL,
-    kind VARCHAR(64) NOT NULL,
-    status VARCHAR(16) NOT NULL,
-    issued_at BIGINT NOT NULL,
-    deadline BIGINT NOT NULL,
     delivered_at BIGINT,
     completed_at BIGINT,
-    data TEXT NOT NULL,
+    data TEXT,
     result TEXT,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (operation_id)
+    PRIMARY KEY (op_id)
 );
 
-CREATE INDEX idx_cache_outbox_delivery ON cache_operation_outbox (target, status, issued_at);
-CREATE INDEX idx_cache_outbox_cleanup ON cache_operation_outbox (status, completed_at);
+CREATE INDEX idx_tunop_read_claim ON tunneled_operation (owner, token, claimed_at);
+CREATE INDEX idx_tunop_mutation_claim ON tunneled_operation (target, status, issued_at);
+CREATE INDEX idx_tunop_expiry ON tunneled_operation (expires_at);
+CREATE INDEX idx_tunop_cleanup ON tunneled_operation (status, completed_at);
 
 
 -- Listeners bound to a runtime (e.g., HTTP/HTTPS)

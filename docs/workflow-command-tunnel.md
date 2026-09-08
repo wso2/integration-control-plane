@@ -32,7 +32,7 @@ sequenceDiagram
     autonumber
     participant UI as Console / API
     participant WS as workflow_service.bal
-    participant DB as cache_entry
+    participant DB as tunneled_operation
     participant RS as runtime_service.bal
     participant BR as Runtime bridge
 
@@ -51,7 +51,7 @@ sequenceDiagram
 
 **Mutations** (`POST`/`PUT`/`DELETE`):
 
-1. The request is written to `cache_operation_outbox` and answered **202 `{operationId}`** immediately.
+1. The request is written to `tunneled_operation` (`cacheable = false`) and answered **202 `{operationId}`** immediately.
 2. The target runtime's next heartbeat response carries it (mutations are claimed **before** reads — a user waiting on an action outranks a list refresh; at most `WF_MAX_OPERATIONS_PER_HEARTBEAT` (10) mutations and `WF_MAX_READS_PER_HEARTBEAT` (10) reads per beat).
 3. The console polls `GET …/operations/{operationId}`: **202** `{status: PENDING|DELIVERED, retryAfterMs}` while in flight, then the stored `httpStatus` and body once the runtime confirmed it, or **504** `{status: EXPIRED}` when no runtime ever did.
 4. A completed operation's row is kept for `WF_COMPLETED_RETENTION_SECONDS` (300s) so the poll can still collect it, then swept.
@@ -153,12 +153,12 @@ Definitions need no command at all. Each **full** heartbeat carries the integrat
 
 ## State and limits
 
-All tunnel state lives in **two generic database tables**, shared by every ICP node:
+All tunnel state lives in **one generic database table**, `tunneled_operation`, shared by every ICP node. A read and a mutation are the same thing to it — an operation run on a runtime whose result is stored and polled for — so they share one row shape, one claim, one completion and one sweep. `cacheable` is the distinction:
 
-- `cache_entry` — one row per distinct read (key = the sha256 above): the stored request, the latest answer, its expiry, and the in-flight fetch token.
-- `cache_operation_outbox` — one row per mutation: the request document, target runtime, status (`PENDING` → `DELIVERED` → `COMPLETED`/`FAILED`/`EXPIRED`), and the result.
+- a **read** (`cacheable = true`) — one row per distinct read (key = the sha256 above): the stored request, the latest answer, its expiry, and the in-flight fetch token. Coalesced onto its key and re-served while stale.
+- a **mutation** (`cacheable = false`) — one row per mutation: the request document, target runtime, status (`PENDING` → `DELIVERED` → `COMPLETED`/`FAILED`/`EXPIRED`), and the result. Addressed to one runtime, delivered once.
 
-The `cache_` names are deliberate: the tables carry a `kind` column (`workflow.read`, `workflow.operation`), so another feature adds a kind rather than a table, and no migration is owed when one does. Timestamps are epoch-second `BIGINT`s — one representation across all five database engines. There are **no foreign keys** to `runtimes` or `users`: K8s deletes runtime rows on scale-down, and a CASCADE would erase the record of a mutation whose outcome nobody established.
+The table is generic on purpose: a `kind` column (`workflow.read`, `workflow.operation`) says what a row is about, so another feature adds a kind rather than a table, and no migration is owed when one does. `expires_at` is the current phase's deadline for both — a read's staleness horizon, a mutation's delivery deadline. Timestamps are epoch-second `BIGINT`s — one representation across all five database engines. There are **no foreign keys** to `runtimes` or `users`: K8s deletes runtime rows on scale-down, and a CASCADE would erase the record of a mutation whose outcome nobody established.
 
 An ICP restart loses nothing: rows survive, an in-flight mutation is still delivered on the next heartbeat any node receives, and read fetches that die with the node are abandoned by the sweep and retried on the next request.
 
@@ -184,8 +184,8 @@ Queueing, delivery, correlation, deadlines, and result relay are operation-agnos
 | `icp_server/workflow_service.bal` | The console-facing resource: request → operation mapping, idempotency keys, operation polling, definitions from stored metadata |
 | `icp_server/workflow_tunnel.bal` | Cache keys and TTLs, read/mutation flows, decision dedup, result fencing, boost ramp, target selection, sweeps |
 | `icp_server/runtime_service.bal` | Heartbeat endpoints that carry commands out, and `POST /icp/commandResult` that brings results back |
-| `icp_server/modules/storage/cache_repository.bal` | `cache_entry` / `cache_operation_outbox` access: claims, coalescing, invalidation, sweeps |
+| `icp_server/modules/storage/cache_repository.bal` | `tunneled_operation` access: claims, coalescing, invalidation, sweeps |
 | `icp_server/modules/storage/heartbeat_repository.bal` | `bi_workflow_metadata` upsert and workflow-integration promotion |
-| `icp_server/resources/db/migration-scripts/add_cache_tables_*.sql` | The two tables, per engine |
+| `icp_server/resources/db/migration-scripts/add_cache_tables_*.sql` | The `tunneled_operation` table, per engine |
 | `icp_server/tests/workflow_tunnel_tests.bal` | Cache flows, fencing, decision dedup, expiry, the boost ramp, and one end-to-end round trip over real HTTP against a simulated bridge |
 | `icp_server/tests/workflow_metadata_tests.bal` | Metadata upsert and clear, capability recording, promotion rules |

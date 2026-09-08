@@ -65,14 +65,12 @@ Deployments upgrading to the **database-backed command tunnel** must also run th
 script once against the **main ICP DB** — `add_workflow_feature_*.sql` alone is not enough.
 Fresh installs do not need it — the `*_init.sql` scripts already contain everything.
 
-Without it, every workflow view fails at its first read: the tunnel answers requests from
-`cache_entry` and queues mutations in `cache_operation_outbox`, and a missing table turns each
-request into a 500.
+Without it, every workflow view fails at its first read: the tunnel answers reads and queues
+mutations in one `tunneled_operation` table, and a missing table turns each request into a 500.
 
-The tables are **derived state** (`cache_` prefix is the contract): they may be dropped and
-recreated on any upgrade with nothing to migrate — losing a row costs one refetch, or one
-caller being told their operation was never confirmed. The scripts only ever create; they are
-idempotent and safe to re-run.
+The table is **derived state**: it may be dropped and recreated on any upgrade with nothing to
+migrate — losing a row costs one refetch, or one caller being told their operation was never
+confirmed. The scripts only ever create; they are idempotent and safe to re-run.
 
 Pick the script matching your database engine — `add_cache_tables_h2.sql`,
 `add_cache_tables_mysql.sql`, `add_cache_tables_postgresql.sql`, `add_cache_tables_mssql.sql`,

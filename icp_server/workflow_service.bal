@@ -191,8 +191,8 @@ isolated function serveWorkflowRead(string componentId, string environmentId, st
     return response;
 }
 
-# The longest client-supplied idempotency key accepted. `cache_operation_outbox.operation_id`
-# is VARCHAR(100) and the key is stored behind a 4-character prefix, so this leaves room to
+# The longest client-supplied idempotency key accepted. `tunneled_operation.op_id` is
+# VARCHAR(100) and the key is stored behind a 4-character prefix, so this leaves room to
 # spare while keeping the failure a 400 rather than a truncated or rejected INSERT.
 const int WF_MAX_IDEMPOTENCY_KEY_LENGTH = 64;
 
@@ -207,7 +207,7 @@ isolated function acceptWorkflowMutation(http:Request req, string componentId,
     string|http:HeaderNotFoundError key = req.getHeader(WF_IDEMPOTENCY_HEADER);
     string idempotencyKey;
     if key is string && key.trim().length() > 0 {
-        // Bounded and checked before it becomes a primary key. `operation_id` is VARCHAR(100)
+        // Bounded and checked before it becomes a primary key. `op_id` is VARCHAR(100)
         // and carries a 4-character prefix, so an unbounded client header turned into a SQL
         // "value too long" error and a 500 — a client's malformed input reported as a server
         // fault, and trivial for any caller to trigger. The charset is restricted for the same
@@ -293,7 +293,7 @@ isolated function acceptWorkflowMutation(http:Request req, string componentId,
 # else acted first. `EXPIRED` is deliberately distinct from `FAILED`: the ICP never learned
 # the outcome, so the caller is told to check the target's state rather than to retry.
 isolated function serveWorkflowOperationStatus(string operationId) returns http:Response {
-    types:CacheOperation?|error row = storage:getCacheOperation(operationId);
+    types:TunneledOperation?|error row = storage:getTunneledOperation(operationId);
     if row is error {
         return workflowErrorResponse(500, "Failed to read the operation: " + row.message());
     }

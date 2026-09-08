@@ -34,10 +34,10 @@ import ballerina/uuid;
 // heartbeat responses carry a nextHeartbeatInSeconds cadence so the bridge polls faster
 // than its regular interval, decaying back as the boost window runs out.
 //
-// Nothing about a request lives in this process. Every ICP node shares the queue through
-// wf_read_cache and wf_operation_outbox, because heartbeats arrive round-robin: the node
-// that accepts a user's request is usually NOT the node that receives the runtime's next
-// check-in, so it persists the request and walks away. A single module-level map here
+// Nothing about a request lives in this process. Every ICP node shares the queue through the
+// tunneled_operation table, because heartbeats arrive round-robin: the node that accepts a
+// user's request is usually NOT the node that receives the runtime's next check-in, so it
+// persists the request and walks away. A single module-level map here
 // would reintroduce node affinity, and the symptom — works on one node, intermittently
 // stuck on two — is expensive to diagnose.
 //
@@ -220,8 +220,8 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
         check storage:expireCacheEntry(cacheKey);
     }
 
-    types:CacheEntry? row = check storage:getCacheEntry(cacheKey);
-    if row is types:CacheEntry {
+    types:TunneledOperation? row = check storage:getTunneledOperation(cacheKey);
+    if row is types:TunneledOperation {
         string? payload = row.data;
         // A failure that has outlived its expiry is a retry, not an answer.
         //
@@ -277,8 +277,8 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
     if !owns {
         // Another request — on this node or another — is already fetching this exact answer.
         // Both callers poll the one row instead of issuing two commands.
-        types:CacheEntry? existing = check storage:getCacheEntry(cacheKey);
-        if existing is types:CacheEntry {
+        types:TunneledOperation? existing = check storage:getTunneledOperation(cacheKey);
+        if existing is types:TunneledOperation {
             string? cached = existing.data;
             if cached is string {
                 return check readOutcomeFromPayload(cached, existing, now);
@@ -303,7 +303,7 @@ isolated function startWorkflowReadRefresh(string cacheKey, string operation, ma
     return ();
 }
 
-isolated function readOutcomeFromPayload(string payload, types:CacheEntry row, int now)
+isolated function readOutcomeFromPayload(string payload, types:TunneledOperation row, int now)
         returns WorkflowReadOutcome|error {
     map<json> document = check payload.fromJsonString().ensureType();
     // An entry that has only ever been fetched holds `{request}`; one that has been answered
@@ -386,8 +386,8 @@ isolated function decisionOperationId(string scopeKey, string taskId) returns st
 }
 
 # The user who submitted a stored operation, from its request document.
-isolated function operationActor(types:CacheOperation row) returns string? {
-    json|error document = row.data.fromJsonString();
+isolated function operationActor(types:TunneledOperation row) returns string? {
+    json|error document = (row.data ?: "").fromJsonString();
     if document is map<json> {
         json identity = document["identity"] ?: ();
         if identity is map<json> {
@@ -420,14 +420,17 @@ isolated function enqueueWorkflowMutation(string componentId, string environment
         : WF_OPERATION_COMMAND_PREFIX + idempotencyKey;
 
     string request = workflowRequestDocument(operation, params, roles, userId);
-    types:CacheOperation row = {
-        operationId: operationId,
+    types:TunneledOperation row = {
+        opId: operationId,
+        cacheable: false,
         target: target.runtimeId,
         kind: CACHE_KIND_WORKFLOW_OPERATION,
         owner: scopeKey,
         status: types:CACHE_OP_PENDING,
         issuedAt: now,
-        deadline: now + WF_OPERATION_DEADLINE_SECONDS,
+        // A mutation's expiry is its delivery deadline: past it the row is undeliverable and
+        // the sweep turns it into an EXPIRED notification rather than a silent loss.
+        expiresAt: now + WF_OPERATION_DEADLINE_SECONDS,
         data: request
     };
     boolean created = check storage:enqueueCacheOperation(row);
@@ -436,7 +439,7 @@ isolated function enqueueWorkflowMutation(string componentId, string environment
     }
 
     // The id was taken. Who took it decides what this caller is told.
-    types:CacheOperation? existing = check storage:getCacheOperation(operationId);
+    types:TunneledOperation? existing = check storage:getTunneledOperation(operationId);
     if existing is () {
         // Swept between the insert and this read. Treat it as queued: the caller polls an id
         // that no longer exists and is told so, rather than being refused something nobody holds.
@@ -450,11 +453,11 @@ isolated function enqueueWorkflowMutation(string componentId, string environment
     if existing.status == types:CACHE_OP_FAILED || existing.status == types:CACHE_OP_EXPIRED {
         // The first decision did not take effect, so the task is still open and this caller is
         // entitled to decide it. A fresh row, because the deterministic id is already spent.
-        types:CacheOperation reopened = row.clone();
-        reopened.operationId = operationId + ".r" + newFetchId().substring(0, 8);
+        types:TunneledOperation reopened = row.clone();
+        reopened.opId = operationId + ".r" + newFetchId().substring(0, 8);
         boolean retried = check storage:enqueueCacheOperation(reopened);
         if retried {
-            return {operationId: reopened.operationId, state: "QUEUED"};
+            return {operationId: reopened.opId, state: "QUEUED"};
         }
     }
     return {operationId: operationId, state: "TAKEN", owner: actor};
@@ -662,57 +665,51 @@ isolated function deliverWorkflowCommands(string runtimeId,
     types:ControlCommand[] commands = [];
     int now = nowUnixSeconds();
 
-    // Mutations first: a user waiting on an action outranks a list refresh.
-    types:CacheOperation[]|error operations =
-        storage:claimCacheOperations(runtimeId, WF_MAX_OPERATIONS_PER_HEARTBEAT);
-    if operations is types:CacheOperation[] {
-        foreach types:CacheOperation operation in operations {
-            json|error request = operation.data.fromJsonString();
-            if request is error {
-                log:printError("Skipping a workflow operation with an unreadable payload",
-                        request, operationId = operation.operationId);
-                continue;
+    // One claim returns this heartbeat's work, mutations before reads. The two kinds build
+    // their command differently: a mutation carries its own id and its stored deadline and its
+    // whole `data` is the request; a read's command id fences the fetch attempt (opId.token),
+    // its deadline is a fresh fetch window, and its `data` is `{request, response?}` so only
+    // the request half travels.
+    types:TunneledOperation[]|error claimed = storage:claimTunneledOperations(runtimeId,
+            scopeKey, WF_MAX_OPERATIONS_PER_HEARTBEAT, WF_MAX_READS_PER_HEARTBEAT);
+    if claimed is types:TunneledOperation[] {
+        foreach types:TunneledOperation op in claimed {
+            string commandId;
+            json request;
+            int deadline;
+            if op.cacheable {
+                json|error document = (op.data ?: "").fromJsonString();
+                request = document is map<json> ? (document["request"] ?: document) : ();
+                if document is error || request is () {
+                    log:printError("Skipping a cached read with an unreadable request",
+                            document is error ? document : error("no request in the entry"),
+                            opId = op.opId);
+                    continue;
+                }
+                commandId = readCommandId(op.opId, op.token ?: "");
+                deadline = now + WF_READ_FETCH_DEADLINE_SECONDS;
+            } else {
+                json|error document = (op.data ?: "").fromJsonString();
+                if document is error {
+                    log:printError("Skipping a workflow operation with an unreadable payload",
+                            document, opId = op.opId);
+                    continue;
+                }
+                request = document;
+                commandId = op.opId;
+                deadline = op.expiresAt;
             }
-            types:ControlCommand|error command = workflowCommand(runtimeId,
-                    operation.operationId, request, operation.deadline);
+            types:ControlCommand|error command =
+                    workflowCommand(runtimeId, commandId, request, deadline);
             if command is error {
-                log:printError("Skipping a malformed workflow operation", command,
-                        operationId = operation.operationId);
+                log:printError("Skipping a malformed workflow command", command, opId = op.opId);
                 continue;
             }
             commands.push(command);
         }
     } else {
-        log:printError("Failed to claim workflow operations for delivery", operations,
+        log:printError("Failed to claim workflow work for delivery", claimed,
                 runtimeId = runtimeId);
-    }
-
-    types:CachePendingFetch[]|error fetches =
-        storage:claimCacheFetches(scopeKey, WF_MAX_READS_PER_HEARTBEAT);
-    if fetches is types:CachePendingFetch[] {
-        foreach types:CachePendingFetch fetch in fetches {
-            // `data` is `{request, response?}`; delivery needs the request half.
-            json|error document = fetch.data.fromJsonString();
-            json request = document is map<json> ? (document["request"] ?: document) : ();
-            if document is error || request is () {
-                log:printError("Skipping a cached read with an unreadable request",
-                        document is error ? document : error("no request in the entry"),
-                        cacheKey = fetch.cacheKey);
-                continue;
-            }
-            types:ControlCommand|error command = workflowCommand(runtimeId,
-                    readCommandId(fetch.cacheKey, fetch.token), request,
-                    now + WF_READ_FETCH_DEADLINE_SECONDS);
-            if command is error {
-                log:printError("Skipping a malformed workflow read", command,
-                        cacheKey = fetch.cacheKey);
-                continue;
-            }
-            commands.push(command);
-        }
-    } else {
-        log:printError("Failed to claim cache fetches for delivery", fetches,
-                scopeKey = scopeKey);
     }
 
     if commands.length() > 0 {
@@ -774,9 +771,9 @@ isolated function recordWorkflowCommandResult(types:WorkflowCommandResult result
 // nothing beyond remembering to.
 isolated function recordWorkflowReadResult(string cacheKey, string fetchId,
         types:WorkflowCommandResult result, int now) returns boolean {
-    types:CacheEntry?|error row = storage:getCacheEntry(cacheKey);
+    types:TunneledOperation?|error row = storage:getTunneledOperation(cacheKey);
     json request = ();
-    if row is types:CacheEntry {
+    if row is types:TunneledOperation {
         string? stored = row.data;
         if stored is string {
             json|error document = stored.fromJsonString();
@@ -809,7 +806,7 @@ isolated function recordWorkflowReadResult(string cacheKey, string fetchId,
         if boostLeft is int && boostLeft > 0 && ttl > WF_TTL_SETTLING_SECONDS {
             ttl = WF_TTL_SETTLING_SECONDS;
         }
-        boolean|error stored = storage:completeCacheFetch(cacheKey, fetchId,
+        boolean|error stored = storage:recordCacheFetchResult(cacheKey, fetchId, true,
                 envelope.toJsonString(), now + ttl);
         if stored is error {
             log:printError("Failed to store a workflow read result", stored, cacheKey = cacheKey);
@@ -819,7 +816,7 @@ isolated function recordWorkflowReadResult(string cacheKey, string fetchId,
     }
     // A failed read keeps any payload the row already holds: the last good answer is worth
     // more than a fresh error, and the caller is told the refresh failed either way.
-    boolean|error recorded = storage:failCacheFetch(cacheKey, fetchId,
+    boolean|error recorded = storage:recordCacheFetchResult(cacheKey, fetchId, false,
             envelope.toJsonString(), now + WF_FAILED_READ_TTL_SECONDS);
     if recorded is error {
         log:printError("Failed to record a workflow read failure", recorded, cacheKey = cacheKey);
@@ -872,8 +869,8 @@ const int WF_INVALIDATE_HORIZON_SECONDS = 3600;
 // logged and swallowed: the mutation's outcome is already recorded, and the worst case of a
 // failed invalidation is bounded staleness — exactly what the TTL already promises.
 isolated function invalidateWorkflowScopeCache(string operationId) {
-    types:CacheOperation?|error row = storage:getCacheOperation(operationId);
-    if row !is types:CacheOperation {
+    types:TunneledOperation?|error row = storage:getTunneledOperation(operationId);
+    if row !is types:TunneledOperation {
         if row is error {
             log:printError("Failed to load a completed operation for cache invalidation", row,
                     operationId = operationId);
@@ -892,12 +889,12 @@ isolated function invalidateWorkflowScopeCache(string operationId) {
 // here, so an outcome is reported exactly once however many nodes saw the result.
 isolated function reportWorkflowOutcome(string operationId, boolean succeeded,
         types:WorkflowCommandResult result) {
-    types:CacheOperation?|error row = storage:getCacheOperation(operationId);
+    types:TunneledOperation?|error row = storage:getTunneledOperation(operationId);
     string operation = "";
     string target = "";
     string? actor = ();
-    if row is types:CacheOperation {
-        json|error request = row.data.fromJsonString();
+    if row is types:TunneledOperation {
+        json|error request = (row.data ?: "").fromJsonString();
         if request is map<json> {
             json? operationValue = request["operation"];
             if operationValue is string {
@@ -944,11 +941,11 @@ isolated function reportWorkflowOutcome(string operationId, boolean succeeded,
 # integration and lost its answer, or never have run at all. That is why it becomes an
 # unresolved notification rather than a log line — a person has to look, and the record has
 # to wait for them.
-isolated function reportExpiredWorkflowOperations(types:CacheOperation[] expired) {
-    foreach types:CacheOperation row in expired {
+isolated function reportExpiredWorkflowOperations(types:TunneledOperation[] expired) {
+    foreach types:TunneledOperation row in expired {
         string operation = "";
         string? actor = ();
-        json|error request = row.data.fromJsonString();
+        json|error request = (row.data ?: "").fromJsonString();
         if request is map<json> {
             json? operationValue = request["operation"];
             if operationValue is string {
@@ -963,9 +960,9 @@ isolated function reportExpiredWorkflowOperations(types:CacheOperation[] expired
                 string `A workflow operation was never confirmed by the integration: ` +
                 string `${operation}. It may or may not have been applied - check the ` +
                 string `target's state before retrying.`,
-                eventSource = row.target,
+                eventSource = row.target ?: row.owner,
                 metadata = {
-                    operationId: row.operationId,
+                    operationId: row.opId,
                     operation: operation,
                     userId: actor,
                     scopeKey: row.owner,
@@ -977,21 +974,11 @@ isolated function reportExpiredWorkflowOperations(types:CacheOperation[] expired
 # Runs one sweep and surfaces whatever it expired. Called on a timer by every node; every
 # statement is idempotent, so two nodes sweeping is harmless and needs no leader election.
 public isolated function sweepWorkflowTunnelState() {
-    // Fetches nobody answered are given up on first. Left alone they keep their token, so
-    // every heartbeat re-offers them and every poll on them reads as "still fetching" — a
-    // question nobody could answer, asked dozens of times, and a caller never told.
-    //
-    // The row keeps its data: that is where the request lives, and a retry needs it to build
-    // a command. `status` carries the failure on its own.
-    int|error given_up = storage:abandonExpiredCacheFetches(WF_FAILED_READ_TTL_SECONDS);
-    if given_up is error {
-        log:printError("Failed to abandon expired cache fetches", given_up);
-    } else if given_up > 0 {
-        log:printWarn(string `${given_up} cache fetch(es) went unanswered and were abandoned`);
-    }
-
-    types:CacheOperation[]|error expired =
-        storage:sweepCacheTables(WF_STALE_SERVE_SECONDS, WF_COMPLETED_RETENTION_SECONDS);
+    // One pass gives up on unanswered reads, expires unconfirmed mutations, and deletes what
+    // is past serving. It reports back only the mutations it expired — the outcomes nobody
+    // established, which have to reach a person rather than be dropped.
+    types:TunneledOperation[]|error expired = storage:sweepTunneledOperations(
+            WF_STALE_SERVE_SECONDS, WF_COMPLETED_RETENTION_SECONDS, WF_FAILED_READ_TTL_SECONDS);
     if expired is error {
         log:printError("The workflow tunnel sweep failed", expired);
         return;
