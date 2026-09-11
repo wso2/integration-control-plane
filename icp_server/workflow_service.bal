@@ -1,4 +1,4 @@
-// Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com) All Rights Reserved.
+// Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
 //
 // WSO2 LLC. licenses this file to you under the Apache License,
 // Version 2.0 (the "License"); you may not use this file except
@@ -203,7 +203,7 @@ const int WF_MAX_IDEMPOTENCY_KEY_LENGTH = 64;
 # produce two operations — the integration is what tells the second one it lost.
 isolated function acceptWorkflowMutation(http:Request req, string componentId,
         string environmentId, string operation, map<json> params, string userId,
-        string[] roles) returns http:Response {
+        string actorId, string[] roles) returns http:Response {
     string|http:HeaderNotFoundError key = req.getHeader(WF_IDEMPOTENCY_HEADER);
     string idempotencyKey;
     if key is string && key.trim().length() > 0 {
@@ -226,7 +226,7 @@ isolated function acceptWorkflowMutation(http:Request req, string componentId,
         idempotencyKey = uuid:createType4AsString();
     }
     WorkflowMutationOutcome?|error queued = enqueueWorkflowMutation(componentId, environmentId,
-            operation, params, userId, roles, idempotencyKey);
+            operation, params, userId, actorId, roles, idempotencyKey);
     if queued is error {
         log:printError("Failed to queue a workflow mutation", queued, operation = operation);
         return workflowErrorResponse(500, "Failed to submit the operation: " + queued.message());
@@ -292,8 +292,13 @@ isolated function acceptWorkflowMutation(http:Request req, string componentId,
 # A finished operation reports what the integration said, including a conflict when someone
 # else acted first. `EXPIRED` is deliberately distinct from `FAILED`: the ICP never learned
 # the outcome, so the caller is told to check the target's state rather than to retry.
-isolated function serveWorkflowOperationStatus(string operationId) returns http:Response {
+isolated function serveWorkflowOperationStatus(string operationId, string componentId,
+        string environmentId) returns http:Response {
     types:CacheOperation?|error row = storage:getCacheOperation(operationId);
+    // An operation id from another scope reads as unknown, not as someone else's status.
+    if row is types:CacheOperation && row.owner != workflowScopeKey(componentId, environmentId) {
+        row = ();
+    }
     if row is error {
         return workflowErrorResponse(500, "Failed to read the operation: " + row.message());
     }
@@ -357,7 +362,8 @@ function handleWorkflowRequest(string componentId, string environmentId, string[
 
     // 2. Authorize with the dedicated workflow permissions (scoped to the integration).
     //    - human-tasks: browsing needs view_human_tasks; acting needs manage_human_tasks.
-    //    - everything else (workflows lifecycle, definitions, review-activities):
+    //    - review-activities and work-items: either permission domain grants the listing.
+    //    - everything else (workflows lifecycle, definitions):
     //      browsing needs view_workflows; any mutation needs manage_workflows.
     string|error projectId = storage:getProjectIdByComponentId(componentId);
     if projectId is error {
@@ -376,6 +382,19 @@ function handleWorkflowRequest(string componentId, string environmentId, string[
         allowedPermissions = method == http:GET
             ? [auth:PERMISSION_WORKFLOW_VIEW_HUMAN_TASKS, auth:PERMISSION_WORKFLOW_MANAGE_HUMAN_TASKS]
             : [auth:PERMISSION_WORKFLOW_MANAGE_HUMAN_TASKS];
+    } else if firstSeg == "work-items" {
+        // Either domain grants the listing; the kinds the caller may see are narrowed below.
+        allowedPermissions = [
+            auth:PERMISSION_WORKFLOW_VIEW_HUMAN_TASKS, auth:PERMISSION_WORKFLOW_MANAGE_HUMAN_TASKS,
+            auth:PERMISSION_WORKFLOW_VIEW_WORKFLOWS, auth:PERMISSION_WORKFLOW_MANAGE_WORKFLOWS
+        ];
+    } else if firstSeg == "review-activities" {
+        allowedPermissions = method == http:GET
+            ? [
+                auth:PERMISSION_WORKFLOW_VIEW_HUMAN_TASKS, auth:PERMISSION_WORKFLOW_MANAGE_HUMAN_TASKS,
+                auth:PERMISSION_WORKFLOW_VIEW_WORKFLOWS, auth:PERMISSION_WORKFLOW_MANAGE_WORKFLOWS
+            ]
+            : [auth:PERMISSION_WORKFLOW_MANAGE_HUMAN_TASKS, auth:PERMISSION_WORKFLOW_MANAGE_WORKFLOWS];
     } else {
         allowedPermissions = method == http:GET
             ? [auth:PERMISSION_WORKFLOW_VIEW_WORKFLOWS, auth:PERMISSION_WORKFLOW_MANAGE_WORKFLOWS]
@@ -402,12 +421,17 @@ function handleWorkflowRequest(string componentId, string environmentId, string[
         escapedRoles.push("admin");
     }
 
+    // Served from stored metadata, before any tunnel lookup: it must answer even when the runtime is offline.
+    if method == http:GET && wfPath.length() == 1 && wfPath[0] == "task-queues" {
+        return handleTaskQueuesRequest(componentId, environmentId);
+    }
+
     // Polling a queued mutation needs neither a runtime nor a scope lookup: the outcome is a
     // row, and the point of recording it is that it survives the runtime that produced it.
     // Answered before target selection so a user still learns what happened to their action
     // when the integration has since gone offline.
     if method == http:GET && wfPath.length() == 2 && wfPath[0] == "operations" {
-        return serveWorkflowOperationStatus(wfPath[1]);
+        return serveWorkflowOperationStatus(wfPath[1], componentId, environmentId);
     }
 
     // 4. Map the request to a management operation and tunnel it to the leader
@@ -425,6 +449,27 @@ function handleWorkflowRequest(string componentId, string environmentId, string[
     // not reach the cache key, or a forced refresh would create a parallel entry instead of
     // refreshing the one everyone reads.
     boolean forceRefresh = queryParams.removeIfHasKey("refresh") == "true";
+
+    // `all` is stripped whatever the path, so it never reaches the cache key or the operation.
+    boolean wantTotal = queryParams.removeIfHasKey("all") == "true";
+    boolean totalCapablePath = (wfPath.length() == 2 && wfPath[0] == "human-tasks" && wfPath[1] == "pending-count")
+            || (wfPath.length() == 1 && wfPath[0] == "work-items");
+    if wantTotal && method == http:GET && totalCapablePath {
+        boolean|error mayTotal = auth:hasAnyPermission(userContext.userId,
+                [auth:PERMISSION_WORKFLOW_VIEW_WORKFLOWS, auth:PERMISSION_WORKFLOW_MANAGE_WORKFLOWS], scope);
+        if mayTotal is boolean && mayTotal {
+            string[]|error allRoles = storage:getAllRoleNames();
+            if allRoles is error {
+                return workflowErrorResponse(500, "Failed to resolve organization roles: " + allRoles.message());
+            }
+            // Added to the caller's own roles: the synthetic "admin" role is not in roles_v2.
+            foreach string role in allRoles.map(escapeRoleName) {
+                if escapedRoles.indexOf(role) is () {
+                    escapedRoles.push(role);
+                }
+            }
+        }
+    }
 
     // The instance graph composes the stored model with the runtime's history, so it is handled
     // here rather than mapped to a single tunneled operation like every other path.
@@ -449,8 +494,20 @@ function handleWorkflowRequest(string componentId, string environmentId, string[
             return workflowErrorResponse(400, "Request body must be a JSON object");
         }
     }
+    // Mutates the map above rather than re-reading the query: a fresh copy would carry `refresh` into the key.
+    if firstSeg == "work-items" {
+        string?|http:Response kinds = resolveWorkItemKinds(userContext.userId, scope,
+                queryParams["kind"]);
+        if kinds is http:Response {
+            return kinds;
+        }
+        if kinds is string {
+            queryParams["kinds"] = kinds;
+        }
+        _ = queryParams.removeIfHasKey("kind");
+    }
     [string, map<json>]? operation = mapWorkflowRequestToOperation(
-            method, wfPath, workflowQueryParams(req.getQueryParams()), body);
+            method, wfPath, queryParams, body);
     if operation is () {
         return workflowErrorResponse(404, "Unknown workflow operation: " + string:'join("/", ...wfPath));
     }
@@ -471,8 +528,42 @@ function handleWorkflowRequest(string componentId, string environmentId, string[
         return serveWorkflowRead(componentId, environmentId, operation[0], operationParams,
                 escapedRoles, forceRefresh);
     }
+    // The runtime records the username as completedBy/decidedBy; the stable id is for the audit trail.
     return acceptWorkflowMutation(req, componentId, environmentId, operation[0], operationParams,
-            userContext.userId, escapedRoles);
+            userContext.username, userContext.userId, escapedRoles);
+}
+
+# The kinds of work a caller may list: the intersection of their permissions (human-task perms
+# → HUMAN_TASK and REVIEW_ACTIVITY, workflow perms → REVIEW_ACTIVITY) and the `kind` requested.
+# A kind outside their permissions is answered 403.
+#
+# + userId - the caller
+# + scope - the integration/environment scope the permissions are checked in
+# + requestedKind - the raw `kind` query value, if any
+# + return - the comma-joined kinds, or a 403/500 response
+isolated function resolveWorkItemKinds(string userId, types:AccessScope scope, json requestedKind)
+        returns string?|http:Response {
+    boolean|error canTasks = auth:hasAnyPermission(userId,
+            [auth:PERMISSION_WORKFLOW_VIEW_HUMAN_TASKS, auth:PERMISSION_WORKFLOW_MANAGE_HUMAN_TASKS], scope);
+    boolean|error canReviews = auth:hasAnyPermission(userId,
+            [auth:PERMISSION_WORKFLOW_VIEW_WORKFLOWS, auth:PERMISSION_WORKFLOW_MANAGE_WORKFLOWS], scope);
+    if canTasks is error || canReviews is error {
+        return workflowErrorResponse(500, "Authorization check failed");
+    }
+    string[] allowed = [];
+    if canTasks {
+        allowed.push("HUMAN_TASK");
+    }
+    if canTasks || canReviews {
+        allowed.push("REVIEW_ACTIVITY");
+    }
+    if requestedKind is string && requestedKind != "" {
+        if allowed.indexOf(requestedKind) is () {
+            return workflowErrorResponse(403, "Access denied for kind: " + requestedKind);
+        }
+        return requestedKind;
+    }
+    return string:'join(",", ...allowed);
 }
 
 @http:ServiceConfig {

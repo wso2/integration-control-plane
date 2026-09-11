@@ -9,7 +9,7 @@
 --   4. role grants                  - Super Admin/Admin/Project Admin: view + manage both;
 --                                     Developer: manage human tasks, view workflows;
 --                                     Viewer: view human tasks only
---   5. bi_workflow_metadata     - workflow metadata + capabilities from the full heartbeat
+--   5. bi_workflow_metadata     - workflow metadata, capabilities and task_queue from the full heartbeat
 -- Idempotent - safe to re-run. Fresh installs get all of this from oracle_init.sql.
 -- Run once against the main ICP DB (as the ICP schema owner).
 

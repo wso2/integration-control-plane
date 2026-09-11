@@ -1,7 +1,4 @@
-/**
- * API URLs, external links, and legacy path helpers for pages not yet migrated to nav.ts.
- * Navigation for the main matrix pages is handled by src/nav.ts.
- */
+// API URLs, external links, and legacy path helpers; navigation for the main matrix pages lives in src/nav.ts.
 
 export function loginUrl(): string {
   return '/login';
@@ -129,7 +126,8 @@ export function projectRoleDetailUrl(orgHandler: string, projectHandler: string,
   return `/organizations/${orgHandler}/projects/${projectHandler}/settings/access-control/roles/${roleId}/edit`;
 }
 
-export function componentAccessControlUrl(orgHandler: string, projectHandler: string, componentHandler: string, tab: 'roles' | 'groups' = 'roles'): string {
+// 'sso-mappings' is included because the component Access Control tab strip navigates with this builder when SSO is on.
+export function componentAccessControlUrl(orgHandler: string, projectHandler: string, componentHandler: string, tab: 'roles' | 'groups' | 'sso-mappings' = 'roles'): string {
   return `/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/settings/access-control/${tab}`;
 }
 

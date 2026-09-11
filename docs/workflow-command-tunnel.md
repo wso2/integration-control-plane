@@ -62,7 +62,7 @@ sequenceDiagram
 
 `selectWorkflowCommandTarget` picks the freshest `RUNNING` runtime for the component and environment whose stored metadata advertises the **`workflowCommands`** capability.
 
-- A runtime advertises that capability only while a workflow integration is registered *and* its bridge has `enableWorkflowManagement = true`. The integration, not the control plane, decides whether it may be managed.
+- A runtime advertises that capability only while a workflow integration is registered *and* its bridge has `enableWorkflowManagement = true` — the Add Runtime snippet's default; a deployment sets it false to run headless (heartbeats only). The integration, not the control plane, decides whether it may be managed.
 - When no runtime qualifies **and nothing is cached**, the request answers **503**. A view that has answered before keeps serving its last answer (marked stale) while the integration is away — an old list still tells the user something true, and the staleness header says so.
 - Requests whose path falls outside the operation vocabulary — including the deprecated `/retry-tasks` aliases — answer **404**. They used to reach the runtime through the callback-URL proxy; that proxy is gone, and `runtimes.callback_url` is no longer written (the column stays for schema compatibility).
 - Listings that are namespace-wide at the runtime (`instances.list`, `humanTasks.list`, `humanTasks.pendingCount`, `reviewActivities.list`) are scoped by default to the target runtime's **published task queue**, so two integrations sharing a Temporal namespace do not see each other's instances. A caller-supplied `taskQueue` wins.

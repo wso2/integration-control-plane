@@ -79,6 +79,11 @@ bower_components
 build/Release
 
 # Dependency directories
+# Both forms: the trailing-slash pattern matches only real directories, so a node_modules
+# SYMLINK (left behind by tooling that links a shared install into a worktree) sailed past it
+# and got committed twice — and CI then failed at `pnpm install` with ENOTDIR, trying to mkdir
+# over a link that points nowhere on the runner.
+node_modules
 node_modules/
 jspm_packages/
 

@@ -186,8 +186,9 @@ export function ComponentAccessControl({ org, project, component }: ComponentSco
     }
   }, [canSeeAccessControl, loadingProject, loadingComponent, componentId, navigate, org, project, component]);
 
-  const projectTabs: readonly string[] = window.API_CONFIG.ssoEnabled ? PROJECT_TABS : PROJECT_TABS.slice(0, 2);
-  const tabIndex = projectTabs.indexOf(tab);
+  const projectTabs: readonly (typeof PROJECT_TABS)[number][] = window.API_CONFIG.ssoEnabled ? PROJECT_TABS : PROJECT_TABS.slice(0, 2);
+  // Widened to string[] because `tab` is a free-form URL param; the tab strip below navigates with a typed builder.
+  const tabIndex = (projectTabs as readonly string[]).indexOf(tab);
   const safeIndex = tabIndex < 0 ? 0 : tabIndex;
 
   if (loadingProject || loadingComponent)

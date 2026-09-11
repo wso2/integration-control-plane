@@ -57,11 +57,12 @@ import { useUpdateArtifactStatus, useUpdateListenerState, useTriggerTask } from 
 import { useListMiUsers, useCreateMiUser, useDeleteMiUser } from '../api/miUsers';
 import { ArtifactApiDefinition, ServiceResources, ServiceListeners, AutomationExecutions, ProxyApiReference } from './ArtifactTabs';
 import { StartWorkflowDialog, type Toast as WorkflowToast } from './workflow/AdminPortal';
-import WorkflowInstancesPanel from './workflow/WorkflowInstancesPanel';
+import { DefinitionStatsStrip } from './workflow/DefinitionStatsStrip';
 import { ArtifactTypeSelector } from './ArtifactDetail';
 import Authorized from './Authorized';
 import { Permissions } from '../constants/permissions';
 import { hasComponent, resourceUrl, useScope } from '../nav';
+import { useAccessControl } from '../contexts/AccessControlContext';
 import { isWorkflowIntegration } from '../constants/integrationTypes';
 import { ENTRY_POINT_CONFIG, ENTRY_POINT_DETAIL_TABS, type SelectedArtifact, type TabProps } from './artifact-config';
 import SyncSwitch from './SyncSwitch';
@@ -90,12 +91,7 @@ function EntryTypeChip({ cfg }: { cfg?: { label: string; color: string; bgColor:
 // needed when a user actually opens the API docs drawer for a BI service.
 const OpenApiDefinitionsDrawer = lazy(() => import('./OpenApiDefinitionsDrawer').then((m) => ({ default: m.OpenApiDefinitionsDrawer })));
 
-/**
- * View Workflows / Start New Workflow, with the start dialog and its toast.
- *
- * Rendered beside the definition selector, which only a Workflow integration has - workflow
- * definitions are not listed for any other integration type.
- */
+// View Workflows / Start New Workflow, with the start dialog and its toast.
 function WorkflowActions({ componentId, envId, workflowType }: { componentId: string; envId: string; workflowType: string }) {
   const [startOpen, setStartOpen] = useState(false);
   const [toast, setToast] = useState<WorkflowToast>(null);
@@ -142,6 +138,8 @@ function EntryPointDetail({ selected, onOpenDrawerTab }: { selected: SelectedArt
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const scope = useScope();
+  const { hasAnyPermission } = useAccessControl();
+  const canViewTasks = hasAnyPermission([Permissions.WORKFLOW_VIEW_HUMAN_TASKS, Permissions.WORKFLOW_MANAGE_HUMAN_TASKS], projectId, componentId);
   const updateTracingStatus = useUpdateArtifactTracingStatus();
   const updateStatisticsStatus = useUpdateArtifactStatisticsStatus();
   const updateArtifactStatus = useUpdateArtifactStatus();
@@ -498,14 +496,9 @@ function EntryPointDetail({ selected, onOpenDrawerTab }: { selected: SelectedArt
             ))}
           </Box>
         )}
-        {/* Listing instances calls /workflows, which the proxy gates on the workflow view permission,
-            so the panel is only rendered for someone who can actually load it. */}
-        {/* hasComponent narrows the scope so the task queue is a string: the panel must never run its
-            query unscoped, which would list the other integrations' runs too. This page only renders
-            at integration scope, so the guard is a type-level guarantee rather than a live branch. */}
         {artifactType === 'Workflow' && hasComponent(scope) && (
           <Authorized permissions={[Permissions.WORKFLOW_VIEW_WORKFLOWS, Permissions.WORKFLOW_MANAGE_WORKFLOWS]}>
-            <WorkflowInstancesPanel componentId={componentId} environmentId={envId} workflowType={artifactName} taskQueue={scope.component} />
+            <DefinitionStatsStrip scope={scope} componentId={componentId} environmentId={envId} workflowType={artifactName} canViewReviews canViewTasks={canViewTasks} />
           </Authorized>
         )}
         {/* pt: 0 for Service — it's the first block rendered (no header/overview above it here), so

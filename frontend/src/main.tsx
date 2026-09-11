@@ -27,6 +27,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { loadConfig } from './config/api';
 import { AccessControlProvider } from './contexts/AccessControlContext';
 import { NotificationsProvider } from './contexts/NotificationsContext';
+import { TimeZoneProvider } from './contexts/TimeZoneContext';
 import { AuthError } from './api/graphql';
 import './index.css';
 
@@ -55,9 +56,11 @@ loadConfig().then(() => {
             <BrowserRouter>
               <AuthProvider>
                 <AccessControlProvider>
-                  <ErrorBoundary>
-                    <App />
-                  </ErrorBoundary>
+                  <TimeZoneProvider>
+                    <ErrorBoundary>
+                      <App />
+                    </ErrorBoundary>
+                  </TimeZoneProvider>
                 </AccessControlProvider>
               </AuthProvider>
             </BrowserRouter>

@@ -937,9 +937,18 @@ isolated function upsertWorkflowMetadata(string runtimeId, types:Heartbeat heart
     string[]? capabilities = heartbeat?.capabilities;
     string? capabilitiesValue = capabilities is string[] && capabilities.length() > 0
         ? string:'join(",", ...capabilities) : ();
+    // Column widths: capabilities VARCHAR(512), task_queue VARCHAR(255).
+    if capabilitiesValue is string && capabilitiesValue.length() > 512 {
+        log:printWarn("Capabilities exceed the column width and are truncated", runtimeId = runtimeId);
+        capabilitiesValue = capabilitiesValue.substring(0, 512);
+    }
     // Runtime state like capabilities: chosen at the worker's startup, reported on every
     // heartbeat, and what scopes the project's shared Temporal namespace to this integration.
     string? taskQueue = heartbeat?.workflowTaskQueue;
+    if taskQueue is string && taskQueue.length() > 255 {
+        log:printWarn("Task queue name exceeds the column width and is truncated", runtimeId = runtimeId);
+        taskQueue = taskQueue.substring(0, 255);
+    }
 
     if dbType == POSTGRESQL {
         _ = check dbClient->execute(`

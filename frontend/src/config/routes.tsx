@@ -23,6 +23,7 @@ import EditComponent from '../pages/EditComponent';
 import Project from '../pages/Project';
 import Component from '../pages/Component';
 import Workflows from '../pages/Workflows';
+import WorkflowTasks from '../pages/WorkflowTasks';
 import TestConsole from '../pages/TestConsole';
 import RuntimeLogs from '../pages/RuntimeLogs';
 import Metrics from '../pages/Metrics';
@@ -50,6 +51,7 @@ export interface AppRoute extends Omit<RouteProps, 'children'> {
 const MATRIX: Matrix = {
   overview: { segment: '', pages: { organizations: Projects, projects: Project, components: Component } },
   workflows: { segment: 'workflows', pages: { projects: Workflows, components: Workflows } },
+  tasks: { segment: 'workflow-tasks', pages: { projects: WorkflowTasks, components: WorkflowTasks } },
   test: { segment: 'test-console', pages: { components: TestConsole } },
   logs: { segment: 'logs', pages: { projects: RuntimeLogs, components: RuntimeLogs } },
   loggers: { segment: loggersSegment, pages: { components: ManageLoggers } },

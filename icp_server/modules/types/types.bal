@@ -370,6 +370,8 @@ public type Heartbeat record {
 public type WorkflowMetadataRecord record {
     @sql:Column {name: "runtime_id"}
     string runtimeId;
+    @sql:Column {name: "component_id"}
+    string componentId;
     string metadata; // the workflow metadata document as a JSON string
     string? capabilities; // comma-joined capability names, or () when none were advertised
     @sql:Column {name: "task_queue"}

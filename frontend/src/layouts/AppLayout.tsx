@@ -50,7 +50,7 @@ import { useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink } from 'react-router';
 import Logo from '../components/Logo';
-import { BarChart3, Bell, Building, ChevronDown, ChevronRight, FlaskConical, Layers, LayoutDashboard, LogOut, Plus, ScrollText, Search, Server, Shield, Sliders, User as UserIcon, Workflow, X } from '@wso2/oxygen-ui-icons-react';
+import { BarChart3, Bell, Building, ChevronDown, ChevronRight, FlaskConical, Layers, LayoutDashboard, LogOut, Plus, ScrollText, Search, Server, Shield, Sliders, User as UserIcon, UserCheck, Workflow, X } from '@wso2/oxygen-ui-icons-react';
 import { useProjectByHandler, useProjects, useComponents, useAllEnvironments } from '../api/queries';
 import { useMultiEnvRuntimeStatusSubscription } from '../api/subscriptions';
 import { useNotificationPreferences } from '../hooks/useNotificationPreferences';
@@ -67,6 +67,7 @@ import { getIcpVersion } from '../config/api';
 const SIDEBAR_ICONS: Record<Resource, JSX.Element> = {
   overview: <LayoutDashboard size={20} />,
   workflows: <Workflow size={20} />,
+  tasks: <UserCheck size={20} />,
   test: <FlaskConical size={20} />,
   logs: <ScrollText size={20} />,
   loggers: <Sliders size={20} />,
@@ -77,7 +78,8 @@ const SIDEBAR_ICONS: Record<Resource, JSX.Element> = {
 };
 
 const SIDEBAR_CATEGORIES: { label: string; resources: Resource[] }[] = [
-  { label: '', resources: ['overview', 'workflows', 'test', 'runtimes'] },
+  { label: '', resources: ['overview', 'test', 'runtimes'] },
+  { label: 'Manage', resources: ['workflows', 'tasks'] },
   { label: 'Observability', resources: ['logs', 'loggers', 'metrics'] },
   { label: 'Infrastructure', resources: ['environments'] },
   { label: 'Management', resources: ['access-control'] },
@@ -129,14 +131,14 @@ export default function AppLayout(): JSX.Element {
   const currentComponent = hasComponent(scope) ? components.find((c) => c.handler === scope.component) : undefined;
   const componentId = currentComponent?.id;
 
-  /** Returns the resource if the user has permission at the target scope, or 'overview' as fallback. */
   const canAccessResource = (targetScope: Parameters<typeof hasProject>[0], target: Resource, targetProjectId: string | undefined = projectId || undefined, targetComponentId: string | undefined = componentId): Resource => {
     switch (target) {
       case 'overview':
         return 'overview';
       case 'workflows':
-        // Only workflow integrations have this view; at project level it always applies.
-        return !hasComponent(targetScope) || isWorkflowIntegration(components.find((c) => c.id === targetComponentId)?.displayType) ? 'workflows' : 'overview';
+      case 'tasks':
+        // Only workflow integrations have these views; at project level they always apply.
+        return !hasComponent(targetScope) || isWorkflowIntegration(components.find((c) => c.id === targetComponentId)?.displayType) ? target : 'overview';
       case 'test':
         // Only integrations that expose a service have anything to test.
         return isWorkflowIntegration(components.find((c) => c.id === targetComponentId)?.displayType) ? 'overview' : 'test';
@@ -179,7 +181,7 @@ export default function AppLayout(): JSX.Element {
   const showTest = !!currentComponent && !isWorkflowIntegration(currentComponent.displayType);
   const items = sidebarItems(scope, resource)
     .filter((item) => item.resource !== 'access-control' || canSeeAccessControl)
-    .filter((item) => item.resource !== 'workflows' || showWorkflows)
+    .filter((item) => (item.resource !== 'workflows' && item.resource !== 'tasks') || showWorkflows)
     .filter((item) => item.resource !== 'test' || showTest);
 
   return (

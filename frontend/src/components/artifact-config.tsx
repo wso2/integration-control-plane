@@ -20,12 +20,10 @@ import { Globe, Link2, ListOrdered, Clock, FolderArchive, Package, Plug, FileTex
 import type { JSX } from 'react';
 import type { GqlArtifact } from '../api/queries';
 
-/** Format artifact type name for display: "RestApi" → "Rest Api" */
 export function formatArtifactTypeName(t: string): string {
   return t.replace(/([a-z])([A-Z])/g, '$1 $2');
 }
 
-/** "RestApi" → "Rest Api(s)", "ProxyService" → "Proxy Service(s)" */
 export function typePlural(t: string): string {
   return t.replace(/([a-z])([A-Z])/g, '$1 $2') + '(s)';
 }
@@ -81,7 +79,8 @@ export const ENTRY_POINT_CONFIG: Record<string, { label: string; detailLabel: st
   Service: { label: 'Service', detailLabel: 'SERVICE', color: '#4a148c', bgColor: '#f3e5f5', metaField: 'basePath', primaryDisplay: true, overviewFields: 'package, type' },
   Listener: { label: 'Listener', detailLabel: 'LISTENER', color: '#bf360c', bgColor: '#fbe9e7', metaField: 'port', primaryDisplay: true, overviewFields: 'package, protocol, host, port' },
   Automation: { label: 'Automation', detailLabel: 'AUTOMATION', color: '#f57c00', bgColor: '#fff3e0', metaField: 'packageVersion', overviewFields: 'packageOrg, packageName, packageVersion' },
-  Workflow: { label: 'Workflow', detailLabel: 'WORKFLOW', color: '#00838f', bgColor: '#e0f7fa', overviewFields: 'state, workerCount' },
+  // No overview fields; the definition's figures come from the stats strip.
+  Workflow: { label: 'Workflow', detailLabel: 'WORKFLOW', color: '#00838f', bgColor: '#e0f7fa' },
 };
 
 export const ENTRY_POINT_DETAIL_TABS: Record<string, string[]> = {

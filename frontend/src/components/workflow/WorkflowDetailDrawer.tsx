@@ -16,29 +16,65 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, IconButton, ListingTable, Snackbar, Stack, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
-import { Ban, OctagonX, PauseCircle, PlayCircle, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, FormControlLabel, IconButton, ListingTable, Radio, RadioGroup, Snackbar, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Ban, BellRing, OctagonX, PauseCircle, PlayCircle, RotateCcw, X } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import CodeViewer from '../CodeViewer';
-import ExecutionGraph from './ExecutionGraph';
-import WorkflowTimeline from './WorkflowTimeline';
-import { isPreparing, useWorkflowExecutionGraph, useWorkflowHistory, useWorkflowInfo, useWorkflowLifecycle, valueOf, type WorkflowLifecycleAction } from '../../api/workflows';
-import { extractWorkflowInput, jsonPretty } from './helpers';
-import { StatusChip, type WorkflowScope } from './shared';
+import WorkflowFlowTab from './WorkflowFlowTab';
+import {
+  isPreparing,
+  isRefreshing,
+  type ResetPoint,
+  useResetPoints,
+  useResetWorkflow,
+  useWorkflowExecutionGraph,
+  useWorkflowHistory,
+  useWorkflowInfo,
+  useWorkflowInstanceGraph,
+  useWorkflowLifecycle,
+  valueOf,
+  type ResetType,
+  type WorkflowLifecycleAction,
+} from '../../api/workflows';
+import { splitQualifiedName } from './helpers';
+import { RefreshingNote, type WorkflowScope } from './shared';
 import Authorized from '../Authorized';
 import { Permissions } from '../../constants/permissions';
 import { useLayout } from '../../contexts/LayoutContext';
+import DateTime from '../DateTime';
 
 // The drawer fills the main content area only — right-anchored, its left edge lands at the sidebar
 // width so the left navigation stays visible. `sidebarWidth` is supplied live so the panel tracks
 // the sidebar's collapsed/expanded state.
-const drawerPaperSx = (sidebarWidth: number) => ({ '& .MuiDrawer-paper': { width: `calc(100% - ${sidebarWidth}px)`, position: 'fixed', top: 64, height: 'calc(100% - 64px)', borderLeft: '1px solid', borderColor: 'divider' } });
-const headerSx = { px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' };
+// A flex column so only the body scrolls — the header and the lifecycle bar stay put.
+const drawerPaperSx = (sidebarWidth: number) => ({
+  '& .MuiDrawer-paper': { width: `calc(100% - ${sidebarWidth}px)`, position: 'fixed', top: 64, height: 'calc(100% - 64px)', borderLeft: '1px solid', borderColor: 'divider', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+});
+const headerSx = { px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 };
 const emptySx = { py: 4, textAlign: 'center', color: 'text.secondary' };
 
+function resetPointLabel(points: ResetPoint[], index: number): string {
+  const names = (p: ResetPoint) => p.nodeNames.map((n) => splitQualifiedName(n).task ?? n);
+  const own = names(points[index]);
+  if (own.length) return own.join(', ');
+  if (index === 0) return 'Start of the run';
+  for (let i = index - 1; i >= 0; i--) {
+    const prev = names(points[i]);
+    if (prev.length) return `After ${prev[prev.length - 1]}`;
+  }
+  return `Checkpoint ${index + 1} of ${points.length}`;
+}
+
 export default function WorkflowDetailDrawer({ scope, workflowId, onClose }: { scope: WorkflowScope; workflowId: string; onClose: () => void }) {
-  const [tab, setTab] = useState(0);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [terminateOpen, setTerminateOpen] = useState(false);
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetType, setResetType] = useState<ResetType>('last-workflow-task');
+  const [resetEventId, setResetEventId] = useState<number | null>(null);
+  const [resetReason, setResetReason] = useState('');
+  const resetMutation = useResetWorkflow(scope);
+  // Reset points load only while the dialog is open — the history read has a cost.
+  const { data: resetPointsResult } = useResetPoints(scope, workflowId, resetOpen);
+  const resetPoints = valueOf(resetPointsResult) ?? [];
   const [reason, setReason] = useState('');
   const [toast, setToast] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
   const { sidebarWidth } = useLayout();
@@ -49,20 +85,18 @@ export default function WorkflowDetailDrawer({ scope, workflowId, onClose }: { s
   const { data: historyResult, isLoading: loadingHistory } = useWorkflowHistory(scope, workflowId);
   // Fetched for the Execution Graph tab (1) and also the Timeline tab (0), which uses the graph's
   // authoritative node types to fix categories/icons the history alone can't determine.
-  const { data: graphResult, isLoading: loadingGraph } = useWorkflowExecutionGraph(scope, tab === 0 || tab === 1 ? workflowId : null);
-  // Each of these is materialized through the integration, so the first read of a drawer that
-  // has just been opened is still being prepared. `preparing` is treated as loading here
-  // rather than as an empty result: an empty history tab would be a wrong answer.
+  const { data: graphResult, isLoading: loadingGraph } = useWorkflowExecutionGraph(scope, workflowId);
+  const { data: instanceGraphResult, isLoading: loadingInstanceGraph } = useWorkflowInstanceGraph(scope, workflowId);
+  const instanceGraph = valueOf(instanceGraphResult);
+  // These reads are materialized through the integration, so a freshly opened drawer is still being prepared.
   const info = valueOf(infoResult);
   const history = valueOf(historyResult) ?? [];
   const graph = valueOf(graphResult);
-  const waitingForInfo = loadingInfo || isPreparing(infoResult);
-  const waitingForHistory = loadingHistory || isPreparing(historyResult);
-  const waitingForGraph = loadingGraph || isPreparing(graphResult);
+  const preparing = isPreparing(infoResult) || isPreparing(historyResult) || isPreparing(graphResult) || isPreparing(instanceGraphResult);
+  const refreshing = isRefreshing(infoResult) || isRefreshing(historyResult) || isRefreshing(graphResult) || isRefreshing(instanceGraphResult);
   const lifecycle = useWorkflowLifecycle(scope);
 
   const status = (info?.status as string | undefined) ?? '';
-  const startInput = extractWorkflowInput(history as Array<Record<string, unknown>>);
 
   // Lifecycle actions narrowed by status: a running instance can be suspended/cancelled/terminated,
   // a suspended one resumed/cancelled/terminated; closed instances (completed, failed, terminated,
@@ -89,21 +123,27 @@ export default function WorkflowDetailDrawer({ scope, workflowId, onClose }: { s
   return (
     <Drawer anchor="right" open variant="persistent" sx={drawerPaperSx(sidebarWidth)} onClose={onClose}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={headerSx}>
-        <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {workflowId}
-          </Typography>
-          {status && <StatusChip status={status} />}
-        </Stack>
+        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          Execution Details
+        </Typography>
         <IconButton size="small" aria-label="close" onClick={onClose}>
           <X size={16} />
         </IconButton>
       </Stack>
 
-      {/* Lifecycle actions — only for users who can manage workflow executions */}
-      {showActions && (
+      {/* Renders for CLOSED runs too: reset exists for runs that failed, bulk retry for the reviews they left. */}
+      {info && (
         <Authorized permissions={[Permissions.WORKFLOW_MANAGE_WORKFLOWS]}>
-          <Stack direction="row" gap={1} sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <Stack direction="row" gap={1} sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', flexWrap: 'wrap', justifyContent: 'flex-end', flexShrink: 0 }}>
+            <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={resetMutation.isPending} onClick={() => setResetOpen(true)}>
+              Reset…
+            </Button>
+            {isRunning && instanceGraph?.graphKind === 'agent' && (
+              // Wake ends an in-progress sleep tool call early; harmless when the agent is not sleeping.
+              <Button size="small" variant="outlined" startIcon={<BellRing size={14} />} disabled={lifecycle.isPending} onClick={() => runAction('wake')}>
+                Wake
+              </Button>
+            )}
             {isRunning && (
               <Button size="small" variant="outlined" startIcon={<PauseCircle size={14} />} disabled={lifecycle.isPending} onClick={() => runAction('suspend')}>
                 Suspend
@@ -114,56 +154,40 @@ export default function WorkflowDetailDrawer({ scope, workflowId, onClose }: { s
                 Resume
               </Button>
             )}
-            <Button size="small" variant="outlined" color="warning" startIcon={<Ban size={14} />} disabled={lifecycle.isPending} onClick={() => runAction('cancel')}>
-              Cancel
-            </Button>
-            <Button size="small" variant="outlined" color="error" startIcon={<OctagonX size={14} />} disabled={lifecycle.isPending} onClick={() => setTerminateOpen(true)}>
-              Terminate
-            </Button>
+            {showActions && (
+              <>
+                <Button size="small" variant="outlined" color="warning" startIcon={<Ban size={14} />} disabled={lifecycle.isPending} onClick={() => runAction('cancel')}>
+                  Cancel
+                </Button>
+                <Button size="small" variant="outlined" color="error" startIcon={<OctagonX size={14} />} disabled={lifecycle.isPending} onClick={() => setTerminateOpen(true)}>
+                  Terminate
+                </Button>
+              </>
+            )}
           </Stack>
         </Authorized>
       )}
 
-      <Box sx={{ px: 2 }}>
-        <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, '& .MuiTabs-flexContainer': { justifyContent: 'flex-end' } }}>
-          <Tab label="Timeline" />
-          <Tab label="Execution Graph" />
-          <Tab label="History" />
-        </Tabs>
-
-        {tab === 0 && (
-          <Stack gap={2}>
-            {/* Info: start input and execution info side by side, then the run's timeline. */}
-            {waitingForInfo ? (
-              <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', py: 4 }} />
-            ) : infoError || !info ? (
-              <Typography sx={emptySx}>Could not load workflow info.</Typography>
-            ) : (
-              <Stack direction="row" gap={1.5} sx={{ flexWrap: 'wrap', alignItems: 'flex-start' }}>
-                {startInput !== null && (
-                  <Box sx={{ flex: 1, minWidth: 280 }}>
-                    <CodeViewer code={startInput} language="json" title="Start input" height="20vh" expandable showLineNumbers={false} />
-                  </Box>
-                )}
-                <Box sx={{ flex: 1, minWidth: 280 }}>
-                  <CodeViewer code={jsonPretty(info)} language="json" title="Execution info" height="20vh" expandable showLineNumbers={false} />
-                </Box>
-              </Stack>
-            )}
-            {waitingForHistory ? (
-              <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', py: 4 }} />
-            ) : history.length === 0 ? (
-              <Typography sx={emptySx}>No history events.</Typography>
-            ) : (
-              <WorkflowTimeline events={history as Array<Record<string, unknown>>} graph={graph} />
-            )}
-          </Stack>
+      <Box sx={{ flex: 1, minHeight: 0, overflow: 'auto', px: 2, pt: 1, pb: 2 }}>
+        <RefreshingNote show={refreshing} />
+        {loadingInfo || loadingHistory || loadingGraph || loadingInstanceGraph || preparing ? (
+          <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', py: 4 }} />
+        ) : infoError ? (
+          <Typography sx={emptySx}>Could not load workflow info.</Typography>
+        ) : (
+          <WorkflowFlowTab instanceGraph={instanceGraph} executionGraph={graph} events={history as Array<Record<string, unknown>>} info={info} onOpenHistory={() => setHistoryOpen(true)} environmentId={scope.environmentId} />
         )}
+      </Box>
 
-        {tab === 2 &&
-          (waitingForHistory ? (
-            <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', py: 4 }} />
-          ) : history.length === 0 ? (
+      <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="lg" fullWidth>
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          Event History
+          <IconButton size="small" aria-label="close event history" onClick={() => setHistoryOpen(false)}>
+            <X size={16} />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {history.length === 0 ? (
             <Typography sx={emptySx}>No history events.</Typography>
           ) : (
             <ListingTable>
@@ -188,17 +212,89 @@ export default function WorkflowDetailDrawer({ scope, workflowId, onClose }: { s
                 ))}
               </ListingTable.Body>
             </ListingTable>
-          ))}
+          )}
+        </DialogContent>
+      </Dialog>
 
-        {tab === 1 &&
-          (waitingForGraph ? (
-            <CircularProgress size={24} sx={{ display: 'block', mx: 'auto', py: 4 }} />
-          ) : !graph ? (
-            <Typography sx={emptySx}>No execution graph available.</Typography>
-          ) : (
-            <ExecutionGraph graph={graph} events={history as Array<Record<string, unknown>>} />
-          ))}
-      </Box>
+      <Dialog open={resetOpen} onClose={() => !resetMutation.isPending && setResetOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Reset Workflow</DialogTitle>
+        <DialogContent>
+          <Stack gap={2} sx={{ pt: 0.5 }}>
+            {/* Steps before the reset point are replayed from history — their side effects are not repeated. */}
+            <Alert severity="warning">
+              {resetType === 'first-workflow-task'
+                ? 'The whole workflow runs again as a new run of the same workflow ID, with its original input — every activity happens again, side effects included, and every human task is asked again. This cannot be undone.'
+                : resetType === 'last-workflow-task'
+                  ? 'The run is replayed from its own history up to its most recent workflow task — completed steps before it are not re-executed and their side effects are not repeated. Only the work after that point runs again, as a new run of the same workflow ID. This cannot be undone.'
+                  : 'The run is replayed from its own history up to the chosen point — completed steps before it are not re-executed and their side effects are not repeated. Everything after the point runs again for real, side effects included, and human tasks after it may be asked again. This cannot be undone.'}
+            </Alert>
+            <RadioGroup value={resetType} onChange={(e) => setResetType(e.target.value as ResetType)}>
+              <FormControlLabel value="last-workflow-task" control={<Radio size="small" />} label="Before the last step — redo only the most recent work" />
+              <FormControlLabel value="first-workflow-task" control={<Radio size="small" />} label="From the beginning — rerun the whole workflow with its original input" />
+              <FormControlLabel value="workflow-task-id" control={<Radio size="small" />} label="A specific point in this run's history" />
+            </RadioGroup>
+            {resetType === 'workflow-task-id' &&
+              (isPreparing(resetPointsResult) ? (
+                <Stack direction="row" alignItems="center" gap={1} sx={{ color: 'text.secondary' }}>
+                  <CircularProgress size={14} />
+                  <Typography variant="caption">Reading this run's reset points from its history…</Typography>
+                </Stack>
+              ) : resetPoints.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  This run has no reset points yet — no workflow task has completed.
+                </Typography>
+              ) : (
+                <RadioGroup value={resetEventId ?? ''} onChange={(e) => setResetEventId(Number(e.target.value))}>
+                  {resetPoints.map((point) => (
+                    <FormControlLabel
+                      key={point.eventId}
+                      value={point.eventId}
+                      control={<Radio size="small" />}
+                      label={
+                        <Stack sx={{ py: 0.25 }}>
+                          <Typography variant="body2">
+                            {resetPointLabel(resetPoints, resetPoints.indexOf(point))}
+                            {point.isFirstFailure ? ' — just before the first failure' : ''}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            <DateTime value={point.timestamp} />
+                          </Typography>
+                        </Stack>
+                      }
+                    />
+                  ))}
+                </RadioGroup>
+              ))}
+            <TextField label="Reason" fullWidth value={resetReason} onChange={(e) => setResetReason(e.target.value)} helperText="Recorded with the reset in the run's history and audit trail." />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button disabled={resetMutation.isPending} onClick={() => setResetOpen(false)}>
+            Back
+          </Button>
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={resetMutation.isPending || (resetType === 'workflow-task-id' && resetEventId === null)}
+            onClick={() =>
+              resetMutation.mutate(
+                { workflowId, resetType, eventId: resetType === 'workflow-task-id' ? (resetEventId ?? undefined) : undefined, reason: resetReason.trim() || undefined },
+                {
+                  onSuccess: (handle) => {
+                    setResetOpen(false);
+                    setToast({ severity: 'success', message: `Workflow reset — new run ${handle?.runId ?? 'started'}.` });
+                  },
+                  onError: (e) => {
+                    setResetOpen(false);
+                    setToast({ severity: 'error', message: e instanceof Error ? e.message : 'Reset failed.' });
+                  },
+                },
+              )
+            }>
+            {resetMutation.isPending ? 'Resetting…' : 'Reset Workflow'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={terminateOpen} onClose={() => setTerminateOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Terminate Workflow</DialogTitle>

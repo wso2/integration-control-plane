@@ -1150,9 +1150,10 @@ public isolated function getOpenApiDefinitionsForRuntime(string runtimeId) retur
 public isolated function getWorkflowMetadataForRuntime(string runtimeId)
         returns types:WorkflowMetadataRecord?|error {
     types:WorkflowMetadataRecord|error metadataRecord = dbClient->queryRow(`
-        SELECT runtime_id, metadata, capabilities, task_queue
-        FROM bi_workflow_metadata
-        WHERE runtime_id = ${runtimeId}
+        SELECT m.runtime_id, r.component_id, m.metadata, m.capabilities, m.task_queue
+        FROM bi_workflow_metadata m
+        INNER JOIN runtimes r ON m.runtime_id = r.runtime_id
+        WHERE m.runtime_id = ${runtimeId}
     `);
     if metadataRecord is sql:NoRowsError {
         return ();
@@ -1169,12 +1170,35 @@ public isolated function getWorkflowMetadataForComponentEnv(string componentId, 
         returns types:WorkflowMetadataRecord[]|error {
     types:WorkflowMetadataRecord[] metadataList = [];
     stream<types:WorkflowMetadataRecord, sql:Error?> metadataStream = dbClient->query(`
-        SELECT m.runtime_id, m.metadata, m.capabilities, m.task_queue
+        SELECT m.runtime_id, r.component_id, m.metadata, m.capabilities, m.task_queue
         FROM bi_workflow_metadata m
         INNER JOIN runtimes r ON m.runtime_id = r.runtime_id
         WHERE r.component_id = ${componentId} AND r.environment_id = ${environmentId}
             AND r.status = 'RUNNING'
         ORDER BY r.last_heartbeat DESC
+    `);
+
+    check from types:WorkflowMetadataRecord metadataRecord in metadataStream
+        do {
+            metadataList.push(metadataRecord);
+        };
+
+    return metadataList;
+}
+
+// Workflow metadata of every RUNNING runtime in the component's project and environment;
+// its own rows first, then freshest heartbeat.
+public isolated function getWorkflowMetadataForProjectEnv(string componentId, string environmentId)
+        returns types:WorkflowMetadataRecord[]|error {
+    types:WorkflowMetadataRecord[] metadataList = [];
+    stream<types:WorkflowMetadataRecord, sql:Error?> metadataStream = dbClient->query(`
+        SELECT m.runtime_id, r.component_id, m.metadata, m.capabilities, m.task_queue
+        FROM bi_workflow_metadata m
+        INNER JOIN runtimes r ON m.runtime_id = r.runtime_id
+        WHERE r.environment_id = ${environmentId}
+            AND r.status = 'RUNNING'
+            AND r.project_id = (SELECT project_id FROM components WHERE component_id = ${componentId})
+        ORDER BY (r.component_id = ${componentId}) DESC, r.last_heartbeat DESC
     `);
 
     check from types:WorkflowMetadataRecord metadataRecord in metadataStream

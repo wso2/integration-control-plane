@@ -38,7 +38,6 @@ import {
   PageContent,
   PageTitle,
   Stack,
-  Switch,
   TablePagination,
   Typography,
 } from '@wso2/oxygen-ui';
@@ -54,8 +53,7 @@ import { useProjectByHandler, useEnvironments, useComponentByHandler, useCompone
 import { useCreateOrgSecret, useDeleteRuntime, useRevokeOrgSecret } from '../api/mutations';
 import { hasComponent, type ProjectScope, type ComponentScope } from '../nav';
 import { formatDistanceToNow } from '../utils/time';
-import { runtimeImports, workflowManagementToml } from '../utils/runtimeToml';
-import { isWorkflowIntegration } from '../constants/integrationTypes';
+import { runtimeImports } from '../utils/runtimeToml';
 import Authorized from '../components/Authorized';
 import { Permissions } from '../constants/permissions';
 import { technologyLabel } from '../constants/technologies';
@@ -85,24 +83,18 @@ secret = "${secret}"
 # icp_url = "https://<hostname>:9445"`;
 }
 
-function biToml(envName: string, secret: string, projectHandle: string, integrationHandle: string, workflowMgt: boolean): string {
-  // The bridge's workflow key and the [ballerina.workflow] block appended below are written as a
-  // set: either the runtime carries workflow management or its snippet mentions workflows nowhere.
-  // enableWorkflowManagement lets the ICP tunnel management operations to the runtime over the
-  // heartbeat channel — no management port or API key is exposed by the runtime.
-  const workflowKeys = workflowMgt ? '\nenableWorkflowManagement = true' : '';
-  const base = `[wso2.icp.runtime.bridge]
+function biToml(envName: string, secret: string, projectHandle: string, integrationHandle: string): string {
+  // One snippet for every BI runtime; enableWorkflowManagement is the deployment's headless opt-out.
+  return `[wso2.icp.runtime.bridge]
 environment = "${envName}"
 project = "${projectHandle}"
 integration = "${integrationHandle}"
 runtime = "<unique id for the runtime>"
-secret = "${secret}"${workflowKeys}
+secret = "${secret}"
+# Set to false to run headless: heartbeats only, no workflow management from the ICP.
+enableWorkflowManagement = true
 # serverUrl = "https://<hostname>:9445"
 # runtimeHostUrl = "http://<hostname>"`;
-  if (!workflowMgt) return base;
-  return `${base}
-
-${workflowManagementToml(integrationHandle)}`;
 }
 
 function AddRuntimeModal({
@@ -110,7 +102,6 @@ function AddRuntimeModal({
   environmentName,
   componentId,
   componentType,
-  displayType,
   projectHandle,
   integrationHandle,
   onClose,
@@ -119,7 +110,6 @@ function AddRuntimeModal({
   environmentName: string;
   componentId: string;
   componentType?: string;
-  displayType?: string;
   projectHandle: string;
   integrationHandle: string;
   onClose: () => void;
@@ -129,17 +119,7 @@ function AddRuntimeModal({
   const [secret, setSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const [workflowMgtChoice, setWorkflowMgtChoice] = useState(false);
   const isBI = componentType === 'BI';
-  // A Workflow integration exists to host workflows, so its runtime always registers with workflow
-  // management enabled and there is nothing to choose. Derived rather than seeded into state so a
-  // late-arriving integration type still takes effect.
-  const alwaysWorkflowMgt = isWorkflowIntegration(displayType);
-  // Every other type still offers the toggle, because an integration's type can be changed after the
-  // fact: a runtime registered without this configuration exposes no workflow data, and switching
-  // the integration to Workflow later cannot add it retroactively. Turning it on up front keeps that
-  // switch usable without re-registering the runtime.
-  const workflowMgt = alwaysWorkflowMgt || workflowMgtChoice;
 
   const handleGenerate = () => {
     setError(null);
@@ -157,7 +137,7 @@ function AddRuntimeModal({
     );
   };
 
-  const config = secret ? (isBI ? biToml(environmentName, secret, projectHandle, integrationHandle, workflowMgt) : miToml(environmentName, secret, projectHandle, integrationHandle)) : null;
+  const config = secret ? (isBI ? biToml(environmentName, secret, projectHandle, integrationHandle) : miToml(environmentName, secret, projectHandle, integrationHandle)) : null;
 
   const handleDialogClose = (_event: unknown, reason: string) => {
     if (createMutation.isPending && (reason === 'backdropClick' || reason === 'escapeKeyDown')) return;
@@ -190,10 +170,6 @@ function AddRuntimeModal({
             <Alert severity="warning" sx={{ mb: 2 }}>
               Copy this secret now. It will not be shown again.
             </Alert>
-            {/* On the results step so it can be flipped without spending another secret on a fresh
-                dialog. Hidden for a Workflow integration, which is always enabled, and for MI, whose
-                deployment.toml has no workflow configuration. */}
-            {isBI && !alwaysWorkflowMgt && <FormControlLabel control={<Switch checked={workflowMgtChoice} onChange={(e) => setWorkflowMgtChoice(e.target.checked)} />} label="Allow workflow management from ICP" sx={{ display: 'flex', mb: 1 }} />}
             <DialogContentText sx={{ mb: 1 }}>
               Add the following configuration to your runtime's <strong>{isBI ? 'Config.toml' : 'deployment.toml'}</strong> file. Change the <strong>runtime</strong> value; it must be unique for each registered runtime.
             </DialogContentText>
@@ -205,15 +181,7 @@ function AddRuntimeModal({
                 </DialogContentText>
                 <CodeBoxWithCopy code={`[build-options]\nremoteManagement = true`} />
                 <DialogContentText sx={{ mb: 1 }}>
-                  {workflowMgt ? (
-                    <>
-                      Add the following imports to your runtime's <strong>main.bal</strong> file:
-                    </>
-                  ) : (
-                    <>
-                      Import wso2/icp.runtime.bridge to your runtime's <strong>main.bal</strong> file:
-                    </>
-                  )}
+                  Import wso2/icp.runtime.bridge in your runtime's <strong>main.bal</strong> file:
                 </DialogContentText>
                 <CodeBoxWithCopy code={runtimeImports()} />
               </>
@@ -331,7 +299,6 @@ function EnvironmentRuntimeCard({
   environmentId,
   componentId,
   componentType,
-  displayType,
   projectHandle,
   integrationHandle,
   projectId,
@@ -344,7 +311,6 @@ function EnvironmentRuntimeCard({
   environmentId: string;
   componentId: string | undefined;
   componentType?: string;
-  displayType?: string;
   projectHandle: string;
   integrationHandle: string;
   projectId: string;
@@ -599,16 +565,7 @@ function EnvironmentRuntimeCard({
 
       {drawerOpen && componentId && <BoundSecretDrawer componentId={componentId} environmentId={environmentId} environmentName={environmentName} onClose={() => setDrawerOpen(false)} />}
       {addOpen && componentId && (
-        <AddRuntimeModal
-          environmentId={environmentId}
-          environmentName={environmentName}
-          componentId={componentId}
-          componentType={componentType}
-          displayType={displayType}
-          projectHandle={projectHandle}
-          integrationHandle={integrationHandle}
-          onClose={() => setAddOpen(false)}
-        />
+        <AddRuntimeModal environmentId={environmentId} environmentName={environmentName} componentId={componentId} componentType={componentType} projectHandle={projectHandle} integrationHandle={integrationHandle} onClose={() => setAddOpen(false)} />
       )}
     </>
   );
@@ -704,7 +661,6 @@ export default function Runtime(scope: ProjectScope | ComponentScope): JSX.Eleme
             environmentId={env.id}
             componentId={componentId}
             componentType={component?.componentType}
-            displayType={component?.displayType}
             projectHandle={projectHandle}
             integrationHandle={integrationHandle}
             projectId={projectId}

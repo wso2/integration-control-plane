@@ -112,6 +112,10 @@ task buildFrontend {
     inputs.dir('frontend/src')
     inputs.file('frontend/package.json')
     outputs.dir('frontend/dist')
+    // The work happens in doLast through exec, outside gradle's dependency tracking — an
+    // up-to-date miss here ships a STALE frontend inside the distribution zip, which is the
+    // kind of failure nobody notices until a fixed bug reappears. Always rebuild; vite is fast.
+    outputs.upToDateWhen { false }
 
     doLast {
         logger.info('Building frontend...')
@@ -361,6 +365,10 @@ task packageICP {
             
             // Create the zip file
             logger.info("Creating zip file: ${zipFile.absolutePath}")
+            // `zip -r` UPDATES an existing archive, so every build's hashed bundles pile up in
+            // the distribution forever — and a consumer can end up serving whichever index.html
+            // survived. The archive is rebuilt from scratch, never appended.
+            delete zipFile
             exec {
                 workingDir 'build/temp-package'
                 commandLine 'zip', '-r', zipFile.absolutePath, '.'

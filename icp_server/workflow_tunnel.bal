@@ -1,4 +1,4 @@
-// Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com) All Rights Reserved.
+// Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com).
 //
 // WSO2 LLC. licenses this file to you under the Apache License,
 // Version 2.0 (the "License"); you may not use this file except
@@ -152,7 +152,9 @@ final string[] & readonly WF_TASK_QUEUE_SCOPED_OPERATIONS = [
     "instances.list",
     "humanTasks.list",
     "humanTasks.pendingCount",
-    "reviewActivities.list"
+    "reviewActivities.list",
+    // The unified queue is two of the listings above read as one, so it needs the same narrowing.
+    "workItems.list"
 ];
 
 # Narrows a listing to the target runtime's task queue, unless the caller named one.
@@ -389,6 +391,10 @@ isolated function decisionOperationId(string scopeKey, string taskId) returns st
 isolated function operationActor(types:CacheOperation row) returns string? {
     json|error document = row.data.fromJsonString();
     if document is map<json> {
+        json actorId = document["actorId"] ?: ();
+        if actorId is string {
+            return actorId;
+        }
         json identity = document["identity"] ?: ();
         if identity is map<json> {
             json userId = identity["userId"] ?: ();
@@ -399,7 +405,7 @@ isolated function operationActor(types:CacheOperation row) returns string? {
 }
 
 isolated function enqueueWorkflowMutation(string componentId, string environmentId,
-        string operation, map<json> params, string userId, string[] roles,
+        string operation, map<json> params, string userId, string actorId, string[] roles,
         string idempotencyKey) returns WorkflowMutationOutcome?|error {
     WorkflowCommandTarget? target = check selectWorkflowCommandTarget(componentId, environmentId);
     if target is () {
@@ -419,7 +425,7 @@ isolated function enqueueWorkflowMutation(string componentId, string environment
         ? decisionOperationId(scopeKey, <string>taskId)
         : WF_OPERATION_COMMAND_PREFIX + idempotencyKey;
 
-    string request = workflowRequestDocument(operation, params, roles, userId);
+    string request = workflowRequestDocument(operation, params, roles, userId, actorId);
     types:CacheOperation row = {
         operationId: operationId,
         target: target.runtimeId,
@@ -443,19 +449,17 @@ isolated function enqueueWorkflowMutation(string componentId, string environment
         return {operationId: operationId, state: "QUEUED"};
     }
     string? actor = operationActor(existing);
-    if !decides || actor == userId {
-        // The caller's own resubmission — the idempotency key doing its job.
-        return {operationId: operationId, state: "RESUBMITTED"};
-    }
-    if existing.status == types:CACHE_OP_FAILED || existing.status == types:CACHE_OP_EXPIRED {
-        // The first decision did not take effect, so the task is still open and this caller is
-        // entitled to decide it. A fresh row, because the deterministic id is already spent.
+    if decides && (existing.status == types:CACHE_OP_FAILED || existing.status == types:CACHE_OP_EXPIRED) {
+        // The first decision never took effect; a fresh row, since the deterministic id is spent.
         types:CacheOperation reopened = row.clone();
         reopened.operationId = operationId + ".r" + newFetchId().substring(0, 8);
         boolean retried = check storage:enqueueCacheOperation(reopened);
         if retried {
             return {operationId: reopened.operationId, state: "QUEUED"};
         }
+    }
+    if !decides || actor == actorId {
+        return {operationId: operationId, state: "RESUBMITTED"};
     }
     return {operationId: operationId, state: "TAKEN", owner: actor};
 }
@@ -468,11 +472,13 @@ isolated function newFetchId() returns string => uuid:createType4AsString();
 // integration can apply its own role check — the ICP's filtering is a convenience, not the
 // authorization boundary.
 isolated function workflowRequestDocument(string operation, map<json> params, string[] roles,
-        string? userId = ()) returns string =>
+        string? userId = (), string? actorId = ()) returns string =>
     {
         operation: operation,
         params: params,
-        identity: {userId: userId, roles: roles}
+        identity: {userId: userId, roles: roles},
+        // ICP-only: the stable user id for the audit trail and the same-caller test. Not tunneled.
+        actorId: actorId ?: userId
     }.toJsonString();
 
 # The identity of one cached answer: its scope, the operation, its parameters, and the
@@ -909,8 +915,11 @@ isolated function reportWorkflowOutcome(string operationId, boolean succeeded,
                 json? workflowId = params["workflowId"];
                 target = taskId is string ? taskId : (workflowId is string ? workflowId : "");
             }
+            json? actorId = request["actorId"];
             json? identity = request["identity"];
-            if identity is map<json> && identity["userId"] is string {
+            if actorId is string {
+                actor = actorId;
+            } else if identity is map<json> && identity["userId"] is string {
                 actor = <string>identity["userId"];
             }
         }
@@ -954,8 +963,11 @@ isolated function reportExpiredWorkflowOperations(types:CacheOperation[] expired
             if operationValue is string {
                 operation = operationValue;
             }
+            json? actorId = request["actorId"];
             json? identity = request["identity"];
-            if identity is map<json> && identity["userId"] is string {
+            if actorId is string {
+                actor = actorId;
+            } else if identity is map<json> && identity["userId"] is string {
                 actor = <string>identity["userId"];
             }
         }
@@ -1011,8 +1023,9 @@ const int WF_COMPLETED_RETENTION_SECONDS = 300;
 // used to reach the runtime through the callback-URL proxy. That proxy is gone, so those
 // paths now answer 404 instead.
 
-final string[] & readonly WF_INSTANCE_SUBRESOURCES = ["history", "activity-tree", "execution-graph"];
-final string[] & readonly WF_INSTANCE_ACTIONS = ["suspend", "resume", "terminate", "cancel"];
+final string[] & readonly WF_INSTANCE_SUBRESOURCES = ["history", "activity-tree", "execution-graph", "reset-points"];
+// "wake" ends a durable agent's in-progress `sleep` tool call early; harmless on other workflows.
+final string[] & readonly WF_INSTANCE_ACTIONS = ["suspend", "resume", "terminate", "cancel", "wake"];
 
 isolated function mapWorkflowRequestToOperation(string method, string[] wfPath,
         map<json> queryParams, map<json> body) returns [string, map<json>]? {
@@ -1048,13 +1061,19 @@ isolated function mapWorkflowRequestToOperation(string method, string[] wfPath,
                         {workflowId: workflowId, runId: wfPath[2]}];
                 }
             }
+            "work-items" => {
+                if segments == 1 {
+                    return ["workItems.list", queryParams];
+                }
+            }
             "human-tasks" => {
                 if segments == 1 {
                     return ["humanTasks.list", queryParams];
                 }
                 if segments == 2 {
                     return wfPath[1] == "pending-count"
-                        ? ["humanTasks.pendingCount", {}]
+                        // The query params carry the taskQueue filter, so the badge matches the filtered listing.
+                        ? ["humanTasks.pendingCount", queryParams]
                         : ["humanTasks.get", {taskId: wfPath[1]}];
                 }
             }
@@ -1079,7 +1098,7 @@ isolated function mapWorkflowRequestToOperation(string method, string[] wfPath,
                 // Fill workflowId so a retried start is idempotent on the runtime side.
                 map<json> params = body.clone();
                 if params["workflowId"] !is string {
-                    params["workflowId"] = "workflow-" + uuid:createType4AsString();
+                    params["workflowId"] = uuid:createType4AsString();
                 }
                 return ["instances.start", params];
             }
@@ -1097,6 +1116,15 @@ isolated function mapWorkflowRequestToOperation(string method, string[] wfPath,
                 }
                 return ["instances." + wfPath[3], params];
             }
+            if segments == 3 && wfPath[2] == "reset" {
+                map<json> params = {workflowId: wfPath[1]};
+                foreach string key in ["resetType", "eventId", "reason", "reapply", "runId"] {
+                    if body[key] !is () {
+                        params[key] = body[key];
+                    }
+                }
+                return ["instances.reset", params];
+            }
         }
         "human-tasks" if segments == 3 => {
             string taskId = wfPath[1];
@@ -1110,6 +1138,15 @@ isolated function mapWorkflowRequestToOperation(string method, string[] wfPath,
                 }
                 return ["humanTasks.fail", params];
             }
+        }
+        "review-activities" if segments == 2 && wfPath[1] == "bulk-retry" => {
+            map<json> params = {};
+            foreach string key in ["action", "taskIds", "parentWorkflowId", "activityName", "feedback"] {
+                if body[key] !is () {
+                    params[key] = body[key];
+                }
+            }
+            return ["reviewActivities.bulkRetry", params];
         }
         "review-activities" if segments == 3 => {
             string action = wfPath[2];
@@ -1135,6 +1172,9 @@ isolated function instanceSubresourceOperation(string sub) returns string {
         }
         "activity-tree" => {
             return "instances.activityTree";
+        }
+        "reset-points" => {
+            return "instances.resetPoints";
         }
         _ => {
             return "instances.executionGraph";

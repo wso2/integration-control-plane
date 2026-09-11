@@ -72,7 +72,8 @@ export function RegistryFileViewer({ runtimeId, filePath, item, onClose }: Regis
     }, 100);
   };
 
-  const getLanguage = (mediaType: string): 'text' | 'xml' | 'json' | 'yaml' | 'javascript' => {
+  const getLanguage = (mediaType?: string): 'text' | 'xml' | 'json' | 'yaml' | 'javascript' => {
+    if (!mediaType) return 'text';
     if (mediaType.includes('xml')) return 'xml';
     if (mediaType.includes('json')) return 'json';
     if (mediaType.includes('javascript')) return 'javascript';
