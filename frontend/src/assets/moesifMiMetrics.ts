@@ -215,6 +215,10 @@ function transform_moesif_metrics(tag, timestamp, record)
         end
     end
 
+    -- Set this after copying the payload so it always identifies the runtime
+    -- whose analytics log this sidecar ships.
+    output["metadata"]["icp_runtimeId"] = os.getenv("ICP_RUNTIME_ID")
+
     return 2, timestamp, output
 end
 `;
@@ -222,7 +226,6 @@ end
 const DOCKER_COMPOSE_YAML = `services:
   fluent-bit:
     image: fluent/fluent-bit:3.0
-    container_name: fluent-bit-moesif
     volumes:
       - \${MI_HOME}/repository/logs:/logs:ro
       - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
@@ -231,21 +234,25 @@ const DOCKER_COMPOSE_YAML = `services:
       - fluent-bit-db:/var/log
     environment:
       - MOESIF_APPLICATION_ID=\${MOESIF_APPLICATION_ID}
+      - ICP_RUNTIME_ID=\${ICP_RUNTIME_ID:?Set ICP_RUNTIME_ID in .env}
       - LOG_FILE_PATH=\${LOG_FILE_PATH:-/logs/synapse-analytics.log}
       - MOESIF_HOST=\${MOESIF_HOST:-api.moesif.net}
+    # The host port is configurable so several sidecars (one per runtime) can
+    # run on one host without colliding on 2020.
     ports:
-      - "2020:2020"
+      - "\${FLUENT_BIT_HTTP_PORT:-2020}:2020"
     restart: unless-stopped
     # The fluent/fluent-bit image ships no shell/curl, so container health is
     # monitored externally via Fluent Bit's built-in health endpoint
-    # (Health_Check On), e.g. GET http://<host>:2020/api/v1/health.
+    # (Health_Check On), e.g. GET http://<host>:\${FLUENT_BIT_HTTP_PORT}/api/v1/health.
 
 volumes:
   fluent-bit-db:
 `;
 
 // Builds the Fluent Bit .env file, injecting the selected Moesif Collector
-// Application ID. MI_HOME must be set by the user to their MI installation path.
+// Application ID. Set MI_HOME to the MI installation path and ICP_RUNTIME_ID
+// to the registered runtime whose analytics log this sidecar ships.
 export function miFluentBitEnv(applicationId: string): string {
   return `# Moesif Collector Application Id (Account -> API Keys -> Collector Application Id)
 MOESIF_APPLICATION_ID=${applicationId}
@@ -253,11 +260,19 @@ MOESIF_APPLICATION_ID=${applicationId}
 # Absolute path to the MI installation (its repository/logs is mounted into Fluent Bit)
 MI_HOME=<MI_HOME>
 
+# Copy the runtime ID from its details in ICP. Run one sidecar per runtime.
+# Sent as metadata.icp_runtimeId for the metrics dashboard's Runtime filter.
+ICP_RUNTIME_ID=<RUNTIME_ID>
+
 # Path (inside the container) of the analytics log to tail
 LOG_FILE_PATH=/logs/synapse-analytics.log
 
 # Moesif collector host
 MOESIF_HOST=api.moesif.net
+
+# Host port for Fluent Bit's health endpoint. Change it when another sidecar
+# on this host already publishes 2020.
+FLUENT_BIT_HTTP_PORT=2020
 `;
 }
 
@@ -278,8 +293,9 @@ const MI_FLUENT_BIT_ZIP_FOLDER = 'moesif-fluent-bit';
 export const MI_FLUENT_BIT_ZIP_FILENAME = 'moesif-fluent-bit.zip';
 
 // Downloads all Fluent Bit sidecar files (including a .env with the supplied
-// Collector Application ID) as a single zip. The user unzips it, sets MI_HOME +
-// the Collector Application ID in the .env, then runs `docker compose up -d`.
+// Collector Application ID) as a single zip. The user unzips it, sets MI_HOME,
+// ICP_RUNTIME_ID and the Collector Application ID in .env, then runs
+// `docker compose up -d`.
 export function downloadMoesifMiFluentBitFiles(applicationId: string): void {
   const entries: Record<string, string> = { ...MI_FLUENT_BIT_FILES, '.env': miFluentBitEnv(applicationId) };
   downloadConfigBundle(entries, MI_FLUENT_BIT_ZIP_FOLDER, MI_FLUENT_BIT_ZIP_FILENAME);
