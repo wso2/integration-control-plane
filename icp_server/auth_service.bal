@@ -221,6 +221,13 @@ service /auth on httpListener {
             }
         }
 
+        // `userDetails` is reassigned inside the block above, which resets the
+        // compiler's type narrowing, so re-check before accessing its fields.
+        if userDetails is error {
+            log:printError("Error getting user details", userDetails);
+            return utils:createInternalServerError("Error getting user details");
+        }
+
         // Generate JWT token using V2 utility function with permissions
         string|error jwtToken = auth:generateJWTTokenV2(
                 userDetails.userId,
@@ -370,6 +377,13 @@ service /auth on httpListener {
                 log:printError("Error getting OIDC user details", userDetails);
                 return utils:createInternalServerError("Error getting user details");
             }
+        }
+
+        // `userDetails` is reassigned inside the block above, which resets the
+        // compiler's type narrowing, so re-check before accessing its fields.
+        if userDetails is error {
+            log:printError("Error getting OIDC user details", userDetails);
+            return utils:createInternalServerError("Error getting user details");
         }
 
         error? ssoAdminGrantResult = grantSuperAdminFromSSOClaims(userDetails.userId, userInfo.username, claims, ssoConfig);

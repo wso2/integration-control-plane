@@ -24,9 +24,11 @@ import biLogsCanvas from './moesifBiLogsCanvas.json';
 // the embedded Moesif canvas via the CANVAS_INIT postMessage during the handshake
 // so the iframe renders the logs without the user having to open Moesif. The
 // payload carries the `dashboards` + `workspaces` definitions the canvas renders,
-// including the `runtimeId` context filter (on the `metadata.icp_runtimeid` log
+// including the `runtimeId` context filter (on the `metadata.icp_runtimeId` log
 // attribute the Fluent Bit sidecar tags records with) whose options MoesifCanvas
-// fills in with the integration's runtimes.
+// fills in with the integration's runtimes. Note the casing: logs carry the id
+// as `metadata.icp_runtimeId`, while the metrics canvas filters on the
+// runtime-published metric tag `metadata.metric_tags.icp_runtimeid` (lowercase).
 
 // Canvas template for the application logs canvas.
 export const MOESIF_LOGS_CANVAS_TEMPLATE = biLogsCanvas;

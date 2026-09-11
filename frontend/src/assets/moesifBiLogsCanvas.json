@@ -10,7 +10,7 @@
           {
             "id": "runtimeId",
             "label": "Runtime",
-            "field": "metadata.icp_runtimeid.raw",
+            "field": "metadata.icp_runtimeId.raw",
             "op": "contains",
             "type": "parentOptions",
             "visibility": "always",
@@ -74,7 +74,7 @@
           "trace_id",
           "log.severity",
           "resource",
-          "metadata.icp_runtimeid"
+          "metadata.icp_runtimeId"
         ],
         "sort": [
           {

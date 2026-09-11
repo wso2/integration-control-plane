@@ -10,6 +10,19 @@
         ["6a7c1a29862ed70a125b9b13", "6a7c1a294006641071c0b9ee", "6a7c1a2a87769f027193fa13"],
         ["6a7c1a2b87769f027193fa14", "6a7c1a2b862ed70a125b9b16"]
       ],
+      "filters": {
+        "context": [
+          {
+            "id": "runtimeId",
+            "label": "Runtime",
+            "field": "metadata.icp_runtimeId.raw",
+            "op": "contains",
+            "type": "parentOptions",
+            "visibility": "always",
+            "multi": true
+          }
+        ]
+      },
       "parent": null,
       "sort_order": 3
     }

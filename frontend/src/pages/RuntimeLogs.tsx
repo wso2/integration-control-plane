@@ -17,15 +17,15 @@
  */
 
 import { Alert, Button, Checkbox, Chip, CircularProgress, Divider, FormControlLabel, IconButton, ListItemText, MenuItem, PageContent, Select, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ChevronDown, ChevronRight, Copy, Download, RefreshCw, ScrollText, X } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, ChevronDown, ChevronRight, Copy, Download, RefreshCw, ScrollText, X } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Link } from 'react-router';
-import { useProjectByHandler, useComponentByHandler, useComponents, useEnvironments, useRuntimes, useComponentRuntimes, useComponentRuntimesByEnvironments, useProjectRuntimes } from '../api/queries';
+import { useProjectByHandler, useComponentByHandler, useComponents, useEnvironments, useRuntimes, useComponentRuntimes, useComponentRuntimesByEnvironments, useProjectRuntimes, useProjectRuntimesByEnvironments } from '../api/queries';
 import { useInfiniteLogs, type LogRow, type LogsRequest } from '../api/logs';
 import { useMoesifLogsConfig, useCreateMoesifLogsDashboards, useMoesifLogsEmbed } from '../api/logsMoesif';
 import { isMoesifEnabled } from '../config/api';
 import { downloadMoesifBiLogsFluentBitFiles } from '../assets/moesifBiLogs';
-import { downloadMoesifMiLogsOtelFiles } from '../assets/moesifMiLogs';
+import { downloadMoesifMiLogsFluentBitFiles } from '../assets/moesifMiLogs';
 import { getMoesifLogsCanvasTemplate } from '../assets/moesifLogsCanvasTemplate';
 import CodeBoxWithCopy from '../components/CodeBoxWithCopy';
 import MoesifCanvas from '../components/MoesifCanvas';
@@ -54,7 +54,7 @@ const PAGE_SIZE = 500;
 const LEVEL_COLORS: Record<string, string> = { ERROR: '#e53935', WARN: '#f9a825', INFO: '#1e88e5', DEBUG: '#78909c' };
 
 // WSO2 MI Moesif logs setup guide, linked from the MI logs setup instructions
-// for further guidance (the MI flow uses an OpenTelemetry Collector to ship
+// for further guidance (the MI flow uses a Fluent Bit sidecar to ship
 // wso2carbon.log to Moesif's OTLP endpoint).
 const MI_MOESIF_LOGS_GUIDE = 'https://mi.docs.wso2.com/en/latest/observe-and-manage/classic-observability-logs/moesif-logs/';
 
@@ -82,8 +82,7 @@ function BiLogsPublishInstructions(): JSX.Element {
         <strong>Restart the runtime</strong> after applying this configuration.
       </Alert>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Download the Fluent Bit bundle, set the Collector Application ID, runtime id, service name, environment and BI log directory in <strong>.env</strong>, then run <strong>docker compose up -d</strong>. Run one sidecar per runtime and set{' '}
-        <strong>ICP_RUNTIME_ID</strong> to that runtime's id so its logs can be filtered by runtime on the dashboard. On Windows, use a Windows-style path and enable the drive under Docker Desktop file sharing.
+        Download the Fluent Bit bundle, set the Collector Application ID, service name, environment and BI log directory in <strong>.env</strong>, then run <strong>docker compose up -d</strong>. The runtime emits <strong>icp.runtimeId</strong> in each JSON log line, which Fluent Bit forwards as a queryable log attribute for dashboard filtering. On Windows, use a Windows-style path and enable the drive under Docker Desktop file sharing.
       </Typography>
       <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={() => downloadMoesifBiLogsFluentBitFiles('<MOESIF_COLLECTOR_APPLICATION_ID>')} sx={{ mt: 1, alignSelf: 'flex-start', py: 0.25, px: 1, fontSize: 12 }}>
         Download Fluent Bit config
@@ -94,23 +93,23 @@ function BiLogsPublishInstructions(): JSX.Element {
 
 // MI (Micro Integrator) "publish logs" instructions. MI already writes its
 // server logs to <MI_HOME>/repository/logs/wso2carbon.log by default, so no
-// MI-side configuration change is needed. An OpenTelemetry Collector sidecar
+// MI-side configuration change is needed. A Fluent Bit sidecar
 // tails that file and ships the entries to Moesif's OTLP logs endpoint. The user
-// downloads the Collector bundle, sets the Collector Application ID + MI_HOME in
+// downloads the Fluent Bit bundle, sets the Collector Application ID + MI_HOME in
 // .env, then runs docker compose up -d. See the WSO2 MI Moesif logs guide for
 // further details.
 function MiLogsPublishInstructions(): JSX.Element {
   return (
     <>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        MI writes its server logs to <strong>&lt;MI_HOME&gt;/repository/logs/wso2carbon.log</strong> by default, so no runtime configuration change is needed. An <strong>OpenTelemetry Collector</strong> sidecar tails that file and ships the entries to Moesif.
+        MI writes its server logs to <strong>&lt;MI_HOME&gt;/repository/logs/wso2carbon.log</strong> by default, so no runtime configuration change is needed. A <strong>Fluent Bit</strong> sidecar tails that file and ships the entries to Moesif.
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1, mt: 2 }}>
-        Download the OpenTelemetry Collector bundle, set the Collector Application ID, <strong>ICP_RUNTIME_ID</strong> (the runtime whose logs this sidecar ships — the logs dashboard filters by it) and <strong>MI_HOME</strong> in <strong>.env</strong>, then
+        Download the Fluent Bit bundle, set the Collector Application ID, <strong>ICP_RUNTIME_ID</strong> (the runtime whose logs this sidecar ships — the logs dashboard filters by it) and <strong>MI_HOME</strong> in <strong>.env</strong>, then
         run <strong>docker compose up -d</strong> to publish logs to Moesif. On Windows, use a Windows-style path and enable the drive under Docker Desktop file sharing.
       </Typography>
-      <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={() => downloadMoesifMiLogsOtelFiles('<MOESIF_COLLECTOR_APPLICATION_ID>')} sx={{ mt: 1, alignSelf: 'flex-start', py: 0.25, px: 1, fontSize: 12 }}>
-        Download OpenTelemetry Collector config
+      <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={() => downloadMoesifMiLogsFluentBitFiles('<MOESIF_COLLECTOR_APPLICATION_ID>')} sx={{ mt: 1, alignSelf: 'flex-start', py: 0.25, px: 1, fontSize: 12 }}>
+        Download Fluent Bit config
       </Button>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
         For further guidance, refer the{' '}
@@ -129,12 +128,13 @@ function MiLogsPublishInstructions(): JSX.Element {
 // sections, followed by OpenSearch as an alternative. When Moesif is disabled
 // only the OpenSearch section is shown. Step 02 differs by runtime technology:
 // BI writes JSON logs to a file that a Fluent Bit sidecar ships to Moesif, while
-// MI ships its default wso2carbon.log via an OpenTelemetry Collector sidecar.
+// MI ships its default wso2carbon.log via a Fluent Bit sidecar.
 function LogsSetupInstructions({
   isMI,
   showBothTechnologies,
   showBackendNotice,
   moesifFormSlot,
+  configured,
 }: {
   isMI?: boolean;
   showBothTechnologies?: boolean;
@@ -143,6 +143,13 @@ function LogsSetupInstructions({
   // on a linked integration on its way to the canvas.
   showBackendNotice?: boolean;
   moesifFormSlot?: JSX.Element;
+  // Rendered from the "View Configurations" action on an already-linked
+  // environment rather than as the initial setup flow: the canvas is shared by
+  // every integration in the environment, so this is how a user checks the
+  // runtime publishing configuration when the canvas shows no data. Step 02 (the
+  // usual omission) opens expanded, the OpenSearch alternative is dropped and
+  // step 03 is framed as a credential update.
+  configured?: boolean;
 }): JSX.Element {
   const moesifEnabled = isMoesifEnabled();
   const opensearchGuide = isMI ? OPENSEARCH_SETUP_GUIDE_MI : OPENSEARCH_SETUP_GUIDE_DEFAULT;
@@ -166,8 +173,14 @@ function LogsSetupInstructions({
       {moesifEnabled && (
         <>
           <Typography variant="h4" sx={{ mb: 1, color: 'warning.main' }}>
-            Configure logs with Moesif
+            {configured ? 'Moesif logs configurations' : 'Configure logs with Moesif'}
           </Typography>
+          {configured && (
+            <Typography color="text.secondary" sx={{ mb: 2 }}>
+              The Moesif canvas is linked for this environment and is shared by every integration in it, so the dashboard loads even for an integration that was never configured to publish logs. Follow the steps below to configure this integration's runtime,
+              or update the stored Management API Key in Step 03.
+            </Typography>
+          )}
           <Typography color="text.secondary" sx={{ mb: 2 }}>
             <strong>Moesif</strong>
             {MOESIF_DESCRIPTION}{' '}
@@ -178,7 +191,7 @@ function LogsSetupInstructions({
           </Typography>
 
           {/* Step 1: prepare Moesif for the environment. */}
-          <MoesifStep title="Step 01: Prepare Moesif" defaultExpanded>
+          <MoesifStep title="Step 01: Prepare Moesif" defaultExpanded={!configured}>
             <Typography variant="body2" color="text.secondary">
               Using{' '}
               <a href="https://www.moesif.com/wrap/basic" target="_blank" rel="noreferrer">
@@ -190,8 +203,8 @@ function LogsSetupInstructions({
 
           {/* Step 2: configure the runtime to write + publish logs to Moesif.
               BI writes JSON logs to a file shipped by Fluent Bit; MI ships its
-              default wso2carbon.log via an OpenTelemetry Collector. */}
-          <MoesifStep title="Step 02: Publish logs from your runtime">
+              default wso2carbon.log via a Fluent Bit sidecar. */}
+          <MoesifStep title="Step 02: Publish logs from your runtime" defaultExpanded={configured}>
             {showBothTechnologies ? (
               /* All integrations in view and the project mixes technologies, so
                  both sidecar flows are shown rather than guessing one. */
@@ -215,19 +228,23 @@ function LogsSetupInstructions({
 
           {/* Step 3: link the canvas with a Management API Key (rendered only when
               an integration + environment are resolved so the mutation has a target). */}
-          {moesifFormSlot && <MoesifStep title="Step 03: Load the dashboard">{moesifFormSlot}</MoesifStep>}
+          {moesifFormSlot && <MoesifStep title={configured ? 'Step 03: Update the canvas credentials' : 'Step 03: Load the dashboard'}>{moesifFormSlot}</MoesifStep>}
         </>
       )}
 
-      <Typography variant="h4" sx={{ mt: moesifEnabled ? 4 : 0, mb: 2, color: 'warning.main' }}>
-        Configure logs with OpenSearch
-      </Typography>
-      <Typography color="text.secondary">
-        Follow the guide to setup observability with OpenSearch :{' '}
-        <a href={opensearchGuide} target="_blank" rel="noreferrer">
-          {opensearchGuide}
-        </a>
-      </Typography>
+      {!configured && (
+        <>
+          <Typography variant="h4" sx={{ mt: moesifEnabled ? 4 : 0, mb: 2, color: 'warning.main' }}>
+            Configure logs with OpenSearch
+          </Typography>
+          <Typography color="text.secondary">
+            Follow the guide to setup observability with OpenSearch :{' '}
+            <a href={opensearchGuide} target="_blank" rel="noreferrer">
+              {opensearchGuide}
+            </a>
+          </Typography>
+        </>
+      )}
     </Stack>
   );
 }
@@ -268,7 +285,8 @@ function MoesifLogsCredentialForm({ onCreate, creating, error }: { onCreate: (ma
 // postMessage handshake as the metrics canvas, but posts the application logs
 // canvas template (getMoesifLogsCanvasTemplate) instead of the metrics one. The
 // canvas is scoped to this integration's runtimes via the `runtimeId` context
-// filter. An Edit action lets the user re-link with new credentials.
+// filter. A "View Configurations" action reopens the setup instructions (and the
+// credential update form) for the linked environment.
 function MoesifLogsCanvasView({
   componentId,
   environmentId,
@@ -308,7 +326,7 @@ function MoesifLogsCanvasView({
           </span>
         </Tooltip>
         <Button variant="outlined" size="small" onClick={onEdit}>
-          Edit canvas credentials
+          View Configurations
         </Button>
       </Stack>
       {loadingEmbed ? (
@@ -366,6 +384,8 @@ function MoesifLogsSection({
   // once the canvas is linked the logs are right there.
   perRuntimeLogsHint?: JSX.Element;
 }): JSX.Element {
+  // Whether the "View Configurations" view is open on a linked environment (the
+  // setup instructions + credential update form instead of the canvas).
   const [editing, setEditing] = useState(false);
   const moesifEnabled = isMoesifEnabled();
   const canQuery = moesifEnabled && !!componentId && !!environmentId;
@@ -393,17 +413,23 @@ function MoesifLogsSection({
     );
   }
 
-  // Linked, but the user chose to re-link with new credentials.
+  // Linked, and the user opened "View Configurations": show the same setup
+  // instructions as the unlinked state so the runtime publishing configuration
+  // can be checked after the fact (the credentials are per environment and
+  // shared, so the canvas renders for integrations that never published a log
+  // line), with step 03 re-linking the canvas with new credentials.
   if (logsConfigured && editing && componentId && environmentId) {
     return (
       <Stack sx={{ width: '100%', textAlign: 'left' }}>
-        <Typography variant="h4" sx={{ mb: 2, color: 'warning.main' }}>
-          Update logs canvas credentials
-        </Typography>
-        <MoesifLogsCredentialForm creating={createLogs.isPending} error={createLogs.error} onCreate={(managementApiKey) => createLogs.mutate({ componentId, environmentId, managementApiKey }, { onSuccess: () => setEditing(false) })} />
-        <Button variant="text" sx={{ alignSelf: 'flex-start', mt: 1 }} onClick={() => setEditing(false)} disabled={createLogs.isPending}>
-          Cancel
+        <Button variant="outlined" size="small" startIcon={<ArrowLeft size={16} />} sx={{ alignSelf: 'flex-start', mb: 2 }} onClick={() => setEditing(false)} disabled={createLogs.isPending}>
+          Back to logs canvas
         </Button>
+        <LogsSetupInstructions
+          isMI={isMI}
+          showBothTechnologies={showBothTechnologies}
+          configured
+          moesifFormSlot={<MoesifLogsCredentialForm creating={createLogs.isPending} error={createLogs.error} onCreate={(managementApiKey) => createLogs.mutate({ componentId, environmentId, managementApiKey }, { onSuccess: () => setEditing(false) })} />}
+        />
       </Stack>
     );
   }
@@ -572,20 +598,32 @@ export default function RuntimeLogs(scope: ProjectScope | ComponentScope): JSX.E
 
   const componentIds = !hasComponent(scope) && integrationFilter !== 'all' ? [integrationFilter] : allComponentIds;
 
-  // Only offer environments where the targeted integration actually has runtimes,
-  // matching the metrics view: it is misleading to query logs (or load the Moesif
-  // logs canvas) for an environment the integration isn't deployed to. This
-  // filtering applies when a specific integration is targeted (component scope or
-  // a chosen integration); the aggregate "All Integrations" view keeps all
-  // environments since runtimes may span several integrations.
+  // Only offer environments where runtimes are actually registered, matching the
+  // metrics view: it is misleading to query logs (or load the Moesif logs canvas)
+  // for an environment nothing is deployed to. When a specific integration is
+  // targeted (component scope or a chosen integration) that integration's
+  // runtimes decide; the aggregate "All Integrations" view uses the project-wide
+  // runtimes, so an environment no integration in the project runs in is hidden.
   const runtimeCheckComponentId = hasComponent(scope) ? (singleComponent?.id ?? '') : integrationFilter !== 'all' ? integrationFilter : '';
+  const aggregateEnvCheck = !hasComponent(scope) && integrationFilter === 'all';
   const environmentIds = useMemo(() => environments.map((e) => e.id), [environments]);
-  const { envsWithRuntimes, isLoading: loadingEnvRuntimes, isError: envRuntimesError, refetch: refetchEnvRuntimes } = useComponentRuntimesByEnvironments(projectId, runtimeCheckComponentId, environmentIds, !!runtimeCheckComponentId);
+  const {
+    envsWithRuntimes: componentEnvsWithRuntimes,
+    isLoading: loadingComponentEnvRuntimes,
+    isError: componentEnvRuntimesError,
+    refetch: refetchComponentEnvRuntimes,
+  } = useComponentRuntimesByEnvironments(projectId, runtimeCheckComponentId, environmentIds, !!runtimeCheckComponentId);
+  const { envsWithRuntimes: projectEnvsWithRuntimes, isLoading: loadingProjectEnvRuntimes, isError: projectEnvRuntimesError, refetch: refetchProjectEnvRuntimes } = useProjectRuntimesByEnvironments(projectId, environmentIds, aggregateEnvCheck);
+  const envsWithRuntimes = aggregateEnvCheck ? projectEnvsWithRuntimes : componentEnvsWithRuntimes;
+  const loadingEnvRuntimes = aggregateEnvCheck ? loadingProjectEnvRuntimes : loadingComponentEnvRuntimes;
+  const envRuntimesError = aggregateEnvCheck ? projectEnvRuntimesError : componentEnvRuntimesError;
+  const refetchEnvRuntimes = aggregateEnvCheck ? refetchProjectEnvRuntimes : refetchComponentEnvRuntimes;
+  const envCheckActive = aggregateEnvCheck || !!runtimeCheckComponentId;
   // Only narrow the environment list once the runtime lookup has resolved with a
   // result. While the lookup is pending (loadingEnvRuntimes) or if it failed
   // (envsWithRuntimes stays empty), keep all environments so we don't hide every
   // environment — a failed lookup should not masquerade as "no runtimes".
-  const availableEnvironments = runtimeCheckComponentId && !loadingEnvRuntimes && envsWithRuntimes.size > 0 ? environments.filter((e) => envsWithRuntimes.has(e.id)) : environments;
+  const availableEnvironments = envCheckActive && !loadingEnvRuntimes && envsWithRuntimes.size > 0 ? environments.filter((e) => envsWithRuntimes.has(e.id)) : environments;
   const availableEnvIds = availableEnvironments.map((e) => e.id);
 
   // Drop any selected environments that are no longer available (e.g. after
@@ -620,8 +658,7 @@ export default function RuntimeLogs(scope: ProjectScope | ComponentScope): JSX.E
 
   // The runtime technologies present in the project. With all integrations in
   // view a mixed project needs both sets of "publish logs" instructions, since
-  // BI ships logs with a Fluent Bit sidecar and MI with an OpenTelemetry
-  // Collector.
+  // BI writes JSON logs and MI uses its default wso2carbon.log file.
   const projectTechnologies = useMemo(() => ['BI', 'MI'].filter((technology) => allComponents.some((component) => component.componentType === technology)), [allComponents]);
 
   // Derive selected environment id from current selection (matching request logic)
@@ -805,7 +842,7 @@ export default function RuntimeLogs(scope: ProjectScope | ComponentScope): JSX.E
       </Stack>
 
       {/* The per-environment runtime lookup failed, so we cannot tell which
-          environments this integration is actually deployed to. The selector
+          environments have registered runtimes. The selector
           falls back to every environment (see availableEnvironments) and logs
           are still queried, so this is a non-blocking warning rather than the
           blocking error the metrics view shows: the results may include
@@ -819,7 +856,7 @@ export default function RuntimeLogs(scope: ProjectScope | ComponentScope): JSX.E
               Retry
             </Button>
           }>
-          Could not verify which environments have runtimes for this integration. Showing all environments — logs may cover environments it isn't deployed to.
+          Could not verify which environments have registered runtimes. Showing all environments — logs may cover environments nothing is deployed to.
         </Alert>
       )}
 

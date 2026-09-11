@@ -16,7 +16,7 @@
  * under the License.
  */
 import { Alert, Button, CircularProgress, Divider, IconButton, MenuItem, PageContent, Select, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { BarChart3, Download, RefreshCw } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, BarChart3, Download, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useProjectByHandler, useComponentByHandler, useComponents, useEnvironments, useComponentRuntimes, useComponentRuntimesByEnvironments, useProjectRuntimesByEnvironments, type GqlRuntime } from '../api/queries';
 import { useMoesifMetricsConfig, useCreateMoesifDashboards, useMoesifDashboardEmbed } from '../api/metricsMoesif';
@@ -115,7 +115,10 @@ function MoesifMiRuntimeInstructions({ applicationId }: { applicationId: string 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
         <br />
         Download the Fluent Bit configuration bundle and unzip it first. In the generated <strong>.env</strong> file, set <strong>MI_HOME</strong> to your MI installation path. Set the <strong>Collector Application ID</strong> to the one you obtained from
-        Moesif. Then, run <strong>docker compose up -d</strong> to start Fluent Bit to publish metrics to Moesif.
+        Moesif. Set <strong>ICP_RUNTIME_ID</strong> to the runtime ID copied from its details in ICP, and run one sidecar per runtime. Then, run <strong>docker compose up -d</strong> to start Fluent Bit to publish metrics to Moesif.
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+        The Runtime filter matches this ICP runtime ID on each metric event. For existing setups, download the updated bundle and recreate the sidecar. Previously published metrics without the runtime ID will not appear when the filter is applied.
       </Typography>
       <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={() => downloadMoesifMiFluentBitFiles(applicationId)} sx={{ mb: 1, alignSelf: 'flex-start', py: 0.25, px: 1, fontSize: 12 }}>
         Download Fluent Bit config
@@ -150,9 +153,13 @@ function MoesifMiRuntimeInstructions({ applicationId }: { applicationId: string 
 // token is minted on demand from the same key, so the user only supplies the
 // Management API Key here.
 //
-// When `isEdit` is set the card is in update mode for an already-linked
-// dashboard: the user supplies a new Management API Key to re-link (overwriting
-// the stored value). An optional Cancel action returns to the metrics view.
+// When `isEdit` is set the card is shown for an already-linked environment: the
+// Moesif credentials are stored per environment and shared by every integration
+// in it, so the canvas loads for integrations whose runtime was never configured
+// to publish metrics. This is the "View configurations" state — the same setup
+// instructions, so the runtime configuration can be checked after the fact —
+// and it doubles as the update path for the stored Management API Key. An
+// optional Cancel action returns to the metrics view.
 function MoesifDashboardCard({ onCreate, creating, error, isEdit, isMI, onCancel }: { onCreate: (managementApiKey: string) => void; creating: boolean; error: unknown; isEdit?: boolean; isMI?: boolean; onCancel?: () => void }): JSX.Element {
   const [managementApiKey, setManagementApiKey] = useState('');
 
@@ -166,13 +173,19 @@ function MoesifDashboardCard({ onCreate, creating, error, isEdit, isMI, onCancel
   return (
     <Stack sx={{ mt: 2 }}>
       {isEdit && (
-        <Typography variant="h6" sx={{ mb: 2 }}>
-          Update dashboard credentials
-        </Typography>
+        <>
+          <Typography variant="h6" sx={{ mb: 1 }}>
+            Moesif metrics configurations
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            The Moesif canvas is linked for this environment and is shared by every integration in it, so the dashboard loads even for an integration that was never configured to publish metrics. Follow the steps below to configure this integration's runtime,
+            or update the stored Management API Key in Step 03.
+          </Typography>
+        </>
       )}
 
       {/* Step 1: prepare Moesif for the environment. */}
-      <MoesifStep title="Step 01: Prepare Moesif" defaultExpanded>
+      <MoesifStep title="Step 01: Prepare Moesif" defaultExpanded={!isEdit}>
         <Typography variant="body2" color="text.secondary">
           Using{' '}
           <a href="https://www.moesif.com/wrap/basic" target="_blank" rel="noreferrer">
@@ -182,13 +195,15 @@ function MoesifDashboardCard({ onCreate, creating, error, isEdit, isMI, onCancel
         </Typography>
       </MoesifStep>
 
-      {/* Step 2: configure the runtime to publish metrics to Moesif. */}
-      <MoesifStep title="Step 02: Publish metrics from your runtime">
+      {/* Step 2: configure the runtime to publish metrics to Moesif. This is
+          what is usually missing when the canvas loads but shows no data, so it
+          opens expanded in the "View configurations" state. */}
+      <MoesifStep title="Step 02: Publish metrics from your runtime" defaultExpanded={isEdit}>
         <MoesifInstructionsContent applicationId={effectiveAppId} isMI={isMI} />
       </MoesifStep>
 
       {/* Step 3: link the canvas with a Management API Key. */}
-      <MoesifStep title="Step 03: Load the dashboard">
+      <MoesifStep title={isEdit ? 'Step 03: Update the dashboard credentials' : 'Step 03: Load the dashboard'}>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Once metrics are flowing to Moesif, create a <strong>Management API Key</strong> with the <strong>access_tokens: create</strong> and <strong>events: read</strong> scopes, then paste it below to load the metrics dashboard. The Organization ID,
           Application ID and a short-lived canvas token are derived from it. Treated as a secret; never stored in the browser.
@@ -246,9 +261,11 @@ export default function MetricsMoesif({ scope, backendSelector, opensearchConfig
   // environment selector picks which environment's config is viewed/linked;
   // defaults to the first environment until the user chooses one.
   const [envFilter, setEnvFilter] = useState('');
-  // When set, the dashboard-credentials edit form is shown for an already-linked
-  // integration so the user can update the stored Management API Key + Moesif
-  // Application ID (re-linking the dashboard via the backend discovery flow).
+  // When set, the configurations view is shown for an already-linked
+  // environment: the setup instructions (so the runtime publishing config can be
+  // checked when the canvas shows no data) plus the form to update the stored
+  // Management API Key + Moesif Application ID (re-linking the dashboard via the
+  // backend discovery flow).
   const [editingDashboard, setEditingDashboard] = useState(false);
 
   const componentId = isComponent ? (singleComponent?.id ?? '') : '';
@@ -577,10 +594,13 @@ export default function MetricsMoesif({ scope, backendSelector, opensearchConfig
     );
   }
 
-  // Linked, but the user chose to update the stored Management API Key + Moesif
-  // Application ID. Re-links the dashboard via the backend discovery flow
-  // (overwriting the stored credentials and workspace id) and, on success,
-  // returns to the metrics view with a freshly-minted embed token.
+  // Linked, and the user opened "View Configurations": the full setup
+  // instructions are shown again so the runtime configuration can be verified
+  // (the environment's credentials are shared, so the canvas renders for
+  // integrations that never published a metric). Submitting a new Management API
+  // Key re-links the dashboard via the backend discovery flow (overwriting the
+  // stored credentials and workspace id) and, on success, returns to the metrics
+  // view with a freshly-minted embed token.
   if (editingDashboard) {
     return (
       <PageContent>
@@ -590,6 +610,9 @@ export default function MetricsMoesif({ scope, backendSelector, opensearchConfig
           </Stack>
         )}
         {header}
+        <Button variant="outlined" size="small" startIcon={<ArrowLeft size={16} />} sx={{ alignSelf: 'flex-start', mb: 1 }} onClick={() => setEditingDashboard(false)}>
+          Back to metrics dashboard
+        </Button>
         <MoesifDashboardCard
           isEdit
           isMI={isMI}
@@ -615,14 +638,14 @@ export default function MetricsMoesif({ scope, backendSelector, opensearchConfig
         <Stack direction="row" gap={2} sx={{ mb: 3 }} flexWrap="wrap" alignItems="center">
           {integrationSelector}
           <Button variant="outlined" size="small" sx={{ ml: 'auto' }} onClick={() => setEditingDashboard(true)}>
-            Edit dashboard credentials
+            View Configurations
           </Button>
         </Stack>
       )}
       {isComponent && (
         <Stack direction="row" gap={2} sx={{ mb: 3 }} justifyContent="flex-end">
           <Button variant="outlined" size="small" onClick={() => setEditingDashboard(true)}>
-            Edit dashboard credentials
+            View Configurations
           </Button>
         </Stack>
       )}
