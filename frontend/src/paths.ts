@@ -211,6 +211,7 @@ export { loginApiUrl, refreshTokenApiUrl, revokeTokenApiUrl, oidcAuthorizeApiUrl
 export const observabilityLogsApiUrl = (): string => window.API_CONFIG.observabilityUrl + '/logs?live=true';
 // Metrics URL helper
 export const observabilityMetricsApiUrl = (): string => window.API_CONFIG.observabilityUrl + '/metrics';
+export const observabilityWorkflowMetricsApiUrl = (): string => window.API_CONFIG.observabilityUrl + '/workflow-metrics';
 
 // ---------------------------------------------------------------------------
 // WSDL/SOAP namespace constants

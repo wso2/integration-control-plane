@@ -2,28 +2,103 @@
   "index_patterns": [
     "ballerina-application-logs-*",
     "ballerina-metrics-logs-*",
+    "ballerina-workflow-metrics-*",
     "mi-application-logs-*",
     "mi-metrics-logs-*"
   ],
   "template": {
     "mappings": {
       "properties": {
-        "time": { "type": "date" },
-        "message": { "type": "text" },
-        "level": { "type": "keyword" },
-        "icp_runtimeId": { "type": "keyword" },
-        "integration": { "type": "keyword" },
-        "product": { "type": "keyword" },
-        "component": { "type": "keyword" },
-        "package": { "type": "keyword" },
-        "log_type": { "type": "keyword" },
-        "service_type": { "type": "keyword" },
-        "app": { "type": "keyword" },
-        "app_name": { "type": "keyword" },
-        "deployment": { "type": "keyword" },
-        "module": { "type": "keyword" },
-        "class": { "type": "keyword" },
-        "artifact_container": { "type": "keyword" }
+        "time": {
+          "type": "date"
+        },
+        "message": {
+          "type": "text"
+        },
+        "level": {
+          "type": "keyword"
+        },
+        "icp_runtimeId": {
+          "type": "keyword"
+        },
+        "integration": {
+          "type": "keyword"
+        },
+        "product": {
+          "type": "keyword"
+        },
+        "component": {
+          "type": "keyword"
+        },
+        "package": {
+          "type": "keyword"
+        },
+        "log_type": {
+          "type": "keyword"
+        },
+        "service_type": {
+          "type": "keyword"
+        },
+        "app": {
+          "type": "keyword"
+        },
+        "app_name": {
+          "type": "keyword"
+        },
+        "deployment": {
+          "type": "keyword"
+        },
+        "module": {
+          "type": "keyword"
+        },
+        "class": {
+          "type": "keyword"
+        },
+        "artifact_container": {
+          "type": "keyword"
+        },
+        "sample": {
+          "type": "keyword"
+        },
+        "workflow_type": {
+          "type": "keyword"
+        },
+        "workflow_id": {
+          "type": "keyword"
+        },
+        "run_id": {
+          "type": "keyword"
+        },
+        "activity_type": {
+          "type": "keyword"
+        },
+        "outcome": {
+          "type": "keyword"
+        },
+        "data_name": {
+          "type": "keyword"
+        },
+        "task_kind": {
+          "type": "keyword"
+        },
+        "task_name": {
+          "type": "keyword"
+        },
+        "action": {
+          "type": "keyword"
+        },
+        "attempt": {
+          "type": "integer"
+        },
+        "duration_seconds": {
+          "type": "float"
+        },
+        "tool_name": {
+          "type": "keyword"
+        },
+        "error_type": {
+          "type": "keyword"
+        }
       }
     }
   }

@@ -17,7 +17,7 @@
  */
 import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
-import { observabilityMetricsApiUrl } from '../paths';
+import { observabilityMetricsApiUrl, observabilityWorkflowMetricsApiUrl } from '../paths';
 import { authenticatedFetch } from '../auth/tokenManager';
 import { gql } from './graphql';
 
@@ -50,6 +50,48 @@ export interface MetricEntry {
 export interface MetricsResponse {
   inboundMetrics: MetricEntry[];
   outboundMetrics: MetricEntry[];
+}
+
+// ── Workflow metrics ──
+// One record per workflow event from the Ballerina workflow module; the server groups them into series by tags.
+
+export type WorkflowSample =
+  | 'workflow.started'
+  | 'workflow.closed'
+  | 'activity.executed'
+  | 'data.sent'
+  | 'task.decided'
+  | 'workflow.suspended'
+  | 'workflow.resumed'
+  | 'workflow.terminated'
+  | 'workflow.cancelled'
+  | 'agent.model_called'
+  | 'agent.tool_called'
+  | 'agent.event_received'
+  | 'agent.slept'
+  | 'agent.task_awaited'
+  | 'agent.tool_reviewed';
+
+export interface WorkflowMetricEntry {
+  sample: WorkflowSample;
+  // Whichever tags the sample carries: workflow_type, activity_type, outcome, task_kind, task_name, action, data_name.
+  tags: Record<string, string>;
+  count: TimeSeriesData;
+  duration_seconds_avg: TimeSeriesData;
+  duration_seconds_max: TimeSeriesData;
+  duration_seconds_percentile_50: TimeSeriesData;
+  duration_seconds_percentile_95: TimeSeriesData;
+  duration_seconds_percentile_99: TimeSeriesData;
+}
+
+export interface WorkflowMetricsResponse {
+  runs: WorkflowMetricEntry[];
+  activities: WorkflowMetricEntry[];
+  decisions: WorkflowMetricEntry[];
+  dataEvents: WorkflowMetricEntry[];
+  // The AI agent's steps (agent.*) and the management control operations (workflow.suspended, …).
+  agentSteps?: WorkflowMetricEntry[];
+  controls?: WorkflowMetricEntry[];
 }
 
 async function fetchMetrics(req: MetricsRequest): Promise<MetricsResponse> {
@@ -89,6 +131,59 @@ async function fetchMetrics(req: MetricsRequest): Promise<MetricsResponse> {
     }
     throw error;
   }
+}
+
+async function fetchWorkflowMetrics(req: MetricsRequest): Promise<WorkflowMetricsResponse> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  try {
+    const res = await authenticatedFetch(observabilityWorkflowMetricsApiUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      let errorMessage = text;
+      try {
+        errorMessage = JSON.parse(text).message || text;
+      } catch {
+        // raw text it is
+      }
+      const error: Error & { status?: number } = new Error(errorMessage);
+      error.status = res.status;
+      throw error;
+    }
+    // The timeout stays armed until the body is consumed: a response whose headers
+    // arrive but whose body stalls must still abort.
+    return (await res.json()) as WorkflowMetricsResponse;
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('Observability service is unavailable. Request timed out.');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// Workflow counterpart of useMetrics; refreshKey re-keys the query so the page's Refresh refetches this too.
+export function useWorkflowMetrics(req: MetricsRequest | null, getTimeRange?: () => { startTime: string; endTime: string }, refreshKey = 0) {
+  const getTimeRangeRef = useRef(getTimeRange);
+  getTimeRangeRef.current = getTimeRange;
+
+  return useQuery<WorkflowMetricsResponse>({
+    queryKey: ['workflow-metrics', req, refreshKey],
+    queryFn: () => {
+      const baseReq = getTimeRangeRef.current ? { ...req!, ...getTimeRangeRef.current() } : req!;
+      return fetchWorkflowMetrics(baseReq);
+    },
+    enabled: !!req,
+    refetchInterval: false,
+    retry: false,
+    staleTime: 0,
+  });
 }
 
 // ── OpenSearch observability metrics availability ──

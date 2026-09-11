@@ -1,0 +1,216 @@
+{
+    "index_patterns": [
+        "ballerina-workflow-metrics-*"
+    ],
+    "template": {
+        "mappings": {
+            "properties": {
+                "@timestamp": {
+                    "type": "date"
+                },
+                "time": {
+                    "type": "date"
+                },
+                "message": {
+                    "type": "text"
+                },
+                "level": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "icp_runtimeId": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "app": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "app_name": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "deployment": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "module": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "product": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "sample": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "workflow_type": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "workflow_id": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "run_id": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "activity_type": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "attempt": {
+                    "type": "integer"
+                },
+                "outcome": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "duration_seconds": {
+                    "type": "float"
+                },
+                "data_name": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "task_kind": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "task_name": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "action": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "tool_name": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                },
+                "error_type": {
+                    "type": "keyword",
+                    "ignore_above": 1024,
+                    "fields": {
+                        "keyword": {
+                            "type": "keyword",
+                            "ignore_above": 1024
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

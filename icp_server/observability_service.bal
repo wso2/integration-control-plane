@@ -265,6 +265,71 @@ service /icp/observability on httpListener {
         return response;
     }
 
+    // Workflow metrics: the same request as `metrics`, answered from the samples the Ballerina
+    // workflow module publishes (runs, activity attempts, data events, task decisions).
+    resource function post workflow\-metrics(http:Request request, types:ICPMetricEntryRequest metricRequest) returns types:WorkflowMetricEntriesResponse|http:Response|error {
+        log:printDebug("Received workflow metric request: " + metricRequest.toString());
+
+        string[] runtimeIdList = check resolveRuntimeIds({
+                                                             componentId: metricRequest.componentId,
+                                                             componentIdList: metricRequest.componentIdList,
+                                                             environmentId: metricRequest.environmentId,
+                                                             environmentList: metricRequest.environmentList
+                                                         });
+
+        types:UserContextV2 userContext = check extractUserFromObservabilityRequest(request);
+        log:printInfo("Processing workflow metrics request", userId = userContext.userId);
+        runtimeIdList = check filterRuntimeIdsForUser(userContext.userId, runtimeIdList);
+
+        // No runtimes to scope by — either the filters matched none, or none were given, and an
+        // unscoped query would read every runtime's samples. Either way, nothing to show.
+        if runtimeIdList.length() == 0 {
+            return {runs: [], activities: [], decisions: [], dataEvents: []};
+        }
+
+        http:Client? httpClient = observabilityHttpClient;
+        if httpClient is () {
+            log:printWarn("Observability backend is not configured or unavailable");
+            http:Response unavailableResponse = new;
+            unavailableResponse.statusCode = 503;
+            unavailableResponse.setPayload({
+                message: "Observability service is unavailable. Please ensure Observability backend is configured and running."
+            });
+            return unavailableResponse;
+        }
+
+        types:LogIndexRuntimeType componentType = check resolveComponentTypes(runtimeIdList);
+        types:MetricEntryRequest adaptorRequest = {
+            runtimeIdList: runtimeIdList,
+            region: metricRequest.region,
+            startTime: metricRequest.startTime,
+            endTime: metricRequest.endTime,
+            resolutionInterval: metricRequest.resolutionInterval
+        };
+
+        string token = check generateObservabilityToken();
+        map<string|string[]> headers = {"Authorization": "Bearer " + token};
+        types:WorkflowMetricEntriesResponse|error response = httpClient->post(string `/observability/workflow-metrics/${componentType.toString()}`, adaptorRequest, headers);
+        if response is error {
+            if response is http:ClientRequestError|http:RemoteServerError {
+                var detail = response.detail();
+                log:printWarn(string `Observability backend returned ${detail.statusCode}: ${response.message()}`);
+                http:Response errorResponse = new;
+                errorResponse.statusCode = detail.statusCode;
+                errorResponse.setPayload(detail.body);
+                return errorResponse;
+            }
+            log:printWarn(string `Failed to connect to observability backend: ${response.message()}`);
+            http:Response unavailableResponse = new;
+            unavailableResponse.statusCode = 503;
+            unavailableResponse.setPayload({
+                message: "Observability service is unavailable. Please ensure Observability backend is configured and running."
+            });
+            return unavailableResponse;
+        }
+        return response;
+    }
+
     resource function post metrics(http:Request request, types:ICPMetricEntryRequest metricRequest) returns types:MetricEntriesResponse|http:Response|error {
 
         log:printDebug("Received metric request: " + metricRequest.toString());

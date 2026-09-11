@@ -134,6 +134,7 @@ services:
 
         echo 'Creating index templates...' &&
         curl -X PUT 'https://opensearch:9200/_index_template/wso2_integration_application_log_template' -ku admin:$$OPENSEARCH_INITIAL_ADMIN_PASSWORD -H 'Content-Type: application/json' -d @/setup/index-template-request.json &&
+        curl -X PUT 'https://opensearch:9200/_index_template/wso2_integration_workflow_metrics_template' -ku admin:$$OPENSEARCH_INITIAL_ADMIN_PASSWORD -H 'Content-Type: application/json' -d @/setup/workflow-metrics-template-request.json &&
 
         echo 'Waiting for OpenSearch Dashboards to be ready...' &&
         until curl -f -u admin:$$OPENSEARCH_INITIAL_ADMIN_PASSWORD http://opensearch-dashboards:5601/api/status; do

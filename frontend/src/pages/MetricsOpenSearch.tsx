@@ -18,13 +18,14 @@
 import { Button, Card, CardContent, Checkbox, CircularProgress, Grid, IconButton, ListItemText, MenuItem, PageContent, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { LineChart } from '@wso2/oxygen-ui-charts-react';
 import { BarChart3, RefreshCw } from '@wso2/oxygen-ui-icons-react';
-import { useCallback, useEffect, useMemo, useState, type JSX } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useProjectByHandler, useComponentByHandler, useComponents, useEnvironments, useProjectRuntimes } from '../api/queries';
 import { useMetrics, type MetricEntry, type MetricsRequest } from '../api/metrics';
 import { useMoesifMetricsConfig } from '../api/metricsMoesif';
 import { isMoesifEnabled } from '../config/api';
 import EmptyListing from '../components/EmptyListing';
 import NotFound from '../components/NotFound';
+import WorkflowMetricsSection from '../components/WorkflowMetricsSection';
 import { resourceUrl, broaden, hasComponent, type ProjectScope, type ComponentScope } from '../nav';
 
 export interface MetricsPageProps {
@@ -362,6 +363,14 @@ export default function MetricsOpenSearch({ scope, backendSelector, opensearchCo
 
   const [envFilter, setEnvFilter] = useState('');
   const [timeRange, setTimeRange] = useState('Past 1 hour');
+  const [refreshKey, setRefreshKey] = useState(0);
+  // The metrics query's refetch handle, reachable from the stable refreshAll callback
+  // declared before the query itself.
+  const refetchRef = useRef<(() => void) | undefined>(undefined);
+  const refreshAll = useCallback(() => {
+    refetchRef.current?.();
+    setRefreshKey((k) => k + 1);
+  }, []);
   const [integrationFilter, setIntegrationFilter] = useState('all');
   const [selectedApiKeys, setSelectedApiKeys] = useState<string[]>([]);
   const [hiddenOverviewLines, setHiddenOverviewLines] = useState<Set<string>>(new Set());
@@ -437,6 +446,7 @@ export default function MetricsOpenSearch({ scope, backendSelector, opensearchCo
   }, [timeRange]);
 
   const { data: metricsData, isLoading, error, refetch } = useMetrics(metricsRequest, getTimeRange);
+  refetchRef.current = refetch;
   const allInboundMetrics = useMemo(() => metricsData?.inboundMetrics ?? [], [metricsData]);
 
   const inboundMetrics = allInboundMetrics;
@@ -501,7 +511,7 @@ export default function MetricsOpenSearch({ scope, backendSelector, opensearchCo
         <Stack direction="row" alignItems="center" gap={1}>
           {showBackendToggle && backendSelector}
           <Tooltip title="Refresh">
-            <IconButton size="small" onClick={() => refetch()} disabled={filtersDisabled || !metricsRequest}>
+            <IconButton size="small" onClick={refreshAll} disabled={filtersDisabled || !metricsRequest}>
               <RefreshCw size={18} />
             </IconButton>
           </Tooltip>
@@ -556,7 +566,7 @@ export default function MetricsOpenSearch({ scope, backendSelector, opensearchCo
               <Typography color="error" textAlign="center">
                 Failed to fetch metrics: {(error as Error).message ?? 'Service unavailable'}
               </Typography>
-              <Button variant="contained" startIcon={<RefreshCw size={16} />} onClick={() => refetch()}>
+              <Button variant="contained" startIcon={<RefreshCw size={16} />} onClick={refreshAll}>
                 Retry
               </Button>
             </>
@@ -804,6 +814,7 @@ export default function MetricsOpenSearch({ scope, backendSelector, opensearchCo
           )}
         </>
       )}
+      {!isLoading && !error && <WorkflowMetricsSection request={metricsRequest} getTimeRange={getTimeRange} makeLabel={makeLabel} refreshKey={refreshKey} />}
     </PageContent>
   );
 }

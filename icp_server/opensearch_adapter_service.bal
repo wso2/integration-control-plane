@@ -351,6 +351,22 @@ service /observability on openSerachObservabilityListener {
             return error(errorMessage);
         }
     }
+
+    // Workflow metrics come from the samples the Ballerina workflow module publishes, so only
+    // BI runtimes have any; an MI-only selection answers with empty series rather than an error.
+    isolated resource function post workflow\-metrics/[string componentType](@http:Header {name: "X-API-Key"} string? apiKeyHeader, http:Request request, types:MetricEntryRequest metricRequest) returns types:WorkflowMetricEntriesResponse|error {
+        log:printDebug("Received workflow metric request for component type " + componentType + ": " + metricRequest.toString());
+
+        if componentType == "BI" || componentType == "ALL" {
+            return check fetchBIWorkflowMetrics(metricRequest);
+        } else if componentType == "MI" {
+            return {runs: [], activities: [], decisions: [], dataEvents: []};
+        } else {
+            string errorMessage = "Unknown component type specified for workflow metrics: " + componentType;
+            log:printWarn(errorMessage);
+            return error(errorMessage);
+        }
+    }
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -1129,4 +1145,241 @@ isolated function getMIMetricQuery(types:MetricEntryRequest metricRequest) retur
     };
 
     return miQuery;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Workflow metrics — index: ballerina-workflow-metrics-*
+// One document per workflow event from ballerina/workflow (logger="workflow-metrics"), routed here by the log
+// pipeline; series group by the tag fields below and bucket over time. Durations apply where duration_seconds is set.
+// ──────────────────────────────────────────────────────────────────────────────
+
+// The tag fields a workflow sample can carry. Composite sources use missing_bucket, so a sample
+// without a field (a decision has no workflow_type) still lands in a group.
+final readonly & string[] WORKFLOW_METRICS_TAG_FIELDS = [
+    "sample",
+    "icp_runtimeId",
+    "app_name",
+    "deployment",
+    "workflow_type",
+    "activity_type",
+    "outcome",
+    "data_name",
+    "task_kind",
+    "task_name",
+    "tool_name",
+    "action",
+    "error_type"
+];
+
+isolated function fetchBIWorkflowMetrics(types:MetricEntryRequest metricRequest) returns types:WorkflowMetricEntriesResponse|error {
+    json query = check getBIWorkflowMetricQuery(metricRequest);
+    log:printDebug("BI OpenSearch workflow metrics query: " + query.toJsonString());
+
+    http:Client? httpClient = opensearchClient;
+    if httpClient is () {
+        log:printError("OpenSearch client is not configured or unavailable");
+        return error("OpenSearch service is unavailable. Please ensure OpenSearch is configured and running.");
+    }
+
+    json|error result = httpClient->post("/ballerina-workflow-metrics-*/_search", query);
+    if result is error {
+        log:printError(string `Failed to query OpenSearch for BI workflow metrics: ${result.message()}`);
+        return error("OpenSearch service is unavailable. Please ensure OpenSearch is configured and running.");
+    }
+
+    json|error aggregations = result.aggregations;
+    if aggregations is error {
+        log:printWarn("No aggregations in BI workflow metrics response. Returning empty result.");
+        return {runs: [], activities: [], decisions: [], dataEvents: [], agentSteps: [], controls: []};
+    }
+    return shapeWorkflowMetrics(aggregations);
+}
+
+// Builds the OpenSearch query: the request's runtimes and window, one composite group per tag
+// combination, and per group a date histogram carrying the count and duration statistics.
+isolated function getBIWorkflowMetricQuery(types:MetricEntryRequest metricRequest) returns json|error {
+    json[] mustClauses = [
+        {
+            "range": {
+                "@timestamp": {
+                    "gte": metricRequest.startTime,
+                    "lte": metricRequest.endTime
+                }
+            }
+        }
+    ];
+    if metricRequest.runtimeIdList.length() > 0 {
+        mustClauses.push({
+            "terms": {
+                "icp_runtimeId.keyword": metricRequest.runtimeIdList
+            }
+        });
+    }
+
+    json[] compositeSources = [];
+    foreach string tagKey in WORKFLOW_METRICS_TAG_FIELDS {
+        compositeSources.push({
+            [tagKey]: {
+                "terms": {
+                    "field": tagKey + ".keyword",
+                    "missing_bucket": true
+                }
+            }
+        });
+    }
+
+    return {
+        "size": 0,
+        "query": {
+            "bool": {
+                "must": mustClauses
+            }
+        },
+        "aggs": {
+            "tag_groups": {
+                "composite": {
+                    "size": 10000,
+                    "sources": compositeSources
+                },
+                "aggs": {
+                    "time_buckets": {
+                        "date_histogram": {
+                            "field": "@timestamp",
+                            "fixed_interval": metricRequest.resolutionInterval,
+                            "min_doc_count": 0,
+                            "extended_bounds": {
+                                "min": metricRequest.startTime,
+                                "max": metricRequest.endTime
+                            }
+                        },
+                        "aggs": {
+                            "avg_duration": {
+                                "avg": {
+                                    "field": "duration_seconds"
+                                }
+                            },
+                            "max_duration": {
+                                "max": {
+                                    "field": "duration_seconds"
+                                }
+                            },
+                            "percentiles_duration": {
+                                "percentiles": {
+                                    "field": "duration_seconds",
+                                    "percents": [50.0, 95.0, 99.0]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+}
+
+// Turns the aggregation result into series, grouped by what each sample counts. Separated from
+// the query so it can be exercised on a canned response.
+isolated function shapeWorkflowMetrics(json aggregations) returns types:WorkflowMetricEntriesResponse|error {
+    types:WorkflowMetricEntriesResponse response =
+            {runs: [], activities: [], decisions: [], dataEvents: [], agentSteps: [], controls: []};
+    json tagGroups = check aggregations.tag_groups;
+    json[] buckets = check tagGroups.buckets.ensureType();
+
+    foreach json bucket in buckets {
+        map<json> keyMap = check bucket.key.ensureType();
+        map<string> tags = {};
+        string sample = "";
+        foreach string tagField in keyMap.keys() {
+            json tagValue = keyMap.get(tagField);
+            if tagValue is string && tagValue != "" {
+                if tagField == "sample" {
+                    sample = tagValue;
+                } else {
+                    tags[tagField] = tagValue;
+                }
+            }
+        }
+        if sample == "" {
+            continue; // not a workflow sample
+        }
+
+        map<int> count = {};
+        map<decimal> avg = {};
+        map<decimal> max = {};
+        map<decimal> p50 = {};
+        map<decimal> p95 = {};
+        map<decimal> p99 = {};
+        json timeBuckets = check bucket.time_buckets;
+        json[] timeBucketArray = check timeBuckets.buckets.ensureType();
+        foreach json timeBucket in timeBucketArray {
+            string timestamp = check timeBucket.key_as_string;
+            int docCount = check timeBucket.doc_count;
+            count[timestamp] = docCount;
+            avg[timestamp] = docCount > 0 ? check statValue(timeBucket, "avg_duration") : 0;
+            max[timestamp] = docCount > 0 ? check statValue(timeBucket, "max_duration") : 0;
+            if docCount > 0 {
+                json percentiles = check timeBucket.percentiles_duration;
+                map<json> values = check percentiles.values.ensureType();
+                p50[timestamp] = check percentileValue(values, "50.0");
+                p95[timestamp] = check percentileValue(values, "95.0");
+                p99[timestamp] = check percentileValue(values, "99.0");
+            } else {
+                p50[timestamp] = 0;
+                p95[timestamp] = 0;
+                p99[timestamp] = 0;
+            }
+        }
+
+        types:WorkflowMetricEntry entry = {
+            sample,
+            tags,
+            count: {name: "count", timeSeriesData: count},
+            duration_seconds_avg: {name: "duration_seconds_avg", timeSeriesData: avg},
+            duration_seconds_max: {name: "duration_seconds_max", timeSeriesData: max},
+            duration_seconds_percentile_50: {name: "duration_seconds_percentile_50", timeSeriesData: p50},
+            duration_seconds_percentile_95: {name: "duration_seconds_percentile_95", timeSeriesData: p95},
+            duration_seconds_percentile_99: {name: "duration_seconds_percentile_99", timeSeriesData: p99}
+        };
+        match sample {
+            "workflow.started"|"workflow.closed" => {
+                response.runs.push(entry);
+            }
+            "activity.executed" => {
+                response.activities.push(entry);
+            }
+            "task.decided" => {
+                response.decisions.push(entry);
+            }
+            "data.sent" => {
+                response.dataEvents.push(entry);
+            }
+            "workflow.suspended"|"workflow.resumed"|"workflow.terminated"|"workflow.cancelled" => {
+                response.controls.push(entry);
+            }
+            _ => {
+                if sample.startsWith("agent.") {
+                    response.agentSteps.push(entry);
+                } else {
+                    log:printDebug("Ignoring unknown workflow sample kind: " + sample);
+                }
+            }
+        }
+    }
+    log:printDebug(string `BI workflow metrics: ${response.runs.length()} run, ${response.activities.length()} activity, ` +
+            string `${response.decisions.length()} decision, ${response.dataEvents.length()} data-event, ` +
+            string `${response.agentSteps.length()} agent-step, ${response.controls.length()} control series`);
+    return response;
+}
+
+// A sub-aggregation's value; samples without a duration (started, data.sent, task.decided) have none.
+isolated function statValue(json timeBucket, string aggName) returns decimal|error {
+    map<json> bucket = check timeBucket.ensureType();
+    json agg = bucket[aggName] ?: ();
+    json value = check agg.value;
+    return value is () ? 0 : check value.ensureType(decimal);
+}
+
+isolated function percentileValue(map<json> values, string percent) returns decimal|error {
+    json value = values[percent];
+    return value is () ? 0 : check value.ensureType(decimal);
 }
