@@ -82,7 +82,8 @@ function BiLogsPublishInstructions(): JSX.Element {
         <strong>Restart the runtime</strong> after applying this configuration.
       </Alert>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-        Download the Fluent Bit bundle, set the Collector Application ID, service name, environment and BI log directory in <strong>.env</strong>, then run <strong>docker compose up -d</strong>. The runtime emits <strong>icp.runtimeId</strong> in each JSON log line, which Fluent Bit forwards as a queryable log attribute for dashboard filtering. On Windows, use a Windows-style path and enable the drive under Docker Desktop file sharing.
+        Download the Fluent Bit bundle, set the Collector Application ID, service name, environment and BI log directory in <strong>.env</strong>, then run <strong>docker compose up -d</strong>. The runtime emits <strong>icp.runtimeId</strong> in each JSON log
+        line, which Fluent Bit forwards as a queryable log attribute for dashboard filtering. On Windows, use a Windows-style path and enable the drive under Docker Desktop file sharing.
       </Typography>
       <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={() => downloadMoesifBiLogsFluentBitFiles('<MOESIF_COLLECTOR_APPLICATION_ID>')} sx={{ mt: 1, alignSelf: 'flex-start', py: 0.25, px: 1, fontSize: 12 }}>
         Download Fluent Bit config
@@ -105,8 +106,8 @@ function MiLogsPublishInstructions(): JSX.Element {
         MI writes its server logs to <strong>&lt;MI_HOME&gt;/repository/logs/wso2carbon.log</strong> by default, so no runtime configuration change is needed. A <strong>Fluent Bit</strong> sidecar tails that file and ships the entries to Moesif.
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1, mt: 2 }}>
-        Download the Fluent Bit bundle, set the Collector Application ID, <strong>ICP_RUNTIME_ID</strong> (the runtime whose logs this sidecar ships — the logs dashboard filters by it) and <strong>MI_HOME</strong> in <strong>.env</strong>, then
-        run <strong>docker compose up -d</strong> to publish logs to Moesif. On Windows, use a Windows-style path and enable the drive under Docker Desktop file sharing.
+        Download the Fluent Bit bundle, set the Collector Application ID, <strong>ICP_RUNTIME_ID</strong> (the runtime whose logs this sidecar ships — the logs dashboard filters by it) and <strong>MI_HOME</strong> in <strong>.env</strong>, then run{' '}
+        <strong>docker compose up -d</strong> to publish logs to Moesif. On Windows, use a Windows-style path and enable the drive under Docker Desktop file sharing.
       </Typography>
       <Button size="small" variant="outlined" startIcon={<Download size={14} />} onClick={() => downloadMoesifMiLogsFluentBitFiles('<MOESIF_COLLECTOR_APPLICATION_ID>')} sx={{ mt: 1, alignSelf: 'flex-start', py: 0.25, px: 1, fontSize: 12 }}>
         Download Fluent Bit config
