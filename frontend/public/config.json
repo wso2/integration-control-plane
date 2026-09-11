@@ -4,10 +4,10 @@
   "VITE_OBSERVABILITY_URL": "https://localhost:9446/icp/observability",
   "VITE_WORKFLOW_URL": "https://localhost:9446/icp/workflow",
   "VITE_WS_URL": "wss://localhost:9446/runtime-status",
-  "VITE_SSO_ENABLED": true,
+  "VITE_SSO_ENABLED": false,
   "VITE_SSO_ISSUER": "https://localhost:9455/oauth2/token",
-  "VITE_PASSWORD_LOGIN_DISABLED": true,
-  "VITE_FEDERATED_ACCESS_CONTROL_ENABLED": true,
+  "VITE_PASSWORD_LOGIN_DISABLED": false,
+  "VITE_FEDERATED_ACCESS_CONTROL_ENABLED": false,
   "VITE_MOESIF_ENABLED": true,
   "VITE_ICP_VERSION": "2.0.0-SNAPSHOT"
 }
