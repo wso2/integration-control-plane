@@ -42,7 +42,6 @@ import { downloadConfigBundle } from './moesifConfigBundle';
 const BI_LOGS_DOCKER_COMPOSE_YAML = `services:
   fluent-bit:
     image: fluent/fluent-bit:4.2.2
-    container_name: fluent-bit-moesif-otel-bi
     volumes:
       - \${BALLERINA_LOG_DIR}:/app/logs:ro
       - ./fluent-bit.yaml:/fluent-bit/etc/fluent-bit.yaml:ro
@@ -54,12 +53,14 @@ const BI_LOGS_DOCKER_COMPOSE_YAML = `services:
       - MOESIF_HOST=\${MOESIF_HOST:-api.moesif.net}
       - OTEL_SERVICE_NAME=\${OTEL_SERVICE_NAME:-ballerina-service}
       - DEPLOYMENT_ENVIRONMENT=\${DEPLOYMENT_ENVIRONMENT:-prod}
-    # Fluent Bit's HTTP server (health endpoint) is exposed on 2020. The
-    # fluent/fluent-bit image is distroless and ships no HTTP client (curl/wget),
-    # so a container-level healthcheck can't be run inside it. Monitor health
-    # externally, e.g. curl -f http://localhost:2020/api/v1/health
+    # Fluent Bit's HTTP server (health endpoint) listens on 2020 inside the
+    # container. The fluent/fluent-bit image is distroless and ships no HTTP
+    # client (curl/wget), so a container-level healthcheck can't be run inside
+    # it. Monitor health externally, e.g.
+    # curl -f http://localhost:\${FLUENT_BIT_HTTP_PORT}/api/v1/health
+    # The host port is configurable so several sidecars can run on one host.
     ports:
-      - "2020:2020"
+      - "\${FLUENT_BIT_HTTP_PORT:-2020}:2020"
     restart: unless-stopped
 
 volumes:
@@ -204,6 +205,10 @@ OTEL_SERVICE_NAME=<SERVICE_NAME>
 
 # OTLP resource attribute deployment.environment — set to the environment name
 DEPLOYMENT_ENVIRONMENT=<ENVIRONMENT>
+
+# Host port for Fluent Bit's health endpoint. Change it when another sidecar
+# on this host already publishes 2020.
+FLUENT_BIT_HTTP_PORT=2020
 `;
 }
 

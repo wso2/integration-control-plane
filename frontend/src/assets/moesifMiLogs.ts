@@ -81,7 +81,6 @@ pipeline:
 const MI_LOGS_DOCKER_COMPOSE_YAML = `services:
   fluent-bit:
     image: fluent/fluent-bit:4.2.2
-    container_name: fluent-bit-moesif-mi-logs
     volumes:
       - \${MI_HOME}/repository/logs:/var/log/wso2mi:ro
       - ./fluent-bit.yaml:/fluent-bit/etc/fluent-bit.yaml:ro

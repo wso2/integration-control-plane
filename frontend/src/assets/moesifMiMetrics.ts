@@ -226,7 +226,6 @@ end
 const DOCKER_COMPOSE_YAML = `services:
   fluent-bit:
     image: fluent/fluent-bit:3.0
-    container_name: fluent-bit-moesif
     volumes:
       - \${MI_HOME}/repository/logs:/logs:ro
       - ./fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
@@ -238,12 +237,14 @@ const DOCKER_COMPOSE_YAML = `services:
       - ICP_RUNTIME_ID=\${ICP_RUNTIME_ID:?Set ICP_RUNTIME_ID in .env}
       - LOG_FILE_PATH=\${LOG_FILE_PATH:-/logs/synapse-analytics.log}
       - MOESIF_HOST=\${MOESIF_HOST:-api.moesif.net}
+    # The host port is configurable so several sidecars (one per runtime) can
+    # run on one host without colliding on 2020.
     ports:
-      - "2020:2020"
+      - "\${FLUENT_BIT_HTTP_PORT:-2020}:2020"
     restart: unless-stopped
     # The fluent/fluent-bit image ships no shell/curl, so container health is
     # monitored externally via Fluent Bit's built-in health endpoint
-    # (Health_Check On), e.g. GET http://<host>:2020/api/v1/health.
+    # (Health_Check On), e.g. GET http://<host>:\${FLUENT_BIT_HTTP_PORT}/api/v1/health.
 
 volumes:
   fluent-bit-db:
@@ -268,6 +269,10 @@ LOG_FILE_PATH=/logs/synapse-analytics.log
 
 # Moesif collector host
 MOESIF_HOST=api.moesif.net
+
+# Host port for Fluent Bit's health endpoint. Change it when another sidecar
+# on this host already publishes 2020.
+FLUENT_BIT_HTTP_PORT=2020
 `;
 }
 

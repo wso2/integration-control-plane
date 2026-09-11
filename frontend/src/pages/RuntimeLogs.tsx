@@ -620,11 +620,13 @@ export default function RuntimeLogs(scope: ProjectScope | ComponentScope): JSX.E
   const envRuntimesError = aggregateEnvCheck ? projectEnvRuntimesError : componentEnvRuntimesError;
   const refetchEnvRuntimes = aggregateEnvCheck ? refetchProjectEnvRuntimes : refetchComponentEnvRuntimes;
   const envCheckActive = aggregateEnvCheck || !!runtimeCheckComponentId;
-  // Only narrow the environment list once the runtime lookup has resolved with a
-  // result. While the lookup is pending (loadingEnvRuntimes) or if it failed
-  // (envsWithRuntimes stays empty), keep all environments so we don't hide every
-  // environment — a failed lookup should not masquerade as "no runtimes".
-  const availableEnvironments = envCheckActive && !loadingEnvRuntimes && envsWithRuntimes.size > 0 ? environments.filter((e) => envsWithRuntimes.has(e.id)) : environments;
+  // Only narrow the environment list once the runtime lookup has resolved. While
+  // it is pending (loadingEnvRuntimes) or if it failed (envRuntimesError), keep
+  // all environments so we don't hide every environment — a failed lookup should
+  // not masquerade as "no runtimes". A successful lookup that returned nothing is
+  // a real result, so the list is narrowed to empty rather than falling back to
+  // every environment and querying logs the integration doesn't run in.
+  const availableEnvironments = envCheckActive && !loadingEnvRuntimes && !envRuntimesError ? environments.filter((e) => envsWithRuntimes.has(e.id)) : environments;
   const availableEnvIds = availableEnvironments.map((e) => e.id);
 
   // Drop any selected environments that are no longer available (e.g. after
@@ -858,6 +860,15 @@ export default function RuntimeLogs(scope: ProjectScope | ComponentScope): JSX.E
             </Button>
           }>
           Could not verify which environments have registered runtimes. Showing all environments — logs may cover environments nothing is deployed to.
+        </Alert>
+      )}
+
+      {/* The lookup succeeded and returned no environments, so the selection is
+          genuinely empty rather than unknown: no logs are queried, so say why
+          instead of leaving an empty environment selector. */}
+      {envCheckActive && !loadingEnvRuntimes && !envRuntimesError && availableEnvironments.length === 0 && (
+        <Alert severity="info" sx={{ mb: 2 }}>
+          No runtimes are registered for this integration in any environment, so there are no logs to show.
         </Alert>
       )}
 
