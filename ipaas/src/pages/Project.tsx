@@ -87,7 +87,7 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth/AuthContext';
 import { componentOverviewUrl, importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, importComingSoonUrl, buildGitHubOAuthUrl } from '../paths';
 import { Permissions } from '../constants/permissions';
-import { isSupportedIntegration, getDisplayLabel, displayTypeFromSample, getNonIntegrationPlatform } from '../constants/integrations';
+import { isSupportedIntegration, getDisplayLabel, displayTypeFromSample, componentSubTypeFromSample, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import IntegrationIcon from '../components/IntegrationIcon';
 import { GITHUB_AUTH } from '../constants/github';
@@ -225,6 +225,9 @@ function EmptyProjectView({ scope, projectId }: { scope: ProjectScope; projectId
         orgHandler: scope.org,
         projectId,
         displayType: displayTypeFromSample(sample.componentType, sample.buildPack),
+        // AI agents and MCP servers ride the Ballerina displayType and are told
+        // apart by the sub-type; without it a sample creates a plain integration.
+        componentSubType: componentSubTypeFromSample(sample.componentType, sample.buildPack),
         srcGitRepoUrl: sample.repositoryUrl,
         repositorySubPath: `${sample.subDirectory ?? ''}${sample.componentPath}`,
         repositoryBranch: sample.branch ?? 'main',

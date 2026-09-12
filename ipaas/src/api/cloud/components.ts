@@ -140,7 +140,9 @@ function resolveCreateMapping(input: CreateComponentInput): { componentType: str
   const mapping = DISPLAY_TYPE_MAP[input.displayType] ?? DISPLAY_TYPE_MAP.ballerinaService;
   const isFileIntegration = input.componentSubType === 'ballerinaFileIntegration' || input.componentSubType === 'miFileIntegration';
   if (isFileIntegration) return { ...mapping, componentType: 'deployment/file-integration' };
-  if (input.componentSubType === 'aiAgent') return { ...mapping, componentType: 'deployment/ai-agent' };
+  // The BFF routes create, build, deploy and delete to agent-manager on this type.
+  // 'deployment/ai-agent' names the agents created before that move.
+  if (input.componentSubType === 'aiAgent') return { ...mapping, componentType: 'proxy/agent-api' };
   if (input.componentSubType === 'MCP') return { ...mapping, componentType: 'deployment/mcp-server' };
   return mapping;
 }
