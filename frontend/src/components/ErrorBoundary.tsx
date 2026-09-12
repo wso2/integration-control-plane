@@ -29,8 +29,11 @@ interface State {
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { hasError: false };
 
+  static getDerivedStateFromError(): State {
+    return { hasError: true };
+  }
+
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    this.setState({ hasError: true });
     console.error('Unhandled error caught by ErrorBoundary:', error, info);
   }
 
