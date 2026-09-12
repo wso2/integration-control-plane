@@ -960,19 +960,19 @@ isolated function getBIMetricQuery(types:MetricEntryRequest metricRequest) retur
     if (runtimeIds.length() > 0) {
         mustClauses.push({
             "terms": {
-                "icp_runtimeId.keyword": runtimeIds
+                "icp_runtimeId": runtimeIds
             }
         });
     }
 
     // Build composite aggregation sources from the predefined tag field list.
-    // missing_bucket:true ensures tag combinations with absent fields are still grouped.
+    // All tag fields are mapped as keyword in the index template — no .keyword suffix needed.
     json[] compositeSources = [];
     foreach string tagKey in METRICS_TAG_FIELDS {
         compositeSources.push({
             [tagKey]: {
                 "terms": {
-                    "field": tagKey + ".keyword",
+                    "field": tagKey,
                     "missing_bucket": true
                 }
             }
@@ -1072,18 +1072,19 @@ isolated function getMIMetricQuery(types:MetricEntryRequest metricRequest) retur
     if (runtimeIds.length() > 0) {
         mustClauses.push({
             "terms": {
-                "icp_runtimeId.keyword": runtimeIds
+                "icp_runtimeId": runtimeIds
             }
         });
     }
 
     // Composite sources for grouping: api name, context, method, transport, runtimeId
+    // payload.* fields are auto-mapped (text + .keyword); icp_runtimeId is keyword in the template.
     json[] compositeSources = [
         {"api": {"terms": {"field": "payload.apiDetails.api.keyword", "missing_bucket": true}}},
         {"apiContext": {"terms": {"field": "payload.apiDetails.apiContext.keyword", "missing_bucket": true}}},
         {"method": {"terms": {"field": "payload.apiDetails.method.keyword", "missing_bucket": true}}},
         {"transport": {"terms": {"field": "payload.apiDetails.transport.keyword", "missing_bucket": true}}},
-        {"icp_runtimeId": {"terms": {"field": "icp_runtimeId.keyword", "missing_bucket": true}}}
+        {"icp_runtimeId": {"terms": {"field": "icp_runtimeId", "missing_bucket": true}}}
     ];
 
     json miQuery = {

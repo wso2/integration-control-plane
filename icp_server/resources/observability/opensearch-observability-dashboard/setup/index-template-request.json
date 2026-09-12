@@ -1,6 +1,9 @@
 {
     "index_patterns": [
-        "ballerina-application-logs-*", "mi-application-logs-*"
+        "ballerina-application-logs-*",
+        "ballerina-metrics-logs-*",
+        "mi-application-logs-*",
+        "mi-metrics-logs-*"
     ],
     "template": {
         "mappings": {
@@ -21,17 +24,20 @@
                         }
                     }
                 },
-                "level": {
-                    "type": "keyword"
-                },
                 "time": {
                     "type": "date"
                 },
-                "integration": {
-                    "type": "keyword"
-                },
                 "message": {
                     "type": "text"
+                },
+                "level": {
+                    "type": "keyword"
+                },
+                "icp_runtimeId": {
+                    "type": "keyword"
+                },
+                "integration": {
+                    "type": "keyword"
                 },
                 "product": {
                     "type": "keyword"
@@ -66,8 +72,56 @@
                 "artifact_container": {
                     "type": "keyword"
                 },
-                "icp_runtimeId": {
+                "status": {
                     "type": "keyword"
+                },
+                "sublevel": {
+                    "type": "keyword"
+                },
+                "src_client_remote": {
+                    "type": "keyword"
+                },
+                "url": {
+                    "type": "keyword"
+                },
+                "app_module": {
+                    "type": "keyword"
+                },
+                "src_module": {
+                    "type": "keyword"
+                },
+                "protocol": {
+                    "type": "keyword"
+                },
+                "method": {
+                    "type": "keyword"
+                },
+                "http_method": {
+                    "type": "keyword"
+                },
+                "status_code_group": {
+                    "type": "keyword"
+                },
+                "http_status_code_group": {
+                    "type": "keyword"
+                },
+                "src_object_name": {
+                    "type": "keyword"
+                },
+                "src_function_name": {
+                    "type": "keyword"
+                },
+                "entrypoint_function_name": {
+                    "type": "keyword"
+                },
+                "entrypoint_function_module": {
+                    "type": "keyword"
+                },
+                "response_time_seconds": {
+                    "type": "float"
+                },
+                "response_time": {
+                    "type": "long"
                 }
             }
         }
