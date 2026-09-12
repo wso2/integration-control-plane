@@ -23,6 +23,7 @@ import { useCreateCodeServer, useEditorKeepAlive, useGetOrCreateSampleRegistry }
 import { useComponentPods } from '../hooks/useRuntime';
 import { CLOUD_EDITOR_POLL_MS, CLOUD_EDITOR_STEPS, CLOUD_EDITOR_TIMEOUT_MS } from '../constants/cloudEditor';
 import { highestPodPhase } from '../utils/cloudEditor';
+import { HttpError } from '../types/http';
 import DeploymentWheel from '../components/CloudEditor/DeploymentWheel';
 import type { ChoreoSampleImage, CloudEditorStepKey, CodeServerInstance, DeploymentParams } from '../types/cloudEditor';
 
@@ -98,7 +99,17 @@ export default function CloudEditorDeployment(): JSX.Element {
             sourceCommitHash: params.sourceCommitHash || undefined,
           });
         } catch (err) {
-          throw new Error('Unable to start the Cloud Editor. Please try again or contact support if the problem persists.', { cause: err });
+          // An HttpError here carries a message the API wrote for the user (e.g. the
+          // editor quota being full, which tells them how to free one). Show it:
+          // replacing it with the generic string is what made a self-fixable
+          // condition look like an outage. Anything else is not actionable, so it
+          // keeps the generic wording.
+          throw new Error(
+            err instanceof HttpError
+              ? err.message
+              : 'Unable to start the Cloud Editor. Please try again or contact support if the problem persists.',
+            { cause: err },
+          );
         }
 
         const normalized = created.url.startsWith('http') ? created.url : `https://${created.url}`;

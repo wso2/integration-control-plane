@@ -29,7 +29,8 @@
  * unchanged.
  */
 
-import { bff, q } from './_client';
+import { BffError, bff, bffUserMessage, q } from './_client';
+import { HttpError } from '../../types/http';
 import type { CodeServerInstance, ContainerRegistry } from '../../types/cloudEditor';
 
 interface CodeServerResponse {
@@ -56,13 +57,27 @@ export async function callCreateCodeServer(params: { userId: string; organizatio
   // implementation but deliberately not forwarded: the BFF's CreateCodeServerInput
   // has no org fields — it resolves the org (namespace) from the bearer token's
   // claims, and the editor identity is keyed on (user, project, component) only.
-  const created = await bff.post<CodeServerResponse>('/code-server', {
-    userId,
-    projectId,
-    componentId,
-    imageUrl,
-    sourceCommitHash,
-  });
+  let created: CodeServerResponse;
+  try {
+    created = await bff.post<CodeServerResponse>('/code-server', {
+      userId,
+      projectId,
+      componentId,
+      imageUrl,
+      sourceCommitHash,
+    });
+  } catch (err) {
+    // A 4xx describes something the user can act on and the BFF words it for them
+    // — a full editor quota, for instance, says to close an existing editor or
+    // upgrade. Re-throw as the shared HttpError so the (product-agnostic) page can
+    // show that text instead of its own generic failure message. Everything else
+    // propagates untouched and keeps the generic wording.
+    const message = bffUserMessage(err);
+    if (message !== null && err instanceof BffError) {
+      throw new HttpError(err.status, message);
+    }
+    throw err;
+  }
   if (created.editorUrl) return asInstance(created.editorUrl);
 
   // First-time provisioning: poll until the editor's gateway route is live.

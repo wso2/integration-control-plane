@@ -68,6 +68,32 @@ export class BffError extends Error {
   }
 }
 
+/**
+ * Extracts the BFF's human-readable message from a failure, for the cases where it
+ * is worth showing the user verbatim.
+ *
+ * The BFF answers errors as `{"error": "<StatusText>", "message": "<text>"}`, and
+ * `message` is written for a person — e.g. a full editor quota explains that you can
+ * close an existing editor or upgrade. Returns null for anything else, so callers
+ * keep their own wording rather than surfacing a raw body or an internal detail.
+ *
+ * Only meaningful for 4xx: those describe something the caller did or can change. A
+ * 5xx message names internal services and is not actionable, so it stays hidden
+ * behind a generic string.
+ */
+export function bffUserMessage(err: unknown): string | null {
+  if (!(err instanceof BffError) || err.status < 400 || err.status >= 500) return null;
+  try {
+    const parsed = JSON.parse(err.body) as { message?: unknown; error?: unknown };
+    for (const candidate of [parsed.message, parsed.error]) {
+      if (typeof candidate === 'string' && candidate.trim() !== '') return candidate;
+    }
+  } catch {
+    // Not JSON (a gateway's HTML error page, say) — nothing safe to show.
+  }
+  return null;
+}
+
 async function request<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
   const init: RequestInit = {
     method,
