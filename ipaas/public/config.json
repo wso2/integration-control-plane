@@ -27,6 +27,7 @@
   "GITHUB_APP_CLIENT_ID": "Iv1.f6cf2cd585148ee7",
   "GITHUB_APP_AUTH_REDIRECTION_URL": "",
   "GITHUB_APP_SLUG": "wso2-cloud-app-dev",
+  "EDITOR_CALLBACK_DOMAINS": "cloud.wso2.com",
   "AVAILABLE_LOGIN_REGIONS": "US::https://localhost:3000,EU::https://console.dv.eu.devant.dev",
   "INTEGRATION_BUILDER_COPILOT_BASE_URL": "https://apis.preview-dv.devant.dev/copilot",
   "INTEGRATION_BUILDER_LLM_MODEL": "claude-sonnet-4-6",
