@@ -33,6 +33,26 @@
  */
 const EDITOR_URI_SCHEMES = ["vscode:", "vscode-insiders:", "vscodium:", "code-oss:", "cursor:", "windsurf:"];
 
+/** Hosts that resolve to the machine running the browser, never to the network. */
+const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]", "::1"];
+
+/** Whether `host` is the domain itself or a subdomain of it. */
+function isSubdomainOf(host: string, domain: string): boolean {
+  const h = host.toLowerCase();
+  const d = domain.toLowerCase();
+  // The leading dot is what makes this a subdomain test rather than a suffix
+  // test: without it "evilcloud.wso2.com" would match "cloud.wso2.com".
+  return h === d || h.endsWith(`.${d}`);
+}
+
+/** Options naming where an editor's OAuth result may be sent. Empty allows only private schemes. */
+export interface EditorCallbackPolicy {
+  /** Exact https origins, for editors at a known address. */
+  origins?: readonly string[];
+  /** Parent domains whose https subdomains are editors. Editors get one subdomain each. */
+  domains?: readonly string[];
+}
+
 /**
  * The callback URI an editor asked to be returned to, or null when `state`
  * names none or names one that must not be followed.
@@ -40,16 +60,19 @@ const EDITOR_URI_SCHEMES = ["vscode:", "vscode-insiders:", "vscodium:", "code-os
  * `state` is echoed back by GitHub exactly as it was handed over, so anyone who
  * can start an authorization can choose its contents. The OAuth code travels to
  * whatever this returns, so a URI is followed only when it cannot be pointed at
- * an arbitrary host:
+ * a host of the caller's choosing:
  *
  *   - a private editor scheme, which resolves to an installed application;
- *   - an https origin named in `allowedOrigins`, for browser-based editors,
- *     which have no private scheme to use.
+ *   - https at an allowlisted origin, or a subdomain of an allowlisted domain,
+ *     for browser-based editors, which have no private scheme to use;
+ *   - http at an allowlisted loopback origin, which is how a native app
+ *     receives a redirect (RFC 8252) and never leaves the machine the browser
+ *     is running on.
  *
- * Everything else is refused, http included: a code delivered in plaintext is
+ * Any other http is refused: a code delivered in plaintext across a network is
  * a code disclosed, whoever receives it.
  */
-export function editorCallbackUri(state: string | null, allowedOrigins: readonly string[] = []): string | null {
+export function editorCallbackUri(state: string | null, policy: EditorCallbackPolicy = {}): string | null {
   if (!state) {
     return null;
   }
@@ -75,12 +98,31 @@ export function editorCallbackUri(state: string | null, allowedOrigins: readonly
   if (EDITOR_URI_SCHEMES.includes(parsed.protocol)) {
     return callbackUri;
   }
-  // Matched on the parsed origin, not on the string: comparing text would let
+
+  // Matched on the parsed URL, never on the string: comparing text would let
   // "https://trusted.example" be a prefix of "https://trusted.example.evil.com",
-  // and credentials or a port could disguise the real host.
-  if (parsed.protocol === "https:" && allowedOrigins.includes(parsed.origin)) {
-    return callbackUri;
+  // and credentials could disguise the real host.
+  if (parsed.username || parsed.password) {
+    return null;
   }
+
+  const origins = policy.origins ?? [];
+  const domains = policy.domains ?? [];
+
+  if (parsed.protocol === "https:") {
+    if (origins.includes(parsed.origin)) {
+      return callbackUri;
+    }
+    return domains.some((domain) => isSubdomainOf(parsed.hostname, domain)) ? callbackUri : null;
+  }
+
+  // Loopback is the machine the browser is already on, so http there exposes
+  // the code to nothing the browser's own user does not already reach. It still
+  // has to be named, so no deployment accepts it without being configured to.
+  if (parsed.protocol === "http:" && LOOPBACK_HOSTS.includes(parsed.hostname)) {
+    return origins.includes(parsed.origin) ? callbackUri : null;
+  }
+
   return null;
 }
 

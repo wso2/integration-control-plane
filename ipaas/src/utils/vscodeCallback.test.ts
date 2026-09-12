@@ -43,13 +43,13 @@ describe('editorCallbackUri', () => {
   it('refuses an https callback that is not allowlisted', () => {
     expect(editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }))).toBeNull();
     expect(
-      editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }), ['https://editor.example.dev']),
+      editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }), { origins: ['https://editor.example.dev'] }),
     ).toBeNull();
   });
 
   it('accepts an https callback whose origin is allowlisted', () => {
     const uri = 'https://editor.example.dev/ghapp?windowId=1';
-    expect(editorCallbackUri(state({ callbackUri: uri }), ['https://editor.example.dev'])).toBe(uri);
+    expect(editorCallbackUri(state({ callbackUri: uri }), { origins: ['https://editor.example.dev'] })).toBe(uri);
   });
 
   // Comparing origins as text would let a trusted origin be a prefix of an
@@ -60,16 +60,15 @@ describe('editorCallbackUri', () => {
     ['https://editor.example.dev:8443/ghapp'],
     ['https://eviledito.example.dev/ghapp'],
   ])('refuses %s against an allowlisted origin', (uri) => {
-    expect(editorCallbackUri(state({ callbackUri: uri }), ['https://editor.example.dev'])).toBeNull();
+    expect(editorCallbackUri(state({ callbackUri: uri }), { origins: ['https://editor.example.dev'] })).toBeNull();
   });
 
   // A code delivered in plaintext is a code disclosed, whoever receives it.
   it('refuses http even when the host is allowlisted', () => {
     expect(
-      editorCallbackUri(state({ callbackUri: 'http://editor.example.dev/ghapp' }), [
-        'https://editor.example.dev',
-        'http://editor.example.dev',
-      ]),
+      editorCallbackUri(state({ callbackUri: 'http://editor.example.dev/ghapp' }), {
+        origins: ['https://editor.example.dev', 'http://editor.example.dev'],
+      }),
     ).toBeNull();
   });
 
@@ -79,7 +78,56 @@ describe('editorCallbackUri', () => {
     ['file:///etc/passwd'],
     ['//evil.example/ghapp'],
   ])('refuses %s', (uri) => {
-    expect(editorCallbackUri(state({ callbackUri: uri }), ['https://editor.example.dev'])).toBeNull();
+    expect(editorCallbackUri(state({ callbackUri: uri }), { origins: ['https://editor.example.dev'] })).toBeNull();
+  });
+
+  // Editors are provisioned one subdomain each, so no allowlist can enumerate
+  // them; the parent domain is what is known ahead of time.
+  it('accepts an https callback under an allowlisted domain', () => {
+    const uri = 'https://editor-abc123.cloud.wso2.com/ghapp';
+    expect(editorCallbackUri(state({ callbackUri: uri }), { domains: ['cloud.wso2.com'] })).toBe(uri);
+  });
+
+  it('accepts the allowlisted domain itself', () => {
+    const uri = 'https://cloud.wso2.com/ghapp';
+    expect(editorCallbackUri(state({ callbackUri: uri }), { domains: ['cloud.wso2.com'] })).toBe(uri);
+  });
+
+  // The dot separating subdomain from parent is the whole test: a plain suffix
+  // match would hand the code to a domain an attacker can simply register.
+  it.each([
+    ['https://evilcloud.wso2.com/ghapp'],
+    ['https://cloud.wso2.com.evil.com/ghapp'],
+    ['https://cloud-wso2.com/ghapp'],
+    ['http://editor-abc123.cloud.wso2.com/ghapp'],
+  ])('refuses %s against an allowlisted domain', (uri) => {
+    expect(editorCallbackUri(state({ callbackUri: uri }), { domains: ['cloud.wso2.com'] })).toBeNull();
+  });
+
+  // Loopback never leaves the machine the browser runs on, so plaintext there
+  // discloses the code to nobody the browser's user cannot already reach. It is
+  // still opt-in, so a deployment that does not configure it does not accept it.
+  it('accepts http on an allowlisted loopback origin', () => {
+    const uri = 'http://localhost:5173/ghapp';
+    expect(editorCallbackUri(state({ callbackUri: uri }), { origins: ['http://localhost:5173'] })).toBe(uri);
+  });
+
+  it('refuses loopback that is not allowlisted', () => {
+    expect(editorCallbackUri(state({ callbackUri: 'http://localhost:5173/ghapp' }))).toBeNull();
+    expect(
+      editorCallbackUri(state({ callbackUri: 'http://127.0.0.1:5173/ghapp' }), { origins: ['http://localhost:5173'] }),
+    ).toBeNull();
+  });
+
+  // A domain allowlist says nothing about plaintext, and loopback is the only
+  // host where http is ever acceptable.
+  it('does not let a domain entry admit http anywhere', () => {
+    expect(
+      editorCallbackUri(state({ callbackUri: 'http://editor.cloud.wso2.com/ghapp' }), {
+        origins: ['http://localhost:5173'],
+        domains: ['cloud.wso2.com'],
+      }),
+    ).toBeNull();
   });
 
   // The console's own popup flow sends opaque values here and must keep using

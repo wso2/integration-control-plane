@@ -32,7 +32,10 @@ export default function GitHubOAuthCallback(): JSX.Element {
     // registered callback URL — so it puts its own URI in `state` and this page
     // forwards the result there. The BroadcastChannel below only reaches a
     // same-origin opener, which an editor's popup is not.
-    const callbackUri = editorCallbackUri(state, window.API_CONFIG?.editorCallbackOrigins ?? []);
+    const callbackUri = editorCallbackUri(state, {
+      origins: window.API_CONFIG?.editorCallbackOrigins ?? [],
+      domains: window.API_CONFIG?.editorCallbackDomains ?? [],
+    });
     if (callbackUri) {
       window.location.href = buildEditorCallbackUrl(callbackUri, {
         code,

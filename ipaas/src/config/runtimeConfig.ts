@@ -54,6 +54,8 @@ interface RuntimeConfig {
   AVAILABLE_LOGIN_REGIONS?: string;
   /** Comma-separated exact origins an editor's https callback may use, e.g. "https://a.example.dev,https://b.example.dev". Empty allows none. */
   EDITOR_CALLBACK_ORIGINS?: string;
+  /** Comma-separated parent domains whose https subdomains may be editor callbacks, e.g. "cloud.wso2.com". Editors get a subdomain each, so they cannot be listed individually. */
+  EDITOR_CALLBACK_DOMAINS?: string;
   CHOREO_URL_MANAGER_URL?: string;
   ENABLE_CUSTOM_URL_MAPPINGS_FEATURE?: string | boolean;
   RAG_INGESTION_IMAGE?: string;
@@ -110,8 +112,20 @@ export interface ApiConfig {
    * one — but the callback arrives inside an OAuth `state` that reached us by
    * way of GitHub, so it is named here rather than trusted. Empty allows no
    * https callback at all, which is the safe default.
+   *
+   * A loopback origin (`http://localhost:5173`) belongs here too, and is the
+   * only place plaintext http is accepted: it resolves to the machine the
+   * browser is already running on, so the code reaches nothing beyond it. Leave
+   * it out of any deployment reachable by someone other than its developer.
    */
   editorCallbackOrigins: string[];
+  /**
+   * Parent domains whose https subdomains may receive an editor's OAuth result.
+   * Editors are provisioned one subdomain each, so they cannot be named
+   * individually — the domain they live under is named instead. Empty allows
+   * none.
+   */
+  editorCallbackDomains: string[];
   /** Choreo URL-manager service base (custom domains + URL mappings). Optional — when unset, the URL Settings section stays hidden. */
   urlManagerUrl?: string;
   /** Feature flag mirroring Devant's ENABLE_CUSTOM_URL_MAPPINGS_FEATURE. */
@@ -181,6 +195,7 @@ const DEFAULT_CONFIG: ApiConfig = {
   aiCopilotDatacollectorBaseUrl: '',
   availableLoginRegions: undefined,
   editorCallbackOrigins: [],
+  editorCallbackDomains: [],
   integrationBuilderCopilotBaseUrl: 'https://apis.preview-dv.devant.dev/copilot',
   integrationBuilderLlmModel: 'claude-sonnet-4-6',
   integrationBuilderMaxTokens: 1024,
@@ -248,7 +263,11 @@ export async function loadConfig(): Promise<void> {
       availableLoginRegions: config.AVAILABLE_LOGIN_REGIONS || undefined,
       editorCallbackOrigins: (config.EDITOR_CALLBACK_ORIGINS || '')
         .split(',')
-        .map((origin) => origin.trim())
+        .map((origin) => origin.trim().toLowerCase())
+        .filter(Boolean),
+      editorCallbackDomains: (config.EDITOR_CALLBACK_DOMAINS || '')
+        .split(',')
+        .map((domain) => domain.trim().toLowerCase())
         .filter(Boolean),
       ragIngestionImage: config.RAG_INGESTION_IMAGE ? trim(config.RAG_INGESTION_IMAGE) : undefined,
       enableRagIngestionFeature: config.ENABLE_RAG_INGESTION_FEATURE === 'true' || config.ENABLE_RAG_INGESTION_FEATURE === true,
