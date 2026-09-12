@@ -26,11 +26,30 @@
  * names no callback leaves that path untouched.
  */
 
-/** Schemes an editor callback may use. Anything else is not an editor and is not followed. */
-const EDITOR_SCHEMES = ["vscode:", "vscode-insiders:", "vscodium:", "code-oss:", "https:", "http:"];
+/**
+ * Private URI schemes an editor registers with the operating system. These
+ * resolve to a locally installed application, so naming one cannot direct the
+ * result at a host of the caller's choosing.
+ */
+const EDITOR_URI_SCHEMES = ["vscode:", "vscode-insiders:", "vscodium:", "code-oss:", "cursor:", "windsurf:"];
 
-/** The callback URI an editor asked to be returned to, or null when `state` names none. */
-export function editorCallbackUri(state: string | null): string | null {
+/**
+ * The callback URI an editor asked to be returned to, or null when `state`
+ * names none or names one that must not be followed.
+ *
+ * `state` is echoed back by GitHub exactly as it was handed over, so anyone who
+ * can start an authorization can choose its contents. The OAuth code travels to
+ * whatever this returns, so a URI is followed only when it cannot be pointed at
+ * an arbitrary host:
+ *
+ *   - a private editor scheme, which resolves to an installed application;
+ *   - an https origin named in `allowedOrigins`, for browser-based editors,
+ *     which have no private scheme to use.
+ *
+ * Everything else is refused, http included: a code delivered in plaintext is
+ * a code disclosed, whoever receives it.
+ */
+export function editorCallbackUri(state: string | null, allowedOrigins: readonly string[] = []): string | null {
   if (!state) {
     return null;
   }
@@ -45,17 +64,24 @@ export function editorCallbackUri(state: string | null): string | null {
   if (typeof callbackUri !== "string" || !callbackUri) {
     return null;
   }
-  // Only ever navigate somewhere whose scheme is one an editor registers.
-  // `state` reaches us by way of GitHub having been handed it, so it is not
-  // trusted input, and an unchecked value here would redirect anywhere.
+
+  let parsed: URL;
   try {
-    if (!EDITOR_SCHEMES.includes(new URL(callbackUri).protocol)) {
-      return null;
-    }
+    parsed = new URL(callbackUri);
   } catch {
     return null;
   }
-  return callbackUri;
+
+  if (EDITOR_URI_SCHEMES.includes(parsed.protocol)) {
+    return callbackUri;
+  }
+  // Matched on the parsed origin, not on the string: comparing text would let
+  // "https://trusted.example" be a prefix of "https://trusted.example.evil.com",
+  // and credentials or a port could disguise the real host.
+  if (parsed.protocol === "https:" && allowedOrigins.includes(parsed.origin)) {
+    return callbackUri;
+  }
+  return null;
 }
 
 /**

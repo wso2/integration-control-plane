@@ -52,6 +52,8 @@ interface RuntimeConfig {
   ENABLE_PLATFORM_SERVICES_FEATURE?: string | boolean;
   /** Comma-separated list of "REGION::https://domain" entries, e.g. "US::https://console.us.devant.dev,EU::https://console.eu.devant.dev". When set, a region selector is shown on login/signup. */
   AVAILABLE_LOGIN_REGIONS?: string;
+  /** Comma-separated exact origins an editor's https callback may use, e.g. "https://a.example.dev,https://b.example.dev". Empty allows none. */
+  EDITOR_CALLBACK_ORIGINS?: string;
   CHOREO_URL_MANAGER_URL?: string;
   ENABLE_CUSTOM_URL_MAPPINGS_FEATURE?: string | boolean;
   RAG_INGESTION_IMAGE?: string;
@@ -102,6 +104,14 @@ export interface ApiConfig {
   aiCopilotDatacollectorBaseUrl: string;
   /** Comma-separated "REGION::https://domain" entries. Present only when multi-region is configured. */
   availableLoginRegions?: string;
+  /**
+   * Exact origins an editor may have its GitHub OAuth result forwarded to over
+   * https. Browser-based editors cannot use a custom URI scheme, so they need
+   * one — but the callback arrives inside an OAuth `state` that reached us by
+   * way of GitHub, so it is named here rather than trusted. Empty allows no
+   * https callback at all, which is the safe default.
+   */
+  editorCallbackOrigins: string[];
   /** Choreo URL-manager service base (custom domains + URL mappings). Optional — when unset, the URL Settings section stays hidden. */
   urlManagerUrl?: string;
   /** Feature flag mirroring Devant's ENABLE_CUSTOM_URL_MAPPINGS_FEATURE. */
@@ -170,6 +180,7 @@ const DEFAULT_CONFIG: ApiConfig = {
   aiCopilotUrlSuffix: '',
   aiCopilotDatacollectorBaseUrl: '',
   availableLoginRegions: undefined,
+  editorCallbackOrigins: [],
   integrationBuilderCopilotBaseUrl: 'https://apis.preview-dv.devant.dev/copilot',
   integrationBuilderLlmModel: 'claude-sonnet-4-6',
   integrationBuilderMaxTokens: 1024,
@@ -235,6 +246,10 @@ export async function loadConfig(): Promise<void> {
       platformServicesApiBaseUrl: config.PLATFORM_SERVICES_API_BASE_URL ? trim(config.PLATFORM_SERVICES_API_BASE_URL) : undefined,
       enablePlatformServicesFeature: config.ENABLE_PLATFORM_SERVICES_FEATURE === 'true' || config.ENABLE_PLATFORM_SERVICES_FEATURE === true,
       availableLoginRegions: config.AVAILABLE_LOGIN_REGIONS || undefined,
+      editorCallbackOrigins: (config.EDITOR_CALLBACK_ORIGINS || '')
+        .split(',')
+        .map((origin) => origin.trim())
+        .filter(Boolean),
       ragIngestionImage: config.RAG_INGESTION_IMAGE ? trim(config.RAG_INGESTION_IMAGE) : undefined,
       enableRagIngestionFeature: config.ENABLE_RAG_INGESTION_FEATURE === 'true' || config.ENABLE_RAG_INGESTION_FEATURE === true,
       ragBackendUrl: config.RAG_INGESTION_BACKEND ? trim(config.RAG_INGESTION_BACKEND) : undefined,

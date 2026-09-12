@@ -27,22 +27,59 @@ describe('editorCallbackUri', () => {
     expect(editorCallbackUri(s)).toBe('vscode://wso2.wso2-integrator/ghapp');
   });
 
+  // A private scheme resolves to a locally installed application, so it cannot
+  // direct the code at a host of the caller's choosing.
   it.each([
     ['vscode-insiders://wso2.wso2-integrator/ghapp'],
     ['vscodium://wso2.wso2-integrator/ghapp'],
-    ['https://editor.example.dev/ghapp'],
-  ])('accepts %s', (uri) => {
+    ['code-oss://wso2.wso2-integrator/ghapp'],
+  ])('accepts the private scheme %s', (uri) => {
     expect(editorCallbackUri(state({ callbackUri: uri }))).toBe(uri);
   });
 
-  // `state` reaches this page by way of GitHub, so it is not trusted input.
-  // Navigating to an unchecked value would make this an open redirect.
+  // `state` is echoed back by GitHub exactly as handed over, so anyone who can
+  // start an authorization chooses its contents. The OAuth code travels to
+  // whatever this returns, so a network URL is followed only when named.
+  it('refuses an https callback that is not allowlisted', () => {
+    expect(editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }))).toBeNull();
+    expect(
+      editorCallbackUri(state({ callbackUri: 'https://evil.example/steal' }), ['https://editor.example.dev']),
+    ).toBeNull();
+  });
+
+  it('accepts an https callback whose origin is allowlisted', () => {
+    const uri = 'https://editor.example.dev/ghapp?windowId=1';
+    expect(editorCallbackUri(state({ callbackUri: uri }), ['https://editor.example.dev'])).toBe(uri);
+  });
+
+  // Comparing origins as text would let a trusted origin be a prefix of an
+  // attacker's host, and credentials or a port could disguise the real one.
+  it.each([
+    ['https://editor.example.dev.evil.com/ghapp'],
+    ['https://editor.example.dev@evil.com/ghapp'],
+    ['https://editor.example.dev:8443/ghapp'],
+    ['https://eviledito.example.dev/ghapp'],
+  ])('refuses %s against an allowlisted origin', (uri) => {
+    expect(editorCallbackUri(state({ callbackUri: uri }), ['https://editor.example.dev'])).toBeNull();
+  });
+
+  // A code delivered in plaintext is a code disclosed, whoever receives it.
+  it('refuses http even when the host is allowlisted', () => {
+    expect(
+      editorCallbackUri(state({ callbackUri: 'http://editor.example.dev/ghapp' }), [
+        'https://editor.example.dev',
+        'http://editor.example.dev',
+      ]),
+    ).toBeNull();
+  });
+
   it.each([
     ['javascript:alert(1)'],
     ['data:text/html,<script>alert(1)</script>'],
     ['file:///etc/passwd'],
+    ['//evil.example/ghapp'],
   ])('refuses %s', (uri) => {
-    expect(editorCallbackUri(state({ callbackUri: uri }))).toBeNull();
+    expect(editorCallbackUri(state({ callbackUri: uri }), ['https://editor.example.dev'])).toBeNull();
   });
 
   // The console's own popup flow sends opaque values here and must keep using
