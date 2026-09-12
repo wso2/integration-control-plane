@@ -465,8 +465,12 @@ function downloadLogs(logs: LogRow[]) {
   const a = document.createElement('a');
   a.href = url;
   a.download = `logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+  document.body.appendChild(a);
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
 }
 
 /** Convert a Date to a datetime-local input value (YYYY-MM-DDTHH:MM) */
