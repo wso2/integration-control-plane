@@ -20,12 +20,30 @@ import { Box, CircularProgress, Typography } from '@wso2/oxygen-ui';
 import { useEffect, type JSX } from 'react';
 import { GITHUB_AUTH } from '../constants/github';
 import { IS_CLOUD } from '../features';
+import { buildEditorCallbackUrl, editorCallbackUri, editorStateOrgId } from '../utils/vscodeCallback';
 
 export default function GitHubOAuthCallback(): JSX.Element {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     const state = params.get('state');
+
+    // An editor cannot receive GitHub's redirect itself — a GitHub App has one
+    // registered callback URL — so it puts its own URI in `state` and this page
+    // forwards the result there. The BroadcastChannel below only reaches a
+    // same-origin opener, which an editor's popup is not.
+    const callbackUri = editorCallbackUri(state);
+    if (callbackUri) {
+      window.location.href = buildEditorCallbackUrl(callbackUri, {
+        code,
+        state,
+        orgId: editorStateOrgId(state),
+        installation_id: params.get('installation_id'),
+        setup_action: params.get('setup_action'),
+      });
+      return;
+    }
+
     const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
     // Cloud only: installationId/setupAction are present when GitHub redirects
     // here after a GitHub App installation (App "Setup URL" pointed at /ghapp).
