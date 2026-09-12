@@ -2,7 +2,7 @@
 -- Add SSO group mapping tables and effective membership views (PostgreSQL)
 -- ============================================================================
 
-CREATE TABLE sso_group_mappings (
+CREATE TABLE IF NOT EXISTS sso_group_mappings (
     mapping_id VARCHAR(36) PRIMARY KEY,
     org_uuid INT NOT NULL DEFAULT 1,
     issuer VARCHAR(255) NOT NULL,
@@ -22,16 +22,17 @@ CREATE TABLE sso_group_mappings (
     CONSTRAINT unique_sso_group_mapping UNIQUE (org_uuid, issuer, claim_name, claim_value, group_id)
 );
 
-CREATE INDEX idx_sgm_org_uuid ON sso_group_mappings(org_uuid);
-CREATE INDEX idx_sgm_issuer_claim ON sso_group_mappings(issuer, claim_name, claim_value);
-CREATE INDEX idx_sgm_group_id ON sso_group_mappings(group_id);
-CREATE INDEX idx_sgm_project_uuid ON sso_group_mappings(project_uuid);
-CREATE INDEX idx_sgm_integration_uuid ON sso_group_mappings(integration_uuid);
+CREATE INDEX IF NOT EXISTS idx_sgm_org_uuid ON sso_group_mappings(org_uuid);
+CREATE INDEX IF NOT EXISTS idx_sgm_issuer_claim ON sso_group_mappings(issuer, claim_name, claim_value);
+CREATE INDEX IF NOT EXISTS idx_sgm_group_id ON sso_group_mappings(group_id);
+CREATE INDEX IF NOT EXISTS idx_sgm_project_uuid ON sso_group_mappings(project_uuid);
+CREATE INDEX IF NOT EXISTS idx_sgm_integration_uuid ON sso_group_mappings(integration_uuid);
 
+DROP TRIGGER IF EXISTS update_sso_group_mappings_updated_at ON sso_group_mappings;
 CREATE TRIGGER update_sso_group_mappings_updated_at BEFORE UPDATE ON sso_group_mappings
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-CREATE TABLE federated_group_user_mapping (
+CREATE TABLE IF NOT EXISTS federated_group_user_mapping (
     id BIGSERIAL PRIMARY KEY,
     org_uuid INT NOT NULL DEFAULT 1,
     issuer VARCHAR(255) NOT NULL,
@@ -48,10 +49,11 @@ CREATE TABLE federated_group_user_mapping (
     CONSTRAINT unique_fed_group_user_claim UNIQUE (org_uuid, issuer, user_uuid, group_id, claim_name, claim_value)
 );
 
-CREATE INDEX idx_fgum_user_uuid ON federated_group_user_mapping(user_uuid);
-CREATE INDEX idx_fgum_group_id ON federated_group_user_mapping(group_id);
-CREATE INDEX idx_fgum_issuer_claim ON federated_group_user_mapping(issuer, claim_name, claim_value);
+CREATE INDEX IF NOT EXISTS idx_fgum_user_uuid ON federated_group_user_mapping(user_uuid);
+CREATE INDEX IF NOT EXISTS idx_fgum_group_id ON federated_group_user_mapping(group_id);
+CREATE INDEX IF NOT EXISTS idx_fgum_issuer_claim ON federated_group_user_mapping(issuer, claim_name, claim_value);
 
+DROP TRIGGER IF EXISTS update_federated_group_user_mapping_updated_at ON federated_group_user_mapping;
 CREATE TRIGGER update_federated_group_user_mapping_updated_at BEFORE UPDATE ON federated_group_user_mapping
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

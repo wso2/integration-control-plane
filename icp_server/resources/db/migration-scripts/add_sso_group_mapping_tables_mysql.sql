@@ -2,7 +2,7 @@
 -- Add SSO group mapping tables and effective membership views (MySQL / MariaDB)
 -- ============================================================================
 
-CREATE TABLE sso_group_mappings (
+CREATE TABLE IF NOT EXISTS sso_group_mappings (
     mapping_id VARCHAR(36) PRIMARY KEY,
     org_uuid INT NOT NULL DEFAULT 1,
     issuer VARCHAR(255) NOT NULL,
@@ -27,7 +27,7 @@ CREATE TABLE sso_group_mappings (
     INDEX idx_sso_group_mapping_integration (integration_uuid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE federated_group_user_mapping (
+CREATE TABLE IF NOT EXISTS federated_group_user_mapping (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     org_uuid INT NOT NULL DEFAULT 1,
     issuer VARCHAR(255) NOT NULL,
