@@ -39,7 +39,6 @@ import { choreologgingComponentLogsApiUrl, choreologgingComponentGatewayLogsApiU
 import { DEFAULT_DP_REGION, PAGE_SIZE } from '../utils/logs';
 import type { ComponentLogsRequest } from '../types/logs';
 import type { MetricsRange } from '../types/observability';
-import { IS_CLOUD } from '../features';
 
 const COLOR = { total: '#569CD6', success: '#2E9E5B', failed: '#EF4444', mean: '#5567D5', p50: '#569CD6', p90: '#ED6C02', p99: '#EF4444', usage: '#5567D5', requests: '#569CD6', limits: '#EF4444' };
 
@@ -131,7 +130,7 @@ export default function ComponentMetrics(scope: ComponentScope): JSX.Element {
       </PageTitle>
 
       <MetricsHeader range={range} onRangeChange={setRange} refreshSeconds={refreshSeconds} onRefreshSecondsChange={setRefreshSeconds} onRefresh={handleRefresh} isRefreshing={http.isFetching || usage.isFetching}>
-        {!IS_CLOUD && environments.length > 1 && (
+        {environments.length > 1 && (
           <TextField select size="small" label="Environment" value={envId} onChange={(e) => setEnvId(e.target.value)} sx={{ minWidth: 150 }}>
             {environments.map((e) => (
               <MenuItem key={e.id} value={e.id}>

@@ -20,7 +20,6 @@ import { Alert, Box, Button, CircularProgress, IconButton, PageContent, PageTitl
 import { GitBranch, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { IS_CLOUD } from '../features';
 import { useEnvTemplates, useOrgDeploymentPipelines } from '../hooks/useDeploymentPipelines';
 import type { DeploymentPipeline } from '../types/deploymentPipeline';
 import { pinDefaultFirst } from '../utils/deploymentPipeline';
@@ -31,7 +30,7 @@ import DeletePipelineDialog from '../components/CdPipelines/DeletePipelineDialog
 
 // Cloud cannot create pipelines, so the empty state describes them instead of
 // pointing at an action that isn't there.
-const EMPTY_DESCRIPTION = IS_CLOUD ? 'Deployment pipelines define how integrations promote across environments.' : 'Create a pipeline to define how integrations promote across environments.';
+const EMPTY_DESCRIPTION = 'Create a pipeline to define how integrations promote across environments.';
 
 export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -45,9 +44,10 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
     <PageContent>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <PageTitle>
-          <PageTitle.Header>Continuous Deployment Pipelines</PageTitle.Header>
+          <PageTitle.Header>Deployment Pipelines</PageTitle.Header>
+          <PageTitle.SubHeader>Promotion paths across environments, available to every project in this organization.</PageTitle.SubHeader>
         </PageTitle>
-        {!IS_CLOUD && !!pipelines?.length && (
+        {!!pipelines?.length && (
           <Button variant="contained" startIcon={<Plus size={20} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
             Create Pipeline
           </Button>
@@ -75,7 +75,7 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
           Failed to load deployment pipelines.
         </Alert>
       ) : !pipelines?.length ? (
-        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction={!IS_CLOUD} actionLabel="Create Pipeline" onAction={() => navigate(cdPipelineEditorUrl(scope))} />
+        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Create Pipeline" onAction={() => navigate(cdPipelineEditorUrl(scope))} />
       ) : (
         <Stack gap={3}>
           {orderedPipelines?.map((pipeline) => (

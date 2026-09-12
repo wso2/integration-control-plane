@@ -20,7 +20,9 @@
 
 import type { CloudDataPlane, CreateEnvironmentData, EnvDeletionEligibility, EnvironmentTemplate, Environment, EnvironmentInput, Logger, ProjectDeployedComponents, UpdateLogLevelInput } from '../../types/environment';
 import { toHandler } from '../../utils/string';
-import { appendEnvironmentToDefaultPipeline } from './deploymentPipelines';
+import { appendEnvironmentToDefaultPipeline, fetchProjectDeploymentPipelines } from './deploymentPipelines';
+import { restrictEnvironmentsToPipeline } from '../../utils/environmentOrder';
+import type { DeploymentPipeline } from '../../types/deploymentPipeline';
 import { bff, items, q, seg, type ListResponse, type MessageResponse } from './_client';
 // The wire shape and its mapper live in their own module so this file and
 // deploymentPipelines.ts can share one definition without importing each other.
@@ -28,7 +30,17 @@ import { toEnvironment, type BffEnvironment } from './_environmentShape';
 
 // _orgUuid is kept for devant contract parity; cloud derives the org from the token.
 
-export const fetchEnvironments = (_orgUuid: string, projectId: string): Promise<Environment[]> => bff.get<ListResponse<BffEnvironment>>(`/environments${q({ project: projectId })}`).then((r) => items(r).map(toEnvironment));
+// Environments are org-wide in OpenChoreo; what makes them a *project's* environments, and
+// fixes their order, is the promotion chain of the pipeline the project is bound to. Index 0 is
+// the first deploy target, so an unordered list would silently retarget deploys.
+// Best-effort: a pipeline read failure degrades to the raw list, never an error.
+export const fetchEnvironments = async (_orgUuid: string, projectId: string): Promise<Environment[]> => {
+  const [environments, pipelines] = await Promise.all([
+    bff.get<ListResponse<BffEnvironment>>(`/environments${q({ project: projectId })}`).then((r) => items(r).map(toEnvironment)),
+    fetchProjectDeploymentPipelines('', projectId).catch(() => [] as DeploymentPipeline[]),
+  ]);
+  return restrictEnvironmentsToPipeline(environments, pipelines[0]?.promotion_tree);
+};
 
 export const fetchAllEnvironments = (): Promise<Environment[]> => bff.get<ListResponse<BffEnvironment>>('/environments').then((r) => items(r).map(toEnvironment));
 

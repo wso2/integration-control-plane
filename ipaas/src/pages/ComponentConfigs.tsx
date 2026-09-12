@@ -16,9 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, MenuItem, PageContent, PageTitle, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, PageContent, PageTitle, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { KeyRound, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
+import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import Authorized from '../components/Authorized';
 import EmptyListing from '../components/EmptyListing';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
@@ -33,7 +34,6 @@ import { useProjectId } from '../hooks/useProjects';
 import { buildConfigRows, mainContainer } from '../utils/devopsConfigs';
 import type { ConfigRow } from '../types/devopsConfigs';
 import type { ComponentScope } from '../nav';
-import { IS_CLOUD } from '../features';
 
 type View = { kind: 'list' } | { kind: 'create' } | { kind: 'edit'; row: ConfigRow };
 
@@ -92,20 +92,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
     );
   };
 
-  const envSelect = !IS_CLOUD && environments.length > 1 && (
-    <Select
-      size="small"
-      value={environments.some((e) => e.id === envId) ? envId : ''}
-      onChange={(e) => setEnvId(e.target.value as string)}
-      inputProps={{ 'aria-label': 'Environment' }}
-      sx={{ fontSize: '0.8125rem', '& .MuiSelect-select': { py: 0.5, px: 1.5 }, minWidth: 140 }}>
-      {environments.map((e) => (
-        <MenuItem key={e.id} value={e.id}>
-          {e.name}
-        </MenuItem>
-      ))}
-    </Select>
-  );
+  const envSelect = environments.length > 1 && <EnvironmentSelect environments={environments} value={envId} onChange={setEnvId} />;
 
   const ctx: EditorContext = { projectId, componentId: comp?.id ?? '', releaseId, containerId, envId };
   const onEditorDone = (message: string) => {

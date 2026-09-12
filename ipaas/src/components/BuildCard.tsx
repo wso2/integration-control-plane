@@ -104,8 +104,13 @@ export default function BuildCard({ componentId, versionId, latestCommit }: Buil
     );
   }
 
-  const commitSha = latestCommit?.sha?.slice(0, 7) ?? lastBuild.sourceCommitId?.slice(0, 7) ?? '';
-  const commitMessage = latestCommit?.message ?? '';
+  // The card names the commit this build was made from, not the repo's newest. The build record
+  // carries no message, and `latestCommit`'s belongs to HEAD — so it is only shown when the two
+  // are the same commit, rather than captioning one SHA with another's message.
+  const buildSha = lastBuild.sourceCommitId || '';
+  const commitSha = (buildSha || latestCommit?.sha || '').slice(0, 7);
+  const isHeadBuild = !buildSha || (!!latestCommit?.sha && latestCommit.sha.slice(0, 7) === buildSha.slice(0, 7));
+  const commitMessage = isHeadBuild ? (latestCommit?.message ?? '') : '';
   const commitTooltip = commitMessage ? `"${commitMessage}"${latestCommit?.author?.name ? ` by ${latestCommit.author.name}` : ''}` : commitSha;
 
   // A finished build resolves past the last step; clamp that to -1 so the shared

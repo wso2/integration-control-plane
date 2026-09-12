@@ -23,7 +23,6 @@ import type { ComponentLogsRequest, LogRow, LogsRequest } from '../../types/logs
 import SearchField from '../SearchField';
 import type { LogsFiltersState } from '../../hooks/useLogsFilters';
 import { LOG_LEVELS, TIME_PRESETS, downloadLogs } from '../../utils/logs';
-import { IS_CLOUD } from '../../features';
 
 export interface LogsFiltersProps {
   /** All filter state from useLogsFilters() */
@@ -45,7 +44,7 @@ export default function LogsFilters({ filters, environments, logs, logsRequest, 
       {/* Filter toolbar */}
       <Stack direction="row" gap={1.5} sx={{ mb: 1 }} flexWrap="wrap" alignItems="center">
         {/* Environment filter — nothing to narrow when there is one environment. */}
-        {!IS_CLOUD && environments.length > 1 && (
+        {environments.length > 1 && (
           <Select
             multiple
             value={envFilter}

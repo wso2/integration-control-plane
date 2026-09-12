@@ -125,6 +125,7 @@ export default function FileEventHeader({
           <>
             <ConfigureButton onClick={() => setConfigureOpen(true)} hasMissingConfigs={missingConfigs} />
             <ConfigureDrawer
+              onSaved={() => onNotify({ text: 'Configuration saved successfully.', severity: 'success' })}
               open={configureOpen}
               onClose={() => setConfigureOpen(false)}
               orgHandler={orgHandler}

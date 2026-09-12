@@ -149,7 +149,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
         ) : (
           <EnvCardHeader
             envName={env.name}
-            latestCommit={latestCommit}
+            deployedCommit={envDeployment?.build?.commit}
             hasDeployment={!!envDeployment}
             isRefreshing={isRefreshing}
             onRefresh={handleRefresh}

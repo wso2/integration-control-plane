@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, CircularProgress, IconButton, PageContent, PageTitle, Stack, Tooltip } from '@wso2/oxygen-ui';
-import { GitBranch, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { GitBranch, Plus, Repeat, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { IS_CLOUD } from '../features';
 import { useEnvTemplates, useProjectDeploymentPipelines } from '../hooks/useDeploymentPipelines';
@@ -33,7 +33,7 @@ import SetDefaultPipelineDialog from '../components/CdPipelines/SetDefaultPipeli
 
 // Cloud cannot add pipelines, so the empty state describes them instead of
 // pointing at an action that isn't there.
-const EMPTY_DESCRIPTION = IS_CLOUD ? 'Deployment pipelines define how integrations promote across environments.' : 'Add an organization pipeline to define how integrations promote across environments.';
+const EMPTY_DESCRIPTION = 'Add an organization pipeline to define how integrations promote across environments.';
 
 export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
   const { projectId, isLoading: resolvingProject } = useProjectId(scope.project);
@@ -52,11 +52,13 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
     <PageContent>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <PageTitle>
-          <PageTitle.Header>Continuous Deployment Pipelines</PageTitle.Header>
+          <PageTitle.Header>Deployment Pipeline</PageTitle.Header>
+          <PageTitle.SubHeader>The promotion path this project's integrations deploy along.</PageTitle.SubHeader>
         </PageTitle>
-        {!IS_CLOUD && !!pipelines?.length && (
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-            Add Pipeline
+        {/* Cloud binds one pipeline per project, so adding a second is really a swap. */}
+        {!!pipelines?.length && (
+          <Button variant="contained" startIcon={IS_CLOUD ? <Repeat size={18} /> : <Plus size={20} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+            {IS_CLOUD ? 'Change Pipeline' : 'Add Pipeline'}
           </Button>
         )}
       </Stack>
@@ -82,7 +84,7 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
           Failed to load deployment pipelines.
         </Alert>
       ) : !pipelines?.length ? (
-        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction={!IS_CLOUD} actionLabel="Add Pipeline" onAction={() => setAddOpen(true)} />
+        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Add Pipeline" onAction={() => setAddOpen(true)} />
       ) : (
         <Stack gap={3}>
           {orderedPipelines?.map((pipeline) => (

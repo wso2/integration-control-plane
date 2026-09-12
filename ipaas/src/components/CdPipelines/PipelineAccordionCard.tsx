@@ -51,7 +51,8 @@ export default function PipelineAccordionCard({ name, isDefault, tree, envTempla
           </Stack>
         </Stack>
       </AccordionSummary>
-      <AccordionDetails>
+      {/* MUI defaults this to 8px 16px 16px; even padding reads better around the chain. */}
+      <AccordionDetails sx={{ p: 2 }}>
         <PromotionPath tree={tree} envTemplates={envTemplates} />
       </AccordionDetails>
     </Accordion>

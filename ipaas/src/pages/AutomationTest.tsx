@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Card, CircularProgress, Divider, MenuItem, PageTitle, Select, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Card, CircularProgress, Divider, PageTitle, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { Activity, Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -30,6 +30,7 @@ import DraftTestDialog, { type DraftDialogIntent, type DraftDialogMode } from '.
 import ExecutionHistoryHeader from '../components/AutomationTest/ExecutionHistoryHeader';
 import FormExecutionSummary from '../components/AutomationTest/FormExecutionSummary';
 import TestStepper from '../components/AutomationTest/TestStepper';
+import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import NotDeployedAlert from '../components/NotDeployedAlert';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
@@ -42,7 +43,6 @@ import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
 import { isTerminalStatus } from '../utils/executionStatus';
 import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, TaskExecution } from '../types/executions';
 import type { ComponentScope } from '../nav';
-import { IS_CLOUD } from '../features';
 
 /**
  * Automation "Test" page — mirrors Devant's "Test Your Automation" console layout:
@@ -250,26 +250,16 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   const runLabel = envCritical ? 'Run' : 'Test';
   const runningLabel = envCritical ? 'Running…' : 'Testing…';
 
-  const envSelect = !IS_CLOUD && environments.length > 1 && (
-    <Select
-      size="small"
-      value={environments.some((e) => e.id === envId) ? envId : ''}
-      onChange={(e) => setEnvId(e.target.value as string)}
-      inputProps={{ 'aria-label': 'Environment' }}
-      sx={{ fontSize: '0.8125rem', '& .MuiSelect-select': { py: 0.5, px: 1.5 }, minWidth: 140 }}>
-      {environments.map((e) => (
-        <MenuItem key={e.id} value={e.id}>
-          {e.name}
-        </MenuItem>
-      ))}
-    </Select>
-  );
+  const envSelect = environments.length > 1 && <EnvironmentSelect environments={environments} value={envId} onChange={setEnvId} />;
 
   /** The page heading, kept identical across every state so it never disappears. */
   const pageTitle = (
-    <PageTitle>
-      <PageTitle.Header>Test Your Automation</PageTitle.Header>
-    </PageTitle>
+    <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+      <PageTitle>
+        <PageTitle.Header>Test Your Automation</PageTitle.Header>
+      </PageTitle>
+      {envSelect}
+    </Stack>
   );
 
   /** Any state that cannot show the console still shows the title, with the reason under it. */
@@ -345,6 +335,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   // Runtime arguments present → the "Test Your Automation" form view (two panels).
   const renderFormView = (): JSX.Element => (
     <Box>
+      {pageTitle}
       <FormExecutionSummary
         commitSha={commitHash}
         buildDate={buildDate}
@@ -426,7 +417,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
       {tracks.length > 0 && (
         // Pin the track bar to the top of the scroll area so it stays visible as the page scrolls.
         <Box sx={{ position: 'sticky', top: 0, zIndex: (theme) => theme.zIndex.appBar }}>
-          <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} extra={envSelect} />
+          <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} />
         </Box>
       )}
       {/* Plain padded container (not PageContent) so the page uses the single outer scroller — the

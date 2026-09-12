@@ -66,6 +66,9 @@ interface BffDeploymentPipeline {
 interface BffProject {
   name: string;
   displayName?: string;
+  // The project response serves the pipeline ref as `defaultDeploymentPipelineId`; the
+  // update request takes it back as `deploymentPipeline`. Read both, write the latter.
+  defaultDeploymentPipelineId?: string;
   deploymentPipeline?: string;
 }
 
@@ -182,8 +185,9 @@ export const fetchOrgDeploymentPipelines = (_orgUuid: string): Promise<Deploymen
 // "no pipeline configured", which is what a swallowed error would look like.
 export const fetchProjectDeploymentPipelines = async (_orgUuid: string, projectId: string): Promise<DeploymentPipeline[]> => {
   const project = await bff.get<BffProject>(`/projects/${seg(projectId)}`);
-  if (!project?.deploymentPipeline) return [];
-  const pipeline = await bff.get<BffDeploymentPipeline>(`/deploymentpipelines/${seg(project.deploymentPipeline)}`);
+  const pipelineName = project?.defaultDeploymentPipelineId || project?.deploymentPipeline;
+  if (!pipelineName) return [];
+  const pipeline = await bff.get<BffDeploymentPipeline>(`/deploymentpipelines/${seg(pipelineName)}`);
   return [{ ...toDeploymentPipeline(pipeline), is_project_default: true }];
 };
 
@@ -199,7 +203,7 @@ export const deleteDeploymentPipeline = (_orgUuid: string, pipelineId: string): 
 
 // derives: no BFF deletion-eligibility route — infer usage from project pipeline refs.
 export const fetchPipelineDeletionEligibility = async (_orgUuid: string, pipelineId: string): Promise<PipelineDeletionEligibility> => {
-  const used = items(await bff.get<ListResponse<BffProject>>('/projects')).filter((p) => p.deploymentPipeline === pipelineId);
+  const used = items(await bff.get<ListResponse<BffProject>>('/projects')).filter((p) => (p.defaultDeploymentPipelineId || p.deploymentPipeline) === pipelineId);
   return {
     id: pipelineId,
     name: pipelineId,

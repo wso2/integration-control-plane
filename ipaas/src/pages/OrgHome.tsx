@@ -29,6 +29,7 @@ import { useCreateDefaultProject, useFetchProjectsByOrgId, useInitOrg } from '..
 import { useCreateProject } from '../hooks/useProjects';
 import { fetchProjects as fetchProjectsApi } from '#api/projects';
 import { projectHomeUrl } from '../paths';
+import { newComponentUrl } from '../nav';
 import { IS_CLOUD } from '../features';
 import { DEFAULT_PROJECT_HANDLER } from '../constants/project';
 import Projects from './Projects';
@@ -137,7 +138,7 @@ export default function OrgHome(): JSX.Element {
             // freshDefaultProject tells AppLayout it can hide the left nav immediately, without
             // waiting on the components/projects queries — we already know this project is empty
             // and the org has no other projects, since we just created it.
-            navigate(projectHomeUrl(orgHandler!, DEFAULT_PROJECT_HANDLER), { replace: true, state: { freshDefaultProject: true } });
+            navigate(newComponentUrl({ org: orgHandler!, project: DEFAULT_PROJECT_HANDLER }), { replace: true });
           });
         })
         .catch((err) => {
@@ -229,7 +230,7 @@ export default function OrgHome(): JSX.Element {
         // freshDefaultProject tells AppLayout it can hide the left nav immediately, without
         // waiting on the components/projects queries — we already know this project is empty and
         // the org has no other projects, since we just created it.
-        navigate(projectHomeUrl(orgHandler!, DEFAULT_PROJECT_HANDLER), { replace: true, state: { freshDefaultProject: true } });
+        navigate(newComponentUrl({ org: orgHandler!, project: DEFAULT_PROJECT_HANDLER }), { replace: true });
       } catch (err) {
         setSubmitError(err instanceof Error ? err.message : 'Setup failed. Please try again.');
         setIsSubmitting(false);

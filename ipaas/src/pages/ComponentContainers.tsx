@@ -34,7 +34,6 @@ import { useProjectId } from '../hooks/useProjects';
 import { useSubscriptions } from '../hooks/useSubscription';
 import { isPrivateDpRelease } from '../utils/containers';
 import type { ComponentScope } from '../nav';
-import { IS_CLOUD } from '../features';
 
 export default function ComponentContainers({ org, project, component }: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid();
@@ -72,7 +71,7 @@ export default function ComponentContainers({ org, project, component }: Compone
 
   const containers = release?.containers ?? [];
 
-  const envSelect = !IS_CLOUD && environments.length > 1 ? <EnvironmentSelect environments={environments} value={envId} onChange={setEnvId} /> : null;
+  const envSelect = environments.length > 1 ? <EnvironmentSelect environments={environments} value={envId} onChange={setEnvId} /> : null;
 
   return (
     <Box>

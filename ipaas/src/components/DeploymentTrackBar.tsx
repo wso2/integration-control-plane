@@ -60,27 +60,29 @@ function TrackLabel({ track, versionView }: { track: DeploymentTrack; versionVie
   );
 }
 
+const barSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 2,
+  px: 3,
+  minHeight: 48,
+  borderBottom: '1px solid',
+  borderColor: 'divider',
+  bgcolor: 'background.acrylic',
+  backdropFilter: 'blur(3px)',
+} as const;
+
 export default function DeploymentTrackBar({ tracks, selectedId, onChange, orgHandler, projectHandler, componentHandler, versionView, extra }: DeploymentTrackBarProps) {
   const navigate = useAppNavigate();
 
-  // Cloud has no deployment tracks yet.
-  if (IS_CLOUD) return null;
+  // Cloud has one implicit track, so the track picker has nothing to offer — but this bar is
+  // where every ComponentScope page puts its environment selector, so keep it for that alone.
+  if (IS_CLOUD) return extra ? <Box sx={barSx}>{extra}</Box> : null;
 
   const basePath = `/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/settings/deployment-tracks`;
 
   return (
-    <Box
-      sx={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 2,
-        px: 3,
-        minHeight: 48,
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        bgcolor: 'background.acrylic',
-        backdropFilter: 'blur(3px)',
-      }}>
+    <Box sx={barSx}>
       {/* Label + tooltip */}
       <Stack direction="row" alignItems="center" gap={0.5}>
         <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, fontSize: '0.8125rem' }}>

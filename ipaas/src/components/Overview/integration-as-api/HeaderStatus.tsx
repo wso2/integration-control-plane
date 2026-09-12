@@ -41,6 +41,7 @@ export default function HeaderStatus({
   hasDeployment,
   deploymentStatusV2,
   deployedCommitSha,
+  onNotify,
   releaseId,
   releaseMgtReleaseId,
   releaseMgtDeploymentId,
@@ -55,6 +56,7 @@ export default function HeaderStatus({
         <>
           <ConfigureButton onClick={() => setConfigureOpen(true)} />
           <ConfigureDrawer
+            onSaved={() => onNotify({ text: 'Configuration saved successfully.', severity: 'success' })}
             open={configureOpen}
             onClose={() => setConfigureOpen(false)}
             orgHandler={orgHandler}

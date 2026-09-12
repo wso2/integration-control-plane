@@ -443,7 +443,7 @@ interface AutomationConfigureDrawerProps {
   buildId?: string;
 }
 
-function AutomationConfigureDrawer({ open, onClose, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId }: AutomationConfigureDrawerProps) {
+function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId }: AutomationConfigureDrawerProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -657,10 +657,14 @@ function AutomationConfigureDrawer({ open, onClose, projectId, componentId, envI
           if (buildId) {
             deployTrack
               .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId, environmentId: actualEnvId, cronTimezone: '' })
-              .then(() => onClose())
+              .then(() => {
+                onClose();
+                onSaved?.();
+              })
               .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
           } else {
             onClose();
+            onSaved?.();
           }
         };
 
@@ -838,6 +842,7 @@ export default function ConfigureDrawer(props: ConfigureDrawerProps) {
       <AutomationConfigureDrawer
         open={props.open}
         onClose={props.onClose}
+        onSaved={props.onSaved}
         projectId={props.projectId}
         componentId={props.componentId}
         envId={props.envTemplateId ?? props.envId}

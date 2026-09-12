@@ -19,6 +19,7 @@
 import { Alert, Autocomplete, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useOrgDeploymentPipelines, useUpdateProjectDeploymentPipelines } from '../../hooks/useDeploymentPipelines';
+import { IS_CLOUD } from '../../features';
 import type { DeploymentPipeline } from '../../types/deploymentPipeline';
 
 interface AddProjectPipelineDialogProps {
@@ -34,6 +35,9 @@ interface AddProjectPipelineDialogProps {
  * Adds org pipelines to a project. The org pipelines not already in the project
  * are multi-selectable; saving PUTs the current ids plus the chosen ones (the
  * project pipeline set is a full replace).
+ *
+ * Cloud binds a project to exactly one pipeline, so there the picker is single-select
+ * and the chosen pipeline replaces the current one rather than joining it.
  */
 export default function AddProjectPipelineDialog({ projectId, currentPipelineIds, onClose, onDone, onError }: AddProjectPipelineDialogProps): ReactNode {
   const { data: orgPipelines, isLoading, isError, refetch } = useOrgDeploymentPipelines();
@@ -42,8 +46,9 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
 
   const available = useMemo(() => (orgPipelines ?? []).filter((p) => !currentPipelineIds.includes(p.id)), [orgPipelines, currentPipelineIds]);
 
+  const chosen = selected.map((p) => p.id);
   const add = () =>
-    update.mutate([...currentPipelineIds, ...selected.map((p) => p.id)], {
+    update.mutate(IS_CLOUD ? chosen : [...currentPipelineIds, ...chosen], {
       onSuccess: () => {
         onClose();
         onDone();
@@ -56,9 +61,9 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Add Deployment Pipelines</DialogTitle>
+      <DialogTitle>{IS_CLOUD ? 'Set Deployment Pipeline' : 'Add Deployment Pipelines'}</DialogTitle>
       <DialogContent>
-        <DialogContentText sx={{ mb: 2 }}>Select deployment pipelines to add to your project.</DialogContentText>
+        <DialogContentText sx={{ mb: 2 }}>{IS_CLOUD ? 'Select the deployment pipeline for your project.' : 'Select deployment pipelines to add to your project.'}</DialogContentText>
         {isLoading ? (
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ py: 2 }}>
             <CircularProgress size={18} />
@@ -82,14 +87,14 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
           </Typography>
         ) : (
           <Autocomplete
-            multiple
+            multiple={!IS_CLOUD}
             options={available}
-            value={selected}
-            onChange={(_, v) => setSelected(v)}
+            value={IS_CLOUD ? (selected[0] ?? null) : selected}
+            onChange={(_, v) => setSelected(v === null ? [] : Array.isArray(v) ? v : [v])}
             getOptionLabel={(p) => p.name}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             disabled={update.isPending}
-            renderInput={(params) => <TextField {...params} label="Pipelines" placeholder="Select pipelines" />}
+            renderInput={(params) => <TextField {...params} label={IS_CLOUD ? 'Pipeline' : 'Pipelines'} placeholder={IS_CLOUD ? 'Select a pipeline' : 'Select pipelines'} />}
           />
         )}
       </DialogContent>

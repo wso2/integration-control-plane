@@ -117,7 +117,7 @@ export default function ProjectMetrics(scope: ProjectScope): JSX.Element {
       </PageTitle>
 
       <MetricsHeader range={range} onRangeChange={setRange} refreshSeconds={refreshSeconds} onRefreshSecondsChange={setRefreshSeconds} onRefresh={handleRefresh} isRefreshing={diagram.isFetching}>
-        {!IS_CLOUD && environments.length > 1 && (
+        {environments.length > 1 && (
           <TextField select size="small" label="Environment" value={envId} onChange={(e) => setEnvId(e.target.value)} sx={{ minWidth: 150 }}>
             {environments.map((e) => (
               <MenuItem key={e.id} value={e.id}>

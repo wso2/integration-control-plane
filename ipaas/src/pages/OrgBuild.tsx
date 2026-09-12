@@ -17,9 +17,14 @@
  */
 
 import type { JSX } from 'react';
-import ComingSoon from './ComingSoon';
+import IntegrationScopePicker from '../components/IntegrationScopePicker';
+import { PageContent } from '@wso2/oxygen-ui';
 import type { OrgScope } from '../nav';
 
-export default function OrgBuild(_scope: OrgScope): JSX.Element {
-  return <ComingSoon title="Build Not Available at Organization Level" description="Navigate to a component to view and manage builds." />;
+export default function OrgBuild(scope: OrgScope): JSX.Element {
+  return (
+    <PageContent>
+      <IntegrationScopePicker org={scope.org} segment="build" />
+    </PageContent>
+  );
 }

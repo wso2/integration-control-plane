@@ -16,9 +16,70 @@
  * under the License.
  */
 
-import { Box, Divider, MenuItem } from '@wso2/oxygen-ui';
-import { Plug, Plus } from '@wso2/oxygen-ui-icons-react';
+import { Box, CircularProgress, Divider, IconButton, ListSubheader, MenuItem, Tooltip } from '@wso2/oxygen-ui';
+import { Plug, Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
+import MenuSearchField from '../MenuSearchField';
+
+export interface SelectRefreshAction {
+  label: string;
+  onClick: () => void;
+  loading?: boolean;
+}
+
+/**
+ * The refresh control itself. The mouse-down guard stops the select from treating the click as
+ * a choice; callers place it either alone in a header row or beside a menu search field.
+ */
+export function selectRefreshButton(refresh: SelectRefreshAction): JSX.Element {
+  return (
+    <Tooltip title={refresh.label} placement="left">
+      <span>
+        <IconButton
+          size="small"
+          aria-label={refresh.label}
+          disabled={refresh.loading}
+          sx={{ color: 'primary.main', flexShrink: 0 }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            refresh.onClick();
+          }}>
+          {refresh.loading ? <CircularProgress size={14} /> : <RefreshCw size={14} />}
+        </IconButton>
+      </span>
+    </Tooltip>
+  );
+}
+
+/** The refresh control alone in a menu row — used when the list is short enough to have no search. */
+export function selectRefreshHeader(refresh: SelectRefreshAction): JSX.Element {
+  return (
+    <ListSubheader key="gh-refresh" sx={{ display: 'flex', justifyContent: 'flex-end', bgcolor: 'background.paper', lineHeight: 1, py: 0.5, minHeight: 0 }}>
+      {selectRefreshButton(refresh)}
+    </ListSubheader>
+  );
+}
+
+export interface SelectMenuSearch {
+  key: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  /** Whether the list is long enough to warrant a search field. */
+  show: boolean;
+}
+
+/**
+ * The menu's header row: the search field with the refresh beside it, or — when the list is too
+ * short for a search — the refresh on its own row. Returns null when there is neither.
+ */
+export function selectMenuHeader(search: SelectMenuSearch, refresh?: SelectRefreshAction): JSX.Element | null {
+  if (search.show) {
+    return <MenuSearchField key={search.key} value={search.value} onChange={search.onChange} placeholder={search.placeholder} action={refresh ? selectRefreshButton(refresh) : undefined} />;
+  }
+  return refresh ? selectRefreshHeader(refresh) : null;
+}
 
 /**
  * Footer actions appended inside the GitHub Organization / Repository dropdown
@@ -47,14 +108,19 @@ function actionItem(value: string, label: string, icon: ReactNode): JSX.Element 
 }
 
 /** Leading items for the Organization select (rendered above the org options). `showInstall` gates the App-install action (needs a configured slug). */
-export function organizationActionItems(showInstall: boolean): JSX.Element[] {
-  if (!showInstall) return [];
-  return [actionItem(GH_SELECT_ACTION.addOrg, 'Add organization', <Plus size={16} />), <Divider key="gh-org-divider" />];
+export function organizationActionItems(showInstall: boolean, refresh?: SelectRefreshAction): JSX.Element[] {
+  const items: JSX.Element[] = [];
+  if (refresh) items.push(selectRefreshHeader(refresh));
+  if (showInstall) items.push(actionItem(GH_SELECT_ACTION.addOrg, 'Add organization', <Plus size={16} />));
+  if (items.length === 0) return [];
+  items.push(<Divider key="gh-org-divider" />);
+  return items;
 }
 
 /** Leading items for the Repository select (rendered above the repo options). Connect needs a configured slug; Create is always available. */
-export function repositoryActionItems(showInstall: boolean): JSX.Element[] {
+export function repositoryActionItems(showInstall: boolean, refresh?: SelectRefreshAction): JSX.Element[] {
   const items: JSX.Element[] = [];
+  if (refresh) items.push(selectRefreshHeader(refresh));
   if (showInstall) items.push(actionItem(GH_SELECT_ACTION.connectRepos, 'Connect more repositories', <Plug size={16} />));
   items.push(actionItem(GH_SELECT_ACTION.createRepo, 'Create repository', <Plus size={16} />));
   items.push(<Divider key="gh-repo-divider" />);

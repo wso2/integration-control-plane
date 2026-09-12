@@ -106,7 +106,7 @@ function DeleteDialog({ template, orgUuid, onClose, onSuccess, onError }: { temp
 
 // Cloud cannot create environments, so the empty state describes them instead of
 // pointing at an action that isn't there.
-const EMPTY_DESCRIPTION = IS_CLOUD ? 'Environments are the deployment targets for your integrations.' : 'Create your first environment to get started';
+const EMPTY_DESCRIPTION = 'Create your first environment to get started';
 
 export default function Environments(scope: OrgScope | ProjectScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -169,7 +169,7 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
           Failed to load environments.
         </Alert>
       ) : !templates?.length ? (
-        <EmptyListing icon={<Layers size={48} />} title="No environments found" description={EMPTY_DESCRIPTION} showAction={canManageEnv && !IS_CLOUD} actionLabel="Create Environment" onAction={() => navigate(newEnvironmentUrl(scope))} />
+        <EmptyListing icon={<Layers size={48} />} title="No environments found" description={EMPTY_DESCRIPTION} showAction={canManageEnv} actionLabel="Create Environment" onAction={() => navigate(newEnvironmentUrl(scope))} />
       ) : (
         <>
           {alert && (
@@ -181,13 +181,11 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
             <ListingTable.Toolbar
               searchSlot={<SearchField value={search} onChange={setSearch} />}
               actions={
-                !IS_CLOUD && (
-                  <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
-                    <Button variant="contained" startIcon={<Plus size={20} />} onClick={() => navigate(newEnvironmentUrl(scope))}>
-                      Create
-                    </Button>
-                  </Authorized>
-                )
+                <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
+                  <Button variant="contained" startIcon={<Plus size={20} />} onClick={() => navigate(newEnvironmentUrl(scope))}>
+                    Create
+                  </Button>
+                </Authorized>
               }
             />
             <ListingTable>
@@ -195,10 +193,10 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
                 <ListingTable.Row>
                   <ListingTable.Cell>Name</ListingTable.Cell>
                   <ListingTable.Cell>Type</ListingTable.Cell>
-                  <ListingTable.Cell>DNS Prefix</ListingTable.Cell>
+                  {/* OpenChoreo derives no per-environment hostname, so cloud has no DNS prefix. */}
+                  {!IS_CLOUD && <ListingTable.Cell>DNS Prefix</ListingTable.Cell>}
                   <ListingTable.Cell>Created</ListingTable.Cell>
-                  {/* Cloud environments are platform-managed — nothing to act on. */}
-                  {!IS_CLOUD && <ListingTable.Cell align="right">Action</ListingTable.Cell>}
+                  <ListingTable.Cell align="right">Action</ListingTable.Cell>
                 </ListingTable.Row>
               </ListingTable.Head>
               <ListingTable.Body>
@@ -218,24 +216,22 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
                         </Stack>
                       </ListingTable.Cell>
                       <ListingTable.Cell>{t.critical ? 'Critical' : 'Non-Critical'}</ListingTable.Cell>
-                      <ListingTable.Cell>{t.dnsPrefix || '—'}</ListingTable.Cell>
+                      {!IS_CLOUD && <ListingTable.Cell>{t.dnsPrefix || '—'}</ListingTable.Cell>}
                       <ListingTable.Cell>
                         <Stack direction="row" alignItems="center" gap={0.5}>
                           <Clock size={14} />
                           {t.createdAt ? formatDistanceToNow(t.createdAt) : '—'}
                         </Stack>
                       </ListingTable.Cell>
-                      {!IS_CLOUD && (
-                        <Authorized permissions={Permissions.ENVIRONMENT_MANAGE} fallback={<ListingTable.Cell align="right" />}>
+                      <Authorized permissions={Permissions.ENVIRONMENT_MANAGE} fallback={<ListingTable.Cell align="right" />}>
                           <ListingTable.Cell align="right">
                             <Tooltip title="Delete">
                               <IconButton size="small" color="error" aria-label={`Delete ${t.name}`} onClick={() => setDeleting(t)}>
                                 <Trash2 size={16} />
                               </IconButton>
                             </Tooltip>
-                          </ListingTable.Cell>
-                        </Authorized>
-                      )}
+                        </ListingTable.Cell>
+                      </Authorized>
                     </ListingTable.Row>
                   ))
                 )}

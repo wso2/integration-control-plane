@@ -33,9 +33,9 @@ interface PipelineEnvNodeProps {
 /** A single environment box in a promotion path — shared by the read-only path and the builder. */
 export default function PipelineEnvNode({ name, region, critical, onRemove, disabled }: PipelineEnvNodeProps): ReactNode {
   return (
-    <Stack sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1.5, px: 1.5, py: 1, minWidth: 180, bgcolor: 'background.paper' }}>
+    <Stack sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 0.75, px: 2.5, py: 1.75, minWidth: 200, gap: 0.25, bgcolor: 'background.paper' }}>
       <Stack direction="row" alignItems="center" gap={1}>
-        <Typography variant="body2" sx={{ fontWeight: 600, flex: 1, wordBreak: 'break-word' }}>
+        <Typography variant="body1" sx={{ fontWeight: 600, flex: 1, wordBreak: 'break-word' }}>
           {name}
         </Typography>
         {critical && <Chip label="Critical" size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}

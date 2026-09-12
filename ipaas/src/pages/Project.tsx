@@ -52,21 +52,13 @@ import {
   Tooltip,
   Typography,
 } from '@wso2/oxygen-ui';
-import { ArrowRight, ChevronDown, ChevronUp, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { ChevronDown, ChevronUp, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
 import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
 import ArchitectureCard from '../components/ArchitectureCard';
 import ContributorsCard from '../components/ContributorsCard';
-import IDEMockup from '../components/IDEMockup/IDEMockup';
-import PillTabs from '../components/PillTabs';
-import PrebuiltCard from '../components/PrebuiltCard';
-import SampleRowCard from '../components/SampleRowCard';
-import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
 import LinkRepositoryDialog from '../components/ProjectCreate/LinkRepositoryDialog';
-import GitLogoIcon from '../assets/icons/GitLogoIcon';
-import GitLabIcon from '../assets/icons/GitLabIcon';
-import BitbucketIcon from '../assets/icons/BitbucketIcon';
-import AzureDevOpsIcon from '../assets/icons/AzureDevOpsIcon';
 import IntegratorIcon from '../assets/icons/IntegratorIcon';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type JSX } from 'react';
@@ -77,354 +69,26 @@ import { useFreshDefaultProject } from '../hooks/useFreshDefaultProject';
 import { useOrgs, useOrgComponentLimits, useOrgSubscriptions } from '../hooks/useOrg';
 import { useChoreoSampleImages } from '../hooks/useRepository';
 import type { Component, ComponentDeletionError, ComponentSubscription, SubscriptionInfo } from '../types/component';
-import { useDeleteComponent, useCreateComponent } from '../hooks/useComponents';
+import { useDeleteComponent } from '../hooks/useComponents';
 import NotFound from '../components/NotFound';
 import { formatDistanceToNow } from '../utils/time';
-import { resourceUrl, broaden, narrow, newComponentUrl, type ProjectScope } from '../nav';
-import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/tokenManager';
-import { IS_CLOUD } from '../features';
+import { resourceUrl, broaden, newComponentUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth/AuthContext';
-import { componentOverviewUrl, importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, importComingSoonUrl, buildGitHubOAuthUrl } from '../paths';
+import { componentOverviewUrl } from '../paths';
 import { Permissions } from '../constants/permissions';
-import { isSupportedIntegration, getDisplayLabel, displayTypeFromSample, getNonIntegrationPlatform } from '../constants/integrations';
+import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import IntegrationIcon from '../components/IntegrationIcon';
-import { GITHUB_AUTH } from '../constants/github';
-import { CARD_HOVER_SX, PROVIDER_ICON_SX, GITHUB_ICON_SX } from '../constants/styles';
 import Authorized from '../components/Authorized';
-import { useAccessControl } from '../contexts/AccessControlContext';
 import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
 import { useLoadProjectPermissions } from '../hooks/usePermissionLoader';
-import { UUID_RE, toHandler } from '../utils/string';
-import { useSamples } from '../hooks/useSamples';
-import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
-import type { Sample } from '../types/samples';
+import { UUID_RE } from '../utils/string';
 
 const Markdown = lazy(() => import('../components/Markdown'));
 
 const FREE_COMPONENT_LIMIT = 5;
 
-function EmptyProjectView({ scope, projectId }: { scope: ProjectScope; projectId: string }) {
-  const navigate = useAppNavigate();
-  const { userId } = useAuth();
-  const { hasAnyPermission } = useAccessControl();
-  const orgUuid = useOrgUuid() ?? '';
-  const { data: samplesData, isLoading: samplesLoading, isError: samplesError } = useSamples();
-  const { data: prebuiltData, isLoading: prebuiltLoading, isError: prebuiltError } = usePrebuiltIntegrations();
-  const { data: sampleImages } = useChoreoSampleImages(orgUuid, projectId);
-  const { data: orgLimits } = useOrgComponentLimits(orgUuid);
-  const { data: subscriptions } = useOrgSubscriptions(orgUuid);
-  const createComponent = useCreateComponent();
-
-  const isUpgraded = (subscriptions ?? []).some((s) => s.subscriptionType === 'devant-subscription' && s.subscriptionStatus === 'active');
-  const orgDevantComponentCount = isUpgraded ? 0 : (orgLimits?.billableComponentCount ?? 0);
-  const quotaReached = orgDevantComponentCount >= FREE_COMPONENT_LIMIT;
-  const canManage = hasAnyPermission([Permissions.INTEGRATION_MANAGE], projectId);
-
-  const creationBlocked = !canManage || quotaReached;
-  const blockedTooltip = !canManage ? 'You do not have permission to create integrations.' : 'You have exceeded the allocated integration quota. Upgrade your subscription.';
-
-  const checkCreationGuard = (): boolean => {
-    if (!canManage) {
-      setPageError({ message: 'You do not have permission to create integrations.', severity: 'error' });
-      return false;
-    }
-    if (quotaReached) {
-      setPageError({ message: 'You have exceeded the allocated integration quota. Upgrade your subscription.', severity: 'warning' });
-      return false;
-    }
-    return true;
-  };
-
-  const featuredSamples = samplesData?.featuredSamples ?? [];
-  const featuredPrebuilt = (prebuiltData?.prebuiltIntegrations ?? []).slice(0, 3);
-
-  const [selectedTab, setSelectedTab] = useState(0);
-  const [deployingSample, setDeployingSample] = useState<string | null>(null);
-  const [isImportAuthenticating, setIsImportAuthenticating] = useState(false);
-  const [pageError, setPageError] = useState<{ message: string; severity: 'error' | 'warning' } | null>(null);
-
-  const importUrl = importComponentUrl(scope.org, scope.project);
-
-  const handleOpenCloudEditor = async () => {
-    if (!checkCreationGuard()) return;
-    const codeServerSample = (sampleImages ?? []).find((img) => img.name === 'Code Server');
-    if (!codeServerSample) {
-      setPageError({ message: 'Cloud Editor is not available. Please try again later.', severity: 'warning' });
-      return;
-    }
-    const deploymentUrl = new URL('/editor', window.location.origin);
-    deploymentUrl.searchParams.set('userId', userId);
-    deploymentUrl.searchParams.set('orgUuid', orgUuid);
-    deploymentUrl.searchParams.set('orgHandle', scope.org);
-    deploymentUrl.searchParams.set('projectId', projectId);
-    deploymentUrl.searchParams.set('componentId', 'null');
-    deploymentUrl.searchParams.set('codeServerSample', JSON.stringify(codeServerSample));
-    const newTab = window.open(deploymentUrl.toString(), '_blank');
-    if (!newTab) {
-      setPageError({ message: 'Please allow popups for this site and try again.', severity: 'warning' });
-    }
-  };
-
-  const handleImportClick = () => {
-    if (!checkCreationGuard()) return;
-    const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
-    if (!githubAppClientId) {
-      // Cloud only: no GitHub App configured means private-repo authorization
-      // is impossible, so land the import page in public-URL mode instead of
-      // its default (private) mode with a dead Authorize button. Other
-      // variants keep the original navigation.
-      navigate(importUrl, IS_CLOUD ? { state: { mode: 'public' } } : undefined);
-      return;
-    }
-    setIsImportAuthenticating(true);
-    const state = generateAndSaveGitHubState();
-    const url = buildGitHubOAuthUrl(githubAppAuthRedirectUrl ?? '', githubAppClientId, state);
-    const popup = window.open(url, 'github-oauth', GITHUB_AUTH.POPUP_DIMENSIONS);
-    if (!popup) {
-      setIsImportAuthenticating(false);
-      setPageError({ message: 'Please allow popups for this site and try again.', severity: 'warning' });
-      return;
-    }
-    const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
-    const pollClosed = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(pollClosed);
-        channel.close();
-        setIsImportAuthenticating(false);
-      }
-    }, GITHUB_AUTH.POPUP_POLL_INTERVAL_MS);
-    channel.onmessage = (event) => {
-      clearInterval(pollClosed);
-      channel.close();
-      const { authCode, state: returnedState } = event.data as { authCode: string | null; state: string | null };
-      if (!returnedState || !validateAndClearGitHubState(returnedState)) {
-        setIsImportAuthenticating(false);
-        setPageError({ message: 'GitHub authorization failed (invalid state). Please try again.', severity: 'error' });
-        return;
-      }
-      if (!authCode) {
-        setIsImportAuthenticating(false);
-        setPageError({ message: 'GitHub authorization failed. Please try again.', severity: 'error' });
-        return;
-      }
-      navigate(importUrl, { state: { authCode } });
-    };
-  };
-
-  const handleQuickDeploy = (sample: Sample) => {
-    if (!checkCreationGuard()) return;
-    if (!projectId) return;
-    setDeployingSample(sample.displayName);
-    createComponent.mutate(
-      {
-        displayName: sample.displayName,
-        name: toHandler(sample.displayName),
-        description: sample.description,
-        orgHandler: scope.org,
-        projectId,
-        displayType: displayTypeFromSample(sample.componentType, sample.buildPack),
-        srcGitRepoUrl: sample.repositoryUrl,
-        repositorySubPath: `${sample.subDirectory ?? ''}${sample.componentPath}`,
-        repositoryBranch: sample.branch ?? 'main',
-        isPublicRepo: true,
-        enableAutoDeploy: true,
-      },
-      {
-        onSuccess: (component) => navigate(resourceUrl(narrow(scope, component.handler), 'overview')),
-        onError: () => setDeployingSample(null),
-      },
-    );
-  };
-
-  if (createComponent.isPending || createComponent.isSuccess || createComponent.isError) {
-    return (
-      <IntegrationCreationLoader
-        label="Integration"
-        subLabel={deployingSample || undefined}
-        isPending={createComponent.isPending}
-        isSuccess={createComponent.isSuccess}
-        error={createComponent.isError ? (createComponent.error?.message ?? 'Something went wrong. Please try again.') : null}
-        onBack={() => {
-          createComponent.reset();
-          setDeployingSample(null);
-        }}
-      />
-    );
-  }
-
-  return (
-    <>
-      {pageError && (
-        <Alert severity={pageError.severity} onClose={() => setPageError(null)} sx={{ mb: 3 }}>
-          {pageError.message}
-        </Alert>
-      )}
-
-      <Box
-        sx={{
-          display: 'grid',
-          gap: 3,
-          alignItems: 'stretch',
-          gridTemplateColumns: { xs: '1fr', md: '6fr 4fr' },
-        }}>
-        {/* Left column: Cloud Editor + Import */}
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 }}>
-          <Tooltip title={creationBlocked ? blockedTooltip : ''} placement="top">
-            <Box sx={creationBlocked ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-              <Card sx={{ ...CARD_HOVER_SX, ...(creationBlocked ? { pointerEvents: 'none' } : {}) }} onClick={handleOpenCloudEditor}>
-                <CardContent sx={{ display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
-                  <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 0.5 }}>
-                    <Typography variant="h2">Create an Integration</Typography>
-                    <Chip label="Beta" size="small" color="primary" variant="outlined" />
-                  </Stack>
-                  <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>
-                    Start developing in a complete, browser-based development environment.
-                  </Typography>
-                  <Box sx={{ height: 260, overflow: 'hidden' }}>
-                    <IDEMockup onOpenClick={handleOpenCloudEditor} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-          </Tooltip>
-
-          <Tooltip title={creationBlocked ? blockedTooltip : ''} placement="top">
-            <Box sx={creationBlocked ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}>
-              <Card variant="outlined" sx={{ boxShadow: 'none', ...(isImportAuthenticating ? { pointerEvents: 'none', opacity: 0.7 } : creationBlocked ? { pointerEvents: 'none' } : {}) }}>
-                <CardContent sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', p: 3, gap: 3, '&:last-child': { pb: 3 } }}>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography variant="h2" sx={{ mb: 0.5 }}>
-                      Import an Integration
-                    </Typography>
-                    <Typography color="text.secondary" variant="body2">
-                      {isImportAuthenticating ? 'Completing GitHub authorization…' : 'Connect your repository and start building instantly'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ width: '2px', alignSelf: 'stretch', bgcolor: 'divider', flexShrink: 0 }} />
-                  <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 3 }}>
-                    {isImportAuthenticating ? (
-                      <CircularProgress size={22} />
-                    ) : (
-                      <>
-                        <Tooltip title="Import from a Public Repository" placement="top">
-                          <IconButton
-                            aria-label="Import from a Public Repository"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(importUrl, { state: { mode: 'public' } });
-                            }}
-                            sx={PROVIDER_ICON_SX}>
-                            <GitLogoIcon size={25} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Import from GitHub" placement="top">
-                          <IconButton aria-label="Import from GitHub" onClick={handleImportClick} sx={GITHUB_ICON_SX}>
-                            <GitHub size={24} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Import from GitLab" placement="top">
-                          <IconButton aria-label="Import from GitLab" onClick={() => navigate(importComingSoonUrl(scope.org, scope.project))} sx={PROVIDER_ICON_SX}>
-                            <GitLabIcon size={22} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Import from Bitbucket" placement="top">
-                          <IconButton aria-label="Import from Bitbucket" onClick={() => navigate(importComingSoonUrl(scope.org, scope.project))} sx={PROVIDER_ICON_SX}>
-                            <BitbucketIcon size={22} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Import from Azure" placement="top">
-                          <IconButton aria-label="Import from Azure" onClick={() => navigate(importComingSoonUrl(scope.org, scope.project))} sx={PROVIDER_ICON_SX}>
-                            <AzureDevOpsIcon size={22} />
-                          </IconButton>
-                        </Tooltip>
-                      </>
-                    )}
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
-          </Tooltip>
-        </Box>
-
-        {/* Right column: Get Started Quickly */}
-        <Box sx={{ minWidth: 0 }}>
-          <Card variant="outlined" sx={{ height: '100%', boxShadow: 'none', display: 'flex', flexDirection: 'column' }}>
-            <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
-              <Typography variant="h2" sx={{ mb: 0.5 }}>
-                Get Started Quickly
-              </Typography>
-              <Typography color="text.secondary" variant="body2" sx={{ mb: 2 }}>
-                Start with prebuilt integrations or simple samples to get started.
-              </Typography>
-              <Box sx={{ mb: 2 }}>
-                <PillTabs value={selectedTab} onChange={setSelectedTab} tabs={[{ label: 'Prebuilt Integrations' }, { label: 'Samples' }]} />
-              </Box>
-              <Box sx={{ display: 'grid', flex: 1, minWidth: 0, '& > *': { gridArea: '1 / 1', zIndex: 1, minWidth: 0 } }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', ...(selectedTab !== 0 ? { visibility: 'hidden', pointerEvents: 'none', zIndex: 0 } : {}) }}>
-                  {prebuiltLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                      <CircularProgress size={24} />
-                    </Box>
-                  ) : prebuiltError ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Failed to load prebuilt integrations.
-                    </Typography>
-                  ) : (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      {featuredPrebuilt.map((integration) => (
-                        <PrebuiltCard key={integration.displayName} integration={integration} onClick={() => navigate(prebuiltIntegrationsUrl(scope.org, scope.project))} disabled={creationBlocked} disabledTooltip={blockedTooltip} />
-                      ))}
-                    </Box>
-                  )}
-                  <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(prebuiltIntegrationsUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
-                      Explore more prebuilt integrations
-                    </Button>
-                  </Box>
-                </Box>
-                <Box sx={{ display: 'flex', flexDirection: 'column', ...(selectedTab !== 1 ? { visibility: 'hidden', pointerEvents: 'none', zIndex: 0 } : {}) }}>
-                  {samplesLoading ? (
-                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                      <CircularProgress size={24} />
-                    </Box>
-                  ) : samplesError ? (
-                    <Typography variant="body2" color="text.secondary">
-                      Failed to load samples.
-                    </Typography>
-                  ) : (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                      {featuredSamples.map((sample) => (
-                        <SampleRowCard key={sample.displayName} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample === sample.displayName} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
-                      ))}
-                    </Box>
-                  )}
-                  <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(browseSamplesUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
-                      Explore more samples
-                    </Button>
-                  </Box>
-                </Box>
-              </Box>
-            </CardContent>
-          </Card>
-        </Box>
-      </Box>
-
-      {/* Footer links */}
-      <Stack direction="row" alignItems="center" gap={2} sx={{ mt: 4 }}>
-        <Link href="https://wso2.com/devant/docs" target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'primary.main', fontSize: '0.875rem' }}>
-          Tutorials
-        </Link>
-        <Divider orientation="vertical" flexItem />
-        <Link href="https://discord.gg/wso2" target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'primary.main', fontSize: '0.875rem' }}>
-          Get Support on Discord
-        </Link>
-      </Stack>
-    </>
-  );
-}
 
 const APIM_SUBSCRIBERS_ERROR_CODE = 'APIM_SUBSCRIBERS';
 
@@ -754,7 +418,7 @@ function IntegrationsTable({
           <Tooltip title={quotaReached ? 'You have exceeded the allocated integration quota. Upgrade your subscription.' : ''} placement="top">
             <span>
               <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newComponentUrl(scope))} disabled={quotaReached}>
-                Create
+                Create an Integration
               </Button>
             </span>
           </Tooltip>
@@ -1302,7 +966,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
       {project && <LinkRepositoryDialog open={linkRepoOpen} onClose={() => setLinkRepoOpen(false)} project={project} orgHandler={scope.org} />}
 
       {isEmpty ? (
-        <EmptyProjectView scope={scope} projectId={projectId} />
+        <CreateIntegrationPanels scope={scope} />
       ) : (
         <Box
           sx={{
@@ -1342,8 +1006,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
           </Box>
           <Box>
             <Stack gap={3}>
-              <ArchitectureCard projectId={projectId} components={components} isLoading={loadingComponents} isRefreshing={fetchingComponents && !loadingComponents} onRefresh={refetchComponents} />
               <IntegrationTypesCard components={components} />
+              <ArchitectureCard projectId={projectId} components={components} isLoading={loadingComponents} />
               <ContributorsCard projectId={projectId} />
             </Stack>
           </Box>

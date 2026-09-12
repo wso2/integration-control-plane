@@ -365,11 +365,9 @@ const CLOUD_HIDDEN_NAV_IDS = new Set([
   'org-certificates',
   'proj-third-party',
   'proj-genai-services',
-  'proj-cd-pipelines',
+  // Environments are org-scoped in OpenChoreo; cloud exposes them at org level only.
   'proj-environments',
-  'org-cd-pipelines',
   'org-data-planes',
-  'org-environments',
   // RAG
   'org-rag',
   'org-scheduled-ingestion',
@@ -398,11 +396,18 @@ const CLOUD_HIDDEN_NAV_IDS = new Set([
   'compliance',
 ]);
 
+// Cloud renders Settings as a top-level item, not inside Infrastructure. Keeping the parent
+// would auto-expand a group the item does not live in whenever Settings is opened.
+const CLOUD_TOP_LEVEL_NAV_IDS = new Set(['org-settings', 'proj-settings']);
+
+const forCloud = (entries: NavEntry[]): NavEntry[] =>
+  entries.filter((e) => !CLOUD_HIDDEN_NAV_IDS.has(e.navId)).map((e) => (CLOUD_TOP_LEVEL_NAV_IDS.has(e.navId) ? { ...e, parent: undefined } : e));
+
 const NAV: Record<Level, NavEntry[]> = IS_CLOUD
   ? {
-      organizations: NAV_ALL.organizations.filter((e) => !CLOUD_HIDDEN_NAV_IDS.has(e.navId)),
-      projects: NAV_ALL.projects.filter((e) => !CLOUD_HIDDEN_NAV_IDS.has(e.navId)),
-      components: NAV_ALL.components.filter((e) => !CLOUD_HIDDEN_NAV_IDS.has(e.navId)),
+      organizations: forCloud(NAV_ALL.organizations),
+      projects: forCloud(NAV_ALL.projects),
+      components: forCloud(NAV_ALL.components),
     }
   : NAV_ALL;
 
@@ -465,8 +470,32 @@ export function parentGroupId(scope: Scope, navId: string): string | undefined {
   return NAV_BY_ID[scope.level][navId]?.parent;
 }
 
-/** URL for a sidebar id at the given scope. Returns null for unknown ids (e.g. 'expand'). */
+/** Climb to the organization scope, whatever level we start from. */
+function toOrgScope(scope: Scope): Scope {
+  let current = scope;
+  while (current.level !== 'organizations') current = broaden(current)!;
+  return current;
+}
+
+/**
+ * Sidebar ids shown at a level that owns no such page — they link to the level that does.
+ * Deliberately not NAV entries: scope switching resolves the *same key* at the target level,
+ * and a project has no environments page to land on, so it must still fall back to overview.
+ */
+const CROSS_SCOPE_NAV_URL: Partial<Record<Level, Record<string, (scope: Scope) => string>>> = {
+  projects: {
+    'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
+  },
+  components: {
+    'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
+    'proj-cd-pipelines': (scope) => buildUrl(broaden(scope)!, 'admin/cd-pipelines'),
+  },
+};
+
+/** URL for a sidebar id at the given scope. Returns null for unknown ids. */
 export function navUrl(scope: Scope, navId: string): string | null {
+  const crossScope = CROSS_SCOPE_NAV_URL[scope.level]?.[navId];
+  if (crossScope) return crossScope(scope);
   const entry = NAV_BY_ID[scope.level][navId];
   return entry ? buildUrl(scope, entry.segment) : null;
 }

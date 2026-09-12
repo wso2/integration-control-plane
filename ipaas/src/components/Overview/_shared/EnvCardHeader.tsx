@@ -22,7 +22,8 @@ import type { ReactNode } from 'react';
 
 export interface EnvCardHeaderProps {
   envName: string;
-  latestCommit?: { sha: string; message: string } | null;
+  /** The commit this environment is actually running — not the repo's newest. */
+  deployedCommit?: { sha: string; message?: string } | null;
   hasDeployment: boolean;
   isRefreshing: boolean;
   onRefresh: () => void;
@@ -40,7 +41,7 @@ export interface EnvCardHeaderProps {
  * components. Types whose header differs entirely provide a `CustomHeader`
  * instead (the shell renders that in place of this frame).
  */
-export default function EnvCardHeader({ envName, latestCommit, hasDeployment, isRefreshing, onRefresh, status, actions }: EnvCardHeaderProps) {
+export default function EnvCardHeader({ envName, deployedCommit, hasDeployment, isRefreshing, onRefresh, status, actions }: EnvCardHeaderProps) {
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap">
       {/* Left: env name + commit + type status slot */}
@@ -49,15 +50,17 @@ export default function EnvCardHeader({ envName, latestCommit, hasDeployment, is
           {envName}
         </Typography>
 
-        {hasDeployment && latestCommit && (
+        {hasDeployment && deployedCommit?.sha && (
           <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
             <GitCommit size={14} style={{ opacity: 0.55, flexShrink: 0 }} />
             <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary', flexShrink: 0 }}>
-              {latestCommit.sha.substring(0, 7)}
+              {deployedCommit.sha.substring(0, 7)}
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {latestCommit.message}
-            </Typography>
+            {deployedCommit.message && (
+              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {deployedCommit.message}
+              </Typography>
+            )}
           </Stack>
         )}
 

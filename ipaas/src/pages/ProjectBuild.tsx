@@ -17,9 +17,14 @@
  */
 
 import type { JSX } from 'react';
-import ComingSoon from './ComingSoon';
+import IntegrationScopePicker from '../components/IntegrationScopePicker';
+import { PageContent } from '@wso2/oxygen-ui';
 import type { ProjectScope } from '../nav';
 
-export default function ProjectBuild(_scope: ProjectScope): JSX.Element {
-  return <ComingSoon title="Build Not Available at Project Level" description="Navigate to a component to view and manage builds." />;
+export default function ProjectBuild(scope: ProjectScope): JSX.Element {
+  return (
+    <PageContent>
+      <IntegrationScopePicker org={scope.org} project={scope.project} segment="build" />
+    </PageContent>
+  );
 }

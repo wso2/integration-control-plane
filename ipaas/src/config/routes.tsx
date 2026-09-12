@@ -127,6 +127,8 @@ const PrebuiltIntegrationDeploy = lazyPage(() => import('../pages/PrebuiltIntegr
 const Build = lazyPage(() => import('../pages/Build'));
 const OrgBuild = lazyPage(() => import('../pages/OrgBuild'));
 const ProjectBuild = lazyPage(() => import('../pages/ProjectBuild'));
+const OrgTest = lazyPage(() => import('../pages/OrgTest'));
+const ProjectTest = lazyPage(() => import('../pages/ProjectTest'));
 const OrgDeploy = lazyPage(() => import('../pages/OrgDeploy'));
 const ProjectDeploy = lazyPage(() => import('../pages/ProjectDeploy'));
 const Deploy = lazyPage(() => import('../pages/Deploy'));
@@ -226,8 +228,8 @@ const routes: AppRoute[] = [
             children: [
               { path: 'organizations/:orgHandler', element: <OrgHomeRedirect /> },
               ...hideable(IS_CLOUD, 'organizations', [{ path: 'organizations/:orgHandler/develop', element: <ComingSoon title="Coming Soon" description="Development tools are currently under development." /> }]),
-              { path: 'organizations/:orgHandler/deploy', element: <ComingSoon title="Coming Soon" description="Deployment management is currently under development." /> },
-              { path: 'organizations/:orgHandler/test', element: <ComingSoon title="Coming Soon" description="Testing tools are currently under development." /> },
+              { path: 'organizations/:orgHandler/deploy', element: createElement(withScope(OrgDeploy, ['organizations'])) },
+              { path: 'organizations/:orgHandler/test', element: createElement(withScope(OrgTest, ['organizations'])) },
               ...hideable(IS_CLOUD, 'organizations', [
                 { path: 'organizations/:orgHandler/insights/usage', element: createElement(withScope(OrgInsights, ['organizations'])) },
                 { path: 'organizations/:orgHandler/insights/delivery', element: createElement(withScope(DeliveryInsights, ['organizations'])) },
@@ -269,7 +271,7 @@ const routes: AppRoute[] = [
                 { path: 'organizations/:orgHandler/admin/governance/documents/:documentId', element: createElement(RouteErrorBoundary, null, createElement(withScope(CreateDocument, ['organizations']))) },
               ]),
               { path: 'organizations/:orgHandler/admin/cd-pipelines', element: createElement(withScope(OrgCdPipelines, ['organizations'])) },
-              ...hideable(IS_CLOUD, 'organizations', [{ path: 'organizations/:orgHandler/admin/cd-pipelines/new', element: <CdPipelineEditor /> }]),
+              { path: 'organizations/:orgHandler/admin/cd-pipelines/new', element: <CdPipelineEditor /> },
               { path: 'organizations/:orgHandler/admin/cd-pipelines/:pipelineId/edit', element: <CdPipelineEditor /> },
               { path: 'organizations/:orgHandler/admin/data-planes', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDataPlanes, ['organizations']))) },
               ...hideable(IS_CLOUD, 'organizations', [
@@ -295,8 +297,8 @@ const routes: AppRoute[] = [
               ]),
               ...generateMatrixRoutes(MATRIX),
               ...hideable(IS_CLOUD, 'projects', [{ path: 'organizations/:orgHandler/projects/:projectHandler/develop', element: <ComingSoon title="Coming Soon" description="Development tools are currently under development." /> }]),
-              { path: 'organizations/:orgHandler/projects/:projectHandler/deploy', element: <ComingSoon title="Coming Soon" description="Deployment management is currently under development." /> },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/test', element: <ComingSoon title="Coming Soon" description="Testing tools are currently under development." /> },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/deploy', element: createElement(withScope(ProjectDeploy, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/test', element: createElement(withScope(ProjectTest, ['projects'])) },
               ...hideable(IS_CLOUD, 'projects', [
                 { path: 'organizations/:orgHandler/projects/:projectHandler/insights/usage', element: createElement(withScope(ProjectInsights, ['projects'])) },
                 { path: 'organizations/:orgHandler/projects/:projectHandler/insights/delivery', element: createElement(withScope(DeliveryInsights, ['projects'])) },
@@ -344,7 +346,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/import', element: createElement(withScope(ImportIntegration, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/samples', element: createElement(withScope(BrowseSamples, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/generate-mcp', element: createElement(withScope(McpProxyFromApi, ['projects'])) },
-              ...hideable(IS_CLOUD, 'organizations', [{ path: 'organizations/:orgHandler/environments/new', element: createElement(withScope(CreateEnvironment, ['organizations'])) }]),
+              { path: 'organizations/:orgHandler/environments/new', element: createElement(withScope(CreateEnvironment, ['organizations'])) },
               { path: 'organizations/:orgHandler/environments/:envId/edit', element: <EditEnvironment /> },
               ...hideable(IS_CLOUD, 'organizations', [
                 { path: 'organizations/:orgHandler/settings/access-control/users/new', element: <CreateUser /> },

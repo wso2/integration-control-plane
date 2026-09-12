@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Button, ButtonGroup, ClickAwayListener, Grow, MenuItem, MenuList, Paper, Popper } from '@wso2/oxygen-ui';
+import { Button, ButtonGroup, ClickAwayListener, Grow, MenuItem, MenuList, Paper, Popper, Tooltip } from '@wso2/oxygen-ui';
 import { CalendarClock, ChevronDown } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState } from 'react';
 import Authorized from '../../Authorized';
@@ -35,12 +35,14 @@ export interface ScheduleButtonProps {
   deploymentPipelineId: string;
   hasSchedule: boolean;
   disabled?: boolean;
+  /** Why the action is unavailable — shown as a tooltip while `disabled`. */
+  disabledReason?: string;
   onSaveSuccess?: () => void;
   onSaveError?: (msg: string) => void;
   onStopSuccess?: () => void;
 }
 
-export default function ScheduleButton({ hasSchedule, disabled, onSaveSuccess, onSaveError, onStopSuccess, ...dialogProps }: ScheduleButtonProps) {
+export default function ScheduleButton({ hasSchedule, disabled, disabledReason, onSaveSuccess, onSaveError, onStopSuccess, ...dialogProps }: ScheduleButtonProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const splitButtonRef = useRef<HTMLDivElement>(null);
@@ -56,7 +58,8 @@ export default function ScheduleButton({ hasSchedule, disabled, onSaveSuccess, o
     <>
       <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
         {hasSchedule ? (
-          <>
+          <Tooltip title={disabled ? (disabledReason ?? '') : ''} placement="top">
+            <span>
             <ButtonGroup variant="contained" size="small" ref={splitButtonRef} disabled={disabled || stopSchedule.isPending}>
               <Button startIcon={<CalendarClock size={14} />} onClick={handleStopSchedule}>
                 Stop Schedule
@@ -84,11 +87,16 @@ export default function ScheduleButton({ hasSchedule, disabled, onSaveSuccess, o
                 </Grow>
               )}
             </Popper>
-          </>
+            </span>
+          </Tooltip>
         ) : (
-          <Button variant="contained" size="small" startIcon={<CalendarClock size={14} />} disabled={disabled} onClick={() => setDialogOpen(true)}>
-            Schedule
-          </Button>
+          <Tooltip title={disabled ? (disabledReason ?? '') : ''} placement="top">
+            <span>
+              <Button variant="contained" size="small" startIcon={<CalendarClock size={14} />} disabled={disabled} onClick={() => setDialogOpen(true)}>
+                Schedule
+              </Button>
+            </span>
+          </Tooltip>
         )}
       </Authorized>
       <ScheduleDialog open={dialogOpen} onClose={() => setDialogOpen(false)} onSaveSuccess={onSaveSuccess} onSaveError={onSaveError} {...dialogProps} />

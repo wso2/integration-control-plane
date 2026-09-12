@@ -200,7 +200,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
     return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
   }
 
-  const envSelector = !IS_CLOUD && environments.length > 1 && (
+  const envSelector = environments.length > 1 && (
     <Select
       size="small"
       value={selectedEnvId}

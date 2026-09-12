@@ -27,6 +27,7 @@ import { useRemovalNotice } from '../hooks/useRemovalNotice';
 import type { Project } from '../types/project';
 import EmptyListing from '../components/EmptyListing';
 import { formatDistanceToNow } from '../utils/time';
+import ExploreMore from '../components/ExploreMore';
 import { newProjectUrl, importProjectUrl, projectSettingsSectionUrl, type OrgScope } from '../nav';
 import { projectHomeUrl } from '../paths';
 import { useAccessControl } from '../contexts/AccessControlContext';
@@ -272,6 +273,8 @@ export default function Projects(scope: OrgScope): JSX.Element {
           )}
         </>
       )}
+
+      <ExploreMore />
     </PageContent>
   );
 }

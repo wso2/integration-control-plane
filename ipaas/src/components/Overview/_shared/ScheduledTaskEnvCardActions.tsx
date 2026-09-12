@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Button } from '@wso2/oxygen-ui';
+import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
@@ -61,8 +61,21 @@ export default function EnvCardActions({
 
   // Automation's Run/Schedule are always disabled while a build is in progress.
   const buildDisabled = !!isBuildInProgress;
-  // A stopped schedule leaves the CronJob deployed, so this only excludes a stopped deployment.
-  const canTest = isDeploymentHealthy(deploymentStatusV2);
+  const deploymentActive = isDeploymentHealthy(deploymentStatusV2);
+  const deploying = deploymentStatusV2 === 'IN_PROGRESS';
+
+  // Both actions need a live workload: Run triggers one, and a schedule written against a
+  // workload that is still rolling out fires against the previous revision. First match wins,
+  // so the list is ordered from the most actionable cause to the least.
+  const blockers: [boolean, string][] = [
+    [missingConfigs, 'Set the required configuration values first.'],
+    [buildDisabled, 'A build is in progress.'],
+    [!releaseId, 'This integration has not been deployed to this environment yet.'],
+    [deploying, 'The deployment is still in progress.'],
+    [!deploymentActive, 'The deployment is not active in this environment.'],
+  ];
+  const blockedReason = blockers.find(([blocked]) => blocked)?.[1] ?? '';
+  const actionsDisabled = !!blockedReason;
 
 
   // Cloud has no runtime-arguments endpoint, so the query stays disabled rather than always failing.
@@ -104,14 +117,19 @@ export default function EnvCardActions({
         versionId={versionId}
         deploymentPipelineId={deploymentPipelineId}
         hasSchedule={!!scheduleConfig?.cronjobFrequency}
-        disabled={missingConfigs || buildDisabled || !releaseId}
+        disabled={actionsDisabled}
+        disabledReason={blockedReason}
         onSaveSuccess={() => onNotify({ text: 'Schedule updated successfully', severity: 'success' })}
         onSaveError={() => onNotify({ text: 'Failed to save schedule. Please try again.', severity: 'error' })}
         onStopSuccess={() => onNotify({ text: 'Schedule stopped successfully', severity: 'success' })}
       />
-      <Button variant="contained" size="small" startIcon={<Play size={14} />} disabled={missingConfigs || buildDisabled || !canTest || triggerRun.isPending || runtimeArgsLoading} onClick={handleTest}>
-        Test
-      </Button>
+      <Tooltip title={blockedReason} placement="top">
+        <span>
+          <Button variant="contained" size="small" startIcon={<Play size={14} />} disabled={actionsDisabled || triggerRun.isPending || runtimeArgsLoading} onClick={handleTest}>
+            Test
+          </Button>
+        </span>
+      </Tooltip>
     </>
   );
 }

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, MenuItem, PageContent, PageTitle, Select } from '@wso2/oxygen-ui';
+import { Box, MenuItem, PageContent, PageTitle, Select, Stack } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import ComingSoon from './ComingSoon';
 import McpPlayground from '../components/McpPlayground/McpPlayground';
@@ -29,7 +29,6 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import type { ComponentScope } from '../nav';
 import type { EnvEndpoint } from '../types/component';
-import { IS_CLOUD } from '../features';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
 const TEST_KEY_HEADER = 'test-key';
@@ -99,7 +98,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
     return <ComingSoon title="Coming Soon" description="Testing tools are currently under development." />;
   }
 
-  const envSelector = !IS_CLOUD && environments.length > 1 && (
+  const envSelector = environments.length > 1 && (
     <Select
       size="small"
       value={selectedEnvId}
@@ -116,16 +115,17 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? scope.project} componentHandler={scope.component} extra={envSelector} />}
+      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? scope.project} componentHandler={scope.component} />}
 
       <PageContent sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+          <PageTitle>
+            <PageTitle.Header>Test</PageTitle.Header>
+          </PageTitle>
+          {envSelector}
+        </Stack>
         {!isActive || !mcpUrl ? (
-          <>
-            <PageTitle>
-              <PageTitle.Header>Test</PageTitle.Header>
-            </PageTitle>
-            <NotDeployedAlert status={deployment?.deploymentStatusV2} />
-          </>
+          <NotDeployedAlert status={deployment?.deploymentStatusV2} />
         ) : (
           <McpPlayground url={mcpUrl} token={token || null} headerName={TEST_KEY_HEADER} isTokenFetching={tokenFetching} onTokenRegenerate={regenerate} endpointSwitcher={endpointSwitcher} visibilitySwitcher={visibilitySwitcher} />
         )}

@@ -27,15 +27,17 @@ interface MenuSearchFieldProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** Rendered to the right of the field, on the same row (e.g. a refresh control). */
+  action?: JSX.Element;
 }
 
 /**
  * Filter row for a `TextField select` menu — render it as the menu's first child, where
  * `ListSubheader` keeps it pinned and non-selectable.
  */
-export default function MenuSearchField({ value, onChange, placeholder = 'Search' }: MenuSearchFieldProps): JSX.Element {
+export default function MenuSearchField({ value, onChange, placeholder = 'Search', action }: MenuSearchFieldProps): JSX.Element {
   return (
-    <ListSubheader sx={{ p: 1, bgcolor: 'background.paper' }}>
+    <ListSubheader sx={{ p: 1, bgcolor: 'background.paper', display: 'flex', alignItems: 'center', gap: 1 }}>
       <TextField
         size="small"
         fullWidth
@@ -58,6 +60,7 @@ export default function MenuSearchField({ value, onChange, placeholder = 'Search
           },
         }}
       />
+      {action}
     </ListSubheader>
   );
 }

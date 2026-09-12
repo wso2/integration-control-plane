@@ -18,7 +18,7 @@
 
 import { Alert, Box, Button, CircularProgress, FormHelperText, Grid, IconButton, InputAdornment, Link, MenuItem, PageContent, Skeleton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, GitBranch, RefreshCw, GitHub } from '@wso2/oxygen-ui-icons-react';
-import MenuSearchField, { MENU_SEARCH_THRESHOLD } from '../components/MenuSearchField';
+import { MENU_SEARCH_THRESHOLD } from '../components/MenuSearchField';
 import { useState, useEffect, useMemo, useRef, type JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -36,7 +36,7 @@ import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
 import type { IntegrationType, SourceMode, LocationState } from '../types/import';
 import { SAMPLE_REPO_URL } from '../constants/github';
 import { external } from '../paths';
-import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems } from '../components/Import/gitHubSelectActions';
+import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems, selectMenuHeader } from '../components/Import/gitHubSelectActions';
 import { GitProvider, type GitCredential } from '../types/credentials';
 import AddCredentialDialog from '../components/Settings/Credentials/AddCredentialDialog';
 import { IS_CLOUD } from '../features';
@@ -52,17 +52,6 @@ import { toHandler, formatRepoNameToDisplayName } from '../utils/string';
 import { parseGitHubUrl } from '../utils/github';
 import { detectTechnology } from '../utils/technologyDetection';
 import { useProjectId } from '../hooks/useProjects';
-
-// Refresh icon sits beside the select (inside the same row), so the native dropdown
-// arrow stays clickable — nothing overlaps it. The helper/error text renders below
-// the row (see FIELD_HELPER_SX), so the icon centres on the input box.
-const FIELD_REFRESH_WRAP_SX = {
-  display: 'inline-flex',
-} as const;
-
-const FIELD_REFRESH_ICON_SX = {
-  color: 'primary.main',
-} as const;
 
 // Helper/error text rendered below the field+refresh row (not inside the field),
 // so the refresh icon stays centred on the input box. Matches MUI's default
@@ -583,22 +572,13 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                     ),
                   },
                 }}>
-                {!isCredentialMode && organizationActionItems(!!githubInstallUrl)}
+                {!isCredentialMode && organizationActionItems(!!githubInstallUrl, isAuthenticated ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
                 {orgOptions.map((org) => (
                   <MenuItem key={org} value={org}>
                     {org}
                   </MenuItem>
                 ))}
               </TextField>
-              {isAuthenticated && !isCredentialMode && (
-                <Tooltip title="Reconnect" placement="top">
-                  <Box component="span" sx={FIELD_REFRESH_WRAP_SX}>
-                    <IconButton size="small" aria-label="Reconnect GitHub" onClick={() => startGitHubAuth(refetchRepos)} sx={FIELD_REFRESH_ICON_SX}>
-                      <RefreshCw size={14} />
-                    </IconButton>
-                  </Box>
-                </Tooltip>
-              )}
             </Stack>
             <FormHelperText error={authStatus === 'failed' || credentialAuthFailed} sx={FIELD_HELPER_SX}>
               {isCredentialMode ? `${providerLabel} organization` : 'GitHub organization'}
@@ -636,7 +616,10 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                     ),
                   },
                 }}>
-                {reposForOrg.length > MENU_SEARCH_THRESHOLD && <MenuSearchField key="repo-search" value={repoSearch} onChange={setRepoSearch} placeholder="Search repositories" />}
+                {selectMenuHeader(
+                  { key: 'repo-search', value: repoSearch, onChange: setRepoSearch, placeholder: 'Search repositories', show: reposForOrg.length > MENU_SEARCH_THRESHOLD },
+                  isAuthenticated ? { label: 'Refresh repositories', onClick: () => refetchRepos(), loading: isReposLoading } : undefined,
+                )}
                 {!isCredentialMode && repositoryActionItems(!!githubInstallUrl)}
                 {reposForOrg
                   .filter((repo) => repo.toLowerCase().includes(repoSearch.trim().toLowerCase()))
@@ -646,15 +629,6 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                     </MenuItem>
                   ))}
               </TextField>
-              {isAuthenticated && !isCredentialMode && (
-                <Tooltip title="Refresh repositories" placement="top">
-                  <Box component="span" sx={FIELD_REFRESH_WRAP_SX}>
-                    <IconButton size="small" aria-label="Refresh repositories" disabled={isReposLoading} onClick={() => refetchRepos()} sx={FIELD_REFRESH_ICON_SX}>
-                      {isReposLoading ? <CircularProgress size={14} /> : <RefreshCw size={14} />}
-                    </IconButton>
-                  </Box>
-                </Tooltip>
-              )}
             </Stack>
             <FormHelperText sx={FIELD_HELPER_SX}>Select repository</FormHelperText>
           </Grid>
@@ -682,7 +656,10 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   ),
                 },
               }}>
-              {(branches ?? []).length > MENU_SEARCH_THRESHOLD && <MenuSearchField key="branch-search" value={branchSearch} onChange={setBranchSearch} placeholder="Search branches" />}
+              {selectMenuHeader(
+                { key: 'branch-search', value: branchSearch, onChange: setBranchSearch, placeholder: 'Search branches', show: (branches ?? []).length > MENU_SEARCH_THRESHOLD },
+                { label: 'Refresh branches', onClick: () => refetchBranches(), loading: isBranchesLoading },
+              )}
               {(branches ?? [])
                 .filter((b) => b.name.toLowerCase().includes(branchSearch.trim().toLowerCase()))
                 .map((b) => (
@@ -692,13 +669,6 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   </MenuItem>
                 ))}
             </TextField>
-            <Tooltip title="Refresh branches" placement="top">
-              <Box component="span" sx={FIELD_REFRESH_WRAP_SX}>
-                <IconButton size="small" aria-label="Refresh branches" disabled={!activeRepo || isBranchesLoading} onClick={() => refetchBranches()} sx={FIELD_REFRESH_ICON_SX}>
-                  {isBranchesLoading ? <CircularProgress size={14} /> : <RefreshCw size={14} />}
-                </IconButton>
-              </Box>
-            </Tooltip>
           </Stack>
           <FormHelperText sx={FIELD_HELPER_SX}>Select branch</FormHelperText>
         </Grid>
