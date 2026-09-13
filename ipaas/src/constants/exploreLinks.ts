@@ -46,7 +46,7 @@ export const EXPLORE_GROUPS: readonly ExploreGroup[] = [
   {
     title: 'References',
     links: [
-      { label: 'RAG Ingestion', href: `${DOCS}genai/develop/rag/overview` },
+      { label: 'Promote Across Environments', href: `${DOCS}manage/cloud/environments/promotion` },
       { label: 'Manage Your Integrations with CI/CD', href: `${DOCS}deploy-operate/cicd/github-actions` },
       { label: 'Observe Your Integration', href: `${DOCS}deploy-operate/observe/observability-overview` },
     ],
