@@ -117,7 +117,8 @@ export const getHealthChecks = async (_orgUuid: string, _projectId: string, comp
 
 export const createHealthCheck = (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, data: HealthCheckWriteData): Promise<HealthCheck> => putProbes(componentId, environmentId, data);
 
-export const updateHealthCheck = (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, _healthCheckId: string, data: HealthCheckWriteData): Promise<HealthCheck> => putProbes(componentId, environmentId, data);
+export const updateHealthCheck = (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, _healthCheckId: string, data: HealthCheckWriteData): Promise<HealthCheck> =>
+  putProbes(componentId, environmentId, data);
 
 export const deleteHealthCheck = async (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, _healthCheckId: string): Promise<void> => {
   if (environmentId) await bff.delete(hcPath(componentId, environmentId));

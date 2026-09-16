@@ -104,24 +104,27 @@ export async function createFixtureComponent(page: Page, project: string, name: 
 // refused while children remain, and enumerating them covers integrations created by a test
 // that failed before it could record the handle.
 export async function deleteFixtureProjects(page: Page, projects: readonly string[]): Promise<string[]> {
-  return page.evaluate(async (handles) => {
-    const base = (window as unknown as { API_CONFIG: { choreoBaseApiUrl: string } }).API_CONFIG.choreoBaseApiUrl;
-    const headers = { Authorization: `Bearer ${localStorage.getItem('auth_token') ?? ''}` };
+  return page.evaluate(
+    async (handles) => {
+      const base = (window as unknown as { API_CONFIG: { choreoBaseApiUrl: string } }).API_CONFIG.choreoBaseApiUrl;
+      const headers = { Authorization: `Bearer ${localStorage.getItem('auth_token') ?? ''}` };
 
-    const out: string[] = [];
-    for (const project of handles) {
-      const listed = await fetch(`${base}/projects/${project}/components`, { headers });
-      const components = listed.ok ? (((await listed.json()).items ?? []) as Record<string, string>[]) : [];
-      for (const component of components) {
-        const name = component.handler ?? component.name;
-        const res = await fetch(`${base}/projects/${project}/components/${name}`, { method: 'DELETE', headers }).catch(() => null);
-        if (!res || (!res.ok && res.status !== 404)) out.push(`${res?.status ?? 'error'} ${project}/${name}`);
+      const out: string[] = [];
+      for (const project of handles) {
+        const listed = await fetch(`${base}/projects/${project}/components`, { headers });
+        const components = listed.ok ? (((await listed.json()).items ?? []) as Record<string, string>[]) : [];
+        for (const component of components) {
+          const name = component.handler ?? component.name;
+          const res = await fetch(`${base}/projects/${project}/components/${name}`, { method: 'DELETE', headers }).catch(() => null);
+          if (!res || (!res.ok && res.status !== 404)) out.push(`${res?.status ?? 'error'} ${project}/${name}`);
+        }
+        const res = await fetch(`${base}/projects/${project}`, { method: 'DELETE', headers });
+        out.push(`${res.status} ${project}`);
       }
-      const res = await fetch(`${base}/projects/${project}`, { method: 'DELETE', headers });
-      out.push(`${res.status} ${project}`);
-    }
-    return out;
-  }, [...projects]);
+      return out;
+    },
+    [...projects],
+  );
 }
 
 // Reports rather than throws: a throw here would replace the tests' own failures with a

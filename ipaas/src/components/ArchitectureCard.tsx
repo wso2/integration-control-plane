@@ -50,17 +50,17 @@ export default function ArchitectureCard({ projectId, components, isLoading }: {
 
         <Collapse in={expanded} unmountOnExit>
           <div style={{ width: '100%', height: 250, overflow: 'hidden', cursor: 'default' }}>
-          {isLoading ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-              <CircularProgress size={32} color="primary" />
-            </div>
-          ) : components.length === 0 ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-              <Typography variant="body2" color="text.secondary">
-                No integrations found
-              </Typography>
-            </div>
-          ) : (
+            {isLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <CircularProgress size={32} color="primary" />
+              </div>
+            ) : components.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Typography variant="body2" color="text.secondary">
+                  No integrations found
+                </Typography>
+              </div>
+            ) : (
               <CellDiagramPreview project={project} />
             )}
           </div>

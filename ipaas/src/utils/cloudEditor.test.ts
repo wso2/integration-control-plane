@@ -98,13 +98,11 @@ describe('highestPodPhase', () => {
 describe('displayableEditorUrl', () => {
   // The address is on screen for the whole of a cold start; the token must not be.
   it('strips the connection token', () => {
-    expect(displayableEditorUrl('https://editor-abc.gateway.example.com/?tkn=deadbeef'))
-      .toBe('https://editor-abc.gateway.example.com/');
+    expect(displayableEditorUrl('https://editor-abc.gateway.example.com/?tkn=deadbeef')).toBe('https://editor-abc.gateway.example.com/');
   });
 
   it('keeps every other query parameter', () => {
-    expect(displayableEditorUrl('https://editor-abc.example.com/?folder=%2Fworkspace&tkn=deadbeef'))
-      .toBe('https://editor-abc.example.com/?folder=%2Fworkspace');
+    expect(displayableEditorUrl('https://editor-abc.example.com/?folder=%2Fworkspace&tkn=deadbeef')).toBe('https://editor-abc.example.com/?folder=%2Fworkspace');
   });
 
   it('is a no-op for a URL with no token', () => {

@@ -77,7 +77,6 @@ export default function EnvCardActions({
   const blockedReason = blockers.find(([blocked]) => blocked)?.[1] ?? '';
   const actionsDisabled = !!blockedReason;
 
-
   // Cloud has no runtime-arguments endpoint, so the query stays disabled rather than always failing.
   const { data: runtimeArgs, isLoading: runtimeArgsLoading } = useRuntimeArguments(component.id, versionId, deployedCommitSha ?? '', !IS_CLOUD);
   const hasRuntimeArgs = (runtimeArgs?.length ?? 0) > 0;

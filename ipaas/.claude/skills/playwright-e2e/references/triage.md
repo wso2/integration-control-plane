@@ -13,21 +13,21 @@ The trace answers the only question that matters at this point: at the moment of
 
 ## Failure patterns
 
-| What you see | Usually means | Fix |
-| --- | --- | --- |
-| `E2E_USERNAME must be set` | No `.env.test` | `cp .env.test.example .env.test` and fill it in. Stop and ask for credentials rather than inventing them. |
-| Setup fails on the Asgardeo page | The IdP changed its markup | Run `--headed`, inspect, update the locators in `global.setup.ts`. |
-| `waitForOTP` times out | Gmail token expired or revoked | Re-run `pnpm test:e2e:get-gmail-token`. |
-| `Not on an org page` from `OrgHomePage` | Test user has no org | Sign in manually once and let onboarding provision one. |
-| `No projectHandler in auth context` | `.auth/context.json` is stale or setup did not reach a project | Delete `.auth/` and re-run so setup regenerates both files. |
-| Every spec redirects to `/login` | Saved `storageState` expired | Delete `.auth/user.json` and re-run; setup will log in again. |
-| Locator times out, trace shows a spinner | Asserted before render — data still loading | Wait on a real rendered element, not the URL. Raise the timeout on that one assertion if staging is slow. |
-| Locator times out, trace shows the element | Name mismatch — casing, whitespace, or a prefix collision | Copy the accessible name out of the trace; add `exact: true` if it collides. |
-| Locator resolves to several elements | Ambiguous name | Add `exact: true`, scope to a container, or `.first()` with a comment saying why that is correct. |
-| Passes alone, fails in the suite | Shared state between tests, or a name collision across parallel workers | Give each test its own resources and `e2e-<purpose>-${Date.now()}` names. |
-| Passes locally, fails in CI | Slower runner, or missing GitHub Actions secrets | Check the uploaded `playwright-report` artifact; confirm `E2E_USERNAME` / `E2E_PASSWORD` are set as secrets. |
-| A wait resolves instantly and asserts nothing | Condition was already true when the wait started | Wait for the *next* state; use the `.then(() => true).catch(() => false)` branch-detection pattern. |
-| Absence assertion passes even when broken | Page had not rendered yet | Assert something visible first, then assert absence. |
+| What you see                                  | Usually means                                                           | Fix                                                                                                          |
+| --------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `E2E_USERNAME must be set`                    | No `.env.test`                                                          | `cp .env.test.example .env.test` and fill it in. Stop and ask for credentials rather than inventing them.    |
+| Setup fails on the Asgardeo page              | The IdP changed its markup                                              | Run `--headed`, inspect, update the locators in `global.setup.ts`.                                           |
+| `waitForOTP` times out                        | Gmail token expired or revoked                                          | Re-run `pnpm test:e2e:get-gmail-token`.                                                                      |
+| `Not on an org page` from `OrgHomePage`       | Test user has no org                                                    | Sign in manually once and let onboarding provision one.                                                      |
+| `No projectHandler in auth context`           | `.auth/context.json` is stale or setup did not reach a project          | Delete `.auth/` and re-run so setup regenerates both files.                                                  |
+| Every spec redirects to `/login`              | Saved `storageState` expired                                            | Delete `.auth/user.json` and re-run; setup will log in again.                                                |
+| Locator times out, trace shows a spinner      | Asserted before render — data still loading                             | Wait on a real rendered element, not the URL. Raise the timeout on that one assertion if staging is slow.    |
+| Locator times out, trace shows the element    | Name mismatch — casing, whitespace, or a prefix collision               | Copy the accessible name out of the trace; add `exact: true` if it collides.                                 |
+| Locator resolves to several elements          | Ambiguous name                                                          | Add `exact: true`, scope to a container, or `.first()` with a comment saying why that is correct.            |
+| Passes alone, fails in the suite              | Shared state between tests, or a name collision across parallel workers | Give each test its own resources and `e2e-<purpose>-${Date.now()}` names.                                    |
+| Passes locally, fails in CI                   | Slower runner, or missing GitHub Actions secrets                        | Check the uploaded `playwright-report` artifact; confirm `E2E_USERNAME` / `E2E_PASSWORD` are set as secrets. |
+| A wait resolves instantly and asserts nothing | Condition was already true when the wait started                        | Wait for the _next_ state; use the `.then(() => true).catch(() => false)` branch-detection pattern.          |
+| Absence assertion passes even when broken     | Page had not rendered yet                                               | Assert something visible first, then assert absence.                                                         |
 
 ## Deciding whether the test or the app is wrong
 

@@ -33,7 +33,6 @@ import { authStatePath } from '../../helpers/product.js';
 const COLUMNS = ['Name', 'Description', 'Type', 'Last Updated', 'Action'];
 const FIXTURE_COMPONENT = 'e2e-fixture-api';
 
-
 test.describe('populated project home @smoke', () => {
   // beforeAll runs once per worker; parallel workers would each create a project and exhaust quota.
   test.describe.configure({ mode: 'serial' });
@@ -169,7 +168,10 @@ test.describe('populated project home @smoke', () => {
     expect(before, 'Need at least one integration to search for').toBeGreaterThan(0);
 
     // Derived at runtime: integration names belong to the backend.
-    const name = ((await rows.first().getAttribute('aria-label')) ?? (await rows.first().innerText())).replace(/^View details for /, '').split('\n')[0].trim();
+    const name = ((await rows.first().getAttribute('aria-label')) ?? (await rows.first().innerText()))
+      .replace(/^View details for /, '')
+      .split('\n')[0]
+      .trim();
 
     await page.getByRole('textbox', { name: 'Search integrations' }).fill(name);
     await expect(rows).toHaveCount(1);

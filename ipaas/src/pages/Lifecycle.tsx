@@ -30,6 +30,7 @@ import { useProjectId } from '../hooks/useProjects';
 import type { ComponentScope } from '../nav';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import { PILL_SELECT_SX } from '../constants/styles';
+import { trackEvent } from '../utils/tracking';
 
 export default function Lifecycle(scope: ComponentScope): JSX.Element {
   const { projectId, isLoading: loadingProject } = useProjectId(scope.project);
@@ -104,6 +105,8 @@ export default function Lifecycle(scope: ComponentScope): JSX.Element {
         }
       }
       await changeState({ action });
+      if (PUBLISH_ACTIONS.has(action)) trackEvent('component-manage-lifecycle-state-change-to-publish');
+      if (action === 'Demote to Created') trackEvent('component-manage-lifecycle-state-change-to-demote-to-created');
       setSuccessMsg(SUCCESS_TEXT[action] ?? 'Lifecycle state updated successfully.');
     } catch (err) {
       setErrorMsg(err instanceof Error ? err.message : 'Lifecycle state change failed');
@@ -133,7 +136,14 @@ export default function Lifecycle(scope: ComponentScope): JSX.Element {
             )}
             {devPortalBaseUrl && (
               <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-end' }}>
-                <Button variant="text" size="small" disabled={!isDevPortalEnabled} onClick={() => window.open(`${devPortalBaseUrl}/${scope.org}`, '_blank')}>
+                <Button
+                  variant="text"
+                  size="small"
+                  disabled={!isDevPortalEnabled}
+                  onClick={() => {
+                    trackEvent('component-manage-dev-portal');
+                    window.open(`${devPortalBaseUrl}/${scope.org}`, '_blank');
+                  }}>
                   ↗ Go to Devportal
                 </Button>
               </Box>

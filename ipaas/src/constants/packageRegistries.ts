@@ -34,8 +34,7 @@ export const BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS = {
 export const BALLERINA_CENTRAL_TOKEN_PANEL_COPY = {
   heading: 'Configure Ballerina Central access',
   optionalTag: 'Optional',
-  infoMessage:
-    "Once configured, this token is applied automatically to all future builds in this organization, so you won't need to set it up again. You can update it anytime from Settings > Package Registries in your organization's home view.",
+  infoMessage: "Once configured, this token is applied automatically to all future builds in this organization, so you won't need to set it up again. You can update it anytime from Settings > Package Registries in your organization's home view.",
   accessTokenLabel: 'Access token',
   tokenPlaceholder: 'Paste your token here',
   saveLabel: 'Save token',

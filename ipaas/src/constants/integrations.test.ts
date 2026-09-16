@@ -60,7 +60,7 @@ describe('project listing — foreign runtimes', () => {
 });
 
 describe('componentSubTypeFromSample', () => {
-  it("subtypes webhook samples so create stamps the component-type annotation", () => {
+  it('subtypes webhook samples so create stamps the component-type annotation', () => {
     expect(componentSubTypeFromSample('webhook', 'ballerina')).toBe('webhook');
     expect(componentSubTypeFromSample('webhook', 'wso2-mi')).toBe('webhook');
   });

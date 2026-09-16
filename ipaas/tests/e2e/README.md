@@ -2,10 +2,10 @@
 
 Playwright smoke tests for two products built from this one source tree:
 
-| Product | Target | Identity provider | Sign-in |
-| ------- | ------ | ----------------- | ------- |
-| **WIP** (formerly Devant) | `https://preview-o2-dev.devant.dev` | Asgardeo | email + OTP, read from Gmail |
-| **Cloud** | `https://ipaas-console-development.gateway.dev.cloud.wso2.com` | Thunder | GitHub SSO (hosted page, Google or GitHub only) |
+| Product                   | Target                                                         | Identity provider | Sign-in                                         |
+| ------------------------- | -------------------------------------------------------------- | ----------------- | ----------------------------------------------- |
+| **WIP** (formerly Devant) | `https://preview-o2-dev.devant.dev`                            | Asgardeo          | email + OTP, read from Gmail                    |
+| **Cloud**                 | `https://ipaas-console-development.gateway.dev.cloud.wso2.com` | Thunder           | GitHub SSO (hosted page, Google or GitHub only) |
 
 The two never share a target: each Playwright project pins its own `baseURL`, so a stray
 `E2E_BASE_URL` cannot point the cloud suite at the WIP host or the reverse.
@@ -165,15 +165,15 @@ own worker count Playwright takes half the machine's cores and the creates start
 
 ### Projects
 
-| Project | Runs | Session | Credentials needed |
-| ------- | ---- | ------- | ------------------ |
-| `setup` | `global.setup.ts` | writes `.auth/user.json` | WIP account + Gmail |
-| `wip` | `specs/shared` + `specs/wip` | `.auth/user.json` | via `setup` |
-| `setup-cloud` | `cloud.setup.ts` | writes `.auth/cloud-user.json` | GitHub bot |
-| `setup-cloud-token` | `cloud-token.setup.ts` | writes `.auth/cloud-user.json` | a platform-issued token |
-| `cloud` | `specs/shared` + `specs/cloud` | `.auth/cloud-user.json` | via whichever setup is selected |
-| `cloud-anon` | `specs/cloud-anon` | none | **none** |
-| `save-google-session` | manual helper | writes `.auth/google-session.json` | interactive |
+| Project               | Runs                           | Session                            | Credentials needed              |
+| --------------------- | ------------------------------ | ---------------------------------- | ------------------------------- |
+| `setup`               | `global.setup.ts`              | writes `.auth/user.json`           | WIP account + Gmail             |
+| `wip`                 | `specs/shared` + `specs/wip`   | `.auth/user.json`                  | via `setup`                     |
+| `setup-cloud`         | `cloud.setup.ts`               | writes `.auth/cloud-user.json`     | GitHub bot                      |
+| `setup-cloud-token`   | `cloud-token.setup.ts`         | writes `.auth/cloud-user.json`     | a platform-issued token         |
+| `cloud`               | `specs/shared` + `specs/cloud` | `.auth/cloud-user.json`            | via whichever setup is selected |
+| `cloud-anon`          | `specs/cloud-anon`             | none                               | **none**                        |
+| `save-google-session` | manual helper                  | writes `.auth/google-session.json` | interactive                     |
 
 `cloud-anon` exists so the pre-authentication surface can be tested without any credentials at
 all — useful for verifying the cloud target is reachable before the bot account is ready.
@@ -190,7 +190,7 @@ handlers — each one a no-op when that stage does not appear: `handleTwoFactor`
 `handleOAuthConsent`, `handleOrgOnboarding`, with `assertNoChallenge` throwing a clear error on
 GitHub's CAPTCHA / device-verification walls, which cannot be scripted past. The cloud build renders no
 in-app sign-in UI at all — `Login.tsx` short-circuits on `IS_CLOUD` and redirects to Thunder's
-hosted Gate, which offers Google and GitHub only. The setup clicks *Continue with GitHub*, signs in
+hosted Gate, which offers Google and GitHub only. The setup clicks _Continue with GitHub_, signs in
 with the bot account, answers whichever second factor GitHub presents, and lands back on the
 console. Cloud onboarding has no region step: `OrgHome` provisions the `default` project itself and
 redirects to its home.
@@ -265,13 +265,13 @@ Then fill in:
 
 For the cloud suite:
 
-| Variable                 | Purpose                                                                          |
-| ------------------------ | -------------------------------------------------------------------------------- |
-| `E2E_GITHUB_USERNAME`    | Bot's GitHub username                                                            |
-| `E2E_GITHUB_PASSWORD`    | Bot's GitHub password                                                            |
-| `E2E_GITHUB_TOTP_SECRET` | Only if the account has TOTP 2FA — the base32 setup key from enrollment           |
+| Variable                         | Purpose                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------- |
+| `E2E_GITHUB_USERNAME`            | Bot's GitHub username                                                              |
+| `E2E_GITHUB_PASSWORD`            | Bot's GitHub password                                                              |
+| `E2E_GITHUB_TOTP_SECRET`         | Only if the account has TOTP 2FA — the base32 setup key from enrollment            |
 | `E2E_ORG_NAME`, `E2E_ORG_HANDLE` | Optional — pin the org created on a first-ever sign-in (otherwise derived per run) |
-| `E2E_CLOUD_BASE_URL`     | Optional — defaults to the development cloud console                             |
+| `E2E_CLOUD_BASE_URL`             | Optional — defaults to the development cloud console                               |
 
 Keep the bot out of every GitHub organization. Org-level "require two-factor authentication"
 forces 2FA on the account, which removes the emailed device-verification path.
@@ -427,7 +427,7 @@ docker run --rm --shm-size=1g ipaas-e2e:local \
 causes renderer crashes that look like random test failures.
 
 The image sets `CI=true`, so a container run picks up the CI half of the config:
-two retries, a single worker, and `forbidOnly`. That is deliberate — the image *is*
+two retries, a single worker, and `forbidOnly`. That is deliberate — the image _is_
 the CI runner — but it means a container run is not identical to `pnpm test:e2e:cloud`
 on your machine.
 
@@ -454,10 +454,10 @@ Required GitHub Actions secrets — CI uses these instead of `.env.test`:
 
 The `e2e-cloud` job in the same workflow runs `--project=cloud-anon --project=cloud` and needs:
 
-| Secret                                                          | Description                                    |
-| --------------------------------------------------------------- | ---------------------------------------------- |
-| `E2E_GITHUB_USERNAME`, `E2E_GITHUB_PASSWORD`                    | Bot's GitHub credentials                       |
-| `E2E_GITHUB_TOTP_SECRET`                                        | Only if the bot has TOTP 2FA                   |
+| Secret                                                          | Description                                      |
+| --------------------------------------------------------------- | ------------------------------------------------ |
+| `E2E_GITHUB_USERNAME`, `E2E_GITHUB_PASSWORD`                    | Bot's GitHub credentials                         |
+| `E2E_GITHUB_TOTP_SECRET`                                        | Only if the bot has TOTP 2FA                     |
 | `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN` | Reused — reads GitHub's device-verification mail |
 
 The two jobs are independent: a cloud failure does not fail the WIP job.
@@ -470,19 +470,19 @@ GitHub disables scheduled workflows on forks, and only runs schedules from the r
 
 See `.claude/skills/playwright-e2e/references/triage.md` for the full table. The common ones:
 
-| Symptom                                    | Cause                                                        | Fix                                                               |
-| ------------------------------------------ | ------------------------------------------------------------ | ----------------------------------------------------------------- |
-| `E2E_USERNAME must be set`                 | No `.env.test`                                               | `cp .env.test.example .env.test` and fill it in                   |
-| `waitForOTP` times out                     | Gmail refresh token expired or revoked                       | `pnpm test:e2e:get-gmail-token`                                   |
-| Setup fails on the Asgardeo login page     | The IdP changed its markup                                   | Run `--headed`, inspect, update the locators in `global.setup.ts` |
-| `Not on an org page`                       | Test account has no org                                      | Sign in manually once and let onboarding provision one            |
-| `No projectHandler in auth context`        | `.auth/context.json` stale, or setup never reached a project | Delete `.auth/` and re-run                                        |
-| Every spec redirects to `/login`           | Saved `storageState` expired                                 | Delete `.auth/user.json` and re-run                               |
-| Locator times out, trace shows a spinner   | Asserted before render                                       | Wait on a rendered element, not the URL                           |
-| Locator times out, trace shows the element | Name mismatch or prefix collision                            | Copy the name from the trace; add `exact: true`                   |
-| Passes alone, fails in the suite           | Shared state or name collision across workers                | Per-test resources with `Date.now()` names                        |
-| Passes locally, fails in CI                | Slower runner, or missing secrets                            | Check the uploaded `playwright-report` artifact                   |
-| `E2E_GITHUB_USERNAME and E2E_GITHUB_PASSWORD must be set` | Cloud credentials absent                      | Fill the cloud block in `.env.test`, or run `pnpm test:e2e:cloud:anon` |
-| Cloud setup stalls on a GitHub screen      | GitHub asked for a factor the setup does not handle          | Run `--headed`; if it is a passkey prompt, remove the passkey from the bot |
-| `waitForOTP` times out during cloud setup  | Bot has TOTP enrolled, so no mail is ever sent               | Set `E2E_GITHUB_TOTP_SECRET`                                      |
-| Cloud specs redirect to Thunder's Gate     | `.auth/cloud-user.json` expired                              | Delete it and re-run                                              |
+| Symptom                                                   | Cause                                                        | Fix                                                                        |
+| --------------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| `E2E_USERNAME must be set`                                | No `.env.test`                                               | `cp .env.test.example .env.test` and fill it in                            |
+| `waitForOTP` times out                                    | Gmail refresh token expired or revoked                       | `pnpm test:e2e:get-gmail-token`                                            |
+| Setup fails on the Asgardeo login page                    | The IdP changed its markup                                   | Run `--headed`, inspect, update the locators in `global.setup.ts`          |
+| `Not on an org page`                                      | Test account has no org                                      | Sign in manually once and let onboarding provision one                     |
+| `No projectHandler in auth context`                       | `.auth/context.json` stale, or setup never reached a project | Delete `.auth/` and re-run                                                 |
+| Every spec redirects to `/login`                          | Saved `storageState` expired                                 | Delete `.auth/user.json` and re-run                                        |
+| Locator times out, trace shows a spinner                  | Asserted before render                                       | Wait on a rendered element, not the URL                                    |
+| Locator times out, trace shows the element                | Name mismatch or prefix collision                            | Copy the name from the trace; add `exact: true`                            |
+| Passes alone, fails in the suite                          | Shared state or name collision across workers                | Per-test resources with `Date.now()` names                                 |
+| Passes locally, fails in CI                               | Slower runner, or missing secrets                            | Check the uploaded `playwright-report` artifact                            |
+| `E2E_GITHUB_USERNAME and E2E_GITHUB_PASSWORD must be set` | Cloud credentials absent                                     | Fill the cloud block in `.env.test`, or run `pnpm test:e2e:cloud:anon`     |
+| Cloud setup stalls on a GitHub screen                     | GitHub asked for a factor the setup does not handle          | Run `--headed`; if it is a passkey prompt, remove the passkey from the bot |
+| `waitForOTP` times out during cloud setup                 | Bot has TOTP enrolled, so no mail is ever sent               | Set `E2E_GITHUB_TOTP_SECRET`                                               |
+| Cloud specs redirect to Thunder's Gate                    | `.auth/cloud-user.json` expired                              | Delete it and re-run                                                       |

@@ -31,10 +31,10 @@
  * resolve to a locally installed application, so naming one cannot direct the
  * result at a host of the caller's choosing.
  */
-const EDITOR_URI_SCHEMES = ["vscode:", "vscode-insiders:", "vscodium:", "code-oss:", "cursor:", "windsurf:"];
+const EDITOR_URI_SCHEMES = ['vscode:', 'vscode-insiders:', 'vscodium:', 'code-oss:', 'cursor:', 'windsurf:'];
 
 /** Hosts that resolve to the machine running the browser, never to the network. */
-const LOOPBACK_HOSTS = ["localhost", "127.0.0.1", "[::1]", "::1"];
+const LOOPBACK_HOSTS = ['localhost', '127.0.0.1', '[::1]', '::1'];
 
 /** Whether `host` is the domain itself or a subdomain of it. */
 function isSubdomainOf(host: string, domain: string): boolean {
@@ -84,7 +84,7 @@ export function editorCallbackUri(state: string | null, policy: EditorCallbackPo
     return null;
   }
   const callbackUri = (decoded as { callbackUri?: unknown } | null)?.callbackUri;
-  if (typeof callbackUri !== "string" || !callbackUri) {
+  if (typeof callbackUri !== 'string' || !callbackUri) {
     return null;
   }
 
@@ -109,7 +109,7 @@ export function editorCallbackUri(state: string | null, policy: EditorCallbackPo
   const origins = policy.origins ?? [];
   const domains = policy.domains ?? [];
 
-  if (parsed.protocol === "https:") {
+  if (parsed.protocol === 'https:') {
     if (origins.includes(parsed.origin)) {
       return callbackUri;
     }
@@ -119,7 +119,7 @@ export function editorCallbackUri(state: string | null, policy: EditorCallbackPo
   // Loopback is the machine the browser is already on, so http there exposes
   // the code to nothing the browser's own user does not already reach. It still
   // has to be named, so no deployment accepts it without being configured to.
-  if (parsed.protocol === "http:" && LOOPBACK_HOSTS.includes(parsed.hostname)) {
+  if (parsed.protocol === 'http:' && LOOPBACK_HOSTS.includes(parsed.hostname)) {
     return origins.includes(parsed.origin) ? callbackUri : null;
   }
 
@@ -131,11 +131,11 @@ export function editorCallbackUri(state: string | null, policy: EditorCallbackPo
  * editor already put on it.
  */
 export function buildEditorCallbackUrl(callbackUri: string, params: Record<string, string | null>): string {
-  const separator = callbackUri.includes("?") ? "&" : "?";
+  const separator = callbackUri.includes('?') ? '&' : '?';
   const query = Object.entries(params)
-    .filter(([, value]) => value !== null && value !== "")
+    .filter(([, value]) => value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
-    .join("&");
+    .join('&');
   return query ? `${callbackUri}${separator}${query}` : callbackUri;
 }
 
@@ -146,7 +146,7 @@ export function editorStateOrgId(state: string | null): string | null {
   }
   try {
     const decoded = JSON.parse(atob(state)) as { orgId?: unknown };
-    return typeof decoded?.orgId === "string" && decoded.orgId ? decoded.orgId : null;
+    return typeof decoded?.orgId === 'string' && decoded.orgId ? decoded.orgId : null;
   } catch {
     return null;
   }

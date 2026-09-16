@@ -19,6 +19,7 @@
 import { useCallback } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createDefaultProject, fetchOrgComponentLimits, fetchOrgSubscriptions, fetchOrgs, fetchProjectsByOrgId, initOrg, registerUser, validateOrgName } from '#api/org';
+import { trackEvent } from '../utils/tracking';
 
 export function useOrgs() {
   return useQuery({
@@ -77,12 +78,18 @@ export function useInitOrg() {
 export function useCreateDefaultProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ orgNumericId, orgHandler, projectHandler }: { orgNumericId: number; orgHandler: string; projectHandler?: string }) => createDefaultProject(orgNumericId, orgHandler, projectHandler),
+    mutationFn: ({ orgNumericId, orgHandler, projectHandler }: { orgNumericId: number; orgHandler: string; projectHandler?: string }) => {
+      trackEvent('project-create-start');
+      return createDefaultProject(orgNumericId, orgHandler, projectHandler);
+    },
     // Without this, AppLayout's own useProjects() call (already mounted throughout onboarding)
     // keeps serving the pre-creation project list — so the page OrgHome navigates to right after
     // this succeeds reads a stale, empty list, finds no matching project, and briefly renders
     // "Project not found" before a later refetch (if any) corrects it.
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    onSuccess: () => {
+      trackEvent('project-create-end');
+      qc.invalidateQueries({ queryKey: ['projects'] });
+    },
   });
 }
 

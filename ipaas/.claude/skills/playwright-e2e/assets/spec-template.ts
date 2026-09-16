@@ -44,10 +44,14 @@ test.describe('<surface> @smoke', () => {
     // Race real readiness against a login redirect so an expired session fails fast
     // with a clear message instead of timing out on content that will never render.
     await Promise.race([
-      page.getByRole('heading', { name: '<expected heading>' })
-        .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-      page.getByRole('heading', { name: 'Sign In' })
-        .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
+      page
+        .getByRole('heading', { name: '<expected heading>' })
+        .waitFor({ state: 'visible', timeout: 30_000 })
+        .catch(() => {}),
+      page
+        .getByRole('heading', { name: 'Sign In' })
+        .waitFor({ state: 'visible', timeout: 30_000 })
+        .catch(() => {}),
     ]);
     await expect(page, 'Session expired or was never authenticated').toHaveURL(/<url-pattern>/, {
       timeout: 5_000,

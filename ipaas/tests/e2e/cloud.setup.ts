@@ -113,10 +113,7 @@ async function handleOAuthConsent(page: Page): Promise<void> {
   if (!/github\.com\/login\/oauth\/authorize/.test(page.url())) return;
 
   const authorize = page.getByRole('button', { name: /authorize/i }).first();
-  await Promise.race([
-    page.waitForURL((url) => !/\/login\/oauth\/authorize/.test(url.pathname), { timeout: 15_000 }),
-    authorize.waitFor({ state: 'visible', timeout: 15_000 }),
-  ]).catch(() => {});
+  await Promise.race([page.waitForURL((url) => !/\/login\/oauth\/authorize/.test(url.pathname), { timeout: 15_000 }), authorize.waitFor({ state: 'visible', timeout: 15_000 })]).catch(() => {});
 
   if (!/github\.com\/login\/oauth\/authorize/.test(page.url())) return;
   if (!(await authorize.isVisible().catch(() => false))) return;

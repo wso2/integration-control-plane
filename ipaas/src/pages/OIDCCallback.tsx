@@ -27,6 +27,7 @@ import { useFetchProjectsByOrgId } from '../hooks/useOrg';
 import { fetchProjects as fetchProjectsApi } from '#api/projects';
 import { loginUrl, projectHomeUrl, projectsRedirectUrl, registerOrgUrl } from '../paths';
 import { IS_CLOUD } from '../features';
+import { trackEvent } from '../utils/tracking';
 
 export default function OIDCCallback(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -73,26 +74,34 @@ export default function OIDCCallback(): JSX.Element {
 
       if (oidcError) {
         setError(`Authentication failed: ${searchParams.get('error_description') || oidcError}`);
+        trackEvent('login-clickbutton-error');
         return;
       }
 
       if (!state) {
         setError('Missing state parameter. Please try logging in again.');
+        trackEvent('login-clickbutton-error');
         return;
       }
 
       if (!validateAndClearOIDCState(state)) {
         setError('Invalid state parameter. This may indicate a CSRF attack. Please try logging in again.');
+        trackEvent('login-clickbutton-error');
         return;
       }
 
       if (!code) {
         setError('Missing authorization code. Please try logging in again.');
+        trackEvent('login-clickbutton-error');
         return;
       }
 
       try {
         const { isNewUser } = await handleOIDCCallback(code, state);
+
+        if (!isNewUser) {
+          trackEvent('login-clickbutton-success', undefined, true);
+        }
 
         if (isNewUser && !IS_CLOUD) {
           // First-time user — no org yet; send to org registration.
@@ -177,6 +186,7 @@ export default function OIDCCallback(): JSX.Element {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to complete authentication');
+        trackEvent('login-clickbutton-error');
       }
     };
 

@@ -224,12 +224,12 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
                         </Stack>
                       </ListingTable.Cell>
                       <Authorized permissions={Permissions.ENVIRONMENT_MANAGE} fallback={<ListingTable.Cell align="right" />}>
-                          <ListingTable.Cell align="right">
-                            <Tooltip title="Delete">
-                              <IconButton size="small" color="error" aria-label={`Delete ${t.name}`} onClick={() => setDeleting(t)}>
-                                <Trash2 size={16} />
-                              </IconButton>
-                            </Tooltip>
+                        <ListingTable.Cell align="right">
+                          <Tooltip title="Delete">
+                            <IconButton size="small" color="error" aria-label={`Delete ${t.name}`} onClick={() => setDeleting(t)}>
+                              <Trash2 size={16} />
+                            </IconButton>
+                          </Tooltip>
                         </ListingTable.Cell>
                       </Authorized>
                     </ListingTable.Row>

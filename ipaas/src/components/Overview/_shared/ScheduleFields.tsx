@@ -123,16 +123,7 @@ export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                 Job Timeout (in seconds)
               </Typography>
-              <TextField
-                fullWidth
-                size="small"
-                type="number"
-                value={form.timeoutSeconds}
-                onChange={(e) => form.setTimeoutSeconds(e.target.value)}
-                placeholder="No timeout"
-                error={!!errors.timeout}
-                helperText={errors.timeout}
-              />
+              <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout} />
             </Box>
             <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow Overlapping Executions" />
           </Stack>

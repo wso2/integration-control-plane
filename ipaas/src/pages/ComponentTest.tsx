@@ -17,7 +17,7 @@
  */
 
 import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import { useEffect, type JSX } from 'react';
 import AgentChatConsole from './AgentChatConsole';
 import AutomationTest from './AutomationTest';
 import ComingSoon from './ComingSoon';
@@ -29,6 +29,7 @@ import { useProjectId } from '../hooks/useProjects';
 import { Navigate } from 'react-router';
 import type { ComponentScope } from '../nav';
 import { componentUrl } from '../paths';
+import { trackEvent } from '../utils/tracking';
 
 /**
  * The component "Test" page dispatches by integration type (identified once via
@@ -39,6 +40,13 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
   const { projectId } = useProjectId(scope.project);
   const { data: comp, isLoading } = useComponentByHandler(projectId, scope.component);
   const identity = useIntegrationIdentity(comp ?? undefined);
+
+  useEffect(() => {
+    if (comp) trackEvent('component-test');
+    // Only re-fire when navigating to a different component, not on every re-render where
+    // `comp` gets a new object reference for the same id (e.g. a background refetch).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comp?.id]);
 
   if (isLoading) {
     return (
@@ -75,6 +83,13 @@ export function AgentChatTestRoute(scope: ComponentScope): JSX.Element {
   const { projectId } = useProjectId(scope.project);
   const { data: comp, isPending } = useComponentByHandler(projectId, scope.component);
   const identity = useIntegrationIdentity(comp ?? undefined);
+
+  useEffect(() => {
+    // Only the confirmed-agent case renders the chat below; a type mismatch redirects to
+    // `/test`, which fires this same event itself — tracking here too would double-count.
+    if (comp && identity?.type === 'ai-agent') trackEvent('component-test');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comp?.id, identity?.type]);
 
   if (projectId && isPending) {
     return (

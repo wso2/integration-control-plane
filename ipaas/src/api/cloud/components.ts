@@ -78,8 +78,7 @@ const ANN_PREBUILT = 'openchoreo.dev/prebuilt';
 const ANN_COMPONENT_TYPE = 'ipaas.wso2.com/component-type';
 const WEBHOOK_DISPLAY_TYPES = new Set(['webhook', 'miWebhook']);
 // Samples build as integration-as-api, so they carry the identity in componentSubType instead.
-const isWebhookInput = (input: CreateComponentInput): boolean =>
-  WEBHOOK_DISPLAY_TYPES.has(input.displayType) || input.componentSubType === 'webhook';
+const isWebhookInput = (input: CreateComponentInput): boolean => WEBHOOK_DISPLAY_TYPES.has(input.displayType) || input.componentSubType === 'webhook';
 
 // Frontend DisplayType -> OpenChoreo ComponentType reference + Workflow
 // (buildpack builder). `componentType` is the {workloadType}/{componentTypeName}

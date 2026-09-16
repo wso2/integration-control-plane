@@ -101,7 +101,26 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
   );
   const isValid = !errors.timeout && !errors.intervalCount && Object.keys(errors.cron).length === 0;
 
-  return { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, timezone, setTimezone, timeoutSeconds, setTimeoutSeconds, allowConcurrency, setAllowConcurrency, cron, description: describeCron(cron), errors, isValid };
+  return {
+    tab,
+    setTab,
+    intervalCount,
+    setIntervalCount,
+    intervalUnit,
+    setIntervalUnit,
+    cronFields,
+    setCronFields,
+    timezone,
+    setTimezone,
+    timeoutSeconds,
+    setTimeoutSeconds,
+    allowConcurrency,
+    setAllowConcurrency,
+    cron,
+    description: describeCron(cron),
+    errors,
+    isValid,
+  };
 }
 
 /** Identifiers a schedule redeploy needs, alongside the {@link useScheduleForm} values. */

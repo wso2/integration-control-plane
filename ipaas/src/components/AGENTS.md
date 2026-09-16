@@ -8,15 +8,15 @@ Reusable UI components. Pure presentation and interaction logic — no direct ba
 
 ## Import rules
 
-| Allowed                                          | Not allowed                                 |
-| ------------------------------------------------ | ------------------------------------------- |
-| `src/hooks/*`                                    | `src/api/*`                                 |
-| `src/types/*`                                    | `src/auth/tokenManager` (data functions)    |
-| `src/constants/*`                                | `authenticatedFetch`, `getOrgUuidFromToken` |
-| `src/utils/*`                                    | Any named HTTP client                       |
-| `src/assets/*`                                   |                                             |
-| `src/contexts/*`                                 |                                             |
-| `@wso2/oxygen-ui`, `@wso2/oxygen-ui-icons-react` |                                             |
+| Allowed                                          | Not allowed                                  |
+| ------------------------------------------------ | -------------------------------------------- |
+| `src/hooks/*`                                    | `src/api/*`                                  |
+| `src/types/*`                                    | `src/auth/tokenManager` (data functions)     |
+| `src/constants/*`                                | `authenticatedFetch`, `getOrgUuidFromToken`  |
+| `src/utils/*`                                    | Any named HTTP client                        |
+| `src/assets/*`                                   |                                              |
+| `src/contexts/*`                                 |                                              |
+| `@wso2/oxygen-ui`, `@wso2/oxygen-ui-icons-react` |                                              |
 | React Router (`useParams`, `Link`)               | `useNavigate` — use `useAppNavigate` instead |
 
 If you need data, call a hook. If the hook does not exist yet, create it in `src/hooks/` first.

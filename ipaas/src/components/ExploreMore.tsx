@@ -47,14 +47,7 @@ export default function ExploreMore(): JSX.Element {
                   </Typography>
                   <Stack gap={0.75}>
                     {group.links.map((link) => (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        variant="body2"
-                        underline="hover"
-                        sx={linkSx}>
+                      <Link key={link.href} href={link.href} target="_blank" rel="noopener noreferrer" variant="body2" underline="hover" sx={linkSx}>
                         <Box component="span" sx={linkArrowSx}>
                           <ArrowRight size={14} />
                         </Box>

@@ -17,17 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  assertUsableLifetime,
-  buildStorageState,
-  decodeTokenClaims,
-  isRetryableTokenFailure,
-  MIN_TOKEN_LIFETIME_MS,
-  parseTokenBody,
-  TOKEN_FETCH_ATTEMPTS,
-  tokenRetryDelayMs,
-  type TokenClaims,
-} from './token';
+import { assertUsableLifetime, buildStorageState, decodeTokenClaims, isRetryableTokenFailure, MIN_TOKEN_LIFETIME_MS, parseTokenBody, TOKEN_FETCH_ATTEMPTS, tokenRetryDelayMs, type TokenClaims } from './token';
 
 const NOW = 1_800_000_000_000;
 
@@ -104,13 +94,7 @@ describe('assertUsableLifetime', () => {
 });
 
 describe('buildStorageState', () => {
-  const entries = (): Record<string, string> =>
-    Object.fromEntries(
-      buildStorageState('the-token', CLAIMS, 'https://console.example.com').origins[0].localStorage.map((e) => [
-        e.name,
-        e.value,
-      ]),
-    );
+  const entries = (): Record<string, string> => Object.fromEntries(buildStorageState('the-token', CLAIMS, 'https://console.example.com').origins[0].localStorage.map((e) => [e.name, e.value]));
 
   it('stores the token and its expiry in milliseconds', () => {
     expect(entries().auth_token).toBe('the-token');
@@ -131,9 +115,7 @@ describe('buildStorageState', () => {
   });
 
   it('scopes the storage to the console origin', () => {
-    expect(buildStorageState('t', CLAIMS, 'https://console.example.com').origins[0].origin).toBe(
-      'https://console.example.com',
-    );
+    expect(buildStorageState('t', CLAIMS, 'https://console.example.com').origins[0].origin).toBe('https://console.example.com');
   });
 });
 

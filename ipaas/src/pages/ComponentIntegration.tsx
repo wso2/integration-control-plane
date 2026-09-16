@@ -17,7 +17,7 @@
  */
 
 import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import { useEffect, type JSX } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import NotFound from '../components/NotFound';
 import { CloudEditorCard, IntegratorIDECard } from '../components/Integration/IntegrationCards';
@@ -27,6 +27,7 @@ import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjec
 import { useCommitHistory, useComponentRepository, useChoreoSampleImages } from '../hooks/useRepository';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
 import { UUID_RE } from '../utils/string';
+import { trackEvent } from '../utils/tracking';
 
 export default function ComponentIntegration(scope: ComponentScope): JSX.Element {
   const isUuid = UUID_RE.test(scope.project);
@@ -48,6 +49,13 @@ export default function ComponentIntegration(scope: ComponentScope): JSX.Element
   const orgUuid = useOrgUuid() ?? '';
   const { data: sampleImages } = useChoreoSampleImages(orgUuid, projectId);
   const codeServerSample = (sampleImages ?? []).find((img) => img.name === 'Code Server');
+
+  useEffect(() => {
+    if (component) trackEvent('component-develop');
+    // Only re-fire when navigating to a different component, not on every re-render where
+    // `component` gets a new object reference for the same id (e.g. a background refetch).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [component?.id]);
 
   if (isLoading) {
     return (

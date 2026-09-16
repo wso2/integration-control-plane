@@ -37,7 +37,7 @@ Two things about this setup drive nearly every rule below.
 
 ## The workflow
 
-Work in this order. The most common way an e2e test goes wrong here is not a bad assertion — it is a locator that was *invented* rather than read off the source. It fails on the first run, and then gets "fixed" by loosening it into something that passes without checking anything. Reading the source first costs a couple of minutes and avoids that whole trap.
+Work in this order. The most common way an e2e test goes wrong here is not a bad assertion — it is a locator that was _invented_ rather than read off the source. It fails on the first run, and then gets "fixed" by loosening it into something that passes without checking anything. Reading the source first costs a couple of minutes and avoids that whole trap.
 
 ### 1. Find the route
 
@@ -60,7 +60,7 @@ If you are about to type a locator string you have not read in a source file, st
 - **Third-party pages** — the WSO2 Identity Platform login screens are not in this repo. Confirm those selectors against a real run (`--headed`, or the trace viewer) and comment why the selector looks the way it does, as `global.setup.ts` does.
 - **Backend-supplied content** — project names, integration names, org handles. Derive these at runtime instead of hardcoding. `org-overview.spec.ts` does this nicely: it reads the display name out of the gear button's `aria-label` (`Settings for <name>`) and then clicks the matching text, so the test works whatever the project is called.
 
-If the element has no accessible name at all, do not reach for a CSS selector. Go to *Making the UI testable* below.
+If the element has no accessible name at all, do not reach for a CSS selector. Go to _Making the UI testable_ below.
 
 ### 4. Decide: page object or inline
 
@@ -159,21 +159,25 @@ Name the file after the page (`EnvironmentsPage.ts`), take `Page` as a private r
 
 ```ts
 await Promise.race([
-  page.getByRole('heading', { name: 'Create an Integration' })
-    .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-  page.getByRole('heading', { name: 'Sign In' })
-    .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
+  page
+    .getByRole('heading', { name: 'Create an Integration' })
+    .waitFor({ state: 'visible', timeout: 30_000 })
+    .catch(() => {}),
+  page
+    .getByRole('heading', { name: 'Sign In' })
+    .waitFor({ state: 'visible', timeout: 30_000 })
+    .catch(() => {}),
 ]);
 await expect(page, 'Session expired or was never authenticated').toHaveURL(/\/projects\/default\/home/, { timeout: 5_000 });
 ```
 
-**Beware conditions that are already true.** `waitForURL(url => url.pathname.includes('login.do'))` resolves instantly if you are already on `login.do`, so it waits for nothing. Wait for the *next* state, and when you need to know which of two branches you took, use the `waitForURL(...).then(() => true).catch(() => false)` pattern from `global.setup.ts`.
+**Beware conditions that are already true.** `waitForURL(url => url.pathname.includes('login.do'))` resolves instantly if you are already on `login.do`, so it waits for nothing. Wait for the _next_ state, and when you need to know which of two branches you took, use the `waitForURL(...).then(() => true).catch(() => false)` pattern from `global.setup.ts`.
 
 **Click and navigation are a race.** When a click triggers a cross-domain redirect, wrap both in `Promise.all` with the wait listed first, so you cannot miss the navigation.
 
 **Never `waitForTimeout`.** A sleep either makes the suite slow or makes it flaky, usually both. Use web-first assertions (`expect(...).toBeVisible()` auto-retries) or wait on a specific condition. If you genuinely cannot express the condition, that is a signal the app needs a testable state indicator — not that the test needs a sleep.
 
-**Assert absence carefully.** `expect(locator).not.toBeVisible()` passes trivially while the page is still loading. Wait for something that proves the page rendered *first*, then assert the absence — as `project-home-empty.spec.ts` does before checking there is no table.
+**Assert absence carefully.** `expect(locator).not.toBeVisible()` passes trivially while the page is still loading. Wait for something that proves the page rendered _first_, then assert the absence — as `project-home-empty.spec.ts` does before checking there is no table.
 
 **Prefer generous explicit timeouts to raising the global one.** Config gives you 60s per test and 15s per action; slow staging surfaces get `{ timeout: 30_000 }` on the specific assertion that needs it.
 

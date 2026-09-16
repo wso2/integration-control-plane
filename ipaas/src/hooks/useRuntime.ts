@@ -19,6 +19,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchComponentPodMetrics, fetchComponentPods, fetchPodEvents, fetchPodLogs, fetchReleaseDetails, redeployRelease } from '#api/runtime';
 import { IS_WIP } from '../features';
+import { trackEvent } from '../utils/tracking';
 import type { PodLogOptions } from '../types/runtime';
 
 const ROOT_KEY = 'runtime';
@@ -96,6 +97,7 @@ export function useRedeployRelease() {
   return useMutation({
     mutationFn: (input: { projectId: string; componentId: string; componentName: string; releaseId: string }) => redeployRelease(input.projectId, input.componentId, input.componentName, input.releaseId),
     onSuccess: () => {
+      trackEvent('component-deploy');
       qc.invalidateQueries({ queryKey: [ROOT_KEY] });
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
     },

@@ -42,12 +42,10 @@ const STARTING_STATUS = /^(Queued|In Progress)$/;
 // Named rather than taken by position: the catalogue's order is the backend's to change.
 const SAMPLE = 'Hello World Service';
 
-
 // The status has no role or accessible name (BuildCard.tsx:194-198), so it is matched by its text.
 function buildStatus(page: Page) {
   return page.getByText(/^(Queued|In Progress|Completed|Failed|Cancelled|Timed Out)/).first();
 }
-
 
 // Samples render as flat siblings with no accessible grouping, so a sample's Deploy button
 // is located relative to its title rather than by position in the list.
@@ -130,7 +128,4 @@ test.describe('deploy a sample @smoke', () => {
     // A set, not 'Queued': the build may already have moved on, making a literal match flaky.
     await expect(buildStatus(page)).toHaveText(STARTING_STATUS, { timeout: 60_000 });
   });
-
-
-
 });

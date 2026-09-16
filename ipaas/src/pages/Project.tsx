@@ -80,6 +80,7 @@ import { Permissions } from '../constants/permissions';
 import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import IntegrationIcon from '../components/IntegrationIcon';
+import { trackEvent } from '../utils/tracking';
 import Authorized from '../components/Authorized';
 import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
 import { useLoadProjectPermissions } from '../hooks/usePermissionLoader';
@@ -126,6 +127,7 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
       {
         onSuccess: (result) => {
           if (result.canDelete) {
+            trackEvent('component-delete');
             onDeleted();
             return;
           }

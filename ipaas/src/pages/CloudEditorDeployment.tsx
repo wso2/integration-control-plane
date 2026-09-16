@@ -117,9 +117,7 @@ export default function CloudEditorDeployment(): JSX.Element {
           });
         } catch (err) {
           const timedOut = err instanceof Error && err.message === CLOUD_EDITOR_TIMEOUT_MESSAGE;
-          const message = timedOut
-            ? 'Your Cloud Editor is taking longer than expected to become ready. Please try again later or contact support.'
-            : 'Unable to start the Cloud Editor. Please try again or contact support if the problem persists.';
+          const message = timedOut ? 'Your Cloud Editor is taking longer than expected to become ready. Please try again later or contact support.' : 'Unable to start the Cloud Editor. Please try again or contact support if the problem persists.';
           throw new Error(serverDetail(err) ?? message, { cause: err });
         }
 
@@ -177,10 +175,7 @@ export default function CloudEditorDeployment(): JSX.Element {
 
   // Cloud: the address is known but the workload may still be starting.
   const awaitingReady = !!instance && !instance.ready && !instance.clusterId;
-  const readyQuery = useEditorReady(
-    { userId: params.userId, projectId: params.projectId, componentId: params.componentId },
-    awaitingReady,
-  );
+  const readyQuery = useEditorReady({ userId: params.userId, projectId: params.projectId, componentId: params.componentId }, awaitingReady);
 
   useEffect(() => {
     if (!awaitingReady) return;
@@ -253,10 +248,7 @@ export default function CloudEditorDeployment(): JSX.Element {
       )}
       {stalled && (
         <Alert severity="warning" sx={{ maxWidth: 560, width: '100%' }}>
-          <Typography variant="body2">
-            Your Cloud Editor is still not responding. It may still be starting — try the address below, or
-            close this tab and open the editor again later. Contact support if it keeps happening.
-          </Typography>
+          <Typography variant="body2">Your Cloud Editor is still not responding. It may still be starting — try the address below, or close this tab and open the editor again later. Contact support if it keeps happening.</Typography>
         </Alert>
       )}
       {awaitingReady && instance && (

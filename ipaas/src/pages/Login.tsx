@@ -27,6 +27,7 @@ import { privacyPolicyUrl, signupUrl } from '../paths';
 import AuthMarketingPanel from '../components/AuthMarketingPanel';
 import RegionSelector from '../components/RegionSelector';
 import { IS_CLOUD } from '../features';
+import { trackEvent } from '../utils/tracking';
 
 function MicrosoftIcon() {
   return (
@@ -53,6 +54,8 @@ export default function Login(): JSX.Element {
   const [loading, setLoading] = useState(false);
   const [provider, setProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => trackEvent('visit-login-page'), []);
 
   // Cloud variant: the branded split-screen sign-in is hosted by Thunder (the IdP),
   // so we don't render our own marketing + provider page. Hand off immediately to
@@ -83,6 +86,7 @@ export default function Login(): JSX.Element {
       setError(friendlyError(err));
       setLoading(false);
       setProvider(null);
+      trackEvent('login-clickbutton-error');
     }
   };
 

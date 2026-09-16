@@ -26,6 +26,7 @@ import { IS_CLOUD } from '../../../features';
 import type { OverviewHeaderActionsProps } from '../../../types/integration';
 import SecurityDrawer from '../../SecurityDrawer';
 import ConfigureActionRow from './ConfigureActionRow';
+import { trackEvent } from '../../../utils/tracking';
 
 /**
  * Props of the default block = the module-slot props + an `extra` slot. A type
@@ -111,6 +112,9 @@ export default function OverviewHeaderActions({ component, apimId, orgHandler, p
                   target="_blank"
                   rel="noopener noreferrer"
                   disabled={!isPublished || !devPortalUrl}
+                  onClick={() => {
+                    if (isPublished && devPortalUrl) trackEvent('component-manage-dev-portal');
+                  }}
                   sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, color: isPublished && devPortalUrl ? 'text.secondary' : 'text.disabled', pointerEvents: 'auto' }}>
                   <CodeXml size={16} />
                 </IconButton>

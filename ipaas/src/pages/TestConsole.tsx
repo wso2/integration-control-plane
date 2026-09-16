@@ -36,6 +36,7 @@ import NotFound from '../components/NotFound';
 import { useProjectId } from '../hooks/useProjects';
 import type { EndpointRef } from '../types/consumers';
 import { friendlyApiError } from '../utils/apiSecurity';
+import { trackEvent } from '../utils/tracking';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
@@ -140,6 +141,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
       const key = IS_CLOUD ? (await endpointTestKeyMutation.mutateAsync()).apiKey : (await generateKeyMutation.mutateAsync({ apimId: selectedEndpoint!.apimId!, keyType: selectedEnv?.critical ? 'Production' : 'Development' }))?.apikey;
       if (key) {
         updateSecurityHeader(key);
+        trackEvent('component-test-openapi-get-test-key');
       } else {
         setKeyError('No test key available. Please check your permissions.');
       }
@@ -364,6 +366,10 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                       request.headers[TEST_KEY_HEADER] = securityHeaderRef.current;
                     }
                     return request;
+                  }}
+                  responseInterceptor={(response) => {
+                    trackEvent('component-test-execute', { status: response.status });
+                    return response;
                   }}
                 />
               </Box>

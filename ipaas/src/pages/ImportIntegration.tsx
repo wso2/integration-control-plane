@@ -53,6 +53,19 @@ import { toHandler, formatRepoNameToDisplayName } from '../utils/string';
 import { parseGitHubUrl } from '../utils/github';
 import { detectTechnology } from '../utils/technologyDetection';
 import { useProjectId } from '../hooks/useProjects';
+import { trackEvent } from '../utils/tracking';
+
+// Maps each selectable integration type to its own Moesif event, so a type added later without a
+// table entry here still reaches Moesif via the generic 'component-create-select-type' fallback
+// (with `integrationType` as a property) instead of vanishing silently.
+const INTEGRATION_TYPE_TRACK_EVENT: Partial<Record<IntegrationType, string>> = {
+  automation: 'component-create-select-type-automation',
+  'ai-agent': 'component-create-select-type-ai-agent',
+  service: 'component-create-select-type-integration-as-api',
+  'mcp-server': 'component-create-select-type-mcp-server',
+  'event-integration': 'component-create-select-type-event-integration',
+  'file-integration': 'component-create-select-type-file-integration',
+};
 
 // Helper/error text rendered below the field+refresh row (not inside the field),
 // so the refresh icon stays centred on the input box. Matches MUI's default
@@ -345,6 +358,15 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const canSubmit = Boolean(activeOrg && activeRepo && selectedBranch && selectedTechnology && selectedIntegrationType && displayName.trim() && handlerValid && projectId && (isPublicRepo || isAuthenticated));
 
   const handleSubmit = () => {
+    // Fires on click, before the API call — 'component-create-end' only fires on success, so the
+    // gap between the two is the real submit-to-success drop-off.
+    trackEvent('component-create-submit', {
+      org: scope.org,
+      project: scope.project,
+      integrationType: selectedIntegrationType ?? 'unknown',
+      buildpack: selectedTechnology ?? 'unknown',
+      provider: credProvider ?? GitProvider.GITHUB,
+    });
     createComponent.mutate(
       {
         displayName: displayName.trim(),
@@ -899,7 +921,13 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
             <Typography variant="h5" sx={{ mb: 2, mt: 5 }}>
               Integration Type
             </Typography>
-            <IntegrationTypeSelector selected={selectedIntegrationType} onSelect={setSelectedIntegrationType} />
+            <IntegrationTypeSelector
+              selected={selectedIntegrationType}
+              onSelect={(type) => {
+                trackEvent(INTEGRATION_TYPE_TRACK_EVENT[type] ?? 'component-create-select-type', { org: scope.org, project: scope.project, integrationType: type });
+                setSelectedIntegrationType(type);
+              }}
+            />
           </Box>
         </BusyFields>
 

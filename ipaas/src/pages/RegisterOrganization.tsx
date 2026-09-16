@@ -26,6 +26,7 @@ import { useAuth } from '../auth/AuthContext';
 import { useRegisterUser, useValidateOrgName } from '../hooks/useOrg';
 import type { RegisterUserResponse } from '../types/org';
 import { loginUrl, orgHomeUrl, privacyPolicyUrl } from '../paths';
+import { trackEvent } from '../utils/tracking';
 
 const ORG_NAME_RE = /^[A-Za-z][A-Za-z0-9\-_ ]+$/;
 const SERVICE_NAME = 'WSO2 Integration Platform';
@@ -127,6 +128,7 @@ export default function RegisterOrganization(): JSX.Element {
 
       // Exchange for org-scoped STS token
       await completeOrgRegistration(handle);
+      trackEvent('signup-success', undefined, true);
       navigate(orgHomeUrl(handle), { replace: true });
     } catch (err) {
       setCreateError(err instanceof Error ? err.message : 'Failed to create organization. Please try again.');

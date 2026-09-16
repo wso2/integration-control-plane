@@ -33,7 +33,6 @@ const CLOUD_SECTIONS = ['Org Details', 'Package Registries'];
 // Declared only in the non-cloud branch of SETTINGS_SECTIONS.
 const WIP_ONLY_SECTIONS = ['Access Control', 'Egress Control', 'Workflows', 'Credentials', 'On-Prem Keys', 'Application Security'];
 
-
 test.describe('settings @smoke', () => {
   let orgHandler: string;
   let projectHandler: string;

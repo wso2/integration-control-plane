@@ -36,6 +36,7 @@ import {
 } from '#api/components';
 import { pollWhileDeleting } from '../utils/deletionPolling';
 import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput } from '../types/component';
+import { trackEvent } from '../utils/tracking';
 
 export function useComponents(orgHandler: string, projectId: string) {
   return useQuery({
@@ -66,8 +67,14 @@ export function useComponentEndpoints(componentId: string, versionId: string) {
 export function useCreateComponent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateComponentInput) => createComponent(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['components'] }),
+    mutationFn: (input: CreateComponentInput) => {
+      trackEvent('component-create-start');
+      return createComponent(input);
+    },
+    onSuccess: () => {
+      trackEvent('component-create-end');
+      qc.invalidateQueries({ queryKey: ['components'] });
+    },
   });
 }
 

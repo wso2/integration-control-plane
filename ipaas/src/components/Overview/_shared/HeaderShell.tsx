@@ -557,31 +557,31 @@ export default function ComponentHeader({ component, project, repository, latest
                 </Button>
               )}
               {showEditorMenu && (
-              <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-end" transition disablePortal style={{ zIndex: 1300 }}>
-                {({ TransitionProps }) => (
-                  <Grow {...TransitionProps}>
-                    <Paper elevation={3}>
-                      <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
-                        <MenuList dense sx={{ minWidth: 200 }}>
-                          <MenuItem onClick={handleOpenInCloud} selected disabled={!codeServerSample}>
-                            <Stack direction="row" alignItems="center" gap={1}>
-                              <Cloud size={14} />
-                              <Typography variant="body2">Open in Cloud</Typography>
-                              <Chip label="Beta" size="small" sx={{ height: 16, fontSize: 10 }} />
-                            </Stack>
-                          </MenuItem>
-                          <MenuItem onClick={handleOpenInVSCode}>
-                            <Stack direction="row" alignItems="center" gap={1}>
-                              <Code2 size={14} />
-                              <Typography variant="body2">Open in VS Code</Typography>
-                            </Stack>
-                          </MenuItem>
-                        </MenuList>
-                      </ClickAwayListener>
-                    </Paper>
-                  </Grow>
-                )}
-              </Popper>
+                <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-end" transition disablePortal style={{ zIndex: 1300 }}>
+                  {({ TransitionProps }) => (
+                    <Grow {...TransitionProps}>
+                      <Paper elevation={3}>
+                        <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
+                          <MenuList dense sx={{ minWidth: 200 }}>
+                            <MenuItem onClick={handleOpenInCloud} selected disabled={!codeServerSample}>
+                              <Stack direction="row" alignItems="center" gap={1}>
+                                <Cloud size={14} />
+                                <Typography variant="body2">Open in Cloud</Typography>
+                                <Chip label="Beta" size="small" sx={{ height: 16, fontSize: 10 }} />
+                              </Stack>
+                            </MenuItem>
+                            <MenuItem onClick={handleOpenInVSCode}>
+                              <Stack direction="row" alignItems="center" gap={1}>
+                                <Code2 size={14} />
+                                <Typography variant="body2">Open in VS Code</Typography>
+                              </Stack>
+                            </MenuItem>
+                          </MenuList>
+                        </ClickAwayListener>
+                      </Paper>
+                    </Grow>
+                  )}
+                </Popper>
               )}
             </Box>
           )}

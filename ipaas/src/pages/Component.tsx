@@ -44,6 +44,7 @@ import { resourceUrl, broaden, type ComponentScope } from '../nav';
 import { useLoadComponentPermissions } from '../hooks/usePermissionLoader';
 import BuildCard from '../components/BuildCard';
 import { UUID_RE } from '../utils/string';
+import { trackEvent } from '../utils/tracking';
 import { RAG_NO_SOURCE_SUBTYPES } from '../constants/ragIngestion';
 
 /**
@@ -115,6 +116,13 @@ export default function Component(scope: ComponentScope): JSX.Element {
   // Resolve the type's Overview module once; shared by the header (HeaderShell)
   // and the env-card renderer (IntegrationRenderer) so neither re-resolves it.
   const overviewModule = useIntegrationModule(identity?.type ?? null);
+
+  useEffect(() => {
+    if (component) trackEvent('component-overview');
+    // Only re-fire when navigating to a different component, not on every re-render where
+    // `component` gets a new object reference for the same id (e.g. a background refetch).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [component?.id]);
 
   // A disabled query reports isLoading false; isPending stays true until the project resolves too.
   if (loadingProject || (projectId && pendingComponent)) return <IntegrationOverviewSkeleton />;

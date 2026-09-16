@@ -88,10 +88,7 @@ export function assertUsableLifetime(claims: TokenClaims, nowMs: number): void {
   const remainingMs = claims.exp * 1000 - nowMs;
   if (remainingMs < MIN_TOKEN_LIFETIME_MS) {
     const remaining = Math.round(remainingMs / 1000);
-    throw new Error(
-      `Token has ${remaining}s of life left, less than the ${MIN_TOKEN_LIFETIME_MS / 60_000} minutes a run needs. ` +
-        'Fetch a fresh one; if the provider keeps serving short-lived tokens, its refresh is failing.',
-    );
+    throw new Error(`Token has ${remaining}s of life left, less than the ${MIN_TOKEN_LIFETIME_MS / 60_000} minutes a run needs. ` + 'Fetch a fresh one; if the provider keeps serving short-lived tokens, its refresh is failing.');
   }
 }
 

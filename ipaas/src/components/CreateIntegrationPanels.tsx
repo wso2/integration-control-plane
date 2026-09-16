@@ -54,6 +54,10 @@ import { Permissions } from '../constants/permissions';
 import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
 import { useSamples } from '../hooks/useSamples';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
+import { trackEvent } from '../utils/tracking';
+
+/** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
+const GET_STARTED_TABS = [{ label: 'Prebuilt Integrations' }, { label: 'Samples' }];
 
 export interface CreateIntegrationPanelsProps {
   scope: ProjectScope;
@@ -112,6 +116,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const handleOpenCloudEditor = () => {
     if (creationBlocked) return;
+    trackEvent('open-cloud-editor-click', { org: scope.org, project: scope.project });
     const codeServerSample = (sampleImages ?? []).find((img) => img.name === 'Code Server');
     if (!codeServerSample) {
       setPageError({ message: 'Cloud Editor is not available. Please try again later.', severity: 'warning' });
@@ -127,6 +132,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const handleImportClick = () => {
     if (creationBlocked) return;
+    trackEvent('component-create-import-github', { org: scope.org, project: scope.project, provider: GitProvider.GITHUB });
     const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
     if (!githubAppClientId) {
       // Cloud only: no GitHub App configured means private-repo authorization
@@ -181,6 +187,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const handleQuickDeploy = (sample: Sample) => {
     if (!projectId || creationBlocked) return;
+    trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
     setDeployingSample(sample.displayName);
     createComponent.mutate(
       {
@@ -332,6 +339,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           aria-label="Import from a Public Repository"
                           onClick={(e) => {
                             e.stopPropagation();
+                            trackEvent('component-create-import-public-url', { org: scope.org, project: scope.project });
                             navigate(importUrl, { state: { mode: 'public' } });
                           }}
                           sx={PROVIDER_ICON_SX}>
@@ -346,7 +354,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                       <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.GITLAB_SELF_MANAGED) : 'Import from GitLab'} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from GitLab" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.GITLAB_SELF_MANAGED } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton
+                            aria-label="Import from GitLab"
+                            disabled={IS_CLOUD}
+                            onClick={() => {
+                              trackEvent('component-create-import-gitlab', { org: scope.org, project: scope.project, provider: GitProvider.GITLAB_SELF_MANAGED });
+                              navigate(importUrl, { state: { provider: GitProvider.GITLAB_SELF_MANAGED } });
+                            }}
+                            sx={PROVIDER_ICON_SX}>
                             <GitLabIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
@@ -354,7 +369,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                       <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.BITBUCKET_CLOUD) : 'Import from Bitbucket'} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Bitbucket" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.BITBUCKET_CLOUD } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton
+                            aria-label="Import from Bitbucket"
+                            disabled={IS_CLOUD}
+                            onClick={() => {
+                              trackEvent('component-create-import-bitbucket', { org: scope.org, project: scope.project, provider: GitProvider.BITBUCKET_CLOUD });
+                              navigate(importUrl, { state: { provider: GitProvider.BITBUCKET_CLOUD } });
+                            }}
+                            sx={PROVIDER_ICON_SX}>
                             <BitbucketIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
@@ -362,7 +384,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                       <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.AZURE_DEVOPS) : 'Import from Azure'} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Azure" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.AZURE_DEVOPS } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton
+                            aria-label="Import from Azure"
+                            disabled={IS_CLOUD}
+                            onClick={() => {
+                              trackEvent('component-create-import-azure-devops', { org: scope.org, project: scope.project, provider: GitProvider.AZURE_DEVOPS });
+                              navigate(importUrl, { state: { provider: GitProvider.AZURE_DEVOPS } });
+                            }}
+                            sx={PROVIDER_ICON_SX}>
                             <AzureDevOpsIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
@@ -391,7 +420,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             }}>
             <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
               <Box sx={{ mb: 2 }}>
-                <PillTabs value={selectedTab} onChange={setSelectedTab} tabs={[{ label: 'Prebuilt Integrations' }, { label: 'Samples' }]} />
+                <PillTabs
+                  value={selectedTab}
+                  onChange={(tab) => {
+                    trackEvent('components-new-get-started-tab', { org: scope.org, project: scope.project, tab: GET_STARTED_TABS[tab]?.label ?? String(tab) });
+                    setSelectedTab(tab);
+                  }}
+                  tabs={GET_STARTED_TABS}
+                />
               </Box>
 
               <Box sx={{ display: 'grid', flex: 1, minWidth: 0, '& > *': { gridArea: '1 / 1', zIndex: 1, minWidth: 0 } }}>
@@ -418,21 +454,30 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           disabledTooltip={blockedTooltip}
                           key={integration.displayName}
                           integration={integration}
-                          onClick={() =>
+                          onClick={() => {
+                            trackEvent('featured-prebuilt-integration-click', { org: scope.org, project: scope.project, integration: integration.displayName });
                             navigate(prebuiltIntegrationsUrl(scope.org, scope.project), {
                               state: {
                                 selectedApplications: integration.applications,
                                 selectedIntegration: integration,
                                 fromPath: `/organizations/${scope.org}/projects/${scope.project}/components/new`,
                               },
-                            })
-                          }
+                            });
+                          }}
                         />
                       ))}
                     </Box>
                   )}
                   <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(prebuiltIntegrationsUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
+                    <Button
+                      variant="text"
+                      color="primary"
+                      endIcon={<ArrowRight size={14} />}
+                      onClick={() => {
+                        trackEvent('prebuilt-integration-explore-click', { org: scope.org, project: scope.project });
+                        navigate(prebuiltIntegrationsUrl(scope.org, scope.project));
+                      }}
+                      sx={{ textTransform: 'none', pl: 0 }}>
                       Explore more prebuilt integrations
                     </Button>
                   </Box>
@@ -461,7 +506,15 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     </Box>
                   )}
                   <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(browseSamplesUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
+                    <Button
+                      variant="text"
+                      color="primary"
+                      endIcon={<ArrowRight size={14} />}
+                      onClick={() => {
+                        trackEvent('components-new-browse-more-samples', { org: scope.org, project: scope.project });
+                        navigate(browseSamplesUrl(scope.org, scope.project));
+                      }}
+                      sx={{ textTransform: 'none', pl: 0 }}>
                       Explore more samples
                     </Button>
                   </Box>

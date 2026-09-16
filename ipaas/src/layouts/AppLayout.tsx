@@ -114,6 +114,7 @@ import { useSubscriptions } from '../hooks/useSubscription';
 import { isExternalCiEnabled } from '../hooks/useExternalCi';
 import { PAID_SUBSCRIPTION_TYPE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
+import { trackEvent } from '../utils/tracking';
 import { useOrgPermissions } from '../hooks/useAuth';
 import { switchOrgToken } from '../auth/tokenManager';
 import {
@@ -418,7 +419,7 @@ function AppLayoutInner(): JSX.Element {
           <Header.Toggle collapsed={hideSidebarForEmptyProject || shell.sidebarCollapsed} onToggle={handleHeaderToggle} />
           <Header.Brand>
             <Header.BrandLogo>
-              <NavLink to={orgHomeUrl(scope.org)} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <NavLink to={orgHomeUrl(scope.org)} onClick={() => trackEvent('navbar-home')} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
                 <Logo />
               </NavLink>
             </Header.BrandLogo>
@@ -611,6 +612,7 @@ function AppLayoutInner(): JSX.Element {
                       key={p.id}
                       selected={hasProject(scope) && (scope.project === p.handler || scope.project === p.id)}
                       onClick={() => {
+                        trackEvent('navbar-project-dropdown-existing');
                         setProjectMenuAnchor(null);
                         setProjectSearch('');
                         const newScope = narrow({ level: 'organizations', org: scope.org }, p.handler);
@@ -1685,6 +1687,7 @@ function AppLayoutInner(): JSX.Element {
               variant="contained"
               onClick={async () => {
                 await logout();
+                trackEvent('navbar-user-logout');
                 navigate(loginUrl());
                 setConfirmDialogOpen(false);
               }}>

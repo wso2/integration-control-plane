@@ -185,6 +185,10 @@ export function clearOidcAuthMetadata(): void {
   localStorage.removeItem(OIDC_ORG_HANDLE_KEY);
 }
 
+export function getOrgHandle(): string | null {
+  return localStorage.getItem(OIDC_ORG_HANDLE_KEY);
+}
+
 async function refreshOidcAccessToken(refreshToken: string): Promise<void> {
   const { stsTokenEndpoint, stsClientId, stsScope, choreoOrgApiUrl } = window.API_CONFIG;
 

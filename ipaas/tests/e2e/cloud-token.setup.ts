@@ -46,10 +46,7 @@ setup('seed the cloud session from a token', async ({ browser }, testInfo) => {
   const context = await browser.newContext({ storageState: AUTH_FILE, baseURL });
   const page = await context.newPage();
   await page.goto('/');
-  await expect(page, 'Token did not produce a signed-in session').toHaveURL(
-    /\/organizations\/[^/]+\/projects\/[^/]+\/home/,
-    { timeout: 120_000 },
-  );
+  await expect(page, 'Token did not produce a signed-in session').toHaveURL(/\/organizations\/[^/]+\/projects\/[^/]+\/home/, { timeout: 120_000 });
 
   const url = page.url();
   const projectMatch = url.match(/\/projects\/([^/]+)/);

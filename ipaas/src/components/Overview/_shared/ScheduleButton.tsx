@@ -60,33 +60,33 @@ export default function ScheduleButton({ hasSchedule, disabled, disabledReason, 
         {hasSchedule ? (
           <Tooltip title={disabled ? (disabledReason ?? '') : ''} placement="top">
             <span>
-            <ButtonGroup variant="contained" size="small" ref={splitButtonRef} disabled={disabled || stopSchedule.isPending}>
-              <Button startIcon={<CalendarClock size={14} />} onClick={handleStopSchedule}>
-                Stop Schedule
-              </Button>
-              <Button size="small" sx={{ px: 0.5 }} onClick={() => setSplitOpen((prev) => !prev)}>
-                <ChevronDown size={14} />
-              </Button>
-            </ButtonGroup>
-            <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-end" transition disablePortal style={{ zIndex: 1300 }}>
-              {({ TransitionProps }) => (
-                <Grow {...TransitionProps}>
-                  <Paper elevation={3}>
-                    <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
-                      <MenuList dense sx={{ minWidth: 160 }}>
-                        <MenuItem
-                          onClick={() => {
-                            setSplitOpen(false);
-                            setDialogOpen(true);
-                          }}>
-                          Edit Schedule
-                        </MenuItem>
-                      </MenuList>
-                    </ClickAwayListener>
-                  </Paper>
-                </Grow>
-              )}
-            </Popper>
+              <ButtonGroup variant="contained" size="small" ref={splitButtonRef} disabled={disabled || stopSchedule.isPending}>
+                <Button startIcon={<CalendarClock size={14} />} onClick={handleStopSchedule}>
+                  Stop Schedule
+                </Button>
+                <Button size="small" sx={{ px: 0.5 }} onClick={() => setSplitOpen((prev) => !prev)}>
+                  <ChevronDown size={14} />
+                </Button>
+              </ButtonGroup>
+              <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-end" transition disablePortal style={{ zIndex: 1300 }}>
+                {({ TransitionProps }) => (
+                  <Grow {...TransitionProps}>
+                    <Paper elevation={3}>
+                      <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
+                        <MenuList dense sx={{ minWidth: 160 }}>
+                          <MenuItem
+                            onClick={() => {
+                              setSplitOpen(false);
+                              setDialogOpen(true);
+                            }}>
+                            Edit Schedule
+                          </MenuItem>
+                        </MenuList>
+                      </ClickAwayListener>
+                    </Paper>
+                  </Grow>
+                )}
+              </Popper>
             </span>
           </Tooltip>
         ) : (

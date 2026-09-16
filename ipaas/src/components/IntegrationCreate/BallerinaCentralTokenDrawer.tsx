@@ -111,9 +111,7 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
                 </Stack>
               </Card>
 
-              <Alert severity="info">
-                You can update this anytime from Settings &gt; Package Registries in your organization's home view.
-              </Alert>
+              <Alert severity="info">You can update this anytime from Settings &gt; Package Registries in your organization's home view.</Alert>
             </Stack>
           ) : (
             <Stack gap={2}>
@@ -131,12 +129,7 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
                       </Typography>
                     ))}
                   </Stack>
-                  <Link
-                    href={BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.linkUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    underline="hover"
-                    sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontWeight: 600, width: 'fit-content' }}>
+                  <Link href={BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.linkUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontWeight: 600, width: 'fit-content' }}>
                     {BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.linkLabel} <ArrowUpRight size={16} />
                   </Link>
                 </Stack>

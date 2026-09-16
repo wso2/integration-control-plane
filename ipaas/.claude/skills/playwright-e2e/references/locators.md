@@ -4,33 +4,32 @@
 
 ## Role mapping
 
-| UI element | Role and locator | Notes |
-| --- | --- | --- |
-| Button | `getByRole('button', { name: 'Create Project', exact: true })` | Use `exact` when the name prefixes another button's name. |
-| Icon-only button | `getByRole('button', { name: 'Clear project' })` | Needs an `aria-label` in the component; if absent, add one (see SKILL.md). |
-| Link | `getByRole('link', { name: 'Terms of Use' })` | External links are `target="_blank"` — assert `href`/`target` rather than clicking. |
-| TextField | `getByLabel('Display Name')` | `getByRole('textbox')` works when there is exactly one on screen. |
-| TextField, no label | `getByPlaceholder('Search projects')` | |
-| Select | `getByRole('combobox', { name: 'Select organization' })` | The accessible name comes from the label. Click it, then pick from the listbox. |
-| Select options | `getByRole('option', { name: 'US' })` | Rendered in a portal, not inside the select. |
-| Autocomplete | `getByRole('combobox')` | Same shape as Select. |
-| Menu item | `getByRole('menuitem', { name: 'Sign Out' })` | The container is `role="menu"`. |
-| Tab | `getByRole('tab', { name: 'Samples' })` | Panel is `role="tabpanel"`. |
-| Dialog | `getByRole('dialog')` | Scope inner queries to it when the same button name exists behind the dialog. |
-| Alert / Snackbar | `getByRole('alert')` | See the filtering note below. |
-| Checkbox, Switch | `getByRole('checkbox')` | MUI Switch renders a checkbox input. |
-| Radio | `getByRole('radio', { name: '...' })` | |
-| Table | `getByRole('table')`, rows `getByRole('row')` | A MUI DataGrid is `role="grid"` with `gridcell`, not `table` — check which one the page uses. |
-| Heading | `getByRole('heading', { name: 'All Projects' })` | Add `{ level: 1 }` only if you actually care about the level. |
-| Progress / spinner | `getByRole('progressbar')` | Handy for waiting out a loading state. |
+| UI element          | Role and locator                                               | Notes                                                                                         |
+| ------------------- | -------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Button              | `getByRole('button', { name: 'Create Project', exact: true })` | Use `exact` when the name prefixes another button's name.                                     |
+| Icon-only button    | `getByRole('button', { name: 'Clear project' })`               | Needs an `aria-label` in the component; if absent, add one (see SKILL.md).                    |
+| Link                | `getByRole('link', { name: 'Terms of Use' })`                  | External links are `target="_blank"` — assert `href`/`target` rather than clicking.           |
+| TextField           | `getByLabel('Display Name')`                                   | `getByRole('textbox')` works when there is exactly one on screen.                             |
+| TextField, no label | `getByPlaceholder('Search projects')`                          |                                                                                               |
+| Select              | `getByRole('combobox', { name: 'Select organization' })`       | The accessible name comes from the label. Click it, then pick from the listbox.               |
+| Select options      | `getByRole('option', { name: 'US' })`                          | Rendered in a portal, not inside the select.                                                  |
+| Autocomplete        | `getByRole('combobox')`                                        | Same shape as Select.                                                                         |
+| Menu item           | `getByRole('menuitem', { name: 'Sign Out' })`                  | The container is `role="menu"`.                                                               |
+| Tab                 | `getByRole('tab', { name: 'Samples' })`                        | Panel is `role="tabpanel"`.                                                                   |
+| Dialog              | `getByRole('dialog')`                                          | Scope inner queries to it when the same button name exists behind the dialog.                 |
+| Alert / Snackbar    | `getByRole('alert')`                                           | See the filtering note below.                                                                 |
+| Checkbox, Switch    | `getByRole('checkbox')`                                        | MUI Switch renders a checkbox input.                                                          |
+| Radio               | `getByRole('radio', { name: '...' })`                          |                                                                                               |
+| Table               | `getByRole('table')`, rows `getByRole('row')`                  | A MUI DataGrid is `role="grid"` with `gridcell`, not `table` — check which one the page uses. |
+| Heading             | `getByRole('heading', { name: 'All Projects' })`               | Add `{ level: 1 }` only if you actually care about the level.                                 |
+| Progress / spinner  | `getByRole('progressbar')`                                     | Handy for waiting out a loading state.                                                        |
 
 ## Gotchas that have already bitten this suite
 
-**Static banners are also `role="alert"`.** A page can render an informational alert *and* an error alert, so a bare `getByRole('alert')` matches the wrong one. Filter it:
+**Static banners are also `role="alert"`.** A page can render an informational alert _and_ an error alert, so a bare `getByRole('alert')` matches the wrong one. Filter it:
 
 ```ts
-const errorAlert = page.getByRole('alert')
-  .filter({ hasNotText: 'You can start with the default Cloud Data Plane' });
+const errorAlert = page.getByRole('alert').filter({ hasNotText: 'You can start with the default Cloud Data Plane' });
 ```
 
 **Two combobox names on the same nav.** The top bar has both `Select organization` and `Select project`. Always pass the name.

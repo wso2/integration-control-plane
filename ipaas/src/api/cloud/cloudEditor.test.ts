@@ -111,9 +111,7 @@ describe('callCreateCodeServer', () => {
 
   it('polls until an address exists, ready or not', async () => {
     post.mockResolvedValue({ componentName: 'cs-1', status: 'provisioning' });
-    get
-      .mockResolvedValueOnce({ componentName: 'cs-1', status: 'provisioning' })
-      .mockResolvedValueOnce({ componentName: 'cs-1', status: 'starting', pendingEditorUrl: EDITOR_URL, ready: false });
+    get.mockResolvedValueOnce({ componentName: 'cs-1', status: 'provisioning' }).mockResolvedValueOnce({ componentName: 'cs-1', status: 'starting', pendingEditorUrl: EDITOR_URL, ready: false });
 
     await expect(settle(callCreateCodeServer(params))).resolves.toMatchObject({ url: EDITOR_URL, ready: false });
   });
@@ -205,15 +203,13 @@ describe('getCodeServer', () => {
   it('reports readiness once the editor is serving', async () => {
     get.mockResolvedValue({ componentName: 'cs-1', status: 'created', editorUrl: EDITOR_URL, ready: true });
 
-    await expect(getCodeServer({ userId: 'u-1', projectId: 'proj-1', componentId: 'comp-1' }))
-      .resolves.toMatchObject({ url: EDITOR_URL, ready: true });
+    await expect(getCodeServer({ userId: 'u-1', projectId: 'proj-1', componentId: 'comp-1' })).resolves.toMatchObject({ url: EDITOR_URL, ready: true });
   });
 
   it('reports a known address that is not serving yet', async () => {
     get.mockResolvedValue({ componentName: 'cs-1', status: 'starting', pendingEditorUrl: EDITOR_URL, ready: false });
 
-    await expect(getCodeServer({ userId: 'u-1', projectId: 'proj-1', componentId: 'comp-1' }))
-      .resolves.toMatchObject({ url: EDITOR_URL, ready: false });
+    await expect(getCodeServer({ userId: 'u-1', projectId: 'proj-1', componentId: 'comp-1' })).resolves.toMatchObject({ url: EDITOR_URL, ready: false });
   });
 
   // null, not a throw: the caller polls this in its hot path.
