@@ -33,9 +33,9 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const selectedEndpoint = endpoints[selectedEpIdx] ?? endpoints[0];
 
-  // The enforcing API Platform gateway URL for the selected endpoint (cloud-only; the hook is
-  // disabled elsewhere). Shown in place of the raw OpenChoreo external route, as the
-  // integration-as-api card does.
+  // The enforcing gateway URL for the selected endpoint (cloud-only; the hook is disabled
+  // elsewhere). For an agent this comes from agent-manager, which registers it on the AI
+  // gateway. Shown in place of the raw OpenChoreo external route.
   const securityRef = IS_CLOUD && selectedEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id } : null;
   const { data: apiSecurity } = useEndpointSecurity(securityRef, IS_CLOUD && !!selectedEndpoint);
 

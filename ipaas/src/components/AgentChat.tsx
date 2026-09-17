@@ -59,12 +59,9 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
   const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, releaseId);
 
   // Candidate chat endpoint: the first reachable one. On the APIM products it must
-  // ALSO carry an APIM id, because the test key is minted per APIM API and a
-  // key-less endpoint could never authenticate (devant skips those too). Cloud has
-  // no APIM — credentials come from the API Platform gateway keyed by the
-  // component/environment/endpoint triple — so requiring an apimId there would
-  // reject every endpoint. (The `/chat` operation is confirmed below only as a
-  // hint; the endpoint is still used when its operations aren't discoverable.)
+  // ALSO carry an APIM id, since the test key is minted per APIM API. Cloud has no
+  // APIM — an agent's key comes from agent-manager — so requiring one there would
+  // reject every endpoint. The `/chat` operation below is a hint, not a filter.
   const candidate = useMemo(() => endpoints.find((e) => e.publicUrl && (IS_CLOUD || e.apimId)) ?? null, [endpoints]);
   const apimId = candidate?.apimId ?? null;
 
@@ -79,10 +76,9 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
   const { data: chatSpec } = useApiDefinition(IS_CLOUD ? candidate?.apimRevisionId : null);
   const hasChatOperation = IS_CLOUD ? !!(chatSpec as { paths?: Record<string, unknown> } | null)?.paths?.['/chat'] : (apimApi?.operations?.some((op) => op.target === '/chat') ?? false);
 
-  // Cloud invokes the apip gateway and nothing else. The endpoint's own external
-  // route is open (the policy engine is not in its path), so falling back to it
-  // would hand the test key to a host that never validates it and would make an
-  // unenforced call look like a secured one.
+  // Cloud invokes the gateway URL and nothing else. Falling back to an unenforced
+  // route would hand the test key to a host that never validates it, making an
+  // open call look secured.
   const chatUrl = IS_CLOUD ? access.gatewayUrl : (candidate?.publicUrl ?? '');
 
   const generateKey = useGenerateTestKey();
@@ -215,11 +211,11 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
     return <Alert severity="info">AI agent chat isn&apos;t available in production environments. Test your agent in a non-critical environment such as Development.</Alert>;
   }
 
-  // Cloud: a reachable endpoint exists, but it is not fronted by the API Platform
-  // gateway — the only URL chat may invoke — so name that cause instead of the
-  // generic "no endpoint", which would send the user looking in the wrong place.
-  const notExposed = IS_CLOUD && !!candidate && access.isUnavailable;
-  const noEndpoint = endpoints.length > 0 && !chatUrl && !notExposed;
+  // An agent is fronted by the AI gateway, which agent-manager registers from the
+  // agent's own configuration. It is never exposed on the API Platform, so no
+  // message here may tell the user to expose it as an API.
+  const noInvokeUrl = IS_CLOUD && !!candidate && access.isUnavailable;
+  const noEndpoint = endpoints.length > 0 && !chatUrl && !noInvokeUrl;
   const isPage = variant === 'page';
 
   return (
@@ -229,9 +225,15 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
           {chatError}
         </Alert>
       )}
-      {authError && <Alert severity="warning">{(IS_CLOUD && access.keyError) || 'Could not authenticate with the agent. Check your permissions and try again.'}</Alert>}
+      {authError && (
+        <Alert severity="warning">
+          {IS_CLOUD
+            ? 'Could not issue a test key for this agent. Its gateway may still be starting — try again in a moment.'
+            : 'Could not authenticate with the agent. Check your permissions and try again.'}
+        </Alert>
+      )}
       {noEndpoint && <Alert severity="info">No chat endpoint found for this agent.</Alert>}
-      {notExposed && <Alert severity="warning">This agent&apos;s endpoint isn&apos;t exposed on the API gateway yet, so it can&apos;t be chat-tested. Redeploy the agent, or check that its endpoint is exposed as an API.</Alert>}
+      {noInvokeUrl && <Alert severity="warning">This agent has no invoke URL yet. Deploy it, or wait for its build to publish an endpoint.</Alert>}
       {needsManualKey && (
         <Alert
           severity="info"
@@ -240,7 +242,7 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
               Use a test key
             </Button>
           }>
-          This agent is secured with OAuth. Chatting here needs a test key, which switches the endpoint to API Key authentication.
+          This agent is secured with OAuth. Chatting here needs a test key instead.
         </Alert>
       )}
       {!noEndpoint && !hasChatOperation && chatUrl && messages.length === 0 && (
