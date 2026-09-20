@@ -78,13 +78,106 @@ isolated function authorizeEnvironmentAccess(string userId, string environmentId
     }
 }
 
+// ── MI management fields ─────────────────────────────────────────────────────
+// Each of these ends in miRead or miWrite (mi_access.bal) and knows nothing about how the
+// runtime was reached. What it does have to handle is an answer that is not ready yet,
+// which `types:Fetchable` carries to the console.
+
+# The runtime a runtime-scoped MI field will ask, once the caller may ask it.
+#
+# + permissions - Any one of these grants the field; reading a runtime's user accounts asks
+#                 for more than viewing its artifacts does
+# + refusal - What the caller is told when they may not. A field that asks for more than
+#             the usual three says which right is missing, because "Unauthorized" on a
+#             screen the user can see is a puzzle rather than an answer
+isolated function miRuntimeById(graphql:Context context, string runtimeId,
+        string[] permissions, string refusal = "Unauthorized")
+        returns types:Runtime|error {
+    types:UserContextV2 userContext = check extractUserContext(context);
+    types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
+    if runtime is () {
+        return error("Runtime not found");
+    }
+    types:AccessScope scope = auth:buildScopeFromContext(runtime.component.projectId,
+            runtime.component.id, runtime.environment.id);
+    if !check auth:hasAnyPermission(userContext.userId, permissions, scope) {
+        log:printWarn("Attempt to reach an MI runtime's management API without permission",
+                userId = userContext.userId, runtimeId = runtimeId);
+        return error(refusal);
+    }
+    return runtime;
+}
+
+# The same, for the two fields that answer an empty page rather than an error when the
+# runtime is gone or the caller may not see it. That is the shape the console has always had
+# for a runtime's loggers and log files, and a table that empties is not worth a red banner.
+isolated function miVisibleRuntime(graphql:Context context, string runtimeId)
+        returns types:Runtime?|error {
+    types:Runtime|error runtime = miRuntimeById(context, runtimeId, MI_VIEW_PERMISSIONS);
+    return runtime is error ? () : runtime;
+}
+
+# One named runtime of a named integration, once the caller may act on it.
+#
+# The integration is an ownership check on a runtime the caller named, not the way it is
+# found, which is why a mismatch is refused rather than resolved around.
+isolated function miRuntimeOfIntegration(graphql:Context context, string componentId,
+        string runtimeId, string[] permissions, string refusal = "Unauthorized")
+        returns types:Runtime|error {
+    types:Runtime runtime = check miRuntimeById(context, runtimeId, permissions, refusal);
+    if runtime.component.id != componentId {
+        return error("Runtime does not belong to the specified integration");
+    }
+    return runtime;
+}
+
+# The runtime a component-scoped MI field will ask, once the caller may ask it.
+#
+# Most of the management API describes the deployed configuration, which is the same on
+# every replica, so the caller names a component and any of its runtimes may answer.
+isolated function miRuntimeOfComponent(graphql:Context context, string componentId,
+        string? environmentId, string? runtimeId) returns types:Runtime|error {
+    types:UserContextV2 userContext = check extractUserContext(context);
+    types:Component? component = check storage:getComponentById(componentId);
+    if component is () {
+        return error("Integration not found");
+    }
+    types:AccessScope scope = auth:buildScopeFromContext(component.projectId,
+            integrationId = componentId, envId = environmentId);
+    if !check auth:hasAnyPermission(userContext.userId, MI_VIEW_PERMISSIONS, scope) {
+        return error("Insufficient permissions to view component artifacts");
+    }
+    types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId,
+            component.projectId, componentId);
+    return utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
+}
+
 # A management answer the console renders as text.
 isolated function fetchableText(MIAnswer answer) returns types:FetchableText =>
     answer.preparing
         ? {...stillFetching()}
         : {...fetchableOf(answer), content: miText(answer.body)};
 
-// Helper function to fetch MI loggers from management API
+# An artifact's own parameter map as the console's name/value rows.
+isolated function namedValues(map<json> values) returns types:Parameter[] =>
+    from var [name, value] in values.entries()
+    select {name, value: value.toString()};
+
+# An overview's fields as rows, in the order given and without the ones the runtime left
+# out: a field MI did not report is one the artifact does not have, and an empty row saying
+# so is worse than no row.
+isolated function presentValues([string, json][] fields) returns types:Parameter[] =>
+    from [string, json] [name, value] in fields
+    where value !is ()
+    select {name, value: value.toString()};
+
+// The rights every read of a runtime's deployed configuration asks for.
+final readonly & string[] MI_VIEW_PERMISSIONS = [
+    auth:PERMISSION_INTEGRATION_VIEW,
+    auth:PERMISSION_INTEGRATION_EDIT,
+    auth:PERMISSION_INTEGRATION_MANAGE
+];
+
 # One runtime's loggers, and the answer they came from.
 #
 # The answer travels with them because grouping several replicas must not lose their
@@ -95,29 +188,52 @@ type MILoggerReport record {|
     MIAnswer answer;
 |};
 
-isolated function fetchMILoggersByRuntime(string runtimeId, types:Runtime runtime) returns MILoggerReport|error {
+# The loggers in a management answer, one entry at a time.
+#
+# Entry by entry because the list is only as good as its worst member: MI has been seen to
+# report an entry with neither name just after a level change, and converting the array in
+# one step let that one entry hide the other eighty-two — the page read "No loggers found"
+# until something else refetched it. A logger the runtime described incompletely is one
+# logger missing from the table, which is the smallest way to be wrong here.
+isolated function reportedLoggers(json body) returns types:MgmtLoggerInfo[]|error {
+    json list = check body.list;
+    if list !is json[] {
+        return error("The runtime did not report a list of loggers");
+    }
+    types:MgmtLoggerInfo[] loggers = [];
+    foreach json entry in list {
+        types:MgmtLoggerInfo|error logger = entry.cloneWithType();
+        if logger is error {
+            log:printWarn("Skipping a logger the runtime described incompletely", logger,
+                    entry = entry.toJsonString());
+            continue;
+        }
+        loggers.push(logger);
+    }
+    return loggers;
+}
+
+# The loggers one MI runtime reports.
+isolated function fetchMILoggersByRuntime(types:Runtime runtime) returns MILoggerReport|error {
     MIAnswer answer = check miRead(runtime, mi_management:loggersPath());
     if answer.preparing {
         return {answer};
     }
-    types:MgmtLoggersResponse reported = check answer.body.cloneWithType();
-
-    log:printDebug("Successfully fetched loggers from MI management API",
-            runtimeId = runtimeId,
-            loggerCount = reported.count);
-
-    // Convert management API response to Logger type
     types:Logger[] loggers = [];
-    foreach types:MgmtLoggerInfo loggerInfo in reported.list {
-        types:LogLevel logLevel = check utils:toLogLevel(loggerInfo.level);
+    foreach types:MgmtLoggerInfo info in check reportedLoggers(answer.body) {
+        types:LogLevel|error level = utils:toLogLevel(info.level);
+        if level is error {
+            log:printWarn("Skipping a logger with a level the ICP does not know",
+                    loggerName = info.loggerName, logLevel = info.level);
+            continue;
+        }
         loggers.push({
-            loggerName: loggerInfo.loggerName,
-            componentName: loggerInfo.componentName,
-            logLevel: logLevel,
-            "runtimeId": runtimeId
+            loggerName: info.loggerName,
+            componentName: info.componentName,
+            logLevel: level,
+            "runtimeId": runtime.runtimeId
         });
     }
-
     return {loggers, answer};
 }
 
@@ -210,102 +326,67 @@ isolated function fetchBILoggersByRuntime(string runtimeId) returns types:Logger
     return loggers;
 }
 
-// Helper function to fetch MI loggers from management API for environment and component
+# Every replica's loggers, grouped by the logger they describe, or `()` while any replica
+# has not answered.
+#
+# Grouping is the backend's work, not the console's: what a user acts on is "this logger, on
+# these runtimes", and a console that had to assemble that would make MI's per-node payload
+# the contract. A runtime that fails is skipped, as it always was — one node being down does
+# not hide the rest. A runtime that is merely not ready yet holds the whole answer back,
+# because a group missing a replica would read as that replica not having the logger.
+#
+# Every replica is asked before that decision is taken. Returning at the first one that is
+# not ready would leave the others' fetches unstarted, so a component with N replicas would
+# take N heartbeats to show a page that should take one.
+isolated function fetchMILoggersByEnvironmentAndComponent(string environmentId, string componentId,
+        string projectId) returns MILoggerGroupReport|error {
+    types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, projectId, componentId);
+    map<types:LoggerGroup> groups = {};
+    boolean preparing = false;
+    boolean stale = false;
+
+    foreach types:Runtime runtime in runtimes {
+        MILoggerReport|error reported = fetchMILoggersByRuntime(runtime);
+        if reported is error {
+            log:printError("Failed to fetch loggers from runtime", reported,
+                    runtimeId = runtime.runtimeId);
+            continue;
+        }
+        if reported.answer.preparing {
+            preparing = true;
+            continue;
+        }
+        stale = stale || reported.answer.stale;
+        foreach types:Logger logger in reported.loggers {
+            string groupKey = string `${logger.loggerName ?: ""}|${logger.componentName}|${logger.logLevel}`;
+            types:LoggerGroup? group = groups[groupKey];
+            if group is types:LoggerGroup {
+                group.runtimeIds.push(runtime.runtimeId);
+                continue;
+            }
+            groups[groupKey] = {
+                loggerName: logger.loggerName,
+                componentName: logger.componentName,
+                logLevel: logger.logLevel,
+                logLevelInSync: true,
+                runtimeIds: [runtime.runtimeId]
+            };
+        }
+    }
+    if preparing {
+        return {state: stillFetching()};
+    }
+    return {
+        groups: groups.toArray(),
+        state: stale ? {stale: true, retryAfterMs: MI_STALE_RETRY_MS} : {}
+    };
+}
+
 # Every replica's loggers as one set of groups, and whether they are still settling.
 type MILoggerGroupReport record {|
     types:LoggerGroup[] groups = [];
     types:Fetchable state = {};
 |};
-
-isolated function fetchMILoggersByEnvironmentAndComponent(string environmentId, string componentId, string projectId) returns MILoggerGroupReport|error {
-    log:printDebug("Fetching loggers from MI management API for environment and component",
-            environmentId = environmentId,
-            componentId = componentId);
-
-    // Get all runtimes for this environment and component
-    types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, projectId, componentId);
-
-    if runtimes.length() == 0 {
-        log:printDebug("No runtimes found for environment and component", environmentId = environmentId, componentId = componentId);
-        return {};
-    }
-
-    // Map to group loggers by (loggerName, componentName) -> runtimeIds
-    map<types:LoggerGroup> loggerGroupMap = {};
-    boolean stale = false;
-
-    // Fetch loggers from each runtime
-    foreach types:Runtime runtime in runtimes {
-        MIAnswer|error answered = miRead(runtime, mi_management:loggersPath());
-
-        if answered is error {
-            log:printError("Failed to fetch loggers from runtime",
-                    runtimeId = runtime.runtimeId,
-                    'error = answered);
-            continue; // Skip this runtime and continue with others
-        }
-
-        // A replica that has not answered holds the whole page back: a group assembled
-        // without it would read as that replica not having the logger at all.
-        if answered.preparing {
-            return {state: stillFetching()};
-        }
-        stale = stale || answered.stale;
-
-        types:MgmtLoggersResponse|error reported = answered.body.cloneWithType();
-
-        if reported is error {
-            log:printError("Failed to read the loggers this runtime reported",
-                    runtimeId = runtime.runtimeId,
-                    'error = reported);
-            continue; // Skip this runtime and continue with others
-        }
-
-        // Process each logger from this runtime
-        foreach types:MgmtLoggerInfo loggerInfo in reported.list {
-            types:LogLevel|error logLevelResult = utils:toLogLevel(loggerInfo.level);
-            if logLevelResult is error {
-                log:printWarn("Invalid log level, skipping logger",
-                        loggerName = loggerInfo.loggerName,
-                        logLevel = loggerInfo.level,
-                        errorMsg = logLevelResult.message());
-                continue;
-            }
-
-            // Create a unique key for grouping (loggerName + componentName + logLevel)
-            string groupKey = loggerInfo.loggerName + "|" + loggerInfo.componentName + "|" + logLevelResult.toString();
-
-            if loggerGroupMap.hasKey(groupKey) {
-                // Logger already exists, add this runtime ID to the group
-                types:LoggerGroup existingGroup = loggerGroupMap.get(groupKey);
-                existingGroup.runtimeIds.push(runtime.runtimeId);
-            } else {
-                // Create new logger group
-                loggerGroupMap[groupKey] = {
-                    loggerName: loggerInfo.loggerName,
-                    componentName: loggerInfo.componentName,
-                    logLevel: logLevelResult,
-                    logLevelInSync: true,
-                    runtimeIds: [runtime.runtimeId]
-                };
-            }
-        }
-    }
-
-    // Convert map to array
-    types:LoggerGroup[] loggerGroups = loggerGroupMap.toArray();
-
-    log:printDebug("Successfully fetched and grouped MI loggers from multiple runtimes",
-            environmentId = environmentId,
-            componentId = componentId,
-            runtimeCount = runtimes.length(),
-            loggerGroupCount = loggerGroups.length());
-
-    return {
-        groups: loggerGroups,
-        state: stale ? {stale: true, retryAfterMs: MI_STALE_RETRY_MS} : {}
-    };
-}
 
 // Helper function: Update log level for BI runtimes (database + command queue)
 isolated function updateLogLevelBI(types:UserContextV2 userContext, types:UpdateLogLevelInput input) returns types:UpdateLogLevelResponse|error {
@@ -413,22 +494,22 @@ isolated function updateLogLevelMI(types:UserContextV2 userContext, types:Update
     map<boolean> processedComponents = {};
     record {|string envId; string envName; string runtimeId;|}[] pendingEvents = [];
 
-    // Build request - only include loggerClass if provided (for adding new logger)
-    // If loggerClass is not provided, we're updating an existing logger
+    // Only include loggerClass when adding a new logger; its presence is what tells MI which
+    // of the two this is.
     string? loggerClass = input?.loggerClass;
     json request = loggerClass is string && loggerClass.trim().length() > 0
         ? {loggerName, loggingLevel: logLevelStr, loggerClass}
         : {loggerName, loggingLevel: logLevelStr};
 
+    // Every replica is written to before any "not yet" is reported, so a component's
+    // writes all queue on the same heartbeat rather than one per round trip.
+    boolean preparing = false;
     foreach types:ValidatedRuntime validated in validatedRuntimes {
-        MIAnswer|error updateResult = miWrite(validated.runtime, http:PATCH,
+        MIAnswer|error updated = miWrite(validated.runtime, http:PATCH,
                 mi_management:loggersPath(), request, userContext, input?.requestId);
-
-        if updateResult is error {
-            log:printError("Failed to update logger on runtime",
-                    runtimeId = validated.runtimeId,
-                    loggerName = loggerName,
-                    'error = updateResult);
+        if updated is error {
+            log:printError("Failed to update logger on runtime", updated,
+                    runtimeId = validated.runtimeId, loggerName = loggerName);
             failureCount += 1;
             continue;
         }
@@ -438,7 +519,7 @@ isolated function updateLogLevelMI(types:UserContextV2 userContext, types:Update
         // poll wrote the same desired state fifteen times for one log level change.
         string envId = validated.runtime.environment.id;
         string key = validated.componentId + ":" + envId;
-        if updateResult.submitted && !processedComponents.hasKey(key) {
+        if updated.submitted && !processedComponents.hasKey(key) {
             types:ReconcileArtifactKey artifact = {artifactName: loggerName, artifactType: "mi-logger"};
             check storage:upsertReconcileDesiredState(validated.componentId, envId, artifact,
                     {"logLevel": logLevelStr});
@@ -446,25 +527,26 @@ isolated function updateLogLevelMI(types:UserContextV2 userContext, types:Update
             processedComponents[key] = true;
         }
 
-        if updateResult.preparing {
-            return {
-                ...stillFetching(),
-                success: false,
-                message: "Waiting for the runtime to confirm this change",
-                commandIds: []
-            };
+        if updated.preparing {
+            preparing = true;
+            continue;
         }
-
         log:printInfo("Successfully updated logger on runtime",
-                runtimeId = validated.runtimeId,
-                loggerName = loggerName,
-                logLevel = logLevelStr);
+                runtimeId = validated.runtimeId, loggerName = loggerName, logLevel = logLevelStr);
         successCount += 1;
         pendingEvents.push({
             envId: validated.runtime.environment.id,
             envName: validated.runtime.environment.name,
             runtimeId: validated.runtimeId
         });
+    }
+    if preparing {
+        return {
+            ...stillFetching(),
+            success: false,
+            message: "Waiting for the runtime to confirm this change",
+            commandIds: []
+        };
     }
 
     if successCount == 0 {
@@ -538,32 +620,32 @@ isolated function deleteLoggerMI(types:UserContextV2 userContext, types:DeleteLo
     log:printDebug("deleteLoggerMI: calling MI management API", loggerName = loggerName, validatedRuntimeCount = validatedRuntimes.length());
     int successCount = 0;
     int failureCount = 0;
-
     string loggerPath = check mi_management:loggerPath(loggerName);
 
+    boolean preparing = false;
     foreach types:ValidatedRuntime validated in validatedRuntimes {
-        MIAnswer|error deleteResult = miWrite(validated.runtime, http:DELETE, loggerPath, (),
+        MIAnswer|error deleted = miWrite(validated.runtime, http:DELETE, loggerPath, (),
                 userContext, input?.requestId);
-
-        if deleteResult is error {
-            log:printError("Failed to delete logger on runtime",
-                    runtimeId = validated.runtimeId,
-                    loggerName = loggerName,
-                    'error = deleteResult);
+        if deleted is error {
+            log:printError("Failed to delete logger on runtime", deleted,
+                    runtimeId = validated.runtimeId, loggerName = loggerName);
             failureCount += 1;
             continue;
         }
-        if deleteResult.preparing {
-            return {
-                ...stillFetching(),
-                success: false,
-                message: "Waiting for the runtime to confirm this change"
-            };
+        if deleted.preparing {
+            preparing = true;
+            continue;
         }
         log:printInfo("Successfully deleted logger on runtime",
-                runtimeId = validated.runtimeId,
-                loggerName = loggerName);
+                runtimeId = validated.runtimeId, loggerName = loggerName);
         successCount += 1;
+    }
+    if preparing {
+        return {
+            ...stillFetching(),
+            success: false,
+            message: "Waiting for the runtime to confirm this change"
+        };
     }
 
     if successCount == 0 {
@@ -1081,33 +1163,12 @@ service /graphql on graphqlListener {
         if trimmedAppName == "" {
             return error("App name must not be empty");
         }
-        types:UserContextV2 userContext = check extractUserContext(context);
-        log:printDebug("Fetching Composite App fault stack trace", userId = userContext.userId, runtimeId = runtimeId, appName = trimmedAppName);
-
-        types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-        if runtime is () {
-            log:printWarn("Runtime not found for Composite App fault stack trace query", userId = userContext.userId, runtimeId = runtimeId);
-            return error("Runtime not found");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(runtime.component.projectId, runtime.component.id, runtime.environment.id);
-
-        if !check auth:hasAnyPermission(userContext.userId, [auth:PERMISSION_INTEGRATION_VIEW, auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            log:printWarn("Attempt to access Composite App fault stack trace without permission", userId = userContext.userId, runtimeId = runtimeId, appName = trimmedAppName);
-            return error("Unauthorized");
-        }
-
-        if runtime.status != types:RUNNING {
-            log:printWarn("Runtime is not online for Composite App fault stack trace query", userId = userContext.userId, runtimeId = runtimeId, status = runtime.status);
-            return error("Runtime is not online");
-        }
-
+        types:Runtime runtime = check miRuntimeById(context, runtimeId, MI_VIEW_PERMISSIONS);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:compositeAppFaultPath(trimmedAppName));
         if answer.preparing {
             return {...stillFetching(), runtimeId, appName: trimmedAppName};
         }
-        log:printDebug("Successfully fetched Composite App fault stack trace", runtimeId = runtimeId, appName = trimmedAppName);
         return {
             ...fetchableOf(answer),
             runtimeId,
@@ -1121,33 +1182,12 @@ service /graphql on graphqlListener {
         if trimmedServiceName == "" {
             return error("Data service name must not be empty");
         }
-        types:UserContextV2 userContext = check extractUserContext(context);
-        log:printDebug("Fetching Data Service fault stack trace", userId = userContext.userId, runtimeId = runtimeId, serviceName = trimmedServiceName);
-
-        types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-        if runtime is () {
-            log:printWarn("Runtime not found for Data Service fault stack trace query", userId = userContext.userId, runtimeId = runtimeId);
-            return error("Runtime not found");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(runtime.component.projectId, runtime.component.id, runtime.environment.id);
-
-        if !check auth:hasAnyPermission(userContext.userId, [auth:PERMISSION_INTEGRATION_VIEW, auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            log:printWarn("Attempt to access Data Service fault stack trace without permission", userId = userContext.userId, runtimeId = runtimeId, serviceName = trimmedServiceName);
-            return error("Unauthorized");
-        }
-
-        if runtime.status != types:RUNNING {
-            log:printWarn("Runtime is not online for Data Service fault stack trace query", userId = userContext.userId, runtimeId = runtimeId, status = runtime.status);
-            return error("Runtime is not online");
-        }
-
+        types:Runtime runtime = check miRuntimeById(context, runtimeId, MI_VIEW_PERMISSIONS);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:dataServiceFaultPath(trimmedServiceName));
         if answer.preparing {
             return {...stillFetching(), runtimeId, serviceName: trimmedServiceName};
         }
-        log:printDebug("Successfully fetched Data Service fault stack trace", runtimeId = runtimeId, serviceName = trimmedServiceName);
         return {
             ...fetchableOf(answer),
             runtimeId,
@@ -1670,8 +1710,7 @@ service /graphql on graphqlListener {
         types:Logger[] result;
         types:Fetchable state = {};
         if componentType == types:MI {
-            // MI: Fetch loggers from management API
-            MILoggerReport reported = check fetchMILoggersByRuntime(runtimeId, runtime);
+            MILoggerReport reported = check fetchMILoggersByRuntime(runtime);
             if reported.answer.preparing {
                 return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
             }
@@ -1726,8 +1765,8 @@ service /graphql on graphqlListener {
         types:LoggerGroup[] result;
         types:Fetchable state = {};
         if componentType == types:MI {
-            // MI: Fetch loggers from management API for all runtimes
-            MILoggerGroupReport reported = check fetchMILoggersByEnvironmentAndComponent(environmentId, componentId, component.projectId);
+            MILoggerGroupReport reported =
+                check fetchMILoggersByEnvironmentAndComponent(environmentId, componentId, component.projectId);
             if reported.state.preparing {
                 return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
             }
@@ -1753,49 +1792,26 @@ service /graphql on graphqlListener {
 
     // Get log files for a specific runtime
     isolated resource function get logFilesByRuntime(graphql:Context context, string runtimeId, string? searchKey = (), types:PaginationInput? pagination = ()) returns types:LogFilesResponse|error {
-        types:UserContextV2 userContext = check extractUserContext(context);
-
-        // Fetch the runtime to get its context for authorization
-        types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-
+        types:Runtime? runtime = check miVisibleRuntime(context, runtimeId);
         if runtime is () {
-            log:printWarn("Runtime not found for log files query", userId = userContext.userId, runtimeId = runtimeId);
             return {count: 0, files: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
         }
-
-        // Build scope from runtime's context
-        types:AccessScope scope = auth:buildScopeFromContext(
-                runtime.component.projectId,
-                runtime.component.id,
-                runtime.environment.id
-        );
-
-        // Verify user has view, edit, or manage permission
-        if !check auth:hasAnyPermission(userContext.userId, [auth:PERMISSION_INTEGRATION_VIEW, auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            log:printWarn("Attempt to access runtime log files without permission", userId = userContext.userId, runtimeId = runtimeId);
-            return {count: 0, files: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
-        }
-
-        // Check if runtime is online
-        if runtime.status != types:RUNNING {
-            log:printWarn("Runtime is not online for log files query", userId = userContext.userId, runtimeId = runtimeId, status = runtime.status);
-            return error("Runtime is not online");
-        }
-
-        // Fetch log files from MI management API
         MIAnswer answer = check miRead(runtime, check mi_management:logFilesPath(searchKey));
         if answer.preparing {
             return {...stillFetching(), count: 0, files: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
         }
-        types:MgmtLogFilesResponse mgmtResponse = check answer.body.cloneWithType();
-
-        // Transform to GraphQL response format
-        types:LogFile[] logFiles = from var item in mgmtResponse.list
+        types:MgmtLogFilesResponse listing = check answer.body.cloneWithType();
+        types:LogFile[] logFiles = from var item in listing.list
             select {fileName: item.FileName, size: item.Size};
 
         int total = logFiles.length();
         [int, int, types:PageInfo] [sliceFrom, sliceTo, pageInfo] = buildPageResult(total, pagination);
-        return {...fetchableOf(answer), count: total, files: logFiles.slice(sliceFrom, sliceTo), pageInfo: pageInfo};
+        return {
+            ...fetchableOf(answer),
+            count: total,
+            files: logFiles.slice(sliceFrom, sliceTo),
+            pageInfo: pageInfo
+        };
     }
 
     // Get log file content for a specific runtime and file name
@@ -1816,10 +1832,6 @@ service /graphql on graphqlListener {
             log:printWarn("File name contains path traversal segment", userId = userContext.userId, runtimeId = runtimeId, fileName = fileName);
             return error("Invalid file name");
         }
-        if trimmedFileName.startsWith("/") {
-            log:printWarn("File name starts with absolute path marker", userId = userContext.userId, runtimeId = runtimeId, fileName = fileName);
-            return error("Invalid file name");
-        }
         // Check for Windows drive letters (e.g., "C:", "D:")
         if trimmedFileName.length() >= 2 && trimmedFileName[1] == ":" {
             string firstChar = trimmedFileName[0];
@@ -1829,34 +1841,8 @@ service /graphql on graphqlListener {
             }
         }
 
-        // Fetch the runtime to get its context for authorization
-        types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-
-        if runtime is () {
-            log:printWarn("Runtime not found for log file content query", userId = userContext.userId, runtimeId = runtimeId);
-            return error("Unable to retrieve log file content");
-        }
-
-        // Build scope from runtime's context
-        types:AccessScope scope = auth:buildScopeFromContext(
-                runtime.component.projectId,
-                runtime.component.id,
-                runtime.environment.id
-        );
-
-        // Verify user has view, edit, or manage permission
-        if !check auth:hasAnyPermission(userContext.userId, [auth:PERMISSION_INTEGRATION_VIEW, auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            log:printWarn("Attempt to access runtime log file content without permission", userId = userContext.userId, runtimeId = runtimeId, fileName = fileName);
-            return error("Unable to retrieve log file content");
-        }
-
-        // Check if runtime is online
-        if runtime.status != types:RUNNING {
-            log:printWarn("Runtime is not online for log file content query", userId = userContext.userId, runtimeId = runtimeId, status = runtime.status);
-            return error("Runtime is not online");
-        }
-
-        // Fetch log file content from MI management API
+        types:Runtime runtime = check miRuntimeById(context, runtimeId, MI_VIEW_PERMISSIONS,
+                "Unable to retrieve log file content");
         return fetchableText(check miRead(runtime,
                 check mi_management:logFilePath(trimmedFileName)));
     }
@@ -1869,7 +1855,8 @@ service /graphql on graphqlListener {
         if answer.preparing {
             return {...stillFetching()};
         }
-        types:RegistryDirectoryResponse listing = check mi_management:registryDirectory(answer.body);
+        types:RegistryDirectoryResponse listing =
+            check mi_management:registryDirectory(answer.body);
         return {...fetchableOf(answer), count: listing.count, items: listing.items};
     }
 
@@ -1888,7 +1875,8 @@ service /graphql on graphqlListener {
         if answer.preparing {
             return {...stillFetching()};
         }
-        types:RegistryResourceMetadata metadata = check mi_management:registryMetadata(answer.body);
+        types:RegistryResourceMetadata metadata =
+            check mi_management:registryMetadata(answer.body);
         return {...fetchableOf(answer), name: metadata.name, mediaType: metadata.mediaType};
     }
 
@@ -1900,8 +1888,13 @@ service /graphql on graphqlListener {
         if answer.preparing {
             return {...stillFetching()};
         }
-        types:RegistryPropertiesResponse described = check mi_management:registryProperties(answer.body);
-        return {...fetchableOf(answer), count: described.count, properties: described.properties};
+        types:RegistryPropertiesResponse described =
+            check mi_management:registryProperties(answer.body);
+        return {
+            ...fetchableOf(answer),
+            count: described.count,
+            properties: described.properties
+        };
     }
 
     // Delete a runtime by ID
@@ -3487,37 +3480,8 @@ service /graphql on graphqlListener {
             string? packageName = (),
             string? templateType = ()
     ) returns types:FetchableText|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
-
-        // Extract user context for RBAC
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        // Get component to verify access
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        // Verify user has the permisions
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId,
-                ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        // Get runtimes and select one using shared helper
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        // Fetch artifact metadata via MI Management API (/management/...)
-        log:printDebug("Fetching artifact details via MI management API",
-                runtimeId = runtime.runtimeId,
-                artifactType = artifactType,
-                artifactName = artifactName
-        );
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(artifactType, artifactName, templateType));
         return answer.preparing
@@ -3536,74 +3500,31 @@ service /graphql on graphqlListener {
             string? runtimeId = (),
             string? packageName = ()
     ) returns types:FetchableText|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
 
-        // Extract user context for RBAC
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        // Get component to verify access
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        // Verify user has the permissions
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId,
-                ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        // Get runtimes for this component (optionally filtered by environment if environmentId !is ())
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-        if runtimes.length() == 0 {
-            return error("No runtimes found for this component");
-        }
-
-        // Select runtime using shared helper
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        log:printDebug("Fetching artifact WSDL via MI management API",
-                runtimeId = runtime.runtimeId,
-                artifactType = artifactType,
-                artifactName = artifactName);
-
-        // Step 1: Retrieve the WSDL URL from the MI Management API
-        // (management API returns wsdl1_1 / wsdl2_0 URLs, not the WSDL content directly)
+        // The management API reports the WSDL's URL, not its content, so this takes two
+        // steps — and the second is not a management call at all: the URL is on MI's service
+        // port, which the ICP dials directly whichever way the first step was served.
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_PROXY_SERVICE, artifactName));
         if answer.preparing {
             return {...stillFetching()};
         }
-        types:MgmtProxyServiceInfo fetchProxyServiceArtifact = check answer.body.cloneWithType();
-        string? wsdlUrl = fetchProxyServiceArtifact?.wsdl1_1;
-        log:printDebug("Retrieved WSDL URL from MI management API",
-                runtimeId = runtime.runtimeId,
-                artifactType = artifactType,
-                artifactName = artifactName,
-                wsdlUrl = wsdlUrl);
+        types:MgmtProxyServiceInfo proxyService = check answer.body.cloneWithType();
+        string? wsdlUrl = proxyService?.wsdl1_1;
         if wsdlUrl is () {
             return error("WSDL URL not found for this artifact");
         }
-
-        // Step 2: Fetch the actual WSDL XML content from the URL
-        // The WSDL URL is typically on the MI HTTP service port (e.g. :8290), not the management port
-        // Pass the trusted runtime hostname for validation (SSRF protection)
         string trustedHost = runtime.managementHostname ?: "";
         if trustedHost == "" {
             return error("Runtime management hostname is not set");
         }
-        string wsdlXml = check mi_management:fetchWsdlContent(wsdlUrl, trustedHost, artifactsApiAllowInsecureTLS);
-
-        log:printDebug("Successfully fetched artifact WSDL via MI management API",
-                runtimeId = runtime.runtimeId,
-                artifactType = artifactType,
-                artifactName = artifactName,
-                wsdlLength = wsdlXml.length());
-        return {...fetchableOf(answer), content: wsdlXml};
+        return {
+            ...fetchableOf(answer),
+            content: check mi_management:fetchWsdlContent(wsdlUrl, trustedHost,
+                    artifactsApiAllowInsecureTLS)
+        };
     }
 
     // Get Local Entry value from a runtime's management API via ICP internal API
@@ -3614,52 +3535,15 @@ service /graphql on graphqlListener {
             string? environmentId = (),
             string? runtimeId = ()
     ) returns types:FetchableText|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
-
-        // Extract user context for RBAC
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        // Get component to verify access
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        // Verify user has the permissions
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId,
-                ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        // Get runtimes for this component (optionally filtered by environment if environmentId !is ())
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-
-        if runtimes.length() == 0 {
-            return error("No runtimes found for this component");
-        }
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        log:printDebug("Fetching local entry info via MI management API",
-                runtimeId = runtime.runtimeId,
-                entryName = entryName);
-
-        // Fetch local entry info via MI Management API (/management/local-entries?name=...)
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_LOCAL_ENTRY, entryName));
         if answer.preparing {
             return {...stillFetching()};
         }
-        types:MgmtLocalEntryInfo entryInfo = check answer.body.cloneWithType();
-        log:printDebug("Successfully fetched local entry info from MI management API",
-                runtimeId = runtime.runtimeId,
-                entryName = entryInfo.name,
-                entryType = entryInfo.'type);
-
-        return {...fetchableOf(answer), content: entryInfo.value};
+        types:MgmtLocalEntryInfo entry = check answer.body.cloneWithType();
+        return {...fetchableOf(answer), content: entry.value};
     }
 
     // Get Parameters for any artifact type from management API via ICP internal API
@@ -3672,99 +3556,34 @@ service /graphql on graphqlListener {
             string? runtimeId = (),
             string? packageName = ()
         ) returns types:FetchableParameters|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
-
-        // Extract user context for RBAC
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        // Get component to verify access
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        // Verify user has the permissions
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId, ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        // Get runtimes for this component (optionally filtered by environment if environmentId !is ())
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-        if runtimes.length() == 0 {
-            return error("No runtimes found for this component");
-        }
-
-        // Select runtime using shared helper
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        log:printDebug("Fetching artifact parameters via MI management API",
-                runtimeId = runtime.runtimeId,
-                artifactType = artifactType,
-                artifactName = artifactName);
-
         // Only these three keep parameters, and each keeps them somewhere else. For any
-        // other type there is nothing to ask the runtime for.
+        // other type there is nothing to ask the runtime for, so the panel shows an empty
+        // tab rather than an error about a type the management API would refuse.
         if artifactType != mi_management:ARTIFACT_TYPE_INBOUND_ENDPOINT
                 && artifactType != mi_management:ARTIFACT_TYPE_MESSAGE_PROCESSOR
                 && artifactType != mi_management:ARTIFACT_TYPE_DATA_SOURCE {
             return {};
         }
-
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(artifactType, artifactName));
         if answer.preparing {
             return {...stillFetching()};
         }
-
-        // Fetch artifact and extract parameters based on artifact type
-        types:Parameter[] params = [];
-
         if artifactType == mi_management:ARTIFACT_TYPE_INBOUND_ENDPOINT {
-            types:MgmtInboundEndpointInfo inboundInfo = check answer.body.cloneWithType();
-            // Append parameters from the management API response
-            params = inboundInfo.parameters ?: [];
-        } else if artifactType == mi_management:ARTIFACT_TYPE_MESSAGE_PROCESSOR {
-            types:MgmtMessageProcessorInfo processorInfo = check answer.body.cloneWithType();
-
-            // Append parameters from the map
-            map<string>? parameters = processorInfo.parameters;
-            if parameters is map<string> {
-                foreach var [key, value] in parameters.entries() {
-                    params.push({name: key, value: value});
-                }
-            }
-        } else {
-            types:MgmtDataSourceInfo dataSourceInfo = check answer.body.cloneWithType();
-
-            // Append configuration parameters from the management API response
-            map<json>? configParams = dataSourceInfo.configurationParameters;
-            log:printDebug("Data source configurationParameters check",
-                    artifactName = artifactName,
-                    hasConfigParams = configParams is map<json>,
-                    configParamsValue = configParams);
-
-            if configParams is map<json> {
-                log:printDebug("Adding data source configuration parameters",
-                        artifactName = artifactName,
-                        parameterCount = configParams.length());
-                foreach var [key, value] in configParams.entries() {
-                    params.push({name: key, value: value.toString()});
-                }
-            }
+            types:MgmtInboundEndpointInfo inbound = check answer.body.cloneWithType();
+            return {...fetchableOf(answer), parameters: inbound.parameters ?: []};
         }
-        // Add more artifact types here as needed
-
-        log:printDebug("Successfully fetched artifact parameters from MI management API",
-                runtimeId = runtime.runtimeId,
-                artifactType = artifactType,
-                artifactName = artifactName,
-                paramCount = params.length());
-
-        return {...fetchableOf(answer), parameters: params};
+        if artifactType == mi_management:ARTIFACT_TYPE_MESSAGE_PROCESSOR {
+            types:MgmtMessageProcessorInfo processor = check answer.body.cloneWithType();
+            return {...fetchableOf(answer), parameters: namedValues(processor.parameters ?: {})};
+        }
+        types:MgmtDataSourceInfo dataSource = check answer.body.cloneWithType();
+        return {
+            ...fetchableOf(answer),
+            parameters: namedValues(dataSource.configurationParameters ?: {})
+        };
     }
 
     // Get overview metadata for a data source from the MI Management API.
@@ -3776,65 +3595,25 @@ service /graphql on graphqlListener {
             string? environmentId = (),
             string? runtimeId = ()
         ) returns types:FetchableParameters|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
-
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId, ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-        if runtimes.length() == 0 {
-            return error("No runtimes found for this component");
-        }
-
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        log:printDebug("Fetching data source overview via MI management API",
-                runtimeId = runtime.runtimeId,
-                dataSourceName = dataSourceName);
-
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_DATA_SOURCE, dataSourceName));
         if answer.preparing {
             return {...stillFetching()};
         }
         types:MgmtDataSourceInfo overview = check answer.body.cloneWithType();
-
-        types:Parameter[] result = [];
-        result.push({name: "name", value: overview.name});
-        if overview.'type is string {
-            result.push({name: "type", value: <string>overview.'type});
-        }
-        if overview.description is string {
-            result.push({name: "description", value: <string>overview.description});
-        }
-        if overview.driverClass is string {
-            result.push({name: "driverClass", value: <string>overview.driverClass});
-        }
-        if overview.userName is string {
-            result.push({name: "userName", value: <string>overview.userName});
-        }
-        if overview.url is string {
-            result.push({name: "url", value: <string>overview.url});
-        }
-
-        log:printDebug("Successfully fetched data source overview from MI management API",
-                runtimeId = runtime.runtimeId,
-                dataSourceName = dataSourceName,
-                totalParamCount = result.length());
-
-        return {...fetchableOf(answer), parameters: result};
+        return {
+            ...fetchableOf(answer),
+            parameters: presentValues([
+                ["name", overview.name],
+                ["type", overview.'type],
+                ["description", overview.description],
+                ["driverClass", overview.driverClass],
+                ["userName", overview.userName],
+                ["url", overview.url]
+            ])
+        };
     }
 
     // Get overview metadata for a message store: name, type, container, size.
@@ -3845,53 +3624,23 @@ service /graphql on graphqlListener {
             string? environmentId = (),
             string? runtimeId = ()
         ) returns types:FetchableParameters|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
-
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId, ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-        if runtimes.length() == 0 {
-            return error("No runtimes found for this component");
-        }
-
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        log:printDebug("Fetching message store overview via MI management API",
-                runtimeId = runtime.runtimeId,
-                storeName = storeName);
-
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_MESSAGE_STORE, storeName));
         if answer.preparing {
             return {...stillFetching()};
         }
         types:MgmtMessageStoreInfo overview = check answer.body.cloneWithType();
-
-        types:Parameter[] result = [];
-        result.push({name: "name", value: overview.name});
-        if overview.'type is string {
-            result.push({name: "type", value: <string>overview.'type});
-        }
-        if overview.container is string {
-            result.push({name: "container", value: <string>overview.container});
-        }
-        if overview.size is int {
-            result.push({name: "size", value: (<int>overview.size).toString()});
-        }
-        return {...fetchableOf(answer), parameters: result};
+        return {
+            ...fetchableOf(answer),
+            parameters: presentValues([
+                ["name", overview.name],
+                ["type", overview.'type],
+                ["container", overview.container],
+                ["size", overview.size]
+            ])
+        };
     }
 
     // Get overview metadata for a message processor: name, type, messageStore, status.
@@ -3902,53 +3651,23 @@ service /graphql on graphqlListener {
             string? environmentId = (),
             string? runtimeId = ()
         ) returns types:FetchableParameters|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
-
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId, ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-        if runtimes.length() == 0 {
-            return error("No runtimes found for this component");
-        }
-
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        log:printDebug("Fetching message processor overview via MI management API",
-                runtimeId = runtime.runtimeId,
-                processorName = processorName);
-
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_MESSAGE_PROCESSOR, processorName));
         if answer.preparing {
             return {...stillFetching()};
         }
         types:MgmtMessageProcessorInfo overview = check answer.body.cloneWithType();
-
-        types:Parameter[] result = [];
-        result.push({name: "name", value: overview.name});
-        if overview.'type is string {
-            result.push({name: "type", value: <string>overview.'type});
-        }
-        if overview.messageStore is string {
-            result.push({name: "messageStore", value: <string>overview.messageStore});
-        }
-        if overview.status is string {
-            result.push({name: "status", value: <string>overview.status});
-        }
-        return {...fetchableOf(answer), parameters: result};
+        return {
+            ...fetchableOf(answer),
+            parameters: presentValues([
+                ["name", overview.name],
+                ["type", overview.'type],
+                ["messageStore", overview.messageStore],
+                ["status", overview.status]
+            ])
+        };
     }
 
     // Get structured overview for a data service: dataSources, queries, resources, operations.
@@ -3959,34 +3678,8 @@ service /graphql on graphqlListener {
             string? environmentId = (),
             string? runtimeId = ()
         ) returns types:FetchableDataService|error {
-        value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
-        if authHeader !is string {
-            return error("Authorization header missing in request");
-        }
-
-        types:UserContextV2 userContext = check auth:extractUserContextV2(authHeader);
-
-        types:Component? component = check storage:getComponentById(componentId);
-        if component is () {
-            return error("Integration not found");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(component.projectId, integrationId = componentId, envId = environmentId);
-        if !check auth:hasAnyPermission(userContext.userId, ["integration_mgt:view", "integration_mgt:edit", "integration_mgt:manage"], scope) {
-            return error("Insufficient permissions to view component artifacts");
-        }
-
-        types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
-        if runtimes.length() == 0 {
-            return error("No runtimes found for this component");
-        }
-
-        types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-
-        log:printDebug("Fetching data service overview via MI management API",
-                runtimeId = runtime.runtimeId,
-                dataServiceName = dataServiceName);
-
+        types:Runtime runtime =
+            check miRuntimeOfComponent(context, componentId, environmentId, runtimeId);
         MIAnswer answer = check miRead(runtime,
                 check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_DATA_SERVICE, dataServiceName));
         if answer.preparing {
@@ -4002,108 +3695,73 @@ service /graphql on graphqlListener {
     // MI Runtime User Management
     // ============================================================
 
+    // Listing a runtime's accounts takes edit rights, not view: who can log in to a
+    // production runtime is not a view-level fact.
     isolated resource function get getMIUsers(graphql:Context context, string componentId, string runtimeId, types:PaginationInput? pagination = ()) returns types:MIUsersPage|error {
-        types:UserContextV2 userContext = check extractUserContext(context);
-
-        types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-        if runtime is () {
-            return error("Runtime not found");
-        }
-        if runtime.component.id != componentId {
-            return error("Runtime does not belong to the specified integration");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(runtime.component.projectId, integrationId = componentId, envId = runtime.environment.id);
-        if !check auth:hasAnyPermission(userContext.userId,
-                [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            return error("Insufficient permissions to view MI users");
-        }
-
-        log:printDebug("Fetching MI users from runtime management API", runtimeId = runtimeId);
+        types:Runtime runtime = check miRuntimeOfIntegration(context, componentId, runtimeId,
+                [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE],
+                "Insufficient permissions to view MI users");
 
         MIAnswer listed = check miRead(runtime, mi_management:usersPath());
         if listed.preparing {
             return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
         }
-
         json[] userList = [];
-        json|error listField = listed.body.list;
-        if listField is json[] {
-            userList = listField;
+        json|error list = listed.body.list;
+        if list is json[] {
+            userList = list;
         }
 
-        // Paginate before enrichment to avoid N HTTP calls for all users when only a page is needed
-        int total = userList.length();
-        [int, int, types:PageInfo] [sliceFrom, sliceTo, pageInfo] = buildPageResult(total, pagination);
-        json[] pageUsers = userList.slice(sliceFrom, sliceTo);
+        // Paginate before enrichment: whether a user is an admin takes a call of its own, so
+        // a page of ten must not cost a call per account in the store.
+        [int, int, types:PageInfo] [sliceFrom, sliceTo, pageInfo] =
+            buildPageResult(userList.length(), pagination);
 
-        // Whether an account is an admin takes a call of its own, so a page costs a call per
-        // user. Every one of them is asked before any "not yet" is reported: returning at the
-        // first unready account would leave the rest unqueued, and a page of ten would then
-        // take ten heartbeats to fill instead of one.
-        types:MIUser[] enrichedUsers = [];
+        // Every account on the page is asked before any "not yet" is reported: returning at
+        // the first unready one would leave the rest unqueued, and a page of ten would take
+        // ten heartbeats to fill instead of one.
+        types:MIUser[] users = [];
         boolean preparing = false;
-        foreach json u in pageUsers {
-            json|error userIdJson = u.userId;
-            if userIdJson is error {
+        foreach json account in userList.slice(sliceFrom, sliceTo) {
+            json|error userId = account.userId;
+            if userId is error {
                 continue;
             }
-            string userIdStr = userIdJson.toString();
-
-            string username = userIdStr;
-            string domain = "primary";
-            int? slashIdx = userIdStr.indexOf("/");
-            if slashIdx is int {
-                domain = userIdStr.substring(0, slashIdx);
-                username = userIdStr.substring(slashIdx + 1);
-            }
+            // MI qualifies a non-primary account as `domain/username`.
+            string qualified = userId.toString();
+            int? separator = qualified.indexOf("/");
+            string domain = separator is int ? qualified.substring(0, separator) : "primary";
+            string username = separator is int ? qualified.substring(separator + 1) : qualified;
 
             // One account the runtime will not describe costs that account its admin flag,
             // not everyone else their row: MI answers 404 for an account its list names but
             // its configured store cannot read back, and a page that hides admin, alice and
             // carol because bob is unreadable tells the operator nothing they can act on.
-            boolean isAdmin = false;
-            MIAnswer|error detail = miRead(runtime, check mi_management:userPath(userIdStr));
+            MIAnswer|error detail = miRead(runtime, check mi_management:userPath(qualified));
             if detail is error {
                 log:printWarn("Listing an MI user whose details the runtime would not give",
                         detail, runtimeId = runtimeId, username = username);
-                enrichedUsers.push({username, domain, isAdmin});
+                users.push({username, domain, isAdmin: false});
                 continue;
             }
             if detail.preparing {
                 preparing = true;
                 continue;
             }
-            json|error isAdminField = detail.body.isAdmin;
-            if isAdminField is boolean {
-                isAdmin = isAdminField;
-            }
-            enrichedUsers.push({username, domain, isAdmin});
+            json|error isAdmin = detail.body.isAdmin;
+            users.push({username, domain, isAdmin: isAdmin is boolean && isAdmin});
         }
         if preparing {
             return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
         }
-
-        log:printDebug("Successfully fetched MI users from runtime", runtimeId = runtimeId, userCount = enrichedUsers.length());
-        return {...fetchableOf(listed), items: enrichedUsers, pageInfo};
+        return {...fetchableOf(listed), items: users, pageInfo};
     }
 
     isolated remote function addMIUser(graphql:Context context, string componentId, string runtimeId, string username, string password, boolean isAdmin = false, string domain = "primary", string? requestId = ()) returns types:MIUserOperationResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
-
-        types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-        if runtime is () {
-            return error("Runtime not found");
-        }
-        if runtime.component.id != componentId {
-            return error("Runtime does not belong to the specified integration");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(runtime.component.projectId, integrationId = componentId, envId = runtime.environment.id);
-        if !check auth:hasAnyPermission(userContext.userId,
-                [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            return error("Insufficient permissions to create MI users");
-        }
+        types:Runtime runtime = check miRuntimeOfIntegration(context, componentId, runtimeId,
+                [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE],
+                "Insufficient permissions to create MI users");
 
         if username.trim().length() == 0 {
             return error("username must be a non-empty string");
@@ -4111,8 +3769,6 @@ service /graphql on graphqlListener {
         if password.trim().length() == 0 {
             return error("password must be a non-empty string");
         }
-
-        log:printInfo("Creating MI user on runtime management API", runtimeId = runtimeId, username = username, isAdmin = isAdmin, domain = domain);
 
         MIAnswer created = check miWrite(runtime, http:POST, mi_management:usersPath(),
                 {userId: username, password, isAdmin, domain}, userContext, requestId);
@@ -4128,27 +3784,14 @@ service /graphql on graphqlListener {
 
     isolated remote function deleteMIUser(graphql:Context context, string componentId, string runtimeId, string username, string domain = "primary", string? requestId = ()) returns types:MIUserOperationResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
-
-        types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
-        if runtime is () {
-            return error("Runtime not found");
-        }
-        if runtime.component.id != componentId {
-            return error("Runtime does not belong to the specified integration");
-        }
-
-        types:AccessScope scope = auth:buildScopeFromContext(runtime.component.projectId, integrationId = componentId, envId = runtime.environment.id);
-        if !check auth:hasAnyPermission(userContext.userId,
-                [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE], scope) {
-            return error("Insufficient permissions to delete MI users");
-        }
+        types:Runtime runtime = check miRuntimeOfIntegration(context, componentId, runtimeId,
+                [auth:PERMISSION_INTEGRATION_EDIT, auth:PERMISSION_INTEGRATION_MANAGE],
+                "Insufficient permissions to delete MI users");
 
         string trimmedUsername = username.trim();
         if trimmedUsername.length() == 0 {
             return error("username must be a non-empty string");
         }
-
-        log:printInfo("Deleting MI user on runtime management API", runtimeId = runtimeId, username = trimmedUsername, domain = domain);
 
         MIAnswer deleted = check miWrite(runtime, http:DELETE,
                 check mi_management:userPath(trimmedUsername, domain), (),

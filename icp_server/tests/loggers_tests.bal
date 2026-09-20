@@ -14,6 +14,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+import icp_server.types;
+
 import ballerina/test;
 
 // =============================================================================
@@ -191,4 +193,41 @@ function testLoggersByRuntimeProjectScopedUser() returns error? {
     int total = check (check (check page.pageInfo).total).ensureType();
 
     test:assertEquals(items.length(), total, "items count should match total");
+}
+
+// =============================================================================
+// Test 6: one logger the runtime described incompletely does not hide the rest
+// =============================================================================
+// MI answered /management/logging with an entry carrying neither name, seconds after a
+// level change, and the whole page went to "No loggers found" until something refetched
+// it. The list is projected entry by entry so that a bad entry costs one row.
+
+@test:Config {
+    groups: ["loggers-graphql"]
+}
+function testAnIncompleteLoggerEntryCostsOnlyItself() returns error? {
+    json answer = {
+        count: 3,
+        list: [
+            {level: "INFO", componentName: "root", loggerName: "rootLogger"},
+            {level: "DEBUG"},
+            {level: "ERROR", componentName: "com.hazelcast", loggerName: "com-hazelcast"}
+        ]
+    };
+
+    types:MgmtLoggerInfo[] reported = check reportedLoggers(answer);
+
+    test:assertEquals(reported.length(), 2, "the two complete entries should survive");
+    test:assertEquals(reported[0].loggerName, "rootLogger");
+    test:assertEquals(reported[1].loggerName, "com-hazelcast");
+}
+
+@test:Config {
+    groups: ["loggers-graphql"]
+}
+function testAnAnswerWithoutAListIsAnError() returns error? {
+    // Distinct from the above: nothing was reported at all, which is the runtime failing
+    // to answer rather than one logger being unreadable, and the caller must hear about it.
+    types:MgmtLoggerInfo[]|error reported = reportedLoggers({count: 0});
+    test:assertTrue(reported is error, "an answer with no list should not read as no loggers");
 }

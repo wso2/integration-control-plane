@@ -177,6 +177,63 @@ type Query {
   logFilesByRuntime(runtimeId: String!, searchKey: String, pagination: PaginationInput): LogFilesResponse!
   logFileContent(runtimeId: String!, fileName: String!): FetchableText!
 
+  # MI Artifact Queries — the deployed configuration, read from the runtime
+  artifactSourceByComponent(
+    componentId: String!
+    artifactType: String!
+    artifactName: String!
+    environmentId: String
+    runtimeId: String
+    packageName: String
+    templateType: String
+  ): FetchableText!
+  artifactWsdlByComponent(
+    componentId: String!
+    artifactType: String!
+    artifactName: String!
+    environmentId: String
+    runtimeId: String
+    packageName: String
+  ): FetchableText!
+  localEntryValueByComponent(
+    componentId: String!
+    entryName: String!
+    environmentId: String
+    runtimeId: String
+  ): FetchableText!
+  artifactParametersByComponent(
+    componentId: String!
+    artifactType: String!
+    artifactName: String!
+    environmentId: String
+    runtimeId: String
+    packageName: String
+  ): FetchableParameters!
+  dataSourceOverviewByComponent(
+    componentId: String!
+    dataSourceName: String!
+    environmentId: String
+    runtimeId: String
+  ): FetchableParameters!
+  messageStoreOverviewByComponent(
+    componentId: String!
+    storeName: String!
+    environmentId: String
+    runtimeId: String
+  ): FetchableParameters!
+  messageProcessorOverviewByComponent(
+    componentId: String!
+    processorName: String!
+    environmentId: String
+    runtimeId: String
+  ): FetchableParameters!
+  dataServiceOverviewByComponent(
+    componentId: String!
+    dataServiceName: String!
+    environmentId: String
+    runtimeId: String
+  ): FetchableDataService!
+
   # MI Runtime User Management Queries
   getMIUsers(componentId: String!, runtimeId: String!, pagination: PaginationInput): MIUsersPage!
   # Registry Resource Browser Queries
@@ -423,6 +480,20 @@ type FetchableText {
   stale: Boolean!
   retryAfterMs: Int!
   content: String!
+}
+
+type FetchableParameters {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
+  parameters: [Parameter!]!
+}
+
+type FetchableDataService {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
+  dataService: MgmtDataServiceInfo
 }
 
 # ============================================
@@ -891,9 +962,9 @@ type MgmtDataServiceOperation {
 }
 
 # ============================================
-# MgmtDataServiceOverview Type - Data Service Overview
+# MgmtDataServiceInfo Type - Data Service Overview
 # ============================================
-type MgmtDataServiceOverview {
+type MgmtDataServiceInfo {
   serviceName: String!
   serviceDescription: String
   wsdl1_1: String
@@ -903,6 +974,8 @@ type MgmtDataServiceOverview {
   queries: [MgmtDataServiceQuery!]!
   resources: [MgmtDataServiceResource!]!
   operations: [MgmtDataServiceOperation!]!
+  configuration: String
+  serviceGroupName: String
 }
 
 # ============================================
