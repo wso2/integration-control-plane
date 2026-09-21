@@ -646,7 +646,7 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
             ? existingById.status : ();
 
     if isNewRegistration {
-        record {|string runtime_id;|}|sql:Error existingByName;
+        record {|string runtime_id; string status;|}|sql:Error existingByName;
         if runtimeName is string {
             // Deliberately not restricted to OFFLINE. uq_runtime_identity already forbids two live
             // runtimes from sharing a non-null name, so a row holding this name under a different
@@ -654,7 +654,7 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
             // restart quicker than heartbeatTimeoutSeconds: the superseded row is still RUNNING,
             // the cleanup below skips it, and the INSERT collides with the constraint.
             existingByName = dbClient->queryRow(`
-                SELECT runtime_id FROM runtimes
+                SELECT runtime_id, status FROM runtimes
                 WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name = ${runtimeName}
             `);
         } else {
@@ -662,7 +662,7 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
             // so sibling replicas in a multi-replica deployment genuinely can coexist here. OFFLINE
             // is what keeps them from deleting one another, and has to stay on this branch.
             existingByName = dbClient->queryRow(`
-                SELECT runtime_id FROM runtimes
+                SELECT runtime_id, status FROM runtimes
                 WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name IS NULL AND status = 'OFFLINE'
             `);
         }
@@ -670,17 +670,19 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
             return existingByName;
         }
 
-        if existingByName is record {|string runtime_id;|} {
+        if existingByName is record {|string runtime_id; string status;|} {
             string oldId = existingByName.runtime_id;
             if oldId != runtimeId {
                 log:printInfo(string `Runtime ID changed from ${oldId} to ${runtimeId} for ${runtimeName ?: "null"}`);
                 check deleteExistingArtifacts(oldId);
                 check deleteReconcileRuntime(oldId);
-                if runtimeName is string {
-                    // Keep the predecessor as a tombstone; see retireSupersededRuntime.
+                if runtimeName is string && existingByName.status != "OFFLINE" {
+                    // The predecessor was still reporting itself as running, so it may yet send
+                    // another heartbeat. Keep it as a tombstone; see retireSupersededRuntime.
                     check retireSupersededRuntime(oldId, heartbeat.component, heartbeat.environment);
                 } else {
-                    // An unnamed row contends for no name, so nothing has to be remembered.
+                    // Nothing has to be remembered: an unnamed row contends for no name, and an
+                    // OFFLINE one has already been silent for longer than heartbeatTimeoutSeconds.
                     log:printDebug(string `Deleting old runtime ${oldId} via reconcile cleanup flow`);
                     check deleteRuntime(oldId);
                 }
