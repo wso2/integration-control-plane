@@ -589,9 +589,10 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
     // Bare, reachable host/IP for this runtime process (optional; NULL when absent) - used by the Try-It proxy
     string? tryItHost = heartbeat?.tryItHost;
 
-    // Check if a stale OFFLINE runtime with the same component/env/name but different ID exists.
-    // Restricting to OFFLINE prevents live sibling replicas in multi-replica deployments from
-    // being mistakenly treated as "old restarted instances" and deleted.
+    // Check whether some other row already holds this runtime's identity
+    // (component_id, environment_id, name) under a different runtime ID, and clear it out before
+    // the upsert below. A restarted runtime normally arrives with a fresh ID, because a container
+    // loses the persisted one along with its filesystem.
     //
     // queryRow, deliberately: this lookup expects at most one row, and a `query` stream that
     // errors mid-consumption is abandoned without being closed — its pooled connection is
@@ -607,11 +608,20 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
     // erased the row type to `record {}` would only move the cast to every call site.
     record {|string runtime_id;|}|sql:Error existingByName;
     if runtimeName is string {
+        // Deliberately not restricted to OFFLINE. uq_runtime_identity already forbids two live
+        // runtimes from sharing a non-null name, so a row holding this name under a different ID
+        // can only be this runtime's own previous instance, never a sibling replica. Matching
+        // OFFLINE rows only would strand any restart quicker than heartbeatTimeoutSeconds: the
+        // superseded row is still RUNNING, the cleanup below skips it, and the INSERT collides
+        // with the constraint.
         existingByName = dbClient->queryRow(`
             SELECT runtime_id FROM runtimes
-            WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name = ${runtimeName} AND status = 'OFFLINE'
+            WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name = ${runtimeName}
         `);
     } else {
+        // Unnamed runtimes are outside uq_runtime_identity, because NULLs compare as distinct, so
+        // sibling replicas in a multi-replica deployment genuinely can coexist here. OFFLINE is
+        // what keeps them from deleting one another, and has to stay on this branch.
         existingByName = dbClient->queryRow(`
             SELECT runtime_id FROM runtimes
             WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name IS NULL AND status = 'OFFLINE'

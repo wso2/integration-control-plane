@@ -258,6 +258,47 @@ function testVmRestartCleansUpOfflineRecord() returns error? {
     cleanupRuntime(HB_RESTART_NEW_ID);
 }
 
+// =============================================================================
+// Test 4: fast restart — the superseded record is still RUNNING
+//
+// A runtime replaced quicker than heartbeatTimeoutSeconds (a rolling update, an eviction, a
+// reschedule, or any container that lost its persisted runtime ID) comes back under a fresh
+// UUID while its previous row is still RUNNING. Matching only OFFLINE rows left that row in
+// place, so the INSERT violated uq_runtime_identity and the heartbeat was rejected.
+//
+// Reclaiming the name is safe here: the constraint guarantees no live sibling holds it. The
+// null-name replica tests above cover the case where siblings genuinely can, and that branch
+// keeps its OFFLINE guard.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testFastRestartReplacesRunningRecord() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+
+    // Old instance registers and stays RUNNING — it is never marked OFFLINE, because the
+    // replacement comes up well inside the heartbeat timeout.
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    types:Runtime? seeded = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertNotEquals(seeded, (), "Old runtime should be seeded as RUNNING before the restart");
+
+    // Replacement instance: same name, fresh UUID, old row still RUNNING.
+    types:HeartbeatResponse response = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+    test:assertTrue(response.acknowledged,
+            "Restarted runtime must be acknowledged even though the old record is still RUNNING");
+
+    types:Runtime? oldRecord = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertEquals(oldRecord, (), "Superseded RUNNING record must be replaced, not left behind");
+
+    types:Runtime? newRuntime = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertNotEquals(newRuntime, (), "Restarted runtime must be registered under its new ID");
+
+    cleanupRuntime(HB_RESTART_NEW_ID);
+}
+
 @test:Config {
     groups: ["heartbeat", "mi-artifacts"]
 }
