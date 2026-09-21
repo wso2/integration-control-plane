@@ -290,12 +290,65 @@ function testFastRestartReplacesRunningRecord() returns error? {
     test:assertTrue(response.acknowledged,
             "Restarted runtime must be acknowledged even though the old record is still RUNNING");
 
+    // The superseded row is kept as a tombstone rather than deleted, so a late heartbeat from
+    // the instance it belonged to still resolves and cannot reclaim the name.
     types:Runtime? oldRecord = check storage:getRuntimeById(HB_RESTART_OLD_ID);
-    test:assertEquals(oldRecord, (), "Superseded RUNNING record must be replaced, not left behind");
+    test:assertTrue(oldRecord is types:Runtime, "Superseded record must be retired, not deleted");
+    if oldRecord is types:Runtime {
+        test:assertEquals(oldRecord?.runtimeName, (), "Superseded record must give up the name");
+        test:assertEquals(oldRecord.status, "RETIRED", "Superseded record must be marked RETIRED");
+    }
+
+    // A tombstone is bookkeeping, not a runtime, so it must not surface in listings.
+    types:Runtime[] listed = check storage:getRuntimes((), (), (), (), HB_COMPONENT_ID);
+    foreach types:Runtime listedRuntime in listed {
+        test:assertNotEquals(listedRuntime.runtimeId, HB_RESTART_OLD_ID,
+                "Retired record must not appear in runtime listings");
+    }
 
     types:Runtime? newRuntime = check storage:getRuntimeById(HB_RESTART_NEW_ID);
     test:assertNotEquals(newRuntime, (), "Restarted runtime must be registered under its new ID");
 
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+}
+
+// =============================================================================
+// Test 5: the superseded instance must not evict its own replacement
+//
+// A replaced instance is often still alive for a few seconds — a terminating pod keeps
+// heartbeating through its grace period. That heartbeat finds the replacement holding the
+// name under an unfamiliar runtime ID. Treating it as a restart would delete the live
+// replacement and reinstate the dead instance, and the two would then trade the name back
+// and forth for as long as both kept heartbeating.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testSupersededInstanceCannotEvictItsReplacement() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+
+    // Late heartbeat from the instance that was just replaced.
+    types:HeartbeatResponse|error stale = storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    test:assertTrue(stale is error,
+            "A superseded instance must not be able to take its name back");
+
+    types:Runtime? replacement = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertTrue(replacement is types:Runtime,
+            "Replacement must survive a heartbeat from the instance it replaced");
+    if replacement is types:Runtime {
+        test:assertEquals(replacement?.runtimeName, HB_RESTART_NAME,
+                "Replacement must still hold the name");
+    }
+
+    cleanupRuntime(HB_RESTART_OLD_ID);
     cleanupRuntime(HB_RESTART_NEW_ID);
 }
 

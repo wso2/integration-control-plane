@@ -24,7 +24,7 @@ import ballerina/time;
 // Get filtered runtimes based on criteria
 public isolated function getRuntimes(string? status, string? runtimeType, string? environmentId, string? projectId, string? componentId) returns types:Runtime[]|error {
     types:Runtime[] runtimeList = [];
-    sql:ParameterizedQuery whereClause = ` WHERE 1=1 `;
+    sql:ParameterizedQuery whereClause = ` WHERE status != 'RETIRED' `;
     sql:ParameterizedQuery whereConditions = ` `;
     if status is string {
         whereConditions = sql:queryConcat(whereConditions, ` AND status = ${status} `);
@@ -73,7 +73,7 @@ public isolated function getRuntimesByIntegrationIds(
     types:Runtime[] runtimeList = [];
 
     // Build WHERE clause with IN condition for component_id
-    sql:ParameterizedQuery whereClause = ` WHERE 1=1 `;
+    sql:ParameterizedQuery whereClause = ` WHERE status != 'RETIRED' `;
     sql:ParameterizedQuery whereConditions = ` `;
 
     // Add component_id IN clause
@@ -223,7 +223,7 @@ public isolated function markOfflineRuntimes() returns error? {
             `SELECT r.runtime_id, r.environment_id, e.name AS environment_name
         FROM runtimes r
         JOIN environments e ON r.environment_id = e.environment_id
-        WHERE r.status != 'OFFLINE'
+        WHERE r.status NOT IN ('OFFLINE', 'RETIRED')
         AND r.last_heartbeat IS NOT NULL
         AND `,
             sqlQueryFromString(getTimestampDiffSeconds("r.last_heartbeat", nowUtc)),
@@ -266,7 +266,7 @@ public isolated function markOfflineRuntimes() returns error? {
                     `DELETE FROM runtimes
                 WHERE runtime_id IN (
                     SELECT runtime_id FROM runtimes
-                    WHERE status != 'OFFLINE'
+                    WHERE status NOT IN ('OFFLINE', 'RETIRED')
                     AND last_heartbeat IS NOT NULL
                     AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
@@ -282,7 +282,7 @@ public isolated function markOfflineRuntimes() returns error? {
         } else {
             sql:ParameterizedQuery deleteQuery = sql:queryConcat(
                     `DELETE FROM runtimes
-                WHERE status != 'OFFLINE'
+                WHERE status NOT IN ('OFFLINE', 'RETIRED')
                 AND last_heartbeat IS NOT NULL
                 AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
@@ -302,7 +302,7 @@ public isolated function markOfflineRuntimes() returns error? {
                 SET status = 'OFFLINE'
                 WHERE runtime_id IN (
                     SELECT runtime_id FROM runtimes
-                    WHERE status != 'OFFLINE'
+                    WHERE status NOT IN ('OFFLINE', 'RETIRED')
                     AND last_heartbeat IS NOT NULL
                     AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
@@ -319,7 +319,7 @@ public isolated function markOfflineRuntimes() returns error? {
             sql:ParameterizedQuery updateQuery = sql:queryConcat(
                     `UPDATE runtimes
                 SET status = 'OFFLINE'
-                WHERE status != 'OFFLINE'
+                WHERE status NOT IN ('OFFLINE', 'RETIRED')
                 AND last_heartbeat IS NOT NULL
                 AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
