@@ -17,9 +17,9 @@
  */
 
 import { Button, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import SchemaFormFields from './SchemaFormFields';
-import { buildFormResult, jsonPretty, type FormField } from './helpers';
+import { formValuesForRaw, jsonPretty, type FormField } from './helpers';
 
 // Shown under the JSON editor while a schema exists: the form is there, and this bypasses it.
 const RAW_MODE_HELPER = 'Raw mode: submitted exactly as typed — the form is bypassed.';
@@ -39,6 +39,9 @@ interface SchemaOrRawEditorProps {
   rawError?: string;
   // Sentence shown beside the mode toggle; also carries the form's own status line.
   hint?: ReactNode;
+  // The value the form was seeded from. Raw mode opens on this with the form's edits laid over it, so
+  // a key the schema does not describe is still there to edit.
+  rawBase?: unknown;
   // Helper text for the JSON editor when there is no form to fall back to.
   noSchemaHelper: string;
   disabled?: boolean;
@@ -51,10 +54,19 @@ interface SchemaOrRawEditorProps {
  * or text the inputs would reshape — can still be submitted exactly as typed. With no parsed fields the
  * JSON editor is all there is, and the toggle is not offered.
  */
-export default function SchemaOrRawEditor({ fields, values, errors, onChange, rawMode, onRawModeChange, rawText, onRawTextChange, rawLabel, rawError, hint, noSchemaHelper, disabled }: SchemaOrRawEditorProps) {
+export default function SchemaOrRawEditor({ fields, values, errors, onChange, rawMode, onRawModeChange, rawText, onRawTextChange, rawLabel, rawError, hint, rawBase, noSchemaHelper, disabled }: SchemaOrRawEditorProps) {
+  // The form's values as of the last seed. A round trip through the form that changed nothing must not
+  // overwrite JSON someone has since typed — only a real form edit reseeds.
+  const seededFrom = useRef<string | null>(null);
+
   const toggleRawMode = () => {
-    // Entering raw mode seeds the JSON from what the form holds now; leaving it keeps the form's values.
-    if (!rawMode && fields) onRawTextChange(jsonPretty(buildFormResult(fields, values).result) || '{}');
+    if (!rawMode && fields) {
+      const formState = JSON.stringify(values);
+      if (seededFrom.current !== formState) {
+        onRawTextChange(jsonPretty(formValuesForRaw(fields, values, rawBase)) || '{}');
+        seededFrom.current = formState;
+      }
+    }
     onRawModeChange(!rawMode);
   };
 

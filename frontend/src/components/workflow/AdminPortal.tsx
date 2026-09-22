@@ -858,6 +858,7 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
                         }}
                         rawLabel="Arguments (JSON)"
                         rawError={rawErr}
+                        rawBase={taskInput}
                         hint={
                           rawMode
                             ? 'Submitted as typed — the form is bypassed.'

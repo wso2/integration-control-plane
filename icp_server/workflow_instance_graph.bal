@@ -194,6 +194,9 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
     int cursor = 0;
 
     int executedCount = 0;
+    // A step that carried an id the model has no node for — version skew, not a runtime too old to
+    // stamp its steps. The two read the same in `steps` (empty) and must not read the same to a client.
+    boolean stampedUnplaced = false;
 
     foreach json node in executedNodes {
         if node !is map<json> {
@@ -239,12 +242,16 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
             resolved = interpolated;
         }
         int index = indexOfStep(modelNodes, resolved);
-        if index < 0 {
+        // Only when there IS a model to be absent from: with no descriptor published there are no
+        // model nodes at all, and every step would read as a version mismatch. That case is already
+        // reported by a nil `graph`, and the steps are still worth returning as a flat set.
+        if index < 0 && modelNodes.length() > 0 {
             // A stamped step the model does not have: the run and the model are different versions of
             // the workflow (`descriptorChecksum` says which). Recording it anyway would file it under
             // an id no node carries, so the step would draw as never executed while the history shows
             // it ran, and nothing would say why. It is reported instead.
             unmatched.push(unmatchedEntry(node, "no step with this id in the model — the run and the model are different versions"));
+            stampedUnplaced = true;
             continue;
         }
         if index >= cursor {
@@ -279,8 +286,11 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
         steps: steps.toJson(),
         takenArms: takenArms.toJson(),
         unmatched: unmatched,
-        // False only when steps ran and none could be placed, stamped or interpolated.
+        // False only when steps ran and none could be placed, stamped or interpolated. A step that
+        // named itself but found no node under that name counts as stamped: the run is placeable,
+        // this model is simply not the one it ran against, which `unmatched` says in its own words.
         stepIdsAvailable: executedCount == 0 || steps.length() > 0 || reviews.length() > 0
+                || stampedUnplaced
     };
     http:Response response = new;
     response.statusCode = 200;
