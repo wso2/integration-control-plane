@@ -22,7 +22,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { resourceUrl, useScope } from '../../nav';
 import SearchField from '../SearchField';
-import SchemaFormFields from './SchemaFormFields';
+import SchemaOrRawEditor from './SchemaOrRawEditor';
 import WorkflowDetailDrawer from './WorkflowDetailDrawer';
 import StructuredValue from './StructuredValue';
 import TaskAdministerCard, { AdministratorsRow, completedAsLabel } from './TaskAdministerCard';
@@ -38,6 +38,7 @@ import {
   ownerLabel,
   ownerScope,
   parseFormSchema,
+  parseRawJson,
   sectionTitleSx,
   sortByStartTimeDesc,
   splitQualifiedName,
@@ -382,6 +383,9 @@ export function StartWorkflowDialog({ scope, initialWorkflowType, onClose, onToa
   const [timeout, setTimeoutVal] = useState('');
   const [formValues, setFormValues] = useState<Record<string, string | boolean>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [rawMode, setRawMode] = useState(false);
+  const [rawText, setRawText] = useState('{}');
+  const [rawErr, setRawErr] = useState('');
   const [startError, setStartError] = useState<string | null>(null);
   const [started, setStarted] = useState<{ workflowType: string; workflowId: string } | null>(null);
   const navigate = useNavigate();
@@ -412,13 +416,21 @@ export function StartWorkflowDialog({ scope, initialWorkflowType, onClose, onToa
     if (!selected) return;
     setStartError(null);
     let parsedInput: unknown;
-    if (formFields) {
+    if (formFields && !rawMode) {
       const { result, errors } = buildFormResult(formFields, formValues);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
         return;
       }
       parsedInput = Object.keys(result).length > 0 ? result : undefined;
+    } else if (selected.inputSchema) {
+      const parsed = parseRawJson(rawText);
+      if (!parsed) {
+        setRawErr('Input must be valid JSON.');
+        return;
+      }
+      // Blank is no input at all, not `{}`: a workflow whose input is optional still starts.
+      parsedInput = rawText.trim() ? parsed.value : undefined;
     }
     start.mutate(
       {
@@ -498,6 +510,9 @@ export function StartWorkflowDialog({ scope, initialWorkflowType, onClose, onToa
               // The input schema is per definition, so switching invalidates anything already typed.
               setFormValues({});
               setFieldErrors({});
+              setRawMode(false);
+              setRawText('{}');
+              setRawErr('');
               setStartError(null);
             }}
             renderInput={(params) => <TextField {...params} label="Workflow Name" required placeholder="Select a workflow" />}
@@ -506,10 +521,30 @@ export function StartWorkflowDialog({ scope, initialWorkflowType, onClose, onToa
           <SubmitError message={startError} onClear={() => setStartError(null)} />
           {selected && (
             <SectionCard title="Input">
-              {formFields ? (
-                <SchemaFormFields fields={formFields} values={formValues} errors={fieldErrors} onChange={setFormValue} />
-              ) : selected.inputSchema ? (
-                <SchemaDisclosure schema={selected.inputSchema} />
+              {selected.inputSchema ? (
+                <Stack gap={2}>
+                  <SchemaOrRawEditor
+                    fields={formFields}
+                    values={formValues}
+                    errors={fieldErrors}
+                    onChange={setFormValue}
+                    rawMode={rawMode}
+                    onRawModeChange={(raw) => {
+                      setRawMode(raw);
+                      setRawErr('');
+                    }}
+                    rawText={rawText}
+                    onRawTextChange={(text) => {
+                      setRawText(text);
+                      setRawErr('');
+                    }}
+                    rawLabel="Input (JSON)"
+                    rawError={rawErr}
+                    noSchemaHelper="This workflow's input has no generated form; the JSON is submitted as the input."
+                    disabled={start.isPending}
+                  />
+                  <SchemaDisclosure schema={selected.inputSchema} />
+                </Stack>
               ) : (
                 <Typography variant="caption" color="text.secondary">
                   This workflow takes no input.
@@ -600,6 +635,7 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [rawText, setRawText] = useState('{}');
   const [rawErr, setRawErr] = useState('');
+  const [rawMode, setRawMode] = useState(false);
   const [feedback, setFeedback] = useState('');
   // The input confirmed in the second step — built once when entering it.
   const [pendingInput, setPendingInput] = useState<unknown>(null);
@@ -677,7 +713,7 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
 
   // Step one of the edited path: validate and stage; the review-changes step submits.
   const stageEdited = () => {
-    if (formFields) {
+    if (formFields && !rawMode) {
       const { result, errors } = buildFormResult(formFields, formValues);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
@@ -687,18 +723,20 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
       setReviewChangesOpen(true);
       return;
     }
-    try {
-      setPendingInput(rawText.trim() ? JSON.parse(rawText) : {});
-      setReviewChangesOpen(true);
-    } catch {
+    const parsed = parseRawJson(rawText);
+    if (!parsed) {
       setRawErr('Arguments must be valid JSON.');
+      return;
     }
+    setPendingInput(parsed.value);
+    setReviewChangesOpen(true);
   };
 
   const closeEdit = () => {
     setMode('view');
     setFieldErrors({});
     setRawErr('');
+    setRawMode(false);
     setDecideError(null);
   };
 
@@ -803,27 +841,35 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
 
                   {mode === 'edit' && (
                     <Stack gap={2} sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        {formFields ? (changes.length === 0 ? 'No changes yet — edit the values to use.' : `Changed: ${changes.map((c) => c.label).join(', ')}`) : 'This activity declares no schema; edit the raw JSON to use.'}
-                      </Typography>
-                      {formFields ? (
-                        <SchemaFormFields fields={formFields} values={formValues} errors={fieldErrors} onChange={setFormValue} />
-                      ) : (
-                        <TextField
-                          label="Arguments (JSON)"
-                          fullWidth
-                          multiline
-                          minRows={5}
-                          value={rawText}
-                          onChange={(e) => {
-                            setRawText(e.target.value);
-                            setRawErr('');
-                          }}
-                          error={!!rawErr}
-                          helperText={rawErr}
-                          slotProps={{ input: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
-                        />
-                      )}
+                      <SchemaOrRawEditor
+                        fields={formFields}
+                        values={formValues}
+                        errors={fieldErrors}
+                        onChange={setFormValue}
+                        rawMode={rawMode}
+                        onRawModeChange={(raw) => {
+                          setRawMode(raw);
+                          setRawErr('');
+                        }}
+                        rawText={rawText}
+                        onRawTextChange={(text) => {
+                          setRawText(text);
+                          setRawErr('');
+                        }}
+                        rawLabel="Arguments (JSON)"
+                        rawError={rawErr}
+                        hint={
+                          rawMode
+                            ? 'Submitted as typed — the form is bypassed.'
+                            : formFields
+                              ? changes.length === 0
+                                ? 'No changes yet — edit the values to use.'
+                                : `Changed: ${changes.map((c) => c.label).join(', ')}`
+                              : 'This activity declares no schema; edit the raw JSON to use.'
+                        }
+                        noSchemaHelper="The arguments the activity is retried with."
+                        disabled={busy}
+                      />
                       {stepButtons(
                         <Button key="b" disabled={busy} onClick={closeEdit}>
                           Cancel
@@ -863,7 +909,8 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
             <DialogContent>
               <Stack gap={2} sx={{ pt: 0.5 }}>
                 <Alert severity="info">The activity {activity.trigger === 'ON_FAILURE' ? 'retries' : 'runs'} with the edited arguments below. This cannot be undone.</Alert>
-                {formFields ? (
+                {/* Raw mode bypassed the form, so the field diff would not describe what is about to be submitted. */}
+                {formFields && !rawMode ? (
                   changes.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
                       Nothing was changed — this is the same as Proceed with the original arguments.
@@ -875,10 +922,11 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
                           <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 140 }}>
                             {c.label}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: 'text.disabled', textDecoration: 'line-through', wordBreak: 'break-word' }}>
+                          {/* pre-wrap: a multiline value has to show its line breaks, or two different values read as one. */}
+                          <Typography variant="body2" sx={{ color: 'text.disabled', textDecoration: 'line-through', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
                             {c.from}
                           </Typography>
-                          <Typography variant="body2" sx={{ color: 'success.main', wordBreak: 'break-word' }}>
+                          <Typography variant="body2" sx={{ color: 'success.main', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>
                             {c.to}
                           </Typography>
                         </Stack>

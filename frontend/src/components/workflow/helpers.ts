@@ -228,7 +228,10 @@ function coerceLeaf(f: FormField, path: string, values: Record<string, string | 
     return;
   }
   const raw = values[path];
-  const text = typeof raw === 'string' ? raw.trim() : '';
+  const entered = typeof raw === 'string' ? raw : '';
+  // Trimmed only to decide blankness and to parse numbers/JSON: a string is submitted exactly as
+  // entered, so leading or trailing newlines in the original value survive an untouched field.
+  const text = entered.trim();
   if (!text) {
     if (f.required) errors[path] = `${f.label} is required.`;
     return;
@@ -247,7 +250,7 @@ function coerceLeaf(f: FormField, path: string, values: Record<string, string | 
       errors[path] = `${f.label} must be valid JSON.`;
     }
   } else {
-    result[f.name] = text;
+    result[f.name] = entered;
   }
 }
 
@@ -311,6 +314,15 @@ export function formValuesFromObject(fields: FormField[], source: Record<string,
   const values: Record<string, string | boolean> = {};
   fillValues(fields, source, '', values);
   return values;
+}
+
+// Parses raw-mode JSON, treating blank as an empty object; returns null when the text is not valid JSON.
+export function parseRawJson(text: string): { value: unknown } | null {
+  try {
+    return { value: text.trim() ? JSON.parse(text) : {} };
+  } catch {
+    return null;
+  }
 }
 
 export interface FieldChange {

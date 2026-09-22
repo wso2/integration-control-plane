@@ -75,6 +75,9 @@ function LeafField({
   }
   const isJson = f.type === 'object' || f.type === 'array';
   const isNumeric = f.type === 'number' || f.type === 'integer';
+  // Free text grows into a textarea. A single-line <input> silently strips CR/LF from its value, so a
+  // multiline argument would render flattened and be submitted that way even untouched.
+  const isText = !f.enumValues && !isJson && !isNumeric;
   return (
     <TextField
       label={f.label}
@@ -82,8 +85,9 @@ function LeafField({
       disabled={disabled}
       required={f.required}
       select={!!f.enumValues}
-      multiline={isJson}
+      multiline={isJson || isText}
       minRows={isJson ? 3 : undefined}
+      maxRows={isText ? 10 : undefined}
       // Numeric fields are deliberately text inputs: <input type="number"> replaces content it can't
       // parse with '', which reaches validation looking untouched and reports "is required" instead of
       // the accurate "must be a number" / "must be an integer". Keeping the raw text lets that through.

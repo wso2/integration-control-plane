@@ -21,10 +21,10 @@ import SearchField from '../SearchField';
 import { ListChecks, RefreshCw, UserCheck, Wrench } from '@wso2/oxygen-ui-icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import SchemaFormFields from './SchemaFormFields';
+import SchemaOrRawEditor from './SchemaOrRawEditor';
 import StructuredValue from './StructuredValue';
 import TaskAdministerCard, { AdministratorsRow, completedAsLabel } from './TaskAdministerCard';
-import { buildFormResult, displayWorkflowId, formatTime, gatewayScope, jsonPretty, ownerLabel, ownerScope, parseFormSchema, sortByStartTimeDesc, splitQualifiedName, unescapeRoleName, type PortalScope } from './helpers';
+import { buildFormResult, displayWorkflowId, formatTime, gatewayScope, jsonPretty, ownerLabel, ownerScope, parseFormSchema, parseRawJson, sortByStartTimeDesc, splitQualifiedName, unescapeRoleName, type PortalScope } from './helpers';
 import { ActionCard, DetailDrawer, DetailRow, HeaderCell, IdText, ListFooter, NotProvided, RefreshingNote, SectionCard, StatusChip, SubmitError, WorkflowIdLink, type WorkflowScope, rowOpenProps } from './shared';
 import { IntegrationFilter, ReviewActivityDetailDialog, StatusFilter, useTimeRangeFilter, WorkflowNameFilter } from './AdminPortal';
 import Authorized from '../Authorized';
@@ -578,12 +578,13 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
       setConfirmOpen(true);
       return;
     }
-    try {
-      setPendingResult(resultText.trim() ? JSON.parse(resultText) : {});
-      setConfirmOpen(true);
-    } catch {
+    const parsed = parseRawJson(resultText);
+    if (!parsed) {
       setErr('Result must be valid JSON.');
+      return;
     }
+    setPendingResult(parsed.value);
+    setConfirmOpen(true);
   };
 
   const submitComplete = () => {
@@ -724,45 +725,27 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
 
                   {mode === 'complete' && (
                     <Stack gap={2} sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-                        <Typography variant="body2" color="text.secondary">
-                          The result the workflow resumes with.
-                        </Typography>
-                        {formFields && (
-                          <Button
-                            size="small"
-                            variant="text"
-                            onClick={() => {
-                              // Raw mode carries the form's values across; it never converts back.
-                              if (!rawMode) {
-                                const { result } = buildFormResult(formFields, formValues);
-                                setResultText(jsonPretty(result) || '{}');
-                              }
-                              setRawMode((v) => !v);
-                              setErr('');
-                            }}>
-                            {rawMode ? 'Back to form' : 'Edit as JSON'}
-                          </Button>
-                        )}
-                      </Stack>
-                      {formFields && !rawMode ? (
-                        <SchemaFormFields fields={formFields} values={formValues} errors={fieldErrors} onChange={setFormValue} />
-                      ) : (
-                        <TextField
-                          label="Result (JSON)"
-                          fullWidth
-                          multiline
-                          minRows={5}
-                          value={resultText}
-                          onChange={(e) => {
-                            setResultText(e.target.value);
-                            setErr('');
-                          }}
-                          error={!!err}
-                          helperText={err || (formFields ? 'Raw mode: submitted exactly as typed — the form is bypassed.' : 'This task declares no result schema; the JSON is submitted as the result.')}
-                          slotProps={{ input: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
-                        />
-                      )}
+                      <SchemaOrRawEditor
+                        fields={formFields}
+                        values={formValues}
+                        errors={fieldErrors}
+                        onChange={setFormValue}
+                        rawMode={rawMode}
+                        onRawModeChange={(raw) => {
+                          setRawMode(raw);
+                          setErr('');
+                        }}
+                        rawText={resultText}
+                        onRawTextChange={(text) => {
+                          setResultText(text);
+                          setErr('');
+                        }}
+                        rawLabel="Result (JSON)"
+                        rawError={err}
+                        hint="The result the workflow resumes with."
+                        noSchemaHelper="This task declares no result schema; the JSON is submitted as the result."
+                        disabled={busy}
+                      />
                       {stepButtons(
                         <Button key="b" disabled={busy} onClick={closeComplete}>
                           Cancel
