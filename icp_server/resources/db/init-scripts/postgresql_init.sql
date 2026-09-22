@@ -672,6 +672,9 @@ CREATE TABLE runtimes (
     server_name VARCHAR(200) NULL,
     registration_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_heartbeat TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Set when a restarted runtime takes this row's name; the row is then a tombstone,
+    -- kept only so its runtime ID still resolves. NULL for every live runtime.
+    retired_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     key_id VARCHAR(16) NULL,

@@ -614,6 +614,9 @@ CREATE TABLE runtimes (
     server_name VARCHAR(200) NULL,
     registration_time TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     last_heartbeat TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    -- Set when a restarted runtime takes this row's name; the row is then a tombstone,
+    -- kept only so its runtime ID still resolves. NULL for every live runtime.
+    retired_at TIMESTAMP(6) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT fk_runtime_project FOREIGN KEY (project_id) REFERENCES projects (project_id) ON DELETE CASCADE,

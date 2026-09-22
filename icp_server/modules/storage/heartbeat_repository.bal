@@ -198,7 +198,7 @@ public isolated function processDeltaHeartbeat(types:DeltaHeartbeat deltaHeartbe
         sql:ExecutionResult|error result = dbClient->execute(sql:queryConcat(
             `UPDATE runtimes
             SET last_heartbeat = `, sqlQueryFromString(timestampCast(currentTimeStr)), `, status = 'RUNNING'
-            WHERE runtime_id = ${runtimeId} AND status <> 'RETIRED'`
+            WHERE runtime_id = ${runtimeId} AND retired_at IS NULL`
         ));
 
         if result is error {
@@ -218,7 +218,7 @@ public isolated function processDeltaHeartbeat(types:DeltaHeartbeat deltaHeartbe
     sql:ExecutionResult|error timestampResult = dbClient->execute(sql:queryConcat(
         `UPDATE runtimes
         SET last_heartbeat = `, sqlQueryFromString(timestampCast(currentTimeStr)), `, status = 'RUNNING'
-        WHERE runtime_id = ${runtimeId} AND status <> 'RETIRED'`
+        WHERE runtime_id = ${runtimeId} AND retired_at IS NULL`
     ));
 
     boolean runtimeExists = true;
@@ -583,19 +583,30 @@ isolated function writeObservedStateBI(string runtimeId, string componentId, str
 // refused by uq_runtime_identity. For an instance that has already been replaced, refusing
 // it is the right answer.
 //
-// The name is cleared so the replacement can take it, and RETIRED keeps the row out of
-// listings and out of the status sweep.
+// The name is cleared so the replacement can take it, and retired_at marks the row as a
+// tombstone, keeping it out of listings and out of the status sweep. A dedicated column
+// rather than a status value, because status is constrained to a fixed set on every engine
+// except H2 — a CHECK on PostgreSQL, SQL Server and Oracle, an ENUM on MySQL — so writing a
+// new one would be rejected everywhere the tests do not run.
 //
-// A tombstone only has to outlive the instance it stands for, which stops heartbeating within
+// retired_at is stamped now, not left to last_heartbeat, because a row is usually retired
+// some way into its heartbeat interval: aged off its last real heartbeat, a tombstone created
+// at T+29s of a 30s window would be swept a second later, while the instance it guards
+// against is still shutting down.
+//
+// A tombstone only has to outlive that instance, which stops heartbeating within
 // heartbeatTimeoutSeconds of being replaced, so markOfflineRuntimes drops it once it is older
 // than that. Retiring deliberately does not clear other tombstones: retirement erases the
 // name, so nothing distinguishes one named runtime's tombstone from another's in the same
 // component and environment, and a blanket sweep would leave whichever runtime was replaced
 // first unguarded again.
 isolated function retireSupersededRuntime(string oldId) returns error? {
-    _ = check dbClient->execute(`
-        UPDATE runtimes SET name = NULL, status = 'RETIRED' WHERE runtime_id = ${oldId}
-    `);
+    string retiredAtStr = check convertUtcToDbDateTime(time:utcNow());
+    _ = check dbClient->execute(sql:queryConcat(
+        `UPDATE runtimes SET name = NULL, status = 'OFFLINE', retired_at = `,
+        sqlQueryFromString(timestampCast(retiredAtStr)),
+        ` WHERE runtime_id = ${oldId}`
+    ));
     log:printDebug(string `Retired superseded runtime ${oldId}`);
 }
 
@@ -747,6 +758,10 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
                 used_memory = EXCLUDED.used_memory,
                 os_arch = EXCLUDED.os_arch,
                 server_name = EXCLUDED.server_name,
+                -- A row that heartbeats again under its own ID is a live runtime, not a
+                -- tombstone: whatever superseded it is gone, or this update would have
+                -- collided with the name it still holds.
+                retired_at = NULL,
                 last_heartbeat = `, sqlQueryFromString(observedAt), `
         `));
     } else if isNewRegistration {
@@ -800,6 +815,8 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
                 used_memory = ${heartbeat.nodeInfo.usedMemory},
                 os_arch = ${heartbeat.nodeInfo.osArch},
                 server_name = ${heartbeat.nodeInfo.platformName},
+                -- See the note on the PostgreSQL branch.
+                retired_at = NULL,
                 last_heartbeat = `, sqlQueryFromString(observedAt), `
             WHERE runtime_id = ${runtimeId}
         `));

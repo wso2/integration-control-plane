@@ -304,7 +304,7 @@ function testFastRestartReplacesRunningRecord() returns error? {
         // NULL name as a placeholder, so what matters is that it is no longer this name.
         test:assertNotEquals(oldRecord?.runtimeName, HB_RESTART_NAME,
                 "Superseded record must give up the name");
-        test:assertEquals(oldRecord.status, "RETIRED", "Superseded record must be marked RETIRED");
+        test:assertEquals(oldRecord.status, "OFFLINE", "Superseded record must not still read as running");
     }
 
     // A tombstone is bookkeeping, not a runtime, so it must not surface in listings. The
@@ -408,8 +408,16 @@ function testDeltaHeartbeatDoesNotReviveRetiredRecord() returns error? {
     types:Runtime? retired = check storage:getRuntimeById(HB_RESTART_OLD_ID);
     test:assertTrue(retired is types:Runtime, "Retired record should still exist");
     if retired is types:Runtime {
-        test:assertEquals(retired.status, "RETIRED",
+        test:assertEquals(retired.status, "OFFLINE",
                 "A delta heartbeat must not bring a retired record back to RUNNING");
+    }
+
+    // Reviving a tombstone would also put it back in the listings, so check there too: the
+    // status alone would not catch a row that was revived and then swept back to OFFLINE.
+    types:Runtime[] listed = check storage:getRuntimes((), (), (), (), HB_COMPONENT_ID);
+    foreach types:Runtime listedRuntime in listed {
+        test:assertNotEquals(listedRuntime.runtimeId, HB_RESTART_OLD_ID,
+                "A delta heartbeat must not return a retired record to the listings");
     }
 
     types:Runtime? replacement = check storage:getRuntimeById(HB_RESTART_NEW_ID);
