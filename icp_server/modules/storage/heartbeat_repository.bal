@@ -189,10 +189,16 @@ public isolated function processDeltaHeartbeat(types:DeltaHeartbeat deltaHeartbe
         // Write an explicit UTC value rather than CURRENT_TIMESTAMP: the latter is
         // evaluated in the database server's timezone, so the column would mean
         // different things depending on where the database happens to run.
+        //
+        // A retired row is excluded: it carries no name, so this would revive it as a
+        // nameless RUNNING runtime that never registered, sitting in the listings beside
+        // the replacement that legitimately holds the name. The heartbeat is still
+        // answered with fullHeartbeatRequired, and that full heartbeat is where a
+        // superseded instance gets its refusal.
         sql:ExecutionResult|error result = dbClient->execute(sql:queryConcat(
             `UPDATE runtimes
             SET last_heartbeat = `, sqlQueryFromString(timestampCast(currentTimeStr)), `, status = 'RUNNING'
-            WHERE runtime_id = ${runtimeId}`
+            WHERE runtime_id = ${runtimeId} AND status <> 'RETIRED'`
         ));
 
         if result is error {
@@ -208,11 +214,11 @@ public isolated function processDeltaHeartbeat(types:DeltaHeartbeat deltaHeartbe
 
     // Hash matches, process delta heartbeat
 
-    // Update the heartbeat timestamp (explicit UTC, see note above)
+    // Update the heartbeat timestamp (explicit UTC, and retired rows excluded, see note above)
     sql:ExecutionResult|error timestampResult = dbClient->execute(sql:queryConcat(
         `UPDATE runtimes
         SET last_heartbeat = `, sqlQueryFromString(timestampCast(currentTimeStr)), `, status = 'RUNNING'
-        WHERE runtime_id = ${runtimeId}`
+        WHERE runtime_id = ${runtimeId} AND status <> 'RETIRED'`
     ));
 
     boolean runtimeExists = true;

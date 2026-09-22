@@ -302,12 +302,19 @@ function testFastRestartReplacesRunningRecord() returns error? {
         test:assertEquals(oldRecord.status, "RETIRED", "Superseded record must be marked RETIRED");
     }
 
-    // A tombstone is bookkeeping, not a runtime, so it must not surface in listings.
+    // A tombstone is bookkeeping, not a runtime, so it must not surface in listings. The
+    // replacement is asserted present in the same pass, so an empty result cannot let the
+    // absence check pass by default.
     types:Runtime[] listed = check storage:getRuntimes((), (), (), (), HB_COMPONENT_ID);
+    boolean replacementListed = false;
     foreach types:Runtime listedRuntime in listed {
         test:assertNotEquals(listedRuntime.runtimeId, HB_RESTART_OLD_ID,
                 "Retired record must not appear in runtime listings");
+        if listedRuntime.runtimeId == HB_RESTART_NEW_ID {
+            replacementListed = true;
+        }
     }
+    test:assertTrue(replacementListed, "Replacement must appear in runtime listings");
 
     types:Runtime? newRuntime = check storage:getRuntimeById(HB_RESTART_NEW_ID);
     test:assertNotEquals(newRuntime, (), "Restarted runtime must be registered under its new ID");
@@ -317,7 +324,50 @@ function testFastRestartReplacesRunningRecord() returns error? {
 }
 
 // =============================================================================
-// Test 5: the superseded instance must not evict its own replacement
+// Test 5: a delta heartbeat must not revive a retired record
+//
+// The delta path only refreshes last_heartbeat and status, keyed on runtime_id alone. A
+// retired row carries no name, so reviving it would put a nameless RUNNING runtime in the
+// listings next to the replacement that legitimately holds the name — and the instance would
+// never have re-registered. The row must stay retired, and the reply must ask for the full
+// heartbeat that is where the refusal happens.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testDeltaHeartbeatDoesNotReviveRetiredRecord() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+
+    types:HeartbeatResponse deltaResponse = check storage:processDeltaHeartbeat({
+        runtimeId: HB_RESTART_OLD_ID,
+        runtimeHash: "stale-hash-forcing-a-full-heartbeat",
+        timestamp: time:utcNow()
+    });
+    test:assertTrue(deltaResponse?.fullHeartbeatRequired ?: false,
+            "A retired record's delta heartbeat must be answered with fullHeartbeatRequired");
+
+    types:Runtime? retired = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertTrue(retired is types:Runtime, "Retired record should still exist");
+    if retired is types:Runtime {
+        test:assertEquals(retired.status, "RETIRED",
+                "A delta heartbeat must not bring a retired record back to RUNNING");
+    }
+
+    types:Runtime? replacement = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertTrue(replacement is types:Runtime, "Replacement must be unaffected");
+
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+}
+
+// =============================================================================
+// Test 6: the superseded instance must not evict its own replacement
 //
 // A replaced instance is often still alive for a few seconds — a terminating pod keeps
 // heartbeating through its grace period. That heartbeat finds the replacement holding the
