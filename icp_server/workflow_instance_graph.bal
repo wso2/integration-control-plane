@@ -239,6 +239,14 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
             resolved = interpolated;
         }
         int index = indexOfStep(modelNodes, resolved);
+        if index < 0 {
+            // A stamped step the model does not have: the run and the model are different versions of
+            // the workflow (`descriptorChecksum` says which). Recording it anyway would file it under
+            // an id no node carries, so the step would draw as never executed while the history shows
+            // it ran, and nothing would say why. It is reported instead.
+            unmatched.push(unmatchedEntry(node, "no step with this id in the model — the run and the model are different versions"));
+            continue;
+        }
         if index >= cursor {
             cursor = index + 1;
         }
