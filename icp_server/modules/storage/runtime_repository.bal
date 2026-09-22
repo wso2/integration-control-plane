@@ -333,6 +333,31 @@ public isolated function markOfflineRuntimes() returns error? {
         }
     }
 
+    // Drop expired tombstones. A retired row exists only to stop the instance it stands for
+    // from taking its name back from the replacement, and that instance stops heartbeating
+    // within heartbeatTimeoutSeconds of being replaced — so once the row is older than that,
+    // it has nothing left to guard against. Deleting rather than marking, because a tombstone
+    // is bookkeeping and OFFLINE would make it look like a runtime someone should see.
+    sql:ParameterizedQuery expireRetiredQuery = sql:queryConcat(
+            `DELETE FROM runtimes
+        WHERE status = 'RETIRED'
+        AND last_heartbeat IS NOT NULL
+        AND `,
+            sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
+            ` > ${heartbeatTimeoutSeconds}`
+    );
+    sql:ExecutionResult|error expiredResult = dbClient->execute(expireRetiredQuery);
+    if expiredResult is error {
+        // Bookkeeping, not correctness: a tombstone that outlives its window is inert, so a
+        // failure here is reported and the sweep carries on to its notifications.
+        log:printWarn("Failed to expire retired runtime records", expiredResult);
+    } else {
+        int? expiredCount = expiredResult.affectedRowCount;
+        if expiredCount is int && expiredCount > 0 {
+            log:printDebug(string `Expired ${expiredCount} retired runtime record(s)`);
+        }
+    }
+
     // Notify WebSocket subscribers for each runtime that ACTUALLY went offline: on
     // PostgreSQL that is the claimed set, which can be smaller than the pre-select saw.
     foreach StaleRuntimeRow r in staleRows {

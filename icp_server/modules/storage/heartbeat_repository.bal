@@ -584,13 +584,15 @@ isolated function writeObservedStateBI(string runtimeId, string componentId, str
 // it is the right answer.
 //
 // The name is cleared so the replacement can take it, and RETIRED keeps the row out of
-// listings and out of the offline sweep. Any earlier tombstone for the same component and
-// environment is dropped first, so at most one is ever held.
-isolated function retireSupersededRuntime(string oldId, string componentId, string environmentId) returns error? {
-    _ = check dbClient->execute(`
-        DELETE FROM runtimes
-        WHERE component_id = ${componentId} AND environment_id = ${environmentId} AND status = 'RETIRED'
-    `);
+// listings and out of the status sweep.
+//
+// A tombstone only has to outlive the instance it stands for, which stops heartbeating within
+// heartbeatTimeoutSeconds of being replaced, so markOfflineRuntimes drops it once it is older
+// than that. Retiring deliberately does not clear other tombstones: retirement erases the
+// name, so nothing distinguishes one named runtime's tombstone from another's in the same
+// component and environment, and a blanket sweep would leave whichever runtime was replaced
+// first unguarded again.
+isolated function retireSupersededRuntime(string oldId) returns error? {
     _ = check dbClient->execute(`
         UPDATE runtimes SET name = NULL, status = 'RETIRED' WHERE runtime_id = ${oldId}
     `);
@@ -685,7 +687,7 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
                 if runtimeName is string && existingByName.status != "OFFLINE" {
                     // The predecessor was still reporting itself as running, so it may yet send
                     // another heartbeat. Keep it as a tombstone; see retireSupersededRuntime.
-                    check retireSupersededRuntime(oldId, heartbeat.component, heartbeat.environment);
+                    check retireSupersededRuntime(oldId);
                 } else {
                     // Nothing has to be remembered: an unnamed row contends for no name, and an
                     // OFFLINE one has already been silent for longer than heartbeatTimeoutSeconds.

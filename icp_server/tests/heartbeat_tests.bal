@@ -35,6 +35,11 @@ const string HB_REPLICA3_ID = "aa000001-test-test-test-000000000003";
 const string HB_RESTART_OLD_ID = "aa000001-test-test-test-000000000007";
 const string HB_RESTART_NEW_ID = "aa000001-test-test-test-000000000008";
 const string HB_RESTART_NAME = "hb-restart-test-unique-runtime";
+// A second named runtime in the same component/environment, for the test that one
+// runtime's retirement must not disturb another's tombstone.
+const string HB_SECOND_OLD_ID = "aa000001-test-test-test-000000000011";
+const string HB_SECOND_NEW_ID = "aa000001-test-test-test-000000000012";
+const string HB_SECOND_NAME = "hb-restart-test-second-runtime";
 // Service-listener binding test: dedicated ID cleaned up via an AfterGroups
 // teardown so rows never leak when an assertion aborts the test.
 const string HB_SERVICE_LISTENER_ID = "aa000001-test-test-test-000000000010";
@@ -324,7 +329,55 @@ function testFastRestartReplacesRunningRecord() returns error? {
 }
 
 // =============================================================================
-// Test 5: a delta heartbeat must not revive a retired record
+// Test 5: one runtime's retirement must not unguard another's
+//
+// Retirement erases the name, so within a component and environment nothing tells one named
+// runtime's tombstone from another's. Clearing tombstones wholesale when the next runtime is
+// replaced would therefore leave whichever was replaced first free to take its name back off
+// its own replacement — the very exchange the tombstone exists to stop.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testRetiringOneRuntimeKeepsAnotherGuarded() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+    cleanupRuntime(HB_SECOND_OLD_ID);
+    cleanupRuntime(HB_SECOND_NEW_ID);
+
+    // First named runtime is replaced, leaving a tombstone behind.
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+
+    // A second, unrelated named runtime in the same component and environment is replaced too.
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_SECOND_OLD_ID, HB_SECOND_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_SECOND_NEW_ID, HB_SECOND_NAME), preResolved = true);
+
+    types:Runtime? firstTombstone = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertTrue(firstTombstone is types:Runtime,
+            "Retiring the second runtime must not drop the first runtime's tombstone");
+
+    // With its tombstone intact, the first superseded instance is still refused.
+    types:HeartbeatResponse|error stale = storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    test:assertTrue(stale is error,
+            "First superseded instance must still be unable to take its name back");
+
+    types:Runtime? firstReplacement = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertTrue(firstReplacement is types:Runtime, "First replacement must survive");
+
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+    cleanupRuntime(HB_SECOND_OLD_ID);
+    cleanupRuntime(HB_SECOND_NEW_ID);
+}
+
+// =============================================================================
+// Test 6: a delta heartbeat must not revive a retired record
 //
 // The delta path only refreshes last_heartbeat and status, keyed on runtime_id alone. A
 // retired row carries no name, so reviving it would put a nameless RUNNING runtime in the
@@ -367,7 +420,7 @@ function testDeltaHeartbeatDoesNotReviveRetiredRecord() returns error? {
 }
 
 // =============================================================================
-// Test 6: the superseded instance must not evict its own replacement
+// Test 7: the superseded instance must not evict its own replacement
 //
 // A replaced instance is often still alive for a few seconds — a terminating pod keeps
 // heartbeating through its grace period. That heartbeat finds the replacement holding the
