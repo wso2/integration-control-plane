@@ -232,6 +232,12 @@ public isolated function staleCacheOwner(string owner, int liveHorizonSeconds)
 # deleted: the stale data keeps serving (with its age shown) while the refresh the caller
 # forced runs behind it. A no-op for an entry that is already stale or absent.
 #
+# An entry mid-fetch is left alone. While a fetch is in flight `expires_at` is that fetch's
+# deadline, not the answer's freshness, so collapsing it would declare a live fetch dead —
+# the reader gives up on it, and a forced refresh held down would abandon and reissue the
+# one fetch it was waiting for, over and over. A row mid-fetch is already being refreshed,
+# which is what the caller asked for.
+#
 # + cacheKey - The entry to expire
 # + return - An error only when the database itself failed
 public isolated function expireCacheEntry(string cacheKey) returns error? {
@@ -239,7 +245,7 @@ public isolated function expireCacheEntry(string cacheKey) returns error? {
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
         UPDATE cache_entry
         SET expires_at = ${now}
-        WHERE cache_key = ${cacheKey} AND expires_at > ${now}
+        WHERE cache_key = ${cacheKey} AND expires_at > ${now} AND token IS NULL
     `);
     if result is sql:Error {
         return error(string `Failed to expire a cache entry`, result);

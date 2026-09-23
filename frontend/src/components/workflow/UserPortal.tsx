@@ -568,6 +568,12 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
     setFieldErrors({});
     setErr('');
     setSubmitError(null);
+    // A result staged for the previous task must not be submittable against this one: the
+    // dialogs complete or fail the current `taskId`, so what they hold goes with the id.
+    setConfirmOpen(false);
+    setFailOpen(false);
+    setPendingResult(null);
+    setReason('');
   }, [taskId]);
 
   const setFormValue = (name: string, value: string | boolean) => {

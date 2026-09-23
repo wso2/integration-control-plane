@@ -524,7 +524,7 @@ export function StartWorkflowDialog({ scope, initialWorkflowType, onClose, onToa
               {selected.inputSchema ? (
                 <Stack gap={2}>
                   <SchemaOrRawEditor
-                    key={selected.workflowType}
+                    key={`${selected.componentId}:${selected.workflowType}`}
                     fields={formFields}
                     values={formValues}
                     errors={fieldErrors}
@@ -681,6 +681,13 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
     setRawErr('');
     setFieldErrors({});
     setDecideError(null);
+    // A decision staged for the previous activity must not be confirmable against this one:
+    // the dialogs submit against the current `taskId`, so what they hold goes with the id.
+    setConfirmProceedOpen(false);
+    setReviewChangesOpen(false);
+    setRejectOpen(false);
+    setPendingInput(null);
+    setFeedback('');
   }, [taskId]);
 
   useEffect(() => {

@@ -220,7 +220,8 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
         // The user demanded certainty. Expiring the entry (never deleting it) drops this call
         // into the stale-serve path below: the current answer still comes back immediately,
         // marked stale, while the forced refresh runs. Coalescing makes this safe to expose —
-        // twenty people pressing Refresh together still produce one fetch.
+        // twenty people pressing Refresh together still produce one fetch, and an entry already
+        // mid-fetch keeps that fetch rather than having it expired out from under it.
         check storage:expireCacheEntry(cacheKey);
     }
 

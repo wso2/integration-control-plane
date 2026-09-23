@@ -47,7 +47,7 @@ isolated function entryOf(string cacheKey) returns types:CacheEntry|error {
 // The case the console saw: a fetch past its deadline, given up on without waiting for the
 // sweep, leaving the row retryable immediately.
 @test:Config {
-    groups: ["workflow-tunnel"]
+    groups: ["workflow_tunnel"]
 }
 isolated function testFetchPastItsDeadlineIsAbandoned() returns error? {
     string cacheKey = "test-fetch-dead-" + storage:cacheNowEpoch().toString();
@@ -66,7 +66,7 @@ isolated function testFetchPastItsDeadlineIsAbandoned() returns error? {
 
 // A fetch still within its deadline is somebody's live question, not a dead one.
 @test:Config {
-    groups: ["workflow-tunnel"]
+    groups: ["workflow_tunnel"]
 }
 isolated function testLiveFetchIsLeftAlone() returns error? {
     string cacheKey = "test-fetch-live-" + storage:cacheNowEpoch().toString();
@@ -83,7 +83,7 @@ isolated function testLiveFetchIsLeftAlone() returns error? {
 // Two nodes can notice the same dead fetch. Only one may abandon it, or the other would
 // issue a second command for a question that already has one.
 @test:Config {
-    groups: ["workflow-tunnel"]
+    groups: ["workflow_tunnel"]
 }
 isolated function testOnlyOneCallerAbandonsAFetch() returns error? {
     string cacheKey = "test-fetch-race-" + storage:cacheNowEpoch().toString();
@@ -95,8 +95,49 @@ isolated function testOnlyOneCallerAbandonsAFetch() returns error? {
 
 // Nothing to abandon is not an error: the key may never have been read.
 @test:Config {
-    groups: ["workflow-tunnel"]
+    groups: ["workflow_tunnel"]
 }
 isolated function testAbandoningAnUnknownKeyIsHarmless() returns error? {
     test:assertFalse(check storage:abandonCacheFetch("test-fetch-absent-key"));
+}
+
+// `?refresh=true` expires an entry so the answer is fetched again. While a fetch is in flight
+// `expires_at` is that fetch's deadline, so expiring it would declare a live fetch dead — the
+// reader then gives up on it, and a refresh held down would abandon and reissue the very fetch
+// it is waiting for. A row mid-fetch is already being refreshed.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testForcedRefreshLeavesALiveFetchAlone() returns error? {
+    string cacheKey = "test-fetch-refresh-" + storage:cacheNowEpoch().toString();
+    int deadline = storage:cacheNowEpoch() + 60;
+    check startTestFetch(cacheKey, deadline);
+
+    check storage:expireCacheEntry(cacheKey);
+
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertTrue(row.token is string, "the fetch must still be in flight");
+    test:assertEquals(row.expiresAt, deadline, "and must keep the deadline it was handed out with");
+    test:assertFalse(check storage:abandonCacheFetch(cacheKey),
+            "so the reader has nothing to give up on");
+}
+
+// An entry that is serving an answer still expires on demand: that is what the escape hatch is for.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testForcedRefreshExpiresASettledEntry() returns error? {
+    string cacheKey = "test-fetch-settled-" + storage:cacheNowEpoch().toString();
+    string token = "token-" + cacheKey;
+    boolean started = check storage:startCacheFetch(cacheKey, "workflow.read", FETCH_OWNER,
+            "{\"operation\":\"instances.get\"}", token, storage:cacheNowEpoch() + 60);
+    test:assertTrue(started);
+    _ = check storage:completeCacheFetch(cacheKey, token, "{\"request\":{},\"response\":{}}",
+            storage:cacheNowEpoch() + 600);
+
+    check storage:expireCacheEntry(cacheKey);
+
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertTrue(row.token is (), "a settled entry holds no fetch");
+    test:assertTrue(row.expiresAt <= storage:cacheNowEpoch(), "and the forced refresh expired it");
 }
