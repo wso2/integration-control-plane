@@ -95,6 +95,7 @@ import { identifyIntegration } from '../utils/identifyIntegration';
 import { isWorkflowIntegration } from '../utils/workflowIntegration';
 import { hasIntegrationTraces } from '../utils/integrationTraces';
 import { useAuth } from '../auth';
+import { isContextEngineEnabled } from '../hooks/useContextEngine';
 import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
 import { useScope, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, settingsCrossScopeUrl, resolveActiveNavId, parentGroupId, navUrl, overviewUrl, navScopeSwitchUrl, resolveResourceKey, componentKeepsPage, type Scope } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
@@ -745,6 +746,15 @@ export default function AppLayout(): JSX.Element {
                         <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     </Sidebar.Item>
+
+                    {isContextEngineEnabled() && (
+                      <Sidebar.Item id="org-context-engines">
+                        <Sidebar.ItemIcon>
+                          <Waypoints size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Context Engines</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+                    )}
                   </Sidebar.Category>,
 
                   <Sidebar.Category key="org-ai">

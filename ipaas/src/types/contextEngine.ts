@@ -1,0 +1,254 @@
+/**
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+/**
+ * Domain model for Context Engines — the org-level feature that builds a
+ * governed context graph from chosen sources and lets selected roles query it
+ * in natural language, over REST, or over MCP.
+ *
+ * A Context Engine is backed by one *context space* on the Devant Context
+ * Engine service. The public engine vocabulary (space, source, evidence, job,
+ * grant) is kept here; the product name shown to users is "Context Engine".
+ */
+
+import type { EmbeddingConfig } from './ragIngestion';
+
+// ── Engine ──────────────────────────────────────────────────────────────────
+
+export type ContextEngineState = 'provisioning' | 'ready' | 'failed' | 'deleting';
+
+/** Tabs on the engine detail page; the active one is a URL segment. */
+export type ContextEngineTabKey = 'overview' | 'playground' | 'api' | 'mcp' | 'access';
+
+/** A context engine as shown in the listing. */
+export interface ContextEngine {
+  id: string;
+  name: string;
+  description: string;
+  state: ContextEngineState;
+  createdAt: string;
+}
+
+/** Which surfaces the engine is published on. */
+export interface ContextEngineExposure {
+  api: boolean;
+  mcp: boolean;
+}
+
+/** Provider + model, without credentials — what the engine reports back. */
+export interface ContextModelSummary {
+  provider: string;
+  model: string;
+}
+
+export interface ContextEngineModels {
+  embedding: ContextModelSummary | null;
+  llm: ContextModelSummary | null;
+}
+
+/** The full engine as shown on its detail page. */
+export interface ContextEngineDetail extends ContextEngine {
+  sources: ContextSource[];
+  models: ContextEngineModels;
+  /** Org role handles granted query access (derived from group grants). */
+  queryRoles: string[];
+  exposure: ContextEngineExposure;
+}
+
+// ── Sources ─────────────────────────────────────────────────────────────────
+
+export type ContextSourceState = 'ready' | 'paused' | 'failed' | 'pending';
+
+/** A source registered on the engine. */
+export interface ContextSource {
+  id: string;
+  name: string;
+  /** Connector id (see {@link SourceConnector}). */
+  type: string;
+  state: ContextSourceState | string;
+}
+
+/**
+ * How a connector field is entered. `url` must be one http(s) URL; `urls` is a
+ * newline-separated list of them; `secret` is masked and travels as a credential.
+ */
+export type SourceFieldKind = 'text' | 'secret' | 'url' | 'urls' | 'multiline';
+
+export interface SourceFieldDef {
+  key: string;
+  label: string;
+  kind: SourceFieldKind;
+  required?: boolean;
+  placeholder?: string;
+  helper?: string;
+  defaultValue?: string;
+}
+
+export type SourceCategory = 'documentation' | 'cloud-storage' | 'code' | 'collaboration' | 'databases' | 'saas' | 'web-files';
+
+/** Icon keys the source mark can draw for connectors without a brand logo. */
+export type SourceIcon = 'book' | 'building' | 'github' | 'globe' | 'upload' | 'database' | 'headset' | 'hash' | 'kanban' | 'file' | 'cloud' | 'folder' | 'mail' | 'table' | 'chat' | 'box' | 'plug' | 'shield' | 'video' | 'rss' | 'cart' | 'card' | 'code';
+
+/**
+ * One entry in the connector catalog — everything the UI needs to list it and
+ * render its configuration form. The catalog is schema-driven so it can grow to
+ * hundreds of connectors without a component per type.
+ */
+export interface SourceConnector {
+  id: string;
+  name: string;
+  description: string;
+  category: SourceCategory;
+  /** Shown in the Popular row and as a quick-add chip. */
+  popular?: boolean;
+  /** Logo path under the public folder; `icon` is drawn when absent. */
+  logo?: string;
+  icon: SourceIcon;
+  fields: SourceFieldDef[];
+  /** Field keys shown in the one-line summary, in order. */
+  summaryKeys: string[];
+  /** Only one instance can be added (e.g. file upload). */
+  single?: boolean;
+}
+
+/** A configured source in the wizard: the connector, a display name and the connector's field values. */
+export interface ContextSourceConfig {
+  type: string;
+  name: string;
+  values: Record<string, string>;
+}
+
+// ── Models ──────────────────────────────────────────────────────────────────
+
+export type LlmProvider = 'openai' | 'anthropic' | 'azure_openai' | 'mistral';
+
+/** `azureApiVersion`/`azureBaseUrl` are only consumed when `provider === 'azure_openai'`. */
+export interface LlmConfig {
+  provider: LlmProvider;
+  model: string;
+  apiKey: string;
+  azureBaseUrl: string;
+  azureApiVersion: string;
+}
+
+// ── Wizard form ─────────────────────────────────────────────────────────────
+
+export interface ContextEngineForm {
+  sources: ContextSourceConfig[];
+  /** Org role handles allowed to query. */
+  roles: string[];
+  embedding: EmbeddingConfig | null;
+  llm: LlmConfig | null;
+  name: string;
+  description: string;
+}
+
+export interface CreateContextEngineInput {
+  name: string;
+  description: string;
+  sources: ContextSourceConfig[];
+  roles: string[];
+  embedding: EmbeddingConfig;
+  llm: LlmConfig;
+}
+
+export interface CreateContextEngineResult {
+  id: string;
+  /** Steps the engine could not complete because it does not expose that route yet. */
+  warnings: string[];
+}
+
+// ── Jobs ────────────────────────────────────────────────────────────────────
+
+export type ContextJobState = 'accepted' | 'queued' | 'running' | 'retry_wait' | 'succeeded' | 'failed';
+
+export interface ContextJobError {
+  code: string;
+  message: string;
+  traceId: string;
+}
+
+export interface ContextJob {
+  id: string;
+  state: ContextJobState | string;
+  operation: string;
+  traceId: string;
+  attemptCount: number;
+  createdAt: string;
+  error?: ContextJobError;
+}
+
+export interface ContextJobHandle {
+  jobId: string;
+  statusUrl: string;
+}
+
+// ── Query ───────────────────────────────────────────────────────────────────
+
+export type ContextQueryMode = 'context' | 'answer';
+
+export interface ContextQueryInput {
+  engineId: string;
+  question: string;
+  mode: ContextQueryMode;
+  limit?: number;
+}
+
+export interface ContextEvidence {
+  id: string;
+  recordId: string;
+  sourceId: string;
+  sourceVersion: string;
+  passage: string;
+  location?: string;
+  sourceUrl?: string;
+}
+
+export interface ContextQueryResult {
+  queryId: string;
+  state: 'completed' | 'insufficient_evidence' | string;
+  answer?: string;
+  evidence: ContextEvidence[];
+  insufficientEvidence: boolean;
+  traceId: string;
+}
+
+// ── Access ──────────────────────────────────────────────────────────────────
+
+export interface ContextGrant {
+  id: string;
+  resourceId: string;
+  actions: string[];
+  principalId?: string;
+  group?: string;
+}
+
+export interface PutContextGrantInput {
+  engineId: string;
+  grantId: string;
+  actions: string[];
+  group?: string;
+  principalId?: string;
+}
+
+export interface ContextPrincipal {
+  id: string;
+  kind: 'user' | 'service' | string;
+  email?: string;
+  groups: string[];
+}
