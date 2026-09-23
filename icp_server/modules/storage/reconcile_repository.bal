@@ -231,43 +231,54 @@ public isolated function queryArtifactState(string componentId, string envId)
 // update win the status it is in the middle of setting.
 public isolated function migrateLegacyArtifactTypeKeys(string componentId, string envId,
         string artifactName, string canonicalType) returns error? {
+    // Select the whole case-insensitive group rather than filtering the canonical spelling out in
+    // SQL. On MySQL this column is utf8mb4_unicode_ci, so `artifact_type <> canonical` is false for
+    // a difference of case alone and an SQL-side filter would match nothing; the exact comparison
+    // is therefore made in Ballerina, which is case-sensitive on every database.
     stream<LegacyDesiredStateRow, sql:Error?> rows = dbClient->query(`
         SELECT artifact_type, state_key, state_value FROM reconcile_desired_state
         WHERE component_id = ${componentId} AND env_id = ${envId}
             AND artifact_name = ${artifactName}
             AND LOWER(TRIM(artifact_type)) = ${canonicalType}
-            AND artifact_type <> ${canonicalType}
     `);
-    LegacyDesiredStateRow[] legacyRows = check from LegacyDesiredStateRow row in rows
+    LegacyDesiredStateRow[] groupRows = check from LegacyDesiredStateRow row in rows
         select row;
-    if legacyRows.length() == 0 {
+
+    boolean hasLegacySpelling = groupRows.some(row => row.artifact_type != canonicalType);
+    if !hasLegacySpelling {
         return;
     }
 
-    types:ReconcileArtifactKey canonicalKey = {artifactName: artifactName, artifactType: canonicalType};
-    map<string> canonicalState = check readReconcileDesiredState(componentId, envId, canonicalKey);
-
-    map<string> carried = {};
-    foreach LegacyDesiredStateRow row in legacyRows {
+    // Merge the group into one state map. The canonical spelling wins a shared key; anything only a
+    // legacy row carries is kept, so a tracing or statistics value set earlier is not lost.
+    map<string> merged = {};
+    foreach LegacyDesiredStateRow row in groupRows {
         string? value = row.state_value;
-        if value is string && !canonicalState.hasKey(row.state_key) && !carried.hasKey(row.state_key) {
-            carried[row.state_key] = value;
+        if value is () {
+            continue;
+        }
+        if row.artifact_type == canonicalType || !merged.hasKey(row.state_key) {
+            merged[row.state_key] = value;
         }
     }
     log:printInfo("Migrating legacy artifact type keys", componentId = componentId, envId = envId,
             artifactName = artifactName, canonicalType = canonicalType,
-            legacyRowCount = legacyRows.length(), carriedKeyCount = carried.length());
-    if carried.length() > 0 {
-        check upsertReconcileDesiredState(componentId, envId, canonicalKey, carried);
-    }
+            rowCount = groupRows.length(), mergedKeyCount = merged.length());
 
+    // Delete the whole group before rewriting it. Deleting only the legacy spellings would remove
+    // the canonical row too under a case-insensitive collation, where the two are not
+    // distinguishable by equality.
     _ = check dbClient->execute(`
         DELETE FROM reconcile_desired_state
         WHERE component_id = ${componentId} AND env_id = ${envId}
             AND artifact_name = ${artifactName}
             AND LOWER(TRIM(artifact_type)) = ${canonicalType}
-            AND artifact_type <> ${canonicalType}
     `);
+
+    types:ReconcileArtifactKey canonicalKey = {artifactName: artifactName, artifactType: canonicalType};
+    if merged.length() > 0 {
+        check upsertReconcileDesiredState(componentId, envId, canonicalKey, merged);
+    }
 }
 
 public isolated function upsertReconcileDesiredState(string componentId, string envId,

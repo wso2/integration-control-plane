@@ -131,6 +131,24 @@ isolated function stateOf(map<map<types:ArtifactStateField>> sm, string name, st
     return fields is map<types:ArtifactStateField> ? fields[key] : ();
 }
 
+// Canonical artifact type for a reconcile key, with any desired state left under a different
+// spelling folded in first. All three artifact mutations go through this, so one artifact cannot
+// end up with two desired-state keys because one mutation normalized and another did not.
+isolated function canonicalArtifactType(string componentId, types:Runtime[] runtimes,
+        string artifactName, string rawArtifactType) returns string|error {
+    string artifactType = storage:normalizeArtifactType(rawArtifactType);
+    map<boolean> migratedEnvs = {};
+    foreach types:Runtime runtime in runtimes {
+        string envId = runtime.environment.id;
+        if migratedEnvs.hasKey(envId) {
+            continue;
+        }
+        migratedEnvs[envId] = true;
+        check storage:migrateLegacyArtifactTypeKeys(componentId, envId, artifactName, artifactType);
+    }
+    return artifactType;
+}
+
 // Group runtimes by environment, upsert desired state per env, and reconcile.
 // Returns [successCount, failedCount] across all envs.
 isolated function reconcilePerEnv(types:Runtime[] runtimes, string componentId,
@@ -3152,16 +3170,8 @@ service /graphql on graphqlListener {
 
         // Fold away any desired state left under a non-canonical spelling of this artifact type
         // before writing the canonical one, so replay cannot keep dispatching the stale row.
-        map<boolean> migratedEnvs = {};
-        foreach types:Runtime runtime in runtimes {
-            string envId = runtime.environment.id;
-            if migratedEnvs.hasKey(envId) {
-                continue;
-            }
-            migratedEnvs[envId] = true;
-            check storage:migrateLegacyArtifactTypeKeys(input.componentId, envId,
-                    input.artifactName, artifactType);
-        }
+        artifactType = check canonicalArtifactType(input.componentId, runtimes, input.artifactName,
+                input.artifactType);
 
         types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"status": input.status};
@@ -3208,7 +3218,9 @@ service /graphql on graphqlListener {
             };
         }
 
-        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        string artifactType = check canonicalArtifactType(input.componentId, runtimes,
+                input.artifactName, input.artifactType);
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"tracing": input.trace};
         [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
@@ -3254,7 +3266,9 @@ service /graphql on graphqlListener {
             };
         }
 
-        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        string artifactType = check canonicalArtifactType(input.componentId, runtimes,
+                input.artifactName, input.artifactType);
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"statistics": input.statistics};
         [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
