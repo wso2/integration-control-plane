@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildFormResult, formValuesForRaw, formValuesFromObject, parseFormSchema, parseRawJson, type FormField } from './helpers';
+import { buildFormResult, formIsAuthoritative, formValuesForRaw, formValuesFromObject, parseFormSchema, parseRawJson, type FormField } from './helpers';
 
 // The schema a review activity's arguments arrive with: free text, a number, a nested group.
 const SCHEMA = JSON.stringify({
@@ -143,5 +143,18 @@ describe('parseRawJson', () => {
   it('submits what was typed verbatim, including newlines inside a string', () => {
     const parsed = parseRawJson(JSON.stringify({ note: MULTILINE }));
     expect(parsed?.value).toEqual({ note: MULTILINE });
+  });
+});
+
+describe('formIsAuthoritative', () => {
+  it('is true only while the form is the thing on screen', () => {
+    const f = fields();
+
+    expect(formIsAuthoritative(f, false)).toBe(true);
+    // Raw mode bypasses the form: what it holds is not what will be submitted.
+    expect(formIsAuthoritative(f, true)).toBe(false);
+    // No schema, no form — the JSON editor is all there is, in either mode.
+    expect(formIsAuthoritative(null, false)).toBe(false);
+    expect(formIsAuthoritative(null, true)).toBe(false);
   });
 });

@@ -39,6 +39,7 @@ import {
   ownerScope,
   parseFormSchema,
   parseRawJson,
+  formIsAuthoritative,
   sectionTitleSx,
   sortByStartTimeDesc,
   splitQualifiedName,
@@ -416,7 +417,7 @@ export function StartWorkflowDialog({ scope, initialWorkflowType, onClose, onToa
     if (!selected) return;
     setStartError(null);
     let parsedInput: unknown;
-    if (formFields && !rawMode) {
+    if (formIsAuthoritative(formFields, rawMode)) {
       const { result, errors } = buildFormResult(formFields, formValues);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
@@ -733,7 +734,7 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
 
   // Step one of the edited path: validate and stage; the review-changes step submits.
   const stageEdited = () => {
-    if (formFields && !rawMode) {
+    if (formIsAuthoritative(formFields, rawMode)) {
       const { result, errors } = buildFormResult(formFields, formValues);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
@@ -932,7 +933,7 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
               <Stack gap={2} sx={{ pt: 0.5 }}>
                 <Alert severity="info">The activity {activity.trigger === 'ON_FAILURE' ? 'retries' : 'runs'} with the edited arguments below. This cannot be undone.</Alert>
                 {/* Raw mode bypassed the form, so the field diff would not describe what is about to be submitted. */}
-                {formFields && !rawMode ? (
+                {formIsAuthoritative(formFields, rawMode) ? (
                   changes.length === 0 ? (
                     <Typography variant="body2" color="text.secondary">
                       Nothing was changed — this is the same as Proceed with the original arguments.

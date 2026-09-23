@@ -359,6 +359,14 @@ export function formValuesForRaw(fields: FormField[], values: Record<string, str
   return out;
 }
 
+// Whether the generated form is what will be submitted. Raw mode bypasses it, so the form is
+// authoritative only while it is the thing on screen — and a caller that asks about the fields
+// alone builds a dialog, a diff or a payload out of values nobody is going to send. The editor and
+// its callers ask this one question rather than each re-deriving it.
+// A type predicate, so a caller that asks still gets the fields narrowed and cannot reach for them
+// without asking first.
+export const formIsAuthoritative = (fields: FormField[] | null, rawMode: boolean): fields is FormField[] => fields !== null && !rawMode;
+
 // Parses raw-mode JSON, treating blank as an empty object; returns null when the text is not valid JSON.
 export function parseRawJson(text: string): { value: unknown } | null {
   try {

@@ -24,7 +24,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import SchemaOrRawEditor from './SchemaOrRawEditor';
 import StructuredValue from './StructuredValue';
 import TaskAdministerCard, { AdministratorsRow, completedAsLabel } from './TaskAdministerCard';
-import { buildFormResult, displayWorkflowId, formatTime, gatewayScope, jsonPretty, ownerLabel, ownerScope, parseFormSchema, parseRawJson, sortByStartTimeDesc, splitQualifiedName, unescapeRoleName, type PortalScope } from './helpers';
+import { buildFormResult, displayWorkflowId, formIsAuthoritative, formatTime, gatewayScope, jsonPretty, ownerLabel, ownerScope, parseFormSchema, parseRawJson, sortByStartTimeDesc, splitQualifiedName, unescapeRoleName, type PortalScope } from './helpers';
 import { ActionCard, DetailDrawer, DetailRow, HeaderCell, IdText, ListFooter, NotProvided, RefreshingNote, SectionCard, StatusChip, SubmitError, WorkflowIdLink, type WorkflowScope, rowOpenProps } from './shared';
 import { IntegrationFilter, ReviewActivityDetailDialog, StatusFilter, useTimeRangeFilter, WorkflowNameFilter } from './AdminPortal';
 import Authorized from '../Authorized';
@@ -588,7 +588,7 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
 
   // Step one: validate and stage the result; step two actually submits it.
   const stageComplete = () => {
-    if (formFields && !rawMode) {
+    if (formIsAuthoritative(formFields, rawMode)) {
       const { result, errors } = buildFormResult(formFields, formValues);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);

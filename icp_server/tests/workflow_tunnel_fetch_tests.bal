@@ -101,6 +101,49 @@ isolated function testAbandoningAnUnknownKeyIsHarmless() returns error? {
     test:assertFalse(check storage:abandonCacheFetch("test-fetch-absent-key"));
 }
 
+// An abandoned entry keeps its row — that is where the request lives — so the retry has to be
+// claimed on it. A fresh insert collides with the row that is already there and starts nothing,
+// which is why the reader claims a refresh instead of falling through to one.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testRetryAfterAbandonIsClaimedNotInserted() returns error? {
+    string cacheKey = "test-fetch-retry-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(cacheKey, storage:cacheNowEpoch() - 5);
+    test:assertTrue(check storage:abandonCacheFetch(cacheKey));
+
+    boolean inserted = check storage:startCacheFetch(cacheKey, "workflow.read", FETCH_OWNER,
+            "{\"operation\":\"instances.get\"}", "retry-insert", storage:cacheNowEpoch() + 60);
+    test:assertFalse(inserted, "an insert collides with the abandoned row and claims nothing");
+
+    test:assertTrue(check storage:claimCacheRefresh(cacheKey, "retry-claim", storage:cacheNowEpoch() + 60),
+            "the retry claims the row that is already there");
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertEquals(row.token, "retry-claim", "and the retry is the fetch now in flight");
+}
+
+// The targeted abandon and the sweep record a given-up fetch the same way, because they are the
+// same statement: a row abandoned by either reads identically to a reader.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testSweepAndTargetedAbandonAgree() returns error? {
+    string byKey = "test-abandon-key-" + storage:cacheNowEpoch().toString();
+    string bySweep = "test-abandon-sweep-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(byKey, storage:cacheNowEpoch() - 5);
+    check startTestFetch(bySweep, storage:cacheNowEpoch() - 5);
+
+    test:assertTrue(check storage:abandonCacheFetch(byKey));
+    _ = check storage:abandonExpiredCacheFetches(0);
+
+    types:CacheEntry targeted = check entryOf(byKey);
+    types:CacheEntry swept = check entryOf(bySweep);
+    test:assertEquals(targeted.status, swept.status);
+    test:assertTrue(targeted.token is () && swept.token is ());
+    test:assertTrue(targeted.claimedAt is () && swept.claimedAt is ());
+    test:assertTrue(targeted.data is string && swept.data is string, "both keep the request to retry with");
+}
+
 // `?refresh=true` expires an entry so the answer is fetched again. While a fetch is in flight
 // `expires_at` is that fetch's deadline, so expiring it would declare a live fetch dead — the
 // reader then gives up on it, and a refresh held down would abandon and reissue the very fetch

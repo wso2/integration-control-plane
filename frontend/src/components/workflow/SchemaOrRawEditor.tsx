@@ -19,7 +19,7 @@
 import { Button, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { useRef, type ReactNode } from 'react';
 import SchemaFormFields from './SchemaFormFields';
-import { formValuesForRaw, jsonPretty, type FormField } from './helpers';
+import { formIsAuthoritative, formValuesForRaw, jsonPretty, type FormField } from './helpers';
 
 // Shown under the JSON editor while a schema exists: the form is there, and this bypasses it.
 const RAW_MODE_HELPER = 'Raw mode: submitted exactly as typed — the form is bypassed.';
@@ -84,7 +84,7 @@ export default function SchemaOrRawEditor({ fields, values, errors, onChange, ra
           )}
         </Stack>
       )}
-      {fields && !rawMode ? (
+      {formIsAuthoritative(fields, rawMode) ? (
         <SchemaFormFields fields={fields} values={values} errors={errors} onChange={onChange} disabled={disabled} />
       ) : (
         <TextField

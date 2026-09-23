@@ -284,7 +284,17 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
         if fetching {
             return {state: "PENDING"};
         }
-        // A row with neither payload nor fetch in flight was abandoned: retry it.
+        // Nothing to serve, and nothing in flight: the fetch was given up on, here or by the sweep.
+        // The retry has to be CLAIMED on the row rather than left to the insert below — an
+        // abandoned entry keeps its row (that is where the request lives), so the insert collides
+        // with it, wins nothing, and the caller would wait a whole poll for a retry that never
+        // started here.
+        error? retried = startWorkflowReadRefresh(cacheKey, operation, params, roles,
+                componentId, environmentId, now);
+        if retried is error {
+            log:printWarn("Failed to retry an abandoned workflow read", retried, cacheKey = cacheKey);
+        }
+        return {state: "PENDING"};
     }
 
     WorkflowCommandTarget? target = check selectWorkflowCommandTarget(componentId, environmentId);
