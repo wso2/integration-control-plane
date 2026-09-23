@@ -409,8 +409,8 @@ public isolated function resolveOrCreateComponent(string projectId, string name,
     string componentType = expectedType;
 
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
-        INSERT INTO components (component_id, project_id, name, display_name, component_type, created_by)
-        VALUES (${componentId}, ${projectId}, ${name}, ${name}, ${componentType}, ${createdBy})
+        INSERT INTO components (component_id, project_id, name, display_name, component_type, display_type, created_by)
+        VALUES (${componentId}, ${projectId}, ${name}, ${name}, ${componentType}, ${"unspecified"}, ${createdBy})
     `);
 
     if result is sql:Error {

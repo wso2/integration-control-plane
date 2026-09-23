@@ -37,7 +37,7 @@ export default function EditComponent(scope: ProjectScope | ComponentScope): JSX
   const { data: component, error: componentError, isLoading: componentLoading } = useComponentByHandler(projectId, componentHandler);
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
-  const [integrationType, setIntegrationType] = useState<IntegrationType>('service');
+  const [integrationType, setIntegrationType] = useState<IntegrationType>('unspecified');
   const mutation = useUpdateComponent();
 
   useEffect(() => {
@@ -130,7 +130,7 @@ export default function EditComponent(scope: ProjectScope | ComponentScope): JSX
 
       <Box sx={{ mb: 4 }}>
         <Typography variant="h5" sx={{ mb: 2 }}>
-          Integration Type
+          Integration Type (optional)
         </Typography>
         <IntegrationTypeSelector selected={integrationType} onSelect={setIntegrationType} technology={component.componentType as Technology} />
       </Box>

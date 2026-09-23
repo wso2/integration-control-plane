@@ -28,20 +28,21 @@ import ballerina/uuid;
 // distinction, so it is accepted for either. Adding an integration type means
 // adding its value under every runtime that offers it; a type one runtime cannot
 // run is simply absent there, as Workflow is for MI.
-// The generic integration type: the column default, what pre-integration-type clients
-// wrote, and what a component auto-created from a heartbeat starts as — at registration
-// time nothing yet knows what the integration contains.
+// The legacy generic integration type: the column default and what older clients
+// wrote. Runtime registration now explicitly writes "unspecified".
 const string GENERIC_DISPLAY_TYPE = "service";
 
 // The workflow integration type. The integration-level Workflows view keys on it, so a
 // workflow integration that carries the generic type shows no workflow features.
 const string WORKFLOW_DISPLAY_TYPE = "ballerinaWorkflow";
 
+// "unspecified" records an explicit choice to leave the integration unclassified.
+// Keep it distinct from the legacy "service" default used by older clients.
 final readonly & map<string[]> SUPPORTED_DISPLAY_TYPES_BY_RUNTIME = {
     // The workflow engine and its management API are Ballerina-only, so
     // `ballerinaWorkflow` has no MI counterpart.
-    "BI": ["service", "ballerinaService", "scheduledTask", "ballerinaEventHandler", "ballerinaWorkflow"],
-    "MI": ["service", "miApiService", "miCronjob", "miEventHandler"]
+    "BI": ["unspecified", "service", "ballerinaService", "scheduledTask", "ballerinaEventHandler", "ballerinaWorkflow"],
+    "MI": ["unspecified", "service", "miApiService", "miCronjob", "miEventHandler"]
 };
 
 // Subtypes for the integration types that share a generic service display_type and
@@ -934,7 +935,7 @@ isolated function mapToComponent(types:ComponentInDB component) returns types:Co
 // Records that a component is a workflow integration, if it is not already typed as
 // something an operator chose.
 //
-// A component auto-created from a heartbeat carries the generic integration type: the
+// A component auto-created by older versions carries the generic integration type: the
 // bridge registers a runtime before anything knows whether the integration contains
 // workflows, so registration cannot tell. The first heartbeat that carries workflow
 // metadata settles it — the integration registered workflows with its runtime — and the
@@ -945,7 +946,8 @@ isolated function mapToComponent(types:ComponentInDB component) returns types:Co
 //
 // Only the generic type is promoted, and only for Ballerina components, since the
 // workflow engine is Ballerina-only: a type an operator chose deliberately is left
-// alone, and re-running this is a no-op.
+// alone, and re-running this is a no-op. New registrations use "unspecified" and
+// stay unclassified until an operator selects a type.
 //
 // + componentId - The component the reporting runtime belongs to
 // + return - An error only if the update itself fails

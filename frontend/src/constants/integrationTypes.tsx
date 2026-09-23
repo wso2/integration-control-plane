@@ -20,10 +20,10 @@ import { Bot, Clock, Folder, Globe, HardDrive, Layers, Radio, Repeat, Server, Sp
 import type { ReactNode } from 'react';
 import type { Technology } from './technologies';
 
-export type IntegrationType = 'service' | 'automation' | 'file-integration' | 'event-integration' | 'ai-agent' | 'mcp-server' | 'workflow';
+export type IntegrationType = 'unspecified' | 'service' | 'automation' | 'file-integration' | 'event-integration' | 'ai-agent' | 'mcp-server' | 'workflow';
 
 export interface IntegrationTypeOption {
-  id: IntegrationType;
+  id: Exclude<IntegrationType, 'unspecified'>;
   title: string;
   description: string;
   icons: { icon: ReactNode; label: string }[];
@@ -32,8 +32,8 @@ export interface IntegrationTypeOption {
 }
 
 /**
- * The integration types an integration can be created as. Ids, order and copy
- * match the devant integration-create flow.
+ * Optional classification for an integration. Specific types match the devant
+ * integration-create flow. No selection is stored as unspecified.
  */
 export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
   {
@@ -118,6 +118,7 @@ export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
  * they are told apart by {@link resolveComponentSubType}.
  */
 export function resolveDisplayType(technology: Technology, integrationType: IntegrationType): string {
+  if (integrationType === 'unspecified') return 'unspecified';
   if (technology === 'BI') {
     if (integrationType === 'automation') return 'scheduledTask';
     if (integrationType === 'event-integration') return 'ballerinaEventHandler';
@@ -160,6 +161,8 @@ export function integrationTypeFromStored(displayType: string, componentSubType?
       return 'mcp-server';
   }
   switch (displayType) {
+    case 'unspecified':
+      return 'unspecified';
     case 'scheduledTask':
     case 'miCronjob':
       return 'automation';
@@ -184,6 +187,8 @@ export function integrationTypeLabel(displayType: string, componentSubType?: str
       return 'MCP Server';
   }
   switch (displayType) {
+    case 'unspecified':
+      return '';
     case 'ballerinaWorkflow':
       return 'Workflow';
     case 'scheduledTask':

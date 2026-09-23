@@ -45,7 +45,7 @@ export default function CreateComponent(scope: ProjectScope): JSX.Element {
   const [handlerEdited, setHandlerEdited] = useState(false);
   const [description, setDescription] = useState('');
   const [componentType, setComponentType] = useState<Technology>('BI');
-  const [integrationType, setIntegrationType] = useState<IntegrationType>('service');
+  const [integrationType, setIntegrationType] = useState<IntegrationType>('unspecified');
   const mutation = useCreateComponent();
 
   const effectiveHandler = handlerEdited ? handler : toHandler(displayName);
@@ -169,14 +169,14 @@ export default function CreateComponent(scope: ProjectScope): JSX.Element {
             setComponentType(t);
             // Not every type is offered by every technology (Workflow is Ballerina-only), so a
             // selection the new technology does not offer falls back to the default.
-            if (!integrationTypesFor(t).some((o) => o.id === integrationType)) setIntegrationType('service');
+            if (!integrationTypesFor(t).some((o) => o.id === integrationType)) setIntegrationType('unspecified');
           }}
         />
       </Box>
 
       <Box sx={{ mb: 4 }}>
         <Typography variant="h5" sx={{ mb: 2 }}>
-          Integration Type
+          Integration Type (optional)
         </Typography>
         <IntegrationTypeSelector selected={integrationType} onSelect={setIntegrationType} technology={componentType} />
       </Box>

@@ -35,10 +35,12 @@ interface IntegrationTypeSelectorProps {
  *
  * Keyboard model is the standard radio-group one: a roving tabIndex puts a single
  * stop in the tab order, and the arrow keys move the selection between options.
+ * Activating a selected tile clears the optional selection.
  */
 export default function IntegrationTypeSelector({ selected, onSelect, technology }: IntegrationTypeSelectorProps): JSX.Element {
   const cardRefs = useRef<(HTMLDivElement | null)[]>([]);
   const options = integrationTypesFor(technology);
+  const hasSelection = options.some((option) => option.id === selected);
 
   const moveSelection = (from: number, delta: number) => {
     const next = (from + delta + options.length) % options.length;
@@ -59,12 +61,12 @@ export default function IntegrationTypeSelector({ selected, onSelect, technology
             role="radio"
             aria-checked={isActive}
             aria-label={opt.title}
-            tabIndex={isActive ? 0 : -1}
-            onClick={() => onSelect(opt.id)}
+            tabIndex={isActive || (!hasSelection && index === 0) ? 0 : -1}
+            onClick={() => onSelect(isActive ? 'unspecified' : opt.id)}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
                 e.preventDefault();
-                onSelect(opt.id);
+                onSelect(isActive ? 'unspecified' : opt.id);
                 return;
               }
               if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {

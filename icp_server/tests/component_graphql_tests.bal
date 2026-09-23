@@ -15,6 +15,8 @@
 // under the License.
 
 import icp_server.auth;
+import icp_server.storage;
+import icp_server.types;
 
 import ballerina/test;
 
@@ -482,7 +484,9 @@ function testCreateComponentAcceptsEveryIntegrationType() returns error? {
         ["miCronjob", "MI"],
         ["ballerinaEventHandler", "BI"],
         ["miEventHandler", "MI"],
-        ["ballerinaWorkflow", "BI"]
+        ["ballerinaWorkflow", "BI"],
+        ["unspecified", "BI"],
+        ["unspecified", "MI"]
     ];
 
     foreach int i in 0 ..< displayTypes.length() {
@@ -535,4 +539,80 @@ function testCreateComponentRejectsUnknownIntegrationType() returns error? {
     // Assert on the message too, so an unrelated failure (permissions, validation) cannot pass.
     test:assertTrue(response.toJsonString().includes("Unsupported integration type"),
             string `Rejection must come from the display-type allowlist, got: ${response.toJsonString()}`);
+}
+
+// Clearing a specific type must also clear its subtype, for both runtimes.
+@test:Config {
+    groups: ["component-graphql", "update-component"]
+}
+function testUpdateComponentToUnspecifiedType() returns error? {
+    string createMutation = string `
+        mutation CreateComponent($component: ComponentInput!) {
+            createComponent(component: $component) { id }
+        }
+    `;
+    string updateMutation = string `
+        mutation UpdateComponent($component: ComponentUpdateInput!) {
+            updateComponent(component: $component) { displayType componentSubType }
+        }
+    `;
+
+    foreach string runtimeType in ["BI", "MI"] {
+        json createdResponse = check executeGraphQL(createMutation, project1AdminToken, {
+            component: {
+                name: string `test-clear-type-${runtimeType.toLowerAscii()}`,
+                displayName: "Clear integration type",
+                description: "Integration containing multiple types",
+                projectId: PROJECT_1_ID,
+                componentType: runtimeType,
+                displayType: runtimeType == "BI" ? "ballerinaService" : "miApiService",
+                componentSubType: "aiAgent"
+            }
+        });
+        test:assertFalse(createdResponse.errors is json, "Creating a typed integration must succeed");
+        json created = check (check createdResponse.data).createComponent;
+        string componentId = check created.id;
+
+        json updatedResponse = check executeGraphQL(updateMutation, project1AdminToken, {
+            component: {
+                id: componentId,
+                displayType: "unspecified"
+            }
+        });
+        test:assertFalse(updatedResponse.errors is json, "Clearing the integration type must succeed");
+        json updated = check (check updatedResponse.data).updateComponent;
+        test:assertEquals(check updated.displayType, "unspecified");
+        test:assertEquals(check updated.componentSubType, ());
+    }
+}
+
+// Add Runtime auto-creates integrations without a user-selected classification.
+@test:Config {
+    groups: ["component-graphql", "runtime-registration"]
+}
+function testRuntimeRegistrationDefaultsToUnspecifiedType() returns error? {
+    foreach string runtimeType in ["BI", "MI"] {
+        string name = string `test-runtime-untyped-${runtimeType.toLowerAscii()}`;
+        string componentId = check storage:resolveOrCreateComponent(
+            PROJECT_1_ID, name, runtimeType, SUPER_ADMIN_USER_ID);
+        types:Component created = check storage:getComponentById(componentId);
+        test:assertEquals(created.displayType, "unspecified");
+        test:assertEquals(created.componentType, runtimeType);
+        test:assertEquals(created.componentSubType, ());
+
+        // Workflow discovery must not replace the unselected state.
+        check storage:promoteToWorkflowIntegration(componentId);
+        types:Component discovered = check storage:getComponentById(componentId);
+        test:assertEquals(discovered.displayType, "unspecified");
+
+        string selectedType = runtimeType == "BI" ? "ballerinaService" : "miApiService";
+        check storage:updateComponent(componentId, (), (), (), SUPER_ADMIN_USER_ID, selectedType, "aiAgent");
+        string resolvedId = check storage:resolveOrCreateComponent(
+            PROJECT_1_ID, name, runtimeType, SUPER_ADMIN_USER_ID);
+        test:assertEquals(resolvedId, componentId);
+        types:Component existing = check storage:getComponentById(resolvedId);
+        test:assertEquals(existing.displayType, selectedType,
+            "Registering another runtime must preserve the user-selected type");
+        test:assertEquals(existing.componentSubType, "aiAgent");
+    }
 }

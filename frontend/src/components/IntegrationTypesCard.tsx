@@ -25,6 +25,7 @@ import { integrationTypeLabel } from '../constants/integrationTypes';
 export default function IntegrationTypesCard({ components }: { components: GqlComponent[] }): JSX.Element {
   const counts = components.reduce<Record<string, number>>((acc, c) => {
     const label = integrationTypeLabel(c.displayType, c.componentSubType);
+    if (!label) return acc;
     acc[label] = (acc[label] || 0) + 1;
     return acc;
   }, {});
