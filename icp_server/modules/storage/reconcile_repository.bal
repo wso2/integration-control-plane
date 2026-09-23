@@ -267,17 +267,21 @@ public isolated function migrateLegacyArtifactTypeKeys(string componentId, strin
 
     // Delete the whole group before rewriting it. Deleting only the legacy spellings would remove
     // the canonical row too under a case-insensitive collation, where the two are not
-    // distinguishable by equality.
-    _ = check dbClient->execute(`
-        DELETE FROM reconcile_desired_state
-        WHERE component_id = ${componentId} AND env_id = ${envId}
-            AND artifact_name = ${artifactName}
-            AND LOWER(TRIM(artifact_type)) = ${canonicalType}
-    `);
-
+    // distinguishable by equality. Both statements run in one transaction so a failure part way
+    // through cannot leave the artifact with its desired state deleted and nothing written back.
     types:ReconcileArtifactKey canonicalKey = {artifactName: artifactName, artifactType: canonicalType};
-    if merged.length() > 0 {
-        check upsertReconcileDesiredState(componentId, envId, canonicalKey, merged);
+    transaction {
+        _ = check dbClient->execute(`
+            DELETE FROM reconcile_desired_state
+            WHERE component_id = ${componentId} AND env_id = ${envId}
+                AND artifact_name = ${artifactName}
+                AND LOWER(TRIM(artifact_type)) = ${canonicalType}
+        `);
+
+        if merged.length() > 0 {
+            check upsertReconcileDesiredState(componentId, envId, canonicalKey, merged);
+        }
+        check commit;
     }
 }
 

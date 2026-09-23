@@ -3248,10 +3248,13 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to change artifact statistics");
         }
 
+        // Validate the canonical spelling, not the caller's. Matching the raw value here would
+        // reject a supported type sent as "Proxy-Service" before it could be normalized.
+        string normalizedType = storage:normalizeArtifactType(input.artifactType);
         string[] supportedTypes = ["proxy-service", "endpoint", "api", "sequence", "inbound-endpoint"];
-        boolean isSupported = supportedTypes.indexOf(input.artifactType) != ();
+        boolean isSupported = supportedTypes.indexOf(normalizedType) != ();
         if !isSupported {
-            return error(string `Artifact type '${input.artifactType}' does not support statistics. Supported types: ProxyService, Endpoint, RestApi, Sequence, InboundEndpoint`);
+            return error(string `Artifact type '${normalizedType}' does not support statistics. Supported types: ProxyService, Endpoint, RestApi, Sequence, InboundEndpoint`);
         }
 
         types:Runtime[] runtimes = check storage:getRuntimes((), "MI", input.environmentId, component.projectId, input.componentId);
