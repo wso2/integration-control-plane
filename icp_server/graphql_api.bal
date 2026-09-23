@@ -3116,6 +3116,28 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to change artifact status");
         }
 
+        // Match, persist and report the same canonical form, so a caller sending "  API  "
+        // is not rejected on one spelling and echoed back another, and so the reconcile key
+        // agrees with the observed state recorded from heartbeats.
+        string artifactType = storage:normalizeArtifactType(input.artifactType);
+
+        // Reject artifact types that cannot support a status change before anything is
+        // persisted. MI answers such a request with a 400 and the dispatch path cannot
+        // surface that, so proceeding would report SUCCESS, write a desired state that can
+        // never converge, and leave the console showing a state the runtime is not in.
+        if !storage:supportsStatusChange(artifactType) {
+            log:printWarn("Rejected status change for unsupported artifact type",
+                    artifactType = artifactType, artifactName = input.artifactName,
+                    componentId = input.componentId);
+            return {
+                status: types:FAILED,
+                message: string `Status change is not supported for artifact type '${artifactType}'. Supported types: ${storage:statusChangeSupportedTypes()}.`,
+                successCount: 0,
+                failedCount: 0,
+                details: []
+            };
+        }
+
         types:Runtime[] runtimes = check storage:getRuntimes((), "MI", (), component.projectId, input.componentId);
         if runtimes.length() == 0 {
             log:printWarn("No MI runtimes found for component", componentId = input.componentId);
@@ -3128,14 +3150,14 @@ service /graphql on graphqlListener {
             };
         }
 
-        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"status": input.status};
         [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
         storage:logAuditEvent(storage:AUDIT_ARTIFACT_STATUS_CHANGE, userId = userContext.userId,
                 resourceType = storage:AUDIT_RESOURCE_ARTIFACT,
-                resourceId = string `${input.componentId}/${input.artifactType}/${input.artifactName}`,
-                details = string `Artifact '${input.artifactName}' (${input.artifactType}) status changed to '${input.status}' by '${userContext.username}'`,
+                resourceId = string `${input.componentId}/${artifactType}/${input.artifactName}`,
+                details = string `Artifact '${input.artifactName}' (${artifactType}) status changed to '${input.status}' by '${userContext.username}'`,
                 clientIp = userContext.clientIp, userAgent = userContext.userAgent);
         return {
             status: counts[1] == 0 ? types:SUCCESS : types:FAILED,
