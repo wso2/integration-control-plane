@@ -316,6 +316,33 @@ public isolated function claimCacheFetches(string owner, int count)
 #
 # + retryAfterSeconds - How long the failed state stands before a read retries it
 # + return - How many fetches were given up on
+# Gives up on one entry's in-flight fetch once its deadline has passed, so the caller that
+# noticed can start a fresh one instead of waiting for the sweep to come round.
+#
+# Conditional on the row still holding an expired fetch, so two nodes noticing the same dead
+# fetch cannot both abandon it and issue two commands. The row keeps its data: that is where the
+# request lives, and a retry needs it. `expires_at` is set to now, which makes the entry
+# immediately retryable by whichever caller gets there first.
+#
+# + cacheKey - The entry whose fetch is being abandoned
+# + return - `true` when this caller abandoned it, `false` when it was already answered,
+#            already abandoned, or is not yet past its deadline
+public isolated function abandonCacheFetch(string cacheKey) returns boolean|error {
+    int now = cacheNowEpoch();
+    sql:ExecutionResult|sql:Error result = dbClient->execute(`
+        UPDATE cache_entry
+        SET status = CASE WHEN status = ${types:CACHE_FETCHING}
+                          THEN ${types:CACHE_FAILED} ELSE status END,
+            token = NULL, claimed_at = NULL, expires_at = ${now}
+        WHERE cache_key = ${cacheKey} AND token IS NOT NULL AND expires_at <= ${now}
+    `);
+    if result is sql:Error {
+        return error(string `Failed to abandon the cache fetch for ${cacheKey}`, result);
+    }
+    int? affected = result.affectedRowCount;
+    return affected is int && affected > 0;
+}
+
 public isolated function abandonExpiredCacheFetches(int retryAfterSeconds)
         returns int|error {
     int now = cacheNowEpoch();
