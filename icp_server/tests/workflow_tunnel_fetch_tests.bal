@@ -1,0 +1,186 @@
+// Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+//
+// WSO2 LLC. licenses this file to you under the Apache License,
+// Version 2.0 (the "License"); you may not use this file except
+// in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied. See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
+import ballerina/test;
+import wso2/icp_server.storage;
+import wso2/icp_server.types;
+
+// =============================================================================
+// Abandoning a workflow read nobody answered
+// =============================================================================
+// A read is handed to a runtime with a deadline (`WF_READ_FETCH_DEADLINE_SECONDS`).
+// Past it the fetch is dead, but the sweep that used to be the only thing to notice
+// runs every few minutes — and until it did, every caller of that key was told
+// "still fetching" about a question nobody would ever answer. These cover giving up
+// on one such fetch on the spot, and the guards that keep two nodes from both doing it.
+// =============================================================================
+
+const string FETCH_OWNER = "test-component:test-environment";
+
+isolated function startTestFetch(string cacheKey, int expiresAt) returns error? {
+    boolean started = check storage:startCacheFetch(cacheKey, "workflow.read", FETCH_OWNER,
+            "{\"operation\":\"instances.get\"}", "token-" + cacheKey, expiresAt);
+    test:assertTrue(started, "the fixture's fetch must be the one that started");
+}
+
+isolated function entryOf(string cacheKey) returns types:CacheEntry|error {
+    types:CacheEntry? row = check storage:getCacheEntry(cacheKey);
+    if row is () {
+        return error(string `no cache entry for ${cacheKey}`);
+    }
+    return row;
+}
+
+// The case the console saw: a fetch past its deadline, given up on without waiting for the
+// sweep, leaving the row retryable immediately.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testFetchPastItsDeadlineIsAbandoned() returns error? {
+    string cacheKey = "test-fetch-dead-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(cacheKey, storage:cacheNowEpoch() - 5);
+
+    boolean abandoned = check storage:abandonCacheFetch(cacheKey);
+    test:assertTrue(abandoned, "a fetch past its deadline is this caller's to abandon");
+
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertTrue(row.token is (), "the dead fetch must no longer look in flight");
+    test:assertEquals(row.status, types:CACHE_FAILED);
+    test:assertTrue(row.expiresAt <= storage:cacheNowEpoch(), "and the entry must be retryable now");
+    // The request stays: a retry builds its command from it.
+    test:assertTrue(row.data is string && (<string>row.data).includes("instances.get"));
+}
+
+// A fetch still within its deadline is somebody's live question, not a dead one.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testLiveFetchIsLeftAlone() returns error? {
+    string cacheKey = "test-fetch-live-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(cacheKey, storage:cacheNowEpoch() + 60);
+
+    boolean abandoned = check storage:abandonCacheFetch(cacheKey);
+    test:assertFalse(abandoned, "a fetch inside its deadline must be left to answer");
+
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertTrue(row.token is string, "and must still read as in flight");
+    test:assertEquals(row.status, types:CACHE_FETCHING);
+}
+
+// Two nodes can notice the same dead fetch. Only one may abandon it, or the other would
+// issue a second command for a question that already has one.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testOnlyOneCallerAbandonsAFetch() returns error? {
+    string cacheKey = "test-fetch-race-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(cacheKey, storage:cacheNowEpoch() - 5);
+
+    test:assertTrue(check storage:abandonCacheFetch(cacheKey), "the first caller wins");
+    test:assertFalse(check storage:abandonCacheFetch(cacheKey), "the second is told it lost");
+}
+
+// Nothing to abandon is not an error: the key may never have been read.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testAbandoningAnUnknownKeyIsHarmless() returns error? {
+    test:assertFalse(check storage:abandonCacheFetch("test-fetch-absent-key"));
+}
+
+// An abandoned entry keeps its row — that is where the request lives — so the retry has to be
+// claimed on it. A fresh insert collides with the row that is already there and starts nothing,
+// which is why the reader claims a refresh instead of falling through to one.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testRetryAfterAbandonIsClaimedNotInserted() returns error? {
+    string cacheKey = "test-fetch-retry-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(cacheKey, storage:cacheNowEpoch() - 5);
+    test:assertTrue(check storage:abandonCacheFetch(cacheKey));
+
+    boolean inserted = check storage:startCacheFetch(cacheKey, "workflow.read", FETCH_OWNER,
+            "{\"operation\":\"instances.get\"}", "retry-insert", storage:cacheNowEpoch() + 60);
+    test:assertFalse(inserted, "an insert collides with the abandoned row and claims nothing");
+
+    test:assertTrue(check storage:claimCacheRefresh(cacheKey, "retry-claim", storage:cacheNowEpoch() + 60),
+            "the retry claims the row that is already there");
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertEquals(row.token, "retry-claim", "and the retry is the fetch now in flight");
+}
+
+// The targeted abandon and the sweep record a given-up fetch the same way, because they are the
+// same statement: a row abandoned by either reads identically to a reader.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testSweepAndTargetedAbandonAgree() returns error? {
+    string byKey = "test-abandon-key-" + storage:cacheNowEpoch().toString();
+    string bySweep = "test-abandon-sweep-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(byKey, storage:cacheNowEpoch() - 5);
+    check startTestFetch(bySweep, storage:cacheNowEpoch() - 5);
+
+    test:assertTrue(check storage:abandonCacheFetch(byKey));
+    _ = check storage:abandonExpiredCacheFetches(0);
+
+    types:CacheEntry targeted = check entryOf(byKey);
+    types:CacheEntry swept = check entryOf(bySweep);
+    test:assertEquals(targeted.status, swept.status);
+    test:assertTrue(targeted.token is () && swept.token is ());
+    test:assertTrue(targeted.claimedAt is () && swept.claimedAt is ());
+    test:assertTrue(targeted.data is string && swept.data is string, "both keep the request to retry with");
+}
+
+// `?refresh=true` expires an entry so the answer is fetched again. While a fetch is in flight
+// `expires_at` is that fetch's deadline, so expiring it would declare a live fetch dead — the
+// reader then gives up on it, and a refresh held down would abandon and reissue the very fetch
+// it is waiting for. A row mid-fetch is already being refreshed.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testForcedRefreshLeavesALiveFetchAlone() returns error? {
+    string cacheKey = "test-fetch-refresh-" + storage:cacheNowEpoch().toString();
+    int deadline = storage:cacheNowEpoch() + 60;
+    check startTestFetch(cacheKey, deadline);
+
+    check storage:expireCacheEntry(cacheKey);
+
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertTrue(row.token is string, "the fetch must still be in flight");
+    test:assertEquals(row.expiresAt, deadline, "and must keep the deadline it was handed out with");
+    test:assertFalse(check storage:abandonCacheFetch(cacheKey),
+            "so the reader has nothing to give up on");
+}
+
+// An entry that is serving an answer still expires on demand: that is what the escape hatch is for.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testForcedRefreshExpiresASettledEntry() returns error? {
+    string cacheKey = "test-fetch-settled-" + storage:cacheNowEpoch().toString();
+    string token = "token-" + cacheKey;
+    boolean started = check storage:startCacheFetch(cacheKey, "workflow.read", FETCH_OWNER,
+            "{\"operation\":\"instances.get\"}", token, storage:cacheNowEpoch() + 60);
+    test:assertTrue(started);
+    _ = check storage:completeCacheFetch(cacheKey, token, "{\"request\":{},\"response\":{}}",
+            storage:cacheNowEpoch() + 600);
+
+    check storage:expireCacheEntry(cacheKey);
+
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertTrue(row.token is (), "a settled entry holds no fetch");
+    test:assertTrue(row.expiresAt <= storage:cacheNowEpoch(), "and the forced refresh expired it");
+}

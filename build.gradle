@@ -106,6 +106,23 @@ task testICP {
     }
 }
 
+task testFrontend {
+    description = 'Run the frontend unit tests (vitest)'
+
+    doLast {
+        logger.info('Running frontend tests...')
+        exec {
+            workingDir 'frontend'
+            commandLine 'pnpm', 'install'
+        }
+        exec {
+            workingDir 'frontend'
+            commandLine 'pnpm', 'test'
+        }
+        logger.info('Frontend tests complete')
+    }
+}
+
 task buildFrontend {
     description = 'Build the frontend application'
 
@@ -400,7 +417,7 @@ task assembleICP {
 
 task checkICP {
     description = 'Run checks and tests'
-    dependsOn testICP
+    dependsOn testICP, testFrontend
 }
 
 task coverage {

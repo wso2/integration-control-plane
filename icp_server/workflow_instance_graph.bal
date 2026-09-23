@@ -194,6 +194,9 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
     int cursor = 0;
 
     int executedCount = 0;
+    // A step that carried an id the model has no node for — version skew, not a runtime too old to
+    // stamp its steps. The two read the same in `steps` (empty) and must not read the same to a client.
+    boolean stampedUnplaced = false;
 
     foreach json node in executedNodes {
         if node !is map<json> {
@@ -221,23 +224,16 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
             continue;
         }
 
-        string resolved;
-        if stepId is string {
-            resolved = stepId;
-        } else if graphKind == "agent" {
-            // An agent's calls have no lexical order to interpolate against, so an unstamped one is only reported.
-            unmatched.push(unmatchedEntry(node, "no step id, and an agent has no order to place it by"));
-            continue;
-        } else {
-            // Unstamped: placed by order against the model, which is sound because a workflow body
-            // is single-threaded, so history is a linear walk.
-            string? interpolated = interpolateStep(nodeType, nodeName, modelNodes, cursor);
-            if interpolated is () {
-                unmatched.push(unmatchedEntry(node, "no step id, and no matching step in the model"));
-                continue;
+        string|Unplaceable placed = placeExecution(nodeType, nodeName, stepId, graphKind, graph,
+                modelNodes, cursor);
+        if placed is Unplaceable {
+            unmatched.push(unmatchedEntry(node, placed.reason));
+            if placed.stamped {
+                stampedUnplaced = true;
             }
-            resolved = interpolated;
+            continue;
         }
+        string resolved = placed;
         int index = indexOfStep(modelNodes, resolved);
         if index >= cursor {
             cursor = index + 1;
@@ -253,8 +249,13 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
             step["reviews"] = entries;
             steps[stepId] = step;
         } else {
+            // The step it gates is not in this model, so there is nothing to fold it onto. It is
+            // reported like any other unplaceable execution — with the step it named, and why.
             foreach json entry in entries {
-                unmatched.push(entry);
+                map<json> orphan = entry is map<json> ? entry.clone() : {};
+                orphan["stepId"] = stepId;
+                orphan["reason"] = "the step this review gates is not in the model";
+                unmatched.push(orphan);
             }
         }
     }
@@ -271,13 +272,64 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
         steps: steps.toJson(),
         takenArms: takenArms.toJson(),
         unmatched: unmatched,
-        // False only when steps ran and none could be placed, stamped or interpolated.
+        // False only when steps ran and none could be placed, stamped or interpolated. A step that
+        // named itself but found no node under that name counts as stamped: the run is placeable,
+        // this model is simply not the one it ran against, which `unmatched` says in its own words.
         stepIdsAvailable: executedCount == 0 || steps.length() > 0 || reviews.length() > 0
+                || stampedUnplaced
     };
     http:Response response = new;
     response.statusCode = 200;
     response.setJsonPayload(payload);
     return response;
+}
+
+# Why one execution has no step on the model to belong to.
+#
+# + reason - What to tell a reader, in their words, on the execution's own entry
+# + stamped - The execution named its call site and the model simply does not have that step —
+#             version skew, not a runtime too old to name its steps. The two leave `steps` equally
+#             empty and must not read the same to a client, so this is what `stepIdsAvailable`
+#             separates them by
+type Unplaceable record {|
+    string reason;
+    boolean stamped = false;
+|};
+
+// Which model step one execution belongs to, or why none does. Every placement rule lives here, so
+// a new outcome is a case in one decision rather than a flag threaded through the loop.
+isolated function placeExecution(string nodeType, string nodeName, string? stepId, string graphKind,
+        json? graph, json[] modelNodes, int cursor) returns string|Unplaceable {
+    if stepId is string {
+        // A model was published and does not have this step: the run and the model are different
+        // versions of the workflow (`descriptorChecksum` says which). Recording it anyway would file
+        // it under an id no node carries, so the step would draw as never executed while the history
+        // shows it ran, and nothing would say why.
+        //
+        // "Published" is the question, not "has nodes": a descriptor whose graph carries no usable
+        // nodes is still an answer about this workflow. Asking the node count instead would let a
+        // degenerate graph fall through to exactly the silent recording this reports. With no
+        // descriptor at all there is nothing to be absent from, and the steps are still worth
+        // returning as a flat set — a nil `graph` already tells a reader why there is no diagram.
+        if graph is map<json> && indexOfStep(modelNodes, stepId) < 0 {
+            return {
+                reason: "no step with this id in the model — the run and the model are different versions",
+                stamped: true
+            };
+        }
+        return stepId;
+    }
+    if graphKind == "agent" {
+        // An agent's calls have no lexical order to interpolate against, so an unstamped one is only reported.
+        return {reason: "no step id, and an agent has no order to place it by"};
+    }
+    // Unstamped: placed by order against the model, which is sound because a workflow body is
+    // single-threaded, so history is a linear walk.
+    string? interpolated = interpolateStep(nodeType, nodeName, modelNodes, cursor);
+    if interpolated is () {
+        return {reason: "no step id, and no matching step in the model"};
+    }
+    return interpolated;
 }
 
 // Accumulates one execution onto its step: the count is what a loop's badge shows, and the status

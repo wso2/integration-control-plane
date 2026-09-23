@@ -228,7 +228,10 @@ function coerceLeaf(f: FormField, path: string, values: Record<string, string | 
     return;
   }
   const raw = values[path];
-  const text = typeof raw === 'string' ? raw.trim() : '';
+  const entered = typeof raw === 'string' ? raw : '';
+  // Trimmed only to decide blankness and to parse numbers/JSON: a string is submitted exactly as
+  // entered, so leading or trailing newlines in the original value survive an untouched field.
+  const text = entered.trim();
   if (!text) {
     if (f.required) errors[path] = `${f.label} is required.`;
     return;
@@ -247,7 +250,7 @@ function coerceLeaf(f: FormField, path: string, values: Record<string, string | 
       errors[path] = `${f.label} must be valid JSON.`;
     }
   } else {
-    result[f.name] = text;
+    result[f.name] = entered;
   }
 }
 
@@ -311,6 +314,66 @@ export function formValuesFromObject(fields: FormField[], source: Record<string,
   const values: Record<string, string | boolean> = {};
   fillValues(fields, source, '', values);
   return values;
+}
+
+// Lays the form's entered values over `base`, leniently: a value the schema can coerce is coerced, a
+// value it cannot is kept as the text that was typed, and a cleared field is removed. Unlike
+// `buildFormResult` this never drops anything — it seeds raw mode, where the whole point is to reach
+// what the form could not express, so a key the schema never modelled and a half-typed number both
+// have to survive the switch.
+function overlayValues(fields: FormField[], values: Record<string, string | boolean>, prefix: string, out: Record<string, unknown>): void {
+  for (const f of fields) {
+    const path = fieldPath(prefix, f.name);
+    if (f.fields) {
+      const existing = out[f.name];
+      const nested: Record<string, unknown> = existing !== null && typeof existing === 'object' && !Array.isArray(existing) ? { ...(existing as Record<string, unknown>) } : {};
+      overlayValues(f.fields, values, path, nested);
+      if (Object.keys(nested).length > 0) out[f.name] = nested;
+      else delete out[f.name];
+      continue;
+    }
+    const entered = values[path];
+    if (typeof entered === 'boolean') {
+      out[f.name] = entered;
+      continue;
+    }
+    // Untouched leaf: whatever `base` carried for it stays. Cleared leaf: the clearing is the edit —
+    // but a field that was already blank in `base` was not cleared by anyone, and dropping its key
+    // would turn an empty string the caller sent into an absent one.
+    if (typeof entered !== 'string') continue;
+    if (entered.trim() === '') {
+      if (entered !== out[f.name]) delete out[f.name];
+      continue;
+    }
+    const coerced: Record<string, unknown> = {};
+    coerceLeaf(f, path, values, coerced, {});
+    out[f.name] = f.name in coerced ? coerced[f.name] : entered;
+  }
+}
+
+// The JSON raw mode opens with: `base` (the value the form was seeded from, so keys the schema does
+// not describe survive) with the form's current values laid over it.
+export function formValuesForRaw(fields: FormField[], values: Record<string, string | boolean>, base?: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = base !== null && base !== undefined && typeof base === 'object' && !Array.isArray(base) ? { ...(base as Record<string, unknown>) } : {};
+  overlayValues(fields, values, '', out);
+  return out;
+}
+
+// Whether the generated form is what will be submitted. Raw mode bypasses it, so the form is
+// authoritative only while it is the thing on screen — and a caller that asks about the fields
+// alone builds a dialog, a diff or a payload out of values nobody is going to send. The editor and
+// its callers ask this one question rather than each re-deriving it.
+// A type predicate, so a caller that asks still gets the fields narrowed and cannot reach for them
+// without asking first.
+export const formIsAuthoritative = (fields: FormField[] | null, rawMode: boolean): fields is FormField[] => fields !== null && !rawMode;
+
+// Parses raw-mode JSON, treating blank as an empty object; returns null when the text is not valid JSON.
+export function parseRawJson(text: string): { value: unknown } | null {
+  try {
+    return { value: text.trim() ? JSON.parse(text) : {} };
+  } catch {
+    return null;
+  }
 }
 
 export interface FieldChange {

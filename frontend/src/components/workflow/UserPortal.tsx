@@ -21,10 +21,10 @@ import SearchField from '../SearchField';
 import { ListChecks, RefreshCw, UserCheck, Wrench } from '@wso2/oxygen-ui-icons-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
-import SchemaFormFields from './SchemaFormFields';
+import SchemaOrRawEditor from './SchemaOrRawEditor';
 import StructuredValue from './StructuredValue';
 import TaskAdministerCard, { AdministratorsRow, completedAsLabel } from './TaskAdministerCard';
-import { buildFormResult, displayWorkflowId, formatTime, gatewayScope, jsonPretty, ownerLabel, ownerScope, parseFormSchema, sortByStartTimeDesc, splitQualifiedName, unescapeRoleName, type PortalScope } from './helpers';
+import { buildFormResult, displayWorkflowId, formIsAuthoritative, formatTime, gatewayScope, jsonPretty, ownerLabel, ownerScope, parseFormSchema, parseRawJson, sortByStartTimeDesc, splitQualifiedName, unescapeRoleName, type PortalScope } from './helpers';
 import { ActionCard, DetailDrawer, DetailRow, HeaderCell, IdText, ListFooter, NotProvided, RefreshingNote, SectionCard, StatusChip, SubmitError, WorkflowIdLink, type WorkflowScope, rowOpenProps } from './shared';
 import { IntegrationFilter, ReviewActivityDetailDialog, StatusFilter, useTimeRangeFilter, WorkflowNameFilter } from './AdminPortal';
 import Authorized from '../Authorized';
@@ -556,6 +556,26 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
   const formFields = parseFormSchema(task?.formSchema);
   const taskInputJson = task?.taskInput !== undefined && task?.taskInput !== null ? jsonPretty(task.taskInput) : null;
 
+  // The dialog is reused when a deep link swaps in another task — it is rendered without a React
+  // key, and the link effects set the open id directly — so a half-written result, and the raw mode
+  // it was written in, would carry onto the next task. Both go back to their starting state with
+  // the id, not only on Cancel.
+  useEffect(() => {
+    setMode('view');
+    setRawMode(false);
+    setResultText('{}');
+    setFormValues({});
+    setFieldErrors({});
+    setErr('');
+    setSubmitError(null);
+    // A result staged for the previous task must not be submittable against this one: the
+    // dialogs complete or fail the current `taskId`, so what they hold goes with the id.
+    setConfirmOpen(false);
+    setFailOpen(false);
+    setPendingResult(null);
+    setReason('');
+  }, [taskId]);
+
   const setFormValue = (name: string, value: string | boolean) => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => {
@@ -568,7 +588,7 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
 
   // Step one: validate and stage the result; step two actually submits it.
   const stageComplete = () => {
-    if (formFields && !rawMode) {
+    if (formIsAuthoritative(formFields, rawMode)) {
       const { result, errors } = buildFormResult(formFields, formValues);
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
@@ -578,12 +598,13 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
       setConfirmOpen(true);
       return;
     }
-    try {
-      setPendingResult(resultText.trim() ? JSON.parse(resultText) : {});
-      setConfirmOpen(true);
-    } catch {
+    const parsed = parseRawJson(resultText);
+    if (!parsed) {
       setErr('Result must be valid JSON.');
+      return;
     }
+    setPendingResult(parsed.value);
+    setConfirmOpen(true);
   };
 
   const submitComplete = () => {
@@ -724,45 +745,28 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
 
                   {mode === 'complete' && (
                     <Stack gap={2} sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
-                      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-                        <Typography variant="body2" color="text.secondary">
-                          The result the workflow resumes with.
-                        </Typography>
-                        {formFields && (
-                          <Button
-                            size="small"
-                            variant="text"
-                            onClick={() => {
-                              // Raw mode carries the form's values across; it never converts back.
-                              if (!rawMode) {
-                                const { result } = buildFormResult(formFields, formValues);
-                                setResultText(jsonPretty(result) || '{}');
-                              }
-                              setRawMode((v) => !v);
-                              setErr('');
-                            }}>
-                            {rawMode ? 'Back to form' : 'Edit as JSON'}
-                          </Button>
-                        )}
-                      </Stack>
-                      {formFields && !rawMode ? (
-                        <SchemaFormFields fields={formFields} values={formValues} errors={fieldErrors} onChange={setFormValue} />
-                      ) : (
-                        <TextField
-                          label="Result (JSON)"
-                          fullWidth
-                          multiline
-                          minRows={5}
-                          value={resultText}
-                          onChange={(e) => {
-                            setResultText(e.target.value);
-                            setErr('');
-                          }}
-                          error={!!err}
-                          helperText={err || (formFields ? 'Raw mode: submitted exactly as typed — the form is bypassed.' : 'This task declares no result schema; the JSON is submitted as the result.')}
-                          slotProps={{ input: { sx: { fontFamily: 'monospace', fontSize: 13 } } }}
-                        />
-                      )}
+                      <SchemaOrRawEditor
+                        key={taskId}
+                        fields={formFields}
+                        values={formValues}
+                        errors={fieldErrors}
+                        onChange={setFormValue}
+                        rawMode={rawMode}
+                        onRawModeChange={(raw) => {
+                          setRawMode(raw);
+                          setErr('');
+                        }}
+                        rawText={resultText}
+                        onRawTextChange={(text) => {
+                          setResultText(text);
+                          setErr('');
+                        }}
+                        rawLabel="Result (JSON)"
+                        rawError={err}
+                        hint="The result the workflow resumes with."
+                        noSchemaHelper="This task declares no result schema; the JSON is submitted as the result."
+                        disabled={busy}
+                      />
                       {stepButtons(
                         <Button key="b" disabled={busy} onClick={closeComplete}>
                           Cancel

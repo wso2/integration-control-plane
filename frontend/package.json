@@ -12,7 +12,8 @@
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx}\"",
     "preview": "vite preview",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
@@ -41,6 +42,7 @@
     "rollup-plugin-visualizer": "6.0.5",
     "typescript": "5.9.3",
     "typescript-eslint": "8.45.0",
-    "vite": "7.1.12"
+    "vite": "7.1.12",
+    "vitest": "3.2.7"
   }
 }

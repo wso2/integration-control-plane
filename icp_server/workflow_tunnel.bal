@@ -220,13 +220,32 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
         // The user demanded certainty. Expiring the entry (never deleting it) drops this call
         // into the stale-serve path below: the current answer still comes back immediately,
         // marked stale, while the forced refresh runs. Coalescing makes this safe to expose —
-        // twenty people pressing Refresh together still produce one fetch.
+        // twenty people pressing Refresh together still produce one fetch, and an entry already
+        // mid-fetch keeps that fetch rather than having it expired out from under it.
         check storage:expireCacheEntry(cacheKey);
     }
 
     types:CacheEntry? row = check storage:getCacheEntry(cacheKey);
     if row is types:CacheEntry {
         string? payload = row.data;
+        // A fetch whose deadline has passed is dead now, not when a timer gets round to saying
+        // so. The sweep that abandons one runs every few minutes, and until it does, every
+        // caller of this key is told "still fetching" about a question nobody will ever answer
+        // — the read deadline above promises the opposite. Giving up on it here bounds the wait
+        // at that deadline: the retry below (or another caller's) asks again straight away.
+        boolean fetching = row.token is string;
+        if fetching && row.expiresAt <= now {
+            boolean|error abandoned = storage:abandonCacheFetch(cacheKey);
+            if abandoned is error {
+                log:printWarn("Failed to abandon a workflow read nobody answered", abandoned,
+                        cacheKey = cacheKey);
+            } else if abandoned {
+                fetching = false;
+            }
+            // `false` means the row moved under this read — answered, or abandoned by another
+            // node. Either way this view of it is stale, so it stays PENDING and the next poll,
+            // a moment away, acts on what the row actually says now.
+        }
         // A failure that has outlived its expiry is a retry, not an answer.
         //
         // Stale-while-revalidate is right for data: an old list still tells the user
@@ -238,7 +257,7 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
         // that has NOT yet expired is still served, so a caller learns promptly that a read
         // failed rather than watching a spinner.
         if row.status == types:CACHE_FAILED && row.expiresAt <= now {
-            if row.token is () {
+            if !fetching {
                 error? started = startWorkflowReadRefresh(cacheKey, operation, params, roles,
                         componentId, environmentId, now);
                 if started is error {
@@ -250,7 +269,7 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
         }
         if payload is string {
             WorkflowReadOutcome outcome = check readOutcomeFromPayload(payload, row, now);
-            if row.expiresAt <= now && row.token is () {
+            if row.expiresAt <= now && !fetching {
                 // Stale and nothing refreshing it: start one behind the answer we are about
                 // to serve. A failure here is not the caller's problem — they still get data.
                 error? started = startWorkflowReadRefresh(cacheKey, operation, params, roles,
@@ -262,10 +281,20 @@ isolated function ensureWorkflowRead(string componentId, string environmentId, s
             }
             return outcome;
         }
-        if row.token is string {
+        if fetching {
             return {state: "PENDING"};
         }
-        // A row with neither payload nor fetch in flight was abandoned: retry it.
+        // Nothing to serve, and nothing in flight: the fetch was given up on, here or by the sweep.
+        // The retry has to be CLAIMED on the row rather than left to the insert below — an
+        // abandoned entry keeps its row (that is where the request lives), so the insert collides
+        // with it, wins nothing, and the caller would wait a whole poll for a retry that never
+        // started here.
+        error? retried = startWorkflowReadRefresh(cacheKey, operation, params, roles,
+                componentId, environmentId, now);
+        if retried is error {
+            log:printWarn("Failed to retry an abandoned workflow read", retried, cacheKey = cacheKey);
+        }
+        return {state: "PENDING"};
     }
 
     WorkflowCommandTarget? target = check selectWorkflowCommandTarget(componentId, environmentId);

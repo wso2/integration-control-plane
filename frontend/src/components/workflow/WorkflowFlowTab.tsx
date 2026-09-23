@@ -175,6 +175,10 @@ export default function WorkflowFlowTab({
 
   const selectedCount = visibleIds?.size ?? 0;
   const railDisabled = reason != null || !instanceGraph;
+  // Steps that ran but could not be placed on the diagram. An agent's calls are unplaceable by
+  // design (they carry no step ids), so the note is for workflows, where it means the diagram is
+  // incomplete — otherwise a step that ran reads as never executed and nothing says why.
+  const unplaced = isAgent || railDisabled ? [] : (instanceGraph?.unmatched ?? []);
 
   return (
     <Stack gap={1.5}>
@@ -184,6 +188,23 @@ export default function WorkflowFlowTab({
           {isAgent ? 'The agent as declared. Reference only.' : 'Approximation of execution flow using checkpoints. Reference only.'}
         </Typography>
         {selectedStepId && <Chip size="small" color="primary" variant="outlined" label={`Filtered: ${selectedStepId} · ${selectedCount} ${selectedCount === 1 ? 'execution' : 'executions'}`} onDelete={() => setSelectedStepId(null)} />}
+        {unplaced.length > 0 && (
+          <Tooltip
+            title={
+              <Stack gap={0.5}>
+                <Typography variant="caption">These ran, but this diagram has no step to draw them on — see the history for the full run.</Typography>
+                {unplaced.map((u, i) => (
+                  <Typography key={`${u.stepId ?? u.label ?? 'step'}-${i}`} variant="caption">
+                    {u.label ?? u.stepId ?? 'A step'}
+                    {u.status ? ` · ${u.status}` : ''}
+                    {u.reason ? ` — ${u.reason}` : ''}
+                  </Typography>
+                ))}
+              </Stack>
+            }>
+            <Chip size="small" color="warning" variant="outlined" label={`${unplaced.length} ${unplaced.length === 1 ? 'step is' : 'steps are'} not on this diagram`} />
+          </Tooltip>
+        )}
       </Stack>
 
       <Stack ref={splitRef} direction={{ xs: 'column', md: 'row' }} gap={{ xs: 2, md: 0 }} alignItems="stretch" sx={{ position: 'relative' }}>

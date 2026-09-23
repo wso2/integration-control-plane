@@ -207,7 +207,7 @@ function WorkflowStatsTable({ scope, environmentId, integrations, runtimeByCompo
         <ListingTable.Head>
           <ListingTable.Row>
             <HeaderCell label="Integration" help="A workflow integration in this project. Open it to work with its executions." />
-            <HeaderCell label="Workflow Types" help="Workflow definitions this integration publishes, from its heartbeat metadata." />
+            <HeaderCell label="Workflow Definitions" help="Workflow definitions this integration publishes, from its heartbeat metadata." />
             <HeaderCell label="Running" help="Instances currently executing or parked. A '+' means more than the first page." />
             <HeaderCell label="Suspended" help="Instances paused by an operator, waiting to be resumed." />
             <HeaderCell label="Failed (24h)" help="Instances that finished as FAILED in the last 24 hours." />

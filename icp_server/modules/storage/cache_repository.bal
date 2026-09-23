@@ -232,6 +232,12 @@ public isolated function staleCacheOwner(string owner, int liveHorizonSeconds)
 # deleted: the stale data keeps serving (with its age shown) while the refresh the caller
 # forced runs behind it. A no-op for an entry that is already stale or absent.
 #
+# An entry mid-fetch is left alone. While a fetch is in flight `expires_at` is that fetch's
+# deadline, not the answer's freshness, so collapsing it would declare a live fetch dead —
+# the reader gives up on it, and a forced refresh held down would abandon and reissue the
+# one fetch it was waiting for, over and over. A row mid-fetch is already being refreshed,
+# which is what the caller asked for.
+#
 # + cacheKey - The entry to expire
 # + return - An error only when the database itself failed
 public isolated function expireCacheEntry(string cacheKey) returns error? {
@@ -239,7 +245,7 @@ public isolated function expireCacheEntry(string cacheKey) returns error? {
     sql:ExecutionResult|sql:Error result = dbClient->execute(`
         UPDATE cache_entry
         SET expires_at = ${now}
-        WHERE cache_key = ${cacheKey} AND expires_at > ${now}
+        WHERE cache_key = ${cacheKey} AND expires_at > ${now} AND token IS NULL
     `);
     if result is sql:Error {
         return error(string `Failed to expire a cache entry`, result);
@@ -316,16 +322,48 @@ public isolated function claimCacheFetches(string owner, int count)
 #
 # + retryAfterSeconds - How long the failed state stands before a read retries it
 # + return - How many fetches were given up on
-public isolated function abandonExpiredCacheFetches(int retryAfterSeconds)
-        returns int|error {
+# Gives up on one entry's in-flight fetch once its deadline has passed, so the caller that
+# noticed can start a fresh one instead of waiting for the sweep to come round.
+#
+# Conditional on the row still holding an expired fetch, so two nodes noticing the same dead
+# fetch cannot both abandon it and issue two commands. The row keeps its data: that is where the
+# request lives, and a retry needs it. `expires_at` is set to now, which makes the entry
+# immediately retryable by whichever caller gets there first.
+#
+# + cacheKey - The entry whose fetch is being abandoned
+# + return - `true` when this caller abandoned it, `false` when it was already answered,
+#            already abandoned, or is not yet past its deadline
+public isolated function abandonCacheFetch(string cacheKey) returns boolean|error {
     int now = cacheNowEpoch();
-    sql:ExecutionResult|sql:Error result = dbClient->execute(`
+    sql:ExecutionResult|sql:Error result = dbClient->execute(
+            abandonFetchesQuery(now, now, `AND cache_key = ${cacheKey}`));
+    if result is sql:Error {
+        return error(string `Failed to abandon the cache fetch for ${cacheKey}`, result);
+    }
+    int? affected = result.affectedRowCount;
+    return affected is int && affected > 0;
+}
+
+// How giving up on a fetch is recorded, written once. The targeted abandon and the periodic sweep
+// are the same statement over different rows, and a change to what an abandoned fetch looks like —
+// another status, another column — has to reach both or they drift apart in the dark.
+//
+// The row keeps its `data`: that is where the request lives, and a retry needs it to build a
+// command. `status` carries the failure on its own.
+isolated function abandonFetchesQuery(int now, int retryAt, sql:ParameterizedQuery scope)
+        returns sql:ParameterizedQuery =>
+    sql:queryConcat(`
         UPDATE cache_entry
         SET status = CASE WHEN status = ${types:CACHE_FETCHING}
                           THEN ${types:CACHE_FAILED} ELSE status END,
-            token = NULL, claimed_at = NULL, expires_at = ${now + retryAfterSeconds}
-        WHERE token IS NOT NULL AND expires_at <= ${now}
-    `);
+            token = NULL, claimed_at = NULL, expires_at = ${retryAt}
+        WHERE token IS NOT NULL AND expires_at <= ${now} `, scope);
+
+public isolated function abandonExpiredCacheFetches(int retryAfterSeconds)
+        returns int|error {
+    int now = cacheNowEpoch();
+    sql:ExecutionResult|sql:Error result = dbClient->execute(
+            abandonFetchesQuery(now, now + retryAfterSeconds, ``));
     if result is sql:Error {
         return error(string `Failed to abandon expired cache fetches`, result);
     }
