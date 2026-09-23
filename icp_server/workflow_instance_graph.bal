@@ -197,6 +197,12 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
     // A step that carried an id the model has no node for — version skew, not a runtime too old to
     // stamp its steps. The two read the same in `steps` (empty) and must not read the same to a client.
     boolean stampedUnplaced = false;
+    // Whether there is a model to be absent FROM. Published but empty counts: a descriptor whose
+    // graph carries no usable nodes is still an answer about this workflow, and a step the model
+    // does not have is unplaceable whether the model has seven nodes or none. Reading this off the
+    // node count instead would let a degenerate graph fall through to being recorded under an id no
+    // node carries — the silent case this reports.
+    boolean modelPublished = graph is map<json>;
 
     foreach json node in executedNodes {
         if node !is map<json> {
@@ -242,10 +248,10 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
             resolved = interpolated;
         }
         int index = indexOfStep(modelNodes, resolved);
-        // Only when there IS a model to be absent from: with no descriptor published there are no
-        // model nodes at all, and every step would read as a version mismatch. That case is already
-        // reported by a nil `graph`, and the steps are still worth returning as a flat set.
-        if index < 0 && modelNodes.length() > 0 {
+        // Only when a model was published: with no descriptor at all every step would read as a
+        // version mismatch, which is not what happened. That case is already reported by a nil
+        // `graph`, and the steps are still worth returning as a flat set.
+        if index < 0 && modelPublished {
             // A stamped step the model does not have: the run and the model are different versions of
             // the workflow (`descriptorChecksum` says which). Recording it anyway would file it under
             // an id no node carries, so the step would draw as never executed while the history shows
@@ -268,8 +274,13 @@ isolated function instanceGraphResponse(string workflowType, map<json> info, jso
             step["reviews"] = entries;
             steps[stepId] = step;
         } else {
+            // The step it gates is not in this model, so there is nothing to fold it onto. It is
+            // reported like any other unplaceable execution — with the step it named, and why.
             foreach json entry in entries {
-                unmatched.push(entry);
+                map<json> orphan = entry is map<json> ? entry.clone() : {};
+                orphan["stepId"] = stepId;
+                orphan["reason"] = "the step this review gates is not in the model";
+                unmatched.push(orphan);
             }
         }
     }

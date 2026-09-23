@@ -556,6 +556,20 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
   const formFields = parseFormSchema(task?.formSchema);
   const taskInputJson = task?.taskInput !== undefined && task?.taskInput !== null ? jsonPretty(task.taskInput) : null;
 
+  // The dialog is reused when a deep link swaps in another task — it is rendered without a React
+  // key, and the link effects set the open id directly — so a half-written result, and the raw mode
+  // it was written in, would carry onto the next task. Both go back to their starting state with
+  // the id, not only on Cancel.
+  useEffect(() => {
+    setMode('view');
+    setRawMode(false);
+    setResultText('{}');
+    setFormValues({});
+    setFieldErrors({});
+    setErr('');
+    setSubmitError(null);
+  }, [taskId]);
+
   const setFormValue = (name: string, value: string | boolean) => {
     setFormValues((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => {
@@ -726,6 +740,7 @@ export function TaskDetailDialog({ scope, taskId, actionable, onClose, onToast }
                   {mode === 'complete' && (
                     <Stack gap={2} sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
                       <SchemaOrRawEditor
+                        key={taskId}
                         fields={formFields}
                         values={formValues}
                         errors={fieldErrors}

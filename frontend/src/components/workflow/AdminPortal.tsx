@@ -524,6 +524,7 @@ export function StartWorkflowDialog({ scope, initialWorkflowType, onClose, onToa
               {selected.inputSchema ? (
                 <Stack gap={2}>
                   <SchemaOrRawEditor
+                    key={selected.workflowType}
                     fields={formFields}
                     values={formValues}
                     errors={fieldErrors}
@@ -669,6 +670,18 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
     }
   }, [decisionHistory]);
   const decision: Record<string, unknown> | null = reportedDecision ? (reportedDecision as Record<string, unknown>) : historyDecision;
+
+  // The drawer is reused when a deep link swaps in another activity — it is rendered without a
+  // React key, and the link effects set the open id directly — so an editor left open in raw mode
+  // would carry that mode, and its seeded JSON, onto the next activity. Everything the editor holds
+  // goes back to its starting state with the id, not only on Cancel.
+  useEffect(() => {
+    setMode('view');
+    setRawMode(false);
+    setRawErr('');
+    setFieldErrors({});
+    setDecideError(null);
+  }, [taskId]);
 
   useEffect(() => {
     if (!activity) return;
@@ -842,6 +855,7 @@ export function ReviewActivityDetailDialog({ scope, taskId, onClose, onToast }: 
                   {mode === 'edit' && (
                     <Stack gap={2} sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 2 }}>
                       <SchemaOrRawEditor
+                        key={taskId}
                         fields={formFields}
                         values={formValues}
                         errors={fieldErrors}

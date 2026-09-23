@@ -75,9 +75,13 @@ isolated function orderExecutedNodes() returns json[] => [
     }
 ];
 
-// Composes a run against a model and returns the payload the console reads.
-isolated function composeInstanceGraph(json[] executed, json[] model) returns map<json>|error {
-    json? graph = model.length() > 0 ? {nodes: model, edges: []} : ();
+// Composes a run against a model and returns the payload the console reads. `published` decides
+// whether a graph was published at all: an empty model can mean either no descriptor, or a
+// descriptor whose graph carries no usable nodes, and the two are not the same answer.
+isolated function composeInstanceGraph(json[] executed, json[] model, boolean? published = ())
+        returns map<json>|error {
+    boolean hasGraph = published ?: model.length() > 0;
+    json? graph = hasGraph ? {nodes: model, edges: []} : ();
     map<json> info = {status: "COMPLETED"};
     http:Response response = instanceGraphResponse("orderWorkflow", info, graph, "checksum-1",
             "workflow", executed, model);
@@ -249,6 +253,20 @@ isolated function testReviewFoldsOntoTheStepItGates() returns error? {
     test:assertEquals(<json[]>payload["unmatched"], []);
 }
 
+// A published graph with no usable nodes is still a model, and a step it does not have is still
+// unplaceable. Reading that off the node count instead let a degenerate graph fall through to the
+// phantom-id recording this reports — the console drew the step as never executed, silently.
+@test:Config {
+    groups: ["instance-graph"]
+}
+isolated function testPublishedGraphWithNoNodesStillReports() returns error? {
+    map<json> payload = check composeInstanceGraph(orderExecutedNodes(), [], published = true);
+
+    test:assertEquals(stepIdsOf(payload), [], "nothing can be placed on a model with no nodes");
+    test:assertEquals(unmatchedLabelsOf(payload), ["paymentInfo", "reserveInventory", "sendConfirmationEmail"]);
+    test:assertEquals(payload["stepIdsAvailable"], true, "the steps named themselves");
+}
+
 // A review naming a step the model does not have has nothing to fold onto, and is reported.
 @test:Config {
     groups: ["instance-graph"]
@@ -268,5 +286,10 @@ isolated function testReviewWithoutItsStepIsReported() returns error? {
 
     json[] unmatched = <json[]>payload["unmatched"];
     test:assertEquals(unmatched.length(), 1);
-    test:assertEquals((<map<json>>unmatched[0])["taskId"], "reviewactivity-2");
+    map<json> orphan = <map<json>>unmatched[0];
+    test:assertEquals(orphan["taskId"], "reviewactivity-2");
+    // Every unmatched entry says why, or the console's note has nothing to show for this one.
+    test:assertEquals(orphan["stepId"], "goneFromTheModel#1");
+    test:assertTrue(orphan["reason"] is string && (<string>orphan["reason"]).length() > 0,
+            "an orphaned review carries a reason like every other unplaceable execution");
 }

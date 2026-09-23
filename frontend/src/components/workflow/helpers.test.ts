@@ -106,6 +106,15 @@ describe('formValuesForRaw', () => {
     expect(formValuesForRaw(f, edited, base)).toEqual({ note: 'after\nwith a break', count: 3, address: { city: 'Colombo' } });
   });
 
+  it('keeps a value that was already blank, which nobody cleared', () => {
+    const f = fields();
+    const base = { note: '', count: 3 };
+    const untouched = formValuesFromObject(f, base);
+
+    // An empty string the caller sent is a value; dropping its key would change what is submitted.
+    expect(formValuesForRaw(f, untouched, base)).toEqual({ note: '', count: 3 });
+  });
+
   it('drops a field that was cleared, rather than resurrecting it from the base', () => {
     const f = fields();
     const base = { note: 'n', count: 3 };

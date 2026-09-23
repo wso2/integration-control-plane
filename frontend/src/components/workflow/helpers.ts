@@ -337,10 +337,12 @@ function overlayValues(fields: FormField[], values: Record<string, string | bool
       out[f.name] = entered;
       continue;
     }
-    // Untouched leaf: whatever `base` carried for it stays. Cleared leaf: the clearing is the edit.
+    // Untouched leaf: whatever `base` carried for it stays. Cleared leaf: the clearing is the edit —
+    // but a field that was already blank in `base` was not cleared by anyone, and dropping its key
+    // would turn an empty string the caller sent into an absent one.
     if (typeof entered !== 'string') continue;
     if (entered.trim() === '') {
-      delete out[f.name];
+      if (entered !== out[f.name]) delete out[f.name];
       continue;
     }
     const coerced: Record<string, unknown> = {};
