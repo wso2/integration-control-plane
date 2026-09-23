@@ -21,6 +21,12 @@ type HeartbeatGenRow record {|
     int gen;
 |};
 
+type LegacyDesiredStateRow record {|
+    string artifact_type;
+    string state_key;
+    string? state_value;
+|};
+
 // === Read ===
 
 public isolated function readReconcileArtifactKeys(string componentId, string envId) returns types:ReconcileArtifactKey[]|error {
@@ -211,6 +217,58 @@ public isolated function queryArtifactState(string componentId, string envId)
 }
 
 // === Upsert ===
+
+// Folds desired state recorded under a non-canonical spelling of an artifact type into the
+// canonical key and removes the old rows.
+//
+// Before artifact types were normalized on write, a caller sending "Proxy-Service" created a
+// desired-state row under that literal string. Writing the canonical "proxy-service" would
+// otherwise leave both, and readReconcileArtifactKeys returns each distinct artifact_type, so
+// heartbeat replay would keep dispatching the stale row's status to the same artifact.
+//
+// State fields the canonical key does not already carry are copied over, so a legacy tracing or
+// statistics value is not lost. Fields it does carry are left alone, which lets the caller's own
+// update win the status it is in the middle of setting.
+public isolated function migrateLegacyArtifactTypeKeys(string componentId, string envId,
+        string artifactName, string canonicalType) returns error? {
+    stream<LegacyDesiredStateRow, sql:Error?> rows = dbClient->query(`
+        SELECT artifact_type, state_key, state_value FROM reconcile_desired_state
+        WHERE component_id = ${componentId} AND env_id = ${envId}
+            AND artifact_name = ${artifactName}
+            AND LOWER(TRIM(artifact_type)) = ${canonicalType}
+            AND artifact_type <> ${canonicalType}
+    `);
+    LegacyDesiredStateRow[] legacyRows = check from LegacyDesiredStateRow row in rows
+        select row;
+    if legacyRows.length() == 0 {
+        return;
+    }
+
+    types:ReconcileArtifactKey canonicalKey = {artifactName: artifactName, artifactType: canonicalType};
+    map<string> canonicalState = check readReconcileDesiredState(componentId, envId, canonicalKey);
+
+    map<string> carried = {};
+    foreach LegacyDesiredStateRow row in legacyRows {
+        string? value = row.state_value;
+        if value is string && !canonicalState.hasKey(row.state_key) && !carried.hasKey(row.state_key) {
+            carried[row.state_key] = value;
+        }
+    }
+    log:printInfo("Migrating legacy artifact type keys", componentId = componentId, envId = envId,
+            artifactName = artifactName, canonicalType = canonicalType,
+            legacyRowCount = legacyRows.length(), carriedKeyCount = carried.length());
+    if carried.length() > 0 {
+        check upsertReconcileDesiredState(componentId, envId, canonicalKey, carried);
+    }
+
+    _ = check dbClient->execute(`
+        DELETE FROM reconcile_desired_state
+        WHERE component_id = ${componentId} AND env_id = ${envId}
+            AND artifact_name = ${artifactName}
+            AND LOWER(TRIM(artifact_type)) = ${canonicalType}
+            AND artifact_type <> ${canonicalType}
+    `);
+}
 
 public isolated function upsertReconcileDesiredState(string componentId, string envId,
         types:ReconcileArtifactKey artifact, map<string> state) returns error? {

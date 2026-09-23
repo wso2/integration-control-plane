@@ -3150,6 +3150,19 @@ service /graphql on graphqlListener {
             };
         }
 
+        // Fold away any desired state left under a non-canonical spelling of this artifact type
+        // before writing the canonical one, so replay cannot keep dispatching the stale row.
+        map<boolean> migratedEnvs = {};
+        foreach types:Runtime runtime in runtimes {
+            string envId = runtime.environment.id;
+            if migratedEnvs.hasKey(envId) {
+                continue;
+            }
+            migratedEnvs[envId] = true;
+            check storage:migrateLegacyArtifactTypeKeys(input.componentId, envId,
+                    input.artifactName, artifactType);
+        }
+
         types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"status": input.status};
         [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);

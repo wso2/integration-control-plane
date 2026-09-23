@@ -16,6 +16,7 @@
 
 import ballerina/test;
 import icp_server.storage;
+import icp_server.types;
 
 // The five MI artifact types whose management API accepts a status change.
 @test:Config {
@@ -129,4 +130,129 @@ function testSupportedTypesTextAgreesWithDecision() {
                     string `'${artifactType}' is accepted but the message does not name it`);
         }
     }
+}
+
+// The storage-level tests above cannot tell where the guard sits. This drives the mutation
+// itself, so deleting the guard or moving it below reconciliation fails here: the resolver
+// would answer SUCCESS and leave a desired-state row behind.
+@test:Config {
+    groups: ["artifact-status-support"]
+}
+function testUpdateArtifactStatusRejectsUnsupportedTypeAtResolver() returns error? {
+    string mutation = string `
+        mutation {
+            updateArtifactStatus(input: {
+                componentId: "${COMPONENT_1_ID}",
+                artifactType: "api",
+                artifactName: "ResolverGuardTestApi",
+                status: DISABLED
+            }) {
+                status
+                message
+                successCount
+                failedCount
+            }
+        }
+    `;
+
+    json response = check executeGraphQL(mutation, orgDevToken);
+    test:assertFalse(response.errors is json, "The mutation should answer, not error");
+
+    json result = check response.data.updateArtifactStatus;
+    test:assertEquals(check result.status, "FAILED",
+            "An unsupported artifact type must be reported as FAILED");
+    test:assertEquals(check result.successCount, 0, "No runtime should be counted as updated");
+    test:assertEquals(check result.failedCount, 0,
+            "Nothing was dispatched, so nothing should be counted as failed");
+    string message = check result.message;
+    test:assertTrue(message.includes("not supported"),
+            string `The message should say the type is unsupported, got: ${message}`);
+    test:assertTrue(message.includes("proxy-service"),
+            string `The message should name the supported types, got: ${message}`);
+
+    // The guard has to run before anything is persisted, so no desired state may exist.
+    types:ReconcileArtifactKey artifact = {
+        artifactName: "ResolverGuardTestApi",
+        artifactType: "api"
+    };
+    map<string> desired = check storage:readReconcileDesiredState(COMPONENT_1_ID, DEV_ENV_ID, artifact);
+    test:assertEquals(desired.length(), 0,
+            "A rejected status change must not write desired state");
+}
+
+// A supported type must still reach reconciliation, so the guard cannot be widened into
+// rejecting everything.
+@test:Config {
+    groups: ["artifact-status-support"]
+}
+function testUpdateArtifactStatusAcceptsSupportedTypeAtResolver() returns error? {
+    string mutation = string `
+        mutation {
+            updateArtifactStatus(input: {
+                componentId: "${COMPONENT_1_ID}",
+                artifactType: "proxy-service",
+                artifactName: "ResolverGuardTestProxy",
+                status: DISABLED
+            }) {
+                status
+                message
+            }
+        }
+    `;
+
+    json response = check executeGraphQL(mutation, orgDevToken);
+    test:assertFalse(response.errors is json, "The mutation should answer, not error");
+    string message = check response.data.updateArtifactStatus.message;
+    test:assertFalse(message.includes("not supported"),
+            string `A supported type must not be rejected by the guard, got: ${message}`);
+}
+
+// Desired state written before artifact types were normalized sits under the literal string the
+// caller sent. Writing the canonical key without folding those rows in would leave both, and
+// heartbeat replay would keep dispatching the stale one to the same artifact.
+@test:Config {
+    groups: ["artifact-status-support"]
+}
+function testMigrateLegacyArtifactTypeKeys() returns error? {
+    string artifactName = "LegacyKeyMigrationProxy";
+    types:ReconcileArtifactKey legacyKey = {artifactName: artifactName, artifactType: "  Proxy-Service  "};
+    types:ReconcileArtifactKey canonicalKey = {artifactName: artifactName, artifactType: "proxy-service"};
+
+    // A legacy row carrying a status the canonical key will also set, and a tracing value it
+    // will not, so both the collision and the carry-over are exercised.
+    check storage:upsertReconcileDesiredState(COMPONENT_1_ID, DEV_ENV_ID, legacyKey,
+            {"status": "enabled", "tracing": "enabled"});
+    check storage:upsertReconcileDesiredState(COMPONENT_1_ID, DEV_ENV_ID, canonicalKey,
+            {"status": "disabled"});
+
+    check storage:migrateLegacyArtifactTypeKeys(COMPONENT_1_ID, DEV_ENV_ID, artifactName,
+            "proxy-service");
+
+    map<string> legacy = check storage:readReconcileDesiredState(COMPONENT_1_ID, DEV_ENV_ID, legacyKey);
+    test:assertEquals(legacy.length(), 0, "The legacy key must be removed after migration");
+
+    map<string> canonical = check storage:readReconcileDesiredState(COMPONENT_1_ID, DEV_ENV_ID, canonicalKey);
+    test:assertEquals(canonical["status"], "disabled",
+            "The value already on the canonical key must win the collision");
+    test:assertEquals(canonical["tracing"], "enabled",
+            "A state field only the legacy key carried must be preserved");
+}
+
+// Migration must be a no-op when nothing legacy exists, so the common path does not disturb
+// state the caller is about to set.
+@test:Config {
+    groups: ["artifact-status-support"]
+}
+function testMigrateLegacyArtifactTypeKeysIsNoopWhenClean() returns error? {
+    string artifactName = "NoLegacyKeyProxy";
+    types:ReconcileArtifactKey canonicalKey = {artifactName: artifactName, artifactType: "proxy-service"};
+    check storage:upsertReconcileDesiredState(COMPONENT_1_ID, DEV_ENV_ID, canonicalKey,
+            {"status": "enabled"});
+
+    check storage:migrateLegacyArtifactTypeKeys(COMPONENT_1_ID, DEV_ENV_ID, artifactName,
+            "proxy-service");
+
+    map<string> canonical = check storage:readReconcileDesiredState(COMPONENT_1_ID, DEV_ENV_ID, canonicalKey);
+    test:assertEquals(canonical["status"], "enabled",
+            "Migration must not disturb the canonical key when there is nothing to migrate");
 }
