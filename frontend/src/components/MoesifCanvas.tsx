@@ -256,7 +256,11 @@ export default function MoesifCanvas({
         src={embedUrl}
         scrolling="no"
         sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-        referrerPolicy="no-referrer"
+        // The canvas derives the parent origin from document.referrer and only
+        // posts CANVAS_RESIZE / CANVAS_RENDERED to it; with no referrer those
+        // messages are dropped and the iframe stays clipped at the min height.
+        // strict-origin sends just the origin, never the ICP path.
+        referrerPolicy="strict-origin"
         onLoad={() => {
           debug('iframe onLoad');
           // A fresh document is loaded: drop any prior handshake state so the

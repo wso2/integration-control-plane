@@ -19,8 +19,11 @@
 import { downloadConfigBundle } from './moesifConfigBundle';
 
 // MI already writes server logs to <MI_HOME>/repository/logs/wso2carbon.log.
-// A Fluent Bit sidecar tails that file and sends records to Moesif over OTLP,
-// following the BI logs setup. No MI runtime configuration change is needed.
+// A Fluent Bit sidecar tails that file, joins multi-line entries (stack
+// traces), parses each "[time] LEVEL {module} - message" line into the OTLP
+// severity and a `module` log attribute (the Log Severity / Module columns of
+// the shared logs canvas), and sends records to Moesif over OTLP, following the
+// BI logs setup. No MI runtime configuration change is needed.
 // Each sidecar adds its ICP runtime id as the OTLP resource attribute
 // icp.runtimeId, which Moesif stores as resource.icp.runtimeId for the logs
 // canvas filter (the same attribute the BI logs sidecar sets).
@@ -42,9 +45,45 @@ pipeline:
       mem_buf_limit: 10MB
       inotify_watcher: false
       db: /var/lib/fluent-bit/mi-logs.db
+      # Join stack traces and other continuation lines onto the entry that
+      # starts with a "[yyyy-MM-dd HH:mm:ss,SSS]" timestamp.
+      multiline.parser: mi_carbon_multiline
 
       processors:
         logs:
+          # Parse "[time] LEVEL {module} - message" so the level and module are
+          # available as record keys for severity mapping and log attributes.
+          - name: parser
+            key_name: log
+            parser: mi_carbon
+            # Keep the raw line: it is the OTLP log body (logs_body_key).
+            preserve_key: true
+            reserve_data: true
+
+          # Derive the OTLP severity_number from the parsed level. Defaults to
+          # INFO (9) when the level is missing/unknown.
+          - name: lua
+            call: set_severity
+            code: |
+              function set_severity(tag, timestamp, record)
+                  local level = record["level"]
+                  local map = {
+                      TRACE = 1,
+                      DEBUG = 5,
+                      INFO  = 9,
+                      WARN  = 13,
+                      ERROR = 17,
+                      FATAL = 21
+                  }
+                  local num = map[level]
+                  if num == nil then
+                      num = 9
+                      record["level"] = "INFO"
+                  end
+                  record["severity_number"] = num
+                  return 2, timestamp, record
+              end
+
           # Wrap records in an OTLP envelope so resource attributes can be set.
           - name: opentelemetry_envelope
 
@@ -72,11 +111,35 @@ pipeline:
       tls.verify: on
       logs_uri: /v1/logs
       logs_body_key: log
+      # Map the parsed level -> SeverityText and computed severity_number
+      # -> SeverityNumber.
+      logs_severity_text_message_key: level
+      logs_severity_number_message_key: severity_number
       logs_body_key_attributes: on
       header:
         - X-Moesif-Application-Id \${MOESIF_APPLICATION_ID}
       workers: 2
       retry_limit: 3
+
+parsers:
+  # MI carbon log line: "[2026-09-24 11:52:12,226]  INFO {org.apache...} - message".
+  # The timestamp is not parsed (it carries no zone), so the record keeps its
+  # read time.
+  - name: mi_carbon
+    format: regex
+    regex: '^\\[[^\\]]+\\]\\s+(?<level>[A-Z]+)\\s+\\{(?<module>[^}]*)\\}'
+
+multiline_parsers:
+  - name: mi_carbon_multiline
+    type: regex
+    flush_timeout: 1000
+    rules:
+      - state: start_state
+        regex: '/^\\[\\d{4}-\\d{2}-\\d{2} /'
+        next_state: cont
+      - state: cont
+        regex: '/^(?!\\[\\d{4}-\\d{2}-\\d{2} )/'
+        next_state: cont
 `;
 
 // Mount logs read-only and persist tail offsets across sidecar restarts.
