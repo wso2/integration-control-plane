@@ -866,7 +866,7 @@ public isolated function getCompositeAppsForRuntime(string runtimeId) returns ty
         do {
             types:CompositeApp app = {
                 name: appRecord.app_name,
-                version: appRecord.version,
+                version: appRecord.version == types:COMPOSITE_APP_UNVERSIONED ? () : appRecord.version,
                 state: appRecord.state,
                 errorMessage: appRecord?.error_message
             };

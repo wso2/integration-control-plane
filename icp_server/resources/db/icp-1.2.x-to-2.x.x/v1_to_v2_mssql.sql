@@ -304,13 +304,13 @@ SET @sql = N'
         CREATE TABLE [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts] (
             runtime_id CHAR(36) NOT NULL,
             app_name NVARCHAR(200) NOT NULL,
-            version NVARCHAR(50) NULL,
+            version NVARCHAR(50) NOT NULL DEFAULT ''__UNVERSIONED__'',
             state NVARCHAR(20) NOT NULL DEFAULT ''Active'' CHECK (state IN (''Active'', ''Faulty'')),
             error_message NVARCHAR(MAX) NULL,
             artifacts NVARCHAR(4000) NULL,
             created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
             updated_at DATETIME2 NOT NULL DEFAULT GETDATE(),
-            PRIMARY KEY (runtime_id, app_name),
+            PRIMARY KEY (runtime_id, app_name, version),
             CONSTRAINT fk_mi_composite_app_artifacts_runtime FOREIGN KEY (runtime_id) REFERENCES [' + @new_main_db + N'].[dbo].[runtimes] (runtime_id) ON DELETE CASCADE
         );
 
@@ -329,7 +329,8 @@ SET @sql = N'
                 SET updated_at = GETDATE()
                 FROM [' + @new_main_db + N'].[dbo].[mi_composite_app_artifacts] rca
                 INNER JOIN inserted i ON rca.runtime_id = i.runtime_id
-                    AND rca.app_name = i.app_name;
+                    AND rca.app_name = i.app_name
+                    AND rca.version = i.version;
             END;
         '');
     END

@@ -532,7 +532,8 @@ isolated function writeObservedStateMI(string runtimeId, string componentId, str
     foreach types:CompositeApp app in <types:CompositeApp[]>artifacts.carbonApps {
         string appState = normalizeCompositeAppState(app.status ?: app.state);
         log:printDebug(string `Processing composite app: ${app.name} with state: ${appState}`);
-        entries.push([{artifactName: app.name, artifactType: "composite-app"}, {"status": appState}]);
+        string appIdentity = types:qualifiedCompositeAppName(app.name, app.version);
+        entries.push([{artifactName: appIdentity, artifactType: "composite-app"}, {"status": appState}]);
     }
     check batchUpsertReconcileObservedState(runtimeId, componentId, envId, entries);
 }
@@ -1473,7 +1474,8 @@ isolated function insertAdditionalMIArtifacts(string runtimeId, types:Heartbeat 
 
     foreach types:CompositeApp app in <types:CompositeApp[]>heartbeat.artifacts.carbonApps {
         string appState = normalizeCompositeAppState(app.status ?: app.state);
-        log:printDebug(string `Inserting/updating composite app artifact: ${app.name}, version: ${app.version ?: ""}, state: ${appState}`);
+        string appVersion = types:normalizedCompositeAppVersion(app.version);
+        log:printDebug(string `Inserting/updating composite app artifact: ${app.name}, version: ${appVersion}, state: ${appState}`);
         string? artifactsJson = app.artifacts is types:CompositeAppArtifact[]
             ? (<types:CompositeAppArtifact[]>app.artifacts).toJsonString()
             : ();
@@ -1481,14 +1483,14 @@ isolated function insertAdditionalMIArtifacts(string runtimeId, types:Heartbeat 
         if isMSSQL() {
             _ = check dbClient->execute(`
                 INSERT INTO mi_composite_app_artifacts (runtime_id, app_name, version, state, error_message, artifacts)
-                VALUES (${runtimeId}, ${app.name}, ${app.version}, ${appState}, ${errorMessage}, ${artifactsJson});
+                VALUES (${runtimeId}, ${app.name}, ${appVersion}, ${appState}, ${errorMessage}, ${artifactsJson});
             `);
         } else if dbType == POSTGRESQL {
             _ = check dbClient->execute(`
                 INSERT INTO mi_composite_app_artifacts (
                     runtime_id, app_name, version, state, error_message, artifacts
                 ) VALUES (
-                    ${runtimeId}, ${app.name}, ${app.version}, ${appState}, ${errorMessage}, ${artifactsJson}
+                    ${runtimeId}, ${app.name}, ${appVersion}, ${appState}, ${errorMessage}, ${artifactsJson}
                 )
             `);
         } else {
@@ -1496,7 +1498,7 @@ isolated function insertAdditionalMIArtifacts(string runtimeId, types:Heartbeat 
                 INSERT INTO mi_composite_app_artifacts (
                     runtime_id, app_name, version, state, error_message, artifacts
                 ) VALUES (
-                    ${runtimeId}, ${app.name}, ${app.version}, ${appState}, ${errorMessage}, ${artifactsJson}
+                    ${runtimeId}, ${app.name}, ${appVersion}, ${appState}, ${errorMessage}, ${artifactsJson}
                 )
             `);
         }

@@ -1255,13 +1255,13 @@ CREATE TRIGGER update_mi_data_service_artifacts_updated_at BEFORE UPDATE ON mi_d
 CREATE TABLE mi_composite_app_artifacts (
     runtime_id CHAR(36) NOT NULL,
     app_name VARCHAR(200) NOT NULL,
-    version VARCHAR(50) NULL,
+    version VARCHAR(50) NOT NULL DEFAULT '__UNVERSIONED__',
     state VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (state IN ('Active', 'Faulty')),
     error_message TEXT NULL, -- Error message when state is Faulty
     artifacts VARCHAR(4000) NULL, -- JSON array serialized as string (convert to JSON in app code when needed)
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (runtime_id, app_name),
+    PRIMARY KEY (runtime_id, app_name, version),
     CONSTRAINT fk_mi_composite_app_artifacts_runtime FOREIGN KEY (runtime_id) REFERENCES runtimes (runtime_id) ON DELETE CASCADE
 );
 
