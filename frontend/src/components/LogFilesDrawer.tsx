@@ -21,6 +21,7 @@ import { Box, Button, CircularProgress, Drawer, IconButton, ListingTable, Stack,
 import { Download, X } from '@wso2/oxygen-ui-icons-react';
 import SearchField from './SearchField';
 import { useLogFilesByRuntime } from '../api/queries';
+import { FETCHABLE, settle, type Fetchable } from '../api/fetchable';
 
 const drawerSx = {
   '& .MuiDrawer-paper': {
@@ -58,14 +59,16 @@ export function LogFilesDrawer({ runtimeId, onClose }: LogFilesDrawerProps): JSX
       // Import the gql function to make the query
       const { gql } = await import('../api/graphql');
 
-      const result = await gql<{ logFileContent: string }>(
-        `query LogFileContent($runtimeId: String!, $fileName: String!) {
-          logFileContent(runtimeId: $runtimeId, fileName: $fileName)
+      const answer = await settle(() =>
+        gql<{ logFileContent: Fetchable & { content: string } }>(
+          `query LogFileContent($runtimeId: String!, $fileName: String!) {
+          logFileContent(runtimeId: $runtimeId, fileName: $fileName) { ${FETCHABLE}, content }
         }`,
-        { runtimeId, fileName },
+          { runtimeId, fileName },
+        ).then((d) => d.logFileContent),
       );
 
-      const content = result.logFileContent;
+      const content = answer.content;
 
       // Create a blob and download
       const blob = new Blob([content], { type: 'text/plain' });

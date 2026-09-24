@@ -149,47 +149,18 @@ isolated function workflowErrorResponse(int statusCode, string message) returns 
 // second click.
 const string WF_IDEMPOTENCY_HEADER = "x-idempotency-key";
 
-// Headers that tell the console what it is looking at. Cached data must never be presented
-// as live: an operator deciding whether to terminate an instance needs the view's age.
-const string WF_FETCHED_AT_HEADER = "x-workflow-fetched-at";
-const string WF_STALE_HEADER = "x-workflow-stale";
-
-# Answers a read from the cache, or accepts it for materialization.
-#
-# `202` with `{status: "FETCHING"}` is the normal first answer for a view nobody has opened
-# recently; the console polls the same URL. A stale entry is served with its age instead,
-# while a refresh runs behind it.
+# Answers a read from the cache, or accepts it for materialization (see `serveReadOutcome`).
 isolated function serveWorkflowRead(string componentId, string environmentId, string operation,
         map<json> params, string[] roles, string? userId = (), boolean forceRefresh = false)
         returns http:Response {
-    WorkflowReadOutcome|error outcome = ensureWorkflowRead(componentId, environmentId, operation,
+    TunneledReadOutcome|error outcome = ensureWorkflowRead(componentId, environmentId, operation,
             params, roles, userId, forceRefresh);
     if outcome is error {
         log:printError("Failed to serve a workflow read", outcome, operation = operation);
         return workflowErrorResponse(500, "Failed to read workflow data: " + outcome.message());
     }
-    match outcome.state {
-        "NO_RUNTIME" => {
-            // The console already renders 503 as "this integration has nothing to contribute",
-            // so an environment with no workflow runtime reads as offline rather than broken.
-            return workflowErrorResponse(503,
-                    "No running workflow runtime can serve this environment's workflow requests");
-        }
-        "PENDING" => {
-            http:Response accepted = new;
-            accepted.statusCode = 202;
-            accepted.setJsonPayload({status: "FETCHING", retryAfterMs: 750});
-            return accepted;
-        }
-    }
-    http:Response response = new;
-    response.statusCode = outcome.httpStatus;
-    response.setJsonPayload(outcome.body);
-    response.setHeader(WF_FETCHED_AT_HEADER, outcome.fetchedAt.toString());
-    if outcome.stale {
-        response.setHeader(WF_STALE_HEADER, "true");
-    }
-    return response;
+    return serveReadOutcome(outcome,
+            "No running workflow runtime can serve this environment's workflow requests");
 }
 
 # The longest client-supplied idempotency key accepted. `cache_operation_outbox.operation_id`
@@ -288,65 +259,6 @@ isolated function acceptWorkflowMutation(http:Request req, string componentId,
     return accepted;
 }
 
-# Answers a poll for a queued mutation.
-#
-# A finished operation reports what the integration said, including a conflict when someone
-# else acted first. `EXPIRED` is deliberately distinct from `FAILED`: the ICP never learned
-# the outcome, so the caller is told to check the target's state rather than to retry.
-isolated function serveWorkflowOperationStatus(string operationId, string componentId,
-        string environmentId) returns http:Response {
-    types:CacheOperation?|error row = storage:getCacheOperation(operationId);
-    // An operation id from another scope reads as unknown, not as someone else's status.
-    if row is types:CacheOperation && row.owner != workflowScopeKey(componentId, environmentId) {
-        row = ();
-    }
-    if row is error {
-        return workflowErrorResponse(500, "Failed to read the operation: " + row.message());
-    }
-    if row is () {
-        return workflowErrorResponse(404, "Unknown operation: " + operationId);
-    }
-    if row.status == types:CACHE_OP_PENDING || row.status == types:CACHE_OP_DELIVERED {
-        http:Response pending = new;
-        pending.statusCode = 202;
-        pending.setJsonPayload({status: row.status, operationId: operationId, retryAfterMs: 750});
-        return pending;
-    }
-    if row.status == types:CACHE_OP_EXPIRED {
-        http:Response expired = new;
-        expired.statusCode = 504;
-        expired.setJsonPayload({
-            status: types:CACHE_OP_EXPIRED,
-            operationId: operationId,
-            "error": {
-                "message": "The integration did not confirm this operation. Check the target's " +
-                    "state before retrying — it may or may not have been applied."
-            }
-        });
-        return expired;
-    }
-    json outcome = ();
-    string? result = row.result;
-    if result is string {
-        json|error parsed = result.fromJsonString();
-        if parsed is json {
-            outcome = parsed;
-        }
-    }
-    int status = 200;
-    json body = ();
-    if outcome is map<json> {
-        json? httpStatus = outcome["httpStatus"];
-        if httpStatus is int {
-            status = httpStatus;
-        }
-        body = outcome["body"];
-    }
-    http:Response response = new;
-    response.statusCode = status;
-    response.setJsonPayload(body);
-    return response;
-}
 
 // Performs auth, leader resolution, and tunneled execution for one workflow management
 // request; returns the response to relay to the caller.
@@ -432,7 +344,7 @@ function handleWorkflowRequest(string componentId, string environmentId, string[
     // Answered before target selection so a user still learns what happened to their action
     // when the integration has since gone offline.
     if method == http:GET && wfPath.length() == 2 && wfPath[0] == "operations" {
-        return serveWorkflowOperationStatus(wfPath[1], componentId, environmentId);
+        return serveTunneledOperationStatus(wfPath[1], workflowScopeKey(componentId, environmentId));
     }
 
     // 4. Map the request to a management operation and tunnel it to the leader

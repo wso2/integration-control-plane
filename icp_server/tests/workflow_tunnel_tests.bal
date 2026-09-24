@@ -298,7 +298,7 @@ function testDeadlineExpiresAnUnconfirmedMutation() returns error? {
             "An expired mutation must never be delivered");
     }
 
-    types:CacheOperation[] expired = check storage:sweepCacheTables(2100, 300);
+    types:CacheOperation[] expired = check storage:sweepCacheTables(2100, {}, 300);
     // The sweeper must name what it expired: an unconfirmed mutation nobody can name is one
     // nobody can be told about.
     boolean named = false;
@@ -418,13 +418,42 @@ function testASweepReportsOnlyWhatItExpired() returns error? {
         data: tunnelRequest("humanTasks.complete")
     });
 
-    types:CacheOperation[] first = check storage:sweepCacheTables(2100, 300);
+    types:CacheOperation[] first = check storage:sweepCacheTables(2100, {}, 300);
     test:assertTrue(first.some(o => o.operationId == operationId),
         "The sweep that expires an operation must report it");
 
     // Every node runs this sweep on the same interval. A second pass must report nothing for
     // the same operation, or two nodes would raise two notifications for one lost outcome.
-    types:CacheOperation[] second = check storage:sweepCacheTables(2100, 300);
+    types:CacheOperation[] second = check storage:sweepCacheTables(2100, {}, 300);
     test:assertFalse(second.some(o => o.operationId == operationId),
         "A later sweep must not re-report an operation it did not expire");
+}
+
+@test:Config {groups: ["workflow_tunnel"]}
+function testTwoUsersDoNotShareOneCachedTaskList() {
+    // A human task list is filtered per user inside the integration — a task assigned to
+    // Alice, or one that excludes her, answers differently for Bob. Roles alone used to key
+    // the entry, so two colleagues with the same role read each other's queue.
+    map<json> params = {taskQueue: "approvals"};
+    string[] roles = ["reviewer"];
+
+    string alice = workflowCacheKey(WF_TUNNEL_SCOPE, "humanTasks.list", params, roles, "alice");
+    string bob = workflowCacheKey(WF_TUNNEL_SCOPE, "humanTasks.list", params, roles, "bob");
+    string aliceAgain = workflowCacheKey(WF_TUNNEL_SCOPE, "humanTasks.list", params, roles, "alice");
+
+    test:assertNotEquals(alice, bob, "two users must not share one entry");
+    test:assertEquals(alice, aliceAgain, "the same user must reuse their own entry");
+}
+
+@test:Config {groups: ["workflow_tunnel"]}
+function testTheReadTheRuntimeRunsNamesItsCaller() returns error? {
+    // The integration applies its own role check, so the request carries who is asking.
+    // The tunnel passes it through unread; losing it here would have the integration
+    // filtering for nobody.
+    json request = check workflowRequestDocument("humanTasks.list", {}, ["reviewer"], "alice")
+        .fromJsonString();
+    json identity = check request.identity;
+
+    test:assertEquals(check identity.userId, "alice");
+    test:assertEquals(check request.actorId, "alice", "the audit trail names the same caller");
 }

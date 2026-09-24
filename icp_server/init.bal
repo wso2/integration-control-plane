@@ -85,6 +85,8 @@ function init() returns error? {
     // Initialize the runtime scheduler
     check initRuntimeScheduler();
 
+    logMIAccessMode();
+
     log:printInfo("ICP server initialization completed successfully");
 }
 

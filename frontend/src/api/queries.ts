@@ -1,5 +1,6 @@
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { gql } from './graphql';
+import { FETCHABLE, unwrap, untilReady, type Fetchable } from './fetchable';
 
 export interface GqlPageInfo {
   total: number;
@@ -252,22 +253,22 @@ export interface GqlLogger {
 const LOGGERS_BY_ENV_AND_COMPONENT_QUERY = `
   query GetLoggers($environmentId: String!, $componentId: String!) {
     loggersByEnvironmentAndComponent(environmentId: $environmentId, componentId: $componentId) {
+      ${FETCHABLE}
       items { loggerName, componentName, logLevel, logLevelInSync, runtimeIds }
       pageInfo { total, limit, offset }
     }
   }`;
 
 export function useLoggers(environmentId: string, componentId: string) {
-  return useQuery({
-    queryKey: ['loggers', environmentId, componentId],
-    queryFn: () => gql<{ loggersByEnvironmentAndComponent: { items: GqlLogger[]; pageInfo: GqlPageInfo } }>(LOGGERS_BY_ENV_AND_COMPONENT_QUERY, { environmentId, componentId }).then((d) => d.loggersByEnvironmentAndComponent.items),
-    enabled: !!environmentId && !!componentId,
-    refetchInterval: (query) => {
-      const loggers = query.state.data;
-      if (!loggers) return false;
-      return loggers.some((l) => l.logLevelInSync === false) ? 1000 : false;
-    },
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['loggers', environmentId, componentId],
+      queryFn: () => gql<{ loggersByEnvironmentAndComponent: Fetchable & { items: GqlLogger[]; pageInfo: GqlPageInfo } }>(LOGGERS_BY_ENV_AND_COMPONENT_QUERY, { environmentId, componentId }).then((d) => d.loggersByEnvironmentAndComponent),
+      enabled: !!environmentId && !!componentId,
+      refetchInterval: (query) => untilReady(query) || (query.state.status !== 'error' && query.state.data?.items.some((l) => l.logLevelInSync === false) ? 1000 : false),
+    }),
+    (d) => d.items,
+  );
 }
 
 export interface GqlRuntime {
@@ -732,43 +733,54 @@ export { ARTIFACT_QUERY_MAP };
 
 // ── Artifact detail panel queries ──
 
+// A field whose answer is plain text: the artifact's XML, a log file, a registry resource.
+type GqlText = Fetchable & { content: string };
+
 const ARTIFACT_SOURCE_QUERY = `
   query GetArtifactSource($environmentId: String!, $componentId: String!, $artifactType: String!, $artifactName: String!, $packageName: String, $templateType: String) {
-    artifactSourceByComponent(environmentId: $environmentId, componentId: $componentId, artifactType: $artifactType, artifactName: $artifactName, packageName: $packageName, templateType: $templateType)
+    artifactSourceByComponent(environmentId: $environmentId, componentId: $componentId, artifactType: $artifactType, artifactName: $artifactName, packageName: $packageName, templateType: $templateType) { ${FETCHABLE}, content }
   }`;
 
 export function useArtifactSource(envId: string, componentId: string, artifactType: string, artifactName: string, packageName?: string, templateType?: string) {
-  return useQuery({
-    queryKey: ['artifactSource', envId, componentId, artifactType, artifactName, packageName, templateType],
-    queryFn: () =>
-      gql<{ artifactSourceByComponent: string }>(ARTIFACT_SOURCE_QUERY, {
-        environmentId: envId,
-        componentId,
-        artifactType,
-        artifactName,
-        packageName,
-        templateType,
-      }).then((d) => d.artifactSourceByComponent),
-    enabled: !!envId && !!componentId && !!artifactType && !!artifactName,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['artifactSource', envId, componentId, artifactType, artifactName, packageName, templateType],
+      queryFn: () =>
+        gql<{ artifactSourceByComponent: GqlText }>(ARTIFACT_SOURCE_QUERY, {
+          environmentId: envId,
+          componentId,
+          artifactType,
+          artifactName,
+          packageName,
+          templateType,
+        }).then((d) => d.artifactSourceByComponent),
+      enabled: !!envId && !!componentId && !!artifactType && !!artifactName,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.content,
+  );
 }
 
 const LOCAL_ENTRY_VALUE_QUERY = `
   query LocalEntryValue($componentId: String!, $entryName: String!, $environmentId: String) {
-    localEntryValueByComponent(componentId: $componentId, entryName: $entryName, environmentId: $environmentId)
+    localEntryValueByComponent(componentId: $componentId, entryName: $entryName, environmentId: $environmentId) { ${FETCHABLE}, content }
   }`;
 
 export function useLocalEntryValue(componentId: string, entryName: string, envId: string) {
-  return useQuery({
-    queryKey: ['localEntryValue', componentId, entryName, envId],
-    queryFn: () =>
-      gql<{ localEntryValueByComponent: string }>(LOCAL_ENTRY_VALUE_QUERY, {
-        componentId,
-        entryName,
-        environmentId: envId,
-      }).then((d) => d.localEntryValueByComponent),
-    enabled: !!componentId && !!entryName && !!envId,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['localEntryValue', componentId, entryName, envId],
+      queryFn: () =>
+        gql<{ localEntryValueByComponent: GqlText }>(LOCAL_ENTRY_VALUE_QUERY, {
+          componentId,
+          entryName,
+          environmentId: envId,
+        }).then((d) => d.localEntryValueByComponent),
+      enabled: !!componentId && !!entryName && !!envId,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.content,
+  );
 }
 
 const DATA_SOURCE_OVERVIEW_QUERY = `
@@ -778,22 +790,26 @@ const DATA_SOURCE_OVERVIEW_QUERY = `
       dataSourceName: $dataSourceName
       environmentId: $environmentId
     ) {
-      name
-      value
+      ${FETCHABLE}
+      parameters { name, value }
     }
   }`;
 
 export function useDataSourceOverview(componentId: string, dataSourceName: string, envId: string) {
-  return useQuery({
-    queryKey: ['dataSourceOverview', componentId, dataSourceName, envId],
-    queryFn: () =>
-      gql<{ dataSourceOverviewByComponent: GqlArtifactParam[] }>(DATA_SOURCE_OVERVIEW_QUERY, {
-        componentId,
-        dataSourceName,
-        environmentId: envId,
-      }).then((d) => d.dataSourceOverviewByComponent),
-    enabled: !!componentId && !!dataSourceName && !!envId,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['dataSourceOverview', componentId, dataSourceName, envId],
+      queryFn: () =>
+        gql<{ dataSourceOverviewByComponent: GqlParameters }>(DATA_SOURCE_OVERVIEW_QUERY, {
+          componentId,
+          dataSourceName,
+          environmentId: envId,
+        }).then((d) => d.dataSourceOverviewByComponent),
+      enabled: !!componentId && !!dataSourceName && !!envId,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.parameters,
+  );
 }
 
 export interface GqlDataServiceOverview {
@@ -815,41 +831,48 @@ const DATA_SERVICE_OVERVIEW_QUERY = `
       dataServiceName: $dataServiceName
       environmentId: $environmentId
     ) {
-      serviceName
-      serviceDescription
-      wsdl1_1
-      wsdl2_0
-      swagger_url
-      dataSources {
-        dataSourceId
-        dataSourceType
-      }
-      queries {
-        id
-        dataSourceId
-      }
-      resources {
-        resourcePath
-        resourceMethod
-      }
-      operations {
-        operationName
-        queryName
+      ${FETCHABLE}
+      dataService {
+        serviceName
+        serviceDescription
+        wsdl1_1
+        wsdl2_0
+        swagger_url
+        dataSources {
+          dataSourceId
+          dataSourceType
+        }
+        queries {
+          id
+          dataSourceId
+        }
+        resources {
+          resourcePath
+          resourceMethod
+        }
+        operations {
+          operationName
+          queryName
+        }
       }
     }
   }`;
 
 export function useDataServiceOverview(componentId: string, dataServiceName: string, envId: string) {
-  return useQuery({
-    queryKey: ['dataServiceOverview', componentId, dataServiceName, envId],
-    queryFn: () =>
-      gql<{ dataServiceOverviewByComponent: GqlDataServiceOverview }>(DATA_SERVICE_OVERVIEW_QUERY, {
-        componentId,
-        dataServiceName,
-        environmentId: envId,
-      }).then((d) => d.dataServiceOverviewByComponent),
-    enabled: !!componentId && !!dataServiceName && !!envId,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['dataServiceOverview', componentId, dataServiceName, envId],
+      queryFn: () =>
+        gql<{ dataServiceOverviewByComponent: Fetchable & { dataService: GqlDataServiceOverview | null } }>(DATA_SERVICE_OVERVIEW_QUERY, {
+          componentId,
+          dataServiceName,
+          environmentId: envId,
+        }).then((d) => d.dataServiceOverviewByComponent),
+      enabled: !!componentId && !!dataServiceName && !!envId,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.dataService ?? undefined,
+  );
 }
 
 const MESSAGE_PROCESSOR_OVERVIEW_QUERY = `
@@ -859,22 +882,26 @@ const MESSAGE_PROCESSOR_OVERVIEW_QUERY = `
       processorName: $processorName
       environmentId: $environmentId
     ) {
-      name
-      value
+      ${FETCHABLE}
+      parameters { name, value }
     }
   }`;
 
 export function useMessageProcessorOverview(componentId: string, processorName: string, envId: string) {
-  return useQuery({
-    queryKey: ['messageProcessorOverview', componentId, processorName, envId],
-    queryFn: () =>
-      gql<{ messageProcessorOverviewByComponent: GqlArtifactParam[] }>(MESSAGE_PROCESSOR_OVERVIEW_QUERY, {
-        componentId,
-        processorName,
-        environmentId: envId,
-      }).then((d) => d.messageProcessorOverviewByComponent),
-    enabled: !!componentId && !!processorName && !!envId,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['messageProcessorOverview', componentId, processorName, envId],
+      queryFn: () =>
+        gql<{ messageProcessorOverviewByComponent: GqlParameters }>(MESSAGE_PROCESSOR_OVERVIEW_QUERY, {
+          componentId,
+          processorName,
+          environmentId: envId,
+        }).then((d) => d.messageProcessorOverviewByComponent),
+      enabled: !!componentId && !!processorName && !!envId,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.parameters,
+  );
 }
 
 // Maps display artifactType to the backend "type" param used in artifactSourceByComponent
@@ -904,6 +931,9 @@ export interface GqlArtifactParam {
   value: string;
 }
 
+// A field whose answer is a list of name/value rows: artifact parameters and overviews.
+type GqlParameters = Fetchable & { parameters: GqlArtifactParam[] };
+
 const ARTIFACT_PARAMS_QUERY = `
   query ArtifactParams($componentId: String!, $artifactType: String!, $artifactName: String!, $environmentId: String, $runtimeId: String, $packageName: String) {
     artifactParametersByComponent(
@@ -914,25 +944,29 @@ const ARTIFACT_PARAMS_QUERY = `
       runtimeId: $runtimeId,
       packageName: $packageName
     ) {
-      name
-      value
+      ${FETCHABLE}
+      parameters { name, value }
     }
   }`;
 
 export function useArtifactParams(componentId: string, artifactType: string, artifactName: string, envId: string, runtimeId?: string, packageName?: string) {
-  return useQuery({
-    queryKey: ['artifactParams', componentId, artifactType, artifactName, envId, runtimeId, packageName],
-    queryFn: () =>
-      gql<{ artifactParametersByComponent: GqlArtifactParam[] }>(ARTIFACT_PARAMS_QUERY, {
-        componentId,
-        artifactType,
-        artifactName,
-        environmentId: envId,
-        runtimeId,
-        packageName,
-      }).then((d) => d.artifactParametersByComponent),
-    enabled: !!componentId && !!artifactType && !!artifactName && !!envId,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['artifactParams', componentId, artifactType, artifactName, envId, runtimeId, packageName],
+      queryFn: () =>
+        gql<{ artifactParametersByComponent: GqlParameters }>(ARTIFACT_PARAMS_QUERY, {
+          componentId,
+          artifactType,
+          artifactName,
+          environmentId: envId,
+          runtimeId,
+          packageName,
+        }).then((d) => d.artifactParametersByComponent),
+      enabled: !!componentId && !!artifactType && !!artifactName && !!envId,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.parameters,
+  );
 }
 
 const ARTIFACT_WSDL_QUERY = `
@@ -944,23 +978,27 @@ const ARTIFACT_WSDL_QUERY = `
       environmentId: $environmentId,
       runtimeId: $runtimeId,
       packageName: $packageName
-    )
+    ) { ${FETCHABLE}, content }
   }`;
 
 export function useArtifactWsdl(componentId: string, artifactType: string, artifactName: string, envId: string, runtimeId?: string, packageName?: string) {
-  return useQuery({
-    queryKey: ['artifactWsdl', componentId, artifactType, artifactName, envId, runtimeId, packageName],
-    queryFn: () =>
-      gql<{ artifactWsdlByComponent: string }>(ARTIFACT_WSDL_QUERY, {
-        componentId,
-        artifactType,
-        artifactName,
-        environmentId: envId,
-        runtimeId,
-        packageName,
-      }).then((d) => d.artifactWsdlByComponent),
-    enabled: !!componentId && !!artifactType && !!artifactName && !!envId,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['artifactWsdl', componentId, artifactType, artifactName, envId, runtimeId, packageName],
+      queryFn: () =>
+        gql<{ artifactWsdlByComponent: GqlText }>(ARTIFACT_WSDL_QUERY, {
+          componentId,
+          artifactType,
+          artifactName,
+          environmentId: envId,
+          runtimeId,
+          packageName,
+        }).then((d) => d.artifactWsdlByComponent),
+      enabled: !!componentId && !!artifactType && !!artifactName && !!envId,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.content,
+  );
 }
 
 // ── Refresh environment artifacts ──
@@ -1000,6 +1038,7 @@ export interface GqlLogFilesByRuntime {
 const LOG_FILES_BY_RUNTIME_QUERY = `
   query LogFilesByRuntime($runtimeId: String!, $searchKey: String, $limit: Int, $offset: Int) {
     logFilesByRuntime(runtimeId: $runtimeId, searchKey: $searchKey, pagination: { limit: $limit, offset: $offset }) {
+      ${FETCHABLE}
       count
       files {
         fileName
@@ -1010,35 +1049,43 @@ const LOG_FILES_BY_RUNTIME_QUERY = `
   }`;
 
 export function useLogFilesByRuntime(runtimeId: string, searchKey?: string, limit?: number, offset?: number) {
-  return useQuery({
-    queryKey: ['logFiles', runtimeId, searchKey, limit, offset],
-    queryFn: () =>
-      gql<{ logFilesByRuntime: GqlLogFilesByRuntime }>(LOG_FILES_BY_RUNTIME_QUERY, {
-        runtimeId,
-        searchKey: searchKey || null,
-        limit: limit ?? null,
-        offset: offset ?? null,
-      }).then((d) => d.logFilesByRuntime),
-    enabled: !!runtimeId,
-    placeholderData: (prev) => prev,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['logFiles', runtimeId, searchKey, limit, offset],
+      queryFn: () =>
+        gql<{ logFilesByRuntime: Fetchable & GqlLogFilesByRuntime }>(LOG_FILES_BY_RUNTIME_QUERY, {
+          runtimeId,
+          searchKey: searchKey || null,
+          limit: limit ?? null,
+          offset: offset ?? null,
+        }).then((d) => d.logFilesByRuntime),
+      enabled: !!runtimeId,
+      placeholderData: (prev) => prev,
+      refetchInterval: untilReady,
+    }),
+    (d) => d as GqlLogFilesByRuntime,
+  );
 }
 
 const LOG_FILE_CONTENT_QUERY = `
   query LogFileContent($runtimeId: String!, $fileName: String!) {
-    logFileContent(runtimeId: $runtimeId, fileName: $fileName)
+    logFileContent(runtimeId: $runtimeId, fileName: $fileName) { ${FETCHABLE}, content }
   }`;
 
 export function useLogFileContent(runtimeId: string, fileName: string, enabled = false) {
-  return useQuery({
-    queryKey: ['logFileContent', runtimeId, fileName],
-    queryFn: () =>
-      gql<{ logFileContent: string }>(LOG_FILE_CONTENT_QUERY, {
-        runtimeId,
-        fileName,
-      }).then((d) => d.logFileContent),
-    enabled: enabled && !!runtimeId && !!fileName,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['logFileContent', runtimeId, fileName],
+      queryFn: () =>
+        gql<{ logFileContent: GqlText }>(LOG_FILE_CONTENT_QUERY, {
+          runtimeId,
+          fileName,
+        }).then((d) => d.logFileContent),
+      enabled: enabled && !!runtimeId && !!fileName,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.content,
+  );
 }
 
 // ── OpenAPI Definitions ──
@@ -1101,6 +1148,7 @@ export interface GqlRegistryPropertiesResponse {
 const REGISTRY_DIRECTORY_QUERY = `
   query RegistryDirectory($runtimeId: String!, $path: String!, $expand: Boolean) {
     registryDirectory(runtimeId: $runtimeId, path: $path, expand: $expand) {
+      ${FETCHABLE}
       count
       items {
         name
@@ -1116,12 +1164,13 @@ const REGISTRY_DIRECTORY_QUERY = `
 
 const REGISTRY_FILE_CONTENT_QUERY = `
   query RegistryFileContent($runtimeId: String!, $path: String!) {
-    registryFileContent(runtimeId: $runtimeId, path: $path)
+    registryFileContent(runtimeId: $runtimeId, path: $path) { ${FETCHABLE}, content }
   }`;
 
 const REGISTRY_RESOURCE_METADATA_QUERY = `
   query RegistryResourceMetadata($runtimeId: String!, $path: String!) {
     registryResourceMetadata(runtimeId: $runtimeId, path: $path) {
+      ${FETCHABLE}
       name
       mediaType
     }
@@ -1130,6 +1179,7 @@ const REGISTRY_RESOURCE_METADATA_QUERY = `
 const REGISTRY_RESOURCE_PROPERTIES_QUERY = `
   query RegistryResourceProperties($runtimeId: String!, $path: String!) {
     registryResourceProperties(runtimeId: $runtimeId, path: $path) {
+      ${FETCHABLE}
       count
       properties {
         name
@@ -1139,50 +1189,66 @@ const REGISTRY_RESOURCE_PROPERTIES_QUERY = `
   }`;
 
 export function useRegistryDirectory(runtimeId: string, path: string, expand = false) {
-  return useQuery({
-    queryKey: ['registryDirectory', runtimeId, path, expand],
-    queryFn: () =>
-      gql<{ registryDirectory: GqlRegistryDirectoryResponse }>(REGISTRY_DIRECTORY_QUERY, {
-        runtimeId,
-        path,
-        expand,
-      }).then((d) => d.registryDirectory),
-    enabled: !!runtimeId && !!path,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['registryDirectory', runtimeId, path, expand],
+      queryFn: () =>
+        gql<{ registryDirectory: Fetchable & GqlRegistryDirectoryResponse }>(REGISTRY_DIRECTORY_QUERY, {
+          runtimeId,
+          path,
+          expand,
+        }).then((d) => d.registryDirectory),
+      enabled: !!runtimeId && !!path,
+      refetchInterval: untilReady,
+    }),
+    (d) => d as GqlRegistryDirectoryResponse,
+  );
 }
 
 export function useRegistryFileContent(runtimeId: string, path: string, enabled = false) {
-  return useQuery({
-    queryKey: ['registryFileContent', runtimeId, path],
-    queryFn: () =>
-      gql<{ registryFileContent: string }>(REGISTRY_FILE_CONTENT_QUERY, {
-        runtimeId,
-        path,
-      }).then((d) => d.registryFileContent),
-    enabled: enabled && !!runtimeId && !!path,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['registryFileContent', runtimeId, path],
+      queryFn: () =>
+        gql<{ registryFileContent: GqlText }>(REGISTRY_FILE_CONTENT_QUERY, {
+          runtimeId,
+          path,
+        }).then((d) => d.registryFileContent),
+      enabled: enabled && !!runtimeId && !!path,
+      refetchInterval: untilReady,
+    }),
+    (d) => d.content,
+  );
 }
 
 export function useRegistryResourceMetadata(runtimeId: string, path: string, enabled = false) {
-  return useQuery({
-    queryKey: ['registryResourceMetadata', runtimeId, path],
-    queryFn: () =>
-      gql<{ registryResourceMetadata: GqlRegistryResourceMetadata }>(REGISTRY_RESOURCE_METADATA_QUERY, {
-        runtimeId,
-        path,
-      }).then((d) => d.registryResourceMetadata),
-    enabled: enabled && !!runtimeId && !!path,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['registryResourceMetadata', runtimeId, path],
+      queryFn: () =>
+        gql<{ registryResourceMetadata: Fetchable & GqlRegistryResourceMetadata }>(REGISTRY_RESOURCE_METADATA_QUERY, {
+          runtimeId,
+          path,
+        }).then((d) => d.registryResourceMetadata),
+      enabled: enabled && !!runtimeId && !!path,
+      refetchInterval: untilReady,
+    }),
+    (d) => d as GqlRegistryResourceMetadata,
+  );
 }
 
 export function useRegistryResourceProperties(runtimeId: string, path: string, enabled = false) {
-  return useQuery({
-    queryKey: ['registryResourceProperties', runtimeId, path],
-    queryFn: () =>
-      gql<{ registryResourceProperties: GqlRegistryPropertiesResponse }>(REGISTRY_RESOURCE_PROPERTIES_QUERY, {
-        runtimeId,
-        path,
-      }).then((d) => d.registryResourceProperties),
-    enabled: enabled && !!runtimeId && !!path,
-  });
+  return unwrap(
+    useQuery({
+      queryKey: ['registryResourceProperties', runtimeId, path],
+      queryFn: () =>
+        gql<{ registryResourceProperties: Fetchable & GqlRegistryPropertiesResponse }>(REGISTRY_RESOURCE_PROPERTIES_QUERY, {
+          runtimeId,
+          path,
+        }).then((d) => d.registryResourceProperties),
+      enabled: enabled && !!runtimeId && !!path,
+      refetchInterval: untilReady,
+    }),
+    (d) => d as GqlRegistryPropertiesResponse,
+  );
 }

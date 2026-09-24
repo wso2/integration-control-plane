@@ -96,9 +96,9 @@ class WorkflowTunnelSweepJob {
     // is what turns an unconfirmed mutation into a notification, so a dead sweep loses those
     // silently rather than loudly.
     public function execute() {
-        error? result = trap sweepWorkflowTunnelState();
+        error? result = trap sweepTunnelState();
         if result is error {
-            log:printError("The workflow tunnel sweep tick failed", result);
+            log:printError("The tunnel sweep tick failed", result);
         }
     }
 

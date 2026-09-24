@@ -105,7 +105,7 @@ Decisions on a human task or review (`humanTasks.complete`, `humanTasks.fail`, `
 | Mutation deadline | `WF_OPERATION_DEADLINE_SECONDS` = 1800s — generous on purpose: nothing is held open, and a user's action surviving a restart of the integration is worth more than failing it quickly |
 | Expired mutation | Becomes `EXPIRED`: the poll answers **504**, and a `workflow_operation_unconfirmed` event (ERROR) is raised — it may or may not have run on the runtime, and *nobody established which*, so an operator is told rather than the record silently vanishing |
 | Failed mutation | A runtime-reported failure raises `workflow_operation_failed` (WARN) |
-| Sweep | `sweepWorkflowTunnelState` runs on a timer on **every** node; every statement is idempotent, so two nodes sweeping is harmless and needs no leader election |
+| Sweep | `sweepTunnelState` (`tunnel.bal`) runs on a timer on **every** node; every statement is idempotent, so two nodes sweeping is harmless and needs no leader election. It sweeps *both* kinds — the tables are shared — and hands each expired mutation to the feature that queued it |
 
 ---
 
@@ -158,7 +158,9 @@ All tunnel state lives in **two generic database tables**, shared by every ICP n
 - `cache_entry` — one row per distinct read (key = the sha256 above): the stored request, the latest answer, its expiry, and the in-flight fetch token.
 - `cache_operation_outbox` — one row per mutation: the request document, target runtime, status (`PENDING` → `DELIVERED` → `COMPLETED`/`FAILED`/`EXPIRED`), and the result.
 
-The `cache_` names are deliberate: the tables carry a `kind` column (`workflow.read`, `workflow.operation`), so another feature adds a kind rather than a table, and no migration is owed when one does. Timestamps are epoch-second `BIGINT`s — one representation across all five database engines. There are **no foreign keys** to `runtimes` or `users`: K8s deletes runtime rows on scale-down, and a CASCADE would erase the record of a mutation whose outcome nobody established.
+The `cache_` names are deliberate: the tables carry a `kind` column, so another feature adds a kind rather than a table, and no migration is owed when one does. MI management took that offer — `mi.read` and `mi.operation` share these tables, this sweep and this contract (see `icp_server/mi_tunnel.bal`).
+
+Retention is per kind. The sweep is given a backstop window (30 minutes, so a kind that declares nothing is still collected) plus shorter windows for kinds that want them: an MI log file is megabytes nobody re-reads, and is dropped after two minutes rather than held for the half hour a workflow list earns. A kind's retention and its stale-serve window are the same number by construction — `TunneledRead.staleServeSeconds` — so a row is never deleted while something would still serve it. Timestamps are epoch-second `BIGINT`s — one representation across all five database engines. There are **no foreign keys** to `runtimes` or `users`: K8s deletes runtime rows on scale-down, and a CASCADE would erase the record of a mutation whose outcome nobody established.
 
 An ICP restart loses nothing: rows survive, an in-flight mutation is still delivered on the next heartbeat any node receives, and read fetches that die with the node are abandoned by the sweep and retried on the next request.
 
@@ -182,7 +184,9 @@ Queueing, delivery, correlation, deadlines, and result relay are operation-agnos
 | File | Responsibility |
 |---|---|
 | `icp_server/workflow_service.bal` | The console-facing resource: request → operation mapping, idempotency keys, operation polling, definitions from stored metadata |
-| `icp_server/workflow_tunnel.bal` | Cache keys and TTLs, read/mutation flows, decision dedup, result fencing, boost ramp, target selection, sweeps |
+| `icp_server/tunnel.bal` | What the two tunneled features share: read coalescing, stale-while-revalidate, the 202 contract, command building, result recording, the boost ramp, the sweep |
+| `icp_server/workflow_tunnel.bal` | Workflow's own: cache keys and TTLs, decision dedup, task-queue scoping, target selection |
+| `icp_server/mi_tunnel.bal` | MI management's own: per-runtime ownership, one TTL, its short retention |
 | `icp_server/runtime_service.bal` | Heartbeat endpoints that carry commands out, and `POST /icp/commandResult` that brings results back |
 | `icp_server/modules/storage/cache_repository.bal` | `cache_entry` / `cache_operation_outbox` access: claims, coalescing, invalidation, sweeps |
 | `icp_server/modules/storage/heartbeat_repository.bal` | `bi_workflow_metadata` upsert and workflow-integration promotion |

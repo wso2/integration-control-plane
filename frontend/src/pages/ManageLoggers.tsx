@@ -80,7 +80,7 @@ const getLogLevelColor = (level: string): 'default' | 'primary' | 'secondary' | 
 };
 
 function LoggersList({ environmentId, componentId, componentType }: { environmentId: string; componentId: string; componentType: string }) {
-  const { data: loggers = [], isLoading, isError, error, refetch } = useLoggers(environmentId, componentId);
+  const { data: loggers = [], isLoading, preparing, isError, error, refetch } = useLoggers(environmentId, componentId);
   const updateLogLevel = useUpdateLogLevel();
   const deleteLogger = useDeleteLogger();
   const [updatingLogger, setUpdatingLogger] = useState<string | null>(null);
@@ -124,8 +124,15 @@ function LoggersList({ environmentId, componentId, componentType }: { environmen
 
   if (isLoading) {
     return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, py: 2 }}>
         <CircularProgress size={24} />
+        {/* Named only when the wait is the runtime's: on the default path the answer is in
+            the request, and a spinner that lingers there would be a different problem. */}
+        {preparing && (
+          <Typography variant="body2" color="text.secondary">
+            Fetching from the runtime…
+          </Typography>
+        )}
       </Box>
     );
   }

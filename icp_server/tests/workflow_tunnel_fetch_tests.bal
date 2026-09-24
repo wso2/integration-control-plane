@@ -184,3 +184,28 @@ isolated function testForcedRefreshExpiresASettledEntry() returns error? {
     test:assertTrue(row.token is (), "a settled entry holds no fetch");
     test:assertTrue(row.expiresAt <= storage:cacheNowEpoch(), "and the forced refresh expired it");
 }
+
+// The rule above only helps if the reader applies it. It lives in the generic tunnel now, so
+// a workflow read and an MI read both give up on a dead fetch on the spot; the storage tests
+// above pass whether or not anyone calls them.
+@test:Config {
+    groups: ["workflow_tunnel"]
+}
+isolated function testTheReaderGivesUpOnADeadFetchAndRetriesIt() returns error? {
+    string cacheKey = "test-fetch-reader-" + storage:cacheNowEpoch().toString();
+    check startTestFetch(cacheKey, storage:cacheNowEpoch() - 5);
+
+    TunneledReadOutcome outcome = check ensureTunneledRead({
+        cacheKey: cacheKey,
+        kind: "workflow.read",
+        owner: FETCH_OWNER,
+        componentId: "test-component",
+        environmentId: "test-environment",
+        request: "{\"operation\":\"instances.get\"}"
+    }, true);
+
+    test:assertEquals(outcome.state, "PENDING");
+    types:CacheEntry row = check entryOf(cacheKey);
+    test:assertTrue(row.token is string, "the dead fetch is replaced by a live one, not left to the sweep");
+    test:assertNotEquals(row.token, "token-" + cacheKey, "and it is a new fetch, claimed on the row");
+}
