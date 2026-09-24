@@ -292,3 +292,49 @@ function testTextKeepsItsBytesAndJsonIsParsed() returns error? {
     asJson.setTextPayload(onDisk, "application/json");
     test:assertEquals(check (check relayedBody(asJson)).b, 1, "JSON is still parsed");
 }
+
+@test:Config {groups: ["mi_tunnel"]}
+function testAResultFromAnotherRuntimeCannotCompleteThisOne() returns error? {
+    // The poster's key proves which runtime it is, never which command it was given. An op id
+    // is derivable — "mio-" + the console's requestId + "." + a visible runtime id — so a
+    // runtime that was never sent this write could answer for it: its outcome would be recorded,
+    // the target's own answer dropped as late, and the wrong runtime's reads staled.
+    string target = "11111111-1111-4111-8111-111111111111";
+    string other = "22222222-2222-4222-8222-222222222222";
+    string operationId = "mio-h3-" + storage:cacheNowEpoch().toString() + "." + target;
+    int now = storage:cacheNowEpoch();
+    _ = check storage:enqueueCacheOperation({
+        operationId: operationId,
+        target: target,
+        owner: miReadOwner(target),
+        kind: CACHE_KIND_MI_OPERATION,
+        status: types:CACHE_OP_PENDING,
+        issuedAt: now,
+        deadline: now + 120,
+        data: miRequestDocument("PATCH", "/management/logging", (), "u-1")
+    });
+    // The write has been handed to its runtime: that is the only state an outcome may land on.
+    types:CacheOperation[] claimed = check storage:claimCacheOperations(target, 10);
+    test:assertEquals(claimed.length(), 1, "the fixture's write must be the one claimed");
+
+    boolean recorded = recordMIOperationResult(operationId, {
+        runtimeId: other,
+        commandId: operationId,
+        status: "COMPLETED",
+        httpStatus: 200,
+        body: {message: "ok"}
+    });
+
+    test:assertFalse(recorded, "only the runtime the write was addressed to may report it");
+    types:CacheOperation? row = check storage:getCacheOperation(operationId);
+    test:assertTrue(row is types:CacheOperation && row.status == types:CACHE_OP_DELIVERED,
+            "the write stays open for its own runtime to answer");
+
+    test:assertTrue(recordMIOperationResult(operationId, {
+        runtimeId: target,
+        commandId: operationId,
+        status: "COMPLETED",
+        httpStatus: 200,
+        body: {message: "ok"}
+    }), "and its own answer still settles it");
+}

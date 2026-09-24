@@ -332,6 +332,17 @@ isolated function recordMIOperationResult(string operationId, types:WorkflowComm
     // Read before completing: the row carries who asked and what for, and completing it is
     // what makes this call the single one that gets to report the outcome.
     types:CacheOperation?|error row = storage:getCacheOperation(operationId);
+    // Only the runtime the write was addressed to may report it. A poster's key proves which
+    // runtime it is, never which command it was given, and an operation id is derivable from a
+    // requestId and a runtime id the console already shows. Without this, any runtime holding a
+    // valid key could answer for another's write: its outcome would be recorded, the target's
+    // own answer dropped as late, and the wrong runtime's reads staled. Fail closed: a row that
+    // cannot be read cannot be matched.
+    if row !is types:CacheOperation || row.target != result.runtimeId {
+        log:printWarn("Dropping an MI management outcome from a runtime it was not addressed to",
+                operationId = operationId, reportedBy = result.runtimeId);
+        return false;
+    }
     boolean|error recorded = storage:completeCacheOperation(operationId,
             succeeded ? types:CACHE_OP_COMPLETED : types:CACHE_OP_FAILED,
             {httpStatus: result.httpStatus, body: result.body, runtimeId: result.runtimeId}
@@ -342,17 +353,12 @@ isolated function recordMIOperationResult(string operationId, types:WorkflowComm
         return false;
     }
     if recorded && succeeded {
-        if row is types:CacheOperation {
-            auditMIOperation(row, result);
-        } else {
-            log:printWarn("An MI management write completed but could not be audited",
-                    operationId = operationId);
-        }
-        int|error staled = storage:staleCacheOwner(miReadOwner(result.runtimeId),
+        auditMIOperation(row, result);
+        int|error staled = storage:staleCacheOwner(miReadOwner(row.target),
                 MI_INVALIDATE_HORIZON_SECONDS);
         if staled is error {
             log:printWarn("Failed to stale an MI runtime's cached reads", staled,
-                    runtimeId = result.runtimeId);
+                    runtimeId = row.target);
         }
     }
     return recorded;
