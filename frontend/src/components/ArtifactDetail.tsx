@@ -464,9 +464,7 @@ export function ArtifactDetail({ selected, onClose }: { selected: SelectedArtifa
   const [stacktraceError, setStacktraceError] = useState<string | null>(null);
   const [stacktraceLoadedFor, setStacktraceLoadedFor] = useState<string | null>(null);
   const stacktraceRequestRef = useRef<string | null>(null);
-  const artifactKey = selected
-    ? `${selected.artifactType}-${selected.artifact.name}-${selected.artifact.version ?? ''}`
-    : '';
+  const artifactKey = selected ? `${selected.artifactType}-${selected.artifact.name}-${selected.artifact.version ?? ''}` : '';
   useEffect(() => {
     if (selected?.initialTab) {
       const tabs = ARTIFACT_TABS[selected.artifactType] ?? DEFAULT_ARTIFACT_TABS;
