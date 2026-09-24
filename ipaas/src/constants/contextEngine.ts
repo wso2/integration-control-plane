@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { ContextGraphState, ContextSourceConfig, LlmConfig, LlmProvider, McpClientId, SourceCategory, SourceConnector, SourceFieldDef, SourceFieldKind } from '../types/contextEngine';
+import type { ContextEngineStorage, ContextGraphState, ContextSourceConfig, LlmConfig, LlmProvider, McpClientId, SourceCategory, SourceConnector, SourceFieldDef, SourceFieldKind, SourceProgressStatus, StorageKind } from '../types/contextEngine';
 import type { EmbeddingProvider } from '../types/ragIngestion';
 
 const RAG_LOGO_BASE = 'assets/images/rag/';
@@ -460,6 +460,29 @@ export const GRAPH_STATE_LABEL: Record<ContextGraphState, string> = {
   failed: 'Build failed',
 };
 
+/** Chip text for a source's place in the pipeline. */
+export const SOURCE_PROGRESS_LABEL: Record<SourceProgressStatus, string> = {
+  waiting: 'Waiting for data',
+  reading: 'Reading',
+  processing: 'Processing',
+  indexing: 'Indexing',
+  processed: 'Processed',
+  attention: 'Processed with errors',
+};
+
+export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'info' | 'success' | 'warning'> = {
+  waiting: 'default',
+  reading: 'info',
+  processing: 'info',
+  indexing: 'info',
+  processed: 'success',
+  attention: 'warning',
+};
+
+/** Progress polling: quick while any source is moving, slow otherwise so a sync started elsewhere still shows up. */
+export const PROGRESS_POLL_ACTIVE_MS = 3000;
+export const PROGRESS_POLL_IDLE_MS = 15000;
+
 // ── MCP clients ─────────────────────────────────────────────────────────────
 
 export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
@@ -478,3 +501,76 @@ export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
 
 /** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
 export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];
+
+// ── Storage backends ────────────────────────────────────────────────────────
+
+export interface StorageBackendInfo {
+  kind: StorageKind;
+  title: string;
+  purpose: string;
+  /** The engine's embedded store. */
+  managedName: string;
+  managedDescription: string;
+  /** The alternative to the embedded store: an Infrastructure server, or an external database. */
+  alternativeLabel: string;
+  alternativeDescription: string;
+  /** Infrastructure list that can supply this store; null when Infrastructure offers none (the alternative is then external). */
+  infraSegment: 'vector-databases' | 'databases' | null;
+  /** Noun used in empty states and links, e.g. "vector database". */
+  infraNoun: string;
+  /** Engine provider ids sent in the configuration payload. */
+  managedProvider: string;
+  alternativeProvider: string;
+}
+
+export const STORAGE_BACKENDS: StorageBackendInfo[] = [
+  {
+    kind: 'vector',
+    title: 'Vector database',
+    purpose: 'Embeddings and similarity search over your sources.',
+    managedName: 'LanceDB',
+    managedDescription: 'Embedded vector index inside the engine. Good to start with; not shared or backed up.',
+    alternativeLabel: 'From Infrastructure · Vector Databases',
+    alternativeDescription: 'A managed PostgreSQL server with pgvector.',
+    infraSegment: 'vector-databases',
+    infraNoun: 'vector database',
+    managedProvider: 'lancedb',
+    alternativeProvider: 'pgvector',
+  },
+  {
+    kind: 'relational',
+    title: 'Relational database',
+    purpose: 'Source records, provenance ledger, grants and evidence.',
+    managedName: 'SQLite',
+    managedDescription: 'Embedded control-plane store for records, provenance and evidence.',
+    alternativeLabel: 'From Infrastructure · Databases',
+    alternativeDescription: 'A managed PostgreSQL server.',
+    infraSegment: 'databases',
+    infraNoun: 'database',
+    managedProvider: 'sqlite',
+    alternativeProvider: 'postgres',
+  },
+  {
+    kind: 'graph',
+    title: 'Graph database',
+    purpose: 'Entities and relationships the engine extracts.',
+    managedName: 'Kuzu',
+    managedDescription: 'Embedded graph index, isolated per engine. Recommended until a shared graph database is available.',
+    alternativeLabel: 'Connect Neo4j',
+    alternativeDescription: 'Bring your own Neo4j instance: Bolt URI, database, user and password.',
+    infraSegment: null,
+    infraNoun: 'graph database',
+    managedProvider: 'kuzu',
+    alternativeProvider: 'neo4j',
+  },
+];
+
+export const STORAGE_BACKEND_BY_KIND: Record<StorageKind, StorageBackendInfo> = Object.fromEntries(STORAGE_BACKENDS.map((b) => [b.kind, b])) as Record<StorageKind, StorageBackendInfo>;
+
+/** Every store on the engine's embedded default. */
+export function defaultStorage(): ContextEngineStorage {
+  return { vector: { mode: 'managed' }, relational: { mode: 'managed' }, graph: { mode: 'managed' } };
+}
+
+/** Default logical database name suggested for an Infrastructure server. */
+export const STORAGE_DEFAULT_DATABASE: Record<StorageKind, string> = { vector: 'context_vectors', relational: 'context_engine', graph: 'neo4j' };

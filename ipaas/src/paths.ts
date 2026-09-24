@@ -329,3 +329,23 @@ export function newContextEngineUrl(orgHandler: string): string {
 export function contextEngineUrl(orgHandler: string, engineId: string, tab: ContextEngineTabKey = 'overview'): string {
   return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/${tab}`;
 }
+
+// ---------------------------------------------------------------------------
+// Infrastructure (org admin) — managed database servers
+// ---------------------------------------------------------------------------
+
+export function orgDatabasesUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/databases`;
+}
+
+export function newOrgDatabaseUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/databases/new`;
+}
+
+export function orgVectorDatabasesUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/vector-databases`;
+}
+
+export function newOrgVectorDatabaseUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/vector-databases/new`;
+}

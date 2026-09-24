@@ -16,7 +16,8 @@
  * under the License.
  */
 
-import type { ContextEngineForm, ContextSourceConfig, LlmConfig } from '../../types/contextEngine';
+import { defaultStorage } from '../../constants/contextEngine';
+import type { ContextEngineForm, ContextSourceConfig, LlmConfig, StorageKind, StorageSelection } from '../../types/contextEngine';
 import type { EmbeddingConfig } from '../../types/ragIngestion';
 
 export const initialContextEngineForm: ContextEngineForm = {
@@ -25,6 +26,7 @@ export const initialContextEngineForm: ContextEngineForm = {
   embedding: null,
   llm: null,
   shareApiKey: false,
+  storage: defaultStorage(),
   name: '',
   description: '',
 };
@@ -37,6 +39,7 @@ export type ContextEngineFormAction =
   | { type: 'embedding'; value: EmbeddingConfig | null }
   | { type: 'llm'; value: LlmConfig | null }
   | { type: 'shareApiKey'; value: boolean }
+  | { type: 'storage'; kind: StorageKind; value: StorageSelection }
   | { type: 'name'; value: string }
   | { type: 'description'; value: string };
 
@@ -56,6 +59,8 @@ export function contextEngineFormReducer(state: ContextEngineForm, action: Conte
       return { ...state, llm: action.value };
     case 'shareApiKey':
       return { ...state, shareApiKey: action.value };
+    case 'storage':
+      return { ...state, storage: { ...state.storage, [action.kind]: action.value } };
     case 'name':
       return { ...state, name: action.value };
     case 'description':

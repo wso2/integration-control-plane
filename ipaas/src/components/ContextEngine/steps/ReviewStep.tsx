@@ -19,17 +19,17 @@
 import { Box, Chip, Grid, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
-import { CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS } from '../../../constants/contextEngine';
+import { CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { engineDescriptionError, engineNameError, sourceTypeName, summarizeSource } from '../../../utils/contextEngine';
+import { engineDescriptionError, engineNameError, isStorageAllManaged, sourceTypeName, summarizeSource, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import { fieldStackSx, mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
 import type { ContextEngineForm } from '../../../types/contextEngine';
 
 /** Wizard step indexes the summary cards can jump back to. */
-export type EditableStep = 0 | 1 | 2;
+export type EditableStep = 0 | 1 | 2 | 3;
 
 interface ReviewStepProps {
   form: ContextEngineForm;
@@ -180,6 +180,28 @@ export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange
           </SummaryCard>
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
+          <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(3)}>
+            <Stack direction="row" gap={3} flexWrap="wrap">
+              {STORAGE_BACKENDS.map((b) => {
+                const sum = summarizeStorage(b.kind, form.storage[b.kind]);
+                return (
+                  <Box key={b.kind} sx={{ minWidth: 120 }}>
+                    <Typography variant="caption" sx={mutedSx}>
+                      {b.title.replace(' database', '')}
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {sum.primary}
+                    </Typography>
+                    <Typography variant="caption" sx={mutedSx}>
+                      {sum.secondary}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+          </SummaryCard>
+        </Grid>
+        <Grid size={{ xs: 12 }}>
           <Box sx={{ ...summaryCardSx, borderColor: 'primary.light' }}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
               What happens when you create
@@ -189,6 +211,9 @@ export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange
                 {n} source{n === 1 ? '' : 's'} {n === 1 ? 'is' : 'are'} registered and {n === 1 ? 'its' : 'their'} credentials stored on the engine.
               </Typography>
               <Typography variant="body2">{r === 0 ? 'No roles are granted yet; only you can query.' : `${r} role${r === 1 ? '' : 's'} ${r === 1 ? 'is' : 'are'} granted query access.`}</Typography>
+              <Typography variant="body2">
+                {isStorageAllManaged(form.storage) ? 'All three stores are embedded in the engine; nothing is provisioned on your Infrastructure.' : 'Stores placed on Infrastructure are written to your servers; the rest stay embedded in the engine.'}
+              </Typography>
               <Typography variant="body2">You start the first graph build from the Overview; it usually takes a few minutes.</Typography>
             </Stack>
           </Box>

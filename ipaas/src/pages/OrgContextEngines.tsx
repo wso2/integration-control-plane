@@ -30,7 +30,8 @@ import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import ExposurePills from '../components/ContextEngine/ExposurePills';
 import GraphStatusChip from '../components/ContextEngine/GraphStatusChip';
 import SourceMark from '../components/ContextEngine/SourceMark';
-import { listMarksSx } from '../components/ContextEngine/styles';
+import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
+import { progressListingText } from '../utils/contextEngine';
 import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
 import type { ContextEngine } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
@@ -165,14 +166,21 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                     </ListingTable.Cell>
                     <ListingTable.Cell>
                       {e.summary ? (
-                        <Box sx={listMarksSx}>
-                          {e.summary.sourceTypes.slice(0, MAX_MARKS).map((t, i) => (
-                            <SourceMark key={`${t}-${i}`} type={t} size={16} />
-                          ))}
-                          <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
-                            {e.summary.sourceCount}
-                          </Typography>
-                        </Box>
+                        <>
+                          <Box sx={listMarksSx}>
+                            {e.summary.sourceTypes.slice(0, MAX_MARKS).map((t, i) => (
+                              <SourceMark key={`${t}-${i}`} type={t} size={16} />
+                            ))}
+                            <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
+                              {e.summary.sourceCount}
+                            </Typography>
+                          </Box>
+                          {progressListingText(e.summary.progress) && (
+                            <Typography variant="caption" color="text.secondary" sx={listProgressTextSx}>
+                              {progressListingText(e.summary.progress)}
+                            </Typography>
+                          )}
+                        </>
                       ) : (
                         '—'
                       )}

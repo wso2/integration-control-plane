@@ -22,7 +22,7 @@ import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine } from '../hooks/useContextEngine';
-import { engineDescriptionError, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, toCreateInput } from '../utils/contextEngine';
+import { engineDescriptionError, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -30,11 +30,12 @@ import VerticalStepper from '../components/VerticalStepper';
 import SourcesStep from '../components/ContextEngine/steps/SourcesStep';
 import AccessStep from '../components/ContextEngine/steps/AccessStep';
 import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
+import StorageStep from '../components/ContextEngine/steps/StorageStep';
 import ReviewStep from '../components/ContextEngine/steps/ReviewStep';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
 import type { OrgScope } from '../nav';
 
-const STEP_LABELS = ['Choose Sources', 'Grant Access', 'Configure Models', 'Name & Create'];
+const STEP_LABELS = ['Choose Sources', 'Grant Access', 'Configure Models', 'Configure Storage', 'Name & Create'];
 const LAST_STEP = STEP_LABELS.length - 1;
 
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
@@ -71,7 +72,13 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   }
 
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
-  const stepBlocker: (string | null)[] = [sourcesStepBlocker(form.sources), null, modelsStepBlocker(form), !form.name.trim() ? 'Enter a name for the engine' : engineNameError(form.name) || engineDescriptionError(form.description) || null];
+  const stepBlocker: (string | null)[] = [
+    sourcesStepBlocker(form.sources),
+    null,
+    modelsStepBlocker(form),
+    storageStepBlocker(form.storage),
+    !form.name.trim() ? 'Enter a name for the engine' : engineNameError(form.name) || engineDescriptionError(form.description) || null,
+  ];
   const stepValid = stepBlocker.map((b) => b === null);
   const canCreate = stepValid.every(Boolean);
 
@@ -111,7 +118,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
           <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
         </Box>
-        <Box sx={{ flex: 1, maxWidth: 960, mt: 2 }}>
+        <Box sx={{ flex: 1, maxWidth: activeStep === 3 ? 1080 : 960, mt: 2 }}>
           {showRestored && (
             <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
               We restored the draft you left in this session. API keys and tokens are never stored, so re-enter them before creating.
@@ -138,7 +145,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
               onShareApiKeyChange={(value) => dispatch({ type: 'shareApiKey', value })}
             />
           )}
-          {activeStep === 3 && (
+          {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
+          {activeStep === 4 && (
             <ReviewStep form={form} roleNames={roleNames} draftSavedAt={draft.savedAt} onNameChange={(value) => dispatch({ type: 'name', value })} onDescriptionChange={(value) => dispatch({ type: 'description', value })} onEdit={setActiveStep} />
           )}
 

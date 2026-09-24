@@ -56,6 +56,8 @@ export interface ContextEngineSummary {
   roleCount: number;
   exposure: ContextEngineExposure;
   graph: ContextGraphStatus;
+  /** Source progress roll-up; null when the engine does not report progress. */
+  progress: ContextEngineProgressSummary | null;
 }
 
 /** A context engine as shown in the listing. */
@@ -93,6 +95,8 @@ export interface ContextEngineDetail extends ContextEngine {
   queryRoles: string[];
   exposure: ContextEngineExposure;
   graph: ContextGraphStatus;
+  /** Per-store placement as the engine reports it; null when it has not reported configuration. */
+  storage: Record<StorageKind, StorageSummary> | null;
 }
 
 // ── Sources ─────────────────────────────────────────────────────────────────
@@ -158,6 +162,55 @@ export interface ContextSourceConfig {
   values: Record<string, string>;
 }
 
+// ── Source progress ─────────────────────────────────────────────────────────
+
+/** Whether the connector is still reading. The engine gives no percentage for this by design. */
+export type SourceReadingState = 'idle' | 'reading' | 'completed';
+
+/** `not_collected` until the engine's worker has asked the knowledge backend at least once. */
+export type SourceIndexingState = 'not_collected' | 'ok' | 'unavailable';
+
+/** Pipeline progress of one source, as `GET /v1/progress/spaces/{id}` reports it. */
+export interface SourceProgress {
+  sourceId: string;
+  reading: { state: SourceReadingState; startedAt?: string; completedAt?: string };
+  /** Deliveries since the latest sync run started. `percent` is finished (succeeded + failed) over total; null when nothing was delivered. */
+  processing: { since?: string; total: number; queued: number; running: number; succeeded: number; failed: number; percent: number | null };
+  records: { active: number; quarantined: number; deleted: number };
+  /** Active record versions the knowledge backend has indexed, from the last background collection. */
+  indexing: { state: SourceIndexingState; expected: number | null; indexed: number | null; indexing: number | null; failed: number | null; missing: number | null; percent: number | null; collectedAt?: string };
+}
+
+export interface ContextEngineProgress {
+  /** False when the engine does not serve the progress route yet. */
+  available: boolean;
+  /** Only the sources the caller may inspect: progress needs delivery or manage rights. */
+  sources: SourceProgress[];
+}
+
+/** One word for where a source is in the pipeline, derived from its progress. */
+export type SourceProgressStatus = 'waiting' | 'reading' | 'processing' | 'indexing' | 'processed' | 'attention';
+
+/** Roll-up of every source's progress, for headers and the listing. */
+export interface ContextEngineProgressSummary {
+  /** Sources registered on the engine. */
+  sourceCount: number;
+  /** Sources whose delivered items are all finished (including those finished with errors). */
+  processed: number;
+  /** Sources still reading, processing or indexing. */
+  active: number;
+  /** Of the active sources, those whose connector is still reading, so their totals are not final. */
+  reading: number;
+  /** Sources that have not received anything yet. */
+  waiting: number;
+  /** Sources the caller cannot see progress for. */
+  hidden: number;
+  /** Finished over delivered items across all sources in their current sync window; null when nothing was delivered. */
+  percent: number | null;
+  /** Delivered items that failed, across all sources. */
+  failedItems: number;
+}
+
 // ── Models ──────────────────────────────────────────────────────────────────
 
 export type LlmProvider = 'openai' | 'anthropic' | 'azure_openai' | 'mistral';
@@ -171,6 +224,46 @@ export interface LlmConfig {
   azureApiVersion: string;
 }
 
+// ── Storage ─────────────────────────────────────────────────────────────────
+
+/** The three stores a context engine keeps its data in. */
+export type StorageKind = 'vector' | 'relational' | 'graph';
+
+/** The engine's embedded store — no setup, not shared. */
+export interface ManagedStorage {
+  mode: 'managed';
+}
+
+/** A managed database server from Infrastructure and the logical database on it. */
+export interface InfrastructureStorage {
+  mode: 'infrastructure';
+  serverId: string;
+  serverName: string;
+  database: string;
+}
+
+/** A database the organization runs elsewhere — the graph store until Infrastructure offers one. */
+export interface ExternalStorage {
+  mode: 'external';
+  uri: string;
+  database: string;
+  user: string;
+  password: string;
+}
+
+export type StorageSelection = ManagedStorage | InfrastructureStorage | ExternalStorage;
+
+export type ContextEngineStorage = Record<StorageKind, StorageSelection>;
+
+/** How the engine reports one store back, without credentials. */
+export interface StorageSummary {
+  provider: string;
+  /** Where it lives, e.g. a server name or "Engine managed". */
+  label: string;
+  /** Second line, e.g. the database name. */
+  detail?: string;
+}
+
 // ── Wizard form ─────────────────────────────────────────────────────────────
 
 export interface ContextEngineForm {
@@ -181,6 +274,7 @@ export interface ContextEngineForm {
   llm: LlmConfig | null;
   /** Reuse the embedding API key for the language model when both use the same provider. */
   shareApiKey: boolean;
+  storage: ContextEngineStorage;
   name: string;
   description: string;
 }
@@ -199,6 +293,7 @@ export interface CreateContextEngineInput {
   roles: string[];
   embedding: EmbeddingConfig;
   llm: LlmConfig;
+  storage: ContextEngineStorage;
 }
 
 export interface CreateContextEngineResult {

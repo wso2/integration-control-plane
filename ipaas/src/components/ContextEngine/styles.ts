@@ -217,6 +217,30 @@ export const summaryRowSx = {
 
 export const mutedSx = { color: 'text.secondary' } as const;
 
+// ── Source progress ─────────────────────────────────────────────────────────
+
+/** A source with its progress bar and captions under the name line. */
+export const sourceProgressRowSx = {
+  py: 1.25,
+  borderBottom: '1px solid',
+  borderColor: 'divider',
+  '&:last-of-type': { borderBottom: 0, pb: 0 },
+} as const;
+
+export const sourceProgressHeadSx = { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2 } as const;
+
+/** Lines the bar and captions up with the source name: the 24px mark box plus the 12px gap. */
+export const sourceProgressBodySx = { mt: 1, pl: '36px', minWidth: 0 } as const;
+
+export const progressBarSx = { height: 6, borderRadius: 3 } as const;
+
+export const progressCaptionSx = { color: 'text.secondary', display: 'block', mt: 0.75 } as const;
+
+/** Whole-engine bar shown above the rows while several sources sync. */
+export const progressOverallSx = { mb: 1.5, p: 1.5, borderRadius: 1, bgcolor: 'action.hover' } as const;
+
+export const progressHeadlineSx = { display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary' } as const;
+
 // ── Playground ──────────────────────────────────────────────────────────────
 
 /** The question box and Ask button side by side, centred on the box; the shortcut hint sits below the row. */
@@ -364,6 +388,8 @@ export const checklistDotSx = (state: 'done' | 'current' | 'todo') =>
 
 export const listMarksSx = { display: 'flex', alignItems: 'center', gap: 0.5 } as const;
 
+export const listProgressTextSx = { display: 'block', mt: 0.5, whiteSpace: 'nowrap' } as const;
+
 // ── Playground ──────────────────────────────────────────────────────────────
 
 export const suggestionRowSx = { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } as const;
@@ -392,3 +418,59 @@ export const answerFooterSx = {
 export const clientTabsSx = { minHeight: 36, mb: 1.5, '& .MuiTab-root': { minHeight: 36, py: 0.5 } } as const;
 
 export const playgroundFrameSx = { mt: 2, height: 560, display: 'flex', flexDirection: 'column' } as const;
+
+// ── Storage step ────────────────────────────────────────────────────────────
+
+/** Three cards need the widest screens; below that two per row keep the pickers readable. */
+export const storageGridSx = {
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
+  gap: 2,
+  alignItems: 'start',
+} as const;
+
+export const storageCardSx = {
+  p: 2.25,
+  minWidth: 0,
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 1,
+  bgcolor: 'background.paper',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1.5,
+} as const;
+
+/** MUI's FormGroup wraps its column by default, which lets long options escape the card. */
+export const storageRadioGroupSx = { width: '100%', flexWrap: 'nowrap', minWidth: 0 } as const;
+
+/** One placement option inside a storage card; highlighted when selected. */
+export const storageOptionSx = (selected: boolean) =>
+  ({
+    p: 1.25,
+    mb: 1,
+    width: '100%',
+    minWidth: 0,
+    boxSizing: 'border-box',
+    border: '1px solid',
+    borderColor: selected ? 'primary.main' : 'divider',
+    borderRadius: 1,
+    '& .MuiFormControlLabel-root': { alignItems: 'flex-start', m: 0, width: '100%' },
+    '& .MuiFormControlLabel-label': { minWidth: 0, flex: 1 },
+    '& .MuiRadio-root': { pt: 0.25 },
+  }) as const;
+
+/** The fields under a selected option: full card width, no indent, so pickers and buttons have room. */
+export const storageOptionBodySx = { mt: 1.5, minWidth: 0 } as const;
+
+export const storageEmptySx = {
+  p: 1.75,
+  border: '1px dashed',
+  borderColor: 'divider',
+  borderRadius: 1,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 1.25,
+} as const;
+
+export const storageLinksSx = { display: 'flex', gap: 2, alignItems: 'center' } as const;

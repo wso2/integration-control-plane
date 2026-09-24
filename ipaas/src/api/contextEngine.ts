@@ -20,9 +20,10 @@
  * Context Engines — backed by the Devant Context Engine REST API (`/v1`).
  *
  * The engine ships milestone by milestone. Routes that exist today: spaces,
- * ingestion jobs, grants, `auth/me`. Routes taken from its OpenAPI contract that
- * are not served yet answer 404/405: sources, queries, evidence, enrichments,
- * space deletion. Two routes are proposals this UI needs the engine to add:
+ * sources, ingestion jobs, grants, `auth/me` and the read-only progress routes
+ * (`/v1/progress/...`). Routes taken from its OpenAPI contract that are not
+ * served yet answer 404/405: queries, evidence, enrichments, space deletion.
+ * Two routes are proposals this UI needs the engine to add:
  * `PUT/GET /v1/spaces/{id}/configuration` (models + source settings and
  * credentials) and `PUT /v1/spaces/{id}/exposures` (API/MCP publishing).
  *
@@ -31,13 +32,15 @@
  */
 
 import { contextEngineClient } from './httpClients';
+import { getServer, getServerAdminUser } from './platformServices';
 import { CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
-import { roleGrantId, rolesFromGrants, toConfigurationPayload, toSourceRegistration } from '../../utils/contextEngine';
+import { infrastructureStorageKinds, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
   ContextEngine,
   ContextEngineDetail,
   ContextEngineExposure,
+  ContextEngineProgress,
   ContextEngineState,
   ContextEngineSummary,
   ContextGraphState,
@@ -53,11 +56,17 @@ import type {
   CreateContextEngineInput,
   CreateContextEngineResult,
   PutContextGrantInput,
+  SourceIndexingState,
+  SourceProgress,
+  SourceReadingState,
+  StorageKind,
+  StorageSummary,
 } from '../../types/contextEngine';
 
 const V1 = '/v1';
 const spacePath = (id: string): string => `${V1}/spaces/${encodeURIComponent(id)}`;
 const grantsPath = (resourceId: string): string => `${V1}/resources/${encodeURIComponent(resourceId)}/grants`;
+const progressPath = (spaceId: string): string => `${V1}/progress/spaces/${encodeURIComponent(spaceId)}`;
 
 // ── Raw wire shapes — private to this file ──────────────────────────────────
 
@@ -132,6 +141,21 @@ interface RawConfiguration {
   llm?: { provider: string; model: string } | null;
   exposure?: { api?: boolean; mcp?: boolean } | null;
   graph?: { state?: string; builtAt?: string; jobId?: string; progress?: { done: number; total: number } } | null;
+  storage?: Partial<Record<StorageKind, { provider?: string; label?: string; detail?: string } | null>> | null;
+}
+
+/** `GET /v1/progress/spaces/{id}` — one entry per source the caller may inspect. */
+interface RawSourceProgress {
+  sourceId: string;
+  reading: { state: string; runId?: string | null; startedAt?: string | null; completedAt?: string | null };
+  processing: { since?: string | null; total: number; queued: number; running: number; succeeded: number; failed: number; percent?: number | null };
+  records: { active: number; quarantined: number; deleted: number };
+  indexing: { state: string; expected?: number | null; indexed?: number | null; indexing?: number | null; failed?: number | null; missing?: number | null; percent?: number | null; collectedAt?: string | null };
+}
+
+interface RawSpaceProgress {
+  spaceId: string;
+  sources: RawSourceProgress[];
 }
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
@@ -152,6 +176,39 @@ const toJob = (raw: RawJob): ContextJob => ({ id: raw.id, state: raw.state, oper
 
 const toEvidence = (raw: RawEvidence): ContextEvidence => ({ id: raw.id, recordId: raw.recordId, sourceId: raw.sourceId, sourceVersion: raw.sourceVersion, passage: raw.passage, location: raw.location, sourceUrl: raw.sourceUrl });
 
+const READING_STATES: ReadonlySet<string> = new Set<SourceReadingState>(['idle', 'reading', 'completed']);
+const INDEXING_STATES: ReadonlySet<string> = new Set<SourceIndexingState>(['not_collected', 'ok', 'unavailable']);
+const orUndefined = (v: string | null | undefined): string | undefined => v ?? undefined;
+
+const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
+  sourceId: raw.sourceId,
+  reading: {
+    state: READING_STATES.has(raw.reading?.state) ? (raw.reading.state as SourceReadingState) : 'idle',
+    startedAt: orUndefined(raw.reading?.startedAt),
+    completedAt: orUndefined(raw.reading?.completedAt),
+  },
+  processing: {
+    since: orUndefined(raw.processing?.since),
+    total: raw.processing?.total ?? 0,
+    queued: raw.processing?.queued ?? 0,
+    running: raw.processing?.running ?? 0,
+    succeeded: raw.processing?.succeeded ?? 0,
+    failed: raw.processing?.failed ?? 0,
+    percent: raw.processing?.percent ?? null,
+  },
+  records: { active: raw.records?.active ?? 0, quarantined: raw.records?.quarantined ?? 0, deleted: raw.records?.deleted ?? 0 },
+  indexing: {
+    state: INDEXING_STATES.has(raw.indexing?.state) ? (raw.indexing.state as SourceIndexingState) : 'not_collected',
+    expected: raw.indexing?.expected ?? null,
+    indexed: raw.indexing?.indexed ?? null,
+    indexing: raw.indexing?.indexing ?? null,
+    failed: raw.indexing?.failed ?? null,
+    missing: raw.indexing?.missing ?? null,
+    percent: raw.indexing?.percent ?? null,
+    collectedAt: orUndefined(raw.indexing?.collectedAt),
+  },
+});
+
 const GRAPH_STATES: ReadonlySet<string> = new Set<ContextGraphState>(['not_built', 'building', 'built', 'failed']);
 
 /** Graph status from the configuration route; an engine that does not report one has not built anything we know of. */
@@ -163,6 +220,36 @@ const toGraph = (raw: RawConfiguration['graph']): ContextGraphStatus => ({
 });
 
 const toExposure = (raw: RawConfiguration | null | undefined): ContextEngineExposure => ({ api: raw?.exposure?.api ?? false, mcp: raw?.exposure?.mcp ?? false });
+
+/** Per-store placement from the configuration route; null until the engine reports any. */
+const toStorage = (raw: RawConfiguration | null | undefined): Record<StorageKind, StorageSummary> | null => {
+  const st = raw?.storage;
+  if (!st) return null;
+  const one = (kind: StorageKind): StorageSummary => {
+    const s = st[kind];
+    return { provider: s?.provider ?? 'unknown', label: s?.label ?? (s?.provider ? s.provider : 'Not reported'), detail: s?.detail };
+  };
+  return { vector: one('vector'), relational: one('relational'), graph: one('graph') };
+};
+
+/**
+ * Connection details for every store that points at an Infrastructure server:
+ * host/port/database from the server, user and password from its admin user.
+ * Mirrors how the RAG wizard resolves a managed vector store.
+ */
+async function resolveInfrastructureConnections(input: CreateContextEngineInput): Promise<Partial<Record<StorageKind, ResolvedConnection>>> {
+  const kinds = infrastructureStorageKinds(input.storage);
+  const entries = await Promise.all(
+    kinds.map(async (kind) => {
+      const sel = input.storage[kind];
+      if (sel.mode !== 'infrastructure') return [kind, undefined] as const;
+      const [server, admin] = await Promise.all([getServer(sel.serverId), getServerAdminUser(sel.serverId)]);
+      const conn = server.connection_params;
+      return [kind, { host: conn.host, port: conn.port, user: conn.user || admin.username, password: admin.password, sslRequired: conn.ssl_required }] as const;
+    }),
+  );
+  return Object.fromEntries(entries.filter(([, v]) => v !== undefined)) as Partial<Record<StorageKind, ResolvedConnection>>;
+}
 
 const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
   queryId: raw.queryId,
@@ -202,23 +289,38 @@ async function fetchSpaceFacets(engineId: string): Promise<{ sources: RawSource[
   return { sources: sources ?? [], grants: grants ?? [], configuration };
 }
 
+/** Listing-only progress: any failure just leaves the progress line out, it never fails the listing. */
+async function fetchSpaceProgressQuietly(engineId: string): Promise<RawSpaceProgress | null> {
+  try {
+    return await contextEngineClient.get<RawSpaceProgress>(progressPath(engineId));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Context engines visible to the caller, each with an at-a-glance summary.
  * The engine lists only spaces the principal holds an action on. Until it
  * offers `GET /v1/spaces?include=summary`, the summary is assembled here with
- * one facet round-trip per space.
+ * one facet round-trip per space, plus its progress roll-up.
  */
 export async function listContextEngines(): Promise<ContextEngine[]> {
   const raw = await contextEngineClient.get<RawContextSpace[]>(`${V1}/spaces`);
   return Promise.all(
     (raw ?? []).map(async (space) => {
-      const facets = await fetchSpaceFacets(space.id);
+      const [facets, progress] = await Promise.all([fetchSpaceFacets(space.id), fetchSpaceProgressQuietly(space.id)]);
       const summary: ContextEngineSummary = {
         sourceCount: facets.sources.length,
         sourceTypes: facets.sources.map((s) => s.type),
         roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
         exposure: toExposure(facets.configuration),
         graph: toGraph(facets.configuration?.graph),
+        progress: progress
+          ? summarizeEngineProgress(
+              facets.sources.map((src) => src.id),
+              (progress.sources ?? []).map(toSourceProgress),
+            )
+          : null,
       };
       return { ...toEngine(space), summary };
     }),
@@ -236,6 +338,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     queryRoles: rolesFromGrants(grants.map(toGrant)),
     exposure: toExposure(configuration),
     graph: toGraph(configuration?.graph),
+    storage: toStorage(configuration),
   };
 }
 
@@ -245,6 +348,8 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
  * warnings; any other failure rolls the space back and rethrows.
  */
 export async function createContextEngine(input: CreateContextEngineInput): Promise<CreateContextEngineResult> {
+  // Resolve Infrastructure connections first so a missing or powered-off server fails before anything is created.
+  const connections = await resolveInfrastructureConnections(input);
   const space = await contextEngineClient.post<RawContextSpace>(`${V1}/spaces`, { name: input.name, ...(input.description ? { description: input.description } : {}) });
   const warnings: string[] = [];
 
@@ -267,7 +372,7 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
     for (const role of input.roles) {
       await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(`${grantsPath(space.id)}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
     }
-    await attempt('Save model configuration and source credentials', () => contextEngineClient.put(`${spacePath(space.id)}/configuration`, toConfigurationPayload(input)));
+    await attempt('Save model, storage and source configuration', () => contextEngineClient.put(`${spacePath(space.id)}/configuration`, toConfigurationPayload(input, connections)));
   } catch (err) {
     // Best-effort rollback so a half-configured engine does not linger in the listing.
     await optional(() => contextEngineClient.delete(spacePath(space.id)), undefined).catch(() => undefined);
@@ -298,6 +403,23 @@ export async function rebuildContextEngine(engineId: string): Promise<ContextJob
 
 export async function getContextJob(jobId: string): Promise<ContextJob> {
   return toJob(await contextEngineClient.get<RawJob>(`${V1}/jobs/${encodeURIComponent(jobId)}`));
+}
+
+// ── Progress ────────────────────────────────────────────────────────────────
+
+/**
+ * Read-only pipeline progress of the engine's sources. The engine returns only
+ * sources the caller may inspect (delivery or manage rights), so a reader sees
+ * fewer entries than sources. An engine without the route reports `available: false`.
+ */
+export async function getContextEngineProgress(engineId: string): Promise<ContextEngineProgress> {
+  try {
+    const raw = await contextEngineClient.get<RawSpaceProgress>(progressPath(engineId));
+    return { available: true, sources: (raw?.sources ?? []).map(toSourceProgress) };
+  } catch (err) {
+    if (isMissingRoute(err)) return { available: false, sources: [] };
+    throw err;
+  }
 }
 
 // ── Query ───────────────────────────────────────────────────────────────────

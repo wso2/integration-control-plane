@@ -19,6 +19,17 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildMcpClientConfig,
+  formatProgressPercent,
+  isEngineProgressActive,
+  overallProgress,
+  progressHeadline,
+  progressListingText,
+  sourceIndexingText,
+  sourceProgressDetail,
+  sourceProgressStatus,
+  sourceProgressValue,
+  sourceSyncText,
+  summarizeEngineProgress,
   buildMcpClientConfigs,
   buildQueryCurl,
   canShareApiKey,
@@ -29,7 +40,13 @@ import {
   graphStatusText,
   graphStatusTone,
   isFormDirty,
+  isGraphUri,
   modelsStepBlocker,
+  sanitizeStorage,
+  storageSelectionError,
+  storageStepBlocker,
+  summarizeStorage,
+  toStoragePayload,
   splitCitations,
   suggestedQuestions,
   toDraft,
@@ -57,8 +74,8 @@ import {
   toCreateInput,
   toSourceRegistration,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, SOURCE_CONNECTORS } from '../constants/contextEngine';
-import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextSourceConfig } from '../types/contextEngine';
+import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
 import type { EmbeddingConfig } from '../types/ragIngestion';
 
 const embedding: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'sk-test', azureApiVersion: '', azureBaseUrl: '' };
@@ -76,6 +93,7 @@ function completeForm(): ContextEngineForm {
     embedding,
     llm: { ...blankLlm('anthropic'), model: 'claude-sonnet-4-6', apiKey: 'sk-ant' },
     shareApiKey: false,
+    storage: defaultStorage(),
     name: 'Support knowledge',
     description: 'Runbooks and docs',
   };
@@ -311,7 +329,8 @@ describe('drafts', () => {
   });
 
   it('knows when there is nothing worth keeping', () => {
-    expect(isFormDirty({ sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, name: '', description: '  ' })).toBe(false);
+    expect(isFormDirty({ sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, storage: defaultStorage(), name: '', description: '  ' })).toBe(false);
+    expect(isFormDirty({ sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, storage: { ...defaultStorage(), vector: { mode: 'infrastructure', serverId: 's1', serverName: 'v', database: 'd' } }, name: '', description: '' })).toBe(true);
     expect(isFormDirty({ ...completeForm(), sources: [], roles: [], embedding: null, llm: null, description: '' })).toBe(true); // name
   });
 });
@@ -331,6 +350,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     queryRoles: [],
     exposure: { api: false, mcp: false },
     graph: { state: 'not_built' },
+    storage: null,
     ...over,
   };
 }
@@ -385,5 +405,162 @@ describe('mcp client configs', () => {
     const vscode = JSON.parse(cfgs[2].json);
     expect(vscode.servers['support-knowledge'].type).toBe('http');
     expect(cfgs[1].path).toBe('.cursor/mcp.json');
+  });
+});
+
+describe('storage', () => {
+  it('managed stores are always usable; infrastructure needs a server and a database', () => {
+    expect(storageSelectionError('vector', { mode: 'managed' })).toBe('');
+    expect(storageSelectionError('vector', { mode: 'infrastructure', serverId: '', serverName: '', database: '' })).toBe('Choose a vector database server, or switch to Engine managed');
+    expect(storageSelectionError('relational', { mode: 'infrastructure', serverId: 's1', serverName: 'platform-db', database: ' ' })).toBe('Enter the database to use on platform-db');
+    expect(storageSelectionError('relational', { mode: 'infrastructure', serverId: 's1', serverName: 'platform-db', database: 'context_engine' })).toBe('');
+  });
+
+  it('external graph needs a graph uri and full credentials', () => {
+    expect(isGraphUri('bolt://graph.internal:7687')).toBe(true);
+    expect(isGraphUri('neo4j+s://abc.databases.neo4j.io')).toBe(true);
+    expect(isGraphUri('graph.internal:7687')).toBe(false);
+    const ext = { mode: 'external' as const, uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'neo4j', password: 'pw' };
+    expect(storageSelectionError('graph', ext)).toBe('');
+    expect(storageSelectionError('graph', { ...ext, uri: 'nope' })).toBe('Enter a bolt://, neo4j:// or http(s):// URI');
+    expect(storageSelectionError('graph', { ...ext, password: '' })).toBe('Enter the database, user and password');
+  });
+
+  it('the step blocker names the first incomplete store', () => {
+    expect(storageStepBlocker(defaultStorage())).toBeNull();
+    expect(storageStepBlocker({ ...defaultStorage(), relational: { mode: 'infrastructure', serverId: '', serverName: '', database: '' } })).toBe('Choose a database server, or switch to Engine managed');
+  });
+
+  it('summarizes each mode in two lines', () => {
+    expect(summarizeStorage('graph', { mode: 'managed' })).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · embedded' });
+    expect(summarizeStorage('vector', { mode: 'infrastructure', serverId: 's1', serverName: 'support-vectors', database: 'context_vectors' })).toEqual({ primary: 'support-vectors', secondary: 'pgvector · context_vectors' });
+    expect(summarizeStorage('graph', { mode: 'external', uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'u', password: 'p' })).toEqual({ primary: 'Neo4j', secondary: 'graph.internal:7687 · neo4j' });
+  });
+
+  it('maps to the engine payload and requires a resolved connection for infrastructure', () => {
+    expect(toStoragePayload('relational', { mode: 'managed' })).toEqual({ provider: 'sqlite' });
+    const infra = { mode: 'infrastructure' as const, serverId: 's1', serverName: 'platform-db', database: 'context_engine' };
+    expect(() => toStoragePayload('relational', infra)).toThrow();
+    expect(toStoragePayload('relational', infra, { host: 'h', port: '5432', user: 'admin', password: 'pw', sslRequired: true })).toEqual({
+      provider: 'postgres',
+      serverId: 's1',
+      serverName: 'platform-db',
+      host: 'h',
+      port: '5432',
+      database: 'context_engine',
+      user: 'admin',
+      password: 'pw',
+      sslRequired: true,
+    });
+    const payload = toConfigurationPayload(toCreateInput({ ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } } }));
+    expect(payload.storage.vector).toEqual({ provider: 'lancedb' });
+    expect(payload.storage.graph).toEqual({ provider: 'neo4j', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' });
+  });
+
+  it('sanitizes stored storage and strips the external password from drafts', () => {
+    expect(sanitizeStorage(undefined)).toEqual(defaultStorage());
+    expect(sanitizeStorage({ vector: { mode: 'infrastructure', serverId: 's1', serverName: 'v', database: 'd' }, graph: { mode: 'bogus' } })).toEqual({ ...defaultStorage(), vector: { mode: 'infrastructure', serverId: 's1', serverName: 'v', database: 'd' } });
+    const form = { ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external' as const, uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'secret' } } };
+    const draft = toDraft(form, '2026-09-24T10:00:00Z');
+    expect(draft.form.storage.graph).toEqual({ mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: '' });
+    expect(fromDraft(JSON.stringify(draft))?.form.storage.graph.mode).toBe('external');
+  });
+});
+
+type ProgressOverrides = { [K in keyof SourceProgress]?: K extends 'sourceId' ? string : Partial<SourceProgress[K]> };
+
+const progress = (o: ProgressOverrides = {}): SourceProgress => ({
+  sourceId: o.sourceId ?? 'src_1',
+  reading: { state: 'idle', ...o.reading },
+  processing: { total: 0, queued: 0, running: 0, succeeded: 0, failed: 0, percent: null, ...o.processing },
+  records: { active: 0, quarantined: 0, deleted: 0, ...o.records },
+  indexing: { state: 'not_collected', expected: null, indexed: null, indexing: null, failed: null, missing: null, percent: null, ...o.indexing },
+});
+
+describe('source progress', () => {
+  it('derives the pipeline status in priority order', () => {
+    expect(sourceProgressStatus(progress())).toBe('waiting');
+    expect(sourceProgressStatus(progress({ reading: { state: 'reading' }, processing: { total: 4, queued: 4, percent: 0 } }))).toBe('reading');
+    expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 4, queued: 1, running: 1, succeeded: 2, percent: 50 } }))).toBe('processing');
+    expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 4, succeeded: 4, percent: 100 }, records: { active: 4 }, indexing: { state: 'ok', expected: 4, indexed: 2, indexing: 2, percent: 50 } }))).toBe('indexing');
+    expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 4, succeeded: 4, percent: 100 }, records: { active: 4 } }))).toBe('processed');
+    expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 4, succeeded: 3, failed: 1, percent: 100 }, records: { active: 3 } }))).toBe('attention');
+    expect(sourceProgressStatus(progress({ reading: { state: 'completed' }, processing: { total: 2, succeeded: 2, percent: 100 }, records: { active: 1, quarantined: 1 } }))).toBe('attention');
+  });
+
+  it('treats a finished sync with nothing new as processed, not waiting', () => {
+    expect(sourceProgressStatus(progress({ reading: { state: 'completed' } }))).toBe('processed');
+    expect(sourceProgressStatus(progress({ records: { active: 12 } }))).toBe('processed');
+  });
+
+  it('picks the bar value, indeterminate whenever the connector is still reading', () => {
+    expect(sourceProgressValue(progress())).toBe(0);
+    expect(sourceProgressValue(progress({ reading: { state: 'reading' } }))).toBeNull();
+    expect(sourceProgressValue(progress({ reading: { state: 'reading' }, processing: { total: 4, succeeded: 4, percent: 100 } }))).toBeNull();
+    expect(sourceProgressValue(progress({ reading: { state: 'completed' }, processing: { total: 4, queued: 3, succeeded: 1, percent: 25 } }))).toBe(25);
+    expect(sourceProgressValue(progress({ reading: { state: 'completed' }, records: { active: 4 }, indexing: { state: 'ok', expected: 4, indexed: 3, indexing: 1, percent: 75 } }))).toBe(75);
+    expect(sourceProgressValue(progress({ reading: { state: 'completed' } }))).toBe(100);
+  });
+
+  it('floors percentages so in-flight work never reads 100%', () => {
+    expect(formatProgressPercent(99.9)).toBe('99%');
+    expect(formatProgressPercent(33.3)).toBe('33%');
+    expect(formatProgressPercent(140)).toBe('100%');
+  });
+
+  it('describes counts, failures and stored records', () => {
+    expect(sourceProgressDetail(progress())).toMatch(/No sync has started yet/);
+    expect(sourceProgressDetail(progress({ reading: { state: 'reading' } }))).toBe('Nothing delivered yet · 0 records stored');
+    expect(sourceProgressDetail(progress({ reading: { state: 'reading' }, processing: { total: 12, succeeded: 12, percent: 100 }, records: { active: 12 } }))).toBe('12 of 12 items processed so far · 12 records stored');
+    expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1200, queued: 658, succeeded: 540, failed: 2, percent: 45.2 }, records: { active: 538, quarantined: 1 } }))).toBe(
+      '542 of 1,200 items processed · 2 failed · 1 quarantined · 538 records stored',
+    );
+    expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1, succeeded: 1, percent: 100 }, records: { active: 1 } }))).toBe('1 of 1 item processed · 1 record stored');
+  });
+
+  it('reports sync timing and indexing only when the engine has something to say', () => {
+    const recent = new Date(Date.now() - 3 * 60_000).toISOString();
+    expect(sourceSyncText(progress())).toBeNull();
+    expect(sourceSyncText(progress({ reading: { state: 'reading', startedAt: recent } }))).toBe('Still reading · sync started 3 min ago');
+    expect(sourceSyncText(progress({ reading: { state: 'completed', completedAt: recent } }))).toBe('Last sync finished 3 min ago');
+    expect(sourceIndexingText(progress())).toBeNull();
+    expect(sourceIndexingText(progress({ indexing: { state: 'unavailable' } }))).toMatch(/unavailable/);
+    expect(sourceIndexingText(progress({ indexing: { state: 'ok', expected: 8, indexed: 6, indexing: 1, missing: 1, percent: 75 } }))).toBe('75% indexed (6 of 8) · 1 missing');
+  });
+
+  it('rolls progress up across sources, counting ones the caller cannot inspect as hidden', () => {
+    const list = [
+      progress({ sourceId: 'a', reading: { state: 'completed' }, processing: { total: 10, succeeded: 9, failed: 1, percent: 100 }, records: { active: 9 } }),
+      progress({ sourceId: 'b', reading: { state: 'reading' }, processing: { total: 10, queued: 8, succeeded: 2, percent: 20 } }),
+      progress({ sourceId: 'c' }),
+    ];
+    const sum = summarizeEngineProgress(['a', 'b', 'c', 'd'], list);
+    expect(sum).toEqual({ sourceCount: 4, processed: 1, active: 1, reading: 1, waiting: 1, hidden: 1, percent: 60, failedItems: 1 });
+    expect(progressHeadline(sum)).toBe('1 of 3 sources processed');
+    expect(progressListingText(sum)).toBe('Syncing');
+    expect(progressListingText({ ...sum, reading: 0 })).toBe('Syncing · 60%');
+    expect(isEngineProgressActive({ available: true, sources: list })).toBe(true);
+    expect(isEngineProgressActive({ available: false, sources: list })).toBe(false);
+  });
+
+  it('follows the earliest moving stage for the whole-engine bar', () => {
+    const done = progress({ sourceId: 'a', reading: { state: 'completed' }, processing: { total: 10, succeeded: 10, percent: 100 }, records: { active: 10 } });
+    const queued = progress({ sourceId: 'b', reading: { state: 'completed' }, processing: { total: 10, queued: 5, succeeded: 5, percent: 50 } });
+    const reading = progress({ sourceId: 'c', reading: { state: 'reading' }, processing: { total: 10, succeeded: 10, percent: 100 } });
+    const indexing = progress({ sourceId: 'd', reading: { state: 'completed' }, processing: { total: 10, succeeded: 10, percent: 100 }, records: { active: 10 }, indexing: { state: 'ok', expected: 10, indexed: 4, indexing: 6, percent: 40 } });
+    expect(overallProgress([done])).toBeNull();
+    expect(overallProgress([done, reading])).toEqual({ value: null, text: '100% of delivered items processed so far' });
+    expect(overallProgress([queued, indexing])).toEqual({ value: 75, text: '75% of delivered items processed' });
+    expect(overallProgress([done, indexing])).toEqual({ value: 40, text: '40% of stored records indexed' });
+    expect(overallProgress([progress({ reading: { state: 'reading' } })])).toEqual({ value: null, text: 'Waiting for the first items' });
+  });
+
+  it('keeps the listing quiet when there is nothing to report', () => {
+    expect(progressListingText(null)).toBeNull();
+    expect(progressListingText(summarizeEngineProgress([], []))).toBeNull();
+    expect(progressListingText(summarizeEngineProgress(['a'], []))).toBeNull();
+    expect(progressListingText(summarizeEngineProgress(['a'], [progress({ sourceId: 'a' })]))).toBe('Waiting for data');
+    expect(progressListingText(summarizeEngineProgress(['a', 'b'], [progress({ sourceId: 'a', records: { active: 3 } }), progress({ sourceId: 'b' })]))).toBe('1 of 2 processed');
+    expect(progressHeadline(summarizeEngineProgress(['a'], []))).toBe('Progress hidden');
   });
 });

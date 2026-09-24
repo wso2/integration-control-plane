@@ -23,6 +23,7 @@ import {
   deleteContextEngine,
   deleteContextGrant,
   getContextEngine,
+  getContextEngineProgress,
   getContextJob,
   getContextPrincipal,
   listContextEngines,
@@ -34,8 +35,8 @@ import {
 } from '#api/contextEngine';
 import { IS_WIP } from '../features';
 import { getAccessToken } from '../auth/tokenManager';
-import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES } from '../constants/contextEngine';
-import { fromDraft, toDraft } from '../utils/contextEngine';
+import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS } from '../constants/contextEngine';
+import { fromDraft, isEngineProgressActive, toDraft } from '../utils/contextEngine';
 import type { ContextEngineExposure, ContextEngineForm, ContextQueryInput, CreateContextEngineInput, PutContextGrantInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
@@ -98,6 +99,25 @@ export function useContextJob(jobId: string | null) {
     queryFn: () => getContextJob(jobId!),
     enabled: isContextEngineEnabled() && !!jobId,
     refetchInterval: (query) => (query.state.data && CONTEXT_JOB_TERMINAL_STATES.has(query.state.data.state) ? false : 3000),
+    retry: false,
+  });
+}
+
+/**
+ * Source progress, polled quickly while any source is reading, processing or
+ * indexing and slowly otherwise. Stops when the engine does not serve progress.
+ * TanStack pauses the interval while the browser tab is hidden.
+ */
+export function useContextEngineProgress(engineId: string) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'progress', engineId],
+    queryFn: () => getContextEngineProgress(engineId),
+    enabled: isContextEngineEnabled() && !!engineId,
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data?.available || query.state.status === 'error') return false;
+      return isEngineProgressActive(data) ? PROGRESS_POLL_ACTIVE_MS : PROGRESS_POLL_IDLE_MS;
+    },
     retry: false,
   });
 }

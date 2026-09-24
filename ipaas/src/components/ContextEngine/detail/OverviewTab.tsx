@@ -20,13 +20,13 @@ import { Alert, Box, Button, Chip, CircularProgress, Grid, Link, Stack, Typograp
 import { Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useAskedFlag, useContextJob, useInvalidateContextEngine, useRebuildContextEngine } from '../../../hooks/useContextEngine';
-import { LLM_PROVIDERS } from '../../../constants/contextEngine';
+import { LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { getStartedSteps, sourceTypeName } from '../../../utils/contextEngine';
+import { getStartedSteps } from '../../../utils/contextEngine';
 import { HttpError } from '../../../types/http';
 import GraphStatusChip from '../GraphStatusChip';
 import GetStartedChecklist from './GetStartedChecklist';
-import SourceMark from '../SourceMark';
+import SourcesProgressCard from './SourcesProgressCard';
 import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
 import type { ContextEngineDetail, ContextEngineTabKey, ContextGraphStatus, GetStartedStepId } from '../../../types/contextEngine';
 
@@ -75,7 +75,7 @@ function ModelRow({ label, provider, model }: { label: string; provider: string;
   );
 }
 
-/** Overview — first-run checklist, graph status, sources, access, models and exposure, each linking to its tab. */
+/** Overview — first-run checklist, source progress, graph status, access, models, storage and exposure, each linking to its tab. */
 export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabProps): JSX.Element {
   const rebuild = useRebuildContextEngine(engine.id);
   const invalidate = useInvalidateContextEngine(engine.id);
@@ -115,8 +115,6 @@ export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabP
     else onGoTab('access');
   };
 
-  const sourceState = (state: string) => (graph.state === 'built' ? state : graph.state === 'building' ? 'Indexing' : 'Waiting for first build');
-
   return (
     <>
       {!allDone && <GetStartedChecklist steps={steps} building={building} onAction={onChecklistAction} />}
@@ -129,30 +127,7 @@ export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabP
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 7 }}>
-          <Card title={`Sources (${engine.sources.length})`}>
-            {engine.sources.length === 0 ? (
-              <Typography variant="body2" sx={mutedSx}>
-                No sources are registered on this engine yet.
-              </Typography>
-            ) : (
-              engine.sources.map((s) => (
-                <Box key={s.id} sx={summaryRowSx}>
-                  <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-                    <SourceMark type={s.type} size={18} />
-                    <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
-                        {s.name}
-                      </Typography>
-                      <Typography variant="caption" sx={mutedSx}>
-                        {sourceTypeName(s.type)}
-                      </Typography>
-                    </Box>
-                  </Stack>
-                  <Chip size="small" variant="outlined" color={graph.state === 'built' && s.state === 'ready' ? 'success' : s.state === 'failed' ? 'error' : 'default'} label={sourceState(s.state)} />
-                </Box>
-              ))
-            )}
-          </Card>
+          <SourcesProgressCard engineId={engine.id} sources={engine.sources} graph={graph} />
         </Grid>
 
         <Grid size={{ xs: 12, md: 5 }}>
@@ -215,6 +190,29 @@ export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabP
           <Card title="Models">
             <ModelRow label="Embedding" provider={providerName('embedding', engine.models.embedding?.provider)} model={engine.models.embedding?.model} />
             <ModelRow label="Language model" provider={providerName('llm', engine.models.llm?.provider)} model={engine.models.llm?.model} />
+          </Card>
+        </Grid>
+
+        <Grid size={{ xs: 12, md: 4 }}>
+          <Card title="Storage">
+            {STORAGE_BACKENDS.map((b) => {
+              const sum = engine.storage?.[b.kind];
+              return (
+                <Box key={b.kind} sx={summaryRowSx}>
+                  <Typography variant="body2" sx={mutedSx}>
+                    {b.title.replace(' database', '')}
+                  </Typography>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {sum?.label ?? '—'}
+                    </Typography>
+                    <Typography variant="caption" sx={mutedSx}>
+                      {sum ? (sum.detail ?? sum.provider) : 'Not reported'}
+                    </Typography>
+                  </Box>
+                </Box>
+              );
+            })}
           </Card>
         </Grid>
 

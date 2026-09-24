@@ -16,13 +16,28 @@
  * under the License.
  */
 
-import { CONNECTOR_BY_ID, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_ACTIONS, GRAPH_STATE_LABEL, MCP_CLIENTS, PLAYGROUND_SUGGESTIONS, ROLE_GRANT_PREFIX } from '../constants/contextEngine';
+import {
+  CONNECTOR_BY_ID,
+  CONTEXT_ENGINE_DESCRIPTION_MAX,
+  CONTEXT_ENGINE_NAME_MAX,
+  CONTEXT_QUERY_ACTIONS,
+  defaultStorage,
+  GRAPH_STATE_LABEL,
+  MCP_CLIENTS,
+  PLAYGROUND_SUGGESTIONS,
+  ROLE_GRANT_PREFIX,
+  STORAGE_BACKEND_BY_KIND,
+  STORAGE_BACKENDS,
+} from '../constants/contextEngine';
 import { formatDistanceToNow } from './time';
 import { isEmbeddingValid } from './ragIngestion';
 import type {
   ContextEngineDetail,
   ContextEngineDraft,
   ContextEngineForm,
+  ContextEngineProgress,
+  ContextEngineProgressSummary,
+  ContextEngineStorage,
   ContextGrant,
   ContextGraphStatus,
   ContextSourceConfig,
@@ -33,6 +48,10 @@ import type {
   SourceCategory,
   SourceConnector,
   SourceFieldDef,
+  SourceProgress,
+  SourceProgressStatus,
+  StorageKind,
+  StorageSelection,
 } from '../types/contextEngine';
 import type { EmbeddingConfig } from '../types/ragIngestion';
 
@@ -183,19 +202,19 @@ export function isNameStepValid(name: string, description: string): boolean {
 }
 
 export function isFormComplete(form: ContextEngineForm): boolean {
-  return isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && isNameStepValid(form.name, form.description);
+  return isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null && isNameStepValid(form.name, form.description);
 }
 
 /** The wizard form as a create request. Throws when a required section is missing — call after {@link isFormComplete}. */
 export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput {
   const llm = effectiveLlm(form);
   if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
-  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm };
+  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, storage: form.storage };
 }
 
 /** Whether the wizard holds anything worth keeping. */
 export function isFormDirty(form: ContextEngineForm): boolean {
-  return form.sources.length > 0 || form.roles.length > 0 || form.embedding !== null || form.llm !== null || form.name.trim() !== '' || form.description.trim() !== '';
+  return form.sources.length > 0 || form.roles.length > 0 || form.embedding !== null || form.llm !== null || !isStorageAllManaged(form.storage) || form.name.trim() !== '' || form.description.trim() !== '';
 }
 
 // ── Drafts ──────────────────────────────────────────────────────────────────
@@ -207,10 +226,11 @@ export function toDraft(form: ContextEngineForm, savedAt: string): ContextEngine
     const secretKeys = new Set((connector?.fields ?? []).filter((f) => f.kind === 'secret').map((f) => f.key));
     return { ...s, values: Object.fromEntries(Object.entries(s.values).map(([k, v]) => [k, secretKeys.has(k) ? '' : v])) };
   });
+  const storage = Object.fromEntries(Object.entries(form.storage).map(([k, sel]) => [k, sel.mode === 'external' ? { ...sel, password: '' } : sel])) as ContextEngineStorage;
   return {
     v: 1,
     savedAt,
-    form: { ...form, sources, embedding: form.embedding ? { ...form.embedding, apiKey: '' } : null, llm: form.llm ? { ...form.llm, apiKey: '' } : null },
+    form: { ...form, sources, storage, embedding: form.embedding ? { ...form.embedding, apiKey: '' } : null, llm: form.llm ? { ...form.llm, apiKey: '' } : null },
   };
 }
 
@@ -224,7 +244,7 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
     return {
       v: 1,
       savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : '',
-      form: { sources: f.sources, roles: f.roles, embedding: f.embedding ?? null, llm: f.llm ?? null, shareApiKey: !!f.shareApiKey, name: f.name, description: typeof f.description === 'string' ? f.description : '' },
+      form: { sources: f.sources, roles: f.roles, embedding: f.embedding ?? null, llm: f.llm ?? null, shareApiKey: !!f.shareApiKey, storage: sanitizeStorage(f.storage), name: f.name, description: typeof f.description === 'string' ? f.description : '' },
     };
   } catch {
     return null;
@@ -272,6 +292,272 @@ export function summarizeSource(source: ContextSourceConfig): string {
     })
     .filter(Boolean);
   return parts.length ? parts.join(' · ') : 'Not configured yet';
+}
+
+// ── Storage ─────────────────────────────────────────────────────────────────
+
+const STORAGE_KINDS: StorageKind[] = ['vector', 'relational', 'graph'];
+
+/** A Neo4j connection URI: bolt://, bolt+s://, neo4j://, neo4j+s:// or http(s)://. */
+export function isGraphUri(value: string): boolean {
+  return /^(bolt|bolt\+s|bolt\+ssc|neo4j|neo4j\+s|neo4j\+ssc|https?):\/\/\S+$/i.test(value.trim());
+}
+
+/** Coerce a stored or foreign storage object to a complete, well-typed one; anything odd falls back to managed. */
+export function sanitizeStorage(raw: unknown): ContextEngineStorage {
+  const base = defaultStorage();
+  if (!raw || typeof raw !== 'object') return base;
+  const obj = raw as Record<string, Partial<Record<string, unknown>> | undefined>;
+  for (const kind of STORAGE_KINDS) {
+    const sel = obj[kind];
+    if (!sel || typeof sel !== 'object') continue;
+    if (sel.mode === 'infrastructure') base[kind] = { mode: 'infrastructure', serverId: String(sel.serverId ?? ''), serverName: String(sel.serverName ?? ''), database: String(sel.database ?? '') };
+    else if (sel.mode === 'external') base[kind] = { mode: 'external', uri: String(sel.uri ?? ''), database: String(sel.database ?? ''), user: String(sel.user ?? ''), password: String(sel.password ?? '') };
+  }
+  return base;
+}
+
+export function isStorageAllManaged(storage: ContextEngineStorage): boolean {
+  return STORAGE_KINDS.every((k) => storage[k].mode === 'managed');
+}
+
+/** Why one store's selection is incomplete; empty when it is usable. */
+export function storageSelectionError(kind: StorageKind, sel: StorageSelection): string {
+  const info = STORAGE_BACKEND_BY_KIND[kind];
+  switch (sel.mode) {
+    case 'managed':
+      return '';
+    case 'infrastructure':
+      if (!sel.serverId) return `Choose a ${info.infraNoun} server, or switch to Engine managed`;
+      if (!nonEmpty(sel.database)) return `Enter the database to use on ${sel.serverName || 'the server'}`;
+      return '';
+    case 'external':
+      if (!nonEmpty(sel.uri)) return 'Enter the connection URI';
+      if (!isGraphUri(sel.uri)) return 'Enter a bolt://, neo4j:// or http(s):// URI';
+      if (!nonEmpty(sel.database) || !nonEmpty(sel.user) || !nonEmpty(sel.password)) return 'Enter the database, user and password';
+      return '';
+  }
+}
+
+/** Why Next is disabled on the Storage step, or null when every store is usable. */
+export function storageStepBlocker(storage: ContextEngineStorage): string | null {
+  for (const kind of STORAGE_KINDS) {
+    const err = storageSelectionError(kind, storage[kind]);
+    if (err) return err;
+  }
+  return null;
+}
+
+/** Two lines describing where a store lives, for the review step and overview. */
+export function summarizeStorage(kind: StorageKind, sel: StorageSelection): { primary: string; secondary: string } {
+  const info = STORAGE_BACKEND_BY_KIND[kind];
+  switch (sel.mode) {
+    case 'managed':
+      return { primary: 'Engine managed', secondary: `${info.managedName} · embedded` };
+    case 'infrastructure':
+      return { primary: sel.serverName || 'Infrastructure server', secondary: `${info.alternativeProvider} · ${sel.database || 'database not set'}` };
+    case 'external': {
+      let host = sel.uri.trim();
+      try {
+        host = new URL(sel.uri.trim()).host || host;
+      } catch {
+        /* keep the raw uri */
+      }
+      return { primary: 'Neo4j', secondary: `${host || 'URI not set'} · ${sel.database || 'database not set'}` };
+    }
+  }
+}
+
+/** Connection details resolved from an Infrastructure server at create time. */
+export interface ResolvedConnection {
+  host: string;
+  port: string;
+  user: string;
+  password: string;
+  sslRequired?: boolean;
+}
+
+export type StoragePayload =
+  | { provider: string }
+  | { provider: string; serverId: string; serverName: string; host: string; port: string; database: string; user: string; password: string; sslRequired?: boolean }
+  | { provider: string; uri: string; database: string; user: string; password: string };
+
+/** One store as the engine's configuration route expects it; Infrastructure servers need their resolved connection. */
+export function toStoragePayload(kind: StorageKind, sel: StorageSelection, connection?: ResolvedConnection): StoragePayload {
+  const info = STORAGE_BACKEND_BY_KIND[kind];
+  switch (sel.mode) {
+    case 'managed':
+      return { provider: info.managedProvider };
+    case 'infrastructure': {
+      if (!connection) throw new Error(`Connection details for ${sel.serverName || sel.serverId} were not resolved.`);
+      return {
+        provider: info.alternativeProvider,
+        serverId: sel.serverId,
+        serverName: sel.serverName,
+        host: connection.host,
+        port: connection.port,
+        database: sel.database.trim(),
+        user: connection.user,
+        password: connection.password,
+        ...(connection.sslRequired !== undefined ? { sslRequired: connection.sslRequired } : {}),
+      };
+    }
+    case 'external':
+      return { provider: info.alternativeProvider, uri: sel.uri.trim(), database: sel.database.trim(), user: sel.user.trim(), password: sel.password };
+  }
+}
+
+/** Storage kinds whose selection points at an Infrastructure server. */
+export function infrastructureStorageKinds(storage: ContextEngineStorage): StorageKind[] {
+  return STORAGE_BACKENDS.map((b) => b.kind).filter((k) => storage[k].mode === 'infrastructure');
+}
+
+// ── Source progress ─────────────────────────────────────────────────────────
+
+const plural = (n: number, word: string): string => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
+
+/** Lower-cased relative time, e.g. "3 min ago"; empty when the timestamp cannot be parsed. */
+const ago = (iso: string): string => {
+  const rel = formatDistanceToNow(iso);
+  return rel ? `${rel.charAt(0).toLowerCase()}${rel.slice(1)}` : '';
+};
+
+/** Floor, so a source is never shown at 100% while something is still in flight. */
+export function formatProgressPercent(percent: number): string {
+  return `${Math.floor(Math.min(Math.max(percent, 0), 100))}%`;
+}
+
+/**
+ * Where a source is in the pipeline. A connector that is still reading wins over
+ * queued work, queued work wins over indexing, and a source that finished with
+ * failed or quarantined items needs attention.
+ */
+export function sourceProgressStatus(p: SourceProgress): SourceProgressStatus {
+  if (p.reading.state === 'reading') return 'reading';
+  if (p.processing.queued + p.processing.running > 0) return 'processing';
+  if (p.indexing.state === 'ok' && (p.indexing.indexing ?? 0) > 0) return 'indexing';
+  if (p.reading.state === 'idle' && p.processing.total === 0 && p.records.active === 0) return 'waiting';
+  if (p.processing.failed > 0 || p.records.quarantined > 0 || (p.indexing.state === 'ok' && (p.indexing.failed ?? 0) > 0)) return 'attention';
+  return 'processed';
+}
+
+export function isSourceProgressActive(p: SourceProgress): boolean {
+  const status = sourceProgressStatus(p);
+  return status === 'reading' || status === 'processing' || status === 'indexing';
+}
+
+export function isEngineProgressActive(progress: ContextEngineProgress | undefined): boolean {
+  return !!progress?.available && progress.sources.some(isSourceProgressActive);
+}
+
+/**
+ * Bar value for one source, or null for an indeterminate bar. While the connector
+ * is still reading the total is unknown, so there is no honest percentage: the
+ * engine reports none for reading by design. Indexing shows the backend's figure.
+ */
+export function sourceProgressValue(p: SourceProgress): number | null {
+  const status = sourceProgressStatus(p);
+  if (status === 'waiting') return 0;
+  if (status === 'reading') return null;
+  if (status === 'indexing') return p.indexing.percent ?? 0;
+  return p.processing.percent ?? 100;
+}
+
+/** Item counts under a source's bar, e.g. "540 of 1,200 items processed · 2 failed · 538 records stored" ("so far" while still reading). */
+export function sourceProgressDetail(p: SourceProgress): string {
+  if (sourceProgressStatus(p) === 'waiting') return 'No sync has started yet. Items appear here once the connector delivers them.';
+  const { total, succeeded, failed } = p.processing;
+  const parts: string[] = [];
+  if (total > 0) parts.push(`${(succeeded + failed).toLocaleString('en-US')} of ${plural(total, 'item')} processed${p.reading.state === 'reading' ? ' so far' : ''}`);
+  else parts.push(p.reading.state === 'reading' ? 'Nothing delivered yet' : 'No new items in the latest sync');
+  if (failed > 0) parts.push(`${failed.toLocaleString('en-US')} failed`);
+  if (p.records.quarantined > 0) parts.push(`${p.records.quarantined.toLocaleString('en-US')} quarantined`);
+  parts.push(`${plural(p.records.active, 'record')} stored`);
+  return parts.join(' · ');
+}
+
+/** Sync timing, e.g. "Last sync finished 3 min ago"; null when the connector has never synced. */
+export function sourceSyncText(p: SourceProgress): string | null {
+  if (p.reading.state === 'reading' && p.reading.startedAt) return `Still reading · sync started ${ago(p.reading.startedAt)}`.trim();
+  if (p.reading.state === 'completed' && p.reading.completedAt) return `Last sync finished ${ago(p.reading.completedAt)}`.trim();
+  return null;
+}
+
+/** Search-index line; null until the engine has collected indexing status for the source. */
+export function sourceIndexingText(p: SourceProgress): string | null {
+  const ix = p.indexing;
+  if (ix.state === 'unavailable') return 'Search index status is unavailable right now';
+  if (ix.state !== 'ok' || !ix.expected) return null;
+  const parts = [`${ix.percent !== null ? formatProgressPercent(ix.percent) : '0%'} indexed (${(ix.indexed ?? 0).toLocaleString('en-US')} of ${ix.expected.toLocaleString('en-US')})`];
+  if (ix.failed) parts.push(`${ix.failed.toLocaleString('en-US')} failed`);
+  if (ix.missing) parts.push(`${ix.missing.toLocaleString('en-US')} missing`);
+  return parts.join(' · ');
+}
+
+/** Roll-up across the engine's sources. Sources without a progress entry are ones the caller may not inspect. */
+export function summarizeEngineProgress(sourceIds: string[], progress: SourceProgress[]): ContextEngineProgressSummary {
+  const byId = new Map(progress.map((p) => [p.sourceId, p]));
+  const sum: ContextEngineProgressSummary = { sourceCount: sourceIds.length, processed: 0, active: 0, reading: 0, waiting: 0, hidden: 0, percent: null, failedItems: 0 };
+  let delivered = 0;
+  let finished = 0;
+  for (const id of sourceIds) {
+    const p = byId.get(id);
+    if (!p) {
+      sum.hidden += 1;
+      continue;
+    }
+    const status = sourceProgressStatus(p);
+    if (status === 'processed' || status === 'attention') sum.processed += 1;
+    else if (status === 'waiting') sum.waiting += 1;
+    else sum.active += 1;
+    if (status === 'reading') sum.reading += 1;
+    delivered += p.processing.total;
+    finished += p.processing.succeeded + p.processing.failed;
+    sum.failedItems += p.processing.failed;
+  }
+  sum.percent = delivered > 0 ? Math.round((Math.min(finished, delivered) * 1000) / delivered) / 10 : null;
+  return sum;
+}
+
+/**
+ * The whole-engine bar while sources move, following the earliest stage any source
+ * is in: indeterminate while a connector reads (totals are not final), the share
+ * of delivered items processed while work is queued, then the share of stored
+ * records indexed. Null when nothing is moving.
+ */
+export function overallProgress(progress: SourceProgress[]): { value: number | null; text: string } | null {
+  const statuses = progress.map(sourceProgressStatus);
+  const delivered = progress.reduce((n, p) => n + p.processing.total, 0);
+  const finished = progress.reduce((n, p) => n + p.processing.succeeded + p.processing.failed, 0);
+  const processed = delivered > 0 ? (Math.min(finished, delivered) * 100) / delivered : null;
+  if (statuses.includes('reading')) return { value: null, text: processed !== null ? `${formatProgressPercent(processed)} of delivered items processed so far` : 'Waiting for the first items' };
+  if (statuses.includes('processing')) return { value: processed ?? 0, text: `${formatProgressPercent(processed ?? 0)} of delivered items processed` };
+  if (statuses.includes('indexing')) {
+    const indexed = progress.filter((p) => p.indexing.state === 'ok' && p.indexing.expected);
+    const expected = indexed.reduce((n, p) => n + (p.indexing.expected ?? 0), 0);
+    const done = indexed.reduce((n, p) => n + (p.indexing.indexed ?? 0), 0);
+    const value = expected > 0 ? (Math.min(done, expected) * 100) / expected : 0;
+    return { value, text: `${formatProgressPercent(value)} of stored records indexed` };
+  }
+  return null;
+}
+
+/** Card header text, e.g. "2 of 3 sources processed". */
+export function progressHeadline(s: ContextEngineProgressSummary): string {
+  const visible = s.sourceCount - s.hidden;
+  if (visible === 0) return s.sourceCount === 0 ? 'No sources' : 'Progress hidden';
+  return `${s.processed} of ${plural(visible, 'source')} processed`;
+}
+
+/**
+ * Compact listing text: syncing (with a percentage once no connector is still
+ * reading), a processed count, or waiting. Null when there is nothing to say.
+ */
+export function progressListingText(s: ContextEngineProgressSummary | null): string | null {
+  if (!s || s.sourceCount === 0 || s.sourceCount === s.hidden) return null;
+  if (s.active > 0) return s.percent !== null && s.reading === 0 ? `Syncing · ${formatProgressPercent(s.percent)}` : 'Syncing';
+  if (s.processed === 0) return 'Waiting for data';
+  return `${s.processed} of ${s.sourceCount - s.hidden} processed`;
 }
 
 // ── Graph status and first-run guidance ─────────────────────────────────────
@@ -387,15 +673,21 @@ export interface ContextEngineConfigurationPayload {
   sources: { name: string; type: string; settings: Record<string, string>; credentials: Record<string, string> }[];
   embedding: { provider: string; model: string; apiKey: string; baseUrl?: string; apiVersion?: string };
   llm: { provider: string; model: string; apiKey: string; baseUrl?: string; apiVersion?: string };
+  storage: Record<StorageKind, StoragePayload>;
 }
 
-/** Body for the engine's `PUT /spaces/{id}/configuration` — models plus source settings and credentials. */
-export function toConfigurationPayload(input: CreateContextEngineInput): ContextEngineConfigurationPayload {
+/** Body for the engine's `PUT /spaces/{id}/configuration` — models, source settings and credentials, and where each store lives; `connections` carries details resolved from Infrastructure. */
+export function toConfigurationPayload(input: CreateContextEngineInput, connections: Partial<Record<StorageKind, ResolvedConnection>> = {}): ContextEngineConfigurationPayload {
   const azure = (baseUrl: string, apiVersion: string, provider: string) => (provider === 'azure_openai' ? { baseUrl, apiVersion } : {});
   return {
     sources: input.sources.map((s) => ({ name: s.name.trim(), type: s.type, settings: sourceSettings(s), credentials: sourceSecrets(s) })),
     embedding: { provider: input.embedding.provider, model: input.embedding.model, apiKey: input.embedding.apiKey, ...azure(input.embedding.azureBaseUrl, input.embedding.azureApiVersion, input.embedding.provider) },
     llm: { provider: input.llm.provider, model: input.llm.model, apiKey: input.llm.apiKey, ...azure(input.llm.azureBaseUrl, input.llm.azureApiVersion, input.llm.provider) },
+    storage: {
+      vector: toStoragePayload('vector', input.storage.vector, connections.vector),
+      relational: toStoragePayload('relational', input.storage.relational, connections.relational),
+      graph: toStoragePayload('graph', input.storage.graph, connections.graph),
+    },
   };
 }
 
