@@ -21,6 +21,12 @@ type HeartbeatGenRow record {|
     int gen;
 |};
 
+type LegacyDesiredStateRow record {|
+    string artifact_type;
+    string state_key;
+    string? state_value;
+|};
+
 // === Read ===
 
 public isolated function readReconcileArtifactKeys(string componentId, string envId) returns types:ReconcileArtifactKey[]|error {
@@ -211,6 +217,73 @@ public isolated function queryArtifactState(string componentId, string envId)
 }
 
 // === Upsert ===
+
+// Folds desired state recorded under a non-canonical spelling of an artifact type into the
+// canonical key and removes the old rows.
+//
+// Before artifact types were normalized on write, a caller sending "Proxy-Service" created a
+// desired-state row under that literal string. Writing the canonical "proxy-service" would
+// otherwise leave both, and readReconcileArtifactKeys returns each distinct artifact_type, so
+// heartbeat replay would keep dispatching the stale row's status to the same artifact.
+//
+// State fields the canonical key does not already carry are copied over, so a legacy tracing or
+// statistics value is not lost. Fields it does carry are left alone, which lets the caller's own
+// update win the status it is in the middle of setting.
+public isolated function migrateLegacyArtifactTypeKeys(string componentId, string envId,
+        string artifactName, string canonicalType) returns error? {
+    // Select the whole case-insensitive group rather than filtering the canonical spelling out in
+    // SQL. On MySQL this column is utf8mb4_unicode_ci, so `artifact_type <> canonical` is false for
+    // a difference of case alone and an SQL-side filter would match nothing; the exact comparison
+    // is therefore made in Ballerina, which is case-sensitive on every database.
+    stream<LegacyDesiredStateRow, sql:Error?> rows = dbClient->query(`
+        SELECT artifact_type, state_key, state_value FROM reconcile_desired_state
+        WHERE component_id = ${componentId} AND env_id = ${envId}
+            AND artifact_name = ${artifactName}
+            AND LOWER(TRIM(artifact_type)) = ${canonicalType}
+    `);
+    LegacyDesiredStateRow[] groupRows = check from LegacyDesiredStateRow row in rows
+        select row;
+
+    boolean hasLegacySpelling = groupRows.some(row => row.artifact_type != canonicalType);
+    if !hasLegacySpelling {
+        return;
+    }
+
+    // Merge the group into one state map. The canonical spelling wins a shared key; anything only a
+    // legacy row carries is kept, so a tracing or statistics value set earlier is not lost.
+    map<string> merged = {};
+    foreach LegacyDesiredStateRow row in groupRows {
+        string? value = row.state_value;
+        if value is () {
+            continue;
+        }
+        if row.artifact_type == canonicalType || !merged.hasKey(row.state_key) {
+            merged[row.state_key] = value;
+        }
+    }
+    log:printInfo("Migrating legacy artifact type keys", componentId = componentId, envId = envId,
+            artifactName = artifactName, canonicalType = canonicalType,
+            rowCount = groupRows.length(), mergedKeyCount = merged.length());
+
+    // Delete the whole group before rewriting it. Deleting only the legacy spellings would remove
+    // the canonical row too under a case-insensitive collation, where the two are not
+    // distinguishable by equality. Both statements run in one transaction so a failure part way
+    // through cannot leave the artifact with its desired state deleted and nothing written back.
+    types:ReconcileArtifactKey canonicalKey = {artifactName: artifactName, artifactType: canonicalType};
+    transaction {
+        _ = check dbClient->execute(`
+            DELETE FROM reconcile_desired_state
+            WHERE component_id = ${componentId} AND env_id = ${envId}
+                AND artifact_name = ${artifactName}
+                AND LOWER(TRIM(artifact_type)) = ${canonicalType}
+        `);
+
+        if merged.length() > 0 {
+            check upsertReconcileDesiredState(componentId, envId, canonicalKey, merged);
+        }
+        check commit;
+    }
+}
 
 public isolated function upsertReconcileDesiredState(string componentId, string envId,
         types:ReconcileArtifactKey artifact, map<string> state) returns error? {

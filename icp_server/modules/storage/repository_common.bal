@@ -66,15 +66,32 @@ const string TOGGLE_DISABLE = "disable";
 // HTTP header value constants
 const string CONTENT_TYPE_JSON = "application/json";
 
+// Every artifact type getManagementPath can resolve. Add a type here when adding a match arm
+// to it, so statusChangeSupportedTypes keeps reporting the full set.
+final readonly & string[] MANAGEMENT_ARTIFACT_TYPES = [
+    ARTIFACT_TYPE_PROXY_SERVICE,
+    ARTIFACT_TYPE_ENDPOINT,
+    ARTIFACT_TYPE_MESSAGE_PROCESSOR,
+    ARTIFACT_TYPE_TASK,
+    ARTIFACT_TYPE_INBOUND_ENDPOINT,
+    ARTIFACT_TYPE_API,
+    ARTIFACT_TYPE_TEMPLATE,
+    ARTIFACT_TYPE_SEQUENCE
+];
+
+// Canonical form of an artifact type, as getManagementPath matches it. Callers that persist or
+// echo an artifact type should normalize first so what is stored and reported is what matched.
+public isolated function normalizeArtifactType(string artifactType) returns string {
+    return artifactType.toLowerAscii().trim();
+}
+
 // Returns the management API path for the given artifact type.
-// When statusOnly=true, only artifact types that support the status field are matched;
-// proxy-service, endpoint, message-processor, task, and inbound-endpoint support status (active/inactive/trigger),
 // When statusOnly=true, only artifact types that support the status field are matched;
 // proxy-service, endpoint, message-processor, task, and inbound-endpoint support status (active/inactive/trigger),
 // while api and sequence only support trace/statistics; template does not support these controls.
 isolated function getManagementPath(string artifactType, boolean statusOnly = false) returns string? {
     log:printDebug("Resolving management path", artifactType = artifactType, statusOnly = statusOnly);
-    match artifactType.toLowerAscii().trim() {
+    match normalizeArtifactType(artifactType) {
         ARTIFACT_TYPE_PROXY_SERVICE => {
             return MGMT_PATH_PROXY_SERVICES;
         }
@@ -103,6 +120,24 @@ isolated function getManagementPath(string artifactType, boolean statusOnly = fa
             return ();
         }
     }
+}
+
+// Returns whether the given artifact type supports a status change (active/inactive/trigger).
+// api and sequence support only trace/statistics and template supports neither, so they are
+// excluded. Callers must reject such requests up front rather than dispatching them: the MI
+// management API refuses them, and the dispatch path cannot report that refusal back.
+public isolated function supportsStatusChange(string artifactType) returns boolean {
+    return getManagementPath(artifactType, true) is string;
+}
+
+// Comma-separated list of artifact types that support a status change, for error messages.
+// Derived by asking getManagementPath about each known type rather than restating the list,
+// so the message cannot disagree with the decision supportsStatusChange actually makes.
+public isolated function statusChangeSupportedTypes() returns string {
+    string[] supported = from string artifactType in MANAGEMENT_ARTIFACT_TYPES
+        where getManagementPath(artifactType, true) is string
+        select artifactType;
+    return string:'join(", ", ...supported);
 }
 
 // Record type for artifact lookup

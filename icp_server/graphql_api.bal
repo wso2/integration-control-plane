@@ -131,6 +131,24 @@ isolated function stateOf(map<map<types:ArtifactStateField>> sm, string name, st
     return fields is map<types:ArtifactStateField> ? fields[key] : ();
 }
 
+// Canonical artifact type for a reconcile key, with any desired state left under a different
+// spelling folded in first. All three artifact mutations go through this, so one artifact cannot
+// end up with two desired-state keys because one mutation normalized and another did not.
+isolated function canonicalArtifactType(string componentId, types:Runtime[] runtimes,
+        string artifactName, string rawArtifactType) returns string|error {
+    string artifactType = storage:normalizeArtifactType(rawArtifactType);
+    map<boolean> migratedEnvs = {};
+    foreach types:Runtime runtime in runtimes {
+        string envId = runtime.environment.id;
+        if migratedEnvs.hasKey(envId) {
+            continue;
+        }
+        migratedEnvs[envId] = true;
+        check storage:migrateLegacyArtifactTypeKeys(componentId, envId, artifactName, artifactType);
+    }
+    return artifactType;
+}
+
 // Group runtimes by environment, upsert desired state per env, and reconcile.
 // Returns [successCount, failedCount] across all envs.
 isolated function reconcilePerEnv(types:Runtime[] runtimes, string componentId,
@@ -3116,6 +3134,28 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to change artifact status");
         }
 
+        // Match, persist and report the same canonical form, so a caller sending "  API  "
+        // is not rejected on one spelling and echoed back another, and so the reconcile key
+        // agrees with the observed state recorded from heartbeats.
+        string artifactType = storage:normalizeArtifactType(input.artifactType);
+
+        // Reject artifact types that cannot support a status change before anything is
+        // persisted. MI answers such a request with a 400 and the dispatch path cannot
+        // surface that, so proceeding would report SUCCESS, write a desired state that can
+        // never converge, and leave the console showing a state the runtime is not in.
+        if !storage:supportsStatusChange(artifactType) {
+            log:printWarn("Rejected status change for unsupported artifact type",
+                    artifactType = artifactType, artifactName = input.artifactName,
+                    componentId = input.componentId);
+            return {
+                status: types:FAILED,
+                message: string `Status change is not supported for artifact type '${artifactType}'. Supported types: ${storage:statusChangeSupportedTypes()}.`,
+                successCount: 0,
+                failedCount: 0,
+                details: []
+            };
+        }
+
         types:Runtime[] runtimes = check storage:getRuntimes((), "MI", (), component.projectId, input.componentId);
         if runtimes.length() == 0 {
             log:printWarn("No MI runtimes found for component", componentId = input.componentId);
@@ -3128,14 +3168,19 @@ service /graphql on graphqlListener {
             };
         }
 
-        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        // Fold away any desired state left under a non-canonical spelling of this artifact type
+        // before writing the canonical one, so replay cannot keep dispatching the stale row.
+        artifactType = check canonicalArtifactType(input.componentId, runtimes, input.artifactName,
+                input.artifactType);
+
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"status": input.status};
         [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
         storage:logAuditEvent(storage:AUDIT_ARTIFACT_STATUS_CHANGE, userId = userContext.userId,
                 resourceType = storage:AUDIT_RESOURCE_ARTIFACT,
-                resourceId = string `${input.componentId}/${input.artifactType}/${input.artifactName}`,
-                details = string `Artifact '${input.artifactName}' (${input.artifactType}) status changed to '${input.status}' by '${userContext.username}'`,
+                resourceId = string `${input.componentId}/${artifactType}/${input.artifactName}`,
+                details = string `Artifact '${input.artifactName}' (${artifactType}) status changed to '${input.status}' by '${userContext.username}'`,
                 clientIp = userContext.clientIp, userAgent = userContext.userAgent);
         return {
             status: counts[1] == 0 ? types:SUCCESS : types:FAILED,
@@ -3173,7 +3218,9 @@ service /graphql on graphqlListener {
             };
         }
 
-        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        string artifactType = check canonicalArtifactType(input.componentId, runtimes,
+                input.artifactName, input.artifactType);
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"tracing": input.trace};
         [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
@@ -3201,10 +3248,13 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to change artifact statistics");
         }
 
+        // Validate the canonical spelling, not the caller's. Matching the raw value here would
+        // reject a supported type sent as "Proxy-Service" before it could be normalized.
+        string normalizedType = storage:normalizeArtifactType(input.artifactType);
         string[] supportedTypes = ["proxy-service", "endpoint", "api", "sequence", "inbound-endpoint"];
-        boolean isSupported = supportedTypes.indexOf(input.artifactType) != ();
+        boolean isSupported = supportedTypes.indexOf(normalizedType) != ();
         if !isSupported {
-            return error(string `Artifact type '${input.artifactType}' does not support statistics. Supported types: ProxyService, Endpoint, RestApi, Sequence, InboundEndpoint`);
+            return error(string `Artifact type '${normalizedType}' does not support statistics. Supported types: ProxyService, Endpoint, RestApi, Sequence, InboundEndpoint`);
         }
 
         types:Runtime[] runtimes = check storage:getRuntimes((), "MI", input.environmentId, component.projectId, input.componentId);
@@ -3219,7 +3269,9 @@ service /graphql on graphqlListener {
             };
         }
 
-        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: input.artifactType};
+        string artifactType = check canonicalArtifactType(input.componentId, runtimes,
+                input.artifactName, input.artifactType);
+        types:ReconcileArtifactKey artifact = {artifactName: input.artifactName, artifactType: artifactType};
         map<string> desiredProps = {"statistics": input.statistics};
         [int, int] counts = check reconcilePerEnv(runtimes, input.componentId, artifact, desiredProps, sync:dispatchMI);
 
