@@ -189,10 +189,16 @@ public isolated function processDeltaHeartbeat(types:DeltaHeartbeat deltaHeartbe
         // Write an explicit UTC value rather than CURRENT_TIMESTAMP: the latter is
         // evaluated in the database server's timezone, so the column would mean
         // different things depending on where the database happens to run.
+        //
+        // A retired row is excluded: it carries no name, so this would revive it as a
+        // nameless RUNNING runtime that never registered, sitting in the listings beside
+        // the replacement that legitimately holds the name. The heartbeat is still
+        // answered with fullHeartbeatRequired, and that full heartbeat is where a
+        // superseded instance gets its refusal.
         sql:ExecutionResult|error result = dbClient->execute(sql:queryConcat(
             `UPDATE runtimes
             SET last_heartbeat = `, sqlQueryFromString(timestampCast(currentTimeStr)), `, status = 'RUNNING'
-            WHERE runtime_id = ${runtimeId}`
+            WHERE runtime_id = ${runtimeId} AND retired_at IS NULL`
         ));
 
         if result is error {
@@ -208,11 +214,11 @@ public isolated function processDeltaHeartbeat(types:DeltaHeartbeat deltaHeartbe
 
     // Hash matches, process delta heartbeat
 
-    // Update the heartbeat timestamp (explicit UTC, see note above)
+    // Update the heartbeat timestamp (explicit UTC, and retired rows excluded, see note above)
     sql:ExecutionResult|error timestampResult = dbClient->execute(sql:queryConcat(
         `UPDATE runtimes
         SET last_heartbeat = `, sqlQueryFromString(timestampCast(currentTimeStr)), `, status = 'RUNNING'
-        WHERE runtime_id = ${runtimeId}`
+        WHERE runtime_id = ${runtimeId} AND retired_at IS NULL`
     ));
 
     boolean runtimeExists = true;
@@ -566,6 +572,44 @@ isolated function writeObservedStateBI(string runtimeId, string componentId, str
     check batchUpsertReconcileObservedState(runtimeId, componentId, envId, entries);
 }
 
+// Retire a named runtime that a fresh instance has just replaced, rather than deleting it.
+//
+// The surviving row is what stops the pair trading the name back and forth. A superseded
+// instance is often still alive for a few seconds — a terminating pod keeps heartbeating
+// through its grace period — and its next heartbeat would otherwise find the replacement,
+// see a runtime ID it does not recognise, and evict it in turn. Because the tombstone keeps
+// the old ID resolvable, that heartbeat is not a new registration, so it never reaches the
+// reclaim; it tries to write its name back through the ordinary update instead and is
+// refused by uq_runtime_identity. For an instance that has already been replaced, refusing
+// it is the right answer.
+//
+// The name is cleared so the replacement can take it, and retired_at marks the row as a
+// tombstone, keeping it out of listings and out of the status sweep. A dedicated column
+// rather than a status value, because status is constrained to a fixed set on every engine
+// except H2 — a CHECK on PostgreSQL, SQL Server and Oracle, an ENUM on MySQL — so writing a
+// new one would be rejected everywhere the tests do not run.
+//
+// retired_at is stamped now, not left to last_heartbeat, because a row is usually retired
+// some way into its heartbeat interval: aged off its last real heartbeat, a tombstone created
+// at T+29s of a 30s window would be swept a second later, while the instance it guards
+// against is still shutting down.
+//
+// A tombstone only has to outlive that instance, which stops heartbeating within
+// heartbeatTimeoutSeconds of being replaced, so markOfflineRuntimes drops it once it is older
+// than that. Retiring deliberately does not clear other tombstones: retirement erases the
+// name, so nothing distinguishes one named runtime's tombstone from another's in the same
+// component and environment, and a blanket sweep would leave whichever runtime was replaced
+// first unguarded again.
+isolated function retireSupersededRuntime(string oldId) returns error? {
+    string retiredAtStr = check convertUtcToDbDateTime(time:utcNow());
+    _ = check dbClient->execute(sql:queryConcat(
+        `UPDATE runtimes SET name = NULL, status = 'OFFLINE', retired_at = `,
+        sqlQueryFromString(timestampCast(retiredAtStr)),
+        ` WHERE runtime_id = ${oldId}`
+    ));
+    log:printDebug(string `Retired superseded runtime ${oldId}`);
+}
+
 // Upsert runtime record
 isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error {
     string? runtimeName = heartbeat.runtime;
@@ -589,9 +633,10 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
     // Bare, reachable host/IP for this runtime process (optional; NULL when absent) - used by the Try-It proxy
     string? tryItHost = heartbeat?.tryItHost;
 
-    // Check if a stale OFFLINE runtime with the same component/env/name but different ID exists.
-    // Restricting to OFFLINE prevents live sibling replicas in multi-replica deployments from
-    // being mistakenly treated as "old restarted instances" and deleted.
+    // Check whether some other row already holds this runtime's identity
+    // (component_id, environment_id, name) under a different runtime ID, and clear it out before
+    // the upsert below. A restarted runtime normally arrives with a fresh ID, because a container
+    // loses the persisted one along with its filesystem.
     //
     // queryRow, deliberately: this lookup expects at most one row, and a `query` stream that
     // errors mid-consumption is abandoned without being closed — its pooled connection is
@@ -605,35 +650,10 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
     // function, and the compiler rejects one with a Ballerina body ("a function with a
     // non-'external' function body cannot be a dependently-typed function"). A helper that
     // erased the row type to `record {}` would only move the cast to every call site.
-    record {|string runtime_id;|}|sql:Error existingByName;
-    if runtimeName is string {
-        existingByName = dbClient->queryRow(`
-            SELECT runtime_id FROM runtimes
-            WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name = ${runtimeName} AND status = 'OFFLINE'
-        `);
-    } else {
-        existingByName = dbClient->queryRow(`
-            SELECT runtime_id FROM runtimes
-            WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name IS NULL AND status = 'OFFLINE'
-        `);
-    }
-    if existingByName is sql:Error && !(existingByName is sql:NoRowsError) {
-        return existingByName;
-    }
-
-    if existingByName is record {|string runtime_id;|} {
-        string oldId = existingByName.runtime_id;
-        if oldId != runtimeId {
-            log:printInfo(string `Runtime ID changed from ${oldId} to ${runtimeId} for ${runtimeName ?: "null"}`);
-            log:printDebug(string `Deleting old runtime ${oldId} via reconcile cleanup flow`);
-            check deleteExistingArtifacts(oldId);
-            check deleteReconcileRuntime(oldId);
-            check deleteRuntime(oldId);
-        }
-    }
-
-    // Determine new-vs-existing and capture previous status before the upsert.
-    // queryRow for the same reason as above: no stream to leak when it fails.
+    // Determine new-vs-existing and capture previous status. Read BEFORE any reclaim below,
+    // because the answer gates it: only a runtime ICP has no row for may take an identity from
+    // another row. A runtime it already knows has either never been replaced, or has been and
+    // must not claw the name back.
     record {|string runtime_id; string status;|}|sql:Error existingById = dbClient->queryRow(`
         SELECT runtime_id, status FROM runtimes WHERE runtime_id = ${runtimeId}
     `);
@@ -643,6 +663,51 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
     boolean isNewRegistration = existingById is sql:NoRowsError;
     string? previousStatus = existingById is record {|string runtime_id; string status;|}
             ? existingById.status : ();
+
+    if isNewRegistration {
+        record {|string runtime_id; string status;|}|sql:Error existingByName;
+        if runtimeName is string {
+            // Deliberately not restricted to OFFLINE. uq_runtime_identity already forbids two live
+            // runtimes from sharing a non-null name, so a row holding this name under a different
+            // ID is this runtime's own predecessor. Matching OFFLINE rows only would strand any
+            // restart quicker than heartbeatTimeoutSeconds: the superseded row is still RUNNING,
+            // the cleanup below skips it, and the INSERT collides with the constraint.
+            existingByName = dbClient->queryRow(`
+                SELECT runtime_id, status FROM runtimes
+                WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name = ${runtimeName}
+            `);
+        } else {
+            // Unnamed runtimes are outside uq_runtime_identity, because NULLs compare as distinct,
+            // so sibling replicas in a multi-replica deployment genuinely can coexist here. OFFLINE
+            // is what keeps them from deleting one another, and has to stay on this branch.
+            existingByName = dbClient->queryRow(`
+                SELECT runtime_id, status FROM runtimes
+                WHERE component_id = ${heartbeat.component} AND environment_id = ${heartbeat.environment} AND name IS NULL AND status = 'OFFLINE'
+            `);
+        }
+        if existingByName is sql:Error && !(existingByName is sql:NoRowsError) {
+            return existingByName;
+        }
+
+        if existingByName is record {|string runtime_id; string status;|} {
+            string oldId = existingByName.runtime_id;
+            if oldId != runtimeId {
+                log:printInfo(string `Runtime ID changed from ${oldId} to ${runtimeId} for ${runtimeName ?: "null"}`);
+                check deleteExistingArtifacts(oldId);
+                check deleteReconcileRuntime(oldId);
+                if runtimeName is string && existingByName.status != "OFFLINE" {
+                    // The predecessor was still reporting itself as running, so it may yet send
+                    // another heartbeat. Keep it as a tombstone; see retireSupersededRuntime.
+                    check retireSupersededRuntime(oldId);
+                } else {
+                    // Nothing has to be remembered: an unnamed row contends for no name, and an
+                    // OFFLINE one has already been silent for longer than heartbeatTimeoutSeconds.
+                    log:printDebug(string `Deleting old runtime ${oldId} via reconcile cleanup flow`);
+                    check deleteRuntime(oldId);
+                }
+            }
+        }
+    }
 
     // Atomic upsert for PostgreSQL, fallback to INSERT/UPDATE for others
     if dbType == POSTGRESQL {
@@ -693,6 +758,10 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
                 used_memory = EXCLUDED.used_memory,
                 os_arch = EXCLUDED.os_arch,
                 server_name = EXCLUDED.server_name,
+                -- A row that heartbeats again under its own ID is a live runtime, not a
+                -- tombstone: whatever superseded it is gone, or this update would have
+                -- collided with the name it still holds.
+                retired_at = NULL,
                 last_heartbeat = `, sqlQueryFromString(observedAt), `
         `));
     } else if isNewRegistration {
@@ -746,6 +815,8 @@ isolated function upsertRuntime(types:Heartbeat heartbeat) returns string?|error
                 used_memory = ${heartbeat.nodeInfo.usedMemory},
                 os_arch = ${heartbeat.nodeInfo.osArch},
                 server_name = ${heartbeat.nodeInfo.platformName},
+                -- See the note on the PostgreSQL branch.
+                retired_at = NULL,
                 last_heartbeat = `, sqlQueryFromString(observedAt), `
             WHERE runtime_id = ${runtimeId}
         `));

@@ -35,6 +35,11 @@ const string HB_REPLICA3_ID = "aa000001-test-test-test-000000000003";
 const string HB_RESTART_OLD_ID = "aa000001-test-test-test-000000000007";
 const string HB_RESTART_NEW_ID = "aa000001-test-test-test-000000000008";
 const string HB_RESTART_NAME = "hb-restart-test-unique-runtime";
+// A second named runtime in the same component/environment, for the test that one
+// runtime's retirement must not disturb another's tombstone.
+const string HB_SECOND_OLD_ID = "aa000001-test-test-test-000000000011";
+const string HB_SECOND_NEW_ID = "aa000001-test-test-test-000000000012";
+const string HB_SECOND_NAME = "hb-restart-test-second-runtime";
 // Service-listener binding test: dedicated ID cleaned up via an AfterGroups
 // teardown so rows never leak when an assertion aborts the test.
 const string HB_SERVICE_LISTENER_ID = "aa000001-test-test-test-000000000010";
@@ -255,6 +260,209 @@ function testVmRestartCleansUpOfflineRecord() returns error? {
     types:Runtime? newRuntime = check storage:getRuntimeById(HB_RESTART_NEW_ID);
     test:assertNotEquals(newRuntime, (), "New runtime must be registered");
 
+    cleanupRuntime(HB_RESTART_NEW_ID);
+}
+
+// =============================================================================
+// Test 4: fast restart — the superseded record is still RUNNING
+//
+// A runtime replaced quicker than heartbeatTimeoutSeconds (a rolling update, an eviction, a
+// reschedule, or any container that lost its persisted runtime ID) comes back under a fresh
+// UUID while its previous row is still RUNNING. Matching only OFFLINE rows left that row in
+// place, so the INSERT violated uq_runtime_identity and the heartbeat was rejected.
+//
+// Reclaiming the name is safe here: the constraint guarantees no live sibling holds it. The
+// null-name replica tests above cover the case where siblings genuinely can, and that branch
+// keeps its OFFLINE guard.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testFastRestartReplacesRunningRecord() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+
+    // Old instance registers and stays RUNNING — it is never marked OFFLINE, because the
+    // replacement comes up well inside the heartbeat timeout.
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    types:Runtime? seeded = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertNotEquals(seeded, (), "Old runtime should be seeded as RUNNING before the restart");
+
+    // Replacement instance: same name, fresh UUID, old row still RUNNING.
+    types:HeartbeatResponse response = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+    test:assertTrue(response.acknowledged,
+            "Restarted runtime must be acknowledged even though the old record is still RUNNING");
+
+    // The superseded row is kept as a tombstone rather than deleted, so a late heartbeat from
+    // the instance it belonged to still resolves and cannot reclaim the name.
+    types:Runtime? oldRecord = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertTrue(oldRecord is types:Runtime, "Superseded record must be retired, not deleted");
+    if oldRecord is types:Runtime {
+        // Asserted against the name rather than a literal empty value: the mapping renders a
+        // NULL name as a placeholder, so what matters is that it is no longer this name.
+        test:assertNotEquals(oldRecord?.runtimeName, HB_RESTART_NAME,
+                "Superseded record must give up the name");
+        test:assertEquals(oldRecord.status, "OFFLINE", "Superseded record must not still read as running");
+    }
+
+    // A tombstone is bookkeeping, not a runtime, so it must not surface in listings. The
+    // replacement is asserted present in the same pass, so an empty result cannot let the
+    // absence check pass by default.
+    types:Runtime[] listed = check storage:getRuntimes((), (), (), (), HB_COMPONENT_ID);
+    boolean replacementListed = false;
+    foreach types:Runtime listedRuntime in listed {
+        test:assertNotEquals(listedRuntime.runtimeId, HB_RESTART_OLD_ID,
+                "Retired record must not appear in runtime listings");
+        if listedRuntime.runtimeId == HB_RESTART_NEW_ID {
+            replacementListed = true;
+        }
+    }
+    test:assertTrue(replacementListed, "Replacement must appear in runtime listings");
+
+    types:Runtime? newRuntime = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertNotEquals(newRuntime, (), "Restarted runtime must be registered under its new ID");
+
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+}
+
+// =============================================================================
+// Test 5: one runtime's retirement must not unguard another's
+//
+// Retirement erases the name, so within a component and environment nothing tells one named
+// runtime's tombstone from another's. Clearing tombstones wholesale when the next runtime is
+// replaced would therefore leave whichever was replaced first free to take its name back off
+// its own replacement — the very exchange the tombstone exists to stop.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testRetiringOneRuntimeKeepsAnotherGuarded() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+    cleanupRuntime(HB_SECOND_OLD_ID);
+    cleanupRuntime(HB_SECOND_NEW_ID);
+
+    // First named runtime is replaced, leaving a tombstone behind.
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+
+    // A second, unrelated named runtime in the same component and environment is replaced too.
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_SECOND_OLD_ID, HB_SECOND_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_SECOND_NEW_ID, HB_SECOND_NAME), preResolved = true);
+
+    types:Runtime? firstTombstone = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertTrue(firstTombstone is types:Runtime,
+            "Retiring the second runtime must not drop the first runtime's tombstone");
+
+    // With its tombstone intact, the first superseded instance is still refused.
+    types:HeartbeatResponse|error stale = storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    test:assertTrue(stale is error,
+            "First superseded instance must still be unable to take its name back");
+
+    types:Runtime? firstReplacement = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertTrue(firstReplacement is types:Runtime, "First replacement must survive");
+
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+    cleanupRuntime(HB_SECOND_OLD_ID);
+    cleanupRuntime(HB_SECOND_NEW_ID);
+}
+
+// =============================================================================
+// Test 6: a delta heartbeat must not revive a retired record
+//
+// The delta path only refreshes last_heartbeat and status, keyed on runtime_id alone. A
+// retired row carries no name, so reviving it would put a nameless RUNNING runtime in the
+// listings next to the replacement that legitimately holds the name — and the instance would
+// never have re-registered. The row must stay retired, and the reply must ask for the full
+// heartbeat that is where the refusal happens.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testDeltaHeartbeatDoesNotReviveRetiredRecord() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+
+    types:HeartbeatResponse deltaResponse = check storage:processDeltaHeartbeat({
+        runtimeId: HB_RESTART_OLD_ID,
+        runtimeHash: "stale-hash-forcing-a-full-heartbeat",
+        timestamp: time:utcNow()
+    });
+    test:assertTrue(deltaResponse?.fullHeartbeatRequired ?: false,
+            "A retired record's delta heartbeat must be answered with fullHeartbeatRequired");
+
+    types:Runtime? retired = check storage:getRuntimeById(HB_RESTART_OLD_ID);
+    test:assertTrue(retired is types:Runtime, "Retired record should still exist");
+    if retired is types:Runtime {
+        test:assertEquals(retired.status, "OFFLINE",
+                "A delta heartbeat must not bring a retired record back to RUNNING");
+    }
+
+    // Reviving a tombstone would also put it back in the listings, so check there too: the
+    // status alone would not catch a row that was revived and then swept back to OFFLINE.
+    types:Runtime[] listed = check storage:getRuntimes((), (), (), (), HB_COMPONENT_ID);
+    foreach types:Runtime listedRuntime in listed {
+        test:assertNotEquals(listedRuntime.runtimeId, HB_RESTART_OLD_ID,
+                "A delta heartbeat must not return a retired record to the listings");
+    }
+
+    types:Runtime? replacement = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertTrue(replacement is types:Runtime, "Replacement must be unaffected");
+
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+}
+
+// =============================================================================
+// Test 7: the superseded instance must not evict its own replacement
+//
+// A replaced instance is often still alive for a few seconds — a terminating pod keeps
+// heartbeating through its grace period. That heartbeat finds the replacement holding the
+// name under an unfamiliar runtime ID. Treating it as a restart would delete the live
+// replacement and reinstate the dead instance, and the two would then trade the name back
+// and forth for as long as both kept heartbeating.
+// =============================================================================
+@test:Config {
+    groups: ["heartbeat", "heartbeat-restart"]
+}
+function testSupersededInstanceCannotEvictItsReplacement() returns error? {
+    cleanupRuntime(HB_RESTART_OLD_ID);
+    cleanupRuntime(HB_RESTART_NEW_ID);
+
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    _ = check storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_NEW_ID, HB_RESTART_NAME), preResolved = true);
+
+    // Late heartbeat from the instance that was just replaced.
+    types:HeartbeatResponse|error stale = storage:processHeartbeat(
+            buildHeartbeat(HB_RESTART_OLD_ID, HB_RESTART_NAME), preResolved = true);
+    test:assertTrue(stale is error,
+            "A superseded instance must not be able to take its name back");
+
+    types:Runtime? replacement = check storage:getRuntimeById(HB_RESTART_NEW_ID);
+    test:assertTrue(replacement is types:Runtime,
+            "Replacement must survive a heartbeat from the instance it replaced");
+    if replacement is types:Runtime {
+        test:assertEquals(replacement?.runtimeName, HB_RESTART_NAME,
+                "Replacement must still hold the name");
+    }
+
+    cleanupRuntime(HB_RESTART_OLD_ID);
     cleanupRuntime(HB_RESTART_NEW_ID);
 }
 

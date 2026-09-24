@@ -309,3 +309,53 @@ sqlcmd -S <server> -U <user> -P <password> -d <icp_db_name> -i add_sso_group_map
 # Oracle (run as the ICP schema owner)
 sqlplus <icp_schema_user>/<password>@//<host>:1521/<service_name> @add_sso_group_mapping_tables_oracle.sql
 ```
+---
+
+## Upgrading an existing ICP v2 deployment: runtime retirement marker
+
+Deployments whose database was initialised before this change must run the retirement script
+once against the **main ICP DB**. Fresh installs do not need it — the `*_init.sql` scripts
+already contain the column.
+
+It adds one nullable column, `runtimes.retired_at`. The column is set when a restarting runtime
+takes over the name its previous instance held: the superseded row is kept as a tombstone, with
+its name cleared so the replacement can take it, so that the old runtime ID still resolves. That
+is what stops the superseded instance — often still alive inside its Kubernetes termination
+grace period — from taking the name back off its replacement and leaving the two trading it.
+Tombstones are hidden from runtime listings and dropped by the offline sweep once older than
+`heartbeatTimeoutSeconds`.
+
+Without it, every heartbeat that supersedes a named runtime fails: the `UPDATE` references a
+column that does not exist, which aborts the heartbeat transaction.
+
+| Engine | Script |
+|---|---|
+| H2 | `add_runtime_retirement_h2.sql` |
+| MySQL / MariaDB | `add_runtime_retirement_mysql.sql` |
+| PostgreSQL | `add_runtime_retirement_postgresql.sql` |
+| Microsoft SQL Server | `add_runtime_retirement_mssql.sql` |
+| Oracle (19c+) | `add_runtime_retirement_oracle.sql` |
+
+The scripts are **idempotent** — safe to re-run. No data backfill is involved: existing rows keep
+`retired_at` NULL, which is correct, because every row that exists at upgrade time is a live
+runtime rather than a tombstone.
+
+```bash
+# H2 (server may stay running thanks to AUTO_SERVER)
+java -cp <path-to-h2.jar> org.h2.tools.RunScript \
+  -url "jdbc:h2:file:./database/icp_db;MODE=MySQL;AUTO_SERVER=TRUE" \
+  -user <db_user> -password <db_password> \
+  -script add_runtime_retirement_h2.sql
+
+# MySQL
+mysql -u <admin_user> -p <icp_db_name> < add_runtime_retirement_mysql.sql
+
+# PostgreSQL
+psql -U <admin_user> -d <icp_db_name> -f add_runtime_retirement_postgresql.sql
+
+# Microsoft SQL Server
+sqlcmd -S <server> -U <user> -P <password> -d <icp_db_name> -i add_runtime_retirement_mssql.sql
+
+# Oracle (run as the ICP schema owner)
+sqlplus <icp_schema_user>/<password>@//<host>:1521/<service_name> @add_runtime_retirement_oracle.sql
+```

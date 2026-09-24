@@ -24,7 +24,7 @@ import ballerina/time;
 // Get filtered runtimes based on criteria
 public isolated function getRuntimes(string? status, string? runtimeType, string? environmentId, string? projectId, string? componentId) returns types:Runtime[]|error {
     types:Runtime[] runtimeList = [];
-    sql:ParameterizedQuery whereClause = ` WHERE 1=1 `;
+    sql:ParameterizedQuery whereClause = ` WHERE retired_at IS NULL `;
     sql:ParameterizedQuery whereConditions = ` `;
     if status is string {
         whereConditions = sql:queryConcat(whereConditions, ` AND status = ${status} `);
@@ -73,7 +73,7 @@ public isolated function getRuntimesByIntegrationIds(
     types:Runtime[] runtimeList = [];
 
     // Build WHERE clause with IN condition for component_id
-    sql:ParameterizedQuery whereClause = ` WHERE 1=1 `;
+    sql:ParameterizedQuery whereClause = ` WHERE retired_at IS NULL `;
     sql:ParameterizedQuery whereConditions = ` `;
 
     // Add component_id IN clause
@@ -223,7 +223,7 @@ public isolated function markOfflineRuntimes() returns error? {
             `SELECT r.runtime_id, r.environment_id, e.name AS environment_name
         FROM runtimes r
         JOIN environments e ON r.environment_id = e.environment_id
-        WHERE r.status != 'OFFLINE'
+        WHERE r.status != 'OFFLINE' AND r.retired_at IS NULL
         AND r.last_heartbeat IS NOT NULL
         AND `,
             sqlQueryFromString(getTimestampDiffSeconds("r.last_heartbeat", nowUtc)),
@@ -266,7 +266,7 @@ public isolated function markOfflineRuntimes() returns error? {
                     `DELETE FROM runtimes
                 WHERE runtime_id IN (
                     SELECT runtime_id FROM runtimes
-                    WHERE status != 'OFFLINE'
+                    WHERE status != 'OFFLINE' AND retired_at IS NULL
                     AND last_heartbeat IS NOT NULL
                     AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
@@ -282,7 +282,7 @@ public isolated function markOfflineRuntimes() returns error? {
         } else {
             sql:ParameterizedQuery deleteQuery = sql:queryConcat(
                     `DELETE FROM runtimes
-                WHERE status != 'OFFLINE'
+                WHERE status != 'OFFLINE' AND retired_at IS NULL
                 AND last_heartbeat IS NOT NULL
                 AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
@@ -302,7 +302,7 @@ public isolated function markOfflineRuntimes() returns error? {
                 SET status = 'OFFLINE'
                 WHERE runtime_id IN (
                     SELECT runtime_id FROM runtimes
-                    WHERE status != 'OFFLINE'
+                    WHERE status != 'OFFLINE' AND retired_at IS NULL
                     AND last_heartbeat IS NOT NULL
                     AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
@@ -319,7 +319,7 @@ public isolated function markOfflineRuntimes() returns error? {
             sql:ParameterizedQuery updateQuery = sql:queryConcat(
                     `UPDATE runtimes
                 SET status = 'OFFLINE'
-                WHERE status != 'OFFLINE'
+                WHERE status != 'OFFLINE' AND retired_at IS NULL
                 AND last_heartbeat IS NOT NULL
                 AND `,
                     sqlQueryFromString(getTimestampDiffSeconds("last_heartbeat", nowUtc)),
@@ -330,6 +330,35 @@ public isolated function markOfflineRuntimes() returns error? {
             if affectedCount is int && affectedCount > 0 {
                 log:printInfo(string `Successfully marked ${affectedCount} runtime(s) as OFFLINE`);
             }
+        }
+    }
+
+    // Drop expired tombstones. A retired row exists only to stop the instance it stands for
+    // from taking its name back from the replacement, and that instance stops heartbeating
+    // within heartbeatTimeoutSeconds of being replaced — so once the row is older than that,
+    // it has nothing left to guard against. Deleting rather than marking, because a tombstone
+    // is bookkeeping and OFFLINE would make it look like a runtime someone should see.
+    //
+    // Aged from retired_at, never from last_heartbeat: a runtime is usually retired part way
+    // into its heartbeat interval, so measuring from the last real heartbeat would give a
+    // tombstone created at T+29s of a 30s window about a second to live — expiring it while
+    // the instance it guards against is still inside its termination grace period.
+    sql:ParameterizedQuery expireRetiredQuery = sql:queryConcat(
+            `DELETE FROM runtimes
+        WHERE retired_at IS NOT NULL
+        AND `,
+            sqlQueryFromString(getTimestampDiffSeconds("retired_at", nowUtc)),
+            ` > ${heartbeatTimeoutSeconds}`
+    );
+    sql:ExecutionResult|error expiredResult = dbClient->execute(expireRetiredQuery);
+    if expiredResult is error {
+        // Bookkeeping, not correctness: a tombstone that outlives its window is inert, so a
+        // failure here is reported and the sweep carries on to its notifications.
+        log:printWarn("Failed to expire retired runtime records", expiredResult);
+    } else {
+        int? expiredCount = expiredResult.affectedRowCount;
+        if expiredCount is int && expiredCount > 0 {
+            log:printDebug(string `Expired ${expiredCount} retired runtime record(s)`);
         }
     }
 
