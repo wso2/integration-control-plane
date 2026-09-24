@@ -219,10 +219,11 @@ export const mutedSx = { color: 'text.secondary' } as const;
 
 // ── Playground ──────────────────────────────────────────────────────────────
 
+/** The question box and Ask button side by side, centred on the box; the shortcut hint sits below the row. */
 export const askBarSx = {
   display: 'flex',
   gap: 1.5,
-  alignItems: 'flex-start',
+  alignItems: 'center',
 } as const;
 
 export const answerCardSx = {
@@ -280,3 +281,114 @@ export const endpointFieldSx = {
   flex: 1,
   '& input': { fontFamily: 'monospace', fontSize: 13 },
 } as const;
+
+// ── Models step ─────────────────────────────────────────────────────────────
+
+export const recommendedBannerSx = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 1.75,
+  p: 2,
+  mb: 2.5,
+  border: '1px solid',
+  borderColor: 'primary.light',
+  borderRadius: 1,
+  bgcolor: 'background.paper',
+} as const;
+
+export const modelColumnsSx = {
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+  gap: 2.5,
+} as const;
+
+export const modelColumnSx = {
+  p: 2.5,
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 1,
+  bgcolor: 'background.paper',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 2,
+} as const;
+
+export const modelTileGridSx = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  gap: 1.25,
+} as const;
+
+// ── Quick add ───────────────────────────────────────────────────────────────
+
+export const quickAddButtonSx = {
+  borderRadius: 4,
+  textTransform: 'none',
+  color: 'text.primary',
+  borderColor: 'divider',
+  '& .MuiButton-endIcon': { color: 'text.secondary' },
+} as const;
+
+// ── Get-started checklist ───────────────────────────────────────────────────
+
+export const checklistSx = {
+  display: 'flex',
+  gap: 3,
+  alignItems: 'flex-start',
+  p: 2.5,
+  mb: 2,
+  border: '1px solid',
+  borderColor: 'divider',
+  borderRadius: 1,
+  bgcolor: 'background.paper',
+} as const;
+
+export const checklistStepSx = { flex: 1, display: 'flex', gap: 1.5, alignItems: 'flex-start', minWidth: 0 } as const;
+
+export const checklistDotSx = (state: 'done' | 'current' | 'todo') =>
+  ({
+    width: 24,
+    height: 24,
+    borderRadius: '50%',
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 12,
+    fontWeight: 600,
+    color: 'common.white',
+    bgcolor: state === 'done' ? 'success.main' : state === 'current' ? 'primary.main' : 'action.disabled',
+  }) as const;
+
+// ── Listing ─────────────────────────────────────────────────────────────────
+
+export const listMarksSx = { display: 'flex', alignItems: 'center', gap: 0.5 } as const;
+
+// ── Playground ──────────────────────────────────────────────────────────────
+
+export const suggestionRowSx = { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } as const;
+
+export const citeChipSx = {
+  height: 18,
+  minWidth: 18,
+  mx: 0.25,
+  verticalAlign: 'super',
+  fontSize: 11,
+  fontWeight: 600,
+  '& .MuiChip-label': { px: 0.75 },
+} as const;
+
+export const answerFooterSx = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: 2,
+  mt: 2,
+  flexWrap: 'wrap',
+} as const;
+
+// ── MCP ─────────────────────────────────────────────────────────────────────
+
+export const clientTabsSx = { minHeight: 36, mb: 1.5, '& .MuiTab-root': { minHeight: 36, py: 0.5 } } as const;
+
+export const playgroundFrameSx = { mt: 2, height: 560, display: 'flex', flexDirection: 'column' } as const;

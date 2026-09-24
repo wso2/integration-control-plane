@@ -24,6 +24,7 @@ export const initialContextEngineForm: ContextEngineForm = {
   roles: [],
   embedding: null,
   llm: null,
+  shareApiKey: false,
   name: '',
   description: '',
 };
@@ -35,6 +36,7 @@ export type ContextEngineFormAction =
   | { type: 'roles'; value: string[] }
   | { type: 'embedding'; value: EmbeddingConfig | null }
   | { type: 'llm'; value: LlmConfig | null }
+  | { type: 'shareApiKey'; value: boolean }
   | { type: 'name'; value: string }
   | { type: 'description'; value: string };
 
@@ -52,6 +54,8 @@ export function contextEngineFormReducer(state: ContextEngineForm, action: Conte
       return { ...state, embedding: action.value };
     case 'llm':
       return { ...state, llm: action.value };
+    case 'shareApiKey':
+      return { ...state, shareApiKey: action.value };
     case 'name':
       return { ...state, name: action.value };
     case 'description':

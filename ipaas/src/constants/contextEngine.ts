@@ -16,7 +16,8 @@
  * under the License.
  */
 
-import type { ContextSourceConfig, LlmConfig, LlmProvider, SourceCategory, SourceConnector, SourceFieldDef, SourceFieldKind } from '../types/contextEngine';
+import type { ContextGraphState, ContextSourceConfig, LlmConfig, LlmProvider, McpClientId, SourceCategory, SourceConnector, SourceFieldDef, SourceFieldKind } from '../types/contextEngine';
+import type { EmbeddingProvider } from '../types/ragIngestion';
 
 const RAG_LOGO_BASE = 'assets/images/rag/';
 const GENAI_LOGO_BASE = 'assets/images/genai/';
@@ -441,3 +442,39 @@ export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
   { name: 'get_evidence', description: 'Read one authorized evidence item behind an answer.' },
   { name: 'explain_query', description: 'Return a caller-safe explanation of how evidence was selected.' },
 ];
+
+// ── Recommended models ──────────────────────────────────────────────────────
+
+/** One-click default pair: one provider, one key, good quality at low cost. */
+export const RECOMMENDED_MODELS: { embedding: { provider: EmbeddingProvider; model: string }; llm: { provider: LlmProvider; model: string } } = {
+  embedding: { provider: 'openai', model: 'text-embedding-3-small' },
+  llm: { provider: 'openai', model: 'gpt-4.1' },
+};
+
+// ── Graph status ────────────────────────────────────────────────────────────
+
+export const GRAPH_STATE_LABEL: Record<ContextGraphState, string> = {
+  not_built: 'Not built',
+  building: 'Building',
+  built: 'Built',
+  failed: 'Build failed',
+};
+
+// ── MCP clients ─────────────────────────────────────────────────────────────
+
+export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
+  { id: 'claude-desktop', label: 'Claude Desktop', path: '~/Library/Application Support/Claude/claude_desktop_config.json' },
+  { id: 'cursor', label: 'Cursor', path: '.cursor/mcp.json' },
+  { id: 'vscode', label: 'VS Code', path: '.vscode/mcp.json' },
+  { id: 'generic', label: 'Generic', path: 'Any client that reads an mcpServers map' },
+];
+
+// ── Local persistence keys ──────────────────────────────────────────────────
+
+/** Session-storage key prefix for the create-wizard draft, suffixed by org handle. */
+export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
+/** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
+export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
+
+/** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
+export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];

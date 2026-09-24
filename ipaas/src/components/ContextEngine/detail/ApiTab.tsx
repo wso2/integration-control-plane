@@ -18,6 +18,7 @@
 
 import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
+import { useSearchParams } from 'react-router';
 import { buildQueryCurl, queryEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
 import ExposureToggle from './ExposureToggle';
@@ -30,6 +31,9 @@ interface ApiTabProps {
 
 /** Expose as API — the REST query endpoint, how to authenticate, and a ready-to-run request. */
 export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
+  const [params] = useSearchParams();
+  // "Use in API" on the Playground lands here with the question in the URL.
+  const question = params.get('q')?.trim() || undefined;
   const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
   const endpoint = queryEndpointUrl(base);
 
@@ -54,7 +58,12 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
         </Typography>
       </Stack>
 
-      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, engine.id)} showCopyButton wrapLongLines />
+      {question && (
+        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1 }}>
+          Pre-filled with the question you asked in the Playground.
+        </Typography>
+      )}
+      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, engine.id, question)} showCopyButton wrapLongLines />
     </Box>
   );
 }

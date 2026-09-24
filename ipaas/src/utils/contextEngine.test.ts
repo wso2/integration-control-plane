@@ -19,8 +19,20 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildMcpClientConfig,
+  buildMcpClientConfigs,
   buildQueryCurl,
+  canShareApiKey,
   connectorCountsByCategory,
+  effectiveLlm,
+  fromDraft,
+  getStartedSteps,
+  graphStatusText,
+  graphStatusTone,
+  isFormDirty,
+  modelsStepBlocker,
+  splitCitations,
+  suggestedQuestions,
+  toDraft,
   engineDescriptionError,
   engineNameError,
   filterConnectors,
@@ -46,7 +58,7 @@ import {
   toSourceRegistration,
 } from './contextEngine';
 import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, SOURCE_CONNECTORS } from '../constants/contextEngine';
-import type { ContextEngineForm, ContextGrant, ContextSourceConfig } from '../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextSourceConfig } from '../types/contextEngine';
 import type { EmbeddingConfig } from '../types/ragIngestion';
 
 const embedding: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'sk-test', azureApiVersion: '', azureBaseUrl: '' };
@@ -63,6 +75,7 @@ function completeForm(): ContextEngineForm {
     roles: ['admin'],
     embedding,
     llm: { ...blankLlm('anthropic'), model: 'claude-sonnet-4-6', apiKey: 'sk-ant' },
+    shareApiKey: false,
     name: 'Support knowledge',
     description: 'Runbooks and docs',
   };
@@ -254,5 +267,123 @@ describe('exposure snippets', () => {
     const cfg = JSON.parse(buildMcpClientConfig('https://engine.example.com/', 'space-1', 'Support Knowledge!'));
     expect(Object.keys(cfg.mcpServers)).toEqual(['support-knowledge']);
     expect(cfg.mcpServers['support-knowledge'].url).toBe('https://engine.example.com/v1/mcp');
+  });
+});
+
+describe('shared api key', () => {
+  it('only offers sharing when providers match and copies the key on submit', () => {
+    const form = completeForm();
+    expect(canShareApiKey(form.embedding, form.llm)).toBe(false); // openai vs anthropic
+    const sameProvider: ContextEngineForm = { ...form, llm: { ...blankLlm('openai'), model: 'gpt-4.1', apiKey: '' }, shareApiKey: true };
+    expect(canShareApiKey(sameProvider.embedding, sameProvider.llm)).toBe(true);
+    expect(effectiveLlm(sameProvider)?.apiKey).toBe('sk-test');
+    expect(modelsStepBlocker(sameProvider)).toBeNull();
+    expect(modelsStepBlocker({ ...sameProvider, shareApiKey: false })).toBe('Complete the language model');
+    expect(toCreateInput(sameProvider).llm.apiKey).toBe('sk-test');
+  });
+
+  it('names the first missing piece of the models step', () => {
+    expect(modelsStepBlocker({ embedding: null, llm: null, shareApiKey: false })).toBe('Choose an embedding model');
+    expect(modelsStepBlocker({ embedding, llm: null, shareApiKey: false })).toBe('Choose a language model');
+  });
+});
+
+describe('drafts', () => {
+  it('strips every secret and round-trips the rest', () => {
+    const form = completeForm();
+    const draft = toDraft(form, '2026-09-23T10:00:00Z');
+    expect(draft.form.sources[0].values.accessToken).toBe('');
+    expect(draft.form.sources[0].values.repositoryUrl).toBe('https://github.com/wso2/docs');
+    expect(draft.form.embedding?.apiKey).toBe('');
+    expect(draft.form.llm?.apiKey).toBe('');
+    expect(draft.form.llm?.model).toBe('claude-sonnet-4-6');
+    const restored = fromDraft(JSON.stringify(draft));
+    expect(restored?.savedAt).toBe('2026-09-23T10:00:00Z');
+    expect(restored?.form.name).toBe('Support knowledge');
+    expect(restored?.form.roles).toEqual(['admin']);
+  });
+
+  it('rejects malformed or foreign drafts', () => {
+    expect(fromDraft(null)).toBeNull();
+    expect(fromDraft('not json')).toBeNull();
+    expect(fromDraft(JSON.stringify({ v: 2, form: {} }))).toBeNull();
+    expect(fromDraft(JSON.stringify({ v: 1, form: { name: 'x' } }))).toBeNull();
+  });
+
+  it('knows when there is nothing worth keeping', () => {
+    expect(isFormDirty({ sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, name: '', description: '  ' })).toBe(false);
+    expect(isFormDirty({ ...completeForm(), sources: [], roles: [], embedding: null, llm: null, description: '' })).toBe(true); // name
+  });
+});
+
+function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDetail {
+  return {
+    id: 'spc_1',
+    name: 'Support Knowledge',
+    description: '',
+    state: 'ready',
+    createdAt: '2026-09-23T09:00:00Z',
+    sources: [
+      { id: 's1', name: 'Platform docs', type: 'github', state: 'ready' },
+      { id: 's2', name: 'Support runbooks', type: 'confluence', state: 'ready' },
+    ],
+    models: { embedding: null, llm: null },
+    queryRoles: [],
+    exposure: { api: false, mcp: false },
+    graph: { state: 'not_built' },
+    ...over,
+  };
+}
+
+describe('graph status and first run', () => {
+  it('describes the graph state', () => {
+    expect(graphStatusText({ state: 'not_built' })).toBe('Not built');
+    expect(graphStatusText({ state: 'building', progress: { done: 2, total: 3 } })).toBe('Building · 2 of 3 sources');
+    expect(graphStatusText({ state: 'built', builtAt: new Date(Date.now() - 5 * 60_000).toISOString() })).toMatch(/^Built /);
+    expect(graphStatusText({ state: 'failed' })).toBe('Build failed');
+    expect(graphStatusTone({ state: 'built' })).toBe('success');
+    expect(graphStatusTone({ state: 'not_built' })).toBe('warning');
+  });
+
+  it('marks the first unfinished step current and the rest todo', () => {
+    const steps = getStartedSteps(engineDetail(), false);
+    expect(steps.map((s) => s.state)).toEqual(['current', 'todo', 'todo', 'todo']);
+    expect(steps[0].description).toBe('Reads 2 sources and creates the graph answers are drawn from.');
+    const later = getStartedSteps(engineDetail({ graph: { state: 'built' }, queryRoles: ['admin'] }), true);
+    expect(later.map((s) => s.state)).toEqual(['done', 'done', 'current', 'done']);
+    expect(later[3].description).toBe('1 role can query.');
+  });
+});
+
+describe('playground helpers', () => {
+  it('seeds suggestions from source names', () => {
+    const qs = suggestedQuestions(engineDetail());
+    expect(qs[0]).toBe('Summarize what is in Platform docs');
+    expect(qs[1]).toBe('Summarize what is in Support runbooks');
+    expect(qs.length).toBeLessThanOrEqual(4);
+    expect(suggestedQuestions({ sources: [] })).toEqual(['What should a new team member read first?', 'Which documents mention rate limits or quotas?']);
+  });
+
+  it('splits [n] markers out of an answer', () => {
+    expect(splitCitations('Redeploy the last release [1]. Confirm the checkpoint [2] first.')).toEqual([
+      { kind: 'text', text: 'Redeploy the last release ' },
+      { kind: 'cite', n: 1 },
+      { kind: 'text', text: '. Confirm the checkpoint ' },
+      { kind: 'cite', n: 2 },
+      { kind: 'text', text: ' first.' },
+    ]);
+    expect(splitCitations('No markers here')).toEqual([{ kind: 'text', text: 'No markers here' }]);
+  });
+});
+
+describe('mcp client configs', () => {
+  it('shapes the same server for each client', () => {
+    const cfgs = buildMcpClientConfigs('https://engine.example.com', 'spc_1', 'Support Knowledge');
+    expect(cfgs.map((c) => c.id)).toEqual(['claude-desktop', 'cursor', 'vscode', 'generic']);
+    const claude = JSON.parse(cfgs[0].json);
+    expect(claude.mcpServers['support-knowledge'].url).toBe('https://engine.example.com/v1/mcp');
+    const vscode = JSON.parse(cfgs[2].json);
+    expect(vscode.servers['support-knowledge'].type).toBe('http');
+    expect(cfgs[1].path).toBe('.cursor/mcp.json');
   });
 });

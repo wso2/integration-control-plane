@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import { useCallback, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createContextEngine,
@@ -32,8 +33,10 @@ import {
   updateContextEngineExposure,
 } from '#api/contextEngine';
 import { IS_WIP } from '../features';
-import { CONTEXT_JOB_TERMINAL_STATES } from '../constants/contextEngine';
-import type { ContextEngineExposure, ContextQueryInput, CreateContextEngineInput, PutContextGrantInput } from '../types/contextEngine';
+import { getAccessToken } from '../auth/tokenManager';
+import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES } from '../constants/contextEngine';
+import { fromDraft, toDraft } from '../utils/contextEngine';
+import type { ContextEngineExposure, ContextEngineForm, ContextQueryInput, CreateContextEngineInput, PutContextGrantInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -144,4 +147,56 @@ export function useContextPrincipal() {
     retry: false,
     staleTime: 60_000,
   });
+}
+
+// ── Local state that outlives a page: wizard draft, first-run flags, engine credential ──
+
+/**
+ * The create-wizard draft for an org, kept in session storage with secrets
+ * stripped. `restore()` is meant for a reducer initializer; `save` and `clear`
+ * are stable so a sync effect can depend on them.
+ */
+export function useContextEngineDraft(orgHandle: string) {
+  const key = `${CONTEXT_ENGINE_DRAFT_KEY_PREFIX}${orgHandle}`;
+  const [savedAt, setSavedAt] = useState<string | null>(() => fromDraft(sessionStorage.getItem(key))?.savedAt ?? null);
+  const restore = useCallback((): ContextEngineForm | null => fromDraft(sessionStorage.getItem(key))?.form ?? null, [key]);
+  const save = useCallback(
+    (form: ContextEngineForm) => {
+      const now = new Date().toISOString();
+      sessionStorage.setItem(key, JSON.stringify(toDraft(form, now)));
+      setSavedAt(now);
+    },
+    [key],
+  );
+  const clear = useCallback(() => {
+    sessionStorage.removeItem(key);
+    setSavedAt(null);
+  }, [key]);
+  return { savedAt, restore, save, clear };
+}
+
+/** Whether this user has asked the engine anything yet — drives the "Ask it something" checklist step. */
+export function useAskedFlag(engineId: string) {
+  const key = `${CONTEXT_ENGINE_ASKED_KEY_PREFIX}${engineId}`;
+  const [asked, setAsked] = useState(() => localStorage.getItem(key) === 'true');
+  const markAsked = useCallback(() => {
+    localStorage.setItem(key, 'true');
+    setAsked(true);
+  }, [key]);
+  return { asked, markAsked };
+}
+
+/** The bearer credential the browser would send to the engine — the dev token when configured, else the platform token. */
+export function useContextEngineBearer(): string | null {
+  const token = window.API_CONFIG?.contextEngineApiToken || getAccessToken();
+  return token ? `Bearer ${token}` : null;
+}
+
+/** Refetch one engine's detail — e.g. after a build job finishes. */
+export function useInvalidateContextEngine(engineId: string) {
+  const qc = useQueryClient();
+  return useCallback(() => {
+    qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+    qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
+  }, [qc, engineId]);
 }

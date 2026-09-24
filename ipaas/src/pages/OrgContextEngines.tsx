@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Play, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngines, useDeleteContextEngine } from '../hooks/useContextEngine';
@@ -27,6 +27,10 @@ import ComingSoon from './ComingSoon';
 import ConfirmDeleteDialog from '../components/ConfirmDeleteDialog';
 import SearchField from '../components/SearchField';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
+import ExposurePills from '../components/ContextEngine/ExposurePills';
+import GraphStatusChip from '../components/ContextEngine/GraphStatusChip';
+import SourceMark from '../components/ContextEngine/SourceMark';
+import { listMarksSx } from '../components/ContextEngine/styles';
 import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
 import type { ContextEngine } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
@@ -34,10 +38,8 @@ import type { OrgScope } from '../nav';
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
 const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } as const;
 
-const formatCreated = (iso: string): string => {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
-};
+/** At most this many connector marks per row; the count covers the rest. */
+const MAX_MARKS = 4;
 
 export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -49,6 +51,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
 
   const goCreate = () => navigate(newContextEngineUrl(scope.org));
   const goDetail = (id: string) => navigate(contextEngineUrl(scope.org, id));
+  const goPlayground = (id: string) => navigate(contextEngineUrl(scope.org, id, 'playground'));
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -121,16 +124,18 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
             <ListingTable.Head>
               <ListingTable.Row>
                 <ListingTable.Cell>Name</ListingTable.Cell>
-                <ListingTable.Cell>Description</ListingTable.Cell>
+                <ListingTable.Cell>Sources</ListingTable.Cell>
+                <ListingTable.Cell>Who can query</ListingTable.Cell>
+                <ListingTable.Cell>Exposure</ListingTable.Cell>
+                <ListingTable.Cell>Graph</ListingTable.Cell>
                 <ListingTable.Cell>State</ListingTable.Cell>
-                <ListingTable.Cell>Created</ListingTable.Cell>
                 <ListingTable.Cell align="right">Actions</ListingTable.Cell>
               </ListingTable.Row>
             </ListingTable.Head>
             <ListingTable.Body>
               {filtered.length === 0 ? (
                 <ListingTable.Row>
-                  <ListingTable.Cell colSpan={5} align="center" sx={{ py: 4, color: 'text.secondary' }}>
+                  <ListingTable.Cell colSpan={7} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                     No context engines match “{search}”.
                   </ListingTable.Cell>
                 </ListingTable.Row>
@@ -150,28 +155,48 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                         goDetail(e.id);
                       }
                     }}>
-                    <ListingTable.Cell>
+                    <ListingTable.Cell sx={{ maxWidth: 360 }}>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
                         {e.name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                        {e.id}
+                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                        {e.description || 'No description'}
                       </Typography>
                     </ListingTable.Cell>
                     <ListingTable.Cell>
-                      <Typography variant="body2" color="text.secondary">
-                        {e.description || '—'}
-                      </Typography>
+                      {e.summary ? (
+                        <Box sx={listMarksSx}>
+                          {e.summary.sourceTypes.slice(0, MAX_MARKS).map((t, i) => (
+                            <SourceMark key={`${t}-${i}`} type={t} size={16} />
+                          ))}
+                          <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
+                            {e.summary.sourceCount}
+                          </Typography>
+                        </Box>
+                      ) : (
+                        '—'
+                      )}
                     </ListingTable.Cell>
+                    <ListingTable.Cell>
+                      <Typography variant="body2">{e.summary ? (e.summary.roleCount === 0 ? 'Only you' : `${e.summary.roleCount} role${e.summary.roleCount === 1 ? '' : 's'}`) : '—'}</Typography>
+                    </ListingTable.Cell>
+                    <ListingTable.Cell>{e.summary ? <ExposurePills exposure={e.summary.exposure} /> : '—'}</ListingTable.Cell>
+                    <ListingTable.Cell>{e.summary ? <GraphStatusChip graph={e.summary.graph} /> : '—'}</ListingTable.Cell>
                     <ListingTable.Cell>
                       <EngineStateChip state={e.state} />
                     </ListingTable.Cell>
-                    <ListingTable.Cell>
-                      <Typography variant="body2" color="text.secondary">
-                        {formatCreated(e.createdAt)}
-                      </Typography>
-                    </ListingTable.Cell>
                     <ListingTable.Cell align="right">
+                      <Tooltip title="Open playground">
+                        <IconButton
+                          size="small"
+                          aria-label={`Open playground for ${e.name}`}
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            goPlayground(e.id);
+                          }}>
+                          <Play size={16} />
+                        </IconButton>
+                      </Tooltip>
                       <Tooltip title="Delete">
                         <IconButton
                           size="small"

@@ -16,9 +16,24 @@
  * under the License.
  */
 
-import { CONNECTOR_BY_ID, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_ACTIONS, ROLE_GRANT_PREFIX } from '../constants/contextEngine';
+import { CONNECTOR_BY_ID, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_ACTIONS, GRAPH_STATE_LABEL, MCP_CLIENTS, PLAYGROUND_SUGGESTIONS, ROLE_GRANT_PREFIX } from '../constants/contextEngine';
+import { formatDistanceToNow } from './time';
 import { isEmbeddingValid } from './ragIngestion';
-import type { ContextEngineForm, ContextGrant, ContextSourceConfig, CreateContextEngineInput, LlmConfig, SourceCategory, SourceConnector, SourceFieldDef } from '../types/contextEngine';
+import type {
+  ContextEngineDetail,
+  ContextEngineDraft,
+  ContextEngineForm,
+  ContextGrant,
+  ContextGraphStatus,
+  ContextSourceConfig,
+  CreateContextEngineInput,
+  GetStartedStep,
+  LlmConfig,
+  McpClientConfig,
+  SourceCategory,
+  SourceConnector,
+  SourceFieldDef,
+} from '../types/contextEngine';
 import type { EmbeddingConfig } from '../types/ragIngestion';
 
 // ── Validation ──────────────────────────────────────────────────────────────
@@ -130,6 +145,27 @@ export function isModelsStepValid(embedding: EmbeddingConfig | null, llm: LlmCon
   return isEmbeddingValid(embedding) && isLlmValid(llm);
 }
 
+/** The embedding key can stand in for the LLM key only when both use the same provider. */
+export function canShareApiKey(embedding: EmbeddingConfig | null, llm: LlmConfig | null): boolean {
+  return !!embedding && !!llm && embedding.provider === llm.provider;
+}
+
+/** The LLM config as it will be submitted — with the embedding key copied in when sharing is on. */
+export function effectiveLlm(form: Pick<ContextEngineForm, 'embedding' | 'llm' | 'shareApiKey'>): LlmConfig | null {
+  if (!form.llm) return null;
+  if (form.shareApiKey && form.embedding && canShareApiKey(form.embedding, form.llm)) return { ...form.llm, apiKey: form.embedding.apiKey };
+  return form.llm;
+}
+
+/** Why the Models step cannot proceed, or null. */
+export function modelsStepBlocker(form: Pick<ContextEngineForm, 'embedding' | 'llm' | 'shareApiKey'>): string | null {
+  if (!form.embedding) return 'Choose an embedding model';
+  if (!isEmbeddingValid(form.embedding)) return 'Complete the embedding model';
+  if (!form.llm) return 'Choose a language model';
+  if (!isLlmValid(effectiveLlm(form))) return 'Complete the language model';
+  return null;
+}
+
 /** Empty is "no error yet"; the step gate handles required-ness. */
 export function engineNameError(name: string): string {
   if (!name) return '';
@@ -147,13 +183,52 @@ export function isNameStepValid(name: string, description: string): boolean {
 }
 
 export function isFormComplete(form: ContextEngineForm): boolean {
-  return isSourcesStepValid(form.sources) && isModelsStepValid(form.embedding, form.llm) && isNameStepValid(form.name, form.description);
+  return isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && isNameStepValid(form.name, form.description);
 }
 
 /** The wizard form as a create request. Throws when a required section is missing — call after {@link isFormComplete}. */
 export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput {
-  if (!form.embedding || !isLlmValid(form.llm)) throw new Error('Model configuration is incomplete.');
-  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm: form.llm };
+  const llm = effectiveLlm(form);
+  if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
+  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm };
+}
+
+/** Whether the wizard holds anything worth keeping. */
+export function isFormDirty(form: ContextEngineForm): boolean {
+  return form.sources.length > 0 || form.roles.length > 0 || form.embedding !== null || form.llm !== null || form.name.trim() !== '' || form.description.trim() !== '';
+}
+
+// ── Drafts ──────────────────────────────────────────────────────────────────
+
+/** The form with every secret blanked, ready for session storage. */
+export function toDraft(form: ContextEngineForm, savedAt: string): ContextEngineDraft {
+  const sources = form.sources.map((s) => {
+    const connector = connectorFor(s.type);
+    const secretKeys = new Set((connector?.fields ?? []).filter((f) => f.kind === 'secret').map((f) => f.key));
+    return { ...s, values: Object.fromEntries(Object.entries(s.values).map(([k, v]) => [k, secretKeys.has(k) ? '' : v])) };
+  });
+  return {
+    v: 1,
+    savedAt,
+    form: { ...form, sources, embedding: form.embedding ? { ...form.embedding, apiKey: '' } : null, llm: form.llm ? { ...form.llm, apiKey: '' } : null },
+  };
+}
+
+/** Parse a stored draft, or null when it is missing, malformed or from another version. */
+export function fromDraft(raw: string | null): ContextEngineDraft | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as Partial<ContextEngineDraft>;
+    const f = parsed.form;
+    if (parsed.v !== 1 || !f || !Array.isArray(f.sources) || !Array.isArray(f.roles) || typeof f.name !== 'string') return null;
+    return {
+      v: 1,
+      savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : '',
+      form: { sources: f.sources, roles: f.roles, embedding: f.embedding ?? null, llm: f.llm ?? null, shareApiKey: !!f.shareApiKey, name: f.name, description: typeof f.description === 'string' ? f.description : '' },
+    };
+  } catch {
+    return null;
+  }
 }
 
 // ── Access ──────────────────────────────────────────────────────────────────
@@ -197,6 +272,96 @@ export function summarizeSource(source: ContextSourceConfig): string {
     })
     .filter(Boolean);
   return parts.length ? parts.join(' · ') : 'Not configured yet';
+}
+
+// ── Graph status and first-run guidance ─────────────────────────────────────
+
+/** Human status of the graph, e.g. "Not built", "Building · 2 of 3 sources", "Built 12 minutes ago". */
+export function graphStatusText(graph: ContextGraphStatus): string {
+  switch (graph.state) {
+    case 'building':
+      return graph.progress ? `Building · ${graph.progress.done} of ${graph.progress.total} sources` : 'Building';
+    case 'built':
+      if (!graph.builtAt) return 'Built';
+      {
+        const rel = formatDistanceToNow(graph.builtAt);
+        return rel ? `Built ${rel.charAt(0).toLowerCase()}${rel.slice(1)}` : 'Built';
+      }
+    default:
+      return GRAPH_STATE_LABEL[graph.state];
+  }
+}
+
+export function graphStatusTone(graph: ContextGraphStatus): 'success' | 'warning' | 'info' | 'error' {
+  switch (graph.state) {
+    case 'built':
+      return 'success';
+    case 'building':
+      return 'info';
+    case 'failed':
+      return 'error';
+    default:
+      return 'warning';
+  }
+}
+
+/** The four first-run steps with their state; the first unfinished one is current. */
+export function getStartedSteps(engine: ContextEngineDetail, asked: boolean): GetStartedStep[] {
+  const done: Record<GetStartedStep['id'], boolean> = {
+    build: engine.graph.state === 'built',
+    ask: asked,
+    publish: engine.exposure.api || engine.exposure.mcp,
+    grant: engine.queryRoles.length > 0,
+  };
+  const n = engine.sources.length;
+  const defs: Omit<GetStartedStep, 'state'>[] = [
+    { id: 'build', title: 'Build the context graph', description: `Reads ${n} source${n === 1 ? '' : 's'} and creates the graph answers are drawn from.` },
+    { id: 'ask', title: 'Ask it something', description: 'Try the Playground and check the cited evidence.' },
+    { id: 'publish', title: 'Publish', description: 'Turn on the REST API or the MCP server for agents.' },
+    { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
+  ];
+  let currentAssigned = false;
+  return defs.map((d) => {
+    if (done[d.id]) return { ...d, state: 'done' };
+    if (!currentAssigned) {
+      currentAssigned = true;
+      return { ...d, state: 'current' };
+    }
+    return { ...d, state: 'todo' };
+  });
+}
+
+// ── Playground ──────────────────────────────────────────────────────────────
+
+/** Questions to offer in an empty Playground, seeded from the engine's sources. */
+export function suggestedQuestions(engine: Pick<ContextEngineDetail, 'sources'>): string[] {
+  const names = engine.sources.map((s) => s.name).filter(Boolean);
+  const out: string[] = [];
+  for (const template of PLAYGROUND_SUGGESTIONS) {
+    if (template.includes('{source}')) {
+      for (const name of names.slice(0, 2)) out.push(template.replace('{source}', name));
+    } else {
+      out.push(template);
+    }
+  }
+  return out.slice(0, 4);
+}
+
+export type AnswerPart = { kind: 'text'; text: string } | { kind: 'cite'; n: number };
+
+/** Split an answer into text and `[n]` citation markers so the markers can link to evidence. */
+export function splitCitations(answer: string): AnswerPart[] {
+  const parts: AnswerPart[] = [];
+  const re = /\[(\d{1,3})\]/g;
+  let last = 0;
+  for (const m of answer.matchAll(re)) {
+    const idx = m.index ?? 0;
+    if (idx > last) parts.push({ kind: 'text', text: answer.slice(last, idx) });
+    parts.push({ kind: 'cite', n: Number(m[1]) });
+    last = idx + m[0].length;
+  }
+  if (last < answer.length) parts.push({ kind: 'text', text: answer.slice(last) });
+  return parts;
 }
 
 // ── Wire payloads ───────────────────────────────────────────────────────────
@@ -278,4 +443,20 @@ export function buildMcpClientConfig(baseUrl: string, engineId: string, engineNa
     null,
     2,
   );
+}
+
+/** The same server entry shaped for each supported client. */
+export function buildMcpClientConfigs(baseUrl: string, engineId: string, engineName: string): McpClientConfig[] {
+  const key =
+    engineName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 63) || 'context-engine';
+  const server = { url: mcpEndpointUrl(baseUrl), headers: { Authorization: 'Bearer <token>', 'X-Context-Space': engineId } };
+  return MCP_CLIENTS.map((c) => ({
+    ...c,
+    json: JSON.stringify(c.id === 'vscode' ? { servers: { [key]: { type: 'http', ...server } } } : { mcpServers: { [key]: server } }, null, 2),
+  }));
 }

@@ -39,6 +39,9 @@ import type {
   ContextEngineDetail,
   ContextEngineExposure,
   ContextEngineState,
+  ContextEngineSummary,
+  ContextGraphState,
+  ContextGraphStatus,
   ContextEvidence,
   ContextGrant,
   ContextJob,
@@ -123,11 +126,12 @@ interface RawPrincipal {
   groups?: string[];
 }
 
-/** Proposed `GET /v1/spaces/{id}/configuration` response — models and exposure without credentials. */
+/** Proposed `GET /v1/spaces/{id}/configuration` response — models, exposure and graph status, without credentials. */
 interface RawConfiguration {
   embedding?: { provider: string; model: string } | null;
   llm?: { provider: string; model: string } | null;
   exposure?: { api?: boolean; mcp?: boolean } | null;
+  graph?: { state?: string; builtAt?: string; jobId?: string; progress?: { done: number; total: number } } | null;
 }
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
@@ -147,6 +151,18 @@ const toGrant = (raw: RawGrant): ContextGrant => ({ id: raw.id, resourceId: raw.
 const toJob = (raw: RawJob): ContextJob => ({ id: raw.id, state: raw.state, operation: raw.operation, traceId: raw.traceId, attemptCount: raw.attemptCount, createdAt: raw.createdAt, error: raw.error });
 
 const toEvidence = (raw: RawEvidence): ContextEvidence => ({ id: raw.id, recordId: raw.recordId, sourceId: raw.sourceId, sourceVersion: raw.sourceVersion, passage: raw.passage, location: raw.location, sourceUrl: raw.sourceUrl });
+
+const GRAPH_STATES: ReadonlySet<string> = new Set<ContextGraphState>(['not_built', 'building', 'built', 'failed']);
+
+/** Graph status from the configuration route; an engine that does not report one has not built anything we know of. */
+const toGraph = (raw: RawConfiguration['graph']): ContextGraphStatus => ({
+  state: raw?.state && GRAPH_STATES.has(raw.state) ? (raw.state as ContextGraphState) : 'not_built',
+  builtAt: raw?.builtAt,
+  jobId: raw?.jobId,
+  progress: raw?.progress,
+});
+
+const toExposure = (raw: RawConfiguration | null | undefined): ContextEngineExposure => ({ api: raw?.exposure?.api ?? false, mcp: raw?.exposure?.mcp ?? false });
 
 const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
   queryId: raw.queryId,
@@ -176,26 +192,50 @@ async function optional<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 // ── Engines ─────────────────────────────────────────────────────────────────
 
-/** Context engines visible to the caller (the engine lists only spaces the principal holds an action on). */
-export async function listContextEngines(): Promise<ContextEngine[]> {
-  const raw = await contextEngineClient.get<RawContextSpace[]>(`${V1}/spaces`);
-  return (raw ?? []).map(toEngine);
-}
-
-/** One engine with its sources, models, query roles and exposure. Only the space itself is required to exist. */
-export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
-  const space = await contextEngineClient.get<RawContextSpace>(spacePath(engineId));
+/** Sources, grants and configuration of one space, each degrading to empty when the engine cannot serve it. */
+async function fetchSpaceFacets(engineId: string): Promise<{ sources: RawSource[]; grants: RawGrant[]; configuration: RawConfiguration | null }> {
   const [sources, grants, configuration] = await Promise.all([
     optional(() => contextEngineClient.get<RawSource[]>(`${spacePath(engineId)}/sources`), [] as RawSource[]),
     optional(() => contextEngineClient.get<RawGrant[]>(grantsPath(engineId)), [] as RawGrant[]),
     optional(() => contextEngineClient.get<RawConfiguration>(`${spacePath(engineId)}/configuration`), null as RawConfiguration | null),
   ]);
+  return { sources: sources ?? [], grants: grants ?? [], configuration };
+}
+
+/**
+ * Context engines visible to the caller, each with an at-a-glance summary.
+ * The engine lists only spaces the principal holds an action on. Until it
+ * offers `GET /v1/spaces?include=summary`, the summary is assembled here with
+ * one facet round-trip per space.
+ */
+export async function listContextEngines(): Promise<ContextEngine[]> {
+  const raw = await contextEngineClient.get<RawContextSpace[]>(`${V1}/spaces`);
+  return Promise.all(
+    (raw ?? []).map(async (space) => {
+      const facets = await fetchSpaceFacets(space.id);
+      const summary: ContextEngineSummary = {
+        sourceCount: facets.sources.length,
+        sourceTypes: facets.sources.map((s) => s.type),
+        roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
+        exposure: toExposure(facets.configuration),
+        graph: toGraph(facets.configuration?.graph),
+      };
+      return { ...toEngine(space), summary };
+    }),
+  );
+}
+
+/** One engine with its sources, models, query roles and exposure. Only the space itself is required to exist. */
+export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
+  const space = await contextEngineClient.get<RawContextSpace>(spacePath(engineId));
+  const { sources, grants, configuration } = await fetchSpaceFacets(engineId);
   return {
     ...toEngine(space),
-    sources: (sources ?? []).map(toSource),
+    sources: sources.map(toSource),
     models: { embedding: configuration?.embedding ?? null, llm: configuration?.llm ?? null },
-    queryRoles: rolesFromGrants((grants ?? []).map(toGrant)),
-    exposure: { api: configuration?.exposure?.api ?? false, mcp: configuration?.exposure?.mcp ?? false },
+    queryRoles: rolesFromGrants(grants.map(toGrant)),
+    exposure: toExposure(configuration),
+    graph: toGraph(configuration?.graph),
   };
 }
 

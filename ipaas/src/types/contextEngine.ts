@@ -35,6 +35,29 @@ export type ContextEngineState = 'provisioning' | 'ready' | 'failed' | 'deleting
 /** Tabs on the engine detail page; the active one is a URL segment. */
 export type ContextEngineTabKey = 'overview' | 'playground' | 'api' | 'mcp' | 'access';
 
+/** Lifecycle of the knowledge graph built from the sources — distinct from the engine's own state. */
+export type ContextGraphState = 'not_built' | 'building' | 'built' | 'failed';
+
+export interface ContextGraphStatus {
+  state: ContextGraphState;
+  /** When the current graph finished building. */
+  builtAt?: string;
+  /** The running or last build job. */
+  jobId?: string;
+  /** Sources processed so far while building. */
+  progress?: { done: number; total: number };
+}
+
+/** At-a-glance facts for the listing; absent when the engine could not report them. */
+export interface ContextEngineSummary {
+  sourceCount: number;
+  /** Connector ids of the sources, for the mark cluster. */
+  sourceTypes: string[];
+  roleCount: number;
+  exposure: ContextEngineExposure;
+  graph: ContextGraphStatus;
+}
+
 /** A context engine as shown in the listing. */
 export interface ContextEngine {
   id: string;
@@ -42,6 +65,7 @@ export interface ContextEngine {
   description: string;
   state: ContextEngineState;
   createdAt: string;
+  summary?: ContextEngineSummary;
 }
 
 /** Which surfaces the engine is published on. */
@@ -68,6 +92,7 @@ export interface ContextEngineDetail extends ContextEngine {
   /** Org role handles granted query access (derived from group grants). */
   queryRoles: string[];
   exposure: ContextEngineExposure;
+  graph: ContextGraphStatus;
 }
 
 // ── Sources ─────────────────────────────────────────────────────────────────
@@ -154,8 +179,17 @@ export interface ContextEngineForm {
   roles: string[];
   embedding: EmbeddingConfig | null;
   llm: LlmConfig | null;
+  /** Reuse the embedding API key for the language model when both use the same provider. */
+  shareApiKey: boolean;
   name: string;
   description: string;
+}
+
+/** A wizard draft kept in session storage. Secrets are stripped before saving and re-entered on restore. */
+export interface ContextEngineDraft {
+  v: 1;
+  savedAt: string;
+  form: ContextEngineForm;
 }
 
 export interface CreateContextEngineInput {
@@ -251,4 +285,26 @@ export interface ContextPrincipal {
   kind: 'user' | 'service' | string;
   email?: string;
   groups: string[];
+}
+
+// ── Post-create guidance and exposure ───────────────────────────────────────
+
+export type GetStartedStepId = 'build' | 'ask' | 'publish' | 'grant';
+
+export interface GetStartedStep {
+  id: GetStartedStepId;
+  title: string;
+  description: string;
+  state: 'done' | 'current' | 'todo';
+}
+
+export type McpClientId = 'claude-desktop' | 'cursor' | 'vscode' | 'generic';
+
+/** A ready-to-paste MCP client configuration for one client. */
+export interface McpClientConfig {
+  id: McpClientId;
+  label: string;
+  /** Where the client keeps this file. */
+  path: string;
+  json: string;
 }

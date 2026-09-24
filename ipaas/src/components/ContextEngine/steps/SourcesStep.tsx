@@ -23,7 +23,7 @@ import { POPULAR_CONNECTORS, SOURCE_CONNECTORS } from '../../../constants/contex
 import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSource } from '../../../utils/contextEngine';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
-import { emptySourcesCardSx, marksRowSx, quickAddRowSx, sourceListSx, sourceRowSx, sourceRowTextSx, sourcesToolbarSx, stepHeadingSx, stepHintSx } from '../styles';
+import { emptySourcesCardSx, marksRowSx, quickAddButtonSx, quickAddRowSx, sourceListSx, sourceRowSx, sourceRowTextSx, sourcesToolbarSx, stepHeadingSx, stepHintSx } from '../styles';
 import type { ContextSourceConfig } from '../../../types/contextEngine';
 
 interface SourcesStepProps {
@@ -119,17 +119,9 @@ export default function SourcesStep({ sources, onAdd, onUpdate, onRemove }: Sour
               Quick add
             </Typography>
             {POPULAR_CONNECTORS.map((c) => (
-              <Chip
-                key={c.id}
-                clickable
-                variant="outlined"
-                icon={<SourceMark type={c.id} size={16} />}
-                label={c.name}
-                deleteIcon={<Plus size={14} />}
-                onDelete={() => openDrawer({ connectorId: c.id })}
-                onClick={() => openDrawer({ connectorId: c.id })}
-                aria-label={`Quick add ${c.name}`}
-              />
+              <Button key={c.id} size="small" variant="outlined" startIcon={<SourceMark type={c.id} size={16} />} endIcon={<Plus size={14} />} onClick={() => openDrawer({ connectorId: c.id })} aria-label={`Quick add ${c.name}`} sx={quickAddButtonSx}>
+                {c.name}
+              </Button>
             ))}
           </Box>
         </>
