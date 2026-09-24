@@ -29,7 +29,7 @@ import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 //AI Agent env-card body
 export default function EnvCardBody({ component, env, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
-  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId, { pollUntilReady: hasDeployment });
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const selectedEndpoint = endpoints[selectedEpIdx] ?? endpoints[0];
 

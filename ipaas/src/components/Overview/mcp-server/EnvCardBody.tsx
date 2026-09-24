@@ -46,7 +46,7 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
   // in-progress deployment has no reachable `/mcp` endpoint yet, and a degraded one
   // (crash-looping, or never rendered) never will.
   const isDeploymentReady = hasDeployment && isDeploymentHealthy(deploymentStatusV2);
-  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId, { pollUntilReady: hasDeployment });
 
   // Default to the MCP-capable endpoint (tools are listed at `${baseUrl}/mcp`). On the
   // APIM products it must also carry an apimId, since the test key is minted per APIM

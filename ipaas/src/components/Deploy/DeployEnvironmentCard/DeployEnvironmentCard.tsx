@@ -140,7 +140,7 @@ export default function DeployEnvironmentCard({
 
   const { data: trackImages = [] } = useDeploymentTrackImages(componentId, versionId);
   const { data: deploymentStatus = [] } = useDeploymentStatus(componentId, versionId);
-  const { data: endpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '');
+  const { data: endpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '', { pollUntilReady: showEndpoints });
 
   const deployedRunId = deployment?.build?.runId ?? null;
   const deployedBuildId = deployment?.build?.buildId ?? null;

@@ -17,8 +17,7 @@
  */
 
 import { Box, PageContent } from '@wso2/oxygen-ui';
-import { Fragment, useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { Fragment, useMemo, useState, type JSX } from 'react';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponentByHandler, useComponentEndpoints } from '../hooks/useComponents';
 import { useIntegrationIdentity } from '../hooks/useIntegrationIdentity';
@@ -27,7 +26,7 @@ import type { IntegrationType } from '../types/integration';
 import { useCommitHistory, useComponentRepository } from '../hooks/useRepository';
 import { useApimApi } from '../hooks/useApim';
 import { IS_WIP } from '../features';
-import { useDeploymentStatus } from '../hooks/useDeployments';
+import { useDeploymentStatus, useRefreshOnBuildSuccess } from '../hooks/useDeployments';
 import BusinessInfo from '../components/BusinessInfo';
 import NotFound from '../components/NotFound';
 import IntegrationOverviewSkeleton from '../components/IntegrationOverviewSkeleton';
@@ -98,17 +97,9 @@ export default function Component(scope: ComponentScope): JSX.Element {
   // Load component permissions using the UUID - only when component is loaded
   useLoadComponentPermissions(scope.org, projectId, component?.id || '');
 
-  const queryClient = useQueryClient();
   const { data: buildDeployments = [] } = useDeploymentStatus(component?.id ?? '', versionId);
   const isBuildInProgress = buildDeployments[0]?.status === 'in_progress';
-  const prevBuildStatusRef = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    const current = buildDeployments[0];
-    if (prevBuildStatusRef.current === 'in_progress' && current?.status === 'completed' && current?.conclusion === 'success') {
-      queryClient.invalidateQueries({ queryKey: ['componentDeployment'] });
-    }
-    prevBuildStatusRef.current = current?.status;
-  }, [buildDeployments, queryClient]);
+  useRefreshOnBuildSuccess(component?.id ?? '', versionId);
 
   // Identity hook must run before any early return — rules of hooks. The
   // hook itself handles `undefined` component by returning `null`.

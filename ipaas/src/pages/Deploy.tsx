@@ -24,6 +24,7 @@ import { useCommitHistory } from '../hooks/useRepository';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgs } from '../hooks/useOrg';
 import { useProjectId } from '../hooks/useProjects';
+import { useRefreshOnBuildSuccess } from '../hooks/useDeployments';
 import { UUID_RE } from '../utils/string';
 import BuildArea from '../components/Deploy/BuildArea';
 import ComingSoon from './ComingSoon';
@@ -50,6 +51,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
 
   const { data: environments = [], isLoading: loadingEnvironments } = useEnvironments(orgUuid, projectId);
   const { data: commits = [] } = useCommitHistory(componentId, branch);
+  useRefreshOnBuildSuccess(componentId, versionId);
 
   // Must be declared before any early returns to satisfy React hooks rules
   const [promotingToEnvId, setPromotingToEnvId] = useState<string | null>(null);

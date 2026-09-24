@@ -31,7 +31,7 @@ import ServiceInsights from '../integration-as-api/ServiceInsights';
  * contract). Matches Devant's webhook overview.
  */
 export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {
-  const { data: envEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const { data: envEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId, { pollUntilReady: hasDeployment });
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];
 
