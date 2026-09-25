@@ -22,7 +22,7 @@ import { Alert, Box, Button, Typography } from '@wso2/oxygen-ui';
 import { useCreateCodeServer, useEditorKeepAlive, useEditorReady, useGetOrCreateSampleRegistry } from '../hooks/useCloudEditor';
 import { useComponentPods } from '../hooks/useRuntime';
 import { CLOUD_EDITOR_POLL_MS, CLOUD_EDITOR_READY_TIMEOUT_MS, CLOUD_EDITOR_SLOW_NOTICE_MS, CLOUD_EDITOR_STEPS, CLOUD_EDITOR_TIMEOUT_MESSAGE, CLOUD_EDITOR_TIMEOUT_MS } from '../constants/cloudEditor';
-import { displayableEditorUrl, highestPodPhase } from '../utils/cloudEditor';
+import { highestPodPhase } from '../utils/cloudEditor';
 import DeploymentWheel from '../components/CloudEditor/DeploymentWheel';
 import type { ChoreoSampleImage, CloudEditorStepKey, CodeServerInstance, DeploymentParams } from '../types/cloudEditor';
 
@@ -246,6 +246,25 @@ export default function CloudEditorDeployment(): JSX.Element {
         Your Cloud Editor instance is currently being created.
       </Typography>
       <DeploymentWheel steps={CLOUD_EDITOR_STEPS} activeIndex={activeIndex} />
+      {/* The wheel alone cannot distinguish "still working" from "stopped
+          answering", and this wait has no natural end. Say when it is running
+          long, and when it has run out -- and once it has, hand over the address
+          so the wait is not the only way in. */}
+      {stalled ? (
+        <Alert severity="warning" sx={{ maxWidth: 520, width: '100%' }}>
+          <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
+            Still not ready
+          </Typography>
+          <Typography variant="body2">
+            {CLOUD_EDITOR_TIMEOUT_MESSAGE}. The page keeps watching, so leave it open if you want to
+            wait; otherwise close this tab and try again.
+          </Typography>
+        </Alert>
+      ) : slowNotice ? (
+        <Typography variant="body2" color="text.secondary" textAlign="center">
+          This is taking longer than usual. A first editor in a new project can take a couple of minutes.
+        </Typography>
+      ) : null}
     </Box>
   );
 }
