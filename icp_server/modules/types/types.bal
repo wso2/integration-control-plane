@@ -126,10 +126,49 @@ public type LogFile record {
 };
 
 public type LogFilesResponse record {
+    *Fetchable;
     int count;
     LogFile[] files;
     PageInfo pageInfo;
 };
+
+// ============================================================
+// MI management: an answer the runtime may not have given yet
+// ============================================================
+
+# Whether the runtime has answered this field yet.
+#
+# Carried by every field the MI management API serves. With `miTunnelEnabled` off the ICP
+# dials the runtime's management port and answers inside the request, so neither flag is
+# ever set and the console sees what it always saw. With it on, the question rides down on
+# the runtime's next heartbeat, and nothing above `mi_access.bal` knows which happened.
+#
+# Read `preparing` before anything else on a response. A field that reports it has no
+# answer yet, so its other members hold defaults — and on a mutation that means `success`
+# is `false` while nothing has failed.
+#
+# + preparing - No answer yet. Ask again in `retryAfterMs`.
+# + stale - There is an answer and it is real, but it has been superseded — by a write of
+#           your own, most often — and its replacement is on the way. Show it, say how old
+#           it is if the screen has room, and ask again.
+# + retryAfterMs - When to ask again, for either reason. Zero means the answer is settled.
+public type Fetchable record {|
+    boolean preparing = false;
+    boolean stale = false;
+    int retryAfterMs = 0;
+|};
+
+# A management answer that is plain text: an artifact's XML, a log file, a registry resource.
+public type FetchableText record {|
+    *Fetchable;
+    string content = "";
+|};
+
+# A management answer projected into name/value pairs: artifact parameters and overviews.
+public type FetchableParameters record {|
+    *Fetchable;
+    Parameter[] parameters = [];
+|};
 
 public type PageInfo record {
     int total;
@@ -243,6 +282,7 @@ public type RegistryResourcesPage record {
 };
 
 public type LoggerGroupsPage record {
+    *Fetchable;
     LoggerGroup[] items;
     PageInfo pageInfo;
 };
@@ -258,6 +298,7 @@ public type WorkflowsPage record {
 };
 
 public type LoggersPage record {
+    *Fetchable;
     Logger[] items;
     PageInfo pageInfo;
 };
@@ -414,7 +455,13 @@ public enum ControlAction {
     // bridges fail record binding on unknown actions. The command's payload carries
     // {commandId, operation, params, identity, deadline}; the runtime posts the outcome
     // to POST /icp/commandResult.
-    WORKFLOW_MGMT
+    WORKFLOW_MGMT,
+    // A tunneled MI management API call, executed by the MI agent against its own loopback
+    // management API — the way an MI behind a load balancer is managed at all, since
+    // nothing routes from the ICP to its management port. Same payload shape as
+    // WORKFLOW_MGMT; `params` carries {method, path, body}. An MI that predates the agent's
+    // command loop ignores the whole `commands` array, so this is safe to send to one.
+    MI_MGMT
 }
 
 // The outcome of a tunneled workflow command, posted by the runtime's bridge to
@@ -1326,16 +1373,18 @@ public type CompositeAppArtifact record {
 
 // Response type for Composite App fault stack trace query
 public type CompositeAppFaultStackTrace record {
+    *Fetchable;
     string runtimeId;
     string appName;
-    string faultStackTrace;
+    string faultStackTrace = "";
 };
 
 // Response type for Data Service fault stack trace query
 public type DataServiceFaultStackTrace record {
+    *Fetchable;
     string runtimeId;
     string serviceName;
-    string faultStackTrace;
+    string faultStackTrace = "";
 };
 
 public type DataSource record {
@@ -2721,9 +2770,14 @@ public type UpdateLogLevelInput record {|
     string? loggerClass?; // Optional: only for adding new logger in MI
     // Common fields
     LogLevel logLevel;
+    // Identifies one submission, so that re-sending this mutation while the runtime has not
+    // confirmed it polls the queued write instead of issuing a second one. Only the
+    // heartbeat tunnel needs it; a write answered in the request never sees it twice.
+    string requestId?;
 |};
 
 public type UpdateLogLevelResponse record {|
+    *Fetchable;
     boolean success;
     string message;
     string[] commandIds; // For BI: command IDs, For MI: empty array (immediate update)
@@ -2732,9 +2786,12 @@ public type UpdateLogLevelResponse record {|
 public type DeleteLoggerInput record {|
     string[] runtimeIds;
     string loggerName;
+    // See UpdateLogLevelInput.requestId.
+    string requestId?;
 |};
 
 public type DeleteLoggerResponse record {|
+    *Fetchable;
     boolean success;
     string message;
 |};
@@ -2754,13 +2811,15 @@ public type MIUsersResponse record {|
 |};
 
 public type MIUsersPage record {
+    *Fetchable;
     MIUser[] items;
     PageInfo pageInfo;
 };
 
 public type MIUserOperationResponse record {
+    *Fetchable;
     string username;
-    string status;
+    string status = "";
 };
 
 public type ValidatedRuntime record {|

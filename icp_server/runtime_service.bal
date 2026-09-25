@@ -187,7 +187,7 @@ service /icp on runtimeListener {
                 heartbeatResponse.commands = reconcileCommands;
             }
 
-            deliverWorkflowCommands(runtimeId, heartbeatResponse);
+            deliverTunneledCommands(runtimeId, heartbeatResponse);
 
             log:printDebug(string `Heartbeat processed for runtime=${runtimeId}, kid=${kid}`);
             return heartbeatResponse;
@@ -256,7 +256,7 @@ service /icp on runtimeListener {
                 }
             }
 
-            deliverWorkflowCommands(runtimeId, heartbeatResponse);
+            deliverTunneledCommands(runtimeId, heartbeatResponse);
 
             log:printDebug(string `Delta heartbeat processed for runtime=${runtimeId}, kid=${kid}`);
             return heartbeatResponse;
@@ -311,7 +311,7 @@ service /icp on runtimeListener {
                     commandId = result.commandId, runtimeId = result.runtimeId, kid = kid);
             return <http:Accepted>{body: {accepted: true}};
         }
-        boolean delivered = recordWorkflowCommandResult(result);
+        boolean delivered = recordTunneledCommandResult(result);
         if !delivered {
             log:printDebug(string `Dropped late/unknown workflow command result: ${result.commandId}`);
         }

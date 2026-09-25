@@ -46,6 +46,7 @@ import { useArtifactTypes, useArtifactPage, ARTIFACT_QUERY_MAP, type GqlArtifact
 import { useUpdateArtifactStatus, useUpdateListenerState } from '../api/mutations';
 import { useUpdateArtifactTracingStatus, useUpdateArtifactStatisticsStatus } from '../api/artifactToggleMutations';
 import { gql } from '../api/graphql';
+import { FETCHABLE, settle, type Fetchable } from '../api/fetchable';
 import SearchField from './SearchField';
 import SyncSwitch from './SyncSwitch';
 import {
@@ -444,6 +445,7 @@ const headerSx = { px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divi
 const COMPOSITE_APP_FAULT_STACKTRACE_QUERY = `
   query GetCompositeAppFaultStackTrace($runtimeId: String!, $appName: String!) {
     compositeAppFaultStackTrace(runtimeId: $runtimeId, appName: $appName) {
+      ${FETCHABLE}
       faultStackTrace
     }
   }
@@ -451,10 +453,13 @@ const COMPOSITE_APP_FAULT_STACKTRACE_QUERY = `
 const DATA_SERVICE_FAULT_STACKTRACE_QUERY = `
   query GetDataServiceFaultStackTrace($runtimeId: String!, $serviceName: String!) {
     dataServiceFaultStackTrace(runtimeId: $runtimeId, serviceName: $serviceName) {
+      ${FETCHABLE}
       faultStackTrace
     }
   }
 `;
+
+type GqlFaultStackTrace = Fetchable & { faultStackTrace: string };
 
 export function ArtifactDetail({ selected, onClose }: { selected: SelectedArtifact | null; onClose: () => void }) {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
@@ -569,22 +574,11 @@ export function ArtifactDetail({ selected, onClose }: { selected: SelectedArtifa
     setStacktraceError(null);
 
     try {
-      let faultStackTrace: string | null = null;
-      if (isFaultyDataService) {
-        const result = await gql<{ dataServiceFaultStackTrace: { faultStackTrace: string } }>(DATA_SERVICE_FAULT_STACKTRACE_QUERY, {
-          runtimeId,
-          serviceName: artifactName,
-        });
-        if (stacktraceRequestRef.current !== requestToken) return;
-        faultStackTrace = result.dataServiceFaultStackTrace?.faultStackTrace || null;
-      } else {
-        const result = await gql<{ compositeAppFaultStackTrace: { faultStackTrace: string } }>(COMPOSITE_APP_FAULT_STACKTRACE_QUERY, {
-          runtimeId,
-          appName: artifactName,
-        });
-        if (stacktraceRequestRef.current !== requestToken) return;
-        faultStackTrace = result.compositeAppFaultStackTrace?.faultStackTrace || null;
-      }
+      const answer = isFaultyDataService
+        ? await settle(() => gql<{ dataServiceFaultStackTrace: GqlFaultStackTrace }>(DATA_SERVICE_FAULT_STACKTRACE_QUERY, { runtimeId, serviceName: artifactName }).then((d) => d.dataServiceFaultStackTrace))
+        : await settle(() => gql<{ compositeAppFaultStackTrace: GqlFaultStackTrace }>(COMPOSITE_APP_FAULT_STACKTRACE_QUERY, { runtimeId, appName: artifactName }).then((d) => d.compositeAppFaultStackTrace));
+      if (stacktraceRequestRef.current !== requestToken) return;
+      const faultStackTrace = answer?.faultStackTrace || null;
 
       setStacktrace(faultStackTrace);
       setStacktraceLoadedFor(requestToken);

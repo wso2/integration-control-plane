@@ -25,7 +25,6 @@ import ballerina/graphql;
 import ballerina/http;
 import ballerina/lang.value;
 import ballerina/log;
-import ballerina/url;
 
 // GraphQL listener configuration
 listener graphql:Listener graphqlListener = new (httpListener);
@@ -79,39 +78,37 @@ isolated function authorizeEnvironmentAccess(string userId, string environmentId
     }
 }
 
+# A management answer the console renders as text.
+isolated function fetchableText(MIAnswer answer) returns types:FetchableText =>
+    answer.preparing
+        ? {...stillFetching()}
+        : {...fetchableOf(answer), content: miText(answer.body)};
+
 // Helper function to fetch MI loggers from management API
-isolated function fetchMILoggersByRuntime(string runtimeId, types:Runtime runtime) returns types:Logger[]|error {
-    // Build management API base URL
-    string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
+# One runtime's loggers, and the answer they came from.
+#
+# The answer travels with them because grouping several replicas must not lose their
+# staleness: a level just set on one node makes that node's list old, and a group assembled
+# from it is old too.
+type MILoggerReport record {|
+    types:Logger[] loggers = [];
+    MIAnswer answer;
+|};
 
-    log:printDebug("Fetching loggers from MI runtime management API",
-            runtimeId = runtimeId,
-            managementUrl = baseUrl);
-
-    // Create management API client (toggle insecure TLS via configuration)
-    http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-        ? new (baseUrl, {secureSocket: {enable: false}})
-        : new (baseUrl);
-    if mgmtClientResult is error {
-        log:printError("Failed to create management API client", mgmtClientResult);
-        return error("Failed to create management API client");
+isolated function fetchMILoggersByRuntime(string runtimeId, types:Runtime runtime) returns MILoggerReport|error {
+    MIAnswer answer = check miRead(runtime, mi_management:loggersPath());
+    if answer.preparing {
+        return {answer};
     }
-
-    // Generate an HMAC JWT to call the MI management API
-    string hmacToken = check storage:issueRuntimeHmacToken(runtimeId);
-
-    // Fetch loggers via MI Management API (/management/logging)
-    log:printDebug("Fetching loggers via MI management API", runtimeId = runtimeId, managementUrl = baseUrl);
-    types:MgmtLoggersResponse loggersResponse = check mi_management:fetchLoggers(mgmtClientResult, hmacToken);
+    types:MgmtLoggersResponse reported = check answer.body.cloneWithType();
 
     log:printDebug("Successfully fetched loggers from MI management API",
             runtimeId = runtimeId,
-            managementUrl = baseUrl,
-            loggerCount = loggersResponse.count);
+            loggerCount = reported.count);
 
     // Convert management API response to Logger type
     types:Logger[] loggers = [];
-    foreach types:MgmtLoggerInfo loggerInfo in loggersResponse.list {
+    foreach types:MgmtLoggerInfo loggerInfo in reported.list {
         types:LogLevel logLevel = check utils:toLogLevel(loggerInfo.level);
         loggers.push({
             loggerName: loggerInfo.loggerName,
@@ -121,7 +118,7 @@ isolated function fetchMILoggersByRuntime(string runtimeId, types:Runtime runtim
         });
     }
 
-    return loggers;
+    return {loggers, answer};
 }
 
 // Look up a single reconcile state field for an artifact.
@@ -214,7 +211,13 @@ isolated function fetchBILoggersByRuntime(string runtimeId) returns types:Logger
 }
 
 // Helper function to fetch MI loggers from management API for environment and component
-isolated function fetchMILoggersByEnvironmentAndComponent(string environmentId, string componentId, string projectId) returns types:LoggerGroup[]|error {
+# Every replica's loggers as one set of groups, and whether they are still settling.
+type MILoggerGroupReport record {|
+    types:LoggerGroup[] groups = [];
+    types:Fetchable state = {};
+|};
+
+isolated function fetchMILoggersByEnvironmentAndComponent(string environmentId, string componentId, string projectId) returns MILoggerGroupReport|error {
     log:printDebug("Fetching loggers from MI management API for environment and component",
             environmentId = environmentId,
             componentId = componentId);
@@ -224,53 +227,42 @@ isolated function fetchMILoggersByEnvironmentAndComponent(string environmentId, 
 
     if runtimes.length() == 0 {
         log:printDebug("No runtimes found for environment and component", environmentId = environmentId, componentId = componentId);
-        return [];
+        return {};
     }
 
     // Map to group loggers by (loggerName, componentName) -> runtimeIds
     map<types:LoggerGroup> loggerGroupMap = {};
+    boolean stale = false;
 
     // Fetch loggers from each runtime
     foreach types:Runtime runtime in runtimes {
-        // Build management API base URL
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
+        MIAnswer|error answered = miRead(runtime, mi_management:loggersPath());
 
-        // Create management API client
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client for runtime",
-                    runtimeId = runtime.runtimeId,
-                    'error = mgmtClientResult);
-            continue; // Skip this runtime and continue with others
-        }
-
-        // Generate HMAC token
-        string|error hmacTokenResult = storage:issueRuntimeHmacToken(runtime.runtimeId);
-
-        if hmacTokenResult is error {
-            log:printError("Failed to generate HMAC token for runtime",
-                    runtimeId = runtime.runtimeId,
-                    'error = hmacTokenResult);
-            continue; // Skip this runtime and continue with others
-        }
-
-        string hmacToken = hmacTokenResult;
-
-        // Fetch loggers from the runtime
-        types:MgmtLoggersResponse|error loggersResponse = mi_management:fetchLoggers(mgmtClientResult, hmacToken);
-
-        if loggersResponse is error {
+        if answered is error {
             log:printError("Failed to fetch loggers from runtime",
                     runtimeId = runtime.runtimeId,
-                    'error = loggersResponse);
+                    'error = answered);
+            continue; // Skip this runtime and continue with others
+        }
+
+        // A replica that has not answered holds the whole page back: a group assembled
+        // without it would read as that replica not having the logger at all.
+        if answered.preparing {
+            return {state: stillFetching()};
+        }
+        stale = stale || answered.stale;
+
+        types:MgmtLoggersResponse|error reported = answered.body.cloneWithType();
+
+        if reported is error {
+            log:printError("Failed to read the loggers this runtime reported",
+                    runtimeId = runtime.runtimeId,
+                    'error = reported);
             continue; // Skip this runtime and continue with others
         }
 
         // Process each logger from this runtime
-        foreach types:MgmtLoggerInfo loggerInfo in loggersResponse.list {
+        foreach types:MgmtLoggerInfo loggerInfo in reported.list {
             types:LogLevel|error logLevelResult = utils:toLogLevel(loggerInfo.level);
             if logLevelResult is error {
                 log:printWarn("Invalid log level, skipping logger",
@@ -309,7 +301,10 @@ isolated function fetchMILoggersByEnvironmentAndComponent(string environmentId, 
             runtimeCount = runtimes.length(),
             loggerGroupCount = loggerGroups.length());
 
-    return loggerGroups;
+    return {
+        groups: loggerGroups,
+        state: stale ? {stale: true, retryAfterMs: MI_STALE_RETRY_MS} : {}
+    };
 }
 
 // Helper function: Update log level for BI runtimes (database + command queue)
@@ -418,75 +413,16 @@ isolated function updateLogLevelMI(types:UserContextV2 userContext, types:Update
     map<boolean> processedComponents = {};
     record {|string envId; string envName; string runtimeId;|}[] pendingEvents = [];
 
+    // Build request - only include loggerClass if provided (for adding new logger)
+    // If loggerClass is not provided, we're updating an existing logger
+    string? loggerClass = input?.loggerClass;
+    json request = loggerClass is string && loggerClass.trim().length() > 0
+        ? {loggerName, loggingLevel: logLevelStr, loggerClass}
+        : {loggerName, loggingLevel: logLevelStr};
+
     foreach types:ValidatedRuntime validated in validatedRuntimes {
-        // Persist intended state via reconcile engine (once per component+env)
-        string envId = validated.runtime.environment.id;
-        string key = validated.componentId + ":" + envId;
-        if !processedComponents.hasKey(key) {
-            types:ReconcileArtifactKey artifact = {artifactName: loggerName, artifactType: "mi-logger"};
-            check storage:upsertReconcileDesiredState(validated.componentId, envId, artifact,
-                    {"logLevel": logLevelStr});
-            log:printInfo(string `Updated reconcile desired state for MI logger ${loggerName} to ${logLevelStr} in component ${validated.componentId}`);
-            processedComponents[key] = true;
-        }
-
-        // Build management API base URL
-        string baseUrl = check storage:buildManagementBaseUrl(
-                validated.runtime.managementHostname,
-                validated.runtime.managementPort
-        );
-
-        // Create management API client
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client for runtime",
-                    runtimeId = validated.runtimeId,
-                    'error = mgmtClientResult);
-            failureCount += 1;
-            continue;
-        }
-
-        // Generate HMAC token
-        string|error hmacTokenResult = storage:issueRuntimeHmacToken(validated.runtimeId);
-
-        if hmacTokenResult is error {
-            log:printError("Failed to generate HMAC token for runtime",
-                    runtimeId = validated.runtimeId,
-                    'error = hmacTokenResult);
-            failureCount += 1;
-            continue;
-        }
-
-        string hmacToken = hmacTokenResult;
-
-        // Build request - only include loggerClass if provided (for adding new logger)
-        // If loggerClass is not provided, we're updating an existing logger
-        types:MgmtUpdateLoggerRequest request;
-        string? loggerClass = input?.loggerClass;
-        if loggerClass is string && loggerClass.trim().length() > 0 {
-            // Adding new logger - include loggerClass
-            request = {
-                loggerName: loggerName,
-                loggingLevel: logLevelStr,
-                loggerClass: loggerClass
-            };
-        } else {
-            // Updating existing logger - don't include loggerClass
-            request = {
-                loggerName: loggerName,
-                loggingLevel: logLevelStr
-            };
-        }
-
-        // Call MI management API to update logger
-        types:MgmtUpdateLoggerResponse|error updateResult = mi_management:updateLogger(
-                mgmtClientResult,
-                hmacToken,
-                request
-        );
+        MIAnswer|error updateResult = miWrite(validated.runtime, http:PATCH,
+                mi_management:loggersPath(), request, userContext, input?.requestId);
 
         if updateResult is error {
             log:printError("Failed to update logger on runtime",
@@ -494,18 +430,41 @@ isolated function updateLogLevelMI(types:UserContextV2 userContext, types:Update
                     loggerName = loggerName,
                     'error = updateResult);
             failureCount += 1;
-        } else {
-            log:printInfo("Successfully updated logger on runtime",
-                    runtimeId = validated.runtimeId,
-                    loggerName = loggerName,
-                    logLevel = logLevelStr);
-            successCount += 1;
-            pendingEvents.push({
-                envId: validated.runtime.environment.id,
-                envName: validated.runtime.environment.name,
-                runtimeId: validated.runtimeId
-            });
+            continue;
         }
+
+        // Intent is recorded by the call that submits the write, never by the polls that
+        // follow it: this mutation is re-sent until the runtime confirms, and an upsert per
+        // poll wrote the same desired state fifteen times for one log level change.
+        string envId = validated.runtime.environment.id;
+        string key = validated.componentId + ":" + envId;
+        if updateResult.submitted && !processedComponents.hasKey(key) {
+            types:ReconcileArtifactKey artifact = {artifactName: loggerName, artifactType: "mi-logger"};
+            check storage:upsertReconcileDesiredState(validated.componentId, envId, artifact,
+                    {"logLevel": logLevelStr});
+            log:printInfo(string `Updated reconcile desired state for MI logger ${loggerName} to ${logLevelStr} in component ${validated.componentId}`);
+            processedComponents[key] = true;
+        }
+
+        if updateResult.preparing {
+            return {
+                ...stillFetching(),
+                success: false,
+                message: "Waiting for the runtime to confirm this change",
+                commandIds: []
+            };
+        }
+
+        log:printInfo("Successfully updated logger on runtime",
+                runtimeId = validated.runtimeId,
+                loggerName = loggerName,
+                logLevel = logLevelStr);
+        successCount += 1;
+        pendingEvents.push({
+            envId: validated.runtime.environment.id,
+            envName: validated.runtime.environment.name,
+            runtimeId: validated.runtimeId
+        });
     }
 
     if successCount == 0 {
@@ -580,39 +539,11 @@ isolated function deleteLoggerMI(types:UserContextV2 userContext, types:DeleteLo
     int successCount = 0;
     int failureCount = 0;
 
+    string loggerPath = check mi_management:loggerPath(loggerName);
+
     foreach types:ValidatedRuntime validated in validatedRuntimes {
-        string baseUrl = check storage:buildManagementBaseUrl(
-                validated.runtime.managementHostname,
-                validated.runtime.managementPort
-        );
-        log:printDebug("Calling MI management API to delete logger", runtimeId = validated.runtimeId, loggerName = loggerName, baseUrl = baseUrl);
-
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client for runtime",
-                    runtimeId = validated.runtimeId,
-                    'error = mgmtClientResult);
-            failureCount += 1;
-            continue;
-        }
-
-        string|error hmacTokenResult = storage:issueRuntimeHmacToken(validated.runtimeId);
-        if hmacTokenResult is error {
-            log:printError("Failed to generate HMAC token for runtime",
-                    runtimeId = validated.runtimeId,
-                    'error = hmacTokenResult);
-            failureCount += 1;
-            continue;
-        }
-
-        types:MgmtDeleteLoggerResponse|error deleteResult = mi_management:deleteLogger(
-                mgmtClientResult,
-                hmacTokenResult,
-                loggerName
-        );
+        MIAnswer|error deleteResult = miWrite(validated.runtime, http:DELETE, loggerPath, (),
+                userContext, input?.requestId);
 
         if deleteResult is error {
             log:printError("Failed to delete logger on runtime",
@@ -620,12 +551,19 @@ isolated function deleteLoggerMI(types:UserContextV2 userContext, types:DeleteLo
                     loggerName = loggerName,
                     'error = deleteResult);
             failureCount += 1;
-        } else {
-            log:printInfo("Successfully deleted logger on runtime",
-                    runtimeId = validated.runtimeId,
-                    loggerName = loggerName);
-            successCount += 1;
+            continue;
         }
+        if deleteResult.preparing {
+            return {
+                ...stillFetching(),
+                success: false,
+                message: "Waiting for the runtime to confirm this change"
+            };
+        }
+        log:printInfo("Successfully deleted logger on runtime",
+                runtimeId = validated.runtimeId,
+                loggerName = loggerName);
+        successCount += 1;
     }
 
     if successCount == 0 {
@@ -1164,17 +1102,18 @@ service /graphql on graphqlListener {
             return error("Runtime is not online");
         }
 
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-        log:printDebug("Calling MI management API for Composite App fault stack trace", runtimeId = runtimeId, appName = trimmedAppName, baseUrl = baseUrl);
-        http:Client mgmtClient = check (artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl));
-
-        string hmacToken = check storage:issueRuntimeHmacToken(runtimeId);
-
-        string faultStackTrace = check mi_management:fetchCompositeAppFaultStackTrace(mgmtClient, hmacToken, trimmedAppName);
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:compositeAppFaultPath(trimmedAppName));
+        if answer.preparing {
+            return {...stillFetching(), runtimeId, appName: trimmedAppName};
+        }
         log:printDebug("Successfully fetched Composite App fault stack trace", runtimeId = runtimeId, appName = trimmedAppName);
-        return {runtimeId, appName: trimmedAppName, faultStackTrace};
+        return {
+            ...fetchableOf(answer),
+            runtimeId,
+            appName: trimmedAppName,
+            faultStackTrace: check mi_management:faultStackTrace(answer.body, trimmedAppName)
+        };
     }
 
     isolated resource function get dataServiceFaultStackTrace(graphql:Context context, string runtimeId, string serviceName) returns types:DataServiceFaultStackTrace|error {
@@ -1203,17 +1142,18 @@ service /graphql on graphqlListener {
             return error("Runtime is not online");
         }
 
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-        log:printDebug("Calling MI management API for Data Service fault stack trace", runtimeId = runtimeId, serviceName = trimmedServiceName, baseUrl = baseUrl);
-        http:Client mgmtClient = check (artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl));
-
-        string hmacToken = check storage:issueRuntimeHmacToken(runtimeId);
-
-        string faultStackTrace = check mi_management:fetchDataServiceFaultStackTrace(mgmtClient, hmacToken, trimmedServiceName);
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:dataServiceFaultPath(trimmedServiceName));
+        if answer.preparing {
+            return {...stillFetching(), runtimeId, serviceName: trimmedServiceName};
+        }
         log:printDebug("Successfully fetched Data Service fault stack trace", runtimeId = runtimeId, serviceName = trimmedServiceName);
-        return {runtimeId, serviceName: trimmedServiceName, faultStackTrace};
+        return {
+            ...fetchableOf(answer),
+            runtimeId,
+            serviceName: trimmedServiceName,
+            faultStackTrace: check mi_management:faultStackTrace(answer.body, trimmedServiceName)
+        };
     }
 
     // Get Inbound Endpoints for a specific environment and component
@@ -1728,9 +1668,15 @@ service /graphql on graphqlListener {
         types:RuntimeType componentType = runtime.component.componentType;
 
         types:Logger[] result;
+        types:Fetchable state = {};
         if componentType == types:MI {
             // MI: Fetch loggers from management API
-            result = check fetchMILoggersByRuntime(runtimeId, runtime);
+            MILoggerReport reported = check fetchMILoggersByRuntime(runtimeId, runtime);
+            if reported.answer.preparing {
+                return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
+            }
+            result = reported.loggers;
+            state = fetchableOf(reported.answer);
         } else {
             // BI: Fetch loggers from database, then overlay reconcile state
             result = check fetchBILoggersByRuntime(runtimeId);
@@ -1746,7 +1692,7 @@ service /graphql on graphqlListener {
             }
         }
         [int, int, types:PageInfo] [sliceFrom, sliceTo, pageInfo] = buildPageResult(result.length(), pagination);
-        return {items: result.slice(sliceFrom, sliceTo), pageInfo};
+        return {...state, items: result.slice(sliceFrom, sliceTo), pageInfo};
     }
 
     // Get loggers for a specific environment and component, grouped by component name
@@ -1778,9 +1724,15 @@ service /graphql on graphqlListener {
         types:RuntimeType componentType = component.componentType;
 
         types:LoggerGroup[] result;
+        types:Fetchable state = {};
         if componentType == types:MI {
             // MI: Fetch loggers from management API for all runtimes
-            result = check fetchMILoggersByEnvironmentAndComponent(environmentId, componentId, component.projectId);
+            MILoggerGroupReport reported = check fetchMILoggersByEnvironmentAndComponent(environmentId, componentId, component.projectId);
+            if reported.state.preparing {
+                return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
+            }
+            result = reported.groups;
+            state = reported.state;
         } else {
             // BI: Fetch loggers from database, then overlay reconcile state
             result = check storage:getLoggersByEnvironmentAndComponent(environmentId, componentId);
@@ -1796,7 +1748,7 @@ service /graphql on graphqlListener {
             }
         }
         [int, int, types:PageInfo] [sliceFrom, sliceTo, pageInfo] = buildPageResult(result.length(), pagination);
-        return {items: result.slice(sliceFrom, sliceTo), pageInfo};
+        return {...state, items: result.slice(sliceFrom, sliceTo), pageInfo};
     }
 
     // Get log files for a specific runtime
@@ -1830,17 +1782,12 @@ service /graphql on graphqlListener {
             return error("Runtime is not online");
         }
 
-        // Create HTTP client for MI management API
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-        http:Client mgmtClient = check (artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl));
-
-        // Generate HMAC token for authentication
-        string hmacToken = check storage:issueRuntimeHmacToken(runtimeId);
-
         // Fetch log files from MI management API
-        types:MgmtLogFilesResponse mgmtResponse = check mi_management:fetchLogFiles(mgmtClient, hmacToken, searchKey);
+        MIAnswer answer = check miRead(runtime, check mi_management:logFilesPath(searchKey));
+        if answer.preparing {
+            return {...stillFetching(), count: 0, files: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
+        }
+        types:MgmtLogFilesResponse mgmtResponse = check answer.body.cloneWithType();
 
         // Transform to GraphQL response format
         types:LogFile[] logFiles = from var item in mgmtResponse.list
@@ -1848,11 +1795,11 @@ service /graphql on graphqlListener {
 
         int total = logFiles.length();
         [int, int, types:PageInfo] [sliceFrom, sliceTo, pageInfo] = buildPageResult(total, pagination);
-        return {count: total, files: logFiles.slice(sliceFrom, sliceTo), pageInfo: pageInfo};
+        return {...fetchableOf(answer), count: total, files: logFiles.slice(sliceFrom, sliceTo), pageInfo: pageInfo};
     }
 
     // Get log file content for a specific runtime and file name
-    isolated resource function get logFileContent(graphql:Context context, string runtimeId, string fileName) returns string|error {
+    isolated resource function get logFileContent(graphql:Context context, string runtimeId, string fileName) returns types:FetchableText|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
         // Validate fileName to prevent path traversal attacks
@@ -1909,45 +1856,52 @@ service /graphql on graphqlListener {
             return error("Runtime is not online");
         }
 
-        // Create HTTP client for MI management API
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-        http:Client mgmtClient = check (artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl));
-
-        // Generate HMAC token for authentication
-        string hmacToken = check storage:issueRuntimeHmacToken(runtimeId);
-
         // Fetch log file content from MI management API
-        return check mi_management:fetchLogFileContent(mgmtClient, hmacToken, fileName);
+        return fetchableText(check miRead(runtime,
+                check mi_management:logFilePath(trimmedFileName)));
     }
 
     isolated resource function get registryDirectory(graphql:Context context, string runtimeId, string path, boolean? expand = ()) returns types:RegistryDirectoryResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
         types:ValidatedRegistryAccess validated = check validateRegistryResourceAccess(userContext, runtimeId, path, "registry directory");
-        types:RegistryApiClient apiClient = check mi_management:createRegistryManagementClient(validated.runtime, runtimeId, artifactsApiAllowInsecureTLS);
-        return check mi_management:fetchRegistryDirectory(apiClient.mgmtClient, apiClient.hmacToken, validated.trimmedPath, expand);
+        MIAnswer answer = check miRead(validated.runtime,
+                check mi_management:registryPath(validated.trimmedPath));
+        if answer.preparing {
+            return {...stillFetching()};
+        }
+        types:RegistryDirectoryResponse listing = check mi_management:registryDirectory(answer.body);
+        return {...fetchableOf(answer), count: listing.count, items: listing.items};
     }
 
-    isolated resource function get registryFileContent(graphql:Context context, string runtimeId, string path) returns string|error {
+    isolated resource function get registryFileContent(graphql:Context context, string runtimeId, string path) returns types:FetchableText|error {
         types:UserContextV2 userContext = check extractUserContext(context);
         types:ValidatedRegistryAccess validated = check validateRegistryResourceAccess(userContext, runtimeId, path, "registry file content");
-        types:RegistryApiClient apiClient = check mi_management:createRegistryManagementClient(validated.runtime, runtimeId, artifactsApiAllowInsecureTLS);
-        return check mi_management:fetchRegistryFileContent(apiClient.mgmtClient, apiClient.hmacToken, validated.trimmedPath);
+        return fetchableText(check miRead(validated.runtime,
+                check mi_management:registrySubPath("content", validated.trimmedPath)));
     }
 
     isolated resource function get registryResourceMetadata(graphql:Context context, string runtimeId, string path) returns types:RegistryResourceMetadata|error {
         types:UserContextV2 userContext = check extractUserContext(context);
         types:ValidatedRegistryAccess validated = check validateRegistryResourceAccess(userContext, runtimeId, path, "registry resource metadata");
-        types:RegistryApiClient apiClient = check mi_management:createRegistryManagementClient(validated.runtime, runtimeId, artifactsApiAllowInsecureTLS);
-        return check mi_management:fetchRegistryResourceMetadata(apiClient.mgmtClient, apiClient.hmacToken, validated.trimmedPath);
+        MIAnswer answer = check miRead(validated.runtime,
+                check mi_management:registrySubPath("metadata", validated.trimmedPath));
+        if answer.preparing {
+            return {...stillFetching()};
+        }
+        types:RegistryResourceMetadata metadata = check mi_management:registryMetadata(answer.body);
+        return {...fetchableOf(answer), name: metadata.name, mediaType: metadata.mediaType};
     }
 
     isolated resource function get registryResourceProperties(graphql:Context context, string runtimeId, string path) returns types:RegistryPropertiesResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
         types:ValidatedRegistryAccess validated = check validateRegistryResourceAccess(userContext, runtimeId, path, "registry resource properties");
-        types:RegistryApiClient apiClient = check mi_management:createRegistryManagementClient(validated.runtime, runtimeId, artifactsApiAllowInsecureTLS);
-        return check mi_management:fetchRegistryResourceProperties(apiClient.mgmtClient, apiClient.hmacToken, validated.trimmedPath);
+        MIAnswer answer = check miRead(validated.runtime,
+                check mi_management:registrySubPath("properties", validated.trimmedPath));
+        if answer.preparing {
+            return {...stillFetching()};
+        }
+        types:RegistryPropertiesResponse described = check mi_management:registryProperties(answer.body);
+        return {...fetchableOf(answer), count: described.count, properties: described.properties};
     }
 
     // Delete a runtime by ID
@@ -2124,13 +2078,16 @@ service /graphql on graphqlListener {
         } else {
             levelResponse = check updateLogLevelBI(userContext, input);
         }
-        string loggerLabel = componentType == types:MI
-            ? (input?.loggerName ?: "")
-            : (input?.componentName ?: "");
-        storage:logAuditEvent(storage:AUDIT_LOG_LEVEL_CHANGE, userId = userContext.userId,
-                resourceType = storage:AUDIT_RESOURCE_LOGGER, resourceId = loggerLabel,
-                details = string `Log level changed for '${loggerLabel}' to '${input.logLevel}' by '${userContext.username}'`,
-                clientIp = userContext.clientIp, userAgent = userContext.userAgent);
+        // BI only: an MI write audits itself where it is made (mi_access.bal), once, and
+        // the same way whichever transport carried it. Auditing here as well recorded a
+        // tunneled log level change twice and a direct one under different wording.
+        if componentType != types:MI {
+            string componentLabel = input?.componentName ?: "";
+            storage:logAuditEvent(storage:AUDIT_LOG_LEVEL_CHANGE, userId = userContext.userId,
+                    resourceType = storage:AUDIT_RESOURCE_LOGGER, resourceId = componentLabel,
+                    details = string `Log level changed for '${componentLabel}' to '${input.logLevel}' by '${userContext.username}'`,
+                    clientIp = userContext.clientIp, userAgent = userContext.userAgent);
+        }
         return levelResponse;
     }
 
@@ -3529,7 +3486,7 @@ service /graphql on graphqlListener {
             string? runtimeId = (),
             string? packageName = (),
             string? templateType = ()
-    ) returns string|error {
+    ) returns types:FetchableText|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -3555,42 +3512,17 @@ service /graphql on graphqlListener {
         types:Runtime[] runtimes = check storage:getRuntimes((), (), environmentId, component.projectId, componentId);
         types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
 
-        // Build management API base URL
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-
-        log:printDebug("Fetching artifact from runtime management API",
-                runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
-                artifactType = artifactType,
-                artifactName = artifactName);
-
-        // Create management API client (toggle insecure TLS via configuration)
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
-        }
-        // Generate an HMAC JWT (same mechanism as heartbeat) to call the ICP internal API
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
-
         // Fetch artifact metadata via MI Management API (/management/...)
         log:printDebug("Fetching artifact details via MI management API",
                 runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
                 artifactType = artifactType,
                 artifactName = artifactName
         );
-        string artifactDetails = check mi_management:getArtifactSource(
-                mgmtClientResult, hmacToken, artifactType, artifactName, packageName, templateType);
-
-        log:printDebug("Successfully fetched artifact details from MI management API",
-                runtimeId = runtime.runtimeId,
-                artifactType = artifactType,
-                artifactName = artifactName,
-                responseLength = artifactDetails.length());
-        return artifactDetails;
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(artifactType, artifactName, templateType));
+        return answer.preparing
+            ? {...stillFetching()}
+            : {...fetchableOf(answer), content: check mi_management:artifactSource(answer.body)};
     }
 
     // Get WSDL for any supported artifact by type and name via ICP internal API
@@ -3603,7 +3535,7 @@ service /graphql on graphqlListener {
             string? environmentId = (),
             string? runtimeId = (),
             string? packageName = ()
-    ) returns string|error {
+    ) returns types:FetchableText|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -3634,35 +3566,19 @@ service /graphql on graphqlListener {
         // Select runtime using shared helper
         types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
 
-        // Build management API base URL
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-
-        // Normalize artifact type
         log:printDebug("Fetching artifact WSDL via MI management API",
                 runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
                 artifactType = artifactType,
                 artifactName = artifactName);
 
-        // Create MI management API client (toggle insecure TLS via configuration)
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
-        }
-        http:Client mgmtClient = mgmtClientResult;
-        log:printDebug("Successfully created management API client",
-                runtimeId = runtime.runtimeId,
-                baseUrl = baseUrl);
-
-        // Generate an HMAC JWT to call the ICP internal API
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
-
         // Step 1: Retrieve the WSDL URL from the MI Management API
         // (management API returns wsdl1_1 / wsdl2_0 URLs, not the WSDL content directly)
-        types:MgmtProxyServiceInfo fetchProxyServiceArtifact = check mi_management:fetchProxyServiceArtifact(mgmtClient, hmacToken, artifactName);
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_PROXY_SERVICE, artifactName));
+        if answer.preparing {
+            return {...stillFetching()};
+        }
+        types:MgmtProxyServiceInfo fetchProxyServiceArtifact = check answer.body.cloneWithType();
         string? wsdlUrl = fetchProxyServiceArtifact?.wsdl1_1;
         log:printDebug("Retrieved WSDL URL from MI management API",
                 runtimeId = runtime.runtimeId,
@@ -3687,7 +3603,7 @@ service /graphql on graphqlListener {
                 artifactType = artifactType,
                 artifactName = artifactName,
                 wsdlLength = wsdlXml.length());
-        return wsdlXml;
+        return {...fetchableOf(answer), content: wsdlXml};
     }
 
     // Get Local Entry value from a runtime's management API via ICP internal API
@@ -3697,7 +3613,7 @@ service /graphql on graphqlListener {
             string entryName,
             string? environmentId = (),
             string? runtimeId = ()
-    ) returns string|error {
+    ) returns types:FetchableText|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -3726,35 +3642,24 @@ service /graphql on graphqlListener {
             return error("No runtimes found for this component");
         }
         types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-        // Build management API base URL
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
 
         log:printDebug("Fetching local entry info via MI management API",
                 runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
                 entryName = entryName);
 
-        // Create MI management API client (toggle insecure TLS via configuration)
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
-        }
-        http:Client mgmtClient = mgmtClientResult;
-
-        // Generate an HMAC JWT (same mechanism as heartbeat) to call the ICP internal API
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
-
         // Fetch local entry info via MI Management API (/management/local-entries?name=...)
-        types:MgmtLocalEntryInfo entryInfo = check mi_management:fetchLocalEntryArtifact(mgmtClient, hmacToken, entryName);
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_LOCAL_ENTRY, entryName));
+        if answer.preparing {
+            return {...stillFetching()};
+        }
+        types:MgmtLocalEntryInfo entryInfo = check answer.body.cloneWithType();
         log:printDebug("Successfully fetched local entry info from MI management API",
                 runtimeId = runtime.runtimeId,
                 entryName = entryInfo.name,
                 entryType = entryInfo.'type);
 
-        return entryInfo.value;
+        return {...fetchableOf(answer), content: entryInfo.value};
     }
 
     // Get Parameters for any artifact type from management API via ICP internal API
@@ -3766,7 +3671,7 @@ service /graphql on graphqlListener {
             string? environmentId = (),
             string? runtimeId = (),
             string? packageName = ()
-        ) returns types:Parameter[]|error {
+        ) returns types:FetchableParameters|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -3801,30 +3706,29 @@ service /graphql on graphqlListener {
                 artifactType = artifactType,
                 artifactName = artifactName);
 
-        // Build management API base URL
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-
-        // Create management API client
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
+        // Only these three keep parameters, and each keeps them somewhere else. For any
+        // other type there is nothing to ask the runtime for.
+        if artifactType != mi_management:ARTIFACT_TYPE_INBOUND_ENDPOINT
+                && artifactType != mi_management:ARTIFACT_TYPE_MESSAGE_PROCESSOR
+                && artifactType != mi_management:ARTIFACT_TYPE_DATA_SOURCE {
+            return {};
         }
-        http:Client mgmtClient = mgmtClientResult;
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
+
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(artifactType, artifactName));
+        if answer.preparing {
+            return {...stillFetching()};
+        }
 
         // Fetch artifact and extract parameters based on artifact type
         types:Parameter[] params = [];
 
         if artifactType == mi_management:ARTIFACT_TYPE_INBOUND_ENDPOINT {
-            types:MgmtInboundEndpointInfo inboundInfo = check mi_management:fetchInboundEndpointArtifact(mgmtClient, hmacToken, artifactName);
+            types:MgmtInboundEndpointInfo inboundInfo = check answer.body.cloneWithType();
             // Append parameters from the management API response
             params = inboundInfo.parameters ?: [];
         } else if artifactType == mi_management:ARTIFACT_TYPE_MESSAGE_PROCESSOR {
-            types:MgmtMessageProcessorInfo processorInfo = check mi_management:fetchMessageProcessorArtifact(
-                    mgmtClient, hmacToken, artifactName);
+            types:MgmtMessageProcessorInfo processorInfo = check answer.body.cloneWithType();
 
             // Append parameters from the map
             map<string>? parameters = processorInfo.parameters;
@@ -3833,9 +3737,8 @@ service /graphql on graphqlListener {
                     params.push({name: key, value: value});
                 }
             }
-        } else if artifactType == mi_management:ARTIFACT_TYPE_DATA_SOURCE {
-            types:MgmtDataSourceInfo dataSourceInfo = check mi_management:fetchDataSourceArtifact(
-                    mgmtClient, hmacToken, artifactName);
+        } else {
+            types:MgmtDataSourceInfo dataSourceInfo = check answer.body.cloneWithType();
 
             // Append configuration parameters from the management API response
             map<json>? configParams = dataSourceInfo.configurationParameters;
@@ -3861,7 +3764,7 @@ service /graphql on graphqlListener {
                 artifactName = artifactName,
                 paramCount = params.length());
 
-        return params;
+        return {...fetchableOf(answer), parameters: params};
     }
 
     // Get overview metadata for a data source from the MI Management API.
@@ -3872,7 +3775,7 @@ service /graphql on graphqlListener {
             string dataSourceName,
             string? environmentId = (),
             string? runtimeId = ()
-        ) returns types:Parameter[]|error {
+        ) returns types:FetchableParameters|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -3896,26 +3799,17 @@ service /graphql on graphqlListener {
         }
 
         types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
 
         log:printDebug("Fetching data source overview via MI management API",
                 runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
                 dataSourceName = dataSourceName);
 
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_DATA_SOURCE, dataSourceName));
+        if answer.preparing {
+            return {...stillFetching()};
         }
-        http:Client mgmtClient = mgmtClientResult;
-
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
-
-        types:MgmtDataSourceInfo overview = check mi_management:fetchDataSourceArtifact(
-                mgmtClient, hmacToken, dataSourceName);
+        types:MgmtDataSourceInfo overview = check answer.body.cloneWithType();
 
         types:Parameter[] result = [];
         result.push({name: "name", value: overview.name});
@@ -3940,7 +3834,7 @@ service /graphql on graphqlListener {
                 dataSourceName = dataSourceName,
                 totalParamCount = result.length());
 
-        return result;
+        return {...fetchableOf(answer), parameters: result};
     }
 
     // Get overview metadata for a message store: name, type, container, size.
@@ -3950,7 +3844,7 @@ service /graphql on graphqlListener {
             string storeName,
             string? environmentId = (),
             string? runtimeId = ()
-        ) returns types:Parameter[]|error {
+        ) returns types:FetchableParameters|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -3974,26 +3868,17 @@ service /graphql on graphqlListener {
         }
 
         types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
 
         log:printDebug("Fetching message store overview via MI management API",
                 runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
                 storeName = storeName);
 
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_MESSAGE_STORE, storeName));
+        if answer.preparing {
+            return {...stillFetching()};
         }
-        http:Client mgmtClient = mgmtClientResult;
-
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
-
-        types:MgmtMessageStoreInfo overview = check mi_management:fetchMessageStoreArtifact(
-                mgmtClient, hmacToken, storeName);
+        types:MgmtMessageStoreInfo overview = check answer.body.cloneWithType();
 
         types:Parameter[] result = [];
         result.push({name: "name", value: overview.name});
@@ -4006,7 +3891,7 @@ service /graphql on graphqlListener {
         if overview.size is int {
             result.push({name: "size", value: (<int>overview.size).toString()});
         }
-        return result;
+        return {...fetchableOf(answer), parameters: result};
     }
 
     // Get overview metadata for a message processor: name, type, messageStore, status.
@@ -4016,7 +3901,7 @@ service /graphql on graphqlListener {
             string processorName,
             string? environmentId = (),
             string? runtimeId = ()
-        ) returns types:Parameter[]|error {
+        ) returns types:FetchableParameters|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -4040,26 +3925,17 @@ service /graphql on graphqlListener {
         }
 
         types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
 
         log:printDebug("Fetching message processor overview via MI management API",
                 runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
                 processorName = processorName);
 
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_MESSAGE_PROCESSOR, processorName));
+        if answer.preparing {
+            return {...stillFetching()};
         }
-        http:Client mgmtClient = mgmtClientResult;
-
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
-
-        types:MgmtMessageProcessorInfo overview = check mi_management:fetchMessageProcessorArtifact(
-                mgmtClient, hmacToken, processorName);
+        types:MgmtMessageProcessorInfo overview = check answer.body.cloneWithType();
 
         types:Parameter[] result = [];
         result.push({name: "name", value: overview.name});
@@ -4072,7 +3948,7 @@ service /graphql on graphqlListener {
         if overview.status is string {
             result.push({name: "status", value: <string>overview.status});
         }
-        return result;
+        return {...fetchableOf(answer), parameters: result};
     }
 
     // Get structured overview for a data service: dataSources, queries, resources, operations.
@@ -4082,7 +3958,7 @@ service /graphql on graphqlListener {
             string dataServiceName,
             string? environmentId = (),
             string? runtimeId = ()
-        ) returns types:MgmtDataServiceInfo|error {
+        ) returns types:FetchableDataService|error {
         value:Cloneable|error|isolated object {} authHeader = context.get("Authorization");
         if authHeader !is string {
             return error("Authorization header missing in request");
@@ -4106,24 +3982,20 @@ service /graphql on graphqlListener {
         }
 
         types:Runtime runtime = check utils:selectRuntime(runtimes, componentId, environmentId, runtimeId);
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
 
         log:printDebug("Fetching data service overview via MI management API",
                 runtimeId = runtime.runtimeId,
-                managementUrl = baseUrl,
                 dataServiceName = dataServiceName);
 
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClientResult is error {
-            log:printError("Failed to create management API client", mgmtClientResult);
-            return error("Failed to create management API client");
+        MIAnswer answer = check miRead(runtime,
+                check mi_management:artifactPath(mi_management:ARTIFACT_TYPE_DATA_SERVICE, dataServiceName));
+        if answer.preparing {
+            return {...stillFetching()};
         }
-        http:Client mgmtClient = mgmtClientResult;
-        string hmacToken = check storage:issueRuntimeHmacToken(runtime.runtimeId);
-        types:MgmtDataServiceInfo dataServiceInfo = check mi_management:fetchDataServiceArtifact(mgmtClient, hmacToken, dataServiceName);
-        return dataServiceInfo;
+        return {
+            ...fetchableOf(answer),
+            dataService: check answer.body.cloneWithType(types:MgmtDataServiceInfo)
+        };
     }
 
     // ============================================================
@@ -4147,41 +4019,15 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to view MI users");
         }
 
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-        http:Client|error mgmtClient = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClient is error {
-            log:printError("Failed to create management API client", mgmtClient);
-            return error("Failed to create management API client");
-        }
-
-        string bearerToken = check storage:issueRuntimeHmacToken(runtimeId);
         log:printDebug("Fetching MI users from runtime management API", runtimeId = runtimeId);
 
-        http:Response|error listResponse = mgmtClient->get("/management/users", {
-            "Authorization": string `Bearer ${bearerToken}`,
-            "Accept": "application/json"
-        });
-        if listResponse is error {
-            log:printError("Failed to fetch MI users from runtime management API", listResponse, runtimeId = runtimeId);
-            return error("Failed to fetch users from runtime");
-        }
-        if listResponse.statusCode != http:STATUS_OK {
-            json|error errBody = listResponse.getJsonPayload();
-            string message = string `MI management API returned status ${listResponse.statusCode}`;
-            if errBody is json {
-                json|error errField = errBody.Error;
-                if errField is string {
-                    message = errField;
-                }
-            }
-            return error(message);
+        MIAnswer listed = check miRead(runtime, mi_management:usersPath());
+        if listed.preparing {
+            return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
         }
 
-        json listBody = check listResponse.getJsonPayload();
         json[] userList = [];
-        json|error listField = listBody.list;
+        json|error listField = listed.body.list;
         if listField is json[] {
             userList = listField;
         }
@@ -4191,14 +4037,18 @@ service /graphql on graphqlListener {
         [int, int, types:PageInfo] [sliceFrom, sliceTo, pageInfo] = buildPageResult(total, pagination);
         json[] pageUsers = userList.slice(sliceFrom, sliceTo);
 
+        // Whether an account is an admin takes a call of its own, so a page costs a call per
+        // user. Every one of them is asked before any "not yet" is reported: returning at the
+        // first unready account would leave the rest unqueued, and a page of ten would then
+        // take ten heartbeats to fill instead of one.
         types:MIUser[] enrichedUsers = [];
+        boolean preparing = false;
         foreach json u in pageUsers {
             json|error userIdJson = u.userId;
             if userIdJson is error {
                 continue;
             }
             string userIdStr = userIdJson.toString();
-            string encodedUsername = check url:encode(userIdStr, "UTF-8");
 
             string username = userIdStr;
             string domain = "primary";
@@ -4208,28 +4058,37 @@ service /graphql on graphqlListener {
                 username = userIdStr.substring(slashIdx + 1);
             }
 
+            // One account the runtime will not describe costs that account its admin flag,
+            // not everyone else their row: MI answers 404 for an account its list names but
+            // its configured store cannot read back, and a page that hides admin, alice and
+            // carol because bob is unreadable tells the operator nothing they can act on.
             boolean isAdmin = false;
-            http:Response|error detailResponse = mgmtClient->get(string `/management/users/${encodedUsername}`, {
-                "Authorization": string `Bearer ${bearerToken}`,
-                "Accept": "application/json"
-            });
-            if detailResponse is http:Response && detailResponse.statusCode == http:STATUS_OK {
-                json|error detailBody = detailResponse.getJsonPayload();
-                if detailBody is json {
-                    json|error isAdminField = detailBody.isAdmin;
-                    if isAdminField is boolean {
-                        isAdmin = isAdminField;
-                    }
-                }
+            MIAnswer|error detail = miRead(runtime, check mi_management:userPath(userIdStr));
+            if detail is error {
+                log:printWarn("Listing an MI user whose details the runtime would not give",
+                        detail, runtimeId = runtimeId, username = username);
+                enrichedUsers.push({username, domain, isAdmin});
+                continue;
+            }
+            if detail.preparing {
+                preparing = true;
+                continue;
+            }
+            json|error isAdminField = detail.body.isAdmin;
+            if isAdminField is boolean {
+                isAdmin = isAdminField;
             }
             enrichedUsers.push({username, domain, isAdmin});
         }
+        if preparing {
+            return {...stillFetching(), items: [], pageInfo: {total: 0, 'limit: 0, offset: 0}};
+        }
 
         log:printDebug("Successfully fetched MI users from runtime", runtimeId = runtimeId, userCount = enrichedUsers.length());
-        return {items: enrichedUsers, pageInfo};
+        return {...fetchableOf(listed), items: enrichedUsers, pageInfo};
     }
 
-    isolated remote function addMIUser(graphql:Context context, string componentId, string runtimeId, string username, string password, boolean isAdmin = false, string domain = "primary") returns types:MIUserOperationResponse|error {
+    isolated remote function addMIUser(graphql:Context context, string componentId, string runtimeId, string username, string password, boolean isAdmin = false, string domain = "primary", string? requestId = ()) returns types:MIUserOperationResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
         types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
@@ -4253,54 +4112,21 @@ service /graphql on graphqlListener {
             return error("password must be a non-empty string");
         }
 
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-        http:Client|error mgmtClient = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClient is error {
-            log:printError("Failed to create management API client", mgmtClient);
-            return error("Failed to create management API client");
-        }
-
-        string bearerToken = check storage:issueRuntimeHmacToken(runtimeId);
-        json createPayload = {userId: username, password, isAdmin, domain};
         log:printInfo("Creating MI user on runtime management API", runtimeId = runtimeId, username = username, isAdmin = isAdmin, domain = domain);
 
-        http:Response|error createResponse = mgmtClient->post("/management/users", createPayload, {
-            "Authorization": string `Bearer ${bearerToken}`,
-            "Content-Type": "application/json"
-        });
-        if createResponse is error {
-            log:printError("Failed to create MI user on runtime management API", createResponse, runtimeId = runtimeId, username = username);
-            return error("Failed to create user on runtime");
+        MIAnswer created = check miWrite(runtime, http:POST, mi_management:usersPath(),
+                {userId: username, password, isAdmin, domain}, userContext, requestId);
+        if created.preparing {
+            return {...stillFetching(), username};
         }
 
-        if createResponse.statusCode != http:STATUS_OK {
-            json|error errBody = createResponse.getJsonPayload();
-            string message = string `MI management API returned status ${createResponse.statusCode}`;
-            if errBody is json {
-                json|error errField = errBody.Error;
-                if errField is string {
-                    message = errField;
-                } else {
-                    json|error msgField = errBody.message;
-                    if msgField is string {
-                        message = msgField;
-                    }
-                }
-            }
-            return error(message);
-        }
-
+        // The audit record is written where the write is (mi_access.bal), so that both
+        // transports leave one and leave the same one.
         log:printInfo("Successfully created MI user on runtime", username = username, runtimeId = runtimeId);
-        storage:logAuditEvent(storage:AUDIT_MI_USER_CREATE, userId = userContext.userId,
-                resourceType = storage:AUDIT_RESOURCE_USER, resourceId = string `${runtimeId}/${username}`,
-                details = string `MI user '${username}' created on runtime '${runtimeId}' by '${userContext.username}'`,
-                clientIp = userContext.clientIp, userAgent = userContext.userAgent);
         return {username, status: "Added"};
     }
 
-    isolated remote function deleteMIUser(graphql:Context context, string componentId, string runtimeId, string username, string domain = "primary") returns types:MIUserOperationResponse|error {
+    isolated remote function deleteMIUser(graphql:Context context, string componentId, string runtimeId, string username, string domain = "primary", string? requestId = ()) returns types:MIUserOperationResponse|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
         types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
@@ -4317,56 +4143,21 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to delete MI users");
         }
 
-        string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-        http:Client|error mgmtClient = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
-        if mgmtClient is error {
-            log:printError("Failed to create management API client", mgmtClient);
-            return error("Failed to create management API client");
-        }
-
         string trimmedUsername = username.trim();
         if trimmedUsername.length() == 0 {
             return error("username must be a non-empty string");
         }
-        string encodedUsername = check url:encode(trimmedUsername, "UTF-8");
 
-        string bearerToken = check storage:issueRuntimeHmacToken(runtimeId);
         log:printInfo("Deleting MI user on runtime management API", runtimeId = runtimeId, username = trimmedUsername, domain = domain);
 
-        string deletePath = domain == "primary"
-            ? string `/management/users/${encodedUsername}`
-            : string `/management/users/${encodedUsername}?domain=${check url:encode(domain, "UTF-8")}`;
-
-        http:Response|error deleteResponse = mgmtClient->delete(deletePath, (), {
-            "Authorization": string `Bearer ${bearerToken}`
-        });
-        if deleteResponse is error {
-            log:printError("Failed to delete MI user on runtime management API", deleteResponse, runtimeId = runtimeId, username = username);
-            return error("Failed to delete user on runtime");
-        }
-
-        if deleteResponse.statusCode == http:STATUS_NOT_FOUND {
-            return error(string `User '${username}' not found on runtime`);
-        }
-        if deleteResponse.statusCode != http:STATUS_OK {
-            json|error errBody = deleteResponse.getJsonPayload();
-            string message = string `MI management API returned status ${deleteResponse.statusCode}`;
-            if errBody is json {
-                json|error errField = errBody.Error;
-                if errField is string {
-                    message = errField;
-                }
-            }
-            return error(message);
+        MIAnswer deleted = check miWrite(runtime, http:DELETE,
+                check mi_management:userPath(trimmedUsername, domain), (),
+                userContext, requestId);
+        if deleted.preparing {
+            return {...stillFetching(), username};
         }
 
         log:printInfo("Successfully deleted MI user on runtime", username = username, runtimeId = runtimeId);
-        storage:logAuditEvent(storage:AUDIT_MI_USER_DELETE, userId = userContext.userId,
-                resourceType = storage:AUDIT_RESOURCE_USER, resourceId = string `${runtimeId}/${username}`,
-                details = string `MI user '${username}' deleted from runtime '${runtimeId}' by '${userContext.username}'`,
-                clientIp = userContext.clientIp, userAgent = userContext.userAgent);
         return {username, status: "Deleted"};
     }
 

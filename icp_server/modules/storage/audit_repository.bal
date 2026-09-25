@@ -93,6 +93,11 @@ public const string AUDIT_ORG_SECRET_REVOKE = "ORG_SECRET_REVOKE";
 public const string AUDIT_MI_USER_CREATE = "MI_USER_CREATE";
 public const string AUDIT_MI_USER_DELETE = "MI_USER_DELETE";
 
+// Any other write to an MI management API, which the console reaches through the heartbeat
+// tunnel. The tunnel carries a method and a path, so a write the ICP has no specific name
+// for is still recorded rather than going unlogged.
+public const string AUDIT_MI_MANAGEMENT_WRITE = "MI_MANAGEMENT_WRITE";
+
 // ── Audit resource type constants ──────────────────────────────────────────
 
 public const string AUDIT_RESOURCE_SESSION = "SESSION";

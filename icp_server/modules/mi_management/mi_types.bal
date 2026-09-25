@@ -14,6 +14,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
+// The management API's own shapes, as far as this module projects them. They stay private:
+// what leaves here is the ICP's schema, so MI's payloads are never the console's contract.
+
 type MgmtRegistryFileItem record {
     string name;
     string mediaType;
@@ -40,15 +43,9 @@ type MgmtRegistryPropertiesResponse record {
     MgmtRegistryProperty[] list;
 };
 
-type MgmtCompositeAppFaultResponse record {
-    string name;
-    string version?;
-    string errorMessage?;
-    string faultStackTrace?;
-};
-
-type MgmtDataServiceFaultResponse record {
-    string serviceName?;
+// Composite apps and data services report a fault the same way, under different names for
+// the thing that faulted — which is the part this projection does not need.
+type MgmtFaultResponse record {
     string errorMessage?;
     string faultStackTrace?;
 };

@@ -1,4 +1,4 @@
-// Copyright (c) 2026, WSO2 Inc. (http://www.wso2.org) All Rights Reserved.
+// Copyright (c) 2026, WSO2 Inc. (http://www.wso2.org)
 //
 // WSO2 Inc. licenses this file to you under the Apache License,
 // Version 2.0 (the "License"); you may not use this file except
@@ -15,23 +15,21 @@
 // under the License.
 
 // Package: mi_management
-// Provides utility functions to call the WSO2 MI Management REST API
-// (at /management path) using HMAC-signed JWT auth
+//
+// The WSO2 MI Management API's vocabulary: which path answers which question, and how its
+// answer becomes an ICP type. Nothing here dials anything — the ICP reaches a runtime one
+// way only, through `mi_access.bal`, which may dial the management port or ride the
+// heartbeat depending on the deployment. Keeping the vocabulary apart from the transport is
+// what lets both be served by the same resolvers.
 
 import ballerina/http;
 import ballerina/log;
 import ballerina/url;
 
-import wso2/icp_server.storage;
 import wso2/icp_server.types;
 
-// Path prefix for all Management API endpoints
 const string MGMT_API_PATH = "/management";
 
-// HTTP header constants
-const string HEADER_AUTHORIZATION = "Authorization";
-const string HEADER_ACCEPT = "Accept";
-const string CONTENT_TYPE_JSON = "application/json";
 const string CONTENT_TYPE_XML = "application/xml";
 
 // Artifact type constants
@@ -44,288 +42,201 @@ public const string ARTIFACT_TYPE_LOCAL_ENTRY = "local-entry";
 public const string ARTIFACT_TYPE_MESSAGE_STORE = "message-store";
 public const string ARTIFACT_TYPE_MESSAGE_PROCESSOR = "message-processor";
 public const string ARTIFACT_TYPE_INBOUND_ENDPOINT = "inbound-endpoint";
-public const string ARTIFACT_TYPE_CONNECTOR = "connector";
 public const string ARTIFACT_TYPE_TEMPLATE = "template";
 public const string ARTIFACT_TYPE_DATA_SERVICE = "data-service";
 public const string ARTIFACT_TYPE_DATA_SOURCE = "data-source";
 
 // ============================================================
-// Artifact-specific fetch functions
+// Paths
 // ============================================================
 
-isolated function fetchApiArtifact(http:Client mgmtClient, string hmacToken, string apiName) returns types:MgmtRestApiInfo|error {
-    string path = string `${MGMT_API_PATH}/apis?apiName=${apiName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtRestApiInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function apiPath(string apiName) returns string|error =>
+    string `${MGMT_API_PATH}/apis?apiName=${check encode(apiName)}`;
 
-public isolated function fetchProxyServiceArtifact(http:Client mgmtClient, string hmacToken, string proxyServiceName) returns types:MgmtProxyServiceInfo|error {
-    string path = string `${MGMT_API_PATH}/proxy-services?proxyServiceName=${proxyServiceName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtProxyServiceInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function proxyServicePath(string proxyServiceName) returns string|error =>
+    string `${MGMT_API_PATH}/proxy-services?proxyServiceName=${check encode(proxyServiceName)}`;
 
-isolated function fetchEndpointArtifact(http:Client mgmtClient, string hmacToken, string endpointName) returns types:MgmtEndpointInfo|error {
-    string path = string `${MGMT_API_PATH}/endpoints?endpointName=${endpointName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtEndpointInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function endpointPath(string endpointName) returns string|error =>
+    string `${MGMT_API_PATH}/endpoints?endpointName=${check encode(endpointName)}`;
 
-isolated function fetchSequenceArtifact(http:Client mgmtClient, string hmacToken, string sequenceName) returns types:MgmtSequenceInfo|error {
-    string path = string `${MGMT_API_PATH}/sequences?sequenceName=${sequenceName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtSequenceInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function sequencePath(string sequenceName) returns string|error =>
+    string `${MGMT_API_PATH}/sequences?sequenceName=${check encode(sequenceName)}`;
 
-isolated function fetchTaskArtifact(http:Client mgmtClient, string hmacToken, string taskName) returns types:MgmtTaskInfo|error {
-    string path = string `${MGMT_API_PATH}/tasks?taskName=${taskName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtTaskInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function taskPath(string taskName) returns string|error =>
+    string `${MGMT_API_PATH}/tasks?taskName=${check encode(taskName)}`;
 
-public isolated function fetchLocalEntryArtifact(http:Client mgmtClient, string hmacToken, string entryName) returns types:MgmtLocalEntryInfo|error {
-    string path = string `${MGMT_API_PATH}/local-entries?name=${entryName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtLocalEntryInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function localEntryPath(string entryName) returns string|error =>
+    string `${MGMT_API_PATH}/local-entries?name=${check encode(entryName)}`;
 
-public isolated function fetchMessageStoreArtifact(http:Client mgmtClient, string hmacToken, string storeName) returns types:MgmtMessageStoreInfo|error {
-    string path = string `${MGMT_API_PATH}/message-stores?name=${storeName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtMessageStoreInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function messageStorePath(string storeName) returns string|error =>
+    string `${MGMT_API_PATH}/message-stores?name=${check encode(storeName)}`;
 
-public isolated function fetchMessageProcessorArtifact(http:Client mgmtClient, string hmacToken, string processorName) returns types:MgmtMessageProcessorInfo|error {
-    string path = string `${MGMT_API_PATH}/message-processors?name=${processorName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtMessageProcessorInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function messageProcessorPath(string processorName) returns string|error =>
+    string `${MGMT_API_PATH}/message-processors?name=${check encode(processorName)}`;
 
-public isolated function fetchInboundEndpointArtifact(http:Client mgmtClient, string hmacToken, string inboundName) returns types:MgmtInboundEndpointInfo|error {
-    string path = string `${MGMT_API_PATH}/inbound-endpoints?inboundEndpointName=${inboundName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtInboundEndpointInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function inboundEndpointPath(string inboundName) returns string|error =>
+    string `${MGMT_API_PATH}/inbound-endpoints?inboundEndpointName=${check encode(inboundName)}`;
 
-isolated function fetchConnectorArtifact(http:Client mgmtClient, string hmacToken, string connectorName, string? packageName) returns types:MgmtConnectorInfo|error {
-    string path = string `${MGMT_API_PATH}/connectors`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtConnectorInfo[] result = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    foreach types:MgmtConnectorInfo connector in result {
-        if connector.name == connectorName && (packageName is () || connector.'package == packageName) {
-            return connector;
-        }
-    }
-    return error(string `Connector '${connectorName}' not found in MI management API response`);
-}
+isolated function templatePath(string templateName, string templateType) returns string|error =>
+    string `${MGMT_API_PATH}/templates?name=${check encode(templateName)}&type=${check encode(templateType)}`;
 
-isolated function fetchTemplateArtifact(http:Client mgmtClient, string hmacToken, string templateName, string templateType) returns types:MgmtTemplateInfo|error {
-    string path = string `${MGMT_API_PATH}/templates?name=${templateName}&type=${templateType}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtTemplateInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function dataServicePath(string dataServiceName) returns string|error =>
+    string `${MGMT_API_PATH}/data-services?dataServiceName=${check encode(dataServiceName)}`;
 
-public isolated function fetchDataServiceArtifact(http:Client mgmtClient, string hmacToken, string dataServiceName) returns types:MgmtDataServiceInfo|error {
-    string path = string `${MGMT_API_PATH}/data-services?dataServiceName=${dataServiceName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtDataServiceInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
+isolated function dataSourcePath(string dataSourceName) returns string|error =>
+    string `${MGMT_API_PATH}/data-sources?name=${check encode(dataSourceName)}`;
 
-public isolated function fetchDataSourceArtifact(http:Client mgmtClient, string hmacToken, string dataSourceName) returns types:MgmtDataSourceInfo|error {
-    string path = string `${MGMT_API_PATH}/data-sources?name=${dataSourceName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtDataSourceInfo result = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    log:printDebug("Data source converted to type",
-            dataSourceName = dataSourceName,
-            hasConfigParams = result.configurationParameters is map<json>,
-            configParamsValue = result.configurationParameters);
-    return result;
-}
-
-isolated function fetchCompositeAppArtifact(http:Client mgmtClient, string hmacToken, string compositeAppName) returns types:MgmtCompositeAppInfo|error {
-    string path = string `${MGMT_API_PATH}/applications?carbonAppName=${compositeAppName}`;
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtCompositeAppInfo respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
-
-// Fetch loggers from the MI Management API
-public isolated function fetchLoggers(http:Client mgmtClient, string hmacToken) returns types:MgmtLoggersResponse|error {
-    string path = string `${MGMT_API_PATH}/logging`;
-    log:printDebug("Fetching loggers from MI management API");
-    types:MgmtLoggersResponse respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
-
-// Update logger (add new logger, update log level, or update root logger)
-public isolated function updateLogger(http:Client mgmtClient, string hmacToken, types:MgmtUpdateLoggerRequest request) returns types:MgmtUpdateLoggerResponse|error {
-    string path = string `${MGMT_API_PATH}/logging`;
-    log:printDebug("Calling MI management API to update logger", path = path, loggerName = request.loggerName, loggingLevel = request.loggingLevel);
-
-    do {
-        types:MgmtUpdateLoggerResponse respResult = check mgmtClient->patch(path, request, {
-            [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-            [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-        });
-
-        log:printInfo("Successfully updated logger via MI management API", loggerName = request.loggerName, loggingLevel = request.loggingLevel);
-        return respResult;
-    } on fail error e {
-        log:printError("Failed to update logger via MI management API", loggerName = request.loggerName, errorMessage = e.message());
-        return e;
-    }
-}
-
-// Delete logger via the MI Management API
-public isolated function deleteLogger(http:Client mgmtClient, string hmacToken, string loggerName) returns types:MgmtDeleteLoggerResponse|error {
-    string encodedName = check url:encode(loggerName, "UTF-8");
-    string path = string `${MGMT_API_PATH}/logging?loggerName=${encodedName}`;
-    log:printDebug("Calling MI management API to delete logger", path = path, loggerName = loggerName);
-
-    do {
-        types:MgmtDeleteLoggerResponse respResult = check mgmtClient->delete(path, headers = {
-            [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-            [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-        });
-
-        log:printInfo("Successfully deleted logger via MI management API", loggerName = loggerName);
-        return respResult;
-    } on fail error e {
-        log:printError("Failed to delete logger via MI management API", loggerName = loggerName, errorMessage = e.message());
-        return e;
-    }
-}
-
-// ============================================================
-// Dispatcher function
-// ============================================================
-
-// Artifact types that have a 'configuration' field i.e. source
-public type ArtifactWithConfig types:MgmtRestApiInfo|types:MgmtProxyServiceInfo|types:MgmtEndpointInfo|
-    types:MgmtSequenceInfo|types:MgmtTaskInfo|types:MgmtMessageStoreInfo|types:MgmtMessageProcessorInfo|
-    types:MgmtInboundEndpointInfo|types:MgmtTemplateInfo|types:MgmtDataServiceInfo|types:MgmtDataSourceInfo;
-
-// fetchRawArtifactItem dispatches to the appropriate artifact-specific fetch function
-// based on the artifact type and returns the typed record.
-isolated function getArtifactsWithSource(http:Client mgmtClient, string hmacToken, string artifactType, string artifactName, string? packageName = (), string? templateType = ()) returns ArtifactWithConfig|error {
-    // Dispatch to artifact-specific fetch functions and return typed records
+# The management path that describes one artifact.
+#
+# + templateType - Templates are named by type as well, and MI answers 404 without it
+public isolated function artifactPath(string artifactType, string artifactName,
+        string? templateType = ()) returns string|error {
     if artifactType == ARTIFACT_TYPE_API {
-        return check fetchApiArtifact(mgmtClient, hmacToken, artifactName);
+        return apiPath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_PROXY_SERVICE {
-        return check fetchProxyServiceArtifact(mgmtClient, hmacToken, artifactName);
+        return proxyServicePath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_ENDPOINT {
-        return check fetchEndpointArtifact(mgmtClient, hmacToken, artifactName);
+        return endpointPath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_SEQUENCE {
-        return check fetchSequenceArtifact(mgmtClient, hmacToken, artifactName);
+        return sequencePath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_TASK {
-        return check fetchTaskArtifact(mgmtClient, hmacToken, artifactName);
+        return taskPath(artifactName);
+    } else if artifactType == ARTIFACT_TYPE_LOCAL_ENTRY {
+        return localEntryPath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_MESSAGE_STORE {
-        return check fetchMessageStoreArtifact(mgmtClient, hmacToken, artifactName);
+        return messageStorePath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_MESSAGE_PROCESSOR {
-        return check fetchMessageProcessorArtifact(mgmtClient, hmacToken, artifactName);
+        return messageProcessorPath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_INBOUND_ENDPOINT {
-        return check fetchInboundEndpointArtifact(mgmtClient, hmacToken, artifactName);
+        return inboundEndpointPath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_TEMPLATE {
         if templateType is () {
-            return error(string `Template artifact type requires 'templateType' parameter to be specified`);
+            return error("Template artifact type requires 'templateType' parameter to be specified");
         }
-        return check fetchTemplateArtifact(mgmtClient, hmacToken, artifactName, templateType);
+        return templatePath(artifactName, templateType);
     } else if artifactType == ARTIFACT_TYPE_DATA_SERVICE {
-        return check fetchDataServiceArtifact(mgmtClient, hmacToken, artifactName);
+        return dataServicePath(artifactName);
     } else if artifactType == ARTIFACT_TYPE_DATA_SOURCE {
-        return check fetchDataSourceArtifact(mgmtClient, hmacToken, artifactName);
-    } else {
-        return error(string `Unsupported artifact type for MI management API: ${artifactType}`);
+        return dataSourcePath(artifactName);
     }
+    return error(string `Unsupported artifact type for MI management API: ${artifactType}`);
+}
+
+public isolated function loggersPath() returns string => MGMT_API_PATH + "/logging";
+
+public isolated function loggerPath(string loggerName) returns string|error =>
+    string `${MGMT_API_PATH}/logging?loggerName=${check encode(loggerName)}`;
+
+public isolated function usersPath() returns string => MGMT_API_PATH + "/users";
+
+public isolated function userPath(string username, string domain = "primary") returns string|error {
+    string path = string `${MGMT_API_PATH}/users/${check encode(username)}`;
+    return domain == "primary" ? path : string `${path}?domain=${check encode(domain)}`;
+}
+
+public isolated function logFilesPath(string? searchKey = ()) returns string|error {
+    if searchKey is () || searchKey.trim() == "" {
+        return MGMT_API_PATH + "/logs";
+    }
+    return string `${MGMT_API_PATH}/logs?searchKey=${check encode(searchKey)}`;
+}
+
+public isolated function logFilePath(string fileName) returns string|error =>
+    string `${MGMT_API_PATH}/logs?file=${check encode(fileName)}`;
+
+public isolated function registryPath(string path) returns string|error =>
+    string `${MGMT_API_PATH}/registry-resources?path=${check encode(path)}`;
+
+# + kind - `content`, `metadata` or `properties`
+public isolated function registrySubPath(string kind, string path) returns string|error =>
+    string `${MGMT_API_PATH}/registry-resources/${kind}?path=${check encode(path)}`;
+
+public isolated function compositeAppFaultPath(string appName) returns string|error =>
+    string `${MGMT_API_PATH}/applications/${check encode(appName)}/fault`;
+
+public isolated function dataServiceFaultPath(string serviceName) returns string|error =>
+    string `${MGMT_API_PATH}/data-services/${check encode(serviceName)}/fault`;
+
+isolated function encode(string value) returns string|error => url:encode(value, "UTF-8");
+
+// ============================================================
+// Projections
+// ============================================================
+
+// Artifact types that carry their synapse configuration i.e. their source
+type ArtifactWithConfig record {
+    string configuration?;
+};
+
+# The named artifact's synapse configuration, or its full metadata when it has none.
+public isolated function artifactSource(json artifact) returns string|error {
+    ArtifactWithConfig described = check artifact.cloneWithType();
+    string? configuration = described.configuration;
+    return configuration is string && configuration.length() > 0
+        ? configuration : artifact.toJsonString();
+}
+
+public isolated function registryDirectory(json answer) returns types:RegistryDirectoryResponse|error {
+    MgmtRegistryDirectoryResponse listing = check answer.cloneWithType();
+    types:RegistryDirectoryItem[] items = from MgmtRegistryFileItem item in listing.list
+        select {
+            name: item.name,
+            mediaType: item.mediaType,
+            isDirectory: item.mediaType == "directory",
+            properties: from MgmtRegistryProperty property in item.properties
+                select {name: property.name, value: property.value}
+        };
+    return {count: listing.count, items};
+}
+
+public isolated function registryMetadata(json answer) returns types:RegistryResourceMetadata|error {
+    MgmtRegistryMetadataResponse metadata = check answer.cloneWithType();
+    return {name: metadata.name, mediaType: metadata.mediaType};
+}
+
+# A registry resource's properties.
+#
+# MI reports "no such resource" by putting its complaint in `list` where the array belongs,
+# which reads as a resource without properties rather than as a failure — the registry
+# browser shows an empty Properties tab and stays usable.
+public isolated function registryProperties(json answer) returns types:RegistryPropertiesResponse|error {
+    json list = check answer.list;
+    if list is string {
+        log:printDebug("MI returned an error for registry properties", errorMessage = list);
+        return {count: 0, properties: []};
+    }
+    MgmtRegistryPropertiesResponse described = check answer.cloneWithType();
+    return {
+        count: described.count,
+        properties: from MgmtRegistryProperty property in described.list
+            select {name: property.name, value: property.value}
+    };
+}
+
+# The stack trace a faulty deployment left behind.
+#
+# + subject - What faulted, for the message when nothing was recorded
+public isolated function faultStackTrace(json answer, string subject) returns string|error {
+    MgmtFaultResponse fault = check answer.cloneWithType();
+    string? stackTrace = fault?.faultStackTrace;
+    if stackTrace is () || stackTrace.trim().length() == 0 {
+        return error(string `No fault stack trace available for: ${subject}`);
+    }
+    return stackTrace;
 }
 
 // ============================================================
-// Public API functions
+// WSDL
 // ============================================================
 
-// fetchArtifactDetails returns the synapse configuration XML for the named
-// artifact, or the full metadata JSON when no 'configuration' field is present.
-public isolated function getArtifactSource(http:Client mgmtClient, string hmacToken, string artifactType, string artifactName, string? packageName = (), string? templateType = ()) returns string|error {
-    log:printDebug("Fetching artifact details from MI management API",
-            artifactType = artifactType, artifactName = artifactName);
-
-    ArtifactWithConfig artifact = check getArtifactsWithSource(mgmtClient, hmacToken, artifactType, artifactName, packageName, templateType);
-
-    // Extract configuration field for artifacts that have it
-    string? config = artifact.configuration;
-    if config is string && config.length() > 0 {
-        return config;
-    }
-
-    // Fallback: return full artifact metadata as JSON
-    return artifact.toJson().toJsonString();
-}
-
-// fetchWsdlContent fetches the actual WSDL XML from the URL returned by the
-// MI Management API. The URL is typically on the MI HTTP service port (e.g.
-// http://host:8290/services/TestProxy?wsdl), distinct from the management port.
-//
-// Security: Replaces the URL host with the trusted management hostname to prevent SSRF attacks.
-// MI may report its own configured hostname in the WSDL URL (e.g. the machine name) which can
-// differ from the hostname ICP uses to connect to the management API. By substituting the host,
-// we ensure the request always goes to the trusted runtime, regardless of what hostname MI reports.
-
+# Fetches a proxy service's WSDL from the URL the management API reported for it.
+#
+# That URL is on MI's service port (e.g. `:8290`), not its management port, so this is a
+# separate dial and not a management call at all.
+#
+# Security: the URL's host is replaced with the trusted management hostname before use. MI
+# reports its own configured hostname, which may differ from the one the ICP reaches it by,
+# and honouring it would let a runtime's configuration point the ICP at any host it liked.
 public isolated function fetchWsdlContent(string wsdlUrl, string trustedHost, boolean allowInsecureTLS) returns string|error {
     log:printInfo("Fetching WSDL content", wsdlUrl = wsdlUrl, trustedHost = trustedHost);
     int? schemeEndPos = wsdlUrl.indexOf("://");
@@ -384,213 +295,15 @@ public isolated function fetchWsdlContent(string wsdlUrl, string trustedHost, bo
 
     log:printInfo("WSDL URL host replaced for security", originalUrl = wsdlUrl, trustedBaseUrl = wsdlBaseUrl);
 
-    http:Client|error wsdlClientResult = allowInsecureTLS
+    http:Client wsdlClient = check (allowInsecureTLS
         ? new (wsdlBaseUrl, {secureSocket: {enable: false}})
-        : new (wsdlBaseUrl);
+        : new (wsdlBaseUrl));
 
-    if wsdlClientResult is error {
-        return error(string `Failed to create HTTP client for WSDL URL: ${wsdlClientResult.message()}`);
-    }
-    http:Client wsdlClient = wsdlClientResult;
-
-    http:Response|error wsdlRespResult = wsdlClient->get(wsdlPath, {[HEADER_ACCEPT]: CONTENT_TYPE_XML});
-    if wsdlRespResult is error {
-        return error(string `WSDL content fetch failed: ${wsdlRespResult.message()}`);
-    }
-    http:Response wsdlResp = wsdlRespResult;
-
+    http:Response wsdlResp = check wsdlClient->get(wsdlPath, {"Accept": CONTENT_TYPE_XML});
     if wsdlResp.statusCode != http:STATUS_OK {
         string|error errPayload = wsdlResp.getTextPayload();
         string errMsg = errPayload is string ? errPayload : "Unknown error";
         return error(string `WSDL content fetch returned status ${wsdlResp.statusCode}: ${errMsg}`);
     }
-
-    string|error wsdlContent = wsdlResp.getTextPayload();
-    if wsdlContent is error {
-        return error(string `Failed to read WSDL content: ${wsdlContent.message()}`);
-    }
-    return wsdlContent;
+    return wsdlResp.getTextPayload();
 }
-
-// ============================================================
-// Log Files API functions
-// ============================================================
-
-// Fetch the list of log files from the MI management API
-// GET /management/logs or /management/logs?searchKey={searchKey}
-public isolated function fetchLogFiles(http:Client mgmtClient, string hmacToken, string? searchKey = ()) returns types:MgmtLogFilesResponse|error {
-    string path = string `${MGMT_API_PATH}/logs`;
-    if searchKey is string && searchKey.trim() != "" {
-        string encodedSearchKey = check url:encode(searchKey, "UTF-8");
-        path = string `${path}?searchKey=${encodedSearchKey}`;
-    }
-    log:printDebug("Calling MI management API", path = path);
-    types:MgmtLogFilesResponse respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return respResult;
-}
-
-// Fetch the content of a specific log file from the MI management API
-// GET /management/logs?file={fileName}
-public isolated function fetchLogFileContent(http:Client mgmtClient, string hmacToken, string fileName) returns string|error {
-    string encodedFileName = check url:encode(fileName, "UTF-8");
-    string path = string `${MGMT_API_PATH}/logs?file=${encodedFileName}`;
-    log:printDebug("Calling MI management API", path = path);
-    string respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`
-    });
-    return respResult;
-}
-
-// Fetch registry directory contents from the MI management API
-// GET /management/registry-resources?path={path}
-public isolated function fetchRegistryDirectory(http:Client mgmtClient, string hmacToken, string path, boolean? expand = ()) returns types:RegistryDirectoryResponse|error {
-    string encodedPath = check url:encode(path, "UTF-8");
-    string apiPath = string `${MGMT_API_PATH}/registry-resources?path=${encodedPath}`;
-    log:printDebug("Calling MI management API", path = apiPath);
-
-    MgmtRegistryDirectoryResponse respResult = check mgmtClient->get(apiPath, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-
-    types:RegistryDirectoryItem[] items = [];
-    log:printDebug("Processing registry directory items", itemCount = respResult.count);
-
-    foreach MgmtRegistryFileItem fileItem in respResult.list {
-        types:RegistryProperty[] mappedProperties = from var prop in fileItem.properties
-            select {name: prop.name, value: prop.value};
-
-        log:printDebug("Mapped registry item",
-            itemName = fileItem.name,
-            mediaType = fileItem.mediaType,
-            propertiesCount = mappedProperties.length()
-        );
-
-        items.push({
-            name: fileItem.name,
-            mediaType: fileItem.mediaType,
-            isDirectory: fileItem.mediaType == "directory",
-            properties: mappedProperties
-        });
-    }
-
-    log:printDebug("Registry directory processing complete", totalItems = items.length());
-    return {count: respResult.count, items: items};
-}
-
-// Fetch registry file content from the MI management API
-// GET /management/registry-resources/content?path={path}
-public isolated function fetchRegistryFileContent(http:Client mgmtClient, string hmacToken, string path) returns string|error {
-    string encodedPath = check url:encode(path, "UTF-8");
-    string apiPath = string `${MGMT_API_PATH}/registry-resources/content?path=${encodedPath}`;
-    log:printDebug("Calling MI management API", path = apiPath);
-    string respResult = check mgmtClient->get(apiPath, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`
-    });
-    return respResult;
-}
-
-// Fetch registry resource metadata from the MI management API
-// GET /management/registry-resources/metadata?path={path}
-public isolated function fetchRegistryResourceMetadata(http:Client mgmtClient, string hmacToken, string path) returns types:RegistryResourceMetadata|error {
-    string encodedPath = check url:encode(path, "UTF-8");
-    string apiPath = string `${MGMT_API_PATH}/registry-resources/metadata?path=${encodedPath}`;
-    log:printDebug("Calling MI management API", path = apiPath);
-    MgmtRegistryMetadataResponse respResult = check mgmtClient->get(apiPath, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    return {name: respResult.name, mediaType: respResult.mediaType};
-}
-
-// Fetch registry resource properties from the MI management API
-// GET /management/registry-resources/properties?path={path}
-public isolated function fetchRegistryResourceProperties(http:Client mgmtClient, string hmacToken, string path, string? propertyName = ()) returns types:RegistryPropertiesResponse|error {
-    string encodedPath = check url:encode(path, "UTF-8");
-    string apiPath = string `${MGMT_API_PATH}/registry-resources/properties?path=${encodedPath}`;
-    if propertyName is string && propertyName.trim() != "" {
-        string encodedName = check url:encode(propertyName, "UTF-8");
-        apiPath = string `${apiPath}&name=${encodedName}`;
-    }
-    log:printDebug("Calling MI management API", path = apiPath);
-    json respJson = check mgmtClient->get(apiPath, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-
-    json listField = check respJson.list;
-    if listField is string {
-        log:printDebug("MI returned error for registry properties", errorMessage = listField, path = path);
-        return {count: 0, properties: []};
-    }
-
-    MgmtRegistryPropertiesResponse respResult = check respJson.cloneWithType();
-    types:RegistryProperty[] props = [];
-    foreach MgmtRegistryProperty prop in respResult.list {
-        props.push({name: prop.name, value: prop.value});
-    }
-
-    return {count: respResult.count, properties: props};
-}
-
-// Fetch the fault stack trace for a faulty Composite App from the MI management API
-// GET /management/applications/{appName}/fault
-public isolated function fetchCompositeAppFaultStackTrace(http:Client mgmtClient, string hmacToken, string appName) returns string|error {
-    string encodedAppName = check url:encode(appName, "UTF-8");
-    string path = string `${MGMT_API_PATH}/applications/${encodedAppName}/fault`;
-    log:printDebug("Calling MI management API for Composite App fault stacktrace", path = path);
-    MgmtCompositeAppFaultResponse respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    string? stackTrace = respResult?.faultStackTrace;
-    if stackTrace is () {
-        log:printWarn("No fault stack trace found for Composite App", appName = appName);
-        return error(string `No fault stack trace available for Composite App: ${appName}`);
-    }
-    if stackTrace.trim().length() == 0 {
-        log:printWarn("Empty fault stack trace found for Composite App", appName = appName);
-        return error(string `No fault stack trace available for Composite App: ${appName}`);
-    }
-    return stackTrace;
-}
-
-// Fetch the fault stack trace for a faulty Data Service from the MI management API
-// GET /management/data-services/{serviceName}/fault
-public isolated function fetchDataServiceFaultStackTrace(http:Client mgmtClient, string hmacToken, string serviceName) returns string|error {
-    string encodedServiceName = check url:encode(serviceName, "UTF-8");
-    string path = string `${MGMT_API_PATH}/data-services/${encodedServiceName}/fault`;
-    log:printDebug("Calling MI management API for Data Service fault stacktrace", path = path);
-    MgmtDataServiceFaultResponse respResult = check mgmtClient->get(path, {
-        [HEADER_AUTHORIZATION]: string `Bearer ${hmacToken}`,
-        [HEADER_ACCEPT]: CONTENT_TYPE_JSON
-    });
-    string? stackTrace = respResult?.faultStackTrace;
-    if stackTrace is () {
-        log:printWarn("No fault stack trace found for Data Service", serviceName = serviceName);
-        return error(string `No fault stack trace available for Data Service: ${serviceName}`);
-    }
-    if stackTrace.trim().length() == 0 {
-        log:printWarn("Empty fault stack trace found for Data Service", serviceName = serviceName);
-        return error(string `No fault stack trace available for Data Service: ${serviceName}`);
-    }
-    return stackTrace;
-}
-
-public isolated function createRegistryManagementClient(types:Runtime runtime, string runtimeId, boolean allowInsecureTLS) returns types:RegistryApiClient|error {
-    log:printDebug("Creating registry management client", runtimeId = runtimeId, hostname = runtime.managementHostname, port = runtime.managementPort);
-
-    string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
-    http:Client mgmtClient = check (allowInsecureTLS
-        ? new (baseUrl, {secureSocket: {enable: false}})
-        : new (baseUrl));
-
-    string hmacToken = check storage:issueRuntimeHmacToken(runtimeId);
-
-    log:printDebug("Registry management client created", runtimeId = runtimeId, baseUrl = baseUrl);
-    return {mgmtClient, hmacToken};
-}
-

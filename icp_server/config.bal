@@ -47,6 +47,15 @@ configurable int refreshTokenCleanupIntervalSeconds = 86400; // 24 hours (in sec
 // mutation deadline, so an expiry is noticed promptly without polling the tables hard.
 configurable int workflowSweepIntervalSeconds = 300;
 
+// Reach MI management APIs through the heartbeat command tunnel instead of dialling the
+// runtime (see mi_tunnel.bal). For deployments where nothing routes from the ICP to a
+// runtime's management port — MI behind a load balancer is the case this exists for.
+//
+// Off by default because it needs an MI new enough to execute tunneled commands. An older
+// one ignores them silently, so the symptom of turning this on too early is management
+// views that report the runtime never answered.
+configurable boolean miTunnelEnabled = false;
+
 // Runtime auth configuration (runtime and server communication)
 configurable string jwtIssuer = "icp-runtime-jwt-issuer";
 configurable string|string[] jwtAudience = "icp-server";

@@ -175,13 +175,13 @@ type Query {
 
   # Log File Queries
   logFilesByRuntime(runtimeId: String!, searchKey: String, pagination: PaginationInput): LogFilesResponse!
-  logFileContent(runtimeId: String!, fileName: String!): String!
+  logFileContent(runtimeId: String!, fileName: String!): FetchableText!
 
   # MI Runtime User Management Queries
   getMIUsers(componentId: String!, runtimeId: String!, pagination: PaginationInput): MIUsersPage!
   # Registry Resource Browser Queries
   registryDirectory(runtimeId: String!, path: String!, expand: Boolean): RegistryDirectoryResponse!
-  registryFileContent(runtimeId: String!, path: String!): String!
+  registryFileContent(runtimeId: String!, path: String!): FetchableText!
   registryResourceMetadata(runtimeId: String!, path: String!): RegistryResourceMetadata!
   registryResourceProperties(runtimeId: String!, path: String!): RegistryPropertiesResponse!
 }
@@ -242,8 +242,8 @@ type Mutation {
   deleteLogger(input: DeleteLoggerInput!): DeleteLoggerResponse!
 
   # MI Runtime User Management Mutations
-  addMIUser(componentId: String!, runtimeId: String!, username: String!, password: String!, isAdmin: Boolean, domain: String): MIUserOperationResponse!
-  deleteMIUser(componentId: String!, runtimeId: String!, username: String!, domain: String): MIUserOperationResponse!
+  addMIUser(componentId: String!, runtimeId: String!, username: String!, password: String!, isAdmin: Boolean, domain: String, requestId: String): MIUserOperationResponse!
+  deleteMIUser(componentId: String!, runtimeId: String!, username: String!, domain: String, requestId: String): MIUserOperationResponse!
 
   # Org-level Secret Mutations
   createOrgSecret(environmentId: String!, componentId: String): String!
@@ -396,9 +396,33 @@ type LogFile {
 # LogFilesResponse Type - Response for Log Files Query
 # ============================================
 type LogFilesResponse {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   count: Int!
   files: [LogFile!]!
   pageInfo: PageInfo!
+}
+
+# ============================================
+# Fetchable - MI management answers
+# ============================================
+# Every field the MI management API serves carries these three. With `miTunnelEnabled`
+# off — the default — the ICP dials the runtime's management port and answers inside the
+# request, so `preparing` is never true and behaviour is what it always was. With it on,
+# the question rides down on the runtime's next heartbeat and the first answer may be
+# `preparing`.
+#
+# Read `preparing` before anything else: a field that reports it has no answer yet, so its
+# other members hold defaults — and on a mutation `success` is false while nothing failed.
+# `stale` means the value is real but superseded (by your own write, usually) and its
+# replacement is on the way. `retryAfterMs` is when to ask again; zero means settled.
+
+type FetchableText {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
+  content: String!
 }
 
 # ============================================
@@ -517,6 +541,9 @@ type RegistryResourcesPage {
 }
 
 type LoggerGroupsPage {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   items: [LoggerGroup!]!
   pageInfo: PageInfo!
 }
@@ -532,6 +559,9 @@ type WorkflowsPage {
 }
 
 type LoggersPage {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   items: [Logger!]!
   pageInfo: PageInfo!
 }
@@ -547,6 +577,9 @@ type EnvironmentsPage {
 }
 
 type MIUsersPage {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   items: [MIUser!]!
   pageInfo: PageInfo!
 }
@@ -706,6 +739,9 @@ type DataService {
 }
 
 type DataServiceFaultStackTrace {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   runtimeId: String!
   serviceName: String!
   faultStackTrace: String!
@@ -737,6 +773,9 @@ type CompositeApp {
 }
 
 type CompositeAppFaultStackTrace {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   runtimeId: String!
   appName: String!
   faultStackTrace: String!
@@ -786,16 +825,25 @@ type RegistryProperty {
 }
 
 type RegistryDirectoryResponse {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   count: Int!
   items: [RegistryDirectoryItem!]!
 }
 
 type RegistryResourceMetadata {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   name: String!
   mediaType: String!
 }
 
 type RegistryPropertiesResponse {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   count: Int!
   properties: [RegistryProperty!]!
 }
@@ -1657,12 +1705,19 @@ input UpdateLogLevelInput {
   loggerName: String
   loggerClass: String
   logLevel: LogLevel!
+  # Names one submission, so re-sending this mutation while the runtime has not confirmed
+  # it polls the queued write instead of issuing a second one. Only the heartbeat tunnel
+  # needs it; a write answered inside the request never sees it twice.
+  requestId: String
 }
 
 # ============================================
 # Update Log Level Response
 # ============================================
 type UpdateLogLevelResponse {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   success: Boolean!
   message: String!
   commandIds: [String!]!
@@ -1674,9 +1729,14 @@ type UpdateLogLevelResponse {
 input DeleteLoggerInput {
   runtimeIds: [String!]!
   loggerName: String!
+  # See UpdateLogLevelInput.requestId.
+  requestId: String
 }
 
 type DeleteLoggerResponse {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   success: Boolean!
   message: String!
 }
@@ -1695,6 +1755,9 @@ type MIUsersResponse {
 }
 
 type MIUserOperationResponse {
+  preparing: Boolean!
+  stale: Boolean!
+  retryAfterMs: Int!
   username: String!
   status: String!
 }

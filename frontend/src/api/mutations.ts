@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { gql } from './graphql';
+import { FETCHABLE, settle, type Fetchable } from './fetchable';
 import type { GqlArtifact, GqlComponent, GqlEnvironment, GqlProject } from './queries';
 import { toBackendArtifactType, toggleStateValue, type ArtifactState } from './artifactToggleMutations';
 
@@ -352,7 +353,7 @@ export interface UpdateLogLevelInput {
 const UPDATE_LOG_LEVEL = `
   mutation UpdateLogLevel($input: UpdateLogLevelInput!) {
     updateLogLevel(input: $input) {
-      success, message, commandIds
+      ${FETCHABLE}, success, message, commandIds
     }
   }`;
 
@@ -360,16 +361,19 @@ export function useUpdateLogLevel() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: UpdateLogLevelInput) =>
-      gql<{ updateLogLevel: { success: boolean; message: string; commandIds: string[] } }>(UPDATE_LOG_LEVEL, {
-        input: {
-          runtimeIds: input.runtimeIds,
-          ...(input.componentName && { componentName: input.componentName }),
-          ...(input.loggerName && { loggerName: input.loggerName }),
-          ...(input.loggerClass && { loggerClass: input.loggerClass }),
-          ...(input.componentType && { componentType: input.componentType }),
-          logLevel: input.logLevel,
-        },
-      }).then((d) => d.updateLogLevel),
+      settle((requestId) =>
+        gql<{ updateLogLevel: Fetchable & { success: boolean; message: string; commandIds: string[] } }>(UPDATE_LOG_LEVEL, {
+          input: {
+            runtimeIds: input.runtimeIds,
+            ...(input.componentName && { componentName: input.componentName }),
+            ...(input.loggerName && { loggerName: input.loggerName }),
+            ...(input.loggerClass && { loggerClass: input.loggerClass }),
+            ...(input.componentType && { componentType: input.componentType }),
+            logLevel: input.logLevel,
+            requestId,
+          },
+        }).then((d) => d.updateLogLevel),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loggers'] });
     },
@@ -379,7 +383,7 @@ export function useUpdateLogLevel() {
 const DELETE_LOGGER = `
   mutation DeleteLogger($input: DeleteLoggerInput!) {
     deleteLogger(input: $input) {
-      success, message
+      ${FETCHABLE}, success, message
     }
   }`;
 
@@ -387,9 +391,11 @@ export function useDeleteLogger() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ runtimeIds, loggerName }: { runtimeIds: string[]; loggerName: string }) =>
-      gql<{ deleteLogger: { success: boolean; message: string } }>(DELETE_LOGGER, {
-        input: { runtimeIds, loggerName },
-      }).then((d) => d.deleteLogger),
+      settle((requestId) =>
+        gql<{ deleteLogger: Fetchable & { success: boolean; message: string } }>(DELETE_LOGGER, {
+          input: { runtimeIds, loggerName, requestId },
+        }).then((d) => d.deleteLogger),
+      ),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['loggers'] });
     },

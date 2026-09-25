@@ -80,7 +80,7 @@ isolated function handleInstanceGraphRequest(string componentId, string environm
     // right, the composition is stateless: every poll either finds both halves ready and
     // composes them, or reports that they are still being fetched. Nothing is remembered
     // between polls, so any ICP node can answer any of them.
-    WorkflowReadOutcome|error infoOutcome = ensureWorkflowRead(componentId, environmentId,
+    TunneledReadOutcome|error infoOutcome = ensureWorkflowRead(componentId, environmentId,
             "instances.get", {workflowId: workflowId}, roles, forceRefresh = forceRefresh);
     http:Response|map<json> info = instanceGraphHalf(infoOutcome, "instance");
     if info is http:Response {
@@ -91,7 +91,7 @@ isolated function handleInstanceGraphRequest(string componentId, string environm
         return workflowErrorResponse(502, "The workflow runtime did not report the instance's type");
     }
 
-    WorkflowReadOutcome|error treeOutcome = ensureWorkflowRead(componentId, environmentId,
+    TunneledReadOutcome|error treeOutcome = ensureWorkflowRead(componentId, environmentId,
             "instances.activityTree", {workflowId: workflowId}, roles, forceRefresh = forceRefresh);
     http:Response|map<json> treeBody = instanceGraphHalf(treeOutcome, "activity tree");
     if treeBody is http:Response {
@@ -121,20 +121,20 @@ isolated function handleInstanceGraphRequest(string componentId, string environm
 
 // A composition is only as fresh as its oldest half, and stale if either half is. Without these headers
 // the console reads a composed answer as permanently fresh and never polls for the refresh already running.
-isolated function stampAge(http:Response response, WorkflowReadOutcome|error... halves) returns http:Response {
+isolated function stampAge(http:Response response, TunneledReadOutcome|error... halves) returns http:Response {
     int fetchedAt = int:MAX_VALUE;
     boolean stale = false;
-    foreach WorkflowReadOutcome|error half in halves {
-        if half is WorkflowReadOutcome {
+    foreach TunneledReadOutcome|error half in halves {
+        if half is TunneledReadOutcome {
             fetchedAt = int:min(fetchedAt, half.fetchedAt);
             stale = stale || half.stale;
         }
     }
     if fetchedAt < int:MAX_VALUE {
-        response.setHeader(WF_FETCHED_AT_HEADER, fetchedAt.toString());
+        response.setHeader(TUNNEL_FETCHED_AT_HEADER, fetchedAt.toString());
     }
     if stale {
-        response.setHeader(WF_STALE_HEADER, "true");
+        response.setHeader(TUNNEL_STALE_HEADER, "true");
     }
     return response;
 }
@@ -143,7 +143,7 @@ isolated function stampAge(http:Response response, WorkflowReadOutcome|error... 
 // instead — `202` while it is still being fetched, the runtime's own error when it failed.
 // A stale half is used as it is: the whole point of serving stale data is that a view keeps
 // working while it refreshes, and the composition inherits that.
-isolated function instanceGraphHalf(WorkflowReadOutcome|error outcome, string what)
+isolated function instanceGraphHalf(TunneledReadOutcome|error outcome, string what)
         returns http:Response|map<json> {
     if outcome is error {
         log:printError("Failed to read a workflow instance graph half", 'error = outcome,

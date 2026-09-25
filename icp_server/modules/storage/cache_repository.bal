@@ -509,10 +509,14 @@ public isolated function completeCacheOperation(string operationId, string statu
 # that timed out in this same pass still becomes a notification rather than vanishing.
 #
 # + staleRetentionSeconds - How long past expiry a cache row stays servable
+# + retentionByKind - Kinds that want their rows dropped sooner than the backstop, because
+#                     they are large and cheap to re-ask. A kind absent from this map is
+#                     still swept by the backstop, so nothing can be forgotten here.
 # + completedRetentionSeconds - How long a recorded outcome stays readable by the console
 # + return - The operations this pass expired, so the caller can surface each one, or an error
 public isolated function sweepCacheTables(int staleRetentionSeconds,
-        int completedRetentionSeconds) returns types:CacheOperation[]|error {
+        map<int> retentionByKind, int completedRetentionSeconds)
+        returns types:CacheOperation[]|error {
     int now = cacheNowEpoch();
 
     // Expire FIRST, stamping this sweep's own id, then read back only what this call
@@ -550,12 +554,23 @@ public isolated function sweepCacheTables(int staleRetentionSeconds,
         }
     }
 
-    // 2. Cache rows past the window in which they would still have been served.
+    // 2. Cache rows past the window in which they would still have been served. The
+    //    backstop first, so a kind nobody declared is still collected; then the kinds that
+    //    asked to go sooner. A log file is tens of megabytes and nobody re-reads it, and
+    //    holding one for the half hour a workflow list deserves is pure cost.
     sql:ExecutionResult|sql:Error dropped = dbClient->execute(`
         DELETE FROM cache_entry WHERE expires_at < ${now - staleRetentionSeconds}
     `);
     if dropped is sql:Error {
         return error(string `Failed to sweep the cache`, dropped);
+    }
+    foreach [string, int] [kind, retention] in retentionByKind.entries() {
+        sql:ExecutionResult|sql:Error droppedForKind = dbClient->execute(`
+            DELETE FROM cache_entry WHERE kind = ${kind} AND expires_at < ${now - retention}
+        `);
+        if droppedForKind is sql:Error {
+            return error(string `Failed to sweep the cache for kind '${kind}'`, droppedForKind);
+        }
     }
 
     // 3. Mutations whose outcome is recorded elsewhere (audit log for a success, an
@@ -646,14 +661,19 @@ public isolated function cacheBoostRemaining(string runtimeId) returns int|error
 # A dedicated query rather than `getRuntimeById`, because the mapped `Runtime` record does
 # not carry these columns and the delivery path needs nothing else.
 #
+# The runtime type comes back with them because it decides which feature's queue this
+# heartbeat may carry, and asking for it separately would be the second query this exists
+# to avoid.
+#
 # + runtimeId - The runtime being answered
-# + return - `[componentId, environmentId, boostSecondsRemaining]`, `()` when the runtime is
-#            unknown or has no component, or an error
+# + return - `[componentId, environmentId, boostSecondsRemaining, runtimeType]`, `()` when
+#            the runtime is unknown or has no component, or an error
 public isolated function getRuntimeCacheOwner(string runtimeId)
-        returns [string, string, int]?|error {
-    record {|string? component_id; string environment_id; int? wf_boosted_until;|}|sql:Error row =
+        returns [string, string, int, string]?|error {
+    record {|string? component_id; string environment_id; int? wf_boosted_until;
+            string runtime_type;|}|sql:Error row =
         dbClient->queryRow(`
-        SELECT component_id, environment_id, wf_boosted_until
+        SELECT component_id, environment_id, wf_boosted_until, runtime_type
         FROM runtimes WHERE runtime_id = ${runtimeId}
     `);
     if row is sql:NoRowsError {
@@ -668,5 +688,5 @@ public isolated function getRuntimeCacheOwner(string runtimeId)
     }
     int? until = row.wf_boosted_until;
     int remaining = until is int ? until - cacheNowEpoch() : 0;
-    return [componentId, row.environment_id, remaining > 0 ? remaining : 0];
+    return [componentId, row.environment_id, remaining > 0 ? remaining : 0, row.runtime_type];
 }
