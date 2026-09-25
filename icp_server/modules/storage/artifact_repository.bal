@@ -448,7 +448,7 @@ public isolated function getCompositeAppsByEnvironmentAndComponent(string enviro
     foreach string runtimeId in runtimeIds {
         types:CompositeApp[] runtimeApps = check getCompositeAppsForRuntime(runtimeId);
         foreach types:CompositeApp app in runtimeApps {
-            string key = app.name;
+            string key = types:qualifiedCompositeAppName(app.name, app.version);
             if !appRuntimeMap.hasKey(key) {
                 // First time seeing this artifact
                 appMap[key] = app;

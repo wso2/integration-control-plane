@@ -543,6 +543,30 @@ public isolated function qualifiedArtifactName(string name, string? package) ret
     return name;
 }
 
+# Storage value used when a legacy heartbeat omits the Composite App version.
+public const string COMPOSITE_APP_UNVERSIONED = "__UNVERSIONED__";
+
+# Normalizes an optional Composite App version for storage in a cross-database
+# primary key. Oracle represents an empty string as NULL, so a non-empty
+# sentinel is required for legacy heartbeat payloads without a version.
+# + version - Optional Composite App version from the heartbeat payload.
+# + return - Version or the internal unversioned sentinel.
+public isolated function normalizedCompositeAppVersion(string? version) returns string {
+    if version is string && version.length() > 0 {
+        return version;
+    }
+    return COMPOSITE_APP_UNVERSIONED;
+}
+
+# Returns the stable identity used for Composite Apps. MI permits multiple
+# applications with the same name when their versions differ.
+# + name - Composite App name.
+# + version - Optional Composite App version from the heartbeat payload.
+# + return - Version-qualified Composite App identity.
+public isolated function qualifiedCompositeAppName(string name, string? version) returns string {
+    return name + ":" + normalizedCompositeAppVersion(version);
+}
+
 # Extracts the raw artifact name from a potentially qualified name.
 # If the name contains a `:`, everything after the last `:` is the raw name.
 # + qualifiedName - Artifact name with or without a package qualifier.

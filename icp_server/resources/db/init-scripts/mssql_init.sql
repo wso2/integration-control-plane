@@ -2027,13 +2027,13 @@ GO
 CREATE TABLE mi_composite_app_artifacts (
     runtime_id CHAR(36) NOT NULL,
     app_name NVARCHAR (200) NOT NULL,
-    version NVARCHAR (50) NULL,
+    version NVARCHAR (50) NOT NULL DEFAULT '__UNVERSIONED__',
     state NVARCHAR (20) NOT NULL DEFAULT 'Active' CHECK (state IN ('Active', 'Faulty')),
     error_message NVARCHAR (MAX) NULL, -- Error message when state is Faulty
     artifacts NVARCHAR (4000) NULL, -- JSON array serialized as string
     created_at DATETIME2 NOT NULL DEFAULT GETDATE (),
     updated_at DATETIME2 NOT NULL DEFAULT GETDATE (),
-    PRIMARY KEY (runtime_id, app_name),
+    PRIMARY KEY (runtime_id, app_name, version),
     CONSTRAINT fk_mi_composite_app_artifacts_runtime FOREIGN KEY (runtime_id) REFERENCES runtimes (runtime_id) ON DELETE CASCADE,
     INDEX idx_runtime_id (runtime_id),
     INDEX idx_app_name (app_name),
@@ -2051,7 +2051,8 @@ BEGIN
     SET updated_at = GETDATE()
     FROM mi_composite_app_artifacts rca
     INNER JOIN inserted i ON rca.runtime_id = i.runtime_id 
-        AND rca.app_name = i.app_name;
+        AND rca.app_name = i.app_name
+        AND rca.version = i.version;
 END;
 GO
 
