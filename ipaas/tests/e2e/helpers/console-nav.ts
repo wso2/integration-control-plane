@@ -50,8 +50,9 @@ export async function openProject(page: Page, displayName: string): Promise<void
 
 export async function openIntegration(page: Page, displayName: string): Promise<void> {
   await page.getByRole('button', { name: 'Select integration' }).click();
-  await page.getByRole('menuitem', { name: displayName }).click();
-  await expect(page.getByRole('heading', { name: displayName })).toBeVisible({ timeout: 60_000 });
+  // First match: a repeated import leaves two integrations under the same name, and either will do.
+  await page.getByRole('menuitem', { name: displayName }).first().click();
+  await expect(page.getByRole('heading', { name: displayName }).first()).toBeVisible({ timeout: 60_000 });
 }
 
 /** Idempotent: waits for a child so the caller does not race the expand animation. */
