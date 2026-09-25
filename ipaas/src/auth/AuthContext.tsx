@@ -27,8 +27,8 @@ import { buildAuthorizationUrl } from './authorizeUrl';
 import {
   saveTokens,
   clearTokens,
-  getAccessToken,
   getRefreshToken,
+  hasStoredSession,
   revokeToken,
   setOnAuthFailure,
   generateAndSaveOIDCState,
@@ -37,7 +37,6 @@ import {
   getAndClearCodeVerifier,
   saveAsgardeoToken,
   getAsgardeoToken,
-  getOrRefreshAsgardeoToken,
   saveOidcAuthMetadata,
   clearOidcAuthMetadata,
 } from './tokenManager';
@@ -86,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  const [isAuthenticated, setIsAuthenticated] = useState(() => !!getAccessToken());
+  const [isAuthenticated, setIsAuthenticated] = useState(() => hasStoredSession());
   const [userInfo, setUserInfo] = useState<UserInfo | null>(() => loadUserInfo());
 
   useEffect(() => {
@@ -98,16 +97,6 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       navigate(loginUrl());
     });
   }, [navigate, queryClient]);
-
-  // Bootstrap the WSO2 Identity Platform token for existing sessions that pre-date saveAsgardeoToken.
-  // Runs once on mount; no-ops if already cached or if not an OIDC session.
-  useEffect(() => {
-    if (isAuthenticated && !getAsgardeoToken()) {
-      getOrRefreshAsgardeoToken().catch(() => {
-        /* best-effort */
-      });
-    }
-  }, [isAuthenticated]);
 
   const login = useCallback(async (username: string, password: string) => {
     const res = await fetch(loginApiUrl(), {
@@ -128,8 +117,8 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       }
       throw err;
     }
-    const data: { userId: string; token: string; expiresIn: number; refreshToken: string; refreshTokenExpiresIn: number; username: string; displayName: string; permissions: string[]; isOidcUser: boolean; requirePasswordChange?: boolean } = await res.json();
-    saveTokens({ token: data.token, expiresIn: data.expiresIn, refreshToken: data.refreshToken, refreshTokenExpiresIn: data.refreshTokenExpiresIn });
+    const data: { userId: string; token: string; expiresIn: number; refreshToken: string; username: string; displayName: string; permissions: string[]; isOidcUser: boolean; requirePasswordChange?: boolean } = await res.json();
+    saveTokens({ token: data.token, expiresIn: data.expiresIn, refreshToken: data.refreshToken });
 
     const user: UserInfo = { userId: data.userId, username: data.username, displayName: data.displayName, isOidcUser: data.isOidcUser, requirePasswordChange: data.requirePasswordChange ?? false };
     localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -159,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     const codeVerifier = getAndClearCodeVerifier();
     if (!codeVerifier) throw new Error('Missing PKCE code verifier. Please try logging in again.');
 
-    // Step 1: Exchange auth code for WSO2 Identity Platform tokens
+    // Step 1: Exchange auth code for the IdP's tokens (Thunder in cloud, asgardeo in WIP)
     const tokenRes = await fetch(asgardeoTokenEndpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -177,9 +166,8 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     }
     const tokenData: { access_token: string; id_token?: string; refresh_token?: string; expires_in?: number } = await tokenRes.json();
 
-    const asgardeoToken = tokenData.access_token;
-    saveAsgardeoToken(asgardeoToken);
-    let finalToken = asgardeoToken;
+    const idpToken = tokenData.access_token;
+    let finalToken = idpToken;
     let finalExpiresIn = tokenData.expires_in ?? 3600;
 
     // Decode ID token early — needed for both new-user and existing-user paths
@@ -212,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       let cloudOrgHandle: string | undefined;
       try {
         // base64url → base64 with padding restored so atob accepts the segment.
-        const normalized = asgardeoToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        const normalized = idpToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
         const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
         const payload = JSON.parse(atob(padded)) as Record<string, unknown>;
         const org = (payload.organization as Record<string, unknown> | undefined) ?? {};
@@ -224,7 +212,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
         throw new Error('Missing organization context after sign-in. Please try logging in again.');
       }
       localStorage.setItem('org_handle', cloudOrgHandle);
-      saveTokens({ token: asgardeoToken, expiresIn: tokenData.expires_in ?? 3600, refreshToken: tokenData.refresh_token ?? '', refreshTokenExpiresIn: 86400 });
+      saveTokens({ token: idpToken, expiresIn: tokenData.expires_in ?? 3600, refreshToken: tokenData.refresh_token ?? '' });
       saveOidcAuthMetadata(cloudOrgHandle);
       const user: UserInfo = { userId, username, displayName, pictureUrl, isOidcUser: true, requirePasswordChange: false };
       localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -232,6 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       setIsAuthenticated(true);
       return { isNewUser: false };
     }
+    saveAsgardeoToken(idpToken, tokenData.expires_in);
 
     // WSO2 Identity Platform's super-tenant — not a real ICP org, always skip.
     const ASGARDEO_SUPER_TENANT = 'carbon.super';
@@ -245,7 +234,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     if (userMgtBaseUrl) {
       try {
         const validateRes = await fetch(`${userMgtBaseUrl}/validate/user?origin_cloud=devant`, {
-          headers: { Authorization: `Bearer ${asgardeoToken}` },
+          headers: { Authorization: `Bearer ${idpToken}` },
         });
         if (validateRes.ok) {
           validateUserSucceeded = true;
@@ -278,7 +267,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     // New user confirmed: validate/user succeeded but returned no organizations yet.
     if (validateUserSucceeded && !orgHandle) {
       // Best-effort: try to get a base STS token for the registration page.
-      let registrationToken = asgardeoToken;
+      let registrationToken = idpToken;
       if (stsTokenEndpoint && stsClientId) {
         try {
           const baseStsRes = await fetch(stsTokenEndpoint, {
@@ -287,7 +276,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
             body: new URLSearchParams({
               grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
               client_id: stsClientId,
-              subject_token: asgardeoToken,
+              subject_token: idpToken,
               subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
               requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
               ...(stsScope ? { scope: stsScope } : {}),
@@ -300,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
           /* use WSO2 Identity Platform token */
         }
       }
-      saveTokens({ token: registrationToken, expiresIn: 3600, refreshToken: tokenData.refresh_token ?? '', refreshTokenExpiresIn: 86400 });
+      saveTokens({ token: registrationToken, expiresIn: 3600, refreshToken: tokenData.refresh_token ?? '' });
       saveOidcAuthMetadata(undefined);
       const newUser: UserInfo = { userId, username, displayName, pictureUrl, isOidcUser: true, requirePasswordChange: false };
       localStorage.setItem(USER_KEY, JSON.stringify(newUser));
@@ -313,7 +302,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       const stsBaseParams = {
         grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
         client_id: stsClientId,
-        subject_token: asgardeoToken,
+        subject_token: idpToken,
         subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
         requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
         ...(stsScope ? { scope: stsScope } : {}),
@@ -380,7 +369,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
           }
           if (!orgHandle) {
             // New user (empty org list)
-            saveTokens({ token: baseStsToken, expiresIn: 3600, refreshToken: tokenData.refresh_token ?? '', refreshTokenExpiresIn: 86400 });
+            saveTokens({ token: baseStsToken, expiresIn: 3600, refreshToken: tokenData.refresh_token ?? '' });
             saveOidcAuthMetadata(undefined);
             const newUser: UserInfo = { userId, username, displayName, pictureUrl, isOidcUser: true, requirePasswordChange: false };
             localStorage.setItem(USER_KEY, JSON.stringify(newUser));
@@ -390,7 +379,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
           }
         } else {
           // STS unavailable — try orgs API with WSO2 Identity Platform token directly (best-effort).
-          const orgResult = await fetchOrgHandle(asgardeoToken);
+          const orgResult = await fetchOrgHandle(idpToken);
           if (orgResult && orgResult !== 'empty') {
             orgHandle = orgResult.handle;
             localStorage.setItem('org_handle', orgHandle);
@@ -399,7 +388,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
               localStorage.setItem('org_numeric_id', String(orgResult.numericId));
             }
           } else if (orgResult === 'empty') {
-            saveTokens({ token: asgardeoToken, expiresIn: finalExpiresIn, refreshToken: tokenData.refresh_token ?? '', refreshTokenExpiresIn: 86400 });
+            saveTokens({ token: idpToken, expiresIn: finalExpiresIn, refreshToken: tokenData.refresh_token ?? '' });
             saveOidcAuthMetadata(undefined);
             const newUser: UserInfo = { userId, username, displayName, pictureUrl, isOidcUser: true, requirePasswordChange: false };
             localStorage.setItem(USER_KEY, JSON.stringify(newUser));
@@ -435,7 +424,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
       }
     }
 
-    saveTokens({ token: finalToken, expiresIn: finalExpiresIn, refreshToken: tokenData.refresh_token ?? '', refreshTokenExpiresIn: 86400 });
+    saveTokens({ token: finalToken, expiresIn: finalExpiresIn, refreshToken: tokenData.refresh_token ?? '' });
     saveOidcAuthMetadata(orgHandle);
     const user: UserInfo = { userId, username, displayName, pictureUrl, isOidcUser: true, requirePasswordChange: false };
     localStorage.setItem(USER_KEY, JSON.stringify(user));
@@ -477,7 +466,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
     }
 
     const existingRefreshToken = getRefreshToken() ?? '';
-    saveTokens({ token: finalToken, expiresIn: finalExpiresIn, refreshToken: existingRefreshToken, refreshTokenExpiresIn: 86400 });
+    saveTokens({ token: finalToken, expiresIn: finalExpiresIn, refreshToken: existingRefreshToken });
     localStorage.setItem('org_handle', orgHandle);
     saveOidcAuthMetadata(orgHandle);
   }, []);
