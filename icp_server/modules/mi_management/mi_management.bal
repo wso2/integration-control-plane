@@ -50,76 +50,44 @@ public const string ARTIFACT_TYPE_DATA_SOURCE = "data-source";
 // Paths
 // ============================================================
 
-isolated function apiPath(string apiName) returns string|error =>
-    string `${MGMT_API_PATH}/apis?apiName=${check encode(apiName)}`;
-
-isolated function proxyServicePath(string proxyServiceName) returns string|error =>
-    string `${MGMT_API_PATH}/proxy-services?proxyServiceName=${check encode(proxyServiceName)}`;
-
-isolated function endpointPath(string endpointName) returns string|error =>
-    string `${MGMT_API_PATH}/endpoints?endpointName=${check encode(endpointName)}`;
-
-isolated function sequencePath(string sequenceName) returns string|error =>
-    string `${MGMT_API_PATH}/sequences?sequenceName=${check encode(sequenceName)}`;
-
-isolated function taskPath(string taskName) returns string|error =>
-    string `${MGMT_API_PATH}/tasks?taskName=${check encode(taskName)}`;
-
-isolated function localEntryPath(string entryName) returns string|error =>
-    string `${MGMT_API_PATH}/local-entries?name=${check encode(entryName)}`;
-
-isolated function messageStorePath(string storeName) returns string|error =>
-    string `${MGMT_API_PATH}/message-stores?name=${check encode(storeName)}`;
-
-isolated function messageProcessorPath(string processorName) returns string|error =>
-    string `${MGMT_API_PATH}/message-processors?name=${check encode(processorName)}`;
-
-isolated function inboundEndpointPath(string inboundName) returns string|error =>
-    string `${MGMT_API_PATH}/inbound-endpoints?inboundEndpointName=${check encode(inboundName)}`;
-
-isolated function templatePath(string templateName, string templateType) returns string|error =>
-    string `${MGMT_API_PATH}/templates?name=${check encode(templateName)}&type=${check encode(templateType)}`;
-
-isolated function dataServicePath(string dataServiceName) returns string|error =>
-    string `${MGMT_API_PATH}/data-services?dataServiceName=${check encode(dataServiceName)}`;
-
-isolated function dataSourcePath(string dataSourceName) returns string|error =>
-    string `${MGMT_API_PATH}/data-sources?name=${check encode(dataSourceName)}`;
+# The collection and query parameter that name one artifact of each type.
+//
+// A table rather than a function per type: the calls differ only in these two words, and a
+// type the table does not know is a type the ICP cannot ask about — which is the answer
+// `artifactPath` gives.
+final readonly & map<[string, string]> ARTIFACT_ROUTES = {
+    [ARTIFACT_TYPE_API]: ["apis", "apiName"],
+    [ARTIFACT_TYPE_PROXY_SERVICE]: ["proxy-services", "proxyServiceName"],
+    [ARTIFACT_TYPE_ENDPOINT]: ["endpoints", "endpointName"],
+    [ARTIFACT_TYPE_SEQUENCE]: ["sequences", "sequenceName"],
+    [ARTIFACT_TYPE_TASK]: ["tasks", "taskName"],
+    [ARTIFACT_TYPE_LOCAL_ENTRY]: ["local-entries", "name"],
+    [ARTIFACT_TYPE_MESSAGE_STORE]: ["message-stores", "name"],
+    [ARTIFACT_TYPE_MESSAGE_PROCESSOR]: ["message-processors", "name"],
+    [ARTIFACT_TYPE_INBOUND_ENDPOINT]: ["inbound-endpoints", "inboundEndpointName"],
+    [ARTIFACT_TYPE_TEMPLATE]: ["templates", "name"],
+    [ARTIFACT_TYPE_DATA_SERVICE]: ["data-services", "dataServiceName"],
+    [ARTIFACT_TYPE_DATA_SOURCE]: ["data-sources", "name"]
+};
 
 # The management path that describes one artifact.
 #
 # + templateType - Templates are named by type as well, and MI answers 404 without it
 public isolated function artifactPath(string artifactType, string artifactName,
         string? templateType = ()) returns string|error {
-    if artifactType == ARTIFACT_TYPE_API {
-        return apiPath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_PROXY_SERVICE {
-        return proxyServicePath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_ENDPOINT {
-        return endpointPath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_SEQUENCE {
-        return sequencePath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_TASK {
-        return taskPath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_LOCAL_ENTRY {
-        return localEntryPath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_MESSAGE_STORE {
-        return messageStorePath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_MESSAGE_PROCESSOR {
-        return messageProcessorPath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_INBOUND_ENDPOINT {
-        return inboundEndpointPath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_TEMPLATE {
-        if templateType is () {
-            return error("Template artifact type requires 'templateType' parameter to be specified");
-        }
-        return templatePath(artifactName, templateType);
-    } else if artifactType == ARTIFACT_TYPE_DATA_SERVICE {
-        return dataServicePath(artifactName);
-    } else if artifactType == ARTIFACT_TYPE_DATA_SOURCE {
-        return dataSourcePath(artifactName);
+    [string, string]? route = ARTIFACT_ROUTES[artifactType];
+    if route is () {
+        return error(string `Unsupported artifact type for MI management API: ${artifactType}`);
     }
-    return error(string `Unsupported artifact type for MI management API: ${artifactType}`);
+    [string, string] [collection, nameParam] = route;
+    string path = string `${MGMT_API_PATH}/${collection}?${nameParam}=${check encode(artifactName)}`;
+    if artifactType != ARTIFACT_TYPE_TEMPLATE {
+        return path;
+    }
+    if templateType is () {
+        return error("Template artifact type requires 'templateType' parameter to be specified");
+    }
+    return string `${path}&type=${check encode(templateType)}`;
 }
 
 public isolated function loggersPath() returns string => MGMT_API_PATH + "/logging";
