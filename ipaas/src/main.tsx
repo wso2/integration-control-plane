@@ -23,6 +23,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import { AuthProvider } from './auth/AuthContext';
+import { restoreSession } from './auth/tokenManager';
 import { loadConfig } from './config/runtimeConfig';
 import { AccessControlProvider } from './contexts/AccessControlContext';
 import { FeaturePreviewProvider } from './contexts/FeaturePreviewContext';
@@ -30,8 +31,10 @@ import './index.css';
 
 const queryClient = new QueryClient();
 
-// Load runtime configuration before rendering the app
-loadConfig().then(() => {
+// Load runtime configuration, then get an existing session's in-memory access token back,
+// before rendering the app
+loadConfig().then(async () => {
+  await restoreSession();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <OxygenUIThemeProvider themes={[{ key: 'acrylicOrange', label: 'Acrylic Orange Theme', theme: AcrylicOrangeTheme }]} initialTheme="acrylicOrange">
