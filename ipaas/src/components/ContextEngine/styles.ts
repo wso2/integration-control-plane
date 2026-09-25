@@ -217,6 +217,18 @@ export const summaryRowSx = {
 
 export const mutedSx = { color: 'text.secondary' } as const;
 
+// ── Source visibility rules ─────────────────────────────────────────────────
+
+export const audienceSectionSx = { mt: 3, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' } as const;
+
+/** Group, role and remove button on one line; stacks on narrow drawers. */
+export const audienceRowSx = {
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', sm: 'minmax(0, 1fr) minmax(0, 1fr) auto' },
+  gap: 1.5,
+  alignItems: 'start',
+} as const;
+
 // ── Source progress ─────────────────────────────────────────────────────────
 
 /** A source with its progress bar and captions under the name line. */

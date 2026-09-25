@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   createContextEngine,
@@ -35,9 +35,10 @@ import {
 } from '#api/contextEngine';
 import { IS_WIP } from '../features';
 import { getAccessToken } from '../auth/tokenManager';
-import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS } from '../constants/contextEngine';
-import { fromDraft, isEngineProgressActive, toDraft } from '../utils/contextEngine';
-import type { ContextEngineExposure, ContextEngineForm, ContextQueryInput, CreateContextEngineInput, PutContextGrantInput } from '../types/contextEngine';
+import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, CONTEXT_OWNER_ACTIONS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS } from '../constants/contextEngine';
+import { fromDraft, isEngineProgressActive, ownerGrantId, resolveGraphStatus, toDraft } from '../utils/contextEngine';
+import { HttpError } from '../types/http';
+import type { ContextEngineExposure, ContextEngineForm, ContextGraphStatus, ContextQueryInput, CreateContextEngineInput, PutContextGrantInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -158,6 +159,25 @@ export function useDeleteContextGrant(engineId: string) {
   });
 }
 
+/**
+ * Give the signed-in user the creator's grant on an engine (query + enrich).
+ * Engines created before the wizard added this grant lack it; the engine
+ * refuses unless the caller holds access.manage.
+ */
+export function useGrantOwnerAccess(engineId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const me = await getContextPrincipal();
+      return putContextGrant({ engineId, grantId: ownerGrantId(me.id), principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'grants', engineId] });
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+    },
+  });
+}
+
 /** Who the engine thinks the caller is — surfaced on the Access tab so grants can be reasoned about. */
 export function useContextPrincipal() {
   return useQuery({
@@ -167,6 +187,65 @@ export function useContextPrincipal() {
     retry: false,
     staleTime: 60_000,
   });
+}
+
+// ── Enrichment status (no engine route reports it yet) ──
+
+const enrichmentListeners = new Set<() => void>();
+const enrichmentKey = (engineId: string): string => `${CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX}${engineId}`;
+
+function readEnrichment(engineId: string): string | null {
+  try {
+    return localStorage.getItem(enrichmentKey(engineId));
+  } catch {
+    return null;
+  }
+}
+
+function writeEnrichment(engineId: string, jobId: string | null): void {
+  try {
+    if (jobId) localStorage.setItem(enrichmentKey(engineId), jobId);
+    else localStorage.removeItem(enrichmentKey(engineId));
+  } catch {
+    // Storage may be unavailable (private mode); the status then lasts for this page only.
+  }
+  enrichmentListeners.forEach((l) => l());
+}
+
+function subscribeEnrichment(listener: () => void): () => void {
+  enrichmentListeners.add(listener);
+  window.addEventListener('storage', listener);
+  return () => {
+    enrichmentListeners.delete(listener);
+    window.removeEventListener('storage', listener);
+  };
+}
+
+/** The last enrichment job started from this browser for one engine, shared by every component that shows it. */
+export function useLastEnrichment(engineId: string) {
+  const jobId = useSyncExternalStore(
+    subscribeEnrichment,
+    () => readEnrichment(engineId),
+    () => null,
+  );
+  const remember = useCallback((id: string) => writeEnrichment(engineId, id), [engineId]);
+  const forget = useCallback(() => writeEnrichment(engineId, null), [engineId]);
+  return { jobId, remember, forget };
+}
+
+/**
+ * Enrichment status for one engine: what the engine reports, filled in from the
+ * last enrichment job this browser started while the engine reports none.
+ */
+export function useEngineGraphStatus(engineId: string, reported: ContextGraphStatus, starting = false) {
+  const { jobId, remember, forget } = useLastEnrichment(engineId);
+  const tracked = reported.state === 'building' && reported.jobId ? reported.jobId : jobId;
+  const job = useContextJob(tracked);
+  // A job the engine no longer knows (e.g. its database was reset) is forgotten.
+  useEffect(() => {
+    if (job.error instanceof HttpError && job.error.status === 404 && tracked === jobId) forget();
+  }, [job.error, tracked, jobId, forget]);
+  return { graph: resolveGraphStatus(reported, job.data, starting), job: job.data, remember };
 }
 
 // ── Local state that outlives a page: wizard draft, first-run flags, engine credential ──

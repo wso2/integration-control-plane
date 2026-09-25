@@ -20,13 +20,14 @@ import { Box, Button, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen
 import { Check, CircleAlert, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { POPULAR_CONNECTORS, SOURCE_CONNECTORS } from '../../../constants/contextEngine';
-import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSource } from '../../../utils/contextEngine';
+import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeAudience, summarizeSource } from '../../../utils/contextEngine';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
 import { emptySourcesCardSx, marksRowSx, quickAddButtonSx, quickAddRowSx, sourceListSx, sourceRowSx, sourceRowTextSx, sourcesToolbarSx, stepHeadingSx, stepHintSx } from '../styles';
 import type { ContextSourceConfig } from '../../../types/contextEngine';
 
 interface SourcesStepProps {
+  orgHandle: string;
   sources: ContextSourceConfig[];
   onAdd: (source: ContextSourceConfig) => void;
   onUpdate: (index: number, source: ContextSourceConfig) => void;
@@ -53,6 +54,9 @@ function SourceRow({ source, onEdit, onRemove }: { source: ContextSourceConfig; 
         <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block' }} noWrap>
           {summarizeSource(source)}
         </Typography>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
+          Visible to: {summarizeAudience(source.audience)}
+        </Typography>
       </Box>
       <Chip size="small" variant="outlined" label={sourceTypeName(source.type)} />
       {reason ? <Chip size="small" variant="outlined" color="warning" icon={<CircleAlert size={14} />} label={reason} /> : <Chip size="small" variant="outlined" color="success" icon={<Check size={14} />} label="Configured" />}
@@ -75,7 +79,7 @@ function SourceRow({ source, onEdit, onRemove }: { source: ContextSourceConfig; 
  * lists what has been added; browsing the catalog and filling a connector's
  * form happen in a drawer, so the page stays short however many connectors exist.
  */
-export default function SourcesStep({ sources, onAdd, onUpdate, onRemove }: SourcesStepProps): JSX.Element {
+export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRemove }: SourcesStepProps): JSX.Element {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, session: 0 });
   const openDrawer = (start?: SourceDrawerStart) => setDrawer((d) => ({ open: true, session: d.session + 1, start }));
   const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }));
@@ -151,7 +155,7 @@ export default function SourcesStep({ sources, onAdd, onUpdate, onRemove }: Sour
         </>
       )}
 
-      <SourceDrawer key={drawer.session} open={drawer.open} start={drawer.start} existing={sources} onClose={closeDrawer} onSubmit={submit} />
+      <SourceDrawer key={drawer.session} orgHandle={orgHandle} open={drawer.open} start={drawer.start} existing={sources} onClose={closeDrawer} onSubmit={submit} />
     </>
   );
 }

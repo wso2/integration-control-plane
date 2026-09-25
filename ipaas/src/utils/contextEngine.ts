@@ -21,6 +21,7 @@ import {
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
   CONTEXT_QUERY_ACTIONS,
+  OWNER_GRANT_PREFIX,
   defaultStorage,
   GRAPH_STATE_LABEL,
   MCP_CLIENTS,
@@ -32,6 +33,7 @@ import {
 import { formatDistanceToNow } from './time';
 import { isEmbeddingValid } from './ragIngestion';
 import type {
+  AudienceRule,
   ContextEngineDetail,
   ContextEngineDraft,
   ContextEngineForm,
@@ -40,6 +42,7 @@ import type {
   ContextEngineStorage,
   ContextGrant,
   ContextGraphStatus,
+  ContextJob,
   ContextSourceConfig,
   CreateContextEngineInput,
   GetStartedStep,
@@ -109,9 +112,26 @@ export function invalidSourceFields(source: ContextSourceConfig): SourceFieldDef
   return connector.fields.filter((f) => sourceFieldError(f, source.values[f.key]) !== '');
 }
 
-/** Whether one source names a known connector, has a name, and passes every field check. */
+/** Rules with anything typed in; fully blank rows are placeholders and ignored. */
+const typedRules = (rules: AudienceRule[] | undefined): AudienceRule[] => (rules ?? []).filter((r) => nonEmpty(r.group) || nonEmpty(r.role));
+
+/**
+ * Why a source's visibility rules are unusable, or '' when they are fine. The
+ * engine quarantines items whose groups have no rule and nobody reads items
+ * without an audience, so a source needs at least one complete rule.
+ */
+export function audienceError(rules: AudienceRule[] | undefined): string {
+  const typed = typedRules(rules);
+  if (typed.length === 0) return 'Map at least one group to a role, or nobody will see this content.';
+  if (typed.some((r) => !nonEmpty(r.group) || !nonEmpty(r.role))) return 'Finish or remove the half-filled rule.';
+  const groups = typed.map((r) => r.group.trim());
+  if (new Set(groups).size !== groups.length) return 'Each group can map to one role only.';
+  return '';
+}
+
+/** Whether one source names a known connector, has a name, passes every field check and has visibility rules. */
 export function isSourceValid(source: ContextSourceConfig): boolean {
-  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0;
+  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && audienceError(source.audience) === '';
 }
 
 /** Short reason a source is incomplete, for its status chip; empty when it is complete. */
@@ -119,8 +139,9 @@ export function sourceIncompleteReason(source: ContextSourceConfig): string {
   if (!connectorFor(source.type)) return 'Unknown connector';
   if (!nonEmpty(source.name)) return 'Name missing';
   const first = invalidSourceFields(source)[0];
-  if (!first) return '';
-  return (source.values[first.key] ?? '').trim() ? `${first.label} invalid` : `${first.label} missing`;
+  if (first) return (source.values[first.key] ?? '').trim() ? `${first.label} invalid` : `${first.label} missing`;
+  if (audienceError(source.audience)) return typedRules(source.audience).length ? 'Visibility incomplete' : 'Visibility missing';
+  return '';
 }
 
 /** Step 1 is complete with at least one valid source and no duplicate names. */
@@ -234,6 +255,15 @@ export function toDraft(form: ContextEngineForm, savedAt: string): ContextEngine
   };
 }
 
+/** A source restored from storage, with every field coerced to its shape; drafts saved before visibility rules existed get one blank rule. */
+function sanitizeSourceConfig(raw: unknown): ContextSourceConfig {
+  const r = (raw ?? {}) as Partial<ContextSourceConfig>;
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  const values = r.values && typeof r.values === 'object' ? Object.fromEntries(Object.entries(r.values).map(([k, v]) => [k, str(v)])) : {};
+  const audience = Array.isArray(r.audience) ? r.audience.map((a) => ({ group: str((a as Partial<AudienceRule>)?.group), role: str((a as Partial<AudienceRule>)?.role) })) : [];
+  return { type: str(r.type), name: str(r.name), values, audience: audience.length ? audience : [{ group: '', role: '' }] };
+}
+
 /** Parse a stored draft, or null when it is missing, malformed or from another version. */
 export function fromDraft(raw: string | null): ContextEngineDraft | null {
   if (!raw) return null;
@@ -244,7 +274,16 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
     return {
       v: 1,
       savedAt: typeof parsed.savedAt === 'string' ? parsed.savedAt : '',
-      form: { sources: f.sources, roles: f.roles, embedding: f.embedding ?? null, llm: f.llm ?? null, shareApiKey: !!f.shareApiKey, storage: sanitizeStorage(f.storage), name: f.name, description: typeof f.description === 'string' ? f.description : '' },
+      form: {
+        sources: f.sources.map(sanitizeSourceConfig),
+        roles: f.roles,
+        embedding: f.embedding ?? null,
+        llm: f.llm ?? null,
+        shareApiKey: !!f.shareApiKey,
+        storage: sanitizeStorage(f.storage),
+        name: f.name,
+        description: typeof f.description === 'string' ? f.description : '',
+      },
     };
   } catch {
     return null;
@@ -256,6 +295,11 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
 /** Grant id for an org role: `role-<handle>`, kept within the engine's grant-id charset. */
 export function roleGrantId(roleHandle: string): string {
   return `${ROLE_GRANT_PREFIX}${roleHandle.trim().replace(/[^A-Za-z0-9._:-]+/g, '-')}`;
+}
+
+/** Grant id for the engine's creator: `owner-<principalId>`, within the engine's grant-id charset. */
+export function ownerGrantId(principalId: string): string {
+  return `${OWNER_GRANT_PREFIX}${principalId.trim().replace(/[^A-Za-z0-9._:-]+/g, '-')}`;
 }
 
 /** Role handles recovered from the group grants the wizard created. */
@@ -292,6 +336,20 @@ export function summarizeSource(source: ContextSourceConfig): string {
     })
     .filter(Boolean);
   return parts.length ? parts.join(' · ') : 'Not configured yet';
+}
+
+/** Visibility rules in one line, e.g. "engineering → admin · support → developer". */
+export function summarizeAudience(rules: AudienceRule[] | undefined, roleNames: Record<string, string> = {}): string {
+  const typed = typedRules(rules).filter((r) => nonEmpty(r.group) && nonEmpty(r.role));
+  if (typed.length === 0) return 'Not visible to anyone yet';
+  return typed.map((r) => `${r.group.trim()} → ${roleNames[r.role] ?? r.role}`).join(' · ');
+}
+
+/** Human position of a passage in its item: the engine reports chunks as `chunk:<n>` from zero. */
+export function evidenceLocationLabel(location: string | undefined): string {
+  if (!location) return '';
+  const m = /^chunk:(\d+)$/.exec(location);
+  return m ? `Part ${Number(m[1]) + 1}` : location;
 }
 
 // ── Storage ─────────────────────────────────────────────────────────────────
@@ -562,23 +620,24 @@ export function progressListingText(s: ContextEngineProgressSummary | null): str
 
 // ── Graph status and first-run guidance ─────────────────────────────────────
 
-/** Human status of the graph, e.g. "Not built", "Building · 2 of 3 sources", "Built 12 minutes ago". */
+/** Human enrichment status, e.g. "Not enriched", "Enriching · 2 of 3 sources", "Enriched 12 min ago". */
 export function graphStatusText(graph: ContextGraphStatus): string {
   switch (graph.state) {
     case 'building':
-      return graph.progress ? `Building · ${graph.progress.done} of ${graph.progress.total} sources` : 'Building';
+      return graph.progress ? `${GRAPH_STATE_LABEL.building} · ${graph.progress.done} of ${graph.progress.total} sources` : GRAPH_STATE_LABEL.building;
     case 'built':
-      if (!graph.builtAt) return 'Built';
+      if (!graph.builtAt) return GRAPH_STATE_LABEL.built;
       {
         const rel = formatDistanceToNow(graph.builtAt);
-        return rel ? `Built ${rel.charAt(0).toLowerCase()}${rel.slice(1)}` : 'Built';
+        return rel ? `${GRAPH_STATE_LABEL.built} ${rel.charAt(0).toLowerCase()}${rel.slice(1)}` : GRAPH_STATE_LABEL.built;
       }
     default:
       return GRAPH_STATE_LABEL[graph.state];
   }
 }
 
-export function graphStatusTone(graph: ContextGraphStatus): 'success' | 'warning' | 'info' | 'error' {
+/** Not enriched is neutral: indexing already makes sources searchable, enrichment is optional. */
+export function graphStatusTone(graph: ContextGraphStatus): 'success' | 'default' | 'info' | 'error' {
   switch (graph.state) {
     case 'built':
       return 'success';
@@ -587,22 +646,38 @@ export function graphStatusTone(graph: ContextGraphStatus): 'success' | 'warning
     case 'failed':
       return 'error';
     default:
-      return 'warning';
+      return 'default';
   }
 }
 
-/** The four first-run steps with their state; the first unfinished one is current. */
-export function getStartedSteps(engine: ContextEngineDetail, asked: boolean): GetStartedStep[] {
+/**
+ * Enrichment status to show: what the engine reports, unless it reports nothing
+ * and we know of a job started from this browser. A job still running always wins.
+ */
+export function resolveGraphStatus(reported: ContextGraphStatus, job: ContextJob | undefined, starting = false): ContextGraphStatus {
+  if (starting) return { state: 'building' };
+  if (job && job.state !== 'succeeded' && job.state !== 'failed') return { state: 'building', jobId: job.id };
+  if (reported.state !== 'not_built' || !job) return reported;
+  return job.state === 'succeeded' ? { state: 'built', builtAt: job.createdAt, jobId: job.id } : { state: 'failed', jobId: job.id };
+}
+
+/**
+ * The four first-run steps with their state; the first unfinished one is current.
+ * Indexing happens as connectors deliver, so the first step completes from
+ * source progress. Engines without progress fall back to a finished enrichment.
+ */
+export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, progress: ContextEngineProgressSummary | null = null): GetStartedStep[] {
   const done: Record<GetStartedStep['id'], boolean> = {
-    build: engine.graph.state === 'built',
+    index: progress ? progress.processed > 0 && progress.active === 0 : engine.graph.state === 'built',
     ask: asked,
     publish: engine.exposure.api || engine.exposure.mcp,
     grant: engine.queryRoles.length > 0,
   };
   const n = engine.sources.length;
+  const indexing = progress ? `${progressHeadline(progress)}. ` : '';
   const defs: Omit<GetStartedStep, 'state'>[] = [
-    { id: 'build', title: 'Build the context graph', description: `Reads ${n} source${n === 1 ? '' : 's'} and creates the graph answers are drawn from.` },
-    { id: 'ask', title: 'Ask it something', description: 'Try the Playground and check the cited evidence.' },
+    { id: 'index', title: 'Index your sources', description: `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.` },
+    { id: 'ask', title: 'Ask it something', description: 'Try the Playground and check the cited passages.' },
     { id: 'publish', title: 'Publish', description: 'Turn on the REST API or the MCP server for agents.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
   ];
@@ -654,7 +729,8 @@ export function splitCitations(answer: string): AnswerPart[] {
 
 /** `RegisterSource` body for the engine's `POST /spaces/{id}/sources`. Credentials never travel here. */
 export function toSourceRegistration(source: ContextSourceConfig): { name: string; type: string; audienceMapping: Record<string, string> } {
-  return { name: source.name.trim(), type: source.type, audienceMapping: {} };
+  const complete = (source.audience ?? []).filter((r) => nonEmpty(r.group) && nonEmpty(r.role));
+  return { name: source.name.trim(), type: source.type, audienceMapping: Object.fromEntries(complete.map((r) => [r.group.trim(), r.role.trim()])) };
 }
 
 /** Non-secret field values — where a source points. */
@@ -711,11 +787,36 @@ export function mcpEndpointUrl(baseUrl: string): string {
 }
 
 export function buildQueryCurl(baseUrl: string, engineId: string, question = 'What is our rollback procedure?'): string {
-  const body = JSON.stringify({ spaceId: engineId, question, mode: 'answer', limit: 5 }, null, 2);
+  const body = JSON.stringify({ spaceId: engineId, question, mode: 'context', limit: 5 }, null, 2);
   return `curl -X POST ${queryEndpointUrl(baseUrl)} \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`;
 }
 
 /** An MCP client `mcpServers` entry pointing at this engine, ready to paste into a client config. */
+/** The shape of a context-mode response, for the API tab. Mirrors the engine's `ContextQueryResponse`. */
+export function buildQueryResponseExample(sourceId = 'src_…'): string {
+  return JSON.stringify(
+    {
+      queryId: 'qry_…',
+      state: 'completed',
+      evidence: [
+        {
+          id: 'evi_…',
+          recordId: 'rollback-runbook',
+          sourceId,
+          sourceVersion: '42',
+          passage: 'To roll back a failed deployment, open the Deploy page, pick the previous release and click Promote.',
+          location: 'chunk:0',
+          sourceUrl: 'https://docs.example.com/runbooks/rollback',
+        },
+      ],
+      insufficientEvidence: false,
+      traceId: 'trace_…',
+    },
+    null,
+    2,
+  );
+}
+
 export function buildMcpClientConfig(baseUrl: string, engineId: string, engineName: string): string {
   const key = engineName
     .trim()

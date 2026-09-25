@@ -132,7 +132,13 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           )}
 
           {activeStep === 0 && (
-            <SourcesStep sources={form.sources} onAdd={(source) => dispatch({ type: 'addSource', source })} onUpdate={(index, source) => dispatch({ type: 'updateSource', index, source })} onRemove={(index) => dispatch({ type: 'removeSource', index })} />
+            <SourcesStep
+              orgHandle={scope.org}
+              sources={form.sources}
+              onAdd={(source) => dispatch({ type: 'addSource', source })}
+              onUpdate={(index, source) => dispatch({ type: 'updateSource', index, source })}
+              onRemove={(index) => dispatch({ type: 'removeSource', index })}
+            />
           )}
           {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />}
           {activeStep === 2 && (

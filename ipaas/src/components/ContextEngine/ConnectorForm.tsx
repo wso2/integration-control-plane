@@ -21,11 +21,13 @@ import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { sourceFieldError, sourceNameError } from '../../utils/contextEngine';
 import SecretField from '../RagIngestion/SecretField';
+import AudienceRulesEditor from './AudienceRulesEditor';
 import SourceMark from './SourceMark';
 import { connectorHeaderSx, fieldStackSx } from './styles';
 import type { ContextSourceConfig, SourceConnector, SourceFieldDef } from '../../types/contextEngine';
 
 interface ConnectorFormProps {
+  orgHandle: string;
   connector: SourceConnector;
   draft: ContextSourceConfig;
   /** Names of the other sources, for the uniqueness check. */
@@ -59,7 +61,7 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
 }
 
 /** The configuration form for one connector, rendered from its field schema. */
-export default function ConnectorForm({ connector, draft, otherNames, onChange, onChangeSource }: ConnectorFormProps): JSX.Element {
+export default function ConnectorForm({ orgHandle, connector, draft, otherNames, onChange, onChangeSource }: ConnectorFormProps): JSX.Element {
   const nameError = sourceNameError(draft.name, otherNames);
   const setValue = (key: string, value: string) => onChange({ ...draft, values: { ...draft.values, [key]: value } });
 
@@ -99,10 +101,12 @@ export default function ConnectorForm({ connector, draft, otherNames, onChange, 
         ))}
         {connector.fields.length === 0 && (
           <Alert severity="info" variant="outlined">
-            Nothing to configure now. You can upload files from the engine's Overview once it is created.
+            No connection settings. You can upload files from the engine&apos;s Overview once it is created.
           </Alert>
         )}
       </Stack>
+
+      <AudienceRulesEditor orgHandle={orgHandle} connectorName={connector.name} rules={draft.audience ?? []} onChange={(audience) => onChange({ ...draft, audience })} />
     </>
   );
 }

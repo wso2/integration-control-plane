@@ -156,10 +156,23 @@ export interface SourceConnector {
 }
 
 /** A configured source in the wizard: the connector, a display name and the connector's field values. */
+/**
+ * One visibility rule: items the connector labels with `group` may be seen by
+ * members of org role `role`. The engine holds back (quarantines) any item that
+ * carries a group with no rule, and only role members with query access see the rest.
+ */
+export interface AudienceRule {
+  /** The group label exactly as the connector sends it. */
+  group: string;
+  /** Org role handle — the same identifier the Access step grants query access to. */
+  role: string;
+}
+
 export interface ContextSourceConfig {
   type: string;
   name: string;
   values: Record<string, string>;
+  audience: AudienceRule[];
 }
 
 // ── Source progress ─────────────────────────────────────────────────────────
@@ -384,7 +397,7 @@ export interface ContextPrincipal {
 
 // ── Post-create guidance and exposure ───────────────────────────────────────
 
-export type GetStartedStepId = 'build' | 'ask' | 'publish' | 'grant';
+export type GetStartedStepId = 'index' | 'ask' | 'publish' | 'grant';
 
 export interface GetStartedStep {
   id: GetStartedStepId;

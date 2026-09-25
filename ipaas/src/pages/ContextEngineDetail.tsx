@@ -29,7 +29,7 @@ import ComingSoon from './ComingSoon';
 import NotFound from '../components/NotFound';
 import ConfirmDeleteDialog from '../components/ConfirmDeleteDialog';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
-import GraphStatusChip from '../components/ContextEngine/GraphStatusChip';
+import { EngineGraphChip } from '../components/ContextEngine/GraphStatusChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
 import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
 import ApiTab from '../components/ContextEngine/detail/ApiTab';
@@ -134,7 +134,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
               {engine.name}
             </Typography>
             <EngineStateChip state={engine.state} />
-            <GraphStatusChip graph={engine.graph} />
+            <EngineGraphChip engineId={engine.id} reported={engine.graph} />
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {engine.description || 'No description'}

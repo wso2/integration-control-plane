@@ -18,7 +18,12 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  audienceError,
   buildMcpClientConfig,
+  evidenceLocationLabel,
+  ownerGrantId,
+  resolveGraphStatus,
+  summarizeAudience,
   formatProgressPercent,
   isEngineProgressActive,
   overallProgress,
@@ -80,10 +85,16 @@ import type { EmbeddingConfig } from '../types/ragIngestion';
 
 const embedding: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'sk-test', azureApiVersion: '', azureBaseUrl: '' };
 
+const RULE = { group: 'engineering', role: 'admin' };
+
+/** A source with field values and one complete visibility rule. */
 const withValues = (id: string, values: Record<string, string>, name?: string): ContextSourceConfig => {
   const blank = blankSource(id);
-  return { ...blank, name: name ?? blank.name, values: { ...blank.values, ...values } };
+  return { ...blank, name: name ?? blank.name, values: { ...blank.values, ...values }, audience: [RULE] };
 };
+
+/** The upload connector has no fields, so this is complete once it has a rule. */
+const upload = (name?: string): ContextSourceConfig => withValues('upload', {}, name);
 
 function completeForm(): ContextEngineForm {
   const github = withValues('github', { repositoryUrl: 'https://github.com/wso2/docs', accessToken: 'ghp_x' });
@@ -136,8 +147,9 @@ describe('source validation', () => {
     expect(isSourceValid(withValues('gdrive', { folderId: 'abc', apiKey: 'k' }))).toBe(true);
     expect(isSourceValid(withValues('website', { urls: 'https://a.com\nnot-a-url' }))).toBe(false);
     expect(isSourceValid(withValues('website', { urls: 'https://a.com' }))).toBe(true);
-    expect(isSourceValid(blankSource('upload'))).toBe(true);
-    expect(isSourceValid({ type: 'gone', name: 'x', values: {} })).toBe(false);
+    expect(isSourceValid(upload())).toBe(true);
+    expect(isSourceValid(blankSource('upload'))).toBe(false); // no visibility rule yet
+    expect(isSourceValid({ type: 'gone', name: 'x', values: {}, audience: [RULE] })).toBe(false);
   });
 
   it('reports the first missing or invalid field and lists them in schema order', () => {
@@ -145,23 +157,35 @@ describe('source validation', () => {
     expect(invalidSourceFields(src).map((f) => f.key)).toEqual(['baseUrl', 'email', 'apiToken']);
     expect(sourceIncompleteReason(src)).toBe('Base URL invalid');
     expect(sourceIncompleteReason(withValues('confluence', { baseUrl: 'https://x.atlassian.net/wiki' }))).toBe('Space Key missing');
-    expect(sourceIncompleteReason(blankSource('upload'))).toBe('');
+    expect(sourceIncompleteReason(upload())).toBe('');
+    expect(sourceIncompleteReason(blankSource('upload'))).toBe('Visibility missing');
+    expect(sourceIncompleteReason({ ...upload(), audience: [{ group: 'engineering', role: '' }] })).toBe('Visibility incomplete');
   });
 
   it('rejects empty and duplicate names', () => {
     expect(sourceNameError('  ', [])).not.toBe('');
     expect(sourceNameError('Docs', ['docs'])).not.toBe('');
     expect(sourceNameError('Docs', ['Other'])).toBe('');
-    expect(isSourceValid({ ...blankSource('upload'), name: '  ' })).toBe(false);
+    expect(isSourceValid({ ...upload(), name: '  ' })).toBe(false);
   });
 
   it('explains why the step is blocked, in priority order', () => {
     expect(sourcesStepBlocker([])).toBe('Add at least one source to continue');
-    const a = blankSource('upload');
+    const a = upload();
     expect(sourcesStepBlocker([a])).toBeNull();
-    expect(sourcesStepBlocker([a, { ...blankSource('upload') }])).toBe('Give each source a unique name');
+    expect(sourcesStepBlocker([a, upload()])).toBe('Give each source a unique name');
     expect(sourcesStepBlocker([a, withValues('github', {}, 'Platform docs')])).toBe('Complete “Platform docs” to continue');
-    expect(isSourcesStepValid([a, { ...blankSource('upload'), name: 'Second' }])).toBe(true);
+    expect(sourcesStepBlocker([a, { ...upload('Second'), audience: [] }])).toBe('Complete “Second” to continue');
+    expect(isSourcesStepValid([a, upload('Second')])).toBe(true);
+  });
+
+  it('needs at least one complete, unique visibility rule', () => {
+    expect(audienceError([])).toMatch(/nobody will see/);
+    expect(audienceError([{ group: '', role: '' }])).toMatch(/nobody will see/);
+    expect(audienceError([RULE, { group: '', role: '' }])).toBe(''); // blank placeholder rows are ignored
+    expect(audienceError([{ group: 'engineering', role: '' }])).toMatch(/half-filled/);
+    expect(audienceError([RULE, { group: ' engineering ', role: 'developer' }])).toMatch(/one role only/);
+    expect(audienceError([RULE, { group: 'support', role: 'developer' }])).toBe('');
   });
 });
 
@@ -254,7 +278,15 @@ describe('access helpers', () => {
 describe('wire payloads', () => {
   it('registers a source without credentials', () => {
     const src = completeForm().sources[0];
-    expect(toSourceRegistration(src)).toEqual({ name: 'GitHub', type: 'github', audienceMapping: {} });
+    expect(toSourceRegistration(src)).toEqual({ name: 'GitHub', type: 'github', audienceMapping: { engineering: 'admin' } });
+    const trimmed = {
+      ...src,
+      audience: [
+        { group: ' support ', role: 'developer' },
+        { group: '', role: '' },
+      ],
+    };
+    expect(toSourceRegistration(trimmed).audienceMapping).toEqual({ support: 'developer' });
   });
 
   it('separates settings from credentials and adds azure fields only for azure', () => {
@@ -270,6 +302,8 @@ describe('wire payloads', () => {
     expect(summarizeSource(withValues('website', { urls: 'https://a.com\nhttps://b.com' }))).toBe('2 URLs');
     expect(summarizeSource(blankSource('gdrive'))).toBe('Not configured yet');
     expect(summarizeSource(blankSource('upload'))).toBe('Upload files after the engine is created');
+    expect(summarizeAudience([RULE, { group: 'support', role: 'developer' }], { admin: 'Admin' })).toBe('engineering → Admin · support → developer');
+    expect(summarizeAudience([{ group: '', role: '' }])).toBe('Not visible to anyone yet');
   });
 });
 
@@ -278,6 +312,7 @@ describe('exposure snippets', () => {
     const curl = buildQueryCurl('https://engine.example.com', 'space-1');
     expect(curl).toContain('https://engine.example.com/v1/queries');
     expect(curl).toContain('"spaceId": "space-1"');
+    expect(curl).toContain('"mode": "context"');
     expect(curl).toContain('Authorization: Bearer $TOKEN');
   });
 
@@ -357,21 +392,62 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
 
 describe('graph status and first run', () => {
   it('describes the graph state', () => {
-    expect(graphStatusText({ state: 'not_built' })).toBe('Not built');
-    expect(graphStatusText({ state: 'building', progress: { done: 2, total: 3 } })).toBe('Building · 2 of 3 sources');
-    expect(graphStatusText({ state: 'built', builtAt: new Date(Date.now() - 5 * 60_000).toISOString() })).toMatch(/^Built /);
-    expect(graphStatusText({ state: 'failed' })).toBe('Build failed');
+    expect(graphStatusText({ state: 'not_built' })).toBe('Not enriched');
+    expect(graphStatusText({ state: 'building', progress: { done: 2, total: 3 } })).toBe('Enriching · 2 of 3 sources');
+    expect(graphStatusText({ state: 'built', builtAt: new Date(Date.now() - 5 * 60_000).toISOString() })).toBe('Enriched 5 min ago');
+    expect(graphStatusText({ state: 'failed' })).toBe('Enrichment failed');
     expect(graphStatusTone({ state: 'built' })).toBe('success');
-    expect(graphStatusTone({ state: 'not_built' })).toBe('warning');
+    expect(graphStatusTone({ state: 'not_built' })).toBe('default');
+  });
+
+  it('fills in enrichment status from a job this browser started when the engine reports none', () => {
+    const job = (state: string) => ({ id: 'job_1', state, operation: 'enrichment', traceId: 't', attemptCount: 1, createdAt: '2026-09-25T10:00:00Z' });
+    const none = { state: 'not_built' as const };
+    expect(resolveGraphStatus(none, undefined)).toEqual(none);
+    expect(resolveGraphStatus(none, undefined, true)).toEqual({ state: 'building' });
+    expect(resolveGraphStatus(none, job('queued'))).toEqual({ state: 'building', jobId: 'job_1' });
+    expect(resolveGraphStatus(none, job('succeeded'))).toEqual({ state: 'built', builtAt: '2026-09-25T10:00:00Z', jobId: 'job_1' });
+    expect(resolveGraphStatus(none, job('failed'))).toEqual({ state: 'failed', jobId: 'job_1' });
+    const reported = { state: 'built' as const, builtAt: '2026-09-25T12:00:00Z' };
+    expect(resolveGraphStatus(reported, job('failed'))).toEqual(reported); // the engine's own report wins once it has one
+    expect(resolveGraphStatus(reported, job('running'))).toEqual({ state: 'building', jobId: 'job_1' });
   });
 
   it('marks the first unfinished step current and the rest todo', () => {
     const steps = getStartedSteps(engineDetail(), false);
+    expect(steps.map((s) => s.id)).toEqual(['index', 'ask', 'publish', 'grant']);
     expect(steps.map((s) => s.state)).toEqual(['current', 'todo', 'todo', 'todo']);
-    expect(steps[0].description).toBe('Reads 2 sources and creates the graph answers are drawn from.');
+    expect(steps[0].description).toBe('Items become searchable as the connector delivers them from 2 sources.');
     const later = getStartedSteps(engineDetail({ graph: { state: 'built' }, queryRoles: ['admin'] }), true);
     expect(later.map((s) => s.state)).toEqual(['done', 'done', 'current', 'done']);
     expect(later[3].description).toBe('1 role can query.');
+  });
+
+  it('completes the index step from source progress once nothing is still moving', () => {
+    const summary = { sourceCount: 2, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
+    const moving = getStartedSteps(engineDetail(), false, summary);
+    expect(moving[0].state).toBe('current');
+    expect(moving[0].description).toBe('1 of 2 sources processed. Items become searchable as the connector delivers them from 2 sources.');
+    expect(getStartedSteps(engineDetail(), false, { ...summary, active: 0, waiting: 1 })[0].state).toBe('done');
+    expect(getStartedSteps(engineDetail(), false, { ...summary, processed: 0, active: 0, waiting: 2 })[0].state).toBe('current');
+  });
+});
+
+describe('owner grant and evidence labels', () => {
+  it('keys the creator grant by principal within the grant-id charset', () => {
+    expect(ownerGrantId('prn_5489f0de')).toBe('owner-prn_5489f0de');
+    expect(ownerGrantId('user@example.com')).toBe('owner-user-example.com');
+  });
+
+  it('turns chunk locations into human parts', () => {
+    expect(evidenceLocationLabel('chunk:0')).toBe('Part 1');
+    expect(evidenceLocationLabel('page 4')).toBe('page 4');
+    expect(evidenceLocationLabel(undefined)).toBe('');
+  });
+
+  it('restores drafts saved before visibility rules existed with one blank rule', () => {
+    const old = JSON.stringify({ v: 1, savedAt: 'x', form: { sources: [{ type: 'upload', name: 'Files', values: {} }], roles: [], name: 'n', description: '' } });
+    expect(fromDraft(old)?.form.sources[0].audience).toEqual([{ group: '', role: '' }]);
   });
 });
 

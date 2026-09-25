@@ -383,7 +383,7 @@ export const CATALOG_PAGE_SIZE = 24;
 export function blankSource(connectorId: string): ContextSourceConfig {
   const connector = CONNECTOR_BY_ID[connectorId];
   if (!connector) throw new Error(`Unknown source connector: ${connectorId}`);
-  return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])) };
+  return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [{ group: '', role: '' }] };
 }
 
 // ── Step 3: LLM providers (embedding providers are shared with RAG) ─────────
@@ -419,6 +419,15 @@ export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Engine actions a querying role receives — read context, open evidence, see the trace. */
 export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
 
+/** What the creator of an engine gets on it: query it and start enrichments. The engine grants creators nothing by itself. */
+export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'context.enrich'] as const;
+
+/** The creator's grant is keyed `owner-<principalId>`. */
+export const OWNER_GRANT_PREFIX = 'owner-';
+
+/** The engine rejects answer mode until its M5 release; the Playground offers passages only until then. */
+export const ANSWER_MODE_AVAILABLE = false;
+
 /** Grants created for an org role are keyed `role-<handle>` so they can be told apart from ad-hoc grants. */
 export const ROLE_GRANT_PREFIX = 'role-';
 
@@ -453,11 +462,12 @@ export const RECOMMENDED_MODELS: { embedding: { provider: EmbeddingProvider; mod
 
 // ── Graph status ────────────────────────────────────────────────────────────
 
+/** Indexing already builds the graph; enrichment is the optional pass that derives more from it. */
 export const GRAPH_STATE_LABEL: Record<ContextGraphState, string> = {
-  not_built: 'Not built',
-  building: 'Building',
-  built: 'Built',
-  failed: 'Build failed',
+  not_built: 'Not enriched',
+  building: 'Enriching',
+  built: 'Enriched',
+  failed: 'Enrichment failed',
 };
 
 /** Chip text for a source's place in the pipeline. */
@@ -498,6 +508,9 @@ export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
 export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
 /** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
 export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
+
+/** localStorage key of the last enrichment job started from this browser, per engine. The engine has no route that reports enrichment state yet. */
+export const CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX = 'contextEngine:enrichment:';
 
 /** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
 export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];

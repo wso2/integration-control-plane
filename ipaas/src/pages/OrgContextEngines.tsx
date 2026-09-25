@@ -28,7 +28,7 @@ import ConfirmDeleteDialog from '../components/ConfirmDeleteDialog';
 import SearchField from '../components/SearchField';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import ExposurePills from '../components/ContextEngine/ExposurePills';
-import GraphStatusChip from '../components/ContextEngine/GraphStatusChip';
+import { EngineGraphChip } from '../components/ContextEngine/GraphStatusChip';
 import SourceMark from '../components/ContextEngine/SourceMark';
 import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
 import { progressListingText } from '../utils/contextEngine';
@@ -128,7 +128,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                 <ListingTable.Cell>Sources</ListingTable.Cell>
                 <ListingTable.Cell>Who can query</ListingTable.Cell>
                 <ListingTable.Cell>Exposure</ListingTable.Cell>
-                <ListingTable.Cell>Graph</ListingTable.Cell>
+                <ListingTable.Cell>Enrichment</ListingTable.Cell>
                 <ListingTable.Cell>State</ListingTable.Cell>
                 <ListingTable.Cell align="right">Actions</ListingTable.Cell>
               </ListingTable.Row>
@@ -189,7 +189,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                       <Typography variant="body2">{e.summary ? (e.summary.roleCount === 0 ? 'Only you' : `${e.summary.roleCount} role${e.summary.roleCount === 1 ? '' : 's'}`) : '—'}</Typography>
                     </ListingTable.Cell>
                     <ListingTable.Cell>{e.summary ? <ExposurePills exposure={e.summary.exposure} /> : '—'}</ListingTable.Cell>
-                    <ListingTable.Cell>{e.summary ? <GraphStatusChip graph={e.summary.graph} /> : '—'}</ListingTable.Cell>
+                    <ListingTable.Cell>{e.summary ? <EngineGraphChip engineId={e.id} reported={e.summary.graph} /> : '—'}</ListingTable.Cell>
                     <ListingTable.Cell>
                       <EngineStateChip state={e.state} />
                     </ListingTable.Cell>

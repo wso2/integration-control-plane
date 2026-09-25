@@ -16,23 +16,21 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, Typography } from '@wso2/oxygen-ui';
-import { Check, Play } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, Typography } from '@wso2/oxygen-ui';
+import { Check } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { checklistDotSx, checklistSx, checklistStepSx, mutedSx } from '../styles';
 import type { GetStartedStep, GetStartedStepId } from '../../../types/contextEngine';
 
 interface GetStartedChecklistProps {
   steps: GetStartedStep[];
-  /** A build is running — the Build action shows progress instead of a button. */
-  building?: boolean;
   onAction: (id: GetStartedStepId) => void;
 }
 
-const ACTION_LABEL: Record<GetStartedStepId, string> = { build: 'Build now', ask: 'Open Playground', publish: 'Publish', grant: 'Manage access' };
+const ACTION_LABEL: Record<GetStartedStepId, string> = { index: 'View progress', ask: 'Open Playground', publish: 'Publish', grant: 'Manage access' };
 
 /** Four first-run steps in a row; the current one carries its action. */
-export default function GetStartedChecklist({ steps, building = false, onAction }: GetStartedChecklistProps): JSX.Element {
+export default function GetStartedChecklist({ steps, onAction }: GetStartedChecklistProps): JSX.Element {
   return (
     <Box sx={checklistSx} role="list" aria-label="Get started">
       {steps.map((step, i) => (
@@ -48,14 +46,8 @@ export default function GetStartedChecklist({ steps, building = false, onAction 
               {step.description}
             </Typography>
             {step.state === 'current' && (
-              <Button
-                size="small"
-                variant="contained"
-                disabled={step.id === 'build' && building}
-                startIcon={step.id === 'build' ? building ? <CircularProgress size={12} color="inherit" /> : <Play size={14} /> : undefined}
-                onClick={() => onAction(step.id)}
-                sx={{ mt: 1 }}>
-                {step.id === 'build' && building ? 'Building…' : ACTION_LABEL[step.id]}
+              <Button size="small" variant={step.id === 'index' ? 'outlined' : 'contained'} onClick={() => onAction(step.id)} sx={{ mt: 1 }}>
+                {ACTION_LABEL[step.id]}
               </Button>
             )}
           </Box>

@@ -38,6 +38,8 @@ import { mutedSx, progressBarSx, progressCaptionSx, progressHeadlineSx, progress
 import type { ContextGraphStatus, ContextSource, SourceProgress } from '../../../types/contextEngine';
 
 interface SourcesProgressCardProps {
+  /** DOM id, so the checklist can scroll here. */
+  id?: string;
   engineId: string;
   sources: ContextSource[];
   /** Drives the fallback chip on engines that do not report progress yet. */
@@ -97,7 +99,7 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  * how many delivered items the engine has processed, and, once the engine
  * collects it, how much the search index has caught up. Polls while anything moves.
  */
-export default function SourcesProgressCard({ engineId, sources, graph }: SourcesProgressCardProps): JSX.Element {
+export default function SourcesProgressCard({ id, engineId, sources, graph }: SourcesProgressCardProps): JSX.Element {
   const progressQuery = useContextEngineProgress(engineId);
   const progress = progressQuery.data;
   const available = !!progress?.available;
@@ -112,7 +114,7 @@ export default function SourcesProgressCard({ engineId, sources, graph }: Source
   const overall = available ? overallProgress(progress.sources) : null;
 
   return (
-    <Box sx={summaryCardSx}>
+    <Box id={id} sx={summaryCardSx}>
       <Box sx={summaryCardHeaderSx}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           Sources ({sources.length})

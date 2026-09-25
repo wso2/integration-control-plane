@@ -22,7 +22,7 @@ import type { JSX, ReactNode } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { engineDescriptionError, engineNameError, isStorageAllManaged, sourceTypeName, summarizeSource, summarizeStorage } from '../../../utils/contextEngine';
+import { engineDescriptionError, engineNameError, isStorageAllManaged, sourceTypeName, summarizeAudience, summarizeSource, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import { fieldStackSx, mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
@@ -120,8 +120,11 @@ export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange
                     <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
                       {s.name}
                     </Typography>
-                    <Typography variant="caption" sx={mutedSx} noWrap>
+                    <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }} noWrap>
                       {summarizeSource(s)}
+                    </Typography>
+                    <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }} noWrap>
+                      Visible to: {summarizeAudience(s.audience, roleNames)}
                     </Typography>
                   </Box>
                 </Stack>
@@ -208,13 +211,14 @@ export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange
             </Typography>
             <Stack gap={0.75}>
               <Typography variant="body2">
-                {n} source{n === 1 ? '' : 's'} {n === 1 ? 'is' : 'are'} registered and {n === 1 ? 'its' : 'their'} credentials stored on the engine.
+                {n} source{n === 1 ? '' : 's'} {n === 1 ? 'is' : 'are'} registered with {n === 1 ? 'its' : 'their'} visibility rules, and {n === 1 ? 'its' : 'their'} credentials are stored on the engine.
               </Typography>
+              <Typography variant="body2">You get query and enrichment access as the creator.</Typography>
               <Typography variant="body2">{r === 0 ? 'No roles are granted yet; only you can query.' : `${r} role${r === 1 ? '' : 's'} ${r === 1 ? 'is' : 'are'} granted query access.`}</Typography>
               <Typography variant="body2">
                 {isStorageAllManaged(form.storage) ? 'All three stores are embedded in the engine; nothing is provisioned on your Infrastructure.' : 'Stores placed on Infrastructure are written to your servers; the rest stay embedded in the engine.'}
               </Typography>
-              <Typography variant="body2">You start the first graph build from the Overview; it usually takes a few minutes.</Typography>
+              <Typography variant="body2">Items become searchable as each connector delivers them; the Overview shows the progress.</Typography>
             </Stack>
           </Box>
         </Grid>

@@ -19,12 +19,19 @@
 import { Chip, CircularProgress } from '@wso2/oxygen-ui';
 import { Check, CircleAlert } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
+import { useEngineGraphStatus } from '../../hooks/useContextEngine';
 import { graphStatusText, graphStatusTone } from '../../utils/contextEngine';
 import type { ContextGraphStatus } from '../../types/contextEngine';
 
-/** The knowledge graph's build state — separate from the engine's own lifecycle chip. */
+/** Enrichment state of the engine's graph — separate from the engine's own lifecycle chip. */
 export default function GraphStatusChip({ graph }: { graph: ContextGraphStatus }): JSX.Element {
   const tone = graphStatusTone(graph);
-  const icon = graph.state === 'building' ? <CircularProgress size={12} color="inherit" sx={{ ml: 0.75 }} /> : graph.state === 'built' ? <Check size={14} /> : <CircleAlert size={14} />;
+  const icon = graph.state === 'building' ? <CircularProgress size={12} color="inherit" sx={{ ml: 0.75 }} /> : graph.state === 'built' ? <Check size={14} /> : graph.state === 'failed' ? <CircleAlert size={14} /> : undefined;
   return <Chip size="small" variant="outlined" color={tone} icon={icon} label={graphStatusText(graph)} />;
+}
+
+/** The chip for one engine, filled in from the last enrichment job this browser started while the engine reports none. */
+export function EngineGraphChip({ engineId, reported }: { engineId: string; reported: ContextGraphStatus }): JSX.Element {
+  const { graph } = useEngineGraphStatus(engineId, reported);
+  return <GraphStatusChip graph={graph} />;
 }

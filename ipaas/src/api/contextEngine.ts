@@ -22,7 +22,9 @@
  * The engine ships milestone by milestone. Routes that exist today: spaces,
  * sources, ingestion jobs, grants, `auth/me` and the read-only progress routes
  * (`/v1/progress/...`). Routes taken from its OpenAPI contract that are not
- * served yet answer 404/405: queries, evidence, enrichments, space deletion.
+ * served yet answer 404/405: evidence, traces, space deletion. Queries serve
+ * context mode only (answer mode is rejected until the engine's M5), and both
+ * queries and enrichments answer 503 when the engine runs without its knowledge backend.
  * Two routes are proposals this UI needs the engine to add:
  * `PUT/GET /v1/spaces/{id}/configuration` (models + source settings and
  * credentials) and `PUT /v1/spaces/{id}/exposures` (API/MCP publishing).
@@ -33,8 +35,8 @@
 
 import { contextEngineClient } from './httpClients';
 import { getServer, getServerAdminUser } from './platformServices';
-import { CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
-import { infrastructureStorageKinds, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
+import { CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
+import { infrastructureStorageKinds, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
   ContextEngine,
@@ -343,7 +345,8 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
 }
 
 /**
- * Create the space, then register sources, grant the chosen roles and store the
+ * Create the space, then grant its creator query and enrichment access, register
+ * sources with their visibility rules, grant the chosen roles and store the
  * model configuration. Steps the engine does not serve yet are reported as
  * warnings; any other failure rolls the space back and rethrows.
  */
@@ -366,6 +369,11 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
   };
 
   try {
+    // The engine gives a space's creator nothing by itself: without this grant they could neither query nor enrich it.
+    await attempt('Give you query and enrichment access', async () => {
+      const me = await getContextPrincipal();
+      await contextEngineClient.put(`${grantsPath(space.id)}/${encodeURIComponent(ownerGrantId(me.id))}`, { principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
+    });
     for (const source of input.sources) {
       await attempt(`Register source “${source.name}”`, () => contextEngineClient.post(`${spacePath(space.id)}/sources`, toSourceRegistration(source)));
     }

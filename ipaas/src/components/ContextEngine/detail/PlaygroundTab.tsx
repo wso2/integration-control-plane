@@ -20,13 +20,15 @@ import { Alert, Box, Button, Chip, CircularProgress, IconButton, Link, Stack, Te
 import { Braces, Copy, Eraser, Send } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
-import { useAskedFlag, useQueryContextEngine } from '../../../hooks/useContextEngine';
-import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
-import { splitCitations, suggestedQuestions } from '../../../utils/contextEngine';
+import { useAskedFlag, useContextPrincipal, useQueryContextEngine } from '../../../hooks/useContextEngine';
+import { ANSWER_MODE_AVAILABLE, CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
+import { evidenceLocationLabel, sourceTypeName, splitCitations, suggestedQuestions } from '../../../utils/contextEngine';
 import { contextEngineUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
+import OwnerAccessButton from './OwnerAccessButton';
+import SourceMark from '../SourceMark';
 import { answerCardSx, answerFooterSx, askBarSx, citeChipSx, evidenceCardSx, mutedSx, passageSx, questionBubbleSx, suggestionRowSx } from '../styles';
-import type { ContextEngineDetail, ContextQueryMode, ContextQueryResult } from '../../../types/contextEngine';
+import type { ContextEngineDetail, ContextQueryMode, ContextQueryResult, ContextSource } from '../../../types/contextEngine';
 
 interface PlaygroundTabProps {
   engine: ContextEngineDetail;
@@ -39,18 +41,26 @@ interface Turn {
   result: ContextQueryResult;
 }
 
-const MODES: { value: ContextQueryMode; label: string; hint: string }[] = [
-  { value: 'answer', label: 'Answer', hint: 'Compose an answer from the evidence with the language model.' },
-  { value: 'context', label: 'Context', hint: 'Return the matching passages only — what an agent would receive.' },
+const MODES: { value: ContextQueryMode; label: string; hint: string; available: boolean }[] = [
+  { value: 'context', label: 'Passages', hint: 'Returns the source-linked passages you are allowed to read — exactly what an agent receives.', available: true },
+  { value: 'answer', label: 'Answer', hint: 'Composes an answer from the passages with the language model.', available: ANSWER_MODE_AVAILABLE },
 ];
 
-function queryErrorMessage(e: unknown): string {
+interface QueryFailure {
+  message: string;
+  /** The engine refused this user; they may be able to grant themselves the creator's access. */
+  forbidden?: boolean;
+}
+
+function queryFailure(e: unknown): QueryFailure {
   if (e instanceof HttpError) {
-    if (e.status === 404 || e.status === 405) return 'Querying is not available on this engine yet — the query route has not been enabled.';
-    if (e.status === 403) return "You don't have query access to this engine.";
-    if (e.status === 401) return 'The context engine rejected the credential.';
+    if (e.status === 403) return { message: "You don't have query access to this engine.", forbidden: true };
+    if (e.status === 503) return { message: "The engine is running without its knowledge backend, so it can't search yet. Start it in provider mode with model keys." };
+    if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };
+    if (e.status === 400) return { message: `The engine rejected the question: ${e.message}` };
+    if (e.status === 401) return { message: 'The context engine rejected the credential.' };
   }
-  return "Couldn't run the query. Please try again.";
+  return { message: "Couldn't run the query. Please try again." };
 }
 
 const evidenceId = (queryId: string, n: number): string => `evidence-${queryId}-${n}`;
@@ -74,46 +84,50 @@ function CitedAnswer({ answer, queryId }: { answer: string; queryId: string }): 
   );
 }
 
-function Evidence({ result }: { result: ContextQueryResult }): JSX.Element {
-  if (result.evidence.length === 0) {
-    return (
-      <Typography variant="body2" sx={mutedSx}>
-        No evidence was returned.
-      </Typography>
-    );
-  }
+function Evidence({ result, sources }: { result: ContextQueryResult; sources: ContextSource[] }): JSX.Element | null {
+  if (result.evidence.length === 0) return null;
+  const byId = new Map(sources.map((s) => [s.id, s]));
   return (
     <Stack gap={1.5}>
-      {result.evidence.map((ev, i) => (
-        <Box key={ev.id} id={evidenceId(result.queryId, i + 1)} sx={evidenceCardSx}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-            <Stack direction="row" alignItems="center" gap={1}>
-              <Chip size="small" label={`[${i + 1}]`} />
-              <Typography variant="caption" sx={mutedSx}>
-                {ev.sourceId} · v{ev.sourceVersion}
-                {ev.location ? ` · ${ev.location}` : ''}
-              </Typography>
+      {result.evidence.map((ev, i) => {
+        const source = byId.get(ev.sourceId);
+        const where = [ev.recordId, evidenceLocationLabel(ev.location)].filter(Boolean).join(' · ');
+        return (
+          <Box key={ev.id} id={evidenceId(result.queryId, i + 1)} sx={evidenceCardSx}>
+            <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+              <Stack direction="row" alignItems="center" gap={1} sx={{ minWidth: 0 }}>
+                <Chip size="small" label={`[${i + 1}]`} />
+                {source && <SourceMark type={source.type} size={16} />}
+                <Typography variant="caption" sx={{ fontWeight: 600 }} noWrap>
+                  {source ? source.name : ev.sourceId}
+                </Typography>
+                <Typography variant="caption" sx={mutedSx} noWrap title={`${source ? sourceTypeName(source.type) : 'Source'} · version ${ev.sourceVersion}`}>
+                  {where}
+                </Typography>
+              </Stack>
+              {ev.sourceUrl && (
+                <Link href={ev.sourceUrl} target="_blank" rel="noopener noreferrer" variant="caption">
+                  Open source
+                </Link>
+              )}
             </Stack>
-            {ev.sourceUrl && (
-              <Link href={ev.sourceUrl} target="_blank" rel="noopener noreferrer" variant="caption">
-                Open source
-              </Link>
-            )}
-          </Stack>
-          <Typography variant="body2" sx={passageSx}>
-            “{ev.passage}”
-          </Typography>
-        </Box>
-      ))}
+            <Typography variant="body2" sx={passageSx}>
+              “{ev.passage}”
+            </Typography>
+          </Box>
+        );
+      })}
     </Stack>
   );
 }
 
-/** Test playground — ask in natural language, read cited evidence, then hand a good question to the API tab. */
+/** Test playground — ask in natural language, read the passages the engine lets you see, then hand a good question to the API tab. */
 export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps): JSX.Element {
   const navigate = useAppNavigate();
   const { markAsked } = useAskedFlag(engine.id);
-  const [mode, setMode] = useState<ContextQueryMode>('answer');
+  const [mode, setMode] = useState<ContextQueryMode>('context');
+  const principal = useContextPrincipal();
+  const groups = principal.data?.groups ?? [];
   const [question, setQuestion] = useState('');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
@@ -162,11 +176,21 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               if (next) setMode(next);
             }}
             aria-label="Query mode">
-            {MODES.map((m) => (
-              <ToggleButton key={m.value} value={m.value}>
-                {m.label}
-              </ToggleButton>
-            ))}
+            {MODES.map((m) =>
+              m.available ? (
+                <ToggleButton key={m.value} value={m.value}>
+                  {m.label}
+                </ToggleButton>
+              ) : (
+                <Tooltip key={m.value} title="Answers arrive with a later engine release. For now the engine returns passages.">
+                  <span>
+                    <ToggleButton value={m.value} disabled>
+                      {m.label}
+                    </ToggleButton>
+                  </span>
+                </Tooltip>
+              ),
+            )}
           </ToggleButtonGroup>
           {turns.length > 0 && (
             <Tooltip title="Clear conversation">
@@ -195,24 +219,26 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             <Typography variant="body2">{t.question}</Typography>
           </Box>
           <Box sx={answerCardSx}>
-            {t.result.insufficientEvidence ? (
-              <Alert severity="warning" variant="outlined" sx={{ mb: 1.5 }}>
-                The engine did not find enough evidence to answer this question.
+            {t.result.insufficientEvidence || t.result.evidence.length === 0 ? (
+              <Alert severity="info" variant="outlined" sx={{ mb: 1.5 }}>
+                No passages you can read matched this question. The engine only searches indexed items whose groups map to a role you belong to{groups.length ? ` (your groups: ${groups.join(', ')})` : ''}.
               </Alert>
             ) : t.mode === 'answer' && t.result.answer ? (
               <CitedAnswer answer={t.result.answer} queryId={t.result.queryId} />
             ) : null}
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-              Evidence
-            </Typography>
-            <Evidence result={t.result} />
+            {t.result.evidence.length > 0 && (
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                {t.mode === 'answer' ? 'Evidence' : 'Passages'}
+              </Typography>
+            )}
+            <Evidence result={t.result} sources={engine.sources} />
             <Box sx={answerFooterSx}>
               <Typography variant="caption" sx={mutedSx}>
-                {t.result.evidence.length} source{t.result.evidence.length === 1 ? '' : 's'} · query {t.result.queryId} · trace {t.result.traceId}
+                {t.result.evidence.length} passage{t.result.evidence.length === 1 ? '' : 's'} · query {t.result.queryId} · trace {t.result.traceId}
               </Typography>
               <Stack direction="row" gap={1}>
-                <Button size="small" variant="text" startIcon={<Copy size={14} />} onClick={() => copyAnswer(t)}>
-                  {copied === t.result.queryId ? 'Copied' : 'Copy answer'}
+                <Button size="small" variant="text" startIcon={<Copy size={14} />} disabled={!t.result.answer && t.result.evidence.length === 0} onClick={() => copyAnswer(t)}>
+                  {copied === t.result.queryId ? 'Copied' : t.result.answer ? 'Copy answer' : 'Copy passages'}
                 </Button>
                 <Button size="small" variant="outlined" startIcon={<Braces size={14} />} onClick={() => openInApi(t)}>
                   Use in API
@@ -224,8 +250,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       ))}
 
       {query.isError && (
-        <Alert severity="error" variant="outlined" onClose={() => query.reset()}>
-          {queryErrorMessage(query.error)}
+        <Alert severity="error" variant="outlined" onClose={queryFailure(query.error).forbidden ? undefined : () => query.reset()} action={queryFailure(query.error).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
+          {queryFailure(query.error).message}
         </Alert>
       )}
 

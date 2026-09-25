@@ -34,6 +34,7 @@ export interface SourceDrawerStart {
 }
 
 interface SourceDrawerProps {
+  orgHandle: string;
   open: boolean;
   start?: SourceDrawerStart;
   /** Sources already in the wizard, for unique names and single-instance connectors. */
@@ -49,7 +50,7 @@ interface SourceDrawerProps {
  * and a sticky footer, however large the catalog grows. Remount (change `key`)
  * to start a fresh session.
  */
-export default function SourceDrawer({ open, start, existing, onClose, onSubmit }: SourceDrawerProps): JSX.Element {
+export default function SourceDrawer({ orgHandle, open, start, existing, onClose, onSubmit }: SourceDrawerProps): JSX.Element {
   const [connectorId, setConnectorId] = useState<string | null>(start?.config?.type ?? start?.connectorId ?? null);
   const [draft, setDraft] = useState<ContextSourceConfig | null>(start?.config ?? (start?.connectorId ? blankSource(start.connectorId) : null));
   const editing = start?.index !== undefined;
@@ -87,7 +88,11 @@ export default function SourceDrawer({ open, start, existing, onClose, onSubmit 
       </Box>
 
       <Box sx={drawerBodySx}>
-        {connector && draft ? <ConnectorForm connector={connector} draft={draft} otherNames={otherNames} onChange={setDraft} onChangeSource={editing ? undefined : backToCatalog} /> : <ConnectorCatalog addedIds={existing.map((s) => s.type)} onPick={pick} />}
+        {connector && draft ? (
+          <ConnectorForm orgHandle={orgHandle} connector={connector} draft={draft} otherNames={otherNames} onChange={setDraft} onChangeSource={editing ? undefined : backToCatalog} />
+        ) : (
+          <ConnectorCatalog addedIds={existing.map((s) => s.type)} onPick={pick} />
+        )}
       </Box>
 
       {connector && draft && (
