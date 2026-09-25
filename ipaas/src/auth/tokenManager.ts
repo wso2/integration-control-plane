@@ -18,84 +18,74 @@
 
 import { refreshTokenApiUrl, revokeTokenApiUrl } from '../config/runtimeConfig';
 import { IS_CLOUD } from '../features';
+import * as cloudAuth from './cloudAuth';
+import * as wipAuth from './wipAuth';
 
-const ACCESS_TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
-const TOKEN_EXPIRES_AT_KEY = 'token_expires_at';
-const REFRESH_TOKEN_EXPIRES_AT_KEY = 'refresh_token_expires_at';
 const REDIRECT_URL_KEY = 'redirect_url';
 const OIDC_STATE_KEY = 'oidc_state';
 const OIDC_AUTH_MODE_KEY = 'auth_mode';
-const OIDC_ORG_HANDLE_KEY = 'org_handle';
+export const OIDC_ORG_HANDLE_KEY = 'org_handle';
 
 const EXPIRY_BUFFER_MS = 30_000;
+const RESTORE_TIMEOUT_MS = 5_000;
 
 interface TokenData {
   token: string;
   expiresIn: number;
   refreshToken: string;
-  refreshTokenExpiresIn: number;
 }
 
-const ASGARDEO_TOKEN_EXPIRY_BUFFER_MS = 60_000;
-
 let refreshPromise: Promise<void> | null = null;
-let asgardeoRefreshPromise: Promise<AsgardeoTokenData | null> | null = null;
+let accessTokenMemory: { token: string; expiresAt: number } | null = null;
 let onAuthFailure: (() => void) | null = null;
-let asgardeoTokenMemory: { token: string; expiresAt: number } | null = null;
-
-type AsgardeoTokenData = { access_token: string; refresh_token?: string; expires_in?: number };
 
 export function setOnAuthFailure(callback: () => void): void {
   onAuthFailure = callback;
 }
 
+export function endSession(): void {
+  clearTokens();
+  onAuthFailure?.();
+}
+
 export function saveTokens(data: TokenData): void {
   const now = Date.now();
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.token);
+  accessTokenMemory = { token: data.token, expiresAt: now + data.expiresIn * 1000 };
   localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
-  localStorage.setItem(TOKEN_EXPIRES_AT_KEY, String(now + data.expiresIn * 1000));
-  localStorage.setItem(REFRESH_TOKEN_EXPIRES_AT_KEY, String(now + data.refreshTokenExpiresIn * 1000));
 }
 
 export function getAccessToken(): string | null {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return accessTokenMemory?.token ?? null;
 }
 
-export function saveAsgardeoToken(token: string, expiresIn?: number): void {
-  asgardeoTokenMemory = { token, expiresAt: Date.now() + (expiresIn ?? 3600) * 1000 };
-}
-
-export function getAsgardeoToken(): string | null {
-  if (!asgardeoTokenMemory) return null;
-  if (Date.now() >= asgardeoTokenMemory.expiresAt - ASGARDEO_TOKEN_EXPIRY_BUFFER_MS) {
-    asgardeoTokenMemory = null;
-    return null;
-  }
-  return asgardeoTokenMemory.token;
-}
-
-export function clearAsgardeoToken(): void {
-  asgardeoTokenMemory = null;
-}
+// WIP only: the raw asgardeo token, kept in memory beside the STS access token.
+export { saveAsgardeoToken, getAsgardeoToken } from './wipAuth';
 
 export function getRefreshToken(): string | null {
   return localStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
+export function saveRefreshToken(refreshToken: string): void {
+  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
+// Whether this browser holds a session that a refresh can bring back
+export function hasStoredSession(): boolean {
+  return !!getRefreshToken();
+}
+
 export function clearTokens(): void {
-  asgardeoTokenMemory = null;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  if (!IS_CLOUD) wipAuth.clearAsgardeoToken();
+  accessTokenMemory = null;
   localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem(TOKEN_EXPIRES_AT_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_EXPIRES_AT_KEY);
 }
 
 /**
  * An expired, revoked, or already-rotated refresh token comes back as
  * `400 invalid_grant`
  */
-async function isInvalidGrant(res: Response): Promise<boolean> {
+export async function isInvalidGrant(res: Response): Promise<boolean> {
   try {
     const body = (await res.json()) as { error?: string };
     return body?.error === 'invalid_grant';
@@ -105,72 +95,30 @@ async function isInvalidGrant(res: Response): Promise<boolean> {
   }
 }
 
-// Shared single-flight WSO2 Identity Platform token refresh — ensures refreshOidcAccessToken and
-// getOrRefreshAsgardeoToken never race on the same refresh token.
-async function doAsgardeoRefresh(): Promise<AsgardeoTokenData | null> {
-  const cached = getAsgardeoToken();
-  if (cached) return { access_token: cached };
+// Sends a refresh_token grant to the IdP. On invalid_grant, retries once because another
+// tab may have already used this refresh token and stored the newer one.
+export async function postRefreshGrant(tokenEndpoint: string, clientId: string, refreshToken: string): Promise<Response> {
+  const post = (token: string) =>
+    fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: token,
+        client_id: clientId,
+      }).toString(),
+    });
 
-  if (asgardeoRefreshPromise) return asgardeoRefreshPromise;
-
-  const refreshToken = getRefreshToken();
-  const { asgardeoClientId, asgardeoTokenEndpoint } = window.API_CONFIG;
-  if (!refreshToken || !asgardeoClientId || !asgardeoTokenEndpoint) return null;
-
-  asgardeoRefreshPromise = (async () => {
-    try {
-      const res = await fetch(asgardeoTokenEndpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({
-          grant_type: 'refresh_token',
-          refresh_token: refreshToken,
-          client_id: asgardeoClientId,
-        }).toString(),
-      });
-      if (!res.ok) {
-        if (res.status === 401 || res.status === 403) {
-          throw new Error(`Asgardeo refresh auth failure: ${res.status}`);
-        }
-        if (res.status === 400 && (await isInvalidGrant(res))) {
-          throw new Error(`Asgardeo refresh auth failure: 400 invalid_grant`);
-        }
-        console.warn('[tokenManager] WSO2 Identity Platform token refresh transient error:', res.status);
-        return null;
-      }
-      const data: AsgardeoTokenData = await res.json();
-      saveAsgardeoToken(data.access_token, data.expires_in);
-      if (data.refresh_token) {
-        localStorage.setItem(REFRESH_TOKEN_KEY, data.refresh_token);
-      }
-      return data;
-    } catch (err) {
-      if (err instanceof Error && err.message.startsWith('Asgardeo refresh auth failure')) throw err;
-      console.warn('[tokenManager] WSO2 Identity Platform token refresh error:', err);
-      return null;
-    }
-  })().finally(() => {
-    asgardeoRefreshPromise = null;
-  });
-
-  return asgardeoRefreshPromise;
-}
-
-// Returns the raw WSO2 Identity Platform token (needed for APIs that don't accept STS tokens).
-// Falls back to a fresh WSO2 Identity Platform token via doAsgardeoRefresh if nothing is cached.
-export async function getOrRefreshAsgardeoToken(): Promise<string | null> {
-  try {
-    const data = await doAsgardeoRefresh();
-    return data?.access_token ?? null;
-  } catch {
-    return null;
-  }
+  const res = await post(refreshToken);
+  if (res.status !== 400) return res;
+  const latest = getRefreshToken();
+  if (!latest || latest === refreshToken || !(await isInvalidGrant(res.clone()))) return res;
+  return post(latest);
 }
 
 function isAccessTokenExpired(): boolean {
-  const expiresAt = localStorage.getItem(TOKEN_EXPIRES_AT_KEY);
-  if (!expiresAt) return true;
-  return Date.now() >= Number(expiresAt) - EXPIRY_BUFFER_MS;
+  if (!accessTokenMemory) return true;
+  return Date.now() >= accessTokenMemory.expiresAt - EXPIRY_BUFFER_MS;
 }
 
 export function saveOidcAuthMetadata(orgHandle?: string): void {
@@ -185,101 +133,8 @@ export function clearOidcAuthMetadata(): void {
   localStorage.removeItem(OIDC_ORG_HANDLE_KEY);
 }
 
-async function refreshOidcAccessToken(refreshToken: string): Promise<void> {
-  const { stsTokenEndpoint, stsClientId, stsScope, choreoOrgApiUrl } = window.API_CONFIG;
-
-  // Step 1: Refresh WSO2 Identity Platform access token (serialized with getOrRefreshAsgardeoToken)
-  let tokenData: AsgardeoTokenData | null;
-  try {
-    tokenData = await doAsgardeoRefresh();
-  } catch {
-    // Definitive auth failure (401/403 from WSO2 Identity Platform)
-    clearTokens();
-    onAuthFailure?.();
-    return;
-  }
-  if (!tokenData) {
-    // Transient failure — don't kill the session
-    return;
-  }
-
-  const newRefreshToken = tokenData.refresh_token ?? refreshToken;
-
-  if (!stsTokenEndpoint || !stsClientId) {
-    saveTokens({ token: tokenData.access_token, expiresIn: tokenData.expires_in ?? 3600, refreshToken: newRefreshToken, refreshTokenExpiresIn: 86400 });
-    return;
-  }
-
-  // Step 2: STS exchange with orgHandle for org-scoped token.
-  // If orgHandle is missing (e.g. old session predating the fix), look it up from the orgs API.
-  try {
-    let orgHandle: string | null = localStorage.getItem(OIDC_ORG_HANDLE_KEY);
-    if (!orgHandle && choreoOrgApiUrl) {
-      try {
-        const baseStsRes = await fetch(stsTokenEndpoint, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({
-            grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-            client_id: stsClientId,
-            subject_token: tokenData.access_token,
-            subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-            requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-            ...(stsScope ? { scope: stsScope } : {}),
-          }).toString(),
-        });
-        if (baseStsRes.ok) {
-          const { access_token: baseStsToken } = (await baseStsRes.json()) as { access_token: string };
-          const orgsRes = await fetch(`${choreoOrgApiUrl}/orgs`, { headers: { Authorization: `Bearer ${baseStsToken}` } });
-          if (orgsRes.ok) {
-            const orgsData = await orgsRes.json();
-            const orgs: Array<{ handle?: string; orgHandle?: string; org_handle?: string }> = orgsData.list ?? orgsData.organizations ?? (Array.isArray(orgsData) ? orgsData : []);
-            for (const org of orgs) {
-              const h = org.handle ?? org.orgHandle ?? org.org_handle;
-              if (h) {
-                orgHandle = h;
-                localStorage.setItem(OIDC_ORG_HANDLE_KEY, h);
-                break;
-              }
-            }
-          }
-        }
-      } catch {
-        // fall through — STS exchange will proceed without orgHandle
-      }
-    }
-
-    const stsParams: Record<string, string> = {
-      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-      client_id: stsClientId,
-      subject_token: tokenData.access_token,
-      subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-      requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-      ...(stsScope ? { scope: stsScope } : {}),
-      ...(orgHandle ? { orgHandle } : {}),
-    };
-
-    const stsRes = await fetch(stsTokenEndpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams(stsParams).toString(),
-    });
-
-    if (!stsRes.ok) {
-      if (stsRes.status === 401 || stsRes.status === 403 || (stsRes.status === 400 && (await isInvalidGrant(stsRes)))) {
-        clearTokens();
-        onAuthFailure?.();
-      }
-      return;
-    }
-
-    const stsData: { access_token: string; expires_in?: number } = await stsRes.json();
-    saveTokens({ token: stsData.access_token, expiresIn: stsData.expires_in ?? 3600, refreshToken: newRefreshToken, refreshTokenExpiresIn: 86400 });
-  } catch {
-    // Network/transient STS error — don't kill the session
-  }
-}
-
+// Gets a new access token using the stored refresh token: local users via the backend, OIDC users
+// via cloudAuth or wipAuth. Concurrent callers share one refresh; ends the session if it's rejected.
 export async function refreshAccessToken(): Promise<void> {
   if (refreshPromise) {
     await refreshPromise;
@@ -289,8 +144,7 @@ export async function refreshAccessToken(): Promise<void> {
   refreshPromise = (async () => {
     const refreshToken = getRefreshToken();
     if (!refreshToken) {
-      clearTokens();
-      onAuthFailure?.();
+      endSession();
       return;
     }
 
@@ -329,8 +183,7 @@ export async function refreshAccessToken(): Promise<void> {
         }
         // Only clear session for explicit auth failures; treat transient errors as non-fatal
         if (res.status === 401 || res.status === 403) {
-          clearTokens();
-          onAuthFailure?.();
+          endSession();
           return;
         }
         // 5xx / 429 / etc. — transient; fall through to OIDC refresh
@@ -341,12 +194,30 @@ export async function refreshAccessToken(): Promise<void> {
     }
 
     // OIDC refresh path
-    await refreshOidcAccessToken(refreshToken);
+    await (IS_CLOUD ? cloudAuth.refreshOidcSession(refreshToken) : wipAuth.refreshOidcSession(refreshToken));
   })().finally(() => {
     refreshPromise = null;
   });
 
   await refreshPromise;
+}
+
+// Runs once before the app renders: the access token lives only in memory, so after a reload
+// this gets a new one using the stored refresh token. Waits at most `timeoutMs`.
+export async function restoreSession(timeoutMs = RESTORE_TIMEOUT_MS): Promise<void> {
+  if (!hasStoredSession() || getAccessToken()) return;
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, timeoutMs);
+  });
+  try {
+    await Promise.race([refreshAccessToken(), timeout]);
+  } catch (err) {
+    console.warn('[tokenManager] session restore failed:', err);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
@@ -375,43 +246,8 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
   return res;
 }
 
-export async function switchOrgToken(orgHandle: string, signal?: AbortSignal): Promise<void> {
-  const currentToken = getAccessToken();
-  const { stsTokenEndpoint, stsClientId, stsScope } = window.API_CONFIG;
-  // Callers treat a resolved promise as "the token is now scoped to `orgHandle`" — silently
-  // resolving here (as this used to) would make that true when nothing was actually persisted.
-  if (!currentToken || !stsTokenEndpoint || !stsClientId) {
-    throw new Error('Org token exchange unavailable: missing auth token or STS configuration');
-  }
-
-  const res = await fetch(stsTokenEndpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
-      client_id: stsClientId,
-      subject_token: currentToken,
-      subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-      requested_token_type: 'urn:ietf:params:oauth:token-type:jwt',
-      ...(stsScope ? { scope: stsScope } : {}),
-      orgHandle,
-    }).toString(),
-    // Lets a caller cancel this exchange if it's been superseded by a newer one before it
-    // resolves — otherwise, whichever request resolves last wins and persists its (possibly
-    // stale) token/org_handle regardless of request order.
-    signal,
-  });
-
-  if (!res.ok) throw new Error(`Org token exchange failed (${res.status})`);
-
-  const data: { access_token: string; expires_in?: number } = await res.json();
-  localStorage.setItem('org_handle', orgHandle);
-  saveTokens({
-    token: data.access_token,
-    expiresIn: data.expires_in ?? 3600,
-    refreshToken: getRefreshToken() ?? '',
-    refreshTokenExpiresIn: 86400,
-  });
+export function switchOrgToken(orgHandle: string, signal?: AbortSignal): Promise<void> {
+  return IS_CLOUD ? cloudAuth.switchOrgToken(orgHandle, signal) : wipAuth.switchOrgToken(orgHandle, signal);
 }
 
 export async function revokeToken(): Promise<void> {
