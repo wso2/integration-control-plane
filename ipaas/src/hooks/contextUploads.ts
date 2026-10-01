@@ -29,10 +29,10 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent } from '#api/contextEngine';
-import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_LABELS_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
-import { engineMessage, uploadStatusFromRecord } from '../utils/contextEngine';
+import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_LABELS_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
+import { engineMessage, labelsFromRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
-import type { UploadedFile, UploadEntry } from '../types/contextEngine';
+import type { AudienceRule, UploadedFile, UploadEntry } from '../types/contextEngine';
 
 export interface FileToUpload {
   content: Blob;
@@ -54,6 +54,7 @@ const queues = new Map<string, (() => Promise<void>)[]>();
 const entryKey = (sourceId: string, recordId: string): string => `${sourceId}\u0000${recordId}`;
 const filesKey = (sourceId: string): string => `${CONTEXT_ENGINE_FILES_KEY_PREFIX}${sourceId}`;
 const labelsKey = (sourceId: string): string => `${CONTEXT_ENGINE_LABELS_KEY_PREFIX}${sourceId}`;
+const rulesKey = (sourceId: string): string => `${CONTEXT_ENGINE_RULES_KEY_PREFIX}${sourceId}`;
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -351,3 +352,15 @@ export function useSourceLabels(sourceId: string): { labels: string[]; addLabel:
 }
 
 const EMPTY_LABELS: string[] = [];
+
+/** A source's rules as this browser last saved them; empty when it never did. The engine does not return them. */
+export function rememberedSourceRules(sourceId: string): AudienceRule[] {
+  return readJson<AudienceRule[]>(rulesKey(sourceId), []).filter((r) => typeof r?.group === 'string' && typeof r?.role === 'string');
+}
+
+/** Keep a source's rules after saving them to the engine, and the labels they define. */
+export function rememberSourceRules(sourceId: string, rules: AudienceRule[]): void {
+  const complete = rules.filter((r) => r.group.trim() !== '' && r.role.trim() !== '').map((r) => ({ group: r.group.trim(), role: r.role.trim() }));
+  writeJson(rulesKey(sourceId), complete);
+  rememberSourceLabels(sourceId, labelsFromRules(complete));
+}

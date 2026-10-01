@@ -19,21 +19,26 @@
 import { Alert, Box, Button, Chip, CircularProgress, Grid, Link, Stack, Typography } from '@wso2/oxygen-ui';
 import { Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
-import { useAskedFlag, useContextEngineProgress, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine } from '../../../hooks/useContextEngine';
+import { useAddContextSource, useAskedFlag, useContextEngineProgress, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine } from '../../../hooks/useContextEngine';
+import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { CONTEXT_JOB_TERMINAL_STATES, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { getStartedSteps, summarizeEngineProgress } from '../../../utils/contextEngine';
+import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, sourceAsConfig, summarizeEngineProgress } from '../../../utils/contextEngine';
+import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GraphStatusChip from '../GraphStatusChip';
 import GetStartedChecklist from './GetStartedChecklist';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourcesProgressCard from './SourcesProgressCard';
 import FilesDrawer from '../files/FilesDrawer';
+import EditSourceDrawer from './EditSourceDrawer';
+import SourceDrawer from '../SourceDrawer';
 import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
-import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, GetStartedStepId } from '../../../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
   engine: ContextEngineDetail;
+  orgHandle: string;
   /** Role handle → display name. */
   roleNames: Record<string, string>;
   onGoTab: (tab: ContextEngineTabKey) => void;
@@ -98,7 +103,7 @@ function enrichFailure(e: unknown): EnrichFailure {
 }
 
 /** Overview — first-run checklist, source progress, enrichment, access, models, storage and exposure, each linking to its tab. */
-export default function OverviewTab({ engine, roleNames, onGoTab, openFilesSourceId }: OverviewTabProps): JSX.Element {
+export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, openFilesSourceId }: OverviewTabProps): JSX.Element {
   const [filesSource, setFilesSource] = useState<ContextSource | null>(() => engine.sources.find((s) => s.id === openFilesSourceId && s.type === 'upload') ?? null);
   const [filesOpen, setFilesOpen] = useState(!!openFilesSourceId);
   const openFiles = (source: ContextSource) => {
@@ -111,6 +116,40 @@ export default function OverviewTab({ engine, roleNames, onGoTab, openFilesSourc
   const { graph, job, remember } = useEngineGraphStatus(engine.id, engine.graph, rebuild.isPending);
   const progress = useContextEngineProgress(engine.id);
   const [enrichError, setEnrichError] = useState<EnrichFailure | null>(null);
+  // Adding a source reuses the wizard's drawer; the session key remounts it fresh each time.
+  const [addSession, setAddSession] = useState(0);
+  const [addOpen, setAddOpen] = useState(false);
+  const [editSource, setEditSource] = useState<ContextSource | null>(null);
+  const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
+  const addSource = useAddContextSource(engine.id);
+  const existingConfigs = engine.sources.map((s) => sourceAsConfig(s, rememberedSourceRules(s.id)));
+
+  const submitNewSource = (config: ContextSourceConfig) => {
+    setSourceNotice(null);
+    addSource.mutate(config, {
+      onSuccess: (created) => {
+        setAddOpen(false);
+        rememberSourceRules(created.id, config.audience ?? []);
+        const staged = config.staged ?? [];
+        const files = staged.flatMap((m) => {
+          const content = getStagedFile(m.id);
+          return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
+        });
+        staged.forEach((m) => dropStagedFile(m.id));
+        if (files.length && config.stagedLabel) {
+          startUploads(engine.id, created.id, files, config.stagedLabel);
+          openFiles(created);
+        }
+        if ((connectorFor(config.type)?.fields.length ?? 0) > 0) {
+          setSourceNotice({ severity: 'warning', message: `“${created.name}” is registered, but its connection settings and credentials are not stored: the engine does not serve the configuration route yet.` });
+        }
+      },
+      onError: (e) => {
+        const forbidden = e instanceof HttpError && e.status === 403;
+        setSourceNotice({ severity: 'error', forbidden, message: forbidden ? 'Adding a source needs the manage permission on this engine.' : engineMessage(e, "Couldn't add the source."), retry: () => submitNewSource(config) });
+      },
+    });
+  };
   const building = graph.state === 'building';
 
   // When a job we are watching ends, the engine may report new state — refetch the engine once.
@@ -154,6 +193,17 @@ export default function OverviewTab({ engine, roleNames, onGoTab, openFilesSourc
     <>
       {!allDone && <GetStartedChecklist steps={steps} onAction={onChecklistAction} />}
 
+      {sourceNotice && (
+        <Alert
+          severity={sourceNotice.severity}
+          variant="outlined"
+          onClose={() => setSourceNotice(null)}
+          action={sourceNotice.forbidden && sourceNotice.retry ? <OwnerAccessButton engineId={engine.id} onGranted={sourceNotice.retry} /> : undefined}
+          sx={{ mb: 2 }}>
+          {sourceNotice.message}
+        </Alert>
+      )}
+
       {enrichError && (
         <Alert severity="warning" variant="outlined" onClose={() => setEnrichError(null)} action={enrichError.forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={startEnrichment} /> : undefined} sx={{ mb: 2 }}>
           {enrichError.message}
@@ -162,7 +212,18 @@ export default function OverviewTab({ engine, roleNames, onGoTab, openFilesSourc
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 7 }}>
-          <SourcesProgressCard id={SOURCES_CARD_ID} engineId={engine.id} sources={engine.sources} graph={graph} onManageFiles={openFiles} />
+          <SourcesProgressCard
+            id={SOURCES_CARD_ID}
+            engineId={engine.id}
+            sources={engine.sources}
+            graph={graph}
+            onManageFiles={openFiles}
+            onAddSource={() => {
+              setAddSession((n) => n + 1);
+              setAddOpen(true);
+            }}
+            onEditSource={setEditSource}
+          />
         </Grid>
 
         <Grid size={{ xs: 12, md: 5 }}>
@@ -271,6 +332,8 @@ export default function OverviewTab({ engine, roleNames, onGoTab, openFilesSourc
       </Grid>
 
       {filesSource && <FilesDrawer engineId={engine.id} source={filesSource} open={filesOpen} onClose={() => setFilesOpen(false)} />}
+      <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
+      {editSource && <EditSourceDrawer key={editSource.id} engineId={engine.id} orgHandle={orgHandle} source={editSource} otherNames={engine.sources.filter((s) => s.id !== editSource.id).map((s) => s.name)} open onClose={() => setEditSource(null)} />}
     </>
   );
 }

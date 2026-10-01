@@ -22,7 +22,7 @@ import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine } from '../hooks/useContextEngine';
-import { checkStagedFile, engineDescriptionError, engineNameError, isFormDirty, labelsFromRules, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
+import { checkStagedFile, engineDescriptionError, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -33,7 +33,7 @@ import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
 import StorageStep from '../components/ContextEngine/steps/StorageStep';
 import ReviewStep from '../components/ContextEngine/steps/ReviewStep';
 import SetupProgress, { type SetupUploadSource } from '../components/ContextEngine/files/SetupProgress';
-import { rememberSourceLabels, startUploads } from '../hooks/contextUploads';
+import { rememberSourceRules, startUploads } from '../hooks/contextUploads';
 import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
 import type { OrgScope } from '../nav';
@@ -114,7 +114,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         for (const source of form.sources) {
           const sourceId = sources[source.name.trim()];
           if (!sourceId) continue;
-          rememberSourceLabels(sourceId, labelsFromRules(source.audience));
+          rememberSourceRules(sourceId, source.audience ?? []);
           const staged = source.staged ?? [];
           if (source.type !== 'upload' || staged.length === 0 || !source.stagedLabel) continue;
           const files = staged.flatMap((m) => {

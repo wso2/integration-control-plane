@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  addContextSource,
   createContextEngine,
   deleteContextEngine,
   deleteContextGrant,
@@ -32,13 +33,14 @@ import {
   queryContextEngine,
   rebuildContextEngine,
   updateContextEngineExposure,
+  updateContextSource,
 } from '#api/contextEngine';
 import { IS_WIP } from '../features';
 import { getAccessToken } from '../auth/tokenManager';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, CONTEXT_OWNER_ACTIONS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS } from '../constants/contextEngine';
 import { fromDraft, isEngineProgressActive, ownerGrantId, resolveGraphStatus, toDraft } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
-import type { ContextEngineExposure, ContextEngineForm, ContextGraphStatus, ContextQueryInput, CreateContextEngineInput, PutContextGrantInput } from '../types/contextEngine';
+import type { ContextEngineExposure, ContextEngineForm, ContextGraphStatus, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -86,6 +88,32 @@ export function useUpdateContextEngineExposure(engineId: string) {
   return useMutation({
     mutationFn: (exposure: ContextEngineExposure) => updateContextEngineExposure(engineId, exposure),
     onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] }),
+  });
+}
+
+/** Register a source on a running engine; the detail and listing refetch so the new source shows with its progress. */
+export function useAddContextSource(engineId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (source: ContextSourceConfig) => addContextSource(engineId, source),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
+      // The new source has no progress row until the next poll; fetch it now so the card never says "hidden".
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'progress', engineId] });
+    },
+  });
+}
+
+export function useUpdateContextSource(engineId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateContextSourceInput) => updateContextSource(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'progress', engineId] });
+    },
   });
 }
 

@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, LinearProgress, Stack, Typography } from '@wso2/oxygen-ui';
-import { Upload } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, LinearProgress, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Pencil, Plus, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useSourceUploads } from '../../../hooks/contextUploads';
 import type { JSX } from 'react';
 import { useContextEngineProgress } from '../../../hooks/useContextEngine';
@@ -48,6 +48,10 @@ interface SourcesProgressCardProps {
   graph: ContextGraphStatus;
   /** Opens the Files drawer for a File Upload source. */
   onManageFiles?: (source: ContextSource) => void;
+  /** Register another source on this engine. */
+  onAddSource?: () => void;
+  /** Rename a source or change its visibility rules. */
+  onEditSource?: (source: ContextSource) => void;
 }
 
 /** "Upload files" until this browser has uploaded something, then "Manage files" with the count. */
@@ -113,7 +117,7 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  * how many delivered items the engine has processed, and, once the engine
  * collects it, how much the search index has caught up. Polls while anything moves.
  */
-export default function SourcesProgressCard({ id, engineId, sources, graph, onManageFiles }: SourcesProgressCardProps): JSX.Element {
+export default function SourcesProgressCard({ id, engineId, sources, graph, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
   const progressQuery = useContextEngineProgress(engineId);
   const progress = progressQuery.data;
   const available = !!progress?.available;
@@ -139,12 +143,19 @@ export default function SourcesProgressCard({ id, engineId, sources, graph, onMa
             <Typography variant="caption">Loading progress…</Typography>
           </Box>
         )}
-        {summary && sources.length > 0 && (
-          <Box sx={progressHeadlineSx} aria-live="polite">
-            {summary.active > 0 && <CircularProgress size={12} color="inherit" aria-hidden />}
-            <Typography variant="caption">{progressHeadline(summary)}</Typography>
-          </Box>
-        )}
+        <Stack direction="row" alignItems="center" gap={1.5}>
+          {summary && sources.length > 0 && (
+            <Box sx={progressHeadlineSx} aria-live="polite">
+              {summary.active > 0 && <CircularProgress size={12} color="inherit" aria-hidden />}
+              <Typography variant="caption">{progressHeadline(summary)}</Typography>
+            </Box>
+          )}
+          {onAddSource && (
+            <Button size="small" variant="outlined" startIcon={<Plus size={14} />} onClick={onAddSource}>
+              Add source
+            </Button>
+          )}
+        </Stack>
       </Box>
 
       {progressQuery.isError && (
@@ -177,7 +188,7 @@ export default function SourcesProgressCard({ id, engineId, sources, graph, onMa
 
       {sources.length === 0 ? (
         <Typography variant="body2" sx={mutedSx}>
-          No sources are registered on this engine yet.
+          No sources are registered on this engine yet.{onAddSource ? ' Add one to start indexing.' : ''}
         </Typography>
       ) : (
         sources.map((s) => {
@@ -199,6 +210,13 @@ export default function SourcesProgressCard({ id, engineId, sources, graph, onMa
                 <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
                   {p ? <ProgressChip progress={p} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} graph={graph} />}
                   {s.type === 'upload' && onManageFiles && <FilesAction engineId={engineId} source={s} onManage={onManageFiles} />}
+                  {onEditSource && (
+                    <Tooltip title="Edit source">
+                      <IconButton size="small" aria-label={`Edit ${s.name}`} onClick={() => onEditSource(s)}>
+                        <Pencil size={16} />
+                      </IconButton>
+                    </Tooltip>
+                  )}
                 </Stack>
               </Box>
               {p && <ProgressBody source={s} progress={p} />}

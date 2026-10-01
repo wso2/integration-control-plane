@@ -171,7 +171,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {activeTab === 'overview' && <OverviewTab engine={engine} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} />}
+      {activeTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} />}
       {activeTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
       {activeTab === 'api' && <ApiTab engine={engine} />}
       {activeTab === 'mcp' && <McpTab engine={engine} />}

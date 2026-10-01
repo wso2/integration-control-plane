@@ -433,8 +433,8 @@ export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Engine actions a querying role receives — read context, open evidence, see the trace. */
 export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
 
-/** What the creator of an engine gets on it: query it, start enrichments and upload files. The engine grants creators nothing by itself. */
-export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'context.enrich', 'ingest.write'] as const;
+/** What the creator of an engine gets on it: query it, start enrichments, upload files and manage its sources. The engine grants creators nothing by itself. */
+export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'context.enrich', 'ingest.write', 'source.manage'] as const;
 
 /** The creator's grant is keyed `owner-<principalId>`. */
 export const OWNER_GRANT_PREFIX = 'owner-';
@@ -531,6 +531,9 @@ export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';
 
 /** localStorage key of the visibility labels known for a source, until the engine reports a source's audience mapping. */
 export const CONTEXT_ENGINE_LABELS_KEY_PREFIX = 'contextEngine:labels:';
+
+/** localStorage key of a source's visibility rules as this browser last saved them, for the edit form. */
+export const CONTEXT_ENGINE_RULES_KEY_PREFIX = 'contextEngine:rules:';
 
 /** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
 export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];

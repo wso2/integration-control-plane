@@ -37,7 +37,7 @@ import { contextEngineClient } from './httpClients';
 import { getAccessToken } from '../../auth/tokenManager';
 import { getServer, getServerAdminUser } from './platformServices';
 import { CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
-import { deliveryIdentity, infrastructureStorageKinds, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
+import { audienceMappingFromRules, deliveryIdentity, infrastructureStorageKinds, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
   ContextEngine,
@@ -60,6 +60,8 @@ import type {
   CreateContextEngineInput,
   CreateContextEngineResult,
   IngestFileInput,
+  ContextSourceConfig,
+  UpdateContextSourceInput,
   PutContextGrantInput,
   RecordEventInput,
   SourceIndexingState,
@@ -447,6 +449,23 @@ export async function getContextEngineProgress(engineId: string): Promise<Contex
     if (isMissingRoute(err)) return { available: false, sources: [] };
     throw err;
   }
+}
+
+// ── Sources ─────────────────────────────────────────────────────────────────
+
+/** Register a source on a running engine with its visibility rules. Connection settings still wait for the configuration route. */
+export async function addContextSource(engineId: string, source: ContextSourceConfig): Promise<ContextSource> {
+  return toSource(await contextEngineClient.post<RawSource>(`${spacePath(engineId)}/sources`, toSourceRegistration(source)));
+}
+
+/** Rename a source, replace its visibility rules, or pause and resume it. */
+export async function updateContextSource(input: UpdateContextSourceInput): Promise<ContextSource> {
+  const body = {
+    ...(input.name !== undefined ? { name: input.name.trim() } : {}),
+    ...(input.audience ? { audienceMapping: audienceMappingFromRules(input.audience) } : {}),
+    ...(input.state ? { state: input.state } : {}),
+  };
+  return toSource(await contextEngineClient.patch<RawSource>(`${V1}/sources/${encodeURIComponent(input.sourceId)}`, body));
 }
 
 // ── File uploads ────────────────────────────────────────────────────────────

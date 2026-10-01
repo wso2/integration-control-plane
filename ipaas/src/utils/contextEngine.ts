@@ -48,6 +48,7 @@ import type {
   ContextGraphStatus,
   ContextJob,
   ContextRecordStatus,
+  ContextSource,
   ContextSourceConfig,
   CreateContextEngineInput,
   GetStartedStep,
@@ -890,8 +891,18 @@ export function splitCitations(answer: string): AnswerPart[] {
 
 /** `RegisterSource` body for the engine's `POST /spaces/{id}/sources`. Credentials never travel here. */
 export function toSourceRegistration(source: ContextSourceConfig): { name: string; type: string; audienceMapping: Record<string, string> } {
-  const complete = (source.audience ?? []).filter((r) => nonEmpty(r.group) && nonEmpty(r.role));
-  return { name: source.name.trim(), type: source.type, audienceMapping: Object.fromEntries(complete.map((r) => [r.group.trim(), r.role.trim()])) };
+  return { name: source.name.trim(), type: source.type, audienceMapping: audienceMappingFromRules(source.audience) };
+}
+
+/** The audience mapping the engine stores: complete rules only, trimmed, later rules winning a repeated group. */
+export function audienceMappingFromRules(rules: AudienceRule[] | undefined): Record<string, string> {
+  const complete = (rules ?? []).filter((r) => nonEmpty(r.group) && nonEmpty(r.role));
+  return Object.fromEntries(complete.map((r) => [r.group.trim(), r.role.trim()]));
+}
+
+/** A registered source as the wizard's drawer understands it: for name checks, single-instance connectors and the edit form. */
+export function sourceAsConfig(source: ContextSource, rules: AudienceRule[] = []): ContextSourceConfig {
+  return { type: source.type, name: source.name, values: {}, audience: rules.length ? rules : [{ group: '', role: '' }] };
 }
 
 /** Non-secret field values — where a source points. */

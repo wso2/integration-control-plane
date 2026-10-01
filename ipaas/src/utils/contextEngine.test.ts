@@ -19,6 +19,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   audienceError,
+  audienceMappingFromRules,
+  sourceAsConfig,
   checkStagedFile,
   contentTypeForFile,
   deliveryIdentity,
@@ -290,6 +292,21 @@ describe('access helpers', () => {
 });
 
 describe('wire payloads', () => {
+  it('turns rules into the engine mapping and a source back into a config', () => {
+    expect(
+      audienceMappingFromRules([
+        { group: ' a ', role: ' admin ' },
+        { group: 'b', role: '' },
+        { group: '', role: 'x' },
+        { group: 'a', role: 'developer' },
+      ]),
+    ).toEqual({ a: 'developer' });
+    expect(audienceMappingFromRules(undefined)).toEqual({});
+    const src = { id: 's1', name: 'Wiki', type: 'confluence', state: 'ready' };
+    expect(sourceAsConfig(src)).toEqual({ type: 'confluence', name: 'Wiki', values: {}, audience: [{ group: '', role: '' }] });
+    expect(sourceAsConfig(src, [{ group: 'eng', role: 'admin' }]).audience).toEqual([{ group: 'eng', role: 'admin' }]);
+  });
+
   it('registers a source without credentials', () => {
     const src = completeForm().sources[0];
     expect(toSourceRegistration(src)).toEqual({ name: 'GitHub', type: 'github', audienceMapping: { engineering: 'admin' } });

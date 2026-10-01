@@ -474,6 +474,15 @@ export interface ContextGrant {
   group?: string;
 }
 
+/** A change to a registered source; every field is optional, but one must be set. */
+export interface UpdateContextSourceInput {
+  sourceId: string;
+  name?: string;
+  /** Replaces all of the source's visibility rules. */
+  audience?: AudienceRule[];
+  state?: 'ready' | 'paused';
+}
+
 export interface PutContextGrantInput {
   engineId: string;
   grantId: string;
