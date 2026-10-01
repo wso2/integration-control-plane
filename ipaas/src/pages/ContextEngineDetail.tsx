@@ -149,8 +149,8 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
       </Stack>
 
       {warnings.length > 0 && (
-        <Alert severity="info" variant="outlined" onClose={() => setWarnings([])} sx={{ mb: 3 }}>
-          The engine was created. The connected engine does not serve these steps yet, so they were skipped:
+        <Alert severity="warning" variant="outlined" onClose={() => setWarnings([])} sx={{ mb: 3 }}>
+          The engine was created, but not every step completed:
           <Box component="ul" sx={{ m: 0, mt: 1, pl: 2.5 }}>
             {warnings.map((w) => (
               <li key={w}>{w}</li>

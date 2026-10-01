@@ -22,7 +22,7 @@ import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine } from '../hooks/useContextEngine';
-import { checkStagedFile, engineDescriptionError, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
+import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -136,6 +136,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         if (e instanceof HttpError && e.status === 409) setError('A context engine with this name already exists.');
         else if (e instanceof HttpError && e.status === 401) setError('The context engine rejected the credential. Check the engine token in runtime config.');
         else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines. Ask an engine administrator for the space.manage action.");
+        else if (e instanceof HttpError) setError(`Couldn't create the context engine: ${engineMessage(e)}`);
         else setError("Couldn't create the context engine. Please try again.");
       },
     });

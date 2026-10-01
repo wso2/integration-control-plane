@@ -103,7 +103,7 @@ function UploadSource({ engineId, source }: { engineId: string; source: SetupUpl
 
 /** What the wizard shows after Create while the staged files are handed to the new engine. */
 export default function SetupProgress({ engineId, engineName, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
-  const configSkipped = warnings.some((w) => /configuration/i.test(w));
+  const configSkipped = warnings.some((w) => /models/i.test(w));
   return (
     <Box sx={setupCardSx}>
       <Stack direction="row" alignItems="center" gap={1.5}>
@@ -124,8 +124,8 @@ export default function SetupProgress({ engineId, engineName, sourceCount, roleC
         <Step tone="done">{`${sourceCount} source${sourceCount === 1 ? '' : 's'} registered with visibility rules`}</Step>
         {roleCount > 0 && <Step tone="done">{`${roleCount} role${roleCount === 1 ? '' : 's'} granted query access`}</Step>}
         {configSkipped && (
-          <Step tone="skipped" aside="The engine does not serve it yet">
-            Model and storage configuration skipped
+          <Step tone="skipped" aside={warnings.find((w) => /models/i.test(w))?.split(': ')[1]}>
+            Models were not saved
           </Step>
         )}
         {uploads.map((u) => (

@@ -25,9 +25,10 @@
  * served yet answer 404/405: evidence, traces, space deletion. Queries serve
  * context mode only (answer mode is rejected until the engine's M5), and both
  * queries and enrichments answer 503 when the engine runs without its knowledge backend.
- * Two routes are proposals this UI needs the engine to add:
- * `PUT/GET /v1/spaces/{id}/configuration` (models + source settings and
- * credentials) and `PUT /v1/spaces/{id}/exposures` (API/MCP publishing).
+ * `PUT/GET /v1/spaces/{id}/configuration` stores the models; the engine encrypts
+ * literal API keys, which needs its secrets key, and ignores the storage and
+ * source settings sent alongside. `PUT /v1/spaces/{id}/exposures` (API/MCP
+ * publishing) is still a proposal this UI needs the engine to add.
  *
  * Reads that hit a missing route degrade to an empty section so the detail page
  * still renders; the create flow reports them as warnings instead of failing.
@@ -37,7 +38,19 @@ import { contextEngineClient } from './httpClients';
 import { getAccessToken } from '../../auth/tokenManager';
 import { getServer, getServerAdminUser } from './platformServices';
 import { CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
-import { audienceMappingFromRules, deliveryIdentity, infrastructureStorageKinds, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
+import {
+  audienceMappingFromRules,
+  deliveryIdentity,
+  engineMessage,
+  infrastructureStorageKinds,
+  ownerGrantId,
+  roleGrantId,
+  rolesFromGrants,
+  summarizeEngineProgress,
+  toConfigurationPayload,
+  toSourceRegistration,
+  type ResolvedConnection,
+} from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
   ContextEngine,
@@ -143,10 +156,11 @@ interface RawPrincipal {
   groups?: string[];
 }
 
-/** Proposed `GET /v1/spaces/{id}/configuration` response — models, exposure and graph status, without credentials. */
+/** `GET /v1/spaces/{id}/configuration`: models without their keys, whether the embedding is locked, and where each store runs. */
 interface RawConfiguration {
-  embedding?: { provider: string; model: string } | null;
-  llm?: { provider: string; model: string } | null;
+  embedding?: { provider: string; model: string; keyKind?: string } | null;
+  llm?: { provider: string; model: string; keyKind?: string } | null;
+  embeddingLocked?: boolean;
   exposure?: { api?: boolean; mcp?: boolean } | null;
   graph?: { state?: string; builtAt?: string; jobId?: string; progress?: { done: number; total: number } } | null;
   storage?: Partial<Record<StorageKind, { provider?: string; label?: string; detail?: string } | null>> | null;
@@ -240,13 +254,24 @@ const toGraph = (raw: RawConfiguration['graph']): ContextGraphStatus => ({
 
 const toExposure = (raw: RawConfiguration | null | undefined): ContextEngineExposure => ({ api: raw?.exposure?.api ?? false, mcp: raw?.exposure?.mcp ?? false });
 
+/** The engine reports a store by provider id; the card shows the name people know. */
+const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
+  lancedb: { label: 'LanceDB', detail: 'Engine managed · embedded' },
+  sqlite: { label: 'SQLite', detail: 'Engine managed · embedded' },
+  kuzu: { label: 'Kuzu', detail: 'Engine managed · embedded' },
+  pgvector: { label: 'PostgreSQL + pgvector', detail: 'External' },
+  postgres: { label: 'PostgreSQL', detail: 'External' },
+  neo4j: { label: 'Neo4j', detail: 'External' },
+};
+
 /** Per-store placement from the configuration route; null until the engine reports any. */
 const toStorage = (raw: RawConfiguration | null | undefined): Record<StorageKind, StorageSummary> | null => {
   const st = raw?.storage;
   if (!st) return null;
   const one = (kind: StorageKind): StorageSummary => {
     const s = st[kind];
-    return { provider: s?.provider ?? 'unknown', label: s?.label ?? (s?.provider ? s.provider : 'Not reported'), detail: s?.detail };
+    const known = s?.provider ? STORE_PROVIDER_LABEL[s.provider] : undefined;
+    return { provider: s?.provider ?? 'unknown', label: s?.label ?? known?.label ?? (s?.provider ? s.provider : 'Not reported'), detail: s?.detail ?? known?.detail };
   };
   return { vector: one('vector'), relational: one('relational'), graph: one('graph') };
 };
@@ -374,12 +399,20 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
   const warnings: string[] = [];
   const sources: Record<string, string> = {};
 
-  const attempt = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
+  // A step the engine does not serve is skipped with a note. A step marked `tolerate`
+  // may also fail outright without sinking the engine: it is reported with the engine's
+  // reason instead, because the space and its sources are already usable and the
+  // engine cannot delete a space yet, so rolling back would only leave an orphan.
+  const attempt = async (label: string, fn: () => Promise<unknown>, tolerate = false): Promise<void> => {
     try {
       await fn();
     } catch (err) {
       if (isMissingRoute(err)) {
-        warnings.push(label);
+        warnings.push(`${label}: the engine does not serve this yet`);
+        return;
+      }
+      if (tolerate) {
+        warnings.push(`${label}: ${engineMessage(err, 'the engine refused it')}`);
         return;
       }
       throw err;
@@ -401,7 +434,7 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
     for (const role of input.roles) {
       await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(`${grantsPath(space.id)}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
     }
-    await attempt('Save model, storage and source configuration', () => contextEngineClient.put(`${spacePath(space.id)}/configuration`, toConfigurationPayload(input, connections)));
+    await attempt('Save the models', () => contextEngineClient.put(`${spacePath(space.id)}/configuration`, toConfigurationPayload(input, connections)), true);
   } catch (err) {
     // Best-effort rollback so a half-configured engine does not linger in the listing.
     await optional(() => contextEngineClient.delete(spacePath(space.id)), undefined).catch(() => undefined);
