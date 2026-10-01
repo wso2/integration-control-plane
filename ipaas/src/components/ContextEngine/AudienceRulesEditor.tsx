@@ -26,6 +26,8 @@ import type { AudienceRule } from '../../types/contextEngine';
 
 interface AudienceRulesEditorProps {
   orgHandle: string;
+  /** `labels`: the groups are labels the user picks per upload, not tags a connector sends. */
+  variant?: 'groups' | 'labels';
   /** Connector display name, e.g. "Confluence", for the group label. */
   connectorName: string;
   rules: AudienceRule[];
@@ -39,7 +41,8 @@ const BLANK: AudienceRule = { group: '', role: '' };
  * groups allowed to see it in the source system; each rule maps one of those
  * groups to an org role. The engine holds back items whose groups have no rule.
  */
-export default function AudienceRulesEditor({ orgHandle, connectorName, rules, onChange }: AudienceRulesEditorProps): JSX.Element {
+export default function AudienceRulesEditor({ orgHandle, variant = 'groups', connectorName, rules, onChange }: AudienceRulesEditorProps): JSX.Element {
+  const labels = variant === 'labels';
   const roles = useRoles(orgHandle);
   const rows = rules.length ? rules : [BLANK];
   const typed = rows.some((r) => r.group.trim() || r.role.trim());
@@ -79,15 +82,17 @@ export default function AudienceRulesEditor({ orgHandle, connectorName, rules, o
   return (
     <Box sx={audienceSectionSx}>
       <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-        Who can see this content
+        {labels ? 'Who can see uploaded files' : 'Who can see this content'}
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 2 }}>
-        {`${connectorName} tells the engine which of its groups may see each item. Map those groups to org roles. Items with a group you haven't mapped are held back, and only role members with query access see the rest.`}
+        {labels
+          ? 'Define labels and map each to an org role. You pick a label for every upload; members of its role, with query access, can find those files.'
+          : `${connectorName} tells the engine which of its groups may see each item. Map those groups to org roles. Items with a group you haven't mapped are held back, and only role members with query access see the rest.`}
       </Typography>
       <Stack sx={fieldStackSx}>
         {rows.map((rule, i) => (
           <Box key={i} sx={audienceRowSx}>
-            <TextField label={`${connectorName} group`} size="small" fullWidth value={rule.group} placeholder="e.g. engineering" onChange={(e) => setRow(i, { group: e.target.value })} />
+            <TextField label={labels ? 'Label' : `${connectorName} group`} size="small" fullWidth value={rule.group} placeholder="e.g. engineering" onChange={(e) => setRow(i, { group: e.target.value })} />
             {roleField(rule, i)}
             <Tooltip title="Remove rule">
               <span>
@@ -101,7 +106,7 @@ export default function AudienceRulesEditor({ orgHandle, connectorName, rules, o
       </Stack>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mt: 1.5 }} flexWrap="wrap">
         <Button size="small" variant="text" startIcon={<Plus size={14} />} onClick={() => onChange([...rows, BLANK])}>
-          Map another group
+          {labels ? 'Add a label' : 'Map another group'}
         </Button>
         {error && (
           <Typography variant="caption" color={typed ? 'error' : 'text.secondary'} role="status">

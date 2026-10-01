@@ -173,6 +173,10 @@ export interface ContextSourceConfig {
   name: string;
   values: Record<string, string>;
   audience: AudienceRule[];
+  /** File Upload only: files chosen in the wizard, uploaded right after the engine exists. The bytes live in {@link stagedFiles}, not here. */
+  staged?: StagedFileMeta[];
+  /** File Upload only: the visibility label the staged files are uploaded under. */
+  stagedLabel?: string;
 }
 
 // ── Source progress ─────────────────────────────────────────────────────────
@@ -222,6 +226,94 @@ export interface ContextEngineProgressSummary {
   percent: number | null;
   /** Delivered items that failed, across all sources. */
   failedItems: number;
+}
+
+// ── File uploads ────────────────────────────────────────────────────────────
+
+/** A file chosen for upload, without its bytes; drafts keep this and the bytes are re-added. */
+export interface StagedFileMeta {
+  id: string;
+  name: string;
+  size: number;
+  contentType: string;
+}
+
+/** Why a chosen file cannot be uploaded, or what to warn about. */
+export interface StagedFileCheck {
+  /** Blocks the upload. */
+  problem?: 'too-large' | 'unsupported';
+  /** Uploads, but is worth a warning. */
+  warning?: 'pdf';
+  /** A file of this name is already in the source; uploading replaces it. */
+  replaces: boolean;
+}
+
+/** The engine's per-record index state. */
+export type ContextIndexState = 'pending' | 'indexed' | 'failed' | 'reconcile_required' | 'not_indexed';
+
+/** `GET /v1/sources/{id}/records/{recordId}`. */
+export interface ContextRecordStatus {
+  recordId: string;
+  state: 'active' | 'quarantined' | 'deleted' | string;
+  currentVersion: string;
+  sourceAclVersion: string;
+  quarantineReason?: string;
+  indexState: ContextIndexState | string;
+  indexError?: string;
+  updatedAt: string;
+}
+
+/**
+ * Where an uploaded file is, in plain words: the transfer, the engine's job,
+ * then the record's index state. `stored` is a file the engine keeps but cannot
+ * search because its knowledge backend is off; `unreadable` is a kept file whose type has no reader yet.
+ */
+export type UploadFileStatus = 'uploading' | 'queued' | 'indexing' | 'searchable' | 'stored' | 'unreadable' | 'held' | 'failed';
+
+/** One file the UI uploaded to a source; remembered per browser until the engine lists records. */
+export interface UploadedFile {
+  recordId: string;
+  name: string;
+  size: number;
+  contentType: string;
+  label: string;
+  version: string;
+  uploadedAt: string;
+  /** The engine job that applied, or will apply, the latest delivery; followed after a reload until it finishes. */
+  jobId?: string;
+}
+
+export interface UploadEntry extends UploadedFile {
+  status: UploadFileStatus;
+  /** 0–100 while uploading. */
+  progress: number;
+  /** Why the file failed or is held back, for the row. */
+  detail?: string;
+  /** The engine refused the caller; the owner grant would fix it. */
+  forbidden?: boolean;
+}
+
+export interface IngestFileInput {
+  engineId: string;
+  sourceId: string;
+  recordId: string;
+  content: Blob;
+  contentType: string;
+  /** The source's audience label the file is visible under. */
+  label: string;
+  /** Numeric, growing: epoch milliseconds. */
+  version: string;
+  onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
+}
+
+export interface RecordEventInput {
+  engineId: string;
+  sourceId: string;
+  recordId: string;
+  operation: 'delete' | 'acl_changed';
+  label: string;
+  version: string;
 }
 
 // ── Models ──────────────────────────────────────────────────────────────────
@@ -311,6 +403,8 @@ export interface CreateContextEngineInput {
 
 export interface CreateContextEngineResult {
   id: string;
+  /** Engine ids of the registered sources, by the name the wizard gave them. */
+  sources: Record<string, string>;
   /** Steps the engine could not complete because it does not expose that route yet. */
   warnings: string[];
 }
@@ -400,6 +494,8 @@ export interface ContextPrincipal {
 export type GetStartedStepId = 'index' | 'ask' | 'publish' | 'grant';
 
 export interface GetStartedStep {
+  /** Button label when it differs from the step's default. */
+  action?: string;
   id: GetStartedStepId;
   title: string;
   description: string;

@@ -19,6 +19,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   audienceError,
+  checkStagedFile,
+  contentTypeForFile,
+  deliveryIdentity,
+  engineMessage,
+  formatBytes,
+  labelsFromRules,
+  stagedBlocker,
+  stagedFileNote,
+  stagedSummary,
+  summarizeUploads,
+  uploadStatusFromRecord,
+  withStagedLabel,
   buildMcpClientConfig,
   evidenceLocationLabel,
   ownerGrantId,
@@ -80,7 +92,9 @@ import {
   toSourceRegistration,
 } from './contextEngine';
 import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, SOURCE_CONNECTORS } from '../constants/contextEngine';
-import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
+import { HttpError } from '../types/http';
+import { dropStagedFile, putStagedFile } from './stagedFiles';
 import type { EmbeddingConfig } from '../types/ragIngestion';
 
 const embedding: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'sk-test', azureApiVersion: '', azureBaseUrl: '' };
@@ -638,5 +652,109 @@ describe('source progress', () => {
     expect(progressListingText(summarizeEngineProgress(['a'], [progress({ sourceId: 'a' })]))).toBe('Waiting for data');
     expect(progressListingText(summarizeEngineProgress(['a', 'b'], [progress({ sourceId: 'a', records: { active: 3 } }), progress({ sourceId: 'b' })]))).toBe('1 of 2 processed');
     expect(progressHeadline(summarizeEngineProgress(['a'], []))).toBe('Progress hidden');
+  });
+});
+
+describe('file uploads', () => {
+  const MB = 1024 * 1024;
+  const record = (o: Partial<ContextRecordStatus>): ContextRecordStatus => ({ recordId: 'r', state: 'active', currentVersion: '1', sourceAclVersion: '1', indexState: 'pending', updatedAt: 'x', ...o });
+
+  it('decides the content type by extension before the browser type', () => {
+    expect(contentTypeForFile('notes.md', '')).toBe('text/markdown');
+    expect(contentTypeForFile('README.MD', 'application/octet-stream')).toBe('text/markdown');
+    expect(contentTypeForFile('data.json')).toBe('application/json');
+    expect(contentTypeForFile('archive', 'text/plain; charset=utf-8')).toBe('text/plain');
+    expect(contentTypeForFile('photo.png', 'image/png')).toBe('');
+  });
+
+  it('formats sizes without a stray decimal', () => {
+    expect(formatBytes(512)).toBe('512 B');
+    expect(formatBytes(3277)).toBe('3.2 KB');
+    expect(formatBytes(25 * MB)).toBe('25 MB');
+    expect(formatBytes(4.8 * MB)).toBe('4.8 MB');
+  });
+
+  it('checks a chosen file and explains the outcome', () => {
+    const big = { name: 'metrics.json', size: 41.2 * MB, contentType: 'application/json' };
+    const bin = { name: 'app.bin', size: 10, contentType: '' };
+    const pdf = { name: 'ref.pdf', size: 4.8 * MB, contentType: 'application/pdf' };
+    const dup = { name: 'oncall.txt', size: 1100, contentType: 'text/plain' };
+    expect(checkStagedFile(big, [])).toEqual({ problem: 'too-large', replaces: false });
+    expect(stagedFileNote(checkStagedFile(big, []), big.size)).toBe('41.2 MB is over the 25 MB limit. Split it or leave it out.');
+    expect(checkStagedFile(bin, [])).toEqual({ problem: 'unsupported', replaces: false });
+    expect(checkStagedFile(pdf, [])).toEqual({ warning: 'pdf', replaces: false });
+    expect(checkStagedFile(dup, ['oncall.txt'])).toEqual({ replaces: true });
+    expect(stagedFileNote(checkStagedFile(dup, ['oncall.txt']), dup.size)).toBe('Replaces the version already in the source');
+    expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size, pdfs: 1 });
+  });
+
+  it('lists labels from rules without blanks or repeats', () => {
+    expect(
+      labelsFromRules([
+        { group: ' engineering ', role: 'admin' },
+        { group: '', role: '' },
+        { group: 'engineering', role: 'developer' },
+        { group: 'support', role: 'developer' },
+      ]),
+    ).toEqual(['engineering', 'support']);
+  });
+
+  it('maps record status to a file status', () => {
+    expect(uploadStatusFromRecord(record({ indexState: 'indexed' }))).toEqual({ status: 'searchable' });
+    expect(uploadStatusFromRecord(record({ indexState: 'pending' }))).toEqual({ status: 'indexing' });
+    expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
+    expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
+    expect(uploadStatusFromRecord(record({ indexState: 'not_indexed' })).status).toBe('stored');
+    expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({ status: 'held', detail: 'Its label has no visibility rule, so nobody can see it.' });
+    expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
+    expect(summarizeUploads([])).toBe('No files yet');
+  });
+
+  it('reads the engine message out of an HTTP error', () => {
+    expect(engineMessage(new HttpError(415, 'HTTP 415: {"code":"unsupported_media_type","message":"Unsupported Media Type","traceId":"t"}'))).toBe('Unsupported Media Type');
+    expect(engineMessage(new HttpError(502, 'HTTP 502: Bad Gateway'))).toBe('Bad Gateway');
+    expect(engineMessage(new Error('offline'))).toBe('offline');
+    expect(deliveryIdentity('a.md', '17')).toBe('4:a.md:17');
+  });
+
+  it('blocks a File Upload source whose staged files lack a label or their bytes', () => {
+    const src: ContextSourceConfig = { ...upload('Files'), staged: [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedLabel: '' };
+    expect(stagedBlocker(src)).toBe('Choose who can see the files');
+    expect(isSourceValid(src)).toBe(false);
+    const labelled = { ...src, stagedLabel: 'engineering' };
+    expect(stagedBlocker(labelled)).toBe('Re-add 1 file');
+    expect(sourceIncompleteReason(labelled)).toBe('Re-add 1 file');
+    putStagedFile('f1', new Blob(['# a']));
+    expect(stagedBlocker(labelled)).toBe('');
+    expect(isSourceValid(labelled)).toBe(true);
+    expect(summarizeSource(labelled)).toBe('1 file staged · 10 B');
+    dropStagedFile('f1');
+    expect(summarizeSource(upload())).toBe('Upload files after the engine is created');
+  });
+
+  it('keeps the staged label to one a rule defines', () => {
+    const src = {
+      ...upload('Files'),
+      audience: [
+        { group: 'engineering', role: 'admin' },
+        { group: 'support', role: 'developer' },
+      ],
+    };
+    expect(withStagedLabel({ ...src, stagedLabel: 'support' }).stagedLabel).toBe('support');
+    expect(withStagedLabel({ ...src, stagedLabel: 'legal' }).stagedLabel).toBe('engineering');
+    expect(withStagedLabel({ ...src, audience: [], stagedLabel: 'x' }).stagedLabel).toBe('');
+  });
+
+  it('keeps staged file names in a restored draft', () => {
+    const form = { ...completeForm(), sources: [{ ...upload('Files'), staged: [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedLabel: 'engineering' }] };
+    const restored = fromDraft(JSON.stringify(toDraft(form, 'x')))!.form.sources[0];
+    expect(restored.staged).toEqual([{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }]);
+    expect(restored.stagedLabel).toBe('engineering');
+  });
+
+  it('offers the upload step first on an engine that only has an upload source', () => {
+    const steps = getStartedSteps(engineDetail(), false, null, true);
+    expect(steps[0]).toMatchObject({ id: 'index', title: 'Upload your first files', action: 'Upload files', state: 'current' });
+    expect(getStartedSteps(engineDetail({ graph: { state: 'built' } }), false, null, true)[0].title).toBe('Index your sources');
   });
 });

@@ -22,7 +22,7 @@ import type { JSX, ReactNode } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { engineDescriptionError, engineNameError, isStorageAllManaged, sourceTypeName, summarizeAudience, summarizeSource, summarizeStorage } from '../../../utils/contextEngine';
+import { engineDescriptionError, engineNameError, formatBytes, isStorageAllManaged, sourceTypeName, summarizeAudience, summarizeSource, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import { fieldStackSx, mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
@@ -62,6 +62,9 @@ function SummaryCard({ title, editLabel, onEdit, children }: { title: string; ed
 /** Step 4 — name the engine and confirm what will be created; every card jumps back to its step. */
 export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange, onDescriptionChange, onEdit }: ReviewStepProps): JSX.Element {
   const nameError = engineNameError(form.name);
+  const stagedFiles = form.sources.flatMap((s) => s.staged ?? []);
+  const stagedCount = stagedFiles.length;
+  const stagedBytes = stagedFiles.reduce((n, f) => n + f.size, 0);
   const descriptionError = engineDescriptionError(form.description);
   const embeddingName = EMBEDDING_PROVIDERS.find((p) => p.id === form.embedding?.provider)?.name ?? form.embedding?.provider ?? '—';
   const llmName = LLM_PROVIDERS.find((p) => p.id === form.llm?.provider)?.name ?? form.llm?.provider ?? '—';
@@ -218,7 +221,16 @@ export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange
               <Typography variant="body2">
                 {isStorageAllManaged(form.storage) ? 'All three stores are embedded in the engine; nothing is provisioned on your Infrastructure.' : 'Stores placed on Infrastructure are written to your servers; the rest stay embedded in the engine.'}
               </Typography>
-              <Typography variant="body2">Items become searchable as each connector delivers them; the Overview shows the progress.</Typography>
+              {stagedCount > 0 ? (
+                <Typography variant="body2">
+                  <Box component="span" sx={{ fontWeight: 500 }}>
+                    {stagedCount} file{stagedCount === 1 ? '' : 's'} ({formatBytes(stagedBytes)}) upload right after the engine exists
+                  </Box>{' '}
+                  and become searchable as they index. Keep this tab open until they finish.
+                </Typography>
+              ) : (
+                <Typography variant="body2">Items become searchable as each connector delivers them; the Overview shows the progress.</Typography>
+              )}
             </Stack>
           </Box>
         </Grid>

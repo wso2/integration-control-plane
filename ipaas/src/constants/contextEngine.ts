@@ -16,7 +16,21 @@
  * under the License.
  */
 
-import type { ContextEngineStorage, ContextGraphState, ContextSourceConfig, LlmConfig, LlmProvider, McpClientId, SourceCategory, SourceConnector, SourceFieldDef, SourceFieldKind, SourceProgressStatus, StorageKind } from '../types/contextEngine';
+import type {
+  ContextEngineStorage,
+  ContextGraphState,
+  ContextSourceConfig,
+  LlmConfig,
+  LlmProvider,
+  McpClientId,
+  SourceCategory,
+  SourceConnector,
+  SourceFieldDef,
+  SourceFieldKind,
+  SourceProgressStatus,
+  StorageKind,
+  UploadFileStatus,
+} from '../types/contextEngine';
 import type { EmbeddingProvider } from '../types/ragIngestion';
 
 const RAG_LOGO_BASE = 'assets/images/rag/';
@@ -419,8 +433,8 @@ export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Engine actions a querying role receives — read context, open evidence, see the trace. */
 export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
 
-/** What the creator of an engine gets on it: query it and start enrichments. The engine grants creators nothing by itself. */
-export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'context.enrich'] as const;
+/** What the creator of an engine gets on it: query it, start enrichments and upload files. The engine grants creators nothing by itself. */
+export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'context.enrich', 'ingest.write'] as const;
 
 /** The creator's grant is keyed `owner-<principalId>`. */
 export const OWNER_GRANT_PREFIX = 'owner-';
@@ -512,8 +526,64 @@ export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
 /** localStorage key of the last enrichment job started from this browser, per engine. The engine has no route that reports enrichment state yet. */
 export const CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX = 'contextEngine:enrichment:';
 
+/** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
+export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';
+
+/** localStorage key of the visibility labels known for a source, until the engine reports a source's audience mapping. */
+export const CONTEXT_ENGINE_LABELS_KEY_PREFIX = 'contextEngine:labels:';
+
 /** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
 export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];
+
+// ── File uploads ────────────────────────────────────────────────────────────
+
+/** The engine's upload limit and type allowlist (its `CONTEXT_ENGINE_UPLOAD_*` settings). */
+export const UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Content type by file extension. Browsers leave `File.type` empty for Markdown, so the name decides. */
+export const UPLOAD_CONTENT_TYPES: Record<string, string> = {
+  txt: 'text/plain',
+  text: 'text/plain',
+  log: 'text/plain',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  html: 'text/html',
+  htm: 'text/html',
+  json: 'application/json',
+  pdf: 'application/pdf',
+};
+
+export const UPLOAD_ACCEPT = Object.keys(UPLOAD_CONTENT_TYPES)
+  .map((ext) => `.${ext}`)
+  .join(',');
+
+/** Files in flight at once from one browser; the engine's worker indexes one at a time anyway. */
+export const UPLOAD_CONCURRENCY = 3;
+
+/** How often an uploaded file's job and record are checked while it is still moving. */
+export const UPLOAD_POLL_MS = 3000;
+
+export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
+  uploading: 'Uploading',
+  queued: 'Queued',
+  indexing: 'Indexing',
+  searchable: 'Searchable',
+  stored: 'Stored, not searchable',
+  unreadable: 'Not readable',
+  held: 'Held back',
+  failed: 'Failed',
+};
+
+export const UPLOAD_STATUS_TONE: Record<UploadFileStatus, 'default' | 'info' | 'success' | 'warning' | 'error'> = {
+  uploading: 'info',
+  queued: 'info',
+  indexing: 'info',
+  searchable: 'success',
+  stored: 'default',
+  unreadable: 'warning',
+  held: 'warning',
+  failed: 'error',
+};
 
 // ── Storage backends ────────────────────────────────────────────────────────
 

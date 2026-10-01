@@ -55,6 +55,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const { engineId = '', tab = 'overview' } = useParams();
   const { state } = useLocation() as { state: CreateContextEngineLocationState | null };
   const [warnings, setWarnings] = useState<string[]>(state?.warnings ?? []);
+  const openFilesSourceId = state?.openFiles;
   const { data: engine, isLoading, isError, error, refetch } = useContextEngine(engineId);
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
@@ -170,7 +171,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {activeTab === 'overview' && <OverviewTab engine={engine} roleNames={roleNames} onGoTab={goTab} />}
+      {activeTab === 'overview' && <OverviewTab engine={engine} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} />}
       {activeTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
       {activeTab === 'api' && <ApiTab engine={engine} />}
       {activeTab === 'mcp' && <McpTab engine={engine} />}

@@ -19,9 +19,10 @@
 import { Alert, Box, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
-import { sourceFieldError, sourceNameError } from '../../utils/contextEngine';
+import { sourceFieldError, sourceNameError, withStagedLabel } from '../../utils/contextEngine';
 import SecretField from '../RagIngestion/SecretField';
 import AudienceRulesEditor from './AudienceRulesEditor';
+import { StagedFilesSection, StagedLabelField } from './files/StagedFilesSection';
 import SourceMark from './SourceMark';
 import { connectorHeaderSx, fieldStackSx } from './styles';
 import type { ContextSourceConfig, SourceConnector, SourceFieldDef } from '../../types/contextEngine';
@@ -63,7 +64,9 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
 /** The configuration form for one connector, rendered from its field schema. */
 export default function ConnectorForm({ orgHandle, connector, draft, otherNames, onChange, onChangeSource }: ConnectorFormProps): JSX.Element {
   const nameError = sourceNameError(draft.name, otherNames);
-  const setValue = (key: string, value: string) => onChange({ ...draft, values: { ...draft.values, [key]: value } });
+  const upload = connector.id === 'upload';
+  const change = (next: ContextSourceConfig) => onChange(upload ? withStagedLabel(next) : next);
+  const setValue = (key: string, value: string) => change({ ...draft, values: { ...draft.values, [key]: value } });
 
   return (
     <>
@@ -93,20 +96,29 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
           value={draft.name}
           error={!!nameError && draft.name.trim() !== ''}
           helperText={draft.name.trim() !== '' ? nameError || undefined : 'How this source appears in the engine.'}
-          onChange={(e) => onChange({ ...draft, name: e.target.value })}
+          onChange={(e) => change({ ...draft, name: e.target.value })}
           sx={REQUIRED_FIELD_SX}
         />
         {connector.fields.map((def) => (
           <Field key={def.key} def={def} value={draft.values[def.key] ?? ''} onChange={(v) => setValue(def.key, v)} />
         ))}
-        {connector.fields.length === 0 && (
-          <Alert severity="info" variant="outlined">
-            No connection settings. You can upload files from the engine&apos;s Overview once it is created.
-          </Alert>
+        {upload ? (
+          <StagedFilesSection draft={draft} onChange={change} />
+        ) : (
+          connector.fields.length === 0 && (
+            <Alert severity="info" variant="outlined">
+              No connection settings.
+            </Alert>
+          )
         )}
       </Stack>
 
-      <AudienceRulesEditor orgHandle={orgHandle} connectorName={connector.name} rules={draft.audience ?? []} onChange={(audience) => onChange({ ...draft, audience })} />
+      <AudienceRulesEditor orgHandle={orgHandle} variant={upload ? 'labels' : 'groups'} connectorName={connector.name} rules={draft.audience ?? []} onChange={(audience) => change({ ...draft, audience })} />
+      {upload && (
+        <Box sx={{ mt: 2.5 }}>
+          <StagedLabelField draft={draft} onChange={change} />
+        </Box>
+      )}
     </>
   );
 }

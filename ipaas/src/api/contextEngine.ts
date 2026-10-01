@@ -34,9 +34,10 @@
  */
 
 import { contextEngineClient } from './httpClients';
+import { getAccessToken } from '../../auth/tokenManager';
 import { getServer, getServerAdminUser } from './platformServices';
 import { CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
-import { infrastructureStorageKinds, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
+import { deliveryIdentity, infrastructureStorageKinds, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toConfigurationPayload, toSourceRegistration, type ResolvedConnection } from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
   ContextEngine,
@@ -54,10 +55,13 @@ import type {
   ContextPrincipal,
   ContextQueryInput,
   ContextQueryResult,
+  ContextRecordStatus,
   ContextSource,
   CreateContextEngineInput,
   CreateContextEngineResult,
+  IngestFileInput,
   PutContextGrantInput,
+  RecordEventInput,
   SourceIndexingState,
   SourceProgress,
   SourceReadingState,
@@ -153,6 +157,17 @@ interface RawSourceProgress {
   processing: { since?: string | null; total: number; queued: number; running: number; succeeded: number; failed: number; percent?: number | null };
   records: { active: number; quarantined: number; deleted: number };
   indexing: { state: string; expected?: number | null; indexed?: number | null; indexing?: number | null; failed?: number | null; missing?: number | null; percent?: number | null; collectedAt?: string | null };
+}
+
+interface RawRecordStatus {
+  recordId: string;
+  state: string;
+  currentVersion: string;
+  sourceAclVersion: string;
+  quarantineReason?: string;
+  indexState: string;
+  indexError?: string;
+  updatedAt: string;
 }
 
 interface RawSpaceProgress {
@@ -355,6 +370,7 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
   const connections = await resolveInfrastructureConnections(input);
   const space = await contextEngineClient.post<RawContextSpace>(`${V1}/spaces`, { name: input.name, ...(input.description ? { description: input.description } : {}) });
   const warnings: string[] = [];
+  const sources: Record<string, string> = {};
 
   const attempt = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -375,7 +391,10 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
       await contextEngineClient.put(`${grantsPath(space.id)}/${encodeURIComponent(ownerGrantId(me.id))}`, { principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
     });
     for (const source of input.sources) {
-      await attempt(`Register source “${source.name}”`, () => contextEngineClient.post(`${spacePath(space.id)}/sources`, toSourceRegistration(source)));
+      await attempt(`Register source “${source.name}”`, async () => {
+        const raw = await contextEngineClient.post<RawSource>(`${spacePath(space.id)}/sources`, toSourceRegistration(source));
+        if (raw?.id) sources[source.name.trim()] = raw.id;
+      });
     }
     for (const role of input.roles) {
       await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(`${grantsPath(space.id)}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
@@ -387,7 +406,7 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
     throw err;
   }
 
-  return { id: space.id, warnings };
+  return { id: space.id, sources, warnings };
 }
 
 /** Delete an engine. The contract returns a job handle; the engine may also answer 204 with no body. */
@@ -428,6 +447,142 @@ export async function getContextEngineProgress(engineId: string): Promise<Contex
     if (isMissingRoute(err)) return { available: false, sources: [] };
     throw err;
   }
+}
+
+// ── File uploads ────────────────────────────────────────────────────────────
+//
+// The browser delivers files itself through the engine's one-call ingestion
+// route: one multipart request per file, the event part first and the bytes
+// second. It mirrors the connector host's sink: the same idempotency-key scheme,
+// the content hash in the event, and a lookup by key after a lost reply.
+
+const sourcePath = (id: string): string => `${V1}/sources/${encodeURIComponent(id)}`;
+
+/** The bearer for requests the browser sends itself: the dev token when configured, else the platform token. */
+function engineBearer(): string | null {
+  const token = window.API_CONFIG?.contextEngineApiToken || getAccessToken();
+  return token ? `Bearer ${token}` : null;
+}
+
+async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
+  const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** `<sourceId>:<operation>:<sha256>`: the connector host's scheme, which stays under the engine's key length limit. */
+async function deliveryKey(sourceId: string, operation: string, recordId: string, version: string): Promise<string> {
+  return `${sourceId}:${operation}:${await sha256Hex(deliveryIdentity(recordId, version))}`;
+}
+
+/** An XHR rather than fetch, because only XHR reports upload progress. Errors carry the engine's status like the fetch client. */
+function sendMultipart(url: string, form: FormData, headers: Record<string, string>, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    const bearer = engineBearer();
+    if (bearer) xhr.setRequestHeader('Authorization', bearer);
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+    xhr.upload.onprogress = (e) => {
+      if (onProgress && e.lengthComputable) onProgress(e.loaded / e.total);
+    };
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText) as RawJobAccepted);
+        } catch {
+          reject(new Error('Expected a JSON response body.'));
+        }
+      } else {
+        reject(new HttpError(xhr.status, `HTTP ${xhr.status}: ${xhr.responseText || xhr.statusText}`));
+      }
+    };
+    xhr.onerror = () => reject(new Error('The upload could not reach the context engine.'));
+    xhr.onabort = () => reject(new DOMException('The upload was cancelled.', 'AbortError'));
+    if (signal) {
+      if (signal.aborted) {
+        xhr.abort();
+        return;
+      }
+      signal.addEventListener('abort', () => xhr.abort(), { once: true });
+    }
+    xhr.send(form);
+  });
+}
+
+/** The job accepted under a delivery key, or null when the engine has none: the check after a lost reply. */
+async function findContextDelivery(sourceId: string, key: string): Promise<ContextJobHandle | null> {
+  try {
+    const raw = await contextEngineClient.get<RawJobAccepted>(`${sourcePath(sourceId)}/ingestions/${encodeURIComponent(key)}`);
+    return raw ? { jobId: raw.jobId, statusUrl: raw.statusUrl } : null;
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 404) return null;
+    throw err;
+  }
+}
+
+/**
+ * Upload one file as a record of the source. The record id is the file name, so
+ * uploading the same name again is a new version. The version doubles as the
+ * ACL version, both epoch milliseconds, so they only grow.
+ */
+export async function ingestContextFile(input: IngestFileInput): Promise<ContextJobHandle> {
+  const key = await deliveryKey(input.sourceId, 'upsert', input.recordId, input.version);
+  const bytes = await input.content.arrayBuffer();
+  const event = {
+    schemaVersion: '1',
+    spaceId: input.engineId,
+    sourceId: input.sourceId,
+    sourceRecordId: input.recordId,
+    sourceVersion: input.version,
+    operation: 'upsert',
+    contentType: input.contentType,
+    contentHash: `sha256:${await sha256Hex(bytes)}`,
+    sourceObservedAt: new Date(Number(input.version)).toISOString(),
+    audience: [input.label],
+    sourceAclVersion: input.version,
+    idempotencyKey: key,
+  };
+  const form = new FormData();
+  form.append('event', new Blob([JSON.stringify(event)], { type: 'application/json' }), 'event.json');
+  form.append('content', new Blob([bytes], { type: input.contentType }), input.recordId);
+  try {
+    const raw = await sendMultipart(`${window.API_CONFIG.contextEngineApiUrl}${sourcePath(input.sourceId)}/ingestions`, form, { 'Idempotency-Key': key }, input.onProgress, input.signal);
+    return { jobId: raw.jobId, statusUrl: raw.statusUrl };
+  } catch (err) {
+    // The engine answered, or the user cancelled: nothing to look up.
+    if (err instanceof HttpError || (err instanceof DOMException && err.name === 'AbortError')) throw err;
+    const found = await findContextDelivery(input.sourceId, key).catch(() => null);
+    if (found) return found;
+    throw err;
+  }
+}
+
+/** Remove a record, or move it to another label, with an event-only delivery. */
+export async function sendContextRecordEvent(input: RecordEventInput): Promise<ContextJobHandle> {
+  const key = await deliveryKey(input.sourceId, input.operation, input.recordId, input.version);
+  const event = {
+    schemaVersion: '1',
+    spaceId: input.engineId,
+    sourceId: input.sourceId,
+    sourceRecordId: input.recordId,
+    sourceVersion: input.version,
+    operation: input.operation,
+    sourceObservedAt: new Date(Number(input.version)).toISOString(),
+    audience: [input.label],
+    sourceAclVersion: input.version,
+    idempotencyKey: key,
+  };
+  const form = new FormData();
+  form.append('event', new Blob([JSON.stringify(event)], { type: 'application/json' }), 'event.json');
+  const raw = await sendMultipart(`${window.API_CONFIG.contextEngineApiUrl}${sourcePath(input.sourceId)}/ingestions`, form, { 'Idempotency-Key': key });
+  return { jobId: raw.jobId, statusUrl: raw.statusUrl };
+}
+
+/** A record's lifecycle and index state. Needs delivery or manage rights on the source. */
+export async function getContextRecordStatus(sourceId: string, recordId: string): Promise<ContextRecordStatus> {
+  const raw = await contextEngineClient.get<RawRecordStatus>(`${sourcePath(sourceId)}/records/${encodeURIComponent(recordId)}`);
+  return { recordId: raw.recordId, state: raw.state, currentVersion: raw.currentVersion, sourceAclVersion: raw.sourceAclVersion, quarantineReason: raw.quarantineReason, indexState: raw.indexState, indexError: raw.indexError, updatedAt: raw.updatedAt };
 }
 
 // ── Query ───────────────────────────────────────────────────────────────────

@@ -29,7 +29,11 @@ import {
   ROLE_GRANT_PREFIX,
   STORAGE_BACKEND_BY_KIND,
   STORAGE_BACKENDS,
+  UPLOAD_CONTENT_TYPES,
+  UPLOAD_MAX_BYTES,
 } from '../constants/contextEngine';
+import { hasStagedFile } from './stagedFiles';
+import { HttpError } from '../types/http';
 import { formatDistanceToNow } from './time';
 import { isEmbeddingValid } from './ragIngestion';
 import type {
@@ -43,6 +47,7 @@ import type {
   ContextGrant,
   ContextGraphStatus,
   ContextJob,
+  ContextRecordStatus,
   ContextSourceConfig,
   CreateContextEngineInput,
   GetStartedStep,
@@ -53,14 +58,20 @@ import type {
   SourceFieldDef,
   SourceProgress,
   SourceProgressStatus,
+  StagedFileCheck,
+  StagedFileMeta,
   StorageKind,
   StorageSelection,
+  UploadEntry,
+  UploadFileStatus,
 } from '../types/contextEngine';
 import type { EmbeddingConfig } from '../types/ragIngestion';
 
 // ── Validation ──────────────────────────────────────────────────────────────
 
 const nonEmpty = (s: string): boolean => s.trim().length > 0;
+
+const plural = (n: number, word: string): string => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
 
 /** A URL the browser can parse with an http(s) scheme. */
 export function isHttpUrl(value: string): boolean {
@@ -129,9 +140,22 @@ export function audienceError(rules: AudienceRule[] | undefined): string {
   return '';
 }
 
-/** Whether one source names a known connector, has a name, passes every field check and has visibility rules. */
+/**
+ * Why a File Upload source's staged files cannot be sent yet, or '' when they can.
+ * Files are optional in the wizard, but chosen ones need a label, and a restored
+ * draft needs their bytes again.
+ */
+export function stagedBlocker(source: ContextSourceConfig): string {
+  const staged = source.staged ?? [];
+  if (staged.length === 0) return '';
+  if (!nonEmpty(source.stagedLabel ?? '')) return 'Choose who can see the files';
+  const missing = staged.filter((f) => !hasStagedFile(f.id)).length;
+  return missing > 0 ? `Re-add ${plural(missing, 'file')}` : '';
+}
+
+/** Whether one source names a known connector, has a name, passes every field check, has visibility rules and its staged files are ready. */
 export function isSourceValid(source: ContextSourceConfig): boolean {
-  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && audienceError(source.audience) === '';
+  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && audienceError(source.audience) === '' && stagedBlocker(source) === '';
 }
 
 /** Short reason a source is incomplete, for its status chip; empty when it is complete. */
@@ -141,7 +165,7 @@ export function sourceIncompleteReason(source: ContextSourceConfig): string {
   const first = invalidSourceFields(source)[0];
   if (first) return (source.values[first.key] ?? '').trim() ? `${first.label} invalid` : `${first.label} missing`;
   if (audienceError(source.audience)) return typedRules(source.audience).length ? 'Visibility incomplete' : 'Visibility missing';
-  return '';
+  return stagedBlocker(source);
 }
 
 /** Step 1 is complete with at least one valid source and no duplicate names. */
@@ -261,7 +285,12 @@ function sanitizeSourceConfig(raw: unknown): ContextSourceConfig {
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   const values = r.values && typeof r.values === 'object' ? Object.fromEntries(Object.entries(r.values).map(([k, v]) => [k, str(v)])) : {};
   const audience = Array.isArray(r.audience) ? r.audience.map((a) => ({ group: str((a as Partial<AudienceRule>)?.group), role: str((a as Partial<AudienceRule>)?.role) })) : [];
-  return { type: str(r.type), name: str(r.name), values, audience: audience.length ? audience : [{ group: '', role: '' }] };
+  const staged = Array.isArray(r.staged)
+    ? r.staged
+        .map((f) => ({ id: str((f as Partial<StagedFileMeta>)?.id), name: str((f as Partial<StagedFileMeta>)?.name), size: Number((f as Partial<StagedFileMeta>)?.size) || 0, contentType: str((f as Partial<StagedFileMeta>)?.contentType) }))
+        .filter((f) => f.id && f.name)
+    : [];
+  return { type: str(r.type), name: str(r.name), values, audience: audience.length ? audience : [{ group: '', role: '' }], ...(staged.length ? { staged, stagedLabel: str(r.stagedLabel) } : {}) };
 }
 
 /** Parse a stored draft, or null when it is missing, malformed or from another version. */
@@ -322,7 +351,12 @@ export function sourceTypeName(type: string): string {
 export function summarizeSource(source: ContextSourceConfig): string {
   const connector = connectorFor(source.type);
   if (!connector) return 'Unknown connector';
-  if (connector.id === 'upload') return 'Upload files after the engine is created';
+  if (connector.id === 'upload') {
+    const staged = source.staged ?? [];
+    if (staged.length === 0) return 'Upload files after the engine is created';
+    const sum = stagedSummary(staged, []);
+    return `${plural(staged.length, 'file')} staged · ${formatBytes(sum.bytes)}${sum.pdfs ? ` · ${plural(sum.pdfs, 'PDF')} stored only` : ''}`;
+  }
   const parts = connector.summaryKeys
     .map((key) => {
       const def = connector.fields.find((f) => f.key === key);
@@ -472,8 +506,6 @@ export function infrastructureStorageKinds(storage: ContextEngineStorage): Stora
 
 // ── Source progress ─────────────────────────────────────────────────────────
 
-const plural = (n: number, word: string): string => `${n.toLocaleString('en-US')} ${word}${n === 1 ? '' : 's'}`;
-
 /** Lower-cased relative time, e.g. "3 min ago"; empty when the timestamp cannot be parsed. */
 const ago = (iso: string): string => {
   const rel = formatDistanceToNow(iso);
@@ -618,6 +650,133 @@ export function progressListingText(s: ContextEngineProgressSummary | null): str
   return `${s.processed} of ${s.sourceCount - s.hidden} processed`;
 }
 
+// ── File uploads ────────────────────────────────────────────────────────────
+
+/** The content type the engine will see for a file: by extension first, since browsers leave `File.type` empty for Markdown. */
+export function contentTypeForFile(name: string, browserType = ''): string {
+  const dot = name.lastIndexOf('.');
+  const byExt = dot >= 0 ? UPLOAD_CONTENT_TYPES[name.slice(dot + 1).toLowerCase()] : undefined;
+  if (byExt) return byExt;
+  const base = browserType.split(';')[0].trim().toLowerCase();
+  return Object.values(UPLOAD_CONTENT_TYPES).includes(base) ? base : '';
+}
+
+/** "3.2 KB", "4.8 MB", "25 MB": one decimal unless it is zero. */
+export function formatBytes(n: number): string {
+  const one = (v: number): string => (Number.isInteger(v) ? String(v) : v.toFixed(1).replace(/\.0$/, ''));
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${one(n / 1024)} KB`;
+  return `${one(n / (1024 * 1024))} MB`;
+}
+
+/** What to say about a chosen file before it is sent. */
+export function checkStagedFile(meta: Pick<StagedFileMeta, 'name' | 'size' | 'contentType'>, existingNames: string[]): StagedFileCheck {
+  const replaces = existingNames.includes(meta.name);
+  if (!meta.contentType) return { problem: 'unsupported', replaces };
+  if (meta.size > UPLOAD_MAX_BYTES) return { problem: 'too-large', replaces };
+  return meta.contentType === 'application/pdf' ? { warning: 'pdf', replaces } : { replaces };
+}
+
+/** The row's caption for a check; '' when there is nothing to say. */
+export function stagedFileNote(check: StagedFileCheck, size: number): string {
+  if (check.problem === 'too-large') return `${formatBytes(size)} is over the ${formatBytes(UPLOAD_MAX_BYTES)} limit. Split it or leave it out.`;
+  if (check.problem === 'unsupported') return 'Only text, Markdown, HTML, JSON or PDF files can be uploaded.';
+  const notes: string[] = [];
+  if (check.warning === 'pdf') notes.push('Stored, but not searchable until the engine can read PDFs');
+  if (check.replaces) notes.push('Replaces the version already in the source');
+  return notes.join(' · ');
+}
+
+/** How many of the chosen files will upload, how many are skipped, and their size. */
+export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'contentType'>[], existingNames: string[]): { ready: number; skipped: number; bytes: number; pdfs: number } {
+  const sum = { ready: 0, skipped: 0, bytes: 0, pdfs: 0 };
+  for (const f of files) {
+    const check = checkStagedFile(f, existingNames);
+    if (check.problem) {
+      sum.skipped += 1;
+      continue;
+    }
+    sum.ready += 1;
+    sum.bytes += f.size;
+    if (check.warning === 'pdf') sum.pdfs += 1;
+  }
+  return sum;
+}
+
+/** The staged label kept only when a rule defines it, else the first label, so files never upload under a label nobody can see. */
+export function withStagedLabel(source: ContextSourceConfig): ContextSourceConfig {
+  const labels = labelsFromRules(source.audience);
+  const current = source.stagedLabel ?? '';
+  const next = labels.includes(current) ? current : (labels[0] ?? '');
+  return next === current ? source : { ...source, stagedLabel: next };
+}
+
+/** The labels a source's visibility rules define, in order, without blanks or repeats. */
+export function labelsFromRules(rules: AudienceRule[] | undefined): string[] {
+  return (rules ?? []).map((r) => r.group.trim()).filter((g, i, all) => g !== '' && all.indexOf(g) === i);
+}
+
+/** Where an uploaded file stands once the engine has taken it, from its record status. */
+export function uploadStatusFromRecord(record: ContextRecordStatus): { status: UploadFileStatus; detail?: string } {
+  if (record.state === 'quarantined') {
+    return { status: 'held', detail: record.quarantineReason === 'unmapped_audience' ? 'Its label has no visibility rule, so nobody can see it.' : `Held back: ${record.quarantineReason ?? 'unknown reason'}.` };
+  }
+  if (record.state === 'deleted') return { status: 'failed', detail: 'This file was removed from the engine.' };
+  switch (record.indexState) {
+    case 'indexed':
+      return { status: 'searchable' };
+    case 'pending':
+      return { status: 'indexing' };
+    case 'reconcile_required':
+      return { status: 'indexing', detail: 'The engine is repairing its index entry for this file.' };
+    case 'failed':
+      return record.indexError === 'extraction_unsupported'
+        ? { status: 'unreadable', detail: "Stored, but the engine can't read this file type yet. Upload a text or Markdown export to make it searchable." }
+        : { status: 'failed', detail: `Indexing failed${record.indexError ? `: ${record.indexError}` : ''}.` };
+    case 'not_indexed':
+      return { status: 'stored', detail: 'The engine is running without its knowledge backend, so nothing is searchable yet.' };
+    default:
+      return { status: 'indexing' };
+  }
+}
+
+export function isUploadActive(entry: Pick<UploadEntry, 'status'>): boolean {
+  return entry.status === 'uploading' || entry.status === 'queued' || entry.status === 'indexing';
+}
+
+/** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */
+export function summarizeUploads(entries: Pick<UploadEntry, 'status'>[]): string {
+  if (entries.length === 0) return 'No files yet';
+  const count = (s: UploadFileStatus): number => entries.filter((e) => e.status === s).length;
+  const parts = [plural(entries.length, 'file')];
+  const moving = entries.filter(isUploadActive).length;
+  if (moving) parts.push(`${moving} in progress`);
+  if (count('searchable')) parts.push(`${count('searchable')} searchable`);
+  if (count('stored')) parts.push(`${count('stored')} stored only`);
+  if (count('unreadable')) parts.push(`${count('unreadable')} not readable`);
+  if (count('held')) parts.push(`${count('held')} held back`);
+  if (count('failed')) parts.push(`${count('failed')} failed`);
+  return parts.join(' · ');
+}
+
+/** The engine's own message from a failed request, e.g. "Unsupported Media Type", else a fallback. */
+export function engineMessage(err: unknown, fallback = 'The request failed.'): string {
+  if (!(err instanceof HttpError)) return err instanceof Error && err.message ? err.message : fallback;
+  const body = err.message.replace(/^HTTP \d+:\s*/, '');
+  try {
+    const parsed = JSON.parse(body) as { message?: unknown };
+    if (typeof parsed.message === 'string' && parsed.message) return parsed.message;
+  } catch {
+    // Not JSON: fall through to the raw text.
+  }
+  return body.trim() || fallback;
+}
+
+/** The delivery's identity the idempotency key is hashed from: length-prefixed, so no two (record, version) pairs collide. */
+export function deliveryIdentity(recordId: string, version: string): string {
+  return `${recordId.length}:${recordId}:${version}`;
+}
+
 // ── Graph status and first-run guidance ─────────────────────────────────────
 
 /** Human enrichment status, e.g. "Not enriched", "Enriching · 2 of 3 sources", "Enriched 12 min ago". */
@@ -666,7 +825,7 @@ export function resolveGraphStatus(reported: ContextGraphStatus, job: ContextJob
  * Indexing happens as connectors deliver, so the first step completes from
  * source progress. Engines without progress fall back to a finished enrichment.
  */
-export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, progress: ContextEngineProgressSummary | null = null): GetStartedStep[] {
+export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, progress: ContextEngineProgressSummary | null = null, uploadFirst = false): GetStartedStep[] {
   const done: Record<GetStartedStep['id'], boolean> = {
     index: progress ? progress.processed > 0 && progress.active === 0 : engine.graph.state === 'built',
     ask: asked,
@@ -676,7 +835,9 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
   const n = engine.sources.length;
   const indexing = progress ? `${progressHeadline(progress)}. ` : '';
   const defs: Omit<GetStartedStep, 'state'>[] = [
-    { id: 'index', title: 'Index your sources', description: `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.` },
+    uploadFirst && !done.index
+      ? { id: 'index', title: 'Upload your first files', description: 'Files become searchable moments after they upload. Nothing else to set up.', action: 'Upload files' }
+      : { id: 'index', title: 'Index your sources', description: `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.` },
     { id: 'ask', title: 'Ask it something', description: 'Try the Playground and check the cited passages.' },
     { id: 'publish', title: 'Publish', description: 'Turn on the REST API or the MCP server for agents.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },

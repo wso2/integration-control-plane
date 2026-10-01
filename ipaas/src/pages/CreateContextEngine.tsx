@@ -22,7 +22,7 @@ import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine } from '../hooks/useContextEngine';
-import { engineDescriptionError, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
+import { checkStagedFile, engineDescriptionError, engineNameError, isFormDirty, labelsFromRules, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -32,6 +32,9 @@ import AccessStep from '../components/ContextEngine/steps/AccessStep';
 import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
 import StorageStep from '../components/ContextEngine/steps/StorageStep';
 import ReviewStep from '../components/ContextEngine/steps/ReviewStep';
+import SetupProgress, { type SetupUploadSource } from '../components/ContextEngine/files/SetupProgress';
+import { rememberSourceLabels, startUploads } from '../hooks/contextUploads';
+import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
 import type { OrgScope } from '../nav';
 
@@ -41,6 +44,17 @@ const LAST_STEP = STEP_LABELS.length - 1;
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
 export interface CreateContextEngineLocationState {
   warnings?: string[];
+  /** A File Upload source to open the Files drawer for on arrival. */
+  openFiles?: string;
+}
+
+interface SetupState {
+  id: string;
+  name: string;
+  warnings: string[];
+  uploads: SetupUploadSource[];
+  sourceCount: number;
+  roleCount: number;
 }
 
 export default function CreateContextEngine(scope: OrgScope): JSX.Element {
@@ -52,6 +66,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const [form, dispatch] = useReducer(contextEngineFormReducer, undefined, () => draft.restore() ?? initialContextEngineForm);
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  // Set once the engine exists and staged files are being handed to it; the steps give way to the setup card.
+  const [setup, setSetup] = useState<SetupState | null>(null);
   const [showRestored, setShowRestored] = useState(restored);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const create = useCreateContextEngine();
@@ -92,9 +108,29 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     if (!canCreate || create.isPending) return;
     setError(null);
     create.mutate(toCreateInput(form), {
-      onSuccess: ({ id, warnings }) => {
+      onSuccess: ({ id, sources, warnings }) => {
         draft.clear();
-        navigate(contextEngineUrl(scope.org, id), { state: { warnings } satisfies CreateContextEngineLocationState });
+        const uploads: SetupUploadSource[] = [];
+        for (const source of form.sources) {
+          const sourceId = sources[source.name.trim()];
+          if (!sourceId) continue;
+          rememberSourceLabels(sourceId, labelsFromRules(source.audience));
+          const staged = source.staged ?? [];
+          if (source.type !== 'upload' || staged.length === 0 || !source.stagedLabel) continue;
+          const files = staged.flatMap((m) => {
+            const content = getStagedFile(m.id);
+            return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
+          });
+          staged.forEach((m) => dropStagedFile(m.id));
+          if (files.length === 0) continue;
+          startUploads(id, sourceId, files, source.stagedLabel);
+          uploads.push({ sourceId, name: source.name.trim() });
+        }
+        if (uploads.length === 0) {
+          navigate(contextEngineUrl(scope.org, id), { state: { warnings } satisfies CreateContextEngineLocationState });
+          return;
+        }
+        setSetup({ id, name: form.name.trim(), warnings, uploads, sourceCount: form.sources.length, roleCount: form.roles.length });
       },
       onError: (e) => {
         if (e instanceof HttpError && e.status === 409) setError('A context engine with this name already exists.');
@@ -107,76 +143,90 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !setup ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
       <PageTitle>
         <PageTitle.Header>Create Context Engine</PageTitle.Header>
       </PageTitle>
 
-      <Stack direction="row" gap={4} alignItems="flex-start" sx={{ mt: 3 }}>
-        <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
-          <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
+      {setup ? (
+        <Box sx={{ mt: 3 }}>
+          <SetupProgress
+            engineId={setup.id}
+            engineName={setup.name}
+            sourceCount={setup.sourceCount}
+            roleCount={setup.roleCount}
+            warnings={setup.warnings}
+            uploads={setup.uploads}
+            onOpen={() => navigate(contextEngineUrl(scope.org, setup.id), { state: { warnings: setup.warnings, openFiles: setup.uploads[0]?.sourceId } satisfies CreateContextEngineLocationState })}
+          />
         </Box>
-        <Box sx={{ flex: 1, maxWidth: activeStep === 3 ? 1080 : 960, mt: 2 }}>
-          {showRestored && (
-            <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
-              We restored the draft you left in this session. API keys and tokens are never stored, so re-enter them before creating.
-            </Alert>
-          )}
-
-          {error && (
-            <Alert severity="error" variant="outlined" onClose={() => setError(null)} sx={{ mb: 3 }}>
-              {error}
-            </Alert>
-          )}
-
-          {activeStep === 0 && (
-            <SourcesStep
-              orgHandle={scope.org}
-              sources={form.sources}
-              onAdd={(source) => dispatch({ type: 'addSource', source })}
-              onUpdate={(index, source) => dispatch({ type: 'updateSource', index, source })}
-              onRemove={(index) => dispatch({ type: 'removeSource', index })}
-            />
-          )}
-          {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />}
-          {activeStep === 2 && (
-            <ModelsStep
-              embedding={form.embedding}
-              llm={form.llm}
-              shareApiKey={form.shareApiKey}
-              onEmbeddingChange={(value) => dispatch({ type: 'embedding', value })}
-              onLlmChange={(value) => dispatch({ type: 'llm', value })}
-              onShareApiKeyChange={(value) => dispatch({ type: 'shareApiKey', value })}
-            />
-          )}
-          {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
-          {activeStep === 4 && (
-            <ReviewStep form={form} roleNames={roleNames} draftSavedAt={draft.savedAt} onNameChange={(value) => dispatch({ type: 'name', value })} onDescriptionChange={(value) => dispatch({ type: 'description', value })} onEdit={setActiveStep} />
-          )}
-
-          <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
-            <Button variant="outlined" disabled={create.isPending} onClick={activeStep === 0 ? () => (dirty ? setLeaveOpen(true) : navigate(base)) : () => setActiveStep((s) => Math.max(0, s - 1))}>
-              {activeStep === 0 ? 'Cancel' : 'Back'}
-            </Button>
-            {activeStep < LAST_STEP ? (
-              <Button variant="contained" disabled={!stepValid[activeStep]} onClick={() => setActiveStep((s) => Math.min(LAST_STEP, s + 1))}>
-                Next
-              </Button>
-            ) : (
-              <Button variant="contained" disabled={!canCreate || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
-                {create.isPending ? 'Creating…' : 'Create Context Engine'}
-              </Button>
+      ) : (
+        <Stack direction="row" gap={4} alignItems="flex-start" sx={{ mt: 3 }}>
+          <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
+            <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
+          </Box>
+          <Box sx={{ flex: 1, maxWidth: activeStep === 3 ? 1080 : 960, mt: 2 }}>
+            {showRestored && (
+              <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
+                We restored the draft you left in this session. API keys and tokens are never stored, so re-enter them before creating.
+              </Alert>
             )}
-            {stepBlocker[activeStep] && (
-              <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                {stepBlocker[activeStep]}
-              </Typography>
+
+            {error && (
+              <Alert severity="error" variant="outlined" onClose={() => setError(null)} sx={{ mb: 3 }}>
+                {error}
+              </Alert>
             )}
-          </Stack>
-        </Box>
-      </Stack>
+
+            {activeStep === 0 && (
+              <SourcesStep
+                orgHandle={scope.org}
+                sources={form.sources}
+                onAdd={(source) => dispatch({ type: 'addSource', source })}
+                onUpdate={(index, source) => dispatch({ type: 'updateSource', index, source })}
+                onRemove={(index) => dispatch({ type: 'removeSource', index })}
+              />
+            )}
+            {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />}
+            {activeStep === 2 && (
+              <ModelsStep
+                embedding={form.embedding}
+                llm={form.llm}
+                shareApiKey={form.shareApiKey}
+                onEmbeddingChange={(value) => dispatch({ type: 'embedding', value })}
+                onLlmChange={(value) => dispatch({ type: 'llm', value })}
+                onShareApiKeyChange={(value) => dispatch({ type: 'shareApiKey', value })}
+              />
+            )}
+            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
+            {activeStep === 4 && (
+              <ReviewStep form={form} roleNames={roleNames} draftSavedAt={draft.savedAt} onNameChange={(value) => dispatch({ type: 'name', value })} onDescriptionChange={(value) => dispatch({ type: 'description', value })} onEdit={setActiveStep} />
+            )}
+
+            <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
+              <Button variant="outlined" disabled={create.isPending} onClick={activeStep === 0 ? () => (dirty ? setLeaveOpen(true) : navigate(base)) : () => setActiveStep((s) => Math.max(0, s - 1))}>
+                {activeStep === 0 ? 'Cancel' : 'Back'}
+              </Button>
+              {activeStep < LAST_STEP ? (
+                <Button variant="contained" disabled={!stepValid[activeStep]} onClick={() => setActiveStep((s) => Math.min(LAST_STEP, s + 1))}>
+                  Next
+                </Button>
+              ) : (
+                <Button variant="contained" disabled={!canCreate || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
+                  {create.isPending ? 'Creating…' : 'Create Context Engine'}
+                </Button>
+              )}
+              {stepBlocker[activeStep] && (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                  {stepBlocker[activeStep]}
+                </Typography>
+              )}
+            </Stack>
+          </Box>
+        </Stack>
+      )}
 
       <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Leave without creating?</DialogTitle>

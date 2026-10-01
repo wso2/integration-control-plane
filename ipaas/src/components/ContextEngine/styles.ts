@@ -229,6 +229,86 @@ export const audienceRowSx = {
   alignItems: 'start',
 } as const;
 
+// ── File uploads ────────────────────────────────────────────────────────────
+
+export const dropzoneSx = (over: boolean, compact: boolean, disabled: boolean) =>
+  ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 1.5,
+    p: compact ? '12px 16px' : '22px 20px',
+    flexDirection: compact ? 'row' : 'column',
+    textAlign: compact ? 'left' : 'center',
+    border: '1.5px dashed',
+    borderColor: over ? 'primary.main' : 'divider',
+    borderRadius: 2.5,
+    bgcolor: over ? 'action.hover' : 'background.paper',
+    opacity: disabled ? 0.6 : 1,
+    transition: 'border-color 120ms, background-color 120ms',
+  }) as const;
+
+export const dropzoneIconSx = (compact: boolean) =>
+  ({
+    width: compact ? 32 : 40,
+    height: compact ? 32 : 40,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    color: 'primary.main',
+    bgcolor: 'action.hover',
+    flexShrink: 0,
+  }) as const;
+
+export const fileListSx = { border: '1px solid', borderColor: 'divider', borderRadius: 2, overflow: 'hidden' } as const;
+
+export const fileRowSx = (dimmed = false) =>
+  ({
+    display: 'flex',
+    alignItems: 'center',
+    gap: 1.5,
+    px: 1.75,
+    py: 1.25,
+    borderBottom: '1px solid',
+    borderColor: 'divider',
+    opacity: dimmed ? 0.75 : 1,
+    '&:last-of-type': { borderBottom: 0 },
+  }) as const;
+
+/** An uploaded file: name line, then the bar and captions under it. */
+export const uploadRowSx = { px: 1.75, py: 1.25, borderBottom: '1px solid', borderColor: 'divider', '&:last-of-type': { borderBottom: 0 } } as const;
+
+export const uploadRowHeadSx = { display: 'flex', alignItems: 'center', gap: 1.5 } as const;
+
+/** Lines the bar and captions up with the file name: the 18px icon plus the 12px gap. */
+export const uploadRowBodySx = { pl: '30px', mt: 0.75 } as const;
+
+export const filesDrawerSx = { '& .MuiDrawer-paper': { width: { xs: '100%', sm: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column' } } as const;
+
+export const filesToolbarSx = { display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' } as const;
+
+export const sectionLabelSx = { fontWeight: 600, mb: 1 } as const;
+
+/** The post-create card on the wizard: steps down the left, the file list under the upload step. */
+export const setupCardSx = { border: '1px solid', borderColor: 'divider', borderRadius: 2.5, p: 3, bgcolor: 'background.paper', maxWidth: 720 } as const;
+
+export const setupStepSx = { display: 'flex', alignItems: 'center', gap: 1.5, py: 1.25 } as const;
+
+export const setupDotSx = (tone: 'done' | 'running' | 'skipped' | 'failed') =>
+  ({
+    width: 24,
+    height: 24,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    color: tone === 'done' ? 'success.contrastText' : tone === 'failed' ? 'error.main' : tone === 'skipped' ? 'warning.dark' : 'primary.main',
+    bgcolor: tone === 'done' ? 'success.main' : 'transparent',
+    border: tone === 'done' ? 0 : '1px solid',
+    borderColor: tone === 'failed' ? 'error.main' : tone === 'skipped' ? 'warning.main' : 'divider',
+  }) as const;
+
 // ── Source progress ─────────────────────────────────────────────────────────
 
 /** A source with its progress bar and captions under the name line. */

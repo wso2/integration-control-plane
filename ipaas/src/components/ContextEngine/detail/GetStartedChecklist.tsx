@@ -46,8 +46,8 @@ export default function GetStartedChecklist({ steps, onAction }: GetStartedCheck
               {step.description}
             </Typography>
             {step.state === 'current' && (
-              <Button size="small" variant={step.id === 'index' ? 'outlined' : 'contained'} onClick={() => onAction(step.id)} sx={{ mt: 1 }}>
-                {ACTION_LABEL[step.id]}
+              <Button size="small" variant={step.id === 'index' && !step.action ? 'outlined' : 'contained'} onClick={() => onAction(step.id)} sx={{ mt: 1 }}>
+                {step.action ?? ACTION_LABEL[step.id]}
               </Button>
             )}
           </Box>

@@ -28,14 +28,17 @@ import GraphStatusChip from '../GraphStatusChip';
 import GetStartedChecklist from './GetStartedChecklist';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourcesProgressCard from './SourcesProgressCard';
+import FilesDrawer from '../files/FilesDrawer';
 import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
-import type { ContextEngineDetail, ContextEngineTabKey, GetStartedStepId } from '../../../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
   engine: ContextEngineDetail;
   /** Role handle → display name. */
   roleNames: Record<string, string>;
   onGoTab: (tab: ContextEngineTabKey) => void;
+  /** Open the Files drawer for this source on arrival, e.g. right after the wizard uploaded to it. */
+  openFilesSourceId?: string;
 }
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }): JSX.Element {
@@ -95,7 +98,13 @@ function enrichFailure(e: unknown): EnrichFailure {
 }
 
 /** Overview — first-run checklist, source progress, enrichment, access, models, storage and exposure, each linking to its tab. */
-export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabProps): JSX.Element {
+export default function OverviewTab({ engine, roleNames, onGoTab, openFilesSourceId }: OverviewTabProps): JSX.Element {
+  const [filesSource, setFilesSource] = useState<ContextSource | null>(() => engine.sources.find((s) => s.id === openFilesSourceId && s.type === 'upload') ?? null);
+  const [filesOpen, setFilesOpen] = useState(!!openFilesSourceId);
+  const openFiles = (source: ContextSource) => {
+    setFilesSource(source);
+    setFilesOpen(true);
+  };
   const rebuild = useRebuildContextEngine(engine.id);
   const invalidate = useInvalidateContextEngine(engine.id);
   const { asked } = useAskedFlag(engine.id);
@@ -119,7 +128,10 @@ export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabP
         progress.data.sources,
       )
     : null;
-  const steps = getStartedSteps({ ...engine, graph }, asked, progressSummary);
+  // An engine whose only sources are uploads starts with an upload, not a wait for a connector.
+  const uploadSources = engine.sources.filter((s) => s.type === 'upload');
+  const uploadFirst = uploadSources.length > 0 && uploadSources.length === engine.sources.length && (!progressSummary || (progressSummary.processed === 0 && progressSummary.active === 0));
+  const steps = getStartedSteps({ ...engine, graph }, asked, progressSummary, uploadFirst);
   const allDone = steps.every((s) => s.state === 'done');
 
   const startEnrichment = () => {
@@ -131,7 +143,8 @@ export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabP
   };
 
   const onChecklistAction = (id: GetStartedStepId) => {
-    if (id === 'index') document.getElementById(SOURCES_CARD_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (id === 'index' && uploadFirst) openFiles(uploadSources[0]);
+    else if (id === 'index') document.getElementById(SOURCES_CARD_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     else if (id === 'ask') onGoTab('playground');
     else if (id === 'publish') onGoTab('api');
     else onGoTab('access');
@@ -149,7 +162,7 @@ export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabP
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 7 }}>
-          <SourcesProgressCard id={SOURCES_CARD_ID} engineId={engine.id} sources={engine.sources} graph={graph} />
+          <SourcesProgressCard id={SOURCES_CARD_ID} engineId={engine.id} sources={engine.sources} graph={graph} onManageFiles={openFiles} />
         </Grid>
 
         <Grid size={{ xs: 12, md: 5 }}>
@@ -256,6 +269,8 @@ export default function OverviewTab({ engine, roleNames, onGoTab }: OverviewTabP
           </Card>
         </Grid>
       </Grid>
+
+      {filesSource && <FilesDrawer engineId={engine.id} source={filesSource} open={filesOpen} onClose={() => setFilesOpen(false)} />}
     </>
   );
 }

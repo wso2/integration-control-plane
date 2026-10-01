@@ -17,6 +17,8 @@
  */
 
 import { Alert, Box, Button, Chip, CircularProgress, LinearProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { Upload } from '@wso2/oxygen-ui-icons-react';
+import { useSourceUploads } from '../../../hooks/contextUploads';
 import type { JSX } from 'react';
 import { useContextEngineProgress } from '../../../hooks/useContextEngine';
 import { SOURCE_PROGRESS_LABEL, SOURCE_PROGRESS_TONE } from '../../../constants/contextEngine';
@@ -44,6 +46,18 @@ interface SourcesProgressCardProps {
   sources: ContextSource[];
   /** Drives the fallback chip on engines that do not report progress yet. */
   graph: ContextGraphStatus;
+  /** Opens the Files drawer for a File Upload source. */
+  onManageFiles?: (source: ContextSource) => void;
+}
+
+/** "Upload files" until this browser has uploaded something, then "Manage files" with the count. */
+function FilesAction({ engineId, source, onManage }: { engineId: string; source: ContextSource; onManage: (source: ContextSource) => void }): JSX.Element {
+  const entries = useSourceUploads(engineId, source.id);
+  return (
+    <Button size="small" variant="outlined" startIcon={<Upload size={14} />} onClick={() => onManage(source)} sx={{ flexShrink: 0 }}>
+      {entries.length ? `Manage files (${entries.length})` : 'Upload files'}
+    </Button>
+  );
 }
 
 /** Chip for engines without the progress route: the old graph-derived guess. */
@@ -99,7 +113,7 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  * how many delivered items the engine has processed, and, once the engine
  * collects it, how much the search index has caught up. Polls while anything moves.
  */
-export default function SourcesProgressCard({ id, engineId, sources, graph }: SourcesProgressCardProps): JSX.Element {
+export default function SourcesProgressCard({ id, engineId, sources, graph, onManageFiles }: SourcesProgressCardProps): JSX.Element {
   const progressQuery = useContextEngineProgress(engineId);
   const progress = progressQuery.data;
   const available = !!progress?.available;
@@ -182,7 +196,10 @@ export default function SourcesProgressCard({ id, engineId, sources, graph }: So
                     </Typography>
                   </Box>
                 </Stack>
-                {p ? <ProgressChip progress={p} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} graph={graph} />}
+                <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
+                  {p ? <ProgressChip progress={p} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} graph={graph} />}
+                  {s.type === 'upload' && onManageFiles && <FilesAction engineId={engineId} source={s} onManage={onManageFiles} />}
+                </Stack>
               </Box>
               {p && <ProgressBody source={s} progress={p} />}
               {!p && available && (
