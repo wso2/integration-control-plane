@@ -17,6 +17,7 @@
 import ballerina/crypto;
 import ballerina/file;
 import ballerina/os;
+import ballerina/toml;
 import ballerina/lang.array;
 import ballerina/log;
 
@@ -65,7 +66,7 @@ function resolvePassword(string envVar, string fallback, string errorMsg) return
 // Resolves a configurable value that may reference an encrypted secret.
 // If configValue matches "$secret{alias}", looks up alias in secrets, decrypts, and returns the plaintext.
 public isolated function resolveConfig(string configValue, map<string> secrets) returns string|error {
-    if configValue.startsWith(CIPHER_SECRET_PREFIX) && configValue.endsWith(CIPHER_SECRET_SUFFIX) {
+    if isSecretAlias(configValue) {
         string alias = configValue.substring(CIPHER_SECRET_PREFIX.length(), configValue.length() - CIPHER_SECRET_SUFFIX.length());
         string? encrypted = secrets[alias];
         if encrypted is () {
@@ -77,6 +78,60 @@ public isolated function resolveConfig(string configValue, map<string> secrets) 
         return decryptedValue;
     }
     return configValue;
+}
+
+// Returns true if configValue is a "$secret{alias}" reference.
+public isolated function isSecretAlias(string configValue) returns boolean {
+    return configValue.startsWith(CIPHER_SECRET_PREFIX) && configValue.endsWith(CIPHER_SECRET_SUFFIX);
+}
+
+// Reads the top-level [secrets] table from the TOML config ICP was started with. The sources match
+// the Ballerina runtime's: the files in BAL_CONFIG_FILES if set, otherwise the inline BAL_CONFIG_DATA,
+// otherwise ./Config.toml. With several files, the first file that defines an alias wins.
+// The WSO2 cipher tool only encrypts a top-level [secrets] table, and Ballerina binds that table only
+// to the root module's `secrets` configurable, so non-root modules use this to resolve the same aliases.
+public function readTopLevelSecrets() returns map<string>|error {
+    string configFiles = os:getEnv("BAL_CONFIG_FILES");
+    if configFiles != "" {
+        map<string> result = {};
+        foreach string path in re `${os:getEnv("OS") == "Windows_NT" ? ";" : ":"}`.split(configFiles) {
+            if path.trim() == "" || !check file:test(path, file:EXISTS) {
+                continue;
+            }
+            foreach [string, string] [alias, value] in secretsTable(check toml:readFile(path)).entries() {
+                if !result.hasKey(alias) {
+                    result[alias] = value;
+                }
+            }
+        }
+        return result;
+    }
+    string configData = os:getEnv("BAL_CONFIG_DATA");
+    if configData != "" {
+        return parseTopLevelSecrets(configData);
+    }
+    if check file:test("Config.toml", file:EXISTS) {
+        return secretsTable(check toml:readFile("Config.toml"));
+    }
+    return {};
+}
+
+// Returns the string entries of the top-level [secrets] table in TOML content.
+public isolated function parseTopLevelSecrets(string tomlContent) returns map<string>|error {
+    return secretsTable(check toml:readString(tomlContent));
+}
+
+isolated function secretsTable(map<json> config) returns map<string> {
+    json secrets = config["secrets"];
+    map<string> result = {};
+    if secrets is map<json> {
+        foreach [string, json] [alias, value] in secrets.entries() {
+            if value is string {
+                result[alias] = value;
+            }
+        }
+    }
+    return result;
 }
 
 // Decrypts a value encrypted by the WSO2 cipher tool using asymmetric RSA/ECB/OAEPwithSHA1andMGF1Padding.

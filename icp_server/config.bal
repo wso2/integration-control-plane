@@ -175,6 +175,8 @@ configurable string opensearchPassword = "Ballerina@123";
 configurable boolean artifactsApiAllowInsecureTLS = true;
 
 // Secrets map containing values encrypted by the WSO2 cipher tool.
+// Populated from the top-level [secrets] table (the table the cipher tool encrypts) or, equivalently,
+// from [icp_server.secrets]. Use only one of the two; Ballerina rejects the top-level table if both exist.
 // All values present in this table are expected to be encrypted; plaintext values will cause an error.
 configurable map<string> secrets = {};
 

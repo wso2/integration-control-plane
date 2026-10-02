@@ -22,8 +22,22 @@ import ballerina/sql;
 final sql:Client dbClient = check createDbClient();
 
 function createDbClient() returns sql:Client|error {
-    string resolvedUser = check utils:resolveConfig(dbUser, secrets);
-    string resolvedPassword = check utils:resolveConfig(dbPassword, secrets);
+    map<string> dbSecrets = check resolveSecretsTable();
+    string resolvedUser = check utils:resolveConfig(dbUser, dbSecrets);
+    string resolvedPassword = check utils:resolveConfig(dbPassword, dbSecrets);
     DatabaseConnectionManager dbManager = check new (dbType, dbHost, dbPort, dbName, resolvedUser, resolvedPassword, dbUseTLS);
     return dbManager.getClient();
+}
+
+// Aliases come from the top-level [secrets] table (the one the cipher tool encrypts), with
+// [icp_server.storage.secrets] taking precedence. The TOML config is read only when an alias is used.
+function resolveSecretsTable() returns map<string>|error {
+    if !utils:isSecretAlias(dbUser) && !utils:isSecretAlias(dbPassword) {
+        return secrets;
+    }
+    map<string> merged = check utils:readTopLevelSecrets();
+    foreach [string, string] [alias, value] in secrets.entries() {
+        merged[alias] = value;
+    }
+    return merged;
 }

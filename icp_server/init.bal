@@ -96,7 +96,7 @@ function init() returns error? {
 }
 
 // Resolves a configurable value for the default module.
-// If the value matches "$secret{alias}", looks up the alias in the [icp_server.secrets] map and decrypts it.
+// If the value matches "$secret{alias}", looks up the alias in the [secrets] map and decrypts it.
 // Otherwise returns the value unchanged (plain-text config).
 function resolveSecret(string configValue) returns string|error {
     return utils:resolveConfig(configValue, secrets);

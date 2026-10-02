@@ -132,7 +132,7 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # ldapTrustStorePath = ""             # Path to a JKS truststore for verifying the LDAP server's CA cert
 # ldapTrustStorePassword = ""
 
-# Secrets alias form (use with [icp_server.secrets] block below):
+# Secrets alias form (use with the [secrets] table at the end of this file):
 # ldapConnectionPassword = "$secret{ldapConnectionPassword}"
 # ldapTrustStorePassword = "$secret{ldapTrustStorePassword}"
 
@@ -200,17 +200,10 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # =============================================================================
 # SECRETS ALIAS CONFIGURATION
 # =============================================================================
+# Reference an encrypted value as "$secret{alias}". The alias is defined in the
+# [secrets] table at the end of this file.
 # frontendJwtHMACSecret = "$secret{secretJWTsecret}"
 # credentialsDbPassword = "$secret{secCredsDbPassword}"
-
-# =============================================================================
-# ENCRYPTED SECRETS CONFIGURATION
-# =============================================================================
-[icp_server.secrets]
-# secretJWTsecret = "encrypted-value-for-jwt-secret"
-# secCredsDbPassword = "encrypted-value-for-credentials-db-password"
-# ldapConnectionPassword = "encrypted-value-for-ldap-connection-password"
-# ldapTrustStorePassword = "encrypted-value-for-ldap-truststore-password"
 
 # =============================================================================
 # DATABASE CONFIGURATION
@@ -269,13 +262,8 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # =============================================================================
 # DATABASE SECRETS ALIAS CONFIGURATION
 # =============================================================================
+# The alias is defined in the [secrets] table at the end of this file.
 # dbPassword = "$secret{secDbPassword}"
-
-# =============================================================================
-# DATABASE ENCRYPTED SECRETS CONFIGURATION
-# =============================================================================
-[icp_server.storage.secrets]
-# secDbPassword = "encrypted-value-for-db-password"
 
 
 [[ballerina.log.modules]]
@@ -285,3 +273,20 @@ level = "INFO"
 [ballerina.http.traceLogAdvancedConfig]
 # Enable printing trace logs on the Console. The default value is `false`.
 console = false
+
+# =============================================================================
+# ENCRYPTED SECRETS CONFIGURATION
+# =============================================================================
+# Holds every value referenced as "$secret{alias}" above, for all sections.
+# 1. Uncomment [secrets] and add each value as plain text wrapped in [], e.g.
+#      secretJWTsecret = "[my-jwt-secret-at-least-32-characters-long]"
+# 2. Run bin/ciphertool.sh -Dconfigure (bin\ciphertool.bat on Windows).
+#    The tool replaces each [plain-text] value with its encrypted form.
+# Keep this as a top-level [secrets] table: the cipher tool only processes this
+# table, and ICP fails to start if [icp_server.secrets] is also present.
+# [secrets]
+# secretJWTsecret = "encrypted-value-for-jwt-secret"
+# secCredsDbPassword = "encrypted-value-for-credentials-db-password"
+# secDbPassword = "encrypted-value-for-db-password"
+# ldapConnectionPassword = "encrypted-value-for-ldap-connection-password"
+# ldapTrustStorePassword = "encrypted-value-for-ldap-truststore-password"
