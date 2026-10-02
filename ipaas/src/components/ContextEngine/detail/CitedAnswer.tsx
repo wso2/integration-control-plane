@@ -16,96 +16,73 @@
  * under the License.
  */
 
-import { Box, Chip, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, ButtonBase, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { absoluteUrl, evidenceVersionLabel, splitCitations } from '../../../utils/contextEngine';
-import { EvidencePlace } from './EvidenceCard';
-import { citeChipSx, mutedSx } from '../styles';
-import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
+import { answerSentences } from '../../../utils/contextEngine';
+import { citationMarkSx, litSentenceSx } from '../styles';
+
+/** A citation someone is pointing at: its evidence number and, from the answer, the sentence it sits in. */
+export interface CitationFocus {
+  n: number;
+  /** Index into the answer's sentences; absent when the passage itself is pointed at, which lights every sentence citing it. */
+  sentence?: number;
+}
 
 interface CitedAnswerProps {
   answer: string;
-  /** The passages the model was given, in prompt order: `[n]` is `evidence[n - 1]`. */
-  evidence: ContextEvidence[];
-  sources: ContextSource[];
-  /** The passage page for a piece of evidence. */
-  hrefFor: (evidence: ContextEvidence) => string;
-  onOpen: (evidence: ContextEvidence) => void;
-  /** Click on a citation: scroll to its card. */
-  onJump: (n: number) => void;
-  /** Hovering a citation highlights its card; null when it leaves. */
-  onPeek: (n: number | null) => void;
+  /** The citation being hovered or focused, if any. */
+  active: CitationFocus | null;
+  /** The citation pinned by a click, if any. */
+  pinned: CitationFocus | null;
+  onHover: (focus: CitationFocus | null) => void;
+  onPin: (focus: CitationFocus) => void;
 }
 
-const peekSx = {
-  bgcolor: 'background.paper',
-  color: 'text.primary',
-  border: '1px solid',
-  borderColor: 'divider',
-  boxShadow: 6,
-  maxWidth: 420,
-  p: 1.5,
-  '& .MuiTooltip-arrow': { color: 'background.paper', '&::before': { border: '1px solid', borderColor: 'divider' } },
-} as const;
-
-function Peek({ n, evidence, source, href, onOpen }: { n: number; evidence: ContextEvidence; source?: ContextSource; href: string; onOpen: () => void }): JSX.Element {
-  return (
-    <Stack gap={0.75}>
-      <Stack direction="row" alignItems="center" gap={1}>
-        <Chip size="small" label={`[${n}]`} />
-        <Typography variant="caption" sx={{ fontWeight: 600 }}>
-          {source?.name ?? evidence.sourceId}
-        </Typography>
-      </Stack>
-      <Typography variant="caption" sx={mutedSx}>
-        <EvidencePlace evidence={evidence} /> · version of {evidenceVersionLabel(evidence.sourceVersion)}
-      </Typography>
-      <Typography variant="body2" sx={{ display: '-webkit-box', WebkitLineClamp: 4, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-        “{evidence.passage}”
-      </Typography>
-      <Stack direction="row" gap={2}>
-        <Link component="button" type="button" variant="body2" onClick={onOpen}>
-          Open passage
-        </Link>
-        <Link component="button" type="button" variant="body2" onClick={() => void navigator.clipboard?.writeText(absoluteUrl(href))}>
-          Copy link
-        </Link>
-      </Stack>
-    </Stack>
-  );
-}
+const matches = (focus: CitationFocus | null, n: number, sentence: number): boolean => !!focus && focus.n === n && (focus.sentence === undefined || focus.sentence === sentence);
 
 /**
- * An answer with its `[n]` citations as small chips. Hovering one shows the
- * passage it names and where it sits; clicking jumps to its card. The engine
- * already removed any citation to a passage the model was not given.
+ * An answer with its `[n]` citations as small numbered marks. Pointing at a
+ * mark lights the sentence it supports; the matching passage lights in the
+ * evidence rail beside the answer. Clicking a mark pins it. Nothing pops up
+ * over the text.
  */
-export default function CitedAnswer({ answer, evidence, sources, hrefFor, onOpen, onJump, onPeek }: CitedAnswerProps): JSX.Element {
-  const byId = new Map(sources.map((s) => [s.id, s]));
+export default function CitedAnswer({ answer, active, pinned, onHover, onPin }: CitedAnswerProps): JSX.Element {
+  const sentences = answerSentences(answer);
   return (
-    <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.7 }}>
-      {splitCitations(answer).map((part, i) => {
-        if (part.kind === 'text') return <span key={i}>{part.text}</span>;
-        const ev = evidence[part.n - 1];
-        const chip = <Chip component="button" size="small" color="primary" variant="outlined" label={part.n} clickable onClick={() => onJump(part.n)} aria-label={`Evidence ${part.n}`} sx={citeChipSx} />;
-        if (!ev)
-          return (
-            <Box key={i} component="span">
-              {chip}
-            </Box>
-          );
+    <Typography variant="body1" component="div" sx={{ lineHeight: 1.75 }}>
+      {sentences.map((s, i) => {
+        const lit = s.cites.some((n) => matches(active, n, i) || matches(pinned, n, i));
+        // Marks sit at the end of the sentence's words, before any line break that follows it.
+        const [, body, tail] = /^([\s\S]*?)(\s*)$/.exec(s.text) ?? [s.text, s.text, ''];
         return (
-          <Tooltip
-            key={i}
-            arrow
-            placement="bottom"
-            enterDelay={150}
-            onOpen={() => onPeek(part.n)}
-            onClose={() => onPeek(null)}
-            title={<Peek n={part.n} evidence={ev} source={byId.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => onOpen(ev)} />}
-            slotProps={{ tooltip: { sx: peekSx } }}>
-            {chip}
-          </Tooltip>
+          <Box key={i} component="span">
+            <Box component="span" sx={lit ? litSentenceSx : undefined}>
+              {/* The markers came out of the text, so a stop that followed one closes up to the word before it. */}
+              <Box component="span" sx={{ whiteSpace: 'pre-wrap' }}>
+                {body.replace(/ +([.!?,;:])/g, '$1')}
+              </Box>
+              {s.cites.map((n) => {
+                const isPinned = matches(pinned, n, i);
+                return (
+                  <ButtonBase
+                    key={n}
+                    aria-label={`Evidence ${n}`}
+                    aria-pressed={isPinned}
+                    onMouseEnter={() => onHover({ n, sentence: i })}
+                    onMouseLeave={() => onHover(null)}
+                    onFocus={() => onHover({ n, sentence: i })}
+                    onBlur={() => onHover(null)}
+                    onClick={() => onPin({ n, sentence: i })}
+                    sx={citationMarkSx(matches(active, n, i) || isPinned, isPinned)}>
+                    {n}
+                  </ButtonBase>
+                );
+              })}
+            </Box>
+            <Box component="span" sx={{ whiteSpace: 'pre-wrap' }}>
+              {tail}
+            </Box>
+          </Box>
         );
       })}
     </Typography>

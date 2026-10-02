@@ -486,15 +486,64 @@ export const listProgressTextSx = { display: 'block', mt: 0.5, whiteSpace: 'nowr
 
 export const suggestionRowSx = { display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' } as const;
 
-export const citeChipSx = {
-  height: 18,
-  minWidth: 18,
-  mx: 0.25,
-  verticalAlign: 'super',
-  fontSize: 11,
-  fontWeight: 600,
-  '& .MuiChip-label': { px: 0.75 },
+/** A `[n]` citation in an answer: an outlined number that fills while pointed at, with a ring while pinned. */
+export const citationMarkSx = (lit: boolean, pinned: boolean) =>
+  ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 18,
+    minWidth: 18,
+    px: 0.6,
+    mx: 0.25,
+    borderRadius: 9,
+    verticalAlign: 'super',
+    fontSize: 11,
+    fontWeight: 600,
+    lineHeight: 1,
+    border: '1px solid',
+    borderColor: lit ? 'primary.main' : 'primary.light',
+    bgcolor: lit ? 'primary.main' : 'background.paper',
+    color: lit ? 'primary.contrastText' : 'primary.main',
+    boxShadow: pinned ? '0 0 0 3px rgba(255, 115, 0, 0.25)' : 'none',
+    transition: 'background-color 120ms, color 120ms, box-shadow 120ms',
+  }) as const;
+
+/** The sentence a pointed-at citation supports. */
+export const litSentenceSx = {
+  bgcolor: 'rgba(255, 115, 0, 0.12)',
+  boxShadow: (t: { palette: { primary: { main: string } } }) => `0 1px 0 ${t.palette.primary.main}`,
+  borderRadius: '3px',
+  px: 0.25,
 } as const;
+
+/** A passage in the evidence rail beside an answer. */
+export const railCardSx = (active: boolean, pinned: boolean, dimmed: boolean) =>
+  ({
+    border: '1px solid',
+    borderColor: active || pinned ? 'primary.main' : 'divider',
+    boxShadow: pinned ? (t: { palette: { primary: { main: string } } }) => `0 0 0 1px ${t.palette.primary.main}, 0 8px 24px rgba(255, 115, 0, 0.14)` : active ? (t: { palette: { primary: { main: string } } }) => `0 0 0 1px ${t.palette.primary.main}` : 'none',
+    borderRadius: 1.25,
+    px: 1.75,
+    py: 1.5,
+    bgcolor: active && !pinned ? 'rgba(255, 115, 0, 0.04)' : 'background.paper',
+    opacity: dimmed ? 0.55 : 1,
+    transition: 'border-color 120ms, box-shadow 120ms, opacity 120ms',
+  }) as const;
+
+/** The number badge on a rail card; a button that pins the passage. */
+export const railNumberSx = (lit: boolean) =>
+  ({
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    fontSize: 11,
+    fontWeight: 600,
+    flexShrink: 0,
+    bgcolor: lit ? 'primary.main' : 'action.selected',
+    color: lit ? 'primary.contrastText' : 'text.primary',
+    transition: 'background-color 120ms, color 120ms',
+  }) as const;
 
 export const answerFooterSx = {
   display: 'flex',

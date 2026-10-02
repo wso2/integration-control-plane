@@ -1062,6 +1062,49 @@ export function absoluteUrl(path: string, origin: string = window.location.origi
   return new URL(path, origin).toString();
 }
 
+/** One sentence of an answer with the evidence numbers cited in it. The text keeps its own spacing and line breaks. */
+export interface AnswerSentence {
+  text: string;
+  cites: number[];
+}
+
+/**
+ * Split an answer into sentences, each with the citations that sit in it. A
+ * marker belongs to the sentence before it, so "Promote [1]. Rollbacks keep
+ * secrets [1]." gives two sentences citing [1]. Sentences end at `.`, `!` or `?`
+ * followed by a space, or at a line break; markers are dropped from the text.
+ */
+export function answerSentences(answer: string): AnswerSentence[] {
+  const out: AnswerSentence[] = [];
+  let text = '';
+  let cites: number[] = [];
+  const close = () => {
+    if (text.trim() || cites.length) out.push({ text, cites });
+    text = '';
+    cites = [];
+  };
+  for (const part of splitCitations(answer)) {
+    if (part.kind === 'cite') {
+      // A marker after a sentence's closing space still belongs to that sentence, not the next one.
+      const target = !text.trim() && out.length ? out[out.length - 1].cites : cites;
+      if (!target.includes(part.n)) target.push(part.n);
+      continue;
+    }
+    let rest = part.text;
+    for (;;) {
+      const m = /([.!?]+["”')\]]*\s+|\n+)/.exec(rest);
+      if (!m) break;
+      const end = (m.index ?? 0) + m[0].length;
+      text += rest.slice(0, end);
+      close();
+      rest = rest.slice(end);
+    }
+    text += rest;
+  }
+  close();
+  return out;
+}
+
 /** The evidence numbers an answer cites, from its `[n]` markers. */
 export function citedNumbers(answer: string | undefined): Set<number> {
   return new Set(answer ? splitCitations(answer).flatMap((p) => (p.kind === 'cite' ? [p.n] : [])) : []);

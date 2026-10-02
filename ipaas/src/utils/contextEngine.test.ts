@@ -27,6 +27,7 @@ import {
   engineMessage,
   formatBytes,
   describeUploadAudience,
+  answerSentences,
   askedQuestionMeta,
   citedNumbers,
   deletionFailureText,
@@ -856,6 +857,27 @@ describe('provenance and evidence', () => {
     ]);
     expect(passageLines(ev({ lines: { first: 1, last: 11 } }))).toBeNull();
     expect(passageLines(ev({}))).toBeNull();
+  });
+
+  it('splits an answer into sentences that keep their citations', () => {
+    expect(answerSentences('Open the Deploy page and click Promote [1]. Rollbacks keep secrets [1][2]. Escalate after 15 minutes [3].')).toEqual([
+      { text: 'Open the Deploy page and click Promote . ', cites: [1] },
+      { text: 'Rollbacks keep secrets . ', cites: [1, 2] },
+      { text: 'Escalate after 15 minutes .', cites: [3] },
+    ]);
+    // A marker before the full stop, a line break, and a sentence with no citation.
+    expect(answerSentences('Pause the workers[2].\nThen promote the standby. Finally update DNS [1]')).toEqual([
+      { text: 'Pause the workers.\n', cites: [2] },
+      { text: 'Then promote the standby. ', cites: [] },
+      { text: 'Finally update DNS ', cites: [1] },
+    ]);
+    // A marker after the closing space, or after a blank line, still belongs to the sentence before it.
+    expect(answerSentences('Challenge 1 ends in a PASS. [4] Challenge 2 follows.\n\n[3] **Verification**')).toEqual([
+      { text: 'Challenge 1 ends in a PASS. ', cites: [4] },
+      { text: ' Challenge 2 follows.\n\n', cites: [3] },
+      { text: ' **Verification**', cites: [] },
+    ]);
+    expect(answerSentences('')).toEqual([]);
   });
 
   it('collects the evidence an answer cites', () => {

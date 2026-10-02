@@ -59,10 +59,6 @@ interface EvidenceCardProps {
   /** Its number in the answer or list, as `[n]`. */
   n: number;
   source?: ContextSource;
-  /** Answer mode only: whether the answer cites it. Left out where nothing is cited. */
-  cited?: boolean;
-  /** Outlined while its citation is hovered. */
-  highlighted?: boolean;
   /** The passage page; Copy link copies its absolute form. */
   href: string;
   onOpen: () => void;
@@ -74,7 +70,7 @@ interface EvidenceCardProps {
  * and the text. Copy link and Open lead to the passage page, which checks
  * access again whenever it opens.
  */
-export default function EvidenceCard({ evidence, n, source, cited, highlighted = false, href, onOpen, id }: EvidenceCardProps): JSX.Element {
+export default function EvidenceCard({ evidence, n, source, href, onOpen, id }: EvidenceCardProps): JSX.Element {
   const [copied, setCopied] = useState(false);
   const copy = () =>
     navigator.clipboard?.writeText(absoluteUrl(href)).then(() => {
@@ -82,7 +78,7 @@ export default function EvidenceCard({ evidence, n, source, cited, highlighted =
       window.setTimeout(() => setCopied(false), 1500);
     });
   return (
-    <Box id={id} sx={{ ...evidenceCardSx, ...(highlighted ? { borderColor: 'primary.main', boxShadow: (t) => `0 0 0 1px ${t.palette.primary.main}` } : {}), transition: 'border-color 120ms, box-shadow 120ms' }}>
+    <Box id={id} sx={evidenceCardSx}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Stack direction="row" alignItems="center" gap={1} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
           <Chip size="small" label={`[${n}]`} />
@@ -95,7 +91,6 @@ export default function EvidenceCard({ evidence, n, source, cited, highlighted =
           </Box>
         </Stack>
         <Stack direction="row" alignItems="center" gap={0.5} sx={{ flexShrink: 0 }}>
-          {cited !== undefined && <Chip size="small" variant="outlined" icon={cited ? <Check size={13} /> : undefined} label={cited ? 'Cited' : 'Not cited'} sx={cited ? undefined : { color: 'text.secondary' }} />}
           {evidence.sourceUrl && (
             <Link href={evidence.sourceUrl} target="_blank" rel="noopener noreferrer" variant="caption" sx={{ mx: 0.5 }}>
               Open source

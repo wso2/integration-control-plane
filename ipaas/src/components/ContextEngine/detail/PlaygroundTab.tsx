@@ -24,11 +24,11 @@ import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
 import { forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
 import { ANSWER_MODE_AVAILABLE, CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
-import { citedNumbers, suggestedQuestions } from '../../../utils/contextEngine';
+import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
-import CitedAnswer from './CitedAnswer';
+import AnsweredTurn from './AnsweredTurn';
 import EvidenceCard from './EvidenceCard';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
@@ -78,12 +78,6 @@ function outcomeOf(mode: ContextQueryMode, result: ContextQueryResult): AskedQue
   return result.evidence.length ? 'passages' : 'none';
 }
 
-const cardId = (queryId: string, n: number): string => `evidence-${queryId}-${n}`;
-
-function jumpTo(id: string): void {
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-}
-
 function SectionHeading({ title, caption }: { title: string; caption?: string }): JSX.Element {
   return (
     <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={2} sx={{ mt: 2.5, mb: 1.5 }}>
@@ -114,7 +108,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const [question, setQuestion] = useState(() => params.get('q')?.trim() ?? '');
   const [turns, setTurns] = useState<Turn[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
-  const [peek, setPeek] = useState<{ queryId: string; n: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const query = useQueryContextEngine();
   const reopen = useReopenContextQuery();
@@ -152,7 +145,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       onSuccess: (result) => {
         setTurns([{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }]);
         setMode(q.mode);
-        setPeek(null);
         query.reset();
         if (result.answerWithheld && q.outcome !== 'hidden') updateQuestion(engine.id, q.queryId, { outcome: 'hidden' });
         window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
@@ -180,21 +172,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     const { result } = t;
     const n = result.evidence.length;
     const answered = t.mode === 'answer' && !!result.answer && !result.answerWithheld;
-    const cited = answered ? citedNumbers(result.answer) : null;
     const lost = t.reopened ? Math.max(0, t.reopened.passagesThen - n) : 0;
-    const cards = result.evidence.map((ev, idx) => (
-      <EvidenceCard
-        key={ev.id}
-        id={cardId(result.queryId, idx + 1)}
-        evidence={ev}
-        n={idx + 1}
-        source={sourcesById.get(ev.sourceId)}
-        cited={cited ? cited.has(idx + 1) : undefined}
-        highlighted={peek?.queryId === result.queryId && peek.n === idx + 1}
-        href={hrefFor(ev)}
-        onOpen={() => openEvidence(ev)}
-      />
-    ));
+    // Full cards for passages, a hidden answer or an answer the engine declined; an answer gets its rail instead.
+    const cards = result.evidence.map((ev, idx) => <EvidenceCard key={ev.id} evidence={ev} n={idx + 1} source={sourcesById.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => openEvidence(ev)} />);
 
     let body: JSX.Element;
     let summary: string;
@@ -222,21 +202,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else if (answered) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = (
-        <>
-          <CitedAnswer
-            answer={result.answer!}
-            evidence={result.evidence}
-            sources={engine.sources}
-            hrefFor={hrefFor}
-            onOpen={openEvidence}
-            onJump={(num) => jumpTo(cardId(result.queryId, num))}
-            onPeek={(num) => setPeek(num === null ? null : { queryId: result.queryId, n: num })}
-          />
-          <SectionHeading title="Evidence" caption="The passages the model was given, in the order it saw them" />
-          <Stack gap={1.5}>{cards}</Stack>
-        </>
-      );
+      body = <AnsweredTurn answer={result.answer!} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} />;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = (
