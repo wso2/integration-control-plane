@@ -330,6 +330,11 @@ export function contextEngineUrl(orgHandler: string, engineId: string, tab: Cont
   return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/${tab}`;
 }
 
+/** One cited passage: the page a citation link opens. */
+export function contextEvidenceUrl(orgHandler: string, engineId: string, evidenceId: string): string {
+  return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/evidence/${encodeURIComponent(evidenceId)}`;
+}
+
 // ---------------------------------------------------------------------------
 // Infrastructure (org admin) — managed database servers
 // ---------------------------------------------------------------------------

@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Grid, Link, Stack, Typography } from '@wso2/oxygen-ui';
-import { Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { EyeOff, Info, KeyRound, Lock, Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
-import { useAddContextSource, useAskedFlag, useContextEngineProgress, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine, useUploadAudience } from '../../../hooks/useContextEngine';
+import { useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { CONTEXT_JOB_TERMINAL_STATES, EVERYONE_VISIBILITY, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, sourceAsConfig, summarizeEngineProgress, visibilityTags, withUploadRules } from '../../../utils/contextEngine';
+import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withUploadRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GraphStatusChip from '../GraphStatusChip';
@@ -32,6 +32,7 @@ import OwnerAccessButton from './OwnerAccessButton';
 import SourcesProgressCard from './SourcesProgressCard';
 import FilesDrawer from '../files/FilesDrawer';
 import EditSourceDrawer from './EditSourceDrawer';
+import EditModelsDrawer from './EditModelsDrawer';
 import SourceDrawer from '../SourceDrawer';
 import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
 import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
@@ -44,6 +45,8 @@ interface OverviewTabProps {
   onGoTab: (tab: ContextEngineTabKey) => void;
   /** Open the Files drawer for this source on arrival, e.g. right after the wizard uploaded to it. */
   openFilesSourceId?: string;
+  /** The engine is being deleted: show what it holds, offer nothing that changes it. */
+  readOnly?: boolean;
 }
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }): JSX.Element {
@@ -66,23 +69,33 @@ const providerName = (kind: 'embedding' | 'llm', id: string | undefined): string
   return list.find((p) => p.id === id)?.name ?? id;
 };
 
-function ModelRow({ label, provider, model }: { label: string; provider: string; model: string | undefined }): JSX.Element {
+function ModelRow({ label, provider, model, locked = false }: { label: string; provider: string; model: string | undefined; locked?: boolean }): JSX.Element {
   return (
     <Box sx={summaryRowSx}>
-      <Typography variant="body2" sx={mutedSx}>
-        {label}
-      </Typography>
+      <Stack direction="row" alignItems="center" gap={1}>
+        <Typography variant="body2" sx={mutedSx}>
+          {label}
+        </Typography>
+        {locked && (
+          <Tooltip title="Fixed while the engine holds indexed items: their vectors only match this model.">
+            <Chip size="small" variant="outlined" icon={<Lock size={12} />} label="Locked" sx={{ height: 22 }} />
+          </Tooltip>
+        )}
+      </Stack>
       <Box sx={{ textAlign: 'right' }}>
         <Typography variant="body2" sx={{ fontWeight: 500 }}>
           {provider}
         </Typography>
         <Typography variant="caption" sx={mutedSx}>
-          {model ?? 'Not set'}
+          {model ?? 'Set where the engine runs'}
         </Typography>
       </Box>
     </Box>
   );
 }
+
+/** Who can see the models: the configuration route needs source or space management rights. */
+const canSeeModels = (actions: string[] | undefined): boolean => !actions || actions.includes('space.manage') || actions.includes('source.manage');
 
 const SOURCES_CARD_ID = 'context-engine-sources';
 
@@ -103,7 +116,7 @@ function enrichFailure(e: unknown): EnrichFailure {
 }
 
 /** Overview — first-run checklist, source progress, enrichment, access, models, storage and exposure, each linking to its tab. */
-export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, openFilesSourceId }: OverviewTabProps): JSX.Element {
+export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, openFilesSourceId, readOnly = false }: OverviewTabProps): JSX.Element {
   const [filesSource, setFilesSource] = useState<ContextSource | null>(() => engine.sources.find((s) => s.id === openFilesSourceId && s.type === 'upload') ?? null);
   const [filesOpen, setFilesOpen] = useState(!!openFilesSourceId);
   const openFiles = (source: ContextSource) => {
@@ -122,6 +135,14 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
   const [editSource, setEditSource] = useState<ContextSource | null>(null);
   const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
+  const permissions = useContextPermissions(engine.id);
+  const canEditModels = !readOnly && !!permissions.data?.includes('space.manage');
+  const [modelsOpen, setModelsOpen] = useState(false);
+  const [modelsSession, setModelsSession] = useState(0);
+  const openModels = () => {
+    setModelsSession((n) => n + 1);
+    setModelsOpen(true);
+  };
   const { everyone } = useUploadAudience(orgHandle, engine.queryRoles);
   const existingConfigs = engine.sources.map((s) => sourceAsConfig(s, rememberedSourceRules(s.id)));
 
@@ -195,7 +216,7 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
 
   return (
     <>
-      {!allDone && <GetStartedChecklist steps={steps} onAction={onChecklistAction} />}
+      {!allDone && !readOnly && <GetStartedChecklist steps={steps} onAction={onChecklistAction} />}
 
       {sourceNotice && (
         <Alert
@@ -221,12 +242,16 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
             engineId={engine.id}
             sources={engine.sources}
             graph={graph}
-            onManageFiles={openFiles}
-            onAddSource={() => {
-              setAddSession((n) => n + 1);
-              setAddOpen(true);
-            }}
-            onEditSource={setEditSource}
+            onManageFiles={readOnly ? undefined : openFiles}
+            onAddSource={
+              readOnly
+                ? undefined
+                : () => {
+                    setAddSession((n) => n + 1);
+                    setAddOpen(true);
+                  }
+            }
+            onEditSource={readOnly ? undefined : setEditSource}
           />
         </Grid>
 
@@ -234,7 +259,7 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
           <Card
             title="Context graph"
             action={
-              <Button size="small" variant="outlined" startIcon={building ? <CircularProgress size={14} color="inherit" /> : graph.state === 'built' ? <RefreshCw size={14} /> : <Play size={14} />} disabled={building} onClick={startEnrichment}>
+              <Button size="small" variant="outlined" startIcon={building ? <CircularProgress size={14} color="inherit" /> : graph.state === 'built' ? <RefreshCw size={14} /> : <Play size={14} />} disabled={building || readOnly} onClick={startEnrichment}>
                 {building ? 'Enriching…' : graph.state === 'built' ? 'Enrich again' : 'Enrich'}
               </Button>
             }>
@@ -282,9 +307,40 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card title="Models">
-            <ModelRow label="Embedding" provider={providerName('embedding', engine.models.embedding?.provider)} model={engine.models.embedding?.model} />
-            <ModelRow label="Language model" provider={providerName('llm', engine.models.llm?.provider)} model={engine.models.llm?.model} />
+          <Card
+            title="Models"
+            action={
+              canEditModels && canSeeModels(permissions.data) ? (
+                <Link component="button" type="button" variant="body2" onClick={openModels}>
+                  {engine.models.embedding || engine.models.llm ? 'Edit' : 'Choose models'}
+                </Link>
+              ) : undefined
+            }>
+            {canSeeModels(permissions.data) ? (
+              <>
+                <ModelRow label="Embedding" provider={engine.models.embedding ? providerName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
+                <ModelRow label="Language model" provider={engine.models.llm ? providerName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
+                {modelKeysLabel(engine.models) ? (
+                  <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
+                    <KeyRound size={14} aria-hidden />
+                    <Typography variant="caption">{modelKeysLabel(engine.models)}</Typography>
+                  </Stack>
+                ) : (
+                  !engine.models.embedding &&
+                  !engine.models.llm && (
+                    <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
+                      <Info size={14} aria-hidden />
+                      <Typography variant="caption">Uses the engine host&apos;s models until you choose its own.</Typography>
+                    </Stack>
+                  )
+                )}
+              </>
+            ) : (
+              <Stack direction="row" gap={1} sx={mutedSx}>
+                <EyeOff size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
+                <Typography variant="body2">Only people who manage this engine&apos;s sources or settings can see its models.</Typography>
+              </Stack>
+            )}
           </Card>
         </Grid>
 
@@ -335,6 +391,7 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
         </Grid>
       </Grid>
 
+      {modelsSession > 0 && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={engine.models} open={modelsOpen} onClose={() => setModelsOpen(false)} />}
       {filesSource && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
       <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} queryRoles={engine.queryRoles} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
       {editSource && (

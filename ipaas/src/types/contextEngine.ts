@@ -80,11 +80,52 @@ export interface ContextEngineExposure {
 export interface ContextModelSummary {
   provider: string;
   model: string;
+  /** How the engine holds the key: `encrypted` from a typed key, `reference` resolved at call time. The key never comes back. */
+  keyKind?: 'encrypted' | 'reference' | 'unknown' | string;
+  dimensions?: number;
+  baseUrl?: string;
+  apiVersion?: string;
 }
 
 export interface ContextEngineModels {
   embedding: ContextModelSummary | null;
   llm: ContextModelSummary | null;
+  /** The engine holds indexed content, so the embedding model cannot change until it can re-index. */
+  embeddingLocked?: boolean;
+  /** Configuration version and when it last changed, when the engine reports them. */
+  version?: number;
+  updatedAt?: string;
+}
+
+/** One model to save. Sent without a key or reference, an unchanged model keeps its stored key. */
+export interface ContextModelInput {
+  provider: string;
+  model: string;
+  apiKey?: string;
+  /** `env:NAME` from the engine's environment, or `cp:<id>` from the control plane. */
+  apiKeyRef?: string;
+  baseUrl?: string;
+  apiVersion?: string;
+  dimensions?: number;
+}
+
+/** One model while it is edited on a running engine; an empty key or reference keeps the stored one when the model is unchanged. */
+export interface ModelDraft {
+  provider: string;
+  model: string;
+  baseUrl: string;
+  apiVersion: string;
+  dimensions?: number;
+  keyMode: 'key' | 'ref';
+  apiKey: string;
+  apiKeyRef: string;
+}
+
+/** Both models go together: the engine drops a model left out, and refuses a locked embedding that is not sent back unchanged. */
+export interface UpdateContextModelsInput {
+  engineId: string;
+  embedding: ContextModelInput | null;
+  llm: ContextModelInput | null;
 }
 
 /** The full engine as shown on its detail page. */
@@ -459,23 +500,68 @@ export interface ContextQueryInput {
   limit?: number;
 }
 
+/** A first-to-last range, counted from one: lines as editors count them, sentences by the engine's rules. */
+export interface ContextRange {
+  first: number;
+  last: number;
+}
+
+/**
+ * Where a passage sits in its record version. The engine sets each part only
+ * when it is certain: lines for text and Markdown, the nearest heading for
+ * Markdown and HTML, the JSON path for JSON. Other types carry the chunk alone.
+ */
+export interface ContextEvidenceLocator {
+  /** From zero. */
+  chunkIndex?: number;
+  /** Code-point offsets in the version's extracted text, end exclusive. */
+  characters?: { start: number; end: number };
+  sentences?: ContextRange;
+  lines?: ContextRange;
+  heading?: string;
+  path?: string;
+}
+
 export interface ContextEvidence {
   id: string;
   recordId: string;
   sourceId: string;
+  /** The record version the passage comes from; uploads use epoch milliseconds. */
   sourceVersion: string;
   passage: string;
+  /** The compact `chunk:<n>` form; `locator` has the exact place. */
   location?: string;
+  locator?: ContextEvidenceLocator;
   sourceUrl?: string;
 }
 
 export interface ContextQueryResult {
   queryId: string;
   state: 'completed' | 'insufficient_evidence' | string;
+  /** Answer mode only; each `[n]` cites `evidence[n - 1]`, and every passage listed was given to the model. */
   answer?: string;
+  /** A reopened answer whose passages the reader can no longer all see: the text is withheld, the visible evidence stays. */
+  answerWithheld?: boolean;
   evidence: ContextEvidence[];
   insufficientEvidence: boolean;
   traceId: string;
+}
+
+/**
+ * A question asked from this browser, kept so it can be reopened. The engine
+ * stores every query for its asker but has no route that lists them yet, and a
+ * reopened query does not carry its question or time.
+ */
+export interface AskedQuestion {
+  queryId: string;
+  engineId: string;
+  question: string;
+  mode: ContextQueryMode;
+  askedAt: string;
+  /** What came back: a written answer, passages only, or nothing to show; `hidden` once a reopen withheld the answer. */
+  outcome: 'answered' | 'passages' | 'none' | 'hidden';
+  /** Passages returned when it was asked, to tell when some have gone since. */
+  passages: number;
 }
 
 // ── Access ──────────────────────────────────────────────────────────────────

@@ -18,16 +18,17 @@
 
 import { Alert, Box, Button, CircularProgress, IconButton, PageContent, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Trash2 } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type JSX } from 'react';
+import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useDeletionJob } from '../hooks/useContextEngine';
+import { deletionFailureText, engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import NotFound from '../components/NotFound';
-import ConfirmDeleteDialog from '../components/ConfirmDeleteDialog';
+import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import { EngineGraphChip } from '../components/ContextEngine/GraphStatusChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
@@ -62,6 +63,11 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const remove = useDeleteContextEngine();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const deleting = engine?.state === 'deleting';
+  const deletion = useDeletionJob(engineId, deleting);
+  // Once an engine seen deleting answers 404, it was deleted rather than never there.
+  const seenDeleting = useRef(false);
+  if (deleting) seenDeleting.current = true;
   const base = contextEnginesUrl(scope.org);
 
   if (!isContextEngineEnabled()) {
@@ -92,7 +98,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
     return (
       <PageContent>
         {back}
-        <NotFound message="This context engine does not exist, or you don't have access to it." backTo={base} />
+        <NotFound message={seenDeleting.current ? 'This context engine was deleted.' : "This context engine does not exist, or you don't have access to it."} backTo={base} />
       </PageContent>
     );
   }
@@ -114,16 +120,23 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
     );
   }
 
+  // Deleting runs as a job on the engine: the page stays, read-only, until the engine is gone.
   const onDelete = () => {
     setDeleteError(null);
     remove.mutate(engine.id, {
-      onSuccess: () => navigate(base),
-      onError: (e) => {
-        setConfirmDelete(false);
-        setDeleteError(e instanceof HttpError && (e.status === 404 || e.status === 405) ? 'This engine does not support deletion yet.' : "Couldn't delete the context engine. Please try again.");
-      },
+      onSuccess: () => setConfirmDelete(false),
+      onError: (e) =>
+        setDeleteError(
+          e instanceof HttpError && e.status === 403
+            ? 'Deleting an engine needs the manage permission on it.'
+            : e instanceof HttpError && e.status === 405
+              ? 'This engine does not support deletion yet.'
+              : `Couldn't delete the context engine: ${engineMessage(e, 'please try again')}.`,
+        ),
     });
   };
+  const deletionFailed = deleting && deletion.data?.state === 'failed';
+  const shownTab: ContextEngineTabKey = deleting ? 'overview' : activeTab;
 
   return (
     <PageContent>
@@ -141,12 +154,39 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             {engine.description || 'No description'}
           </Typography>
         </Box>
-        <Tooltip title="Delete engine">
-          <IconButton color="error" aria-label={`Delete ${engine.name}`} onClick={() => setConfirmDelete(true)}>
-            <Trash2 size={18} />
-          </IconButton>
-        </Tooltip>
+        {!deleting && (
+          <Tooltip title="Delete engine">
+            <IconButton color="error" aria-label={`Delete ${engine.name}`} onClick={() => setConfirmDelete(true)}>
+              <Trash2 size={18} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
+
+      {deleting &&
+        (deletionFailed ? (
+          <Alert
+            severity="error"
+            variant="outlined"
+            sx={{ mb: 3 }}
+            action={
+              <Button color="inherit" size="small" disabled={remove.isPending} onClick={onDelete}>
+                Retry
+              </Button>
+            }>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              Deleting this engine failed
+            </Typography>
+            {deletionFailureText(deletion.data?.error?.code)}
+          </Alert>
+        ) : (
+          <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+              This engine is being deleted
+            </Typography>
+            Questions, uploads and changes are paused, and its API and MCP endpoints have stopped answering. It disappears from your list once the engine finishes.
+          </Alert>
+        ))}
 
       {warnings.length > 0 && (
         <Alert severity="warning" variant="outlined" onClose={() => setWarnings([])} sx={{ mb: 3 }}>
@@ -159,38 +199,37 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         </Alert>
       )}
 
-      {deleteError && (
+      {deleteError && !confirmDelete && (
         <Alert severity="error" variant="outlined" onClose={() => setDeleteError(null)} sx={{ mb: 3 }}>
           {deleteError}
         </Alert>
       )}
 
-      <Tabs value={activeTab} onChange={(_, v) => goTab(v as ContextEngineTabKey)} sx={tabsSx}>
+      <Tabs value={shownTab} onChange={(_, v) => goTab(v as ContextEngineTabKey)} sx={tabsSx}>
         {TABS.map((t) => (
-          <Tab key={t.value} label={t.label} value={t.value} />
+          <Tab key={t.value} label={t.label} value={t.value} disabled={deleting && t.value !== 'overview'} />
         ))}
       </Tabs>
 
-      {activeTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} />}
-      {activeTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
-      {activeTab === 'api' && <ApiTab engine={engine} />}
-      {activeTab === 'mcp' && <McpTab engine={engine} />}
-      {activeTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />}
+      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={deleting} />}
+      {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
+      {shownTab === 'api' && <ApiTab engine={engine} />}
+      {shownTab === 'mcp' && <McpTab engine={engine} />}
+      {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />}
 
       {confirmDelete && (
-        <ConfirmDeleteDialog
-          title={
-            <>
-              Delete <strong>{engine.name}</strong>?
-            </>
-          }
+        <DeleteEngineDialog
+          name={engine.name}
+          sourceCount={engine.sources.length}
+          isPending={remove.isPending}
+          error={deleteError}
           onConfirm={onDelete}
-          onClose={() => setConfirmDelete(false)}
-          isPending={remove.isPending}>
-          <Typography variant="body2" color="text.secondary">
-            The context graph, its sources and every grant on this engine will be removed. Integrations and agents calling its API or MCP endpoint will stop receiving answers.
-          </Typography>
-        </ConfirmDeleteDialog>
+          onClose={() => {
+            if (remove.isPending) return;
+            setConfirmDelete(false);
+            setDeleteError(null);
+          }}
+        />
       )}
     </PageContent>
   );

@@ -25,23 +25,37 @@ import {
   deleteContextGrant,
   getContextEngine,
   getContextEngineProgress,
+  getContextEvidence,
   getContextJob,
+  getContextPermissions,
   getContextPrincipal,
+  getContextQuery,
   listContextEngines,
   listContextGrants,
   putContextGrant,
   queryContextEngine,
   rebuildContextEngine,
   updateContextEngineExposure,
+  updateContextModels,
   updateContextSource,
 } from '#api/contextEngine';
 import { IS_WIP } from '../features';
 import { getAccessToken } from '../auth/tokenManager';
-import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, CONTEXT_OWNER_ACTIONS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS } from '../constants/contextEngine';
+import {
+  CONTEXT_ENGINE_ASKED_KEY_PREFIX,
+  CONTEXT_ENGINE_DELETION_KEY_PREFIX,
+  CONTEXT_ENGINE_DRAFT_KEY_PREFIX,
+  CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX,
+  CONTEXT_JOB_TERMINAL_STATES,
+  CONTEXT_OWNER_ACTIONS,
+  DELETION_POLL_MS,
+  PROGRESS_POLL_ACTIVE_MS,
+  PROGRESS_POLL_IDLE_MS,
+} from '../constants/contextEngine';
 import { everyoneRoles, fromDraft, isEngineProgressActive, ownerGrantId, resolveGraphStatus, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { HttpError } from '../types/http';
-import type { ContextEngineExposure, ContextEngineForm, ContextGraphStatus, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineExposure, ContextEngineForm, ContextGraphStatus, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -50,22 +64,97 @@ export function isContextEngineEnabled(): boolean {
   return IS_WIP && !!window.API_CONFIG?.enableContextEngineFeature && !!window.API_CONFIG?.contextEngineApiUrl;
 }
 
+/** The engines the caller can see; checked again every few seconds while one is being deleted. */
 export function useContextEngines() {
   return useQuery({
     queryKey: [ROOT_KEY, 'list'],
     queryFn: () => listContextEngines(),
     enabled: isContextEngineEnabled(),
     retry: false,
+    refetchInterval: (query) => (query.state.data?.some((e) => e.state === 'deleting') ? DELETION_POLL_MS : false),
   });
 }
 
+/** One engine; checked again every few seconds while it is being deleted, until it is gone. */
 export function useContextEngine(engineId: string) {
   return useQuery({
     queryKey: [ROOT_KEY, 'detail', engineId],
     queryFn: () => getContextEngine(engineId),
     enabled: isContextEngineEnabled() && !!engineId,
     retry: false,
+    refetchInterval: (query) => (query.state.data?.state === 'deleting' ? DELETION_POLL_MS : false),
   });
+}
+
+/** The caller's effective actions on one engine, to offer only what they can do. Empty while unknown. */
+export function useContextPermissions(engineId: string) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'permissions', engineId],
+    queryFn: () => getContextPermissions(engineId),
+    enabled: isContextEngineEnabled() && !!engineId,
+    retry: false,
+    staleTime: 30_000,
+  });
+}
+
+/** Replace the engine's models; the engine's page refetches to show the new ones and their key status. */
+export function useUpdateContextModels(engineId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Omit<UpdateContextModelsInput, 'engineId'>) => updateContextModels({ ...input, engineId }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] }),
+  });
+}
+
+/** Reopen a question this caller asked; every passage is checked again. */
+export function useReopenContextQuery() {
+  return useMutation({ mutationFn: (queryId: string) => getContextQuery(queryId) });
+}
+
+/** One passage behind a citation link. A 404 means it is gone or out of reach, which the engine does not tell apart. */
+export function useContextEvidence(evidenceId: string) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'evidence', evidenceId],
+    queryFn: () => getContextEvidence(evidenceId),
+    enabled: isContextEngineEnabled() && !!evidenceId,
+    retry: false,
+  });
+}
+
+// ── Deletion jobs (the engine lists a deleting engine but not its job) ──
+
+const deletionKey = (engineId: string): string => `${CONTEXT_ENGINE_DELETION_KEY_PREFIX}${engineId}`;
+
+function readDeletionJob(engineId: string): string | null {
+  try {
+    return localStorage.getItem(deletionKey(engineId));
+  } catch {
+    return null;
+  }
+}
+
+function writeDeletionJob(engineId: string, jobId: string | null): void {
+  try {
+    if (jobId) localStorage.setItem(deletionKey(engineId), jobId);
+    else localStorage.removeItem(deletionKey(engineId));
+  } catch {
+    // Storage may be unavailable; a failed deletion then shows as still deleting.
+  }
+}
+
+/**
+ * The deletion job started from this browser for an engine that is being
+ * deleted, polled until it ends. A failed job means the engine kept itself and
+ * its data, and deleting again continues where it stopped.
+ */
+export function useDeletionJob(engineId: string, deleting: boolean) {
+  const jobId = deleting ? readDeletionJob(engineId) : null;
+  return useContextJob(jobId);
+}
+
+/** Whether the deletion started from this browser failed, so it can be offered again. */
+export function useDeletionFailed(engineId: string, state: string): boolean {
+  return useDeletionJob(engineId, state === 'deleting').data?.state === 'failed';
 }
 
 export function useCreateContextEngine() {
@@ -76,11 +165,17 @@ export function useCreateContextEngine() {
   });
 }
 
+/** Start (or retry) deleting an engine. The engine answers with a job; the list and page then show it as deleting until it is gone. */
 export function useDeleteContextEngine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (engineId: string) => deleteContextEngine(engineId),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] }),
+    onSuccess: (handle, engineId) => {
+      writeDeletionJob(engineId, handle?.jobId ?? null);
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
+      qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
+      if (handle?.jobId) qc.invalidateQueries({ queryKey: [ROOT_KEY, 'job', handle.jobId] });
+    },
   });
 }
 

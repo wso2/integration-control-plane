@@ -51,6 +51,13 @@ import type {
   ContextSource,
   ContextSourceConfig,
   CreateContextEngineInput,
+  AskedQuestion,
+  ContextEngineModels,
+  ContextModelInput,
+  ContextModelSummary,
+  ModelDraft,
+  ContextEvidence,
+  ContextRange,
   FileVisibility,
   GetStartedStep,
   LlmConfig,
@@ -1003,6 +1010,107 @@ export function splitCitations(answer: string): AnswerPart[] {
   }
   if (last < answer.length) parts.push({ kind: 'text', text: answer.slice(last) });
   return parts;
+}
+
+/** Why an engine's deletion job failed, in words, from its error code. */
+export function deletionFailureText(code: string | undefined): string {
+  const lead = code === 'residue_found' ? 'A removed item was still searchable, so the engine kept this engine and its data.' : 'The engine kept this engine and its data.';
+  return `${lead} Deleting again continues where the last attempt stopped.`;
+}
+
+// ── Editing models on a running engine ──────────────────────────────────────
+
+/** Whether a draft names the model already stored, ignoring its key, as the engine compares them. */
+export function isSameModel(current: ContextModelSummary | null, draft: ModelDraft | null): boolean {
+  if (!current || !draft) return !current && !draft;
+  return current.provider === draft.provider && current.model === draft.model.trim() && (current.baseUrl ?? '') === draft.baseUrl.trim() && (current.apiVersion ?? '') === draft.apiVersion.trim() && current.dimensions === draft.dimensions;
+}
+
+/** Why a model draft cannot be saved, or '' when it can. A new model needs its own key; an unchanged one keeps the stored key when none is entered. */
+export function modelDraftError(draft: ModelDraft, current: ContextModelSummary | null): string {
+  if (!nonEmpty(draft.model)) return 'Choose a model';
+  if (draft.provider === 'azure_openai' && (!nonEmpty(draft.baseUrl) || !nonEmpty(draft.apiVersion))) return 'Enter the base URL and API version';
+  const entered = draft.keyMode === 'key' ? draft.apiKey : draft.apiKeyRef;
+  if (draft.keyMode === 'ref' && nonEmpty(entered) && !/^(env|cp):\S+$/.test(entered.trim())) return 'A reference looks like env:NAME or cp:ID';
+  if (!nonEmpty(entered) && !isSameModel(current, draft)) return draft.keyMode === 'key' ? 'Enter an API key for this model' : 'Enter a key reference for this model';
+  return '';
+}
+
+/** A draft as the engine takes it: the key or the reference only when one was entered. */
+export function toModelInput(draft: ModelDraft): ContextModelInput {
+  return {
+    provider: draft.provider,
+    model: draft.model.trim(),
+    ...(draft.provider === 'azure_openai' ? { baseUrl: draft.baseUrl.trim(), apiVersion: draft.apiVersion.trim() } : {}),
+    ...(draft.dimensions ? { dimensions: draft.dimensions } : {}),
+    ...(draft.keyMode === 'key' && nonEmpty(draft.apiKey) ? { apiKey: draft.apiKey } : {}),
+    ...(draft.keyMode === 'ref' && nonEmpty(draft.apiKeyRef) ? { apiKeyRef: draft.apiKeyRef.trim() } : {}),
+  };
+}
+
+/** How the engine holds an engine's model keys, for the Models card. */
+export function modelKeysLabel(models: Pick<ContextEngineModels, 'embedding' | 'llm'>): string {
+  const kinds = new Set([models.embedding?.keyKind, models.llm?.keyKind].filter(Boolean));
+  if (kinds.size === 0) return '';
+  if (kinds.size === 1 && kinds.has('encrypted')) return 'Keys encrypted by the engine';
+  if (kinds.size === 1 && kinds.has('reference')) return 'Keys from secret references';
+  return `Embedding key ${models.embedding?.keyKind === 'reference' ? 'from a reference' : 'encrypted'} · language model key ${models.llm?.keyKind === 'reference' ? 'from a reference' : 'encrypted'}`;
+}
+
+/** The absolute form of an in-app path, for links people paste elsewhere. */
+export function absoluteUrl(path: string, origin: string = window.location.origin): string {
+  return new URL(path, origin).toString();
+}
+
+/** The evidence numbers an answer cites, from its `[n]` markers. */
+export function citedNumbers(answer: string | undefined): Set<number> {
+  return new Set(answer ? splitCitations(answer).flatMap((p) => (p.kind === 'cite' ? [p.n] : [])) : []);
+}
+
+// ── Passage places ──────────────────────────────────────────────────────────
+
+const span = (r: ContextRange, one: string, many: string): string => (r.first === r.last ? `${one} ${r.first}` : `${many} ${r.first}–${r.last}`);
+
+/**
+ * Where a passage sits, in reading order: a JSON path (shown as code), lines or
+ * else sentences, and the section heading. `coarse` is set when the engine
+ * could only name the part, as for PDFs and office files until it reads pages.
+ */
+export function evidencePlace(evidence: Pick<ContextEvidence, 'locator' | 'location'>): { path?: string; parts: string[]; coarse: boolean } {
+  const l = evidence.locator;
+  const parts: string[] = [];
+  if (l?.lines) parts.push(span(l.lines, 'Line', 'Lines'));
+  else if (l?.sentences && !l.path) parts.push(span(l.sentences, 'Sentence', 'Sentences'));
+  if (l?.heading) parts.push(`under “${l.heading}”`);
+  const fine = !!(l?.path || l?.lines || l?.sentences);
+  if (!fine) {
+    const part = l?.chunkIndex !== undefined ? `Part ${l.chunkIndex + 1}` : evidenceLocationLabel(evidence.location);
+    if (part) parts.unshift(part);
+  }
+  return { path: l?.path, parts, coarse: !fine };
+}
+
+/** A record version as people read it: uploads and most connectors version by epoch milliseconds. */
+export function evidenceVersionLabel(version: string): string {
+  const n = Number(version);
+  if (!Number.isFinite(n) || n < 1e12 || n > 1e14) return version;
+  return new Date(n).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+/** The passage split into its numbered source lines, or null when the lines cannot be lined up with the text. */
+export function passageLines(evidence: Pick<ContextEvidence, 'locator' | 'passage'>): { n: number; text: string }[] | null {
+  const lines = evidence.locator?.lines;
+  if (!lines) return null;
+  const text = evidence.passage.split('\n');
+  if (text.length !== lines.last - lines.first + 1) return null;
+  return text.map((t, i) => ({ n: lines.first + i, text: t }));
+}
+
+/** How a stored question reads in the recent list, e.g. "2 hours ago · answered · 3 passages". */
+export function askedQuestionMeta(q: Pick<AskedQuestion, 'askedAt' | 'outcome' | 'passages'>): string {
+  const when = formatDistanceToNow(q.askedAt) || 'Earlier';
+  const what = { answered: `answered · ${plural(q.passages, 'passage')}`, passages: plural(q.passages, 'passage'), none: 'no answer', hidden: 'answer hidden' }[q.outcome] ?? '';
+  return `${when} · ${what}`;
 }
 
 // ── Wire payloads ───────────────────────────────────────────────────────────

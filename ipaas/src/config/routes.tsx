@@ -68,6 +68,7 @@ const ComponentRuntime = lazyPage(() => import('../pages/ComponentRuntime'));
 const OrgContextEngines = lazyPage(() => import('../pages/OrgContextEngines'));
 const CreateContextEngine = lazyPage(() => import('../pages/CreateContextEngine'));
 const ContextEngineDetail = lazyPage(() => import('../pages/ContextEngineDetail'));
+const ContextEvidence = lazyPage(() => import('../pages/ContextEvidence'));
 const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
 const ComponentContainers = lazyPage(() => import('../pages/ComponentContainers'));
 const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChecks'));
@@ -151,6 +152,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/context-engines/new', element: createElement(RouteErrorBoundary, null, createElement(withScope(CreateContextEngine, ['organizations']))) },
               { path: 'organizations/:orgHandler/context-engines/:engineId', element: createElement(RouteErrorBoundary, null, createElement(withScope(ContextEngineDetail, ['organizations']))) },
               { path: 'organizations/:orgHandler/context-engines/:engineId/:tab', element: createElement(RouteErrorBoundary, null, createElement(withScope(ContextEngineDetail, ['organizations']))) },
+              { path: 'organizations/:orgHandler/context-engines/:engineId/evidence/:evidenceId', element: createElement(RouteErrorBoundary, null, createElement(withScope(ContextEvidence, ['organizations']))) },
               { path: 'organizations/:orgHandler/admin/data-planes', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDataPlanes, ['organizations']))) },
               { path: 'organizations/:orgHandler/ai-services/knowledge-bases', element: createElement(withScope(KnowledgeBases, ['organizations'])) },
               { path: 'organizations/:orgHandler/ai-services/knowledge-bases/new', element: createElement(withScope(CreateKnowledgeBase, ['organizations'])) },

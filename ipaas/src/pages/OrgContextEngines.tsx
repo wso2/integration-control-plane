@@ -17,21 +17,21 @@
  */
 
 import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Play, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type JSX } from 'react';
+import { Play, Plus, RotateCcw, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { useMemo, useState, type JSX, type MouseEvent } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { isContextEngineEnabled, useContextEngines, useDeleteContextEngine } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, useContextEngines, useDeleteContextEngine, useDeletionFailed } from '../hooks/useContextEngine';
 import { contextEngineUrl, newContextEngineUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
-import ConfirmDeleteDialog from '../components/ConfirmDeleteDialog';
+import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
+import DeletionStatus from '../components/ContextEngine/DeletionStatus';
 import SearchField from '../components/SearchField';
-import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import ExposurePills from '../components/ContextEngine/ExposurePills';
 import { EngineGraphChip } from '../components/ContextEngine/GraphStatusChip';
 import SourceMark from '../components/ContextEngine/SourceMark';
 import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
-import { progressListingText } from '../utils/contextEngine';
+import { engineMessage, progressListingText } from '../utils/contextEngine';
 import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
 import type { ContextEngine } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
@@ -42,13 +42,52 @@ const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRa
 /** At most this many connector marks per row; the count covers the rest. */
 const MAX_MARKS = 4;
 
+/** A row's actions; while an engine is being deleted they pause, and a failed deletion can be retried. */
+function RowActions({ engine, onPlayground, onDelete, onRetry, retrying }: { engine: ContextEngine; onPlayground: () => void; onDelete: () => void; onRetry: () => void; retrying: boolean }): JSX.Element {
+  const deleting = engine.state === 'deleting';
+  const failed = useDeletionFailed(engine.id, engine.state);
+  const stop = (fn: () => void) => (ev: MouseEvent) => {
+    ev.stopPropagation();
+    fn();
+  };
+  return (
+    <>
+      <Tooltip title={deleting ? 'Paused while the engine is deleted' : 'Open playground'}>
+        <span>
+          <IconButton size="small" aria-label={`Open playground for ${engine.name}`} disabled={deleting} onClick={stop(onPlayground)}>
+            <Play size={16} />
+          </IconButton>
+        </span>
+      </Tooltip>
+      {failed ? (
+        <Tooltip title="Retry deletion">
+          <span>
+            <IconButton size="small" color="primary" aria-label={`Retry deleting ${engine.name}`} disabled={retrying} onClick={stop(onRetry)}>
+              <RotateCcw size={16} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      ) : (
+        <Tooltip title={deleting ? 'Being deleted' : 'Delete'}>
+          <span>
+            <IconButton size="small" color="error" aria-label={`Delete ${engine.name}`} disabled={deleting} onClick={stop(onDelete)}>
+              <Trash2 size={16} />
+            </IconButton>
+          </span>
+        </Tooltip>
+      )}
+    </>
+  );
+}
+
 export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
   const { data: engines, isLoading, isFetching, isError, error, refetch } = useContextEngines();
   const remove = useDeleteContextEngine();
   const [search, setSearch] = useState('');
   const [toDelete, setToDelete] = useState<ContextEngine | null>(null);
-  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [alert, setAlert] = useState<{ type: 'info' | 'error'; message: string } | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const goCreate = () => navigate(newContextEngineUrl(scope.org));
   const goDetail = (id: string) => navigate(contextEngineUrl(scope.org, id));
@@ -64,18 +103,20 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
   }
 
-  const confirmDelete = () => {
-    if (!toDelete) return;
-    const name = toDelete.name;
-    remove.mutate(toDelete.id, {
+  const deletionError = (e: unknown, name: string): string => {
+    if (e instanceof HttpError && e.status === 403) return 'Deleting an engine needs the manage permission on it.';
+    if (e instanceof HttpError && e.status === 405) return 'This engine does not support deletion yet.';
+    return `Couldn't delete “${name}”: ${engineMessage(e, 'please try again')}.`;
+  };
+
+  const startDelete = (engine: ContextEngine, fromDialog: boolean) => {
+    setDeleteError(null);
+    remove.mutate(engine.id, {
       onSuccess: () => {
         setToDelete(null);
-        setAlert({ type: 'success', message: `Deleting “${name}”.` });
+        setAlert({ type: 'info', message: `“${engine.name}” is being deleted. It leaves this list once the engine finishes.` });
       },
-      onError: (e) => {
-        setToDelete(null);
-        setAlert({ type: 'error', message: e instanceof HttpError && (e.status === 404 || e.status === 405) ? 'This engine does not support deletion yet.' : `Couldn't delete “${name}”. Please try again.` });
-      },
+      onError: (e) => (fromDialog ? setDeleteError(deletionError(e, engine.name)) : setAlert({ type: 'error', message: deletionError(e, engine.name) })),
     });
   };
 
@@ -191,32 +232,10 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                     <ListingTable.Cell>{e.summary ? <ExposurePills exposure={e.summary.exposure} /> : '—'}</ListingTable.Cell>
                     <ListingTable.Cell>{e.summary ? <EngineGraphChip engineId={e.id} reported={e.summary.graph} /> : '—'}</ListingTable.Cell>
                     <ListingTable.Cell>
-                      <EngineStateChip state={e.state} />
+                      <DeletionStatus engineId={e.id} state={e.state} />
                     </ListingTable.Cell>
-                    <ListingTable.Cell align="right">
-                      <Tooltip title="Open playground">
-                        <IconButton
-                          size="small"
-                          aria-label={`Open playground for ${e.name}`}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            goPlayground(e.id);
-                          }}>
-                          <Play size={16} />
-                        </IconButton>
-                      </Tooltip>
-                      <Tooltip title="Delete">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          aria-label={`Delete ${e.name}`}
-                          onClick={(ev) => {
-                            ev.stopPropagation();
-                            setToDelete(e);
-                          }}>
-                          <Trash2 size={16} />
-                        </IconButton>
-                      </Tooltip>
+                    <ListingTable.Cell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                      <RowActions engine={e} onPlayground={() => goPlayground(e.id)} onDelete={() => setToDelete(e)} onRetry={() => startDelete(e, false)} retrying={remove.isPending} />
                     </ListingTable.Cell>
                   </ListingTable.Row>
                 ))
@@ -227,19 +246,18 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
       )}
 
       {toDelete && (
-        <ConfirmDeleteDialog
-          title={
-            <>
-              Delete <strong>{toDelete.name}</strong>?
-            </>
-          }
-          onConfirm={confirmDelete}
-          onClose={() => setToDelete(null)}
-          isPending={remove.isPending}>
-          <Typography variant="body2" color="text.secondary">
-            The context graph, its sources and every grant on this engine will be removed. Integrations and agents calling its API or MCP endpoint will stop receiving answers.
-          </Typography>
-        </ConfirmDeleteDialog>
+        <DeleteEngineDialog
+          name={toDelete.name}
+          sourceCount={toDelete.summary?.sourceCount}
+          isPending={remove.isPending}
+          error={deleteError}
+          onConfirm={() => startDelete(toDelete, true)}
+          onClose={() => {
+            if (remove.isPending) return;
+            setToDelete(null);
+            setDeleteError(null);
+          }}
+        />
       )}
     </PageContent>
   );

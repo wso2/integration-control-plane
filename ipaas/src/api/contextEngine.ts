@@ -56,6 +56,9 @@ import type {
   ContextEngine,
   ContextEngineDetail,
   ContextEngineExposure,
+  ContextEngineModels,
+  ContextModelInput,
+  ContextModelSummary,
   ContextEngineProgress,
   ContextEngineState,
   ContextEngineSummary,
@@ -75,6 +78,7 @@ import type {
   IngestFileInput,
   ContextSourceConfig,
   UpdateContextSourceInput,
+  UpdateContextModelsInput,
   PutContextGrantInput,
   RecordEventInput,
   SourceIndexingState,
@@ -137,6 +141,7 @@ interface RawEvidence {
   sourceVersion: string;
   passage: string;
   location?: string;
+  locator?: { chunkIndex?: number; characters?: { start: number; end: number }; sentences?: { first: number; last: number }; lines?: { first: number; last: number }; heading?: string; path?: string };
   sourceUrl?: string;
 }
 
@@ -144,6 +149,7 @@ interface RawQueryResponse {
   queryId: string;
   state: string;
   answer?: string;
+  answerWithheld?: boolean;
   evidence?: RawEvidence[];
   insufficientEvidence?: boolean;
   traceId: string;
@@ -157,10 +163,21 @@ interface RawPrincipal {
 }
 
 /** `GET /v1/spaces/{id}/configuration`: models without their keys, whether the embedding is locked, and where each store runs. */
+interface RawModelSummary {
+  provider: string;
+  model: string;
+  keyKind?: string;
+  dimensions?: number | null;
+  baseUrl?: string | null;
+  apiVersion?: string | null;
+}
+
 interface RawConfiguration {
-  embedding?: { provider: string; model: string; keyKind?: string } | null;
-  llm?: { provider: string; model: string; keyKind?: string } | null;
+  embedding?: RawModelSummary | null;
+  llm?: RawModelSummary | null;
   embeddingLocked?: boolean;
+  version?: number;
+  updatedAt?: string;
   exposure?: { api?: boolean; mcp?: boolean } | null;
   graph?: { state?: string; builtAt?: string; jobId?: string; progress?: { done: number; total: number } } | null;
   storage?: Partial<Record<StorageKind, { provider?: string; label?: string; detail?: string } | null>> | null;
@@ -207,7 +224,27 @@ const toGrant = (raw: RawGrant): ContextGrant => ({ id: raw.id, resourceId: raw.
 
 const toJob = (raw: RawJob): ContextJob => ({ id: raw.id, state: raw.state, operation: raw.operation, traceId: raw.traceId, attemptCount: raw.attemptCount, createdAt: raw.createdAt, error: raw.error });
 
-const toEvidence = (raw: RawEvidence): ContextEvidence => ({ id: raw.id, recordId: raw.recordId, sourceId: raw.sourceId, sourceVersion: raw.sourceVersion, passage: raw.passage, location: raw.location, sourceUrl: raw.sourceUrl });
+const toEvidence = (raw: RawEvidence): ContextEvidence => ({
+  id: raw.id,
+  recordId: raw.recordId,
+  sourceId: raw.sourceId,
+  sourceVersion: raw.sourceVersion,
+  passage: raw.passage,
+  location: raw.location,
+  locator: raw.locator ? { chunkIndex: raw.locator.chunkIndex, characters: raw.locator.characters, sentences: raw.locator.sentences, lines: raw.locator.lines, heading: raw.locator.heading, path: raw.locator.path } : undefined,
+  sourceUrl: raw.sourceUrl,
+});
+
+const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary | null =>
+  raw ? { provider: raw.provider, model: raw.model, keyKind: raw.keyKind, dimensions: raw.dimensions ?? undefined, baseUrl: raw.baseUrl ?? undefined, apiVersion: raw.apiVersion ?? undefined } : null;
+
+const toModels = (raw: RawConfiguration | null | undefined): ContextEngineModels => ({
+  embedding: toModel(raw?.embedding),
+  llm: toModel(raw?.llm),
+  embeddingLocked: raw?.embeddingLocked ?? false,
+  version: raw?.version,
+  updatedAt: raw?.updatedAt,
+});
 
 const READING_STATES: ReadonlySet<string> = new Set<SourceReadingState>(['idle', 'reading', 'completed']);
 const INDEXING_STATES: ReadonlySet<string> = new Set<SourceIndexingState>(['not_collected', 'ok', 'unavailable']);
@@ -299,6 +336,7 @@ const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
   queryId: raw.queryId,
   state: raw.state,
   answer: raw.answer,
+  answerWithheld: raw.answerWithheld ?? false,
   evidence: (raw.evidence ?? []).map(toEvidence),
   insufficientEvidence: raw.insufficientEvidence ?? raw.state === 'insufficient_evidence',
   traceId: raw.traceId,
@@ -378,7 +416,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
   return {
     ...toEngine(space),
     sources: sources.map(toSource),
-    models: { embedding: configuration?.embedding ?? null, llm: configuration?.llm ?? null },
+    models: toModels(configuration),
     queryRoles: rolesFromGrants(grants.map(toGrant)),
     exposure: toExposure(configuration),
     graph: toGraph(configuration?.graph),
@@ -444,9 +482,33 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
   return { id: space.id, sources, warnings };
 }
 
-/** Delete an engine. The contract returns a job handle; the engine may also answer 204 with no body. */
-export async function deleteContextEngine(engineId: string): Promise<void> {
-  await contextEngineClient.delete<RawJobAccepted | undefined>(spacePath(engineId));
+/**
+ * Delete an engine. The engine queues a deletion job and answers 202 with its
+ * handle; the engine stays listed as `deleting` until the job finishes, and a
+ * repeated request returns the running job or, after a failure, a new attempt.
+ */
+export async function deleteContextEngine(engineId: string): Promise<ContextJobHandle | null> {
+  const raw = await contextEngineClient.delete<RawJobAccepted | undefined>(spacePath(engineId));
+  return raw?.jobId ? { jobId: raw.jobId, statusUrl: raw.statusUrl } : null;
+}
+
+/** A model as `PUT .../configuration` takes it: the key or reference only when one was entered. */
+const toModelPayload = (m: ContextModelInput) => ({
+  provider: m.provider,
+  model: m.model.trim(),
+  ...(m.apiKey ? { apiKey: m.apiKey } : m.apiKeyRef ? { apiKeyRef: m.apiKeyRef.trim() } : {}),
+  ...(m.baseUrl ? { baseUrl: m.baseUrl } : {}),
+  ...(m.apiVersion ? { apiVersion: m.apiVersion } : {}),
+  ...(m.dimensions ? { dimensions: m.dimensions } : {}),
+});
+
+/** Replace the engine's models. Needs `space.manage`; 409 when a locked embedding changes, 503 when a typed key cannot be stored. */
+export async function updateContextModels(input: UpdateContextModelsInput): Promise<ContextEngineModels> {
+  const body = {
+    ...(input.embedding ? { embedding: toModelPayload(input.embedding) } : {}),
+    ...(input.llm ? { llm: toModelPayload(input.llm) } : {}),
+  };
+  return toModels(await contextEngineClient.put<RawConfiguration>(`${spacePath(input.engineId)}/configuration`, body));
 }
 
 /** Proposed `PUT /v1/spaces/{id}/exposures` — publish or unpublish the API and MCP surfaces. */
@@ -642,6 +704,30 @@ export async function getContextRecordStatus(sourceId: string, recordId: string)
 export async function queryContextEngine(input: ContextQueryInput): Promise<ContextQueryResult> {
   const raw = await contextEngineClient.post<RawQueryResponse>(`${V1}/queries`, { spaceId: input.engineId, question: input.question, mode: input.mode, ...(input.limit ? { limit: input.limit } : {}) });
   return toQueryResult(raw);
+}
+
+/**
+ * Reopen a stored query. Only its asker can, and every passage is checked
+ * again: ones that moved out of reach drop out, and an answer whose passages
+ * are not all still visible comes back withheld. Anyone else gets 404.
+ */
+export async function getContextQuery(queryId: string): Promise<ContextQueryResult> {
+  return toQueryResult(await contextEngineClient.get<RawQueryResponse>(`${V1}/queries/${encodeURIComponent(queryId)}`));
+}
+
+/**
+ * One passage by its evidence id, for a citation link. Open to anyone with
+ * query or evidence access who may read the record now, while it is still at
+ * that version; every refusal is the same 404.
+ */
+export async function getContextEvidence(evidenceId: string): Promise<ContextEvidence> {
+  return toEvidence(await contextEngineClient.get<RawEvidence>(`${V1}/evidence/${encodeURIComponent(evidenceId)}`));
+}
+
+/** The caller's effective engine actions on a resource they can see. */
+export async function getContextPermissions(resourceId: string): Promise<string[]> {
+  const raw = await contextEngineClient.get<{ resourceId: string; actions?: string[] }>(`${V1}/auth/permissions?resourceId=${encodeURIComponent(resourceId)}`);
+  return raw?.actions ?? [];
 }
 
 // ── Access ──────────────────────────────────────────────────────────────────

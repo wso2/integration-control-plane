@@ -440,8 +440,8 @@ export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.re
 /** The creator's grant is keyed `owner-<principalId>`. */
 export const OWNER_GRANT_PREFIX = 'owner-';
 
-/** The engine rejects answer mode until its M5 release; the Playground offers passages only until then. */
-export const ANSWER_MODE_AVAILABLE = false;
+/** The engine answers in prose with checked citations since its M5 answer release. */
+export const ANSWER_MODE_AVAILABLE = true;
 
 /** Grants created for an org role are keyed `role-<handle>` so they can be told apart from ad-hoc grants. */
 export const ROLE_GRANT_PREFIX = 'role-';
@@ -529,6 +529,18 @@ export const CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX = 'contextEngine:enrichment:';
 
 /** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
 export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';
+
+/** localStorage key of the questions asked from this browser, per engine, until the engine lists a caller's stored queries. */
+export const CONTEXT_ENGINE_QUESTIONS_KEY_PREFIX = 'contextEngine:questions:';
+
+/** How many asked questions are kept per engine. */
+export const ASKED_QUESTIONS_MAX = 20;
+
+/** localStorage key of the deletion job started from this browser, per engine, so a failed deletion can be told apart and retried. */
+export const CONTEXT_ENGINE_DELETION_KEY_PREFIX = 'contextEngine:deletion:';
+
+/** How often a list or page with an engine being deleted checks again. */
+export const DELETION_POLL_MS = 3000;
 
 /** localStorage key of a source's visibility rules as this browser last saved them, for the edit form and the upload rules check. */
 export const CONTEXT_ENGINE_RULES_KEY_PREFIX = 'contextEngine:rules:';

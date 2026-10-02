@@ -27,6 +27,16 @@ import {
   engineMessage,
   formatBytes,
   describeUploadAudience,
+  askedQuestionMeta,
+  citedNumbers,
+  deletionFailureText,
+  evidencePlace,
+  evidenceVersionLabel,
+  isSameModel,
+  modelDraftError,
+  modelKeysLabel,
+  passageLines,
+  toModelInput,
   describeVisibility,
   everyoneRoles,
   sharingMismatches,
@@ -816,5 +826,81 @@ describe('file uploads', () => {
     const steps = getStartedSteps(engineDetail(), false, null, true);
     expect(steps[0]).toMatchObject({ id: 'index', title: 'Upload your first files', action: 'Upload files', state: 'current' });
     expect(getStartedSteps(engineDetail({ graph: { state: 'built' } }), false, null, true)[0].title).toBe('Index your sources');
+  });
+});
+
+describe('provenance and evidence', () => {
+  const ev = (locator: object, passage = 'a\nb\nc') => ({ id: 'e', recordId: 'r.md', sourceId: 's', sourceVersion: '1', passage, location: 'chunk:2', locator });
+
+  it('names where a passage sits, as precisely as the engine placed it', () => {
+    expect(evidencePlace(ev({ chunkIndex: 0, lines: { first: 4, last: 7 }, sentences: { first: 2, last: 3 }, heading: 'Rollback steps' }))).toEqual({ path: undefined, parts: ['Lines 4–7', 'under “Rollback steps”'], coarse: false });
+    expect(evidencePlace(ev({ chunkIndex: 0, lines: { first: 9, last: 9 } })).parts).toEqual(['Line 9']);
+    expect(evidencePlace(ev({ chunkIndex: 1, path: '$.rollback.freezeWindow', sentences: { first: 1, last: 1 } }))).toEqual({ path: '$.rollback.freezeWindow', parts: [], coarse: false });
+    expect(evidencePlace(ev({ chunkIndex: 3, sentences: { first: 3, last: 4 }, heading: 'Incidents' })).parts).toEqual(['Sentences 3–4', 'under “Incidents”']);
+    // A PDF or office file is placed by its part only.
+    expect(evidencePlace(ev({ chunkIndex: 2 }))).toEqual({ path: undefined, parts: ['Part 3'], coarse: true });
+    expect(evidencePlace({ location: 'chunk:4', locator: undefined })).toEqual({ path: undefined, parts: ['Part 5'], coarse: true });
+  });
+
+  it('shows epoch versions as dates and leaves other versions alone', () => {
+    expect(evidenceVersionLabel('1790872243455')).toMatch(/2026/);
+    expect(evidenceVersionLabel('v12')).toBe('v12');
+    expect(evidenceVersionLabel('17')).toBe('17');
+  });
+
+  it('numbers passage lines only when they line up with the locator', () => {
+    expect(passageLines(ev({ lines: { first: 4, last: 6 } }))).toEqual([
+      { n: 4, text: 'a' },
+      { n: 5, text: 'b' },
+      { n: 6, text: 'c' },
+    ]);
+    expect(passageLines(ev({ lines: { first: 1, last: 11 } }))).toBeNull();
+    expect(passageLines(ev({}))).toBeNull();
+  });
+
+  it('collects the evidence an answer cites', () => {
+    expect([...citedNumbers('Do this [2]. Then that [1][2].')].sort()).toEqual([1, 2]);
+    expect(citedNumbers(undefined).size).toBe(0);
+  });
+
+  it('describes a stored question for the recent list', () => {
+    const now = new Date().toISOString();
+    expect(askedQuestionMeta({ askedAt: now, outcome: 'answered', passages: 3 })).toBe('Just now · answered · 3 passages');
+    expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
+    expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
+  });
+
+  it('explains a failed deletion', () => {
+    expect(deletionFailureText('residue_found')).toMatch(/still searchable/);
+    expect(deletionFailureText(undefined)).toMatch(/continues where the last attempt stopped/);
+  });
+});
+
+describe('editing models on a running engine', () => {
+  const current = { provider: 'openai', model: 'gpt-4.1', keyKind: 'encrypted' };
+  const draft = { provider: 'openai', model: 'gpt-4.1', baseUrl: '', apiVersion: '', keyMode: 'key' as const, apiKey: '', apiKeyRef: '' };
+
+  it('keeps the stored key for an unchanged model and asks for one when it changes', () => {
+    expect(isSameModel(current, draft)).toBe(true);
+    expect(modelDraftError(draft, current)).toBe('');
+    expect(toModelInput(draft)).toEqual({ provider: 'openai', model: 'gpt-4.1' });
+    const other = { ...draft, model: 'gpt-4.1-mini' };
+    expect(isSameModel(current, other)).toBe(false);
+    expect(modelDraftError(other, current)).toBe('Enter an API key for this model');
+    expect(modelDraftError({ ...other, apiKey: 'sk-x' }, current)).toBe('');
+    expect(toModelInput({ ...other, apiKey: 'sk-x' })).toEqual({ provider: 'openai', model: 'gpt-4.1-mini', apiKey: 'sk-x' });
+  });
+
+  it('checks key references and Azure fields', () => {
+    expect(modelDraftError({ ...draft, keyMode: 'ref', apiKeyRef: 'OPENAI_KEY' }, current)).toBe('A reference looks like env:NAME or cp:ID');
+    expect(toModelInput({ ...draft, keyMode: 'ref', apiKeyRef: ' env:OPENAI_KEY ' })).toEqual({ provider: 'openai', model: 'gpt-4.1', apiKeyRef: 'env:OPENAI_KEY' });
+    expect(modelDraftError({ ...draft, provider: 'azure_openai', model: 'dep', apiKey: 'k' }, null)).toBe('Enter the base URL and API version');
+    expect(modelDraftError({ ...draft, model: ' ' }, current)).toBe('Choose a model');
+  });
+
+  it('says how the keys are held', () => {
+    expect(modelKeysLabel({ embedding: { provider: 'openai', model: 'e', keyKind: 'encrypted' }, llm: current })).toBe('Keys encrypted by the engine');
+    expect(modelKeysLabel({ embedding: { provider: 'azure_openai', model: 'e', keyKind: 'reference' }, llm: null })).toBe('Keys from secret references');
+    expect(modelKeysLabel({ embedding: null, llm: null })).toBe('');
   });
 });
