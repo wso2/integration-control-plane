@@ -1062,47 +1062,41 @@ export function absoluteUrl(path: string, origin: string = window.location.origi
   return new URL(path, origin).toString();
 }
 
-/** One sentence of an answer with the evidence numbers cited in it. The text keeps its own spacing and line breaks. */
-export interface AnswerSentence {
-  text: string;
-  cites: number[];
+/** Where a sentence ends: a stop with any closing quote or bracket, then a space; or a line break. */
+const SENTENCE_END = /[.!?]+["”')\]]*\s+|\n+/g;
+
+/**
+ * Split text into sentences, each keeping the stop and the space or line break
+ * that ends it, so joining the pieces gives the text back. The last piece has
+ * no end when the text stops mid-sentence; `endsSentence` tells.
+ */
+export function splitSentences(text: string): string[] {
+  const out: string[] = [];
+  let last = 0;
+  for (const m of text.matchAll(SENTENCE_END)) {
+    const end = (m.index ?? 0) + m[0].length;
+    out.push(text.slice(last, end));
+    last = end;
+  }
+  if (last < text.length) out.push(text.slice(last));
+  return out;
+}
+
+/** Whether a piece from {@link splitSentences} ends at a sentence end. */
+export function endsSentence(piece: string): boolean {
+  return /([.!?]+["”')\]]*\s+|\n+)$/.test(piece);
 }
 
 /**
- * Split an answer into sentences, each with the citations that sit in it. A
- * marker belongs to the sentence before it, so "Promote [1]. Rollbacks keep
- * secrets [1]." gives two sentences citing [1]. Sentences end at `.`, `!` or `?`
- * followed by a space, or at a line break; markers are dropped from the text.
+ * Turn the `[n]` markers of an answer into Markdown links `[n](#cite-n)`, so a
+ * Markdown renderer hands them over as links to draw as citation marks. Only
+ * numbers that name a passage are converted, and nothing inside code is touched.
  */
-export function answerSentences(answer: string): AnswerSentence[] {
-  const out: AnswerSentence[] = [];
-  let text = '';
-  let cites: number[] = [];
-  const close = () => {
-    if (text.trim() || cites.length) out.push({ text, cites });
-    text = '';
-    cites = [];
-  };
-  for (const part of splitCitations(answer)) {
-    if (part.kind === 'cite') {
-      // A marker after a sentence's closing space still belongs to that sentence, not the next one.
-      const target = !text.trim() && out.length ? out[out.length - 1].cites : cites;
-      if (!target.includes(part.n)) target.push(part.n);
-      continue;
-    }
-    let rest = part.text;
-    for (;;) {
-      const m = /([.!?]+["”')\]]*\s+|\n+)/.exec(rest);
-      if (!m) break;
-      const end = (m.index ?? 0) + m[0].length;
-      text += rest.slice(0, end);
-      close();
-      rest = rest.slice(end);
-    }
-    text += rest;
-  }
-  close();
-  return out;
+export function citationLinks(answer: string, passages: number): string {
+  return answer
+    .split(/(```[\s\S]*?```|`[^`\n]*`)/)
+    .map((part, i) => (i % 2 ? part : part.replace(/\[(\d{1,3})\](?!\()/g, (m, d: string) => (Number(d) >= 1 && Number(d) <= passages ? `[${d}](#cite-${d})` : m))))
+    .join('');
 }
 
 /** The evidence numbers an answer cites, from its `[n]` markers. */

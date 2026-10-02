@@ -509,6 +509,26 @@ export const citationMarkSx = (lit: boolean, pinned: boolean) =>
     transition: 'background-color 120ms, color 120ms, box-shadow 120ms',
   }) as const;
 
+/** An answer rendered from Markdown: modest headings, tight lists, inline code, the last block flush with the card. */
+export const answerMarkdownSx = {
+  fontSize: '1rem',
+  lineHeight: 1.75,
+  '& h1, & h2, & h3, & h4, & h5, & h6': { fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.4, mt: 2, mb: 0.75 },
+  '& p': { m: 0, mb: 1.5 },
+  '& ul, & ol': { pl: 3, m: 0, mb: 1.5 },
+  '& li': { mb: 0.5 },
+  '& li > p': { mb: 0.5 },
+  '& code': { fontFamily: 'monospace', bgcolor: 'action.hover', px: 0.5, borderRadius: 0.5, fontSize: '0.85em' },
+  '& pre': { bgcolor: 'action.hover', p: 1.5, borderRadius: 1, overflow: 'auto', mb: 1.5, fontSize: '0.85rem', lineHeight: 1.5 },
+  '& pre code': { bgcolor: 'transparent', px: 0, fontSize: 'inherit' },
+  '& blockquote': { m: 0, mb: 1.5, pl: 2, borderLeft: '3px solid', borderColor: 'divider', color: 'text.secondary' },
+  '& a': { color: 'primary.main' },
+  '& table': { borderCollapse: 'collapse', mb: 1.5, display: 'block', overflowX: 'auto', fontSize: '0.9rem' },
+  '& th, & td': { border: '1px solid', borderColor: 'divider', px: 1.5, py: 0.5, textAlign: 'left' },
+  '& th': { fontWeight: 600 },
+  '& > :last-child, & > div > :last-child': { mb: 0 },
+} as const;
+
 /** The sentence a pointed-at citation supports. */
 export const litSentenceSx = {
   bgcolor: 'rgba(255, 115, 0, 0.12)',

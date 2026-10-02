@@ -56,7 +56,7 @@ export default function AnsweredTurn({ answer, evidence, sources, hrefFor, onOpe
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
-      <CitedAnswer answer={answer} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
+      <CitedAnswer answer={answer} passages={evidence.length} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
       <EvidenceRail evidence={evidence} sources={sources} cited={cited} active={active?.n ?? null} pinned={pinned?.n ?? null} hrefFor={hrefFor} onHover={(n) => setActive(n === null ? null : { n })} onPin={(n) => togglePin({ n })} onOpen={onOpen} />
     </Box>
   );
