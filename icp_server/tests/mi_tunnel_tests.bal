@@ -363,10 +363,11 @@ function testArtifactControlsAreManagementWrites() {
 isolated json[] routedControlWrites = [];
 
 isolated function captureControlWrite(string runtimeId, string method, string path, json body)
-        returns error? {
+        returns boolean|error {
     lock {
         routedControlWrites.push({runtimeId, method, path, body: body.clone()});
     }
+    return true;
 }
 
 @test:Config {groups: ["mi_tunnel"]}
@@ -500,4 +501,31 @@ function testEveryCommandInAResponseIsSigned() {
     foreach types:ControlCommand command in response.commands ?: [] {
         test:assertTrue(command.signature is string, "Every command must be signed: " + command.commandId);
     }
+}
+
+function tunnelCapableMIVersions() returns string[][] =>
+    [["4.7.0"], ["4.7.0-SNAPSHOT"], ["4.7.0-beta"], ["4.7.0-alpha2"], ["4.7.1"], ["4.8.0"],
+        ["5.0.0"], [" 4.7.0 "], ["4.7"]];
+
+function tunnelIncapableMIVersions() returns string[][] =>
+    [["4.7.0-alpha"], ["4.7.0-ALPHA"], ["4.6.0"], ["4.6.0-rc"], ["4.4.0"], ["3.9.9"], [""],
+        ["unknown"], ["4.x.0"]];
+
+@test:Config {groups: ["mi_tunnel"], dataProvider: tunnelCapableMIVersions}
+function testMIVersionsThatExecuteTunneledCommands(string version) {
+    test:assertTrue(miVersionSupportsTunnel(version),
+            string `MI '${version}' executes tunneled commands and should take the tunnel`);
+}
+
+@test:Config {groups: ["mi_tunnel"], dataProvider: tunnelIncapableMIVersions}
+function testMIVersionsThatPredateTheTunnelAreDialledDirectly(string version) {
+    // These ignore the `commands` array: tunnelling to them leaves reads preparing forever
+    // and artifact controls reported dispatched while nothing changes.
+    test:assertFalse(miVersionSupportsTunnel(version),
+            string `MI '${version}' cannot execute tunneled commands and must be dialled directly`);
+}
+
+@test:Config {groups: ["mi_tunnel"]}
+function testAnMIWithoutAReportedVersionIsDialledDirectly() {
+    test:assertFalse(miVersionSupportsTunnel(()));
 }

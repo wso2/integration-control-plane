@@ -24,7 +24,8 @@ import ballerina/uuid;
 // ── The one way the ICP asks an MI runtime anything ──────────────────────────
 // Every MI management field ends here. Above this line nothing knows whether the answer
 // came back through the runtime's management port or rode up on a heartbeat; below it,
-// `miTunnelEnabled` is the only thing that decides.
+// `miUsesTunnel` decides, per runtime: `miTunnelEnabled`, and whether that MI can execute
+// tunneled commands at all.
 //
 // The caller's side of the difference is timing, and only that: the port answers inside the
 // request, while the tunnel must wait for a heartbeat and so reports `preparing` first. That
@@ -48,7 +49,8 @@ const string MI_OFFLINE_MESSAGE = "The runtime is not online";
 # console that behaves plausibly while exercising the other path entirely.
 isolated function logMIAccessMode() {
     log:printInfo(miTunnelEnabled
-        ? "MI management reaches runtimes over the heartbeat tunnel (miTunnelEnabled = true)"
+        ? "MI management reaches MI 4.7.0 and later over the heartbeat tunnel, and dials " +
+            "older runtimes directly (miTunnelEnabled = true)"
         : "MI management dials runtime management ports directly " +
             "(tunnel disabled — set miTunnelEnabled to use it)");
 }
@@ -84,7 +86,7 @@ isolated function fetchableOf(MIAnswer answer) returns types:Fetchable =>
 
 # Reads a runtime's management API.
 isolated function miRead(types:Runtime runtime, string path) returns MIAnswer|error {
-    if !miTunnelEnabled {
+    if !miUsesTunnel(runtime) {
         [int, json] [status, body] = check callMIManagement(runtime, http:GET, path, ());
         return {body: check accepted(status, body)};
     }
@@ -105,14 +107,14 @@ isolated function miRead(types:Runtime runtime, string path) returns MIAnswer|er
 
 # Writes to a runtime's management API, and reports the outcome once the runtime confirms it.
 #
-# With the tunnel off the runtime confirms it in this call. With it on the write is queued
+# Without the tunnel the runtime confirms it in this call. With it on the write is queued
 # under `requestId` and the caller is told to ask again — asking again *is* the poll, so the
 # console re-sends the same mutation rather than learning a second vocabulary. A caller that
 # supplies no `requestId` still gets its write executed; it just cannot learn the outcome,
 # because there is no name under which to ask for it.
 isolated function miWrite(types:Runtime runtime, string method, string path, json body,
         types:UserContextV2 caller, string? requestId) returns MIAnswer|error {
-    if !miTunnelEnabled {
+    if !miUsesTunnel(runtime) {
         [int, json] [status, answer] = check callMIManagement(runtime, method, path, body);
         json confirmed = check accepted(status, answer);
         // Audited here, where the runtime has confirmed it, so the record reads the same as
