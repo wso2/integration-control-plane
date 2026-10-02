@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { getOrgUuidFromToken } from '../../auth/tokenManager';
+import { getOrgUuidFromToken } from '#auth';
 import { apimClient, choreoClient } from './httpClients';
 import type { ApiDocument, RuleAdherenceResponse, ThrottlingPolicy } from '../../types/marketplace';
 

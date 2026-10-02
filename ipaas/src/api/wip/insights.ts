@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { authenticatedFetch } from '../../auth/tokenManager';
+import { authenticatedFetch } from '#auth';
 import { gql } from './graphql';
 import type {
   InsightsEnvironment,

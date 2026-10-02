@@ -11,7 +11,7 @@ Reusable UI components. Pure presentation and interaction logic — no direct ba
 | Allowed                                          | Not allowed                                 |
 | ------------------------------------------------ | ------------------------------------------- |
 | `src/hooks/*`                                    | `src/api/*`                                 |
-| `src/types/*`                                    | `src/auth/tokenManager` (data functions)    |
+| `src/types/*`                                    | `#auth` data functions    |
 | `src/constants/*`                                | `authenticatedFetch`, `getOrgUuidFromToken` |
 | `src/utils/*`                                    | Any named HTTP client                       |
 | `src/assets/*`                                   |                                             |

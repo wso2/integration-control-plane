@@ -35,7 +35,7 @@ import AppLayout from '../layouts/AppLayout';
 
 // Lazy — all pages inside the authenticated shell
 const PolicyLayout = lazyPage(() => import('../layouts/PolicyLayout'));
-const ProtectedRoute = lazyPage(() => import('../auth/ProtectedRoute'));
+const ProtectedRoute = lazyPage(() => import('../layouts/ProtectedRoute'));
 const OrgHomeRedirect = lazyPage(() => import('../components/OrgHomeRedirect'));
 
 const OIDCCallback = lazyPage(() => import('../pages/OIDCCallback'));

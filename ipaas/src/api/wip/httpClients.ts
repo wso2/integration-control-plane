@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { authenticatedFetch, getOrgUuidFromToken, refreshAccessToken } from '../../auth/tokenManager';
+import { authenticatedFetch, getOrgUuidFromToken, refreshAccessToken } from '#auth';
 import { HttpError } from '../../types/http';
 
 export interface HttpClient {

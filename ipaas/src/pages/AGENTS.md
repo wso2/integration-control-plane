@@ -8,28 +8,28 @@ Route-level components. Each file corresponds to one route. Same import rules as
 
 ## Import rules
 
-| Allowed                                   | Not allowed                                                |
-| ----------------------------------------- | ---------------------------------------------------------- |
-| `src/hooks/*`                             | `src/api/*`                                                |
-| `src/types/*`                             | `auth/tokenManager` (data functions — see exception below) |
-| `src/constants/*`                         | `authenticatedFetch`, `getOrgUuidFromToken`                |
-| `src/utils/*`                             | Any named HTTP client                                      |
-| `src/components/*`                        |                                                            |
-| `src/contexts/*`                          |                                                            |
-| React Router (`useNavigate`, `useParams`) |                                                            |
+| Allowed                                   | Not allowed                                  |
+| ----------------------------------------- | -------------------------------------------- |
+| `src/hooks/*`                             | `src/api/*`                                  |
+| `src/types/*`                             | `#auth` data functions (see exception below) |
+| `src/constants/*`                         | `authenticatedFetch`, `getOrgUuidFromToken`  |
+| `src/utils/*`                             | Any named HTTP client                        |
+| `src/components/*`                        |                                              |
+| `src/contexts/*`                          |                                              |
+| React Router (`useNavigate`, `useParams`) |                                              |
 
 ---
 
 ## Accepted exception — OAuth CSRF helpers
 
-Three pages import directly from `auth/tokenManager`:
+Three pages import directly from `#auth`:
 
 | Page                                          | Imported symbols                                            | Why                                                                          |
 | --------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | `Project.tsx`, `CreateIntegrationOptions.tsx` | `generateAndSaveGitHubState`, `validateAndClearGitHubState` | GitHub OAuth popup CSRF state — pure localStorage utilities, no network call |
 | `OIDCCallback.tsx`                            | `validateAndClearOIDCState`, `getAndClearRedirectUrl`       | OIDC redirect landing — one-shot state extraction on arrival                 |
 
-These are CSRF state helpers, not data access. All other `tokenManager` functions (`getOrgUuidFromToken`, `authenticatedFetch`) must go through hooks.
+These are CSRF state helpers, not data access. All other `#auth` data functions (`getOrgUuidFromToken`, `authenticatedFetch`) must go through hooks.
 
 ---
 

@@ -13,7 +13,7 @@ The frontend for **WIP** (formerly Devant), WSO2's integration platform. Also bu
 
 ```
 src/
-  auth/          # AuthContext, OIDC token flow, STS exchange
+  auth/          # Per-product auth via #auth alias: contract.ts, cloud/, wip/, shared/
   config/        # routes.tsx — all app routes defined here
   layouts/       # AppLayout (authenticated shell), PublicLayout, PolicyLayout
   pages/         # One file per page/route (~51 pages)
@@ -87,7 +87,7 @@ See `tests/e2e/README.md` for full setup and troubleshooting.
 
 ## Things to know before changing code
 
-- **Product-specific code** lives under `src/api/wip/`, `src/api/cloud/`, `src/api/icp/` and is resolved via the `#api/` alias in `vite.config.ts`. Shared code goes in `src/api/`.
+- **Product-specific code** lives under `src/api/wip/`, `src/api/cloud/`, `src/api/icp/` and is resolved via the `#api/` alias in `vite.config.ts`. Shared code goes in `src/api/`. Auth works the same way through `#auth` (`src/auth/cloud/` or `src/auth/wip/`); import auth only from `#auth`.
 - **`IS_WIP` flag** gates WIP-only routes like prebuilt integrations. Check `routes.tsx` before adding routes.
 - **`public/config.json`** is not committed with real credentials — it points to `preview-dv` by default. Each environment deploys its own config.
 - **React Router v7** — uses the new `<Route>` JSX API, not the v6 object config. Check `src/config/routes.tsx`.

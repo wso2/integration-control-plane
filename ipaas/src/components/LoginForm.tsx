@@ -24,7 +24,7 @@ import { Alert, Box, Button, Checkbox, CircularProgress, Divider, FormControlLab
 import { Eye, EyeOff, GitHub, Google } from '@wso2/oxygen-ui-icons-react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { resourceUrl } from '../nav';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 
 function friendlyLoginError(err: unknown, isSso = false): string {
   const message = (err instanceof Error ? err.message : String(err)).toLowerCase();

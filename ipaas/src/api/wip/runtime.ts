@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { getOrgUuidFromToken } from '../../auth/tokenManager';
+import { getOrgUuidFromToken } from '#auth';
 import { choreoClient, withScopeRetry } from './httpClients';
 import type { ClusterPod, PodEvent, PodLogOptions, PodMetrics, RuntimeMetrics, RuntimeReleaseDetails } from '../../types/runtime';
 

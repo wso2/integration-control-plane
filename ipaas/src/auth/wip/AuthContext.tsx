@@ -20,9 +20,10 @@ import { createContext, useContext, useState, useCallback, useMemo, useEffect } 
 import type { JSX, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
-import { loginApiUrl } from '../config/runtimeConfig';
-import { loginUrl } from '../paths';
-import { IS_CLOUD } from '../features';
+import { loginApiUrl } from '../../config/runtimeConfig';
+import { loginUrl } from '../../paths';
+import { IS_CLOUD } from '../../features';
+import type { AuthContextValue } from '../contract';
 import { buildAuthorizationUrl, buildLogoutUrl } from './authorizeUrl';
 import {
   saveTokens,
@@ -53,22 +54,6 @@ interface UserInfo {
   pictureUrl?: string;
   isOidcUser: boolean;
   requirePasswordChange: boolean;
-}
-
-interface AuthContextValue {
-  isAuthenticated: boolean;
-  userId: string;
-  username: string;
-  displayName: string;
-  pictureUrl?: string;
-  isOidcUser: boolean;
-  requirePasswordChange: boolean;
-  clearRequirePasswordChange: () => void;
-  login: (username: string, password: string) => Promise<void>;
-  loginWithOIDC: (fidp?: string) => Promise<void>;
-  handleOIDCCallback: (code: string, state: string | null) => Promise<{ isNewUser: boolean }>;
-  completeOrgRegistration: (orgHandle: string) => Promise<void>;
-  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

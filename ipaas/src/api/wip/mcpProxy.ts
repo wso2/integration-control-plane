@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { getOrgUuidFromToken } from '../../auth/tokenManager';
+import { getOrgUuidFromToken } from '#auth';
 import { apimClient } from './httpClients';
 import type { CreateMcpApiInput, CreatedMcpApi, McpFeatureOperation, McpProxyMetadata } from '../../types/mcpProxy';
 

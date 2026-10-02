@@ -17,7 +17,7 @@
  */
 
 import { useEffect, useRef } from 'react';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { fetchProjectPermissions, fetchComponentPermissions } from '#api/auth';
 

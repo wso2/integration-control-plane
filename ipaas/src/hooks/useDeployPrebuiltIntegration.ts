@@ -19,7 +19,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useCreateComponent, useDeleteComponent } from './useComponents';
 import { useDeployPrebuiltImage } from './useDeployments';
-import { getOrgUuidFromToken } from '../auth/tokenManager';
+import { getOrgUuidFromToken } from '#auth';
 import { componentSubTypeFromSample, displayTypeFromSample } from '../constants/integrations';
 import { derivePrebuiltSlug } from '../utils/prebuilt';
 import { checkNameAvailability, fetchComponentDetail, fetchFirstEnvironment, fetchLatestCommitSha, savePrebuiltConfig } from '#api/prebuilt';

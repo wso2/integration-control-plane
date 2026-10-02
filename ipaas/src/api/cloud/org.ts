@@ -28,13 +28,13 @@
 
 import type { OrgEntry, OrgComponentLimits, OrgSubscription, RegisterUserResponse } from '../../types/org';
 import type { Project } from '../../types/project';
-import { getAccessToken } from '../../auth/tokenManager';
+import { getAccessToken } from '#auth';
 import { bff, items, seg, type ListResponse } from './_client';
 
 // Read org claims from the access-token payload. Returns empty on any failure
 // — callers treat that as "unscoped" rather than throwing.
-function readJwtOrgClaims(): { handle?: string; uuid?: string } {
-  const token = getAccessToken();
+async function readJwtOrgClaims(): Promise<{ handle?: string; uuid?: string }> {
+  const token = await getAccessToken();
   if (!token) return {};
   try {
     // JWT payloads are base64url without padding; restore '+'/'/' and pad to a
@@ -56,7 +56,7 @@ function readJwtOrgClaims(): { handle?: string; uuid?: string } {
 // No BFF round-trip: the org switcher is disabled in cloud, and AppLayout
 // only needs an entry where handle === scope.org for the header to render.
 export const fetchOrgs = async (): Promise<OrgEntry[]> => {
-  const { handle, uuid } = readJwtOrgClaims();
+  const { handle, uuid } = await readJwtOrgClaims();
   if (!handle && !uuid) return [];
   return [{ handle: handle ?? '', numericId: 0, ...(uuid ? { uuid } : {}) }];
 };
@@ -72,7 +72,7 @@ export const validateOrgName = (_orgName: string): Promise<boolean> => Promise.r
 // JWT claims (falling back to the supplied orgName) so the post-registration
 // navigation in RegisterOrganization.tsx still works.
 export const registerUser = async (orgName: string, _termsAccepted: boolean, _serviceName: string): Promise<RegisterUserResponse> => {
-  const { handle, uuid } = readJwtOrgClaims();
+  const { handle, uuid } = await readJwtOrgClaims();
   const resolvedHandle = handle || orgName;
   return {
     organizations: [

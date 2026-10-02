@@ -24,7 +24,7 @@
  * supported here because the shared HttpClient lacks it.
  */
 
-import { authenticatedFetch } from '../../auth/tokenManager';
+import { authenticatedFetch } from '#auth';
 
 // Token-scope 403 retry helpers are product-agnostic shared HTTP infra; they
 // live alongside the base HTTP clients in wip/. Re-exported so cloud domain

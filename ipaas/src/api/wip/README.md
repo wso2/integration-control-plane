@@ -4,7 +4,7 @@
 > This directory is the **wip** (Choreo v2) real implementation of the API layer. It contains all backend communication logic for this product, structured in three tiers:
 
 ```text
-authenticatedFetch          (auth/tokenManager.ts)
+authenticatedFetch          (auth/wip/tokenManager.ts)
         ↓
 createHttpClient / gql()    (httpClients.ts / graphql.ts)
         ↓
@@ -17,7 +17,7 @@ Domain files                (alerts.ts, builds.ts, components.ts, …)
 
 ## Tier 1 — Auth transport
 
-`authenticatedFetch` in `auth/tokenManager.ts` is the single point responsible for injecting access tokens, detecting expiry, refreshing, and retrying on 401. **Domain files must not call `authenticatedFetch` directly** except in the documented special cases below.
+`authenticatedFetch` in `auth/wip/tokenManager.ts` is the single point responsible for injecting access tokens, detecting expiry, refreshing, and retrying on 401. **Domain files must not call `authenticatedFetch` directly** except in the documented special cases below.
 
 ---
 

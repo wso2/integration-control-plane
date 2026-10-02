@@ -24,7 +24,8 @@
     "noUncheckedSideEffectImports": true,
     "paths": {
       "#api/*": ["./src/api/wip/*"],
-      "#product/*": ["./src/product/wip/*"]
+      "#product/*": ["./src/product/wip/*"],
+      "#auth": ["./src/auth/wip/index.ts"]
     }
   },
   "include": ["src"]

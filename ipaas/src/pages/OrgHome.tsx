@@ -20,7 +20,7 @@ import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 // ButtonBase, Stack (below) and ArrowRight, Settings, Users (icons) are only used by the
 // persona-selection step, which is commented out below — restore these imports alongside it.
 import { Alert, Box, Button, Card, CardContent, CircularProgress, FormControl, MenuItem, Select, Typography } from '@wso2/oxygen-ui';

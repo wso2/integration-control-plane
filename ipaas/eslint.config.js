@@ -42,4 +42,13 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^_', argsIgnorePattern: '^_', destructuredArrayIgnorePattern: '^_', ignoreRestSiblings: true }],
     },
   },
+  {
+    // Auth is resolved per product by the #auth alias; a relative import would
+    // pin one product's implementation into every build.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/auth/**'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['**/auth/**'], message: 'Import auth from #auth (see src/auth/contract.ts).' }] }],
+    },
+  },
 ];

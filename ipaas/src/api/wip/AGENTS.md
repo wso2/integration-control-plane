@@ -7,7 +7,7 @@ This file covers implementation details **specific to the wip product**. For the
 ## Transport tiers
 
 ```text
-auth/tokenManager.ts         authenticatedFetch — token injection, 401 refresh
+auth/wip/tokenManager.ts         authenticatedFetch — token injection, 401 refresh
         ↓
 api/wip/httpClients.ts       createHttpClient factory, named clients, retry helpers
 api/wip/graphql.ts           gql() helper — wraps the single GraphQL endpoint

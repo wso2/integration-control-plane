@@ -16,13 +16,10 @@
  * under the License.
  */
 
-import { getOrgUuidFromToken } from '#auth';
-
 /**
- * Returns the current org UUID derived from the active access token, or null
- * if no org-scoped token is present. Components should use this instead of
- * reading the token through #auth directly.
+ * Cloud auth. Resolved through `#auth` when PRODUCT=cloud.
+ *
+ * Re-exports the WIP implementation until cloud moves to the Thunder SDK.
  */
-export function useOrgUuid(): string | null {
-  return getOrgUuidFromToken();
-}
+
+export * from '../wip';

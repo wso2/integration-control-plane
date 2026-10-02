@@ -24,7 +24,7 @@ import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import SearchField from '../../SearchField';
 import { Permissions } from '../../../constants/permissions';
 import Authorized from '../../Authorized';
-import { useAuth } from '../../../auth/AuthContext';
+import { useAuth } from '#auth';
 import { useUsers, useDeleteUser, usePendingInvitations, useDeleteInvitation } from '../../../hooks/useAuth';
 import type { User } from '../../../types/auth';
 import { editOrgUserUrl } from '../../../paths';

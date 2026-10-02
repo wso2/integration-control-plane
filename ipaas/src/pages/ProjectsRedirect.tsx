@@ -23,7 +23,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Link, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { loginUrl, orgHomeUrl, privacyPolicyUrl } from '../paths';
 
 export default function ProjectsRedirect(): JSX.Element {

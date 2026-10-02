@@ -26,7 +26,7 @@
  * billing as disabled rather than hitting a malformed URL.
  */
 
-import { authenticatedFetch } from '../../auth/tokenManager';
+import { authenticatedFetch } from '#auth';
 import { q } from './_client';
 import type { BillingOrg } from '../../types/billing';
 

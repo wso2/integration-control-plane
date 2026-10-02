@@ -22,7 +22,7 @@ import { useState, useCallback, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import SearchField from '../components/SearchField';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
 import { useUsers, useGroups, useUpdateUserGroups, useRemoveUserFromGroup } from '../hooks/useAuth';

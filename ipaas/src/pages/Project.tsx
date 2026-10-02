@@ -75,7 +75,7 @@ import NotFound from '../components/NotFound';
 import { formatDistanceToNow } from '../utils/time';
 import { resourceUrl, broaden, newComponentUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { componentOverviewUrl } from '../paths';
 import { Permissions } from '../constants/permissions';
 import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';

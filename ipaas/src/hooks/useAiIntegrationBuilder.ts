@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAccessToken } from '../auth/tokenManager';
+import { getAccessToken } from '#auth';
 import { usePrebuiltIntegrations } from './usePrebuiltIntegrations';
 import { runAiIntegrationPipeline, clearChatHistory } from '../services/aiIntegrationBuilder';
 import type { AiIntegrationBuilderResponse, ConversationTurn, PipelineStage, StepEvent } from '../types/aiBuilder';
@@ -33,9 +33,10 @@ interface UseAiIntegrationBuilder {
 
 // The copilot token-exchange requires the Choreo STS token (choreo:*/apim:* scopes),
 // which is the Bearer tokenManager already issues — not the raw Asgardeo OIDC token.
-function getToken(): Promise<string> {
-  const token = getAccessToken();
-  return token ? Promise.resolve(token) : Promise.reject(new Error('Not authenticated'));
+async function getToken(): Promise<string> {
+  const token = await getAccessToken();
+  if (!token) throw new Error('Not authenticated');
+  return token;
 }
 
 export function useAiIntegrationBuilder(projectId: string, initialQuery: string): UseAiIntegrationBuilder {

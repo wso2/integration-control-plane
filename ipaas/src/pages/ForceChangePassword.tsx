@@ -21,7 +21,7 @@ import type { JSX } from 'react';
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Divider, IconButton, InputAdornment, InputLabel, OutlinedInput, Stack, Typography } from '@wso2/oxygen-ui';
 import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { useForceChangePassword } from '../hooks/useAuth';
 import { resourceUrl } from '../nav';
 

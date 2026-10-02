@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { authenticatedFetch } from '../../auth/tokenManager';
+import { authenticatedFetch } from '#auth';
 import { copilotDatacollectorClient } from './httpClients';
 import { COPILOT_DEFAULT_PERSPECTIVE } from '../../constants/copilot';
 import { getOrCreateCopilotSessionId } from '../../utils/copilot';

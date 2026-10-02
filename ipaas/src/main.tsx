@@ -22,7 +22,7 @@ import { BrowserRouter } from 'react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import { AuthProvider } from './auth/AuthContext';
+import { AuthProvider } from '#auth';
 import { loadConfig } from './config/runtimeConfig';
 import { AccessControlProvider } from './contexts/AccessControlContext';
 import { FeaturePreviewProvider } from './contexts/FeaturePreviewContext';

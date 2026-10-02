@@ -16,13 +16,14 @@
  * under the License.
  */
 
-import { getOrgUuidFromToken } from '#auth';
-
 /**
- * Returns the current org UUID derived from the active access token, or null
- * if no org-scoped token is present. Components should use this instead of
- * reading the token through #auth directly.
+ * Compile-time assertion that this folder satisfies `src/auth/contract.ts`.
+ * Never imported at runtime; the underscore local is exempt from `noUnusedLocals`.
  */
-export function useOrgUuid(): string | null {
-  return getOrgUuidFromToken();
-}
+
+import type { AuthModule } from '../contract';
+import * as cloud from './index';
+
+const _cloud: AuthModule = cloud;
+
+void _cloud;

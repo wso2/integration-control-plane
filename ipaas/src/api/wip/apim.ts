@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { authenticatedFetch, getOrgUuidFromToken } from '../../auth/tokenManager';
+import { authenticatedFetch, getOrgUuidFromToken } from '#auth';
 import { apimClient, choreoClient } from './httpClients';
 import type { ApimApiInfo, GeneratedTestKey, DeploySettingsV2Payload, LifecycleState, LifecycleHistory, MarketplaceService } from '../../types/apim';
 import type { ApiDocument } from '../../types/marketplace';

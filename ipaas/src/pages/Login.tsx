@@ -22,7 +22,7 @@ import { Alert, Box, Button, CircularProgress, ColorSchemeImage, Divider, Grid, 
 import PageLoader from '../components/PageLoader';
 import { Building2, GitHub, Google, Mail } from '@wso2/oxygen-ui-icons-react';
 import { Link as NavLink, useSearchParams } from 'react-router';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { useBfcacheReset } from '../hooks/useBfcacheReset';
 import { privacyPolicyUrl, signupUrl } from '../paths';
 import AuthMarketingPanel from '../components/AuthMarketingPanel';

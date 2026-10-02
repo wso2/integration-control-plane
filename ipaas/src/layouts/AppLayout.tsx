@@ -115,7 +115,7 @@ import { isExternalCiEnabled } from '../hooks/useExternalCi';
 import { PAID_SUBSCRIPTION_TYPE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useOrgPermissions } from '../hooks/useAuth';
-import { switchOrgToken } from '../auth/tokenManager';
+import { switchOrgToken, useAuth } from '#auth';
 import {
   useScope,
   broaden,
@@ -137,7 +137,6 @@ import {
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, registerOrgUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
-import { useAuth } from '../auth/AuthContext';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { CopilotProvider } from '../contexts/CopilotContext';
 const CopilotDrawer = lazy(() => import('../components/AiCopilot/CopilotDrawer'));

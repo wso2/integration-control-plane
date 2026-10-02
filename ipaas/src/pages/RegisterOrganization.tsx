@@ -22,7 +22,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { Alert, Box, Button, Checkbox, CircularProgress, ColorSchemeImage, Divider, FormControlLabel, InputAdornment, InputLabel, Link, OutlinedInput, Stack, Typography } from '@wso2/oxygen-ui';
 import { Building2, CheckCircle, XCircle } from '@wso2/oxygen-ui-icons-react';
 
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { useRegisterUser, useValidateOrgName } from '../hooks/useOrg';
 import type { RegisterUserResponse } from '../types/org';
 import { loginUrl, orgHomeUrl, privacyPolicyUrl } from '../paths';

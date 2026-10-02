@@ -18,7 +18,7 @@
 
 import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import NotFound from '../components/NotFound';
 import { CloudEditorCard, IntegratorIDECard } from '../components/Integration/IntegrationCards';
 import { useComponentByHandler } from '../hooks/useComponents';

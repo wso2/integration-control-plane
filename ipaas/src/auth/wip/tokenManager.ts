@@ -16,15 +16,14 @@
  * under the License.
  */
 
-import { refreshTokenApiUrl, revokeTokenApiUrl } from '../config/runtimeConfig';
-import { IS_CLOUD } from '../features';
+import { refreshTokenApiUrl, revokeTokenApiUrl } from '../../config/runtimeConfig';
+import { IS_CLOUD } from '../../features';
 
 const ACCESS_TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const ID_TOKEN_KEY = 'id_token';
 const TOKEN_EXPIRES_AT_KEY = 'token_expires_at';
 const REFRESH_TOKEN_EXPIRES_AT_KEY = 'refresh_token_expires_at';
-const REDIRECT_URL_KEY = 'redirect_url';
 const OIDC_STATE_KEY = 'oidc_state';
 const OIDC_AUTH_MODE_KEY = 'auth_mode';
 const OIDC_ORG_HANDLE_KEY = 'org_handle';
@@ -451,24 +450,6 @@ export async function revokeToken(): Promise<void> {
   }
 }
 
-export function saveRedirectUrl(url: string): void {
-  // Never persist a redirect to the synthetic 'default' org — it isn't real and
-  // would loop back there on every subsequent login.
-  try {
-    const pathname = new URL(url).pathname;
-    if (pathname.startsWith('/organizations/default/') || pathname === '/organizations/default') return;
-  } catch {
-    /* ignore malformed URLs */
-  }
-  localStorage.setItem(REDIRECT_URL_KEY, url);
-}
-
-export function getAndClearRedirectUrl(): string | null {
-  const url = localStorage.getItem(REDIRECT_URL_KEY);
-  localStorage.removeItem(REDIRECT_URL_KEY);
-  return url;
-}
-
 export function generateAndSaveOIDCState(): string {
   const state = crypto.randomUUID();
   localStorage.setItem(OIDC_STATE_KEY, state);
@@ -479,21 +460,6 @@ export function validateAndClearOIDCState(state: string): boolean {
   const savedState = localStorage.getItem(OIDC_STATE_KEY);
   localStorage.removeItem(OIDC_STATE_KEY);
   return savedState === state;
-}
-
-// GitHub OAuth CSRF state — sessionStorage so it's scoped to the initiating tab
-const GITHUB_OAUTH_STATE_KEY = 'github_oauth_state';
-
-export function generateAndSaveGitHubState(): string {
-  const state = crypto.randomUUID();
-  sessionStorage.setItem(GITHUB_OAUTH_STATE_KEY, state);
-  return state;
-}
-
-export function validateAndClearGitHubState(state: string): boolean {
-  const saved = sessionStorage.getItem(GITHUB_OAUTH_STATE_KEY);
-  sessionStorage.removeItem(GITHUB_OAUTH_STATE_KEY);
-  return saved !== null && saved === state;
 }
 
 // ---------------------------------------------------------------------------

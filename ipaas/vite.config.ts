@@ -29,6 +29,7 @@ if (!(ALLOWED_PRODUCTS as string[]).includes(rawProduct)) {
   throw new Error(`Invalid PRODUCT="${rawProduct}"; must be one of: ${ALLOWED_PRODUCTS.join(', ')}`);
 }
 const product = rawProduct as Product;
+const authProduct = product === 'cloud' ? 'cloud' : 'wip';
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -63,6 +64,7 @@ export default defineConfig({
     alias: {
       '#api': path.resolve(__dirname, `src/api/${product}`),
       '#product': path.resolve(__dirname, `src/product/${product}`),
+      '#auth': path.resolve(__dirname, `src/auth/${authProduct}`),
     },
   },
   build: {

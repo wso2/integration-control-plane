@@ -31,7 +31,7 @@ import { formatDistanceToNow } from '../../../utils/time';
 import { getGitProviderIcon } from '../../../utils/build';
 import { buildRepoBrowseUrl } from '../../../utils/gitProviderUrl';
 import { DESCRIPTION_MAX_LENGTH, clampDescription, isAtNewlineLimit } from '../../../utils/description';
-import { useAuth } from '../../../auth/AuthContext';
+import { useAuth } from '#auth';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import { getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';

@@ -26,13 +26,13 @@ Every feature follows a strict four-layer separation. Violating these boundaries
                 │ imports
 ┌───────────────▼─────────────────────────────────┐
 │  api/                                           │  Pure async service fns
-│  Import from: auth/tokenManager (clients only), │
+│  Import from: #auth (clients only),             │
 │               config/, types/                   │
 │  Never: React hooks, JSX                        │
 └───────────────┬─────────────────────────────────┘
                 │ imports
 ┌───────────────▼─────────────────────────────────┐
-│  auth/tokenManager.ts                           │  HTTP transport + token mgmt
+│  #auth → src/auth/{cloud,wip}/                  │  HTTP transport + token mgmt
 │  api/httpClients.ts   api/graphql.ts            │
 └─────────────────────────────────────────────────┘
 
@@ -42,13 +42,13 @@ utils/      ← same; every file has a co-located *.test.ts Vitest unit test
 config/     ← same
 ```
 
-**The single most important rule**: components and pages must never import directly from `api/`, `auth/tokenManager` (data functions), or any backend transport. All data access goes through `hooks/`.
+**The single most important rule**: components and pages must never import directly from `api/`, `#auth` data functions, or any backend transport. All data access goes through `hooks/`.
 
 ---
 
 ## The one accepted exception
 
-`auth/tokenManager.ts` exports two categories of functions:
+`#auth` exports two categories of functions:
 
 | Category                                        | Examples                                                                                                           | Used in                        |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
@@ -134,9 +134,22 @@ Cloud and wip share the same UI; only `src/product/icp/` accumulates UI variants
 
 See `src/product/README.md` for the full guide.
 
+### `#auth` alias — product-specific auth
+
+Vite resolves `#auth` → `src/auth/cloud/` for `cloud`, and `src/auth/wip/` for `wip` and `icp`. App code imports auth only from `#auth`; ESLint rejects relative imports into `src/auth/`.
+
+| Path                   | Purpose                                                                 |
+| ---------------------- | ----------------------------------------------------------------------- |
+| `src/auth/contract.ts` | Types only — the `AuthModule` surface both implementations must satisfy |
+| `src/auth/wip/`        | WSO2 Identity Platform OIDC + STS exchange, and local login (ICP)       |
+| `src/auth/cloud/`      | Cloud (Thunder) auth                                                    |
+| `src/auth/shared/`     | Non-auth helpers both re-export (redirect URL, GitHub OAuth state)      |
+
+The two implementations share no logic, only the contract. Each folder has a `_check.ts` that asserts its exports against `AuthModule`.
+
 ### TypeScript paths
 
-`tsconfig.app.json` maps both aliases to the `wip/` folder for type checking regardless of build product. This means the IDE always type-checks against wip implementations — which is intentional since wip is the reference product (the only one with real implementations today).
+`tsconfig.app.json` maps all three aliases (`#api`, `#product`, `#auth`) to the `wip/` folder for type checking regardless of build product. This means the IDE always type-checks against wip implementations — which is intentional since wip is the reference product (the only one with real implementations today).
 
 ---
 
@@ -194,7 +207,7 @@ src/
   components/       Reusable shared UI components (see src/components/AGENTS.md)
   pages/            Route-level page components (see src/pages/AGENTS.md)
   features.ts       Build-time IS_WIP / IS_CLOUD / IS_ICP flags
-  auth/             OIDC/token management — only tokenManager.ts is consumed by hooks
+  auth/             Per-product auth behind the #auth alias (see `#auth` alias above)
   config/           Runtime config helpers (runtimeConfig.ts, statusColors.ts)
   constants/        Static lookup tables, style constants, route constants
   contexts/         React context providers (non-server state only)

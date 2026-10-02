@@ -19,7 +19,7 @@
 import { Navigate, Outlet } from 'react-router';
 import { Box, ColorSchemeToggle, Layout, ParticleBackground, Stack } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth } from '#auth';
 import { orgHomeUrl, projectHomeUrl, registerOrgUrl } from '../paths';
 
 export default function PublicLayout(): JSX.Element {

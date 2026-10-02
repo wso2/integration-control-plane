@@ -20,7 +20,7 @@ import { useState } from 'react';
 import { useObtainGithubToken } from './useRepository';
 import { GITHUB_AUTH } from '../constants/github';
 import { buildGitHubAppInstallUrl, buildGitHubOAuthUrl } from '../paths';
-import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth/tokenManager';
+import { generateAndSaveGitHubState, validateAndClearGitHubState } from '#auth';
 import { IS_CLOUD } from '../features';
 import type { AuthStatus } from '../types/import';
 

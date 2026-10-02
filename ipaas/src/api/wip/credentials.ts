@@ -17,7 +17,7 @@
  */
 
 import { gql } from './graphql';
-import { getOrgUuidFromToken } from '../../auth/tokenManager';
+import { getOrgUuidFromToken } from '#auth';
 import { GitProvider, type CreateGitCredentialInput, type CredentialDeleteEligibility, type GitCredential } from '../../types/credentials';
 
 // Git credentials live on the projects GraphQL endpoint (same as Devant). Values
