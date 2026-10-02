@@ -17,7 +17,7 @@
  */
 
 /**
- * Context Engines — backed by the Devant Context Engine REST API (`/v1`).
+ * Context Engines — backed by the Context Engine REST API (`/v1`).
  *
  * The engine ships milestone by milestone. Routes that exist today: spaces,
  * sources, ingestion jobs, grants, `auth/me` and the read-only progress routes
@@ -591,7 +591,7 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
     contentType: input.contentType,
     contentHash: `sha256:${await sha256Hex(bytes)}`,
     sourceObservedAt: new Date(Number(input.version)).toISOString(),
-    audience: [input.label],
+    audience: input.audience,
     sourceAclVersion: input.version,
     idempotencyKey: key,
   };
@@ -610,7 +610,7 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
   }
 }
 
-/** Remove a record, or move it to another label, with an event-only delivery. */
+/** Remove a record, or change who can see it, with an event-only delivery. */
 export async function sendContextRecordEvent(input: RecordEventInput): Promise<ContextJobHandle> {
   const key = await deliveryKey(input.sourceId, input.operation, input.recordId, input.version);
   const event = {
@@ -621,7 +621,7 @@ export async function sendContextRecordEvent(input: RecordEventInput): Promise<C
     sourceVersion: input.version,
     operation: input.operation,
     sourceObservedAt: new Date(Number(input.version)).toISOString(),
-    audience: [input.label],
+    audience: input.audience,
     sourceAclVersion: input.version,
     idempotencyKey: key,
   };

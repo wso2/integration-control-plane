@@ -42,6 +42,8 @@ interface SourceDrawerProps {
   onClose: () => void;
   /** `index` is set when an existing source was edited. */
   onSubmit: (config: ContextSourceConfig, index?: number) => void;
+  /** Roles granted query access, on a running engine; the wizard chooses them after sources. */
+  queryRoles?: string[];
 }
 
 /**
@@ -50,7 +52,7 @@ interface SourceDrawerProps {
  * and a sticky footer, however large the catalog grows. Remount (change `key`)
  * to start a fresh session.
  */
-export default function SourceDrawer({ orgHandle, open, start, existing, onClose, onSubmit }: SourceDrawerProps): JSX.Element {
+export default function SourceDrawer({ orgHandle, open, start, existing, onClose, onSubmit, queryRoles }: SourceDrawerProps): JSX.Element {
   const [connectorId, setConnectorId] = useState<string | null>(start?.config?.type ?? start?.connectorId ?? null);
   const [draft, setDraft] = useState<ContextSourceConfig | null>(start?.config ?? (start?.connectorId ? blankSource(start.connectorId) : null));
   const editing = start?.index !== undefined;
@@ -89,7 +91,7 @@ export default function SourceDrawer({ orgHandle, open, start, existing, onClose
 
       <Box sx={drawerBodySx}>
         {connector && draft ? (
-          <ConnectorForm orgHandle={orgHandle} connector={connector} draft={draft} otherNames={otherNames} onChange={setDraft} onChangeSource={editing ? undefined : backToCatalog} />
+          <ConnectorForm orgHandle={orgHandle} connector={connector} draft={draft} otherNames={otherNames} onChange={setDraft} onChangeSource={editing ? undefined : backToCatalog} queryRoles={queryRoles} />
         ) : (
           <ConnectorCatalog addedIds={existing.map((s) => s.type)} onPick={pick} />
         )}

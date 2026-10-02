@@ -16,13 +16,13 @@
  * under the License.
  */
 
-import { Box, Chip, Grid, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, Grid, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { engineDescriptionError, engineNameError, formatBytes, isStorageAllManaged, sourceTypeName, summarizeAudience, summarizeSource, summarizeStorage } from '../../../utils/contextEngine';
+import { engineDescriptionError, engineNameError, formatBytes, isStorageAllManaged, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import { fieldStackSx, mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
@@ -35,6 +35,10 @@ interface ReviewStepProps {
   form: ContextEngineForm;
   /** Role handle → display name, for the access summary. */
   roleNames: Record<string, string>;
+  /** The roles "everyone who can query" stands for, for uploads shared that way. */
+  everyone: string[];
+  /** The creator's groups, to warn about content they will not see themselves. */
+  myGroups: string[];
   /** When the draft was last written to session storage, if at all. */
   draftSavedAt: string | null;
   onNameChange: (value: string) => void;
@@ -60,8 +64,10 @@ function SummaryCard({ title, editLabel, onEdit, children }: { title: string; ed
 }
 
 /** Step 4 — name the engine and confirm what will be created; every card jumps back to its step. */
-export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange, onDescriptionChange, onEdit }: ReviewStepProps): JSX.Element {
+export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, onNameChange, onDescriptionChange, onEdit }: ReviewStepProps): JSX.Element {
   const nameError = engineNameError(form.name);
+  // Query access and visibility are set in different steps; say where they disagree before anything is created.
+  const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
   const stagedFiles = form.sources.flatMap((s) => s.staged ?? []);
   const stagedCount = stagedFiles.length;
   const stagedBytes = stagedFiles.reduce((n, f) => n + f.size, 0);
@@ -112,6 +118,40 @@ export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange
         />
       </Stack>
 
+      {(mismatch.seeNothing.length > 0 || mismatch.cannotQuery.length > 0 || mismatch.hiddenFromMe.length > 0) && (
+        <Stack gap={1.5} sx={{ mb: 2 }}>
+          {mismatch.seeNothing.length > 0 && (
+            <Alert
+              severity="warning"
+              variant="outlined"
+              action={
+                <Button size="small" onClick={() => onEdit(0)}>
+                  Edit sources
+                </Button>
+              }>
+              {`${roleList(mismatch.seeNothing, roleNames)} can query, but no source shares content with ${mismatch.seeNothing.length === 1 ? 'it' : 'them'}, so ${mismatch.seeNothing.length === 1 ? 'it gets' : 'they get'} empty answers.`}
+            </Alert>
+          )}
+          {mismatch.cannotQuery.length > 0 && (
+            <Alert
+              severity="warning"
+              variant="outlined"
+              action={
+                <Button size="small" onClick={() => onEdit(1)}>
+                  Edit access
+                </Button>
+              }>
+              {`Content is shared with ${roleList(mismatch.cannotQuery, roleNames)}, but ${mismatch.cannotQuery.length === 1 ? 'that role' : 'those roles'} can't query this engine. Grant access, or the sharing has no effect.`}
+            </Alert>
+          )}
+          {mismatch.hiddenFromMe.length > 0 && (
+            <Alert severity="warning" variant="outlined">
+              {`You won't see content from ${mismatch.hiddenFromMe.join(', ')} yourself: you aren't in any role ${mismatch.hiddenFromMe.length === 1 ? 'it is' : 'they are'} shared with.`}
+            </Alert>
+          )}
+        </Stack>
+      )}
+
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
           <SummaryCard title={`Sources (${n})`} editLabel="sources" onEdit={() => onEdit(0)}>
@@ -127,7 +167,7 @@ export default function ReviewStep({ form, roleNames, draftSavedAt, onNameChange
                       {summarizeSource(s)}
                     </Typography>
                     <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }} noWrap>
-                      Visible to: {summarizeAudience(s.audience, roleNames)}
+                      Visible to: {summarizeSourceVisibility(s, roleNames)}
                     </Typography>
                   </Box>
                 </Stack>

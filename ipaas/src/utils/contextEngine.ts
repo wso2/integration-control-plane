@@ -51,6 +51,7 @@ import type {
   ContextSource,
   ContextSourceConfig,
   CreateContextEngineInput,
+  FileVisibility,
   GetStartedStep,
   LlmConfig,
   McpClientConfig,
@@ -58,6 +59,7 @@ import type {
   SourceConnector,
   SourceFieldDef,
   SourceProgress,
+  UploadedFile,
   SourceProgressStatus,
   StagedFileCheck,
   StagedFileMeta,
@@ -143,20 +145,23 @@ export function audienceError(rules: AudienceRule[] | undefined): string {
 
 /**
  * Why a File Upload source's staged files cannot be sent yet, or '' when they can.
- * Files are optional in the wizard, but chosen ones need a label, and a restored
- * draft needs their bytes again.
+ * Files are optional in the wizard; "only some roles" needs a role, and a
+ * restored draft needs the files' bytes again.
  */
 export function stagedBlocker(source: ContextSourceConfig): string {
   const staged = source.staged ?? [];
   if (staged.length === 0) return '';
-  if (!nonEmpty(source.stagedLabel ?? '')) return 'Choose who can see the files';
+  if (visibilityError(source.stagedVisibility)) return 'Choose who can see the files';
   const missing = staged.filter((f) => !hasStagedFile(f.id)).length;
   return missing > 0 ? `Re-add ${plural(missing, 'file')}` : '';
 }
 
+/** Whether a source needs visibility rules typed in: connectors do; File Upload sources get theirs from the roles each upload is shared with. */
+export const needsAudienceRules = (source: Pick<ContextSourceConfig, 'type'>): boolean => source.type !== 'upload';
+
 /** Whether one source names a known connector, has a name, passes every field check, has visibility rules and its staged files are ready. */
 export function isSourceValid(source: ContextSourceConfig): boolean {
-  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && audienceError(source.audience) === '' && stagedBlocker(source) === '';
+  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && (!needsAudienceRules(source) || audienceError(source.audience) === '') && stagedBlocker(source) === '';
 }
 
 /** Short reason a source is incomplete, for its status chip; empty when it is complete. */
@@ -165,7 +170,7 @@ export function sourceIncompleteReason(source: ContextSourceConfig): string {
   if (!nonEmpty(source.name)) return 'Name missing';
   const first = invalidSourceFields(source)[0];
   if (first) return (source.values[first.key] ?? '').trim() ? `${first.label} invalid` : `${first.label} missing`;
-  if (audienceError(source.audience)) return typedRules(source.audience).length ? 'Visibility incomplete' : 'Visibility missing';
+  if (needsAudienceRules(source) && audienceError(source.audience)) return typedRules(source.audience).length ? 'Visibility incomplete' : 'Visibility missing';
   return stagedBlocker(source);
 }
 
@@ -291,7 +296,14 @@ function sanitizeSourceConfig(raw: unknown): ContextSourceConfig {
         .map((f) => ({ id: str((f as Partial<StagedFileMeta>)?.id), name: str((f as Partial<StagedFileMeta>)?.name), size: Number((f as Partial<StagedFileMeta>)?.size) || 0, contentType: str((f as Partial<StagedFileMeta>)?.contentType) }))
         .filter((f) => f.id && f.name)
     : [];
-  return { type: str(r.type), name: str(r.name), values, audience: audience.length ? audience : [{ group: '', role: '' }], ...(staged.length ? { staged, stagedLabel: str(r.stagedLabel) } : {}) };
+  return { type: str(r.type), name: str(r.name), values, audience: audience.length ? audience : [{ group: '', role: '' }], ...(staged.length ? { staged, stagedVisibility: sanitizeVisibility(r.stagedVisibility) } : {}) };
+}
+
+/** A stored visibility choice, coerced; anything unreadable, including a draft's old label, becomes everyone who can query. */
+function sanitizeVisibility(raw: unknown): FileVisibility {
+  const v = (raw ?? {}) as { kind?: unknown; roles?: unknown };
+  if (v.kind === 'roles' && Array.isArray(v.roles)) return { kind: 'roles', roles: v.roles.filter((x): x is string => typeof x === 'string') };
+  return { kind: 'everyone' };
 }
 
 /** Parse a stored draft, or null when it is missing, malformed or from another version. */
@@ -704,23 +716,129 @@ export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'con
   return sum;
 }
 
-/** The staged label kept only when a rule defines it, else the first label, so files never upload under a label nobody can see. */
-export function withStagedLabel(source: ContextSourceConfig): ContextSourceConfig {
-  const labels = labelsFromRules(source.audience);
-  const current = source.stagedLabel ?? '';
-  const next = labels.includes(current) ? current : (labels[0] ?? '');
-  return next === current ? source : { ...source, stagedLabel: next };
+// ── Upload visibility ───────────────────────────────────────────────────────
+// Uploaded files are shared with roles directly. The UI tags each file with role
+// handles and keeps the File Upload source's rules mapping every handle to itself,
+// so nobody has to invent a label and then map it.
+
+const uniqueTrimmed = (xs: string[]): string[] => xs.map((x) => x.trim()).filter((x, i, all) => x !== '' && all.indexOf(x) === i);
+
+/** "a", "a and b", "a, b and c", with role handles shown by name. */
+function nameList(roles: string[], roleNames: Record<string, string>): string {
+  const names = roles.map((r) => roleNames[r] ?? r);
+  return names.length <= 1 ? (names[0] ?? '') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
 }
 
-/** The labels a source's visibility rules define, in order, without blanks or repeats. */
-export function labelsFromRules(rules: AudienceRule[] | undefined): string[] {
-  return (rules ?? []).map((r) => r.group.trim()).filter((g, i, all) => g !== '' && all.indexOf(g) === i);
+/**
+ * The role handles "everyone who can query" stands for: every org role plus the
+ * roles granted query access. Query access still decides who may ask; tagging a
+ * file with every role only means no asker is filtered out, including roles
+ * granted later. When org roles could not be loaded, the granted roles and the
+ * uploader's own groups stand in.
+ */
+export function everyoneRoles(orgRoles: string[] | undefined, queryRoles: string[], myGroups: string[] = []): string[] {
+  return orgRoles && orgRoles.length > 0 ? uniqueTrimmed([...orgRoles, ...queryRoles]) : uniqueTrimmed([...queryRoles, ...myGroups]);
 }
+
+/** The audience tags a file is sent with: the chosen roles, or every role for everyone who can query. */
+export function visibilityTags(visibility: FileVisibility | undefined, everyone: string[]): string[] {
+  return visibility?.kind === 'roles' ? uniqueTrimmed(visibility.roles) : uniqueTrimmed(everyone);
+}
+
+/** A File Upload source's rules: each role handle maps to itself. */
+export function uploadSourceRules(roles: string[]): AudienceRule[] {
+  return uniqueTrimmed(roles).map((role) => ({ group: role, role }));
+}
+
+/** Every File Upload source gets rules mapping the given roles to themselves; other sources keep their own. */
+export function withUploadRules(sources: ContextSourceConfig[], roles: string[]): ContextSourceConfig[] {
+  return sources.map((s) => (s.type === 'upload' ? { ...s, audience: uploadSourceRules(roles) } : s));
+}
+
+/** Why a visibility choice cannot be used, or '' when it can: "only some roles" needs at least one. */
+export function visibilityError(visibility: FileVisibility | undefined): string {
+  return visibility?.kind === 'roles' && uniqueTrimmed(visibility.roles).length === 0 ? 'Choose at least one role' : '';
+}
+
+/** "Everyone who can query", or the chosen roles by name. */
+export function describeVisibility(visibility: FileVisibility | undefined, roleNames: Record<string, string> = {}): string {
+  if (!visibility || visibility.kind === 'everyone') return 'Everyone who can query';
+  const roles = uniqueTrimmed(visibility.roles);
+  return roles.length ? roles.map((r) => roleNames[r] ?? r).join(', ') : 'No roles chosen';
+}
+
+/** Who can see an uploaded file, for its row; a file uploaded before roles were chosen shows its label. */
+export function describeUploadAudience(entry: Pick<UploadedFile, 'visibility' | 'label'>, roleNames: Record<string, string> = {}): string {
+  if (entry.visibility) return describeVisibility(entry.visibility, roleNames);
+  return entry.label ? `Label “${entry.label}”` : 'Everyone who can query';
+}
+
+/** Who a source's content reaches, for the wizard's rows: connectors by their rules, uploads by the files' choice. */
+export function summarizeSourceVisibility(source: ContextSourceConfig, roleNames: Record<string, string> = {}): string {
+  return needsAudienceRules(source) ? summarizeAudience(source.audience, roleNames) : describeVisibility(source.stagedVisibility, roleNames);
+}
+
+/**
+ * Where a visibility choice will surprise its owner: chosen roles that cannot
+ * query the engine, and an uploader who is in none of the roles. `queryRoles`
+ * is left out where query access is not chosen yet; `myGroups` when unknown.
+ */
+export function visibilityWarnings(input: { visibility: FileVisibility | undefined; everyone: string[]; queryRoles?: string[]; myGroups?: string[]; roleNames?: Record<string, string> }): string[] {
+  const { visibility, everyone, queryRoles, myGroups, roleNames = {} } = input;
+  const tags = visibilityTags(visibility, everyone);
+  const warnings: string[] = [];
+  if (visibility?.kind === 'roles' && queryRoles) {
+    const cannotQuery = tags.filter((r) => !queryRoles.includes(r));
+    if (cannotQuery.length) warnings.push(`${nameList(cannotQuery, roleNames)} can't query this engine, so ${cannotQuery.length === 1 ? 'it' : 'they'} won't find these files until granted access.`);
+  }
+  if (myGroups && myGroups.length > 0 && tags.length > 0 && !tags.some((t) => myGroups.includes(t))) warnings.push("You aren't in any of these roles, so these files won't show in your own answers.");
+  return warnings;
+}
+
+/** Where who-can-query and who-can-see disagree across a whole engine, for the review step. */
+export interface SharingMismatches {
+  /** Roles with query access that no source shares anything with: they get empty answers. */
+  seeNothing: string[];
+  /** Roles a source shares content with by name that cannot query: the sharing has no effect. */
+  cannotQuery: string[];
+  /** Sources whose content the creator is in none of the roles for. */
+  hiddenFromMe: string[];
+}
+
+/** The roles a source shares content with: a connector's mapped roles, an upload's chosen roles or everyone. */
+function sourceSharedRoles(source: ContextSourceConfig, everyone: string[]): string[] {
+  if (!needsAudienceRules(source)) return visibilityTags(source.stagedVisibility, everyone);
+  return uniqueTrimmed(
+    typedRules(source.audience)
+      .filter((r) => nonEmpty(r.group) && nonEmpty(r.role))
+      .map((r) => r.role),
+  );
+}
+
+export function sharingMismatches(sources: ContextSourceConfig[], queryRoles: string[], everyone: string[], myGroups: string[] = []): SharingMismatches {
+  const shared = new Set(sources.flatMap((s) => sourceSharedRoles(s, everyone)));
+  // "Everyone who can query" names every role on purpose, so only explicit choices can name a role that cannot query.
+  const named = new Set(sources.filter((s) => needsAudienceRules(s) || s.stagedVisibility?.kind === 'roles').flatMap((s) => sourceSharedRoles(s, everyone)));
+  return {
+    seeNothing: queryRoles.filter((r) => !shared.has(r)),
+    cannotQuery: [...named].filter((r) => !queryRoles.includes(r)),
+    hiddenFromMe: myGroups.length ? sources.filter((s) => !sourceSharedRoles(s, everyone).some((r) => myGroups.includes(r))).map((s) => s.name.trim()) : [],
+  };
+}
+
+/** Role handles as a readable list, for warnings. */
+export const roleList = nameList;
 
 /** Where an uploaded file stands once the engine has taken it, from its record status. */
 export function uploadStatusFromRecord(record: ContextRecordStatus): { status: UploadFileStatus; detail?: string } {
   if (record.state === 'quarantined') {
-    return { status: 'held', detail: record.quarantineReason === 'unmapped_audience' ? 'Its label has no visibility rule, so nobody can see it.' : `Held back: ${record.quarantineReason ?? 'unknown reason'}.` };
+    return {
+      status: 'held',
+      detail:
+        record.quarantineReason === 'unmapped_audience'
+          ? "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file."
+          : `Held back: ${record.quarantineReason ?? 'unknown reason'}.`,
+    };
   }
   if (record.state === 'deleted') return { status: 'failed', detail: 'This file was removed from the engine.' };
   switch (record.indexState) {

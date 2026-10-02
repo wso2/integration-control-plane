@@ -17,113 +17,69 @@
  */
 
 import { Alert, Box, Button, Drawer, IconButton, LinearProgress, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { FileText, RefreshCw, Search, Tag, Trash2, Upload, X } from '@wso2/oxygen-ui-icons-react';
+import { FileText, RefreshCw, Search, Trash2, Upload, Users, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { refreshUploads, relabelUpload, removeUpload, retryForbidden, retryUpload, startUploads, useSourceLabels, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
-import { UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
-import { checkStagedFile, contentTypeForFile, engineMessage, formatBytes, isUploadActive, stagedSummary, summarizeUploads } from '../../../utils/contextEngine';
+import { changeUploadVisibility, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
+import { useUploadAudience } from '../../../hooks/useContextEngine';
+import { EVERYONE_VISIBILITY, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
+import { checkStagedFile, contentTypeForFile, describeUploadAudience, engineMessage, formatBytes, isUploadActive, stagedSummary, summarizeUploads, visibilityError, visibilityTags } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile, stageFiles } from '../../../utils/stagedFiles';
 import { formatDistanceToNow } from '../../../utils/time';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
 import OwnerAccessButton from '../detail/OwnerAccessButton';
 import SourceMark from '../SourceMark';
 import FileDropzone from './FileDropzone';
+import FileVisibilityField from './FileVisibilityField';
 import StagedFileList from './StagedFileList';
 import UploadStatusChip from './UploadStatusChip';
 import { drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx } from '../styles';
-import type { ContextSource, StagedFileMeta, UploadEntry, UploadFileStatus } from '../../../types/contextEngine';
+import type { ContextSource, FileVisibility, StagedFileMeta, UploadEntry, UploadFileStatus } from '../../../types/contextEngine';
 
 interface FilesDrawerProps {
   engineId: string;
+  orgHandle: string;
   source: ContextSource;
+  /** Roles granted query access to the engine, for the visibility warnings. */
+  queryRoles: string[];
   open: boolean;
   onClose: () => void;
 }
 
-const NEW_LABEL = '\u0000new';
-
-/** Pick a label the files are visible under, or type a new one. */
-function LabelSelect({ id, labels, value, onChange, onAdd, label }: { id: string; labels: string[]; value: string; onChange: (label: string) => void; onAdd: (label: string) => void; label: string }): JSX.Element {
-  const [adding, setAdding] = useState(labels.length === 0);
-  const [typed, setTyped] = useState('');
-  const commit = () => {
-    const next = typed.trim();
-    if (!next) return;
-    onAdd(next);
-    onChange(next);
-    setTyped('');
-    setAdding(false);
-  };
-  if (adding) {
-    return (
-      <Stack direction="row" gap={1} alignItems="flex-start">
-        <TextField
-          id={id}
-          size="small"
-          fullWidth
-          label={label}
-          value={typed}
-          placeholder="e.g. engineering"
-          helperText="A new label needs a visibility rule on this source, or its files are held back."
-          onChange={(e) => setTyped(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && commit()}
-        />
-        <Button size="small" variant="outlined" onClick={commit} disabled={!typed.trim()} sx={{ mt: 0.5, flexShrink: 0 }}>
-          Use label
-        </Button>
-        {labels.length > 0 && (
-          <Button size="small" variant="text" onClick={() => setAdding(false)} sx={{ mt: 0.5, flexShrink: 0 }}>
-            Cancel
-          </Button>
-        )}
-      </Stack>
-    );
-  }
-  return (
-    <TextField id={id} select size="small" fullWidth label={label} value={value} helperText="Members of the label’s role, with query access, can find these files." onChange={(e) => (e.target.value === NEW_LABEL ? setAdding(true) : onChange(e.target.value))}>
-      {labels.map((l) => (
-        <MenuItem key={l} value={l}>
-          {l}
-        </MenuItem>
-      ))}
-      <MenuItem value={NEW_LABEL}>Add a label…</MenuItem>
-    </TextField>
-  );
-}
-
 function UploadRow({
   entry,
-  labels,
+  orgHandle,
+  queryRoles,
+  roleNames,
   canRetry,
   onRetry,
   onReplace,
-  onRelabel,
+  onChangeVisibility,
   onRemove,
-  onAddLabel,
 }: {
   entry: UploadEntry;
-  labels: string[];
+  orgHandle: string;
+  queryRoles: string[];
+  roleNames: Record<string, string>;
   canRetry: boolean;
   onRetry: () => void;
   onReplace: () => void;
-  onRelabel: (label: string) => Promise<void>;
+  onChangeVisibility: (visibility: FileVisibility) => Promise<void>;
   onRemove: () => void;
-  onAddLabel: (label: string) => void;
 }): JSX.Element {
-  const [relabel, setRelabel] = useState<string | null>(null);
+  const [sharing, setSharing] = useState<FileVisibility | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = isUploadActive(entry);
   const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
-    if (relabel === null || relabel === entry.label) return setRelabel(null);
+    if (sharing === null) return;
     setSaving(true);
     setError(null);
     try {
-      await onRelabel(relabel);
-      setRelabel(null);
+      await onChangeVisibility(sharing);
+      setSharing(null);
     } catch (e) {
-      setError(engineMessage(e, "Couldn't change the label."));
+      setError(engineMessage(e, "Couldn't change who can see it."));
     } finally {
       setSaving(false);
     }
@@ -137,7 +93,7 @@ function UploadRow({
             {entry.name}
           </Typography>
           <Typography variant="caption" sx={mutedSx} noWrap>
-            {formatBytes(entry.size)} · {entry.label || 'no label'} · {formatDistanceToNow(entry.uploadedAt) || 'just now'}
+            {formatBytes(entry.size)} · {describeUploadAudience(entry, roleNames)} · {formatDistanceToNow(entry.uploadedAt) || 'just now'}
           </Typography>
         </Box>
         <UploadStatusChip entry={entry} />
@@ -158,8 +114,8 @@ function UploadRow({
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Change who can see it">
-                  <IconButton size="small" aria-label={`Change label of ${entry.name}`} onClick={() => setRelabel(entry.label)}>
-                    <Tag size={16} />
+                  <IconButton size="small" aria-label={`Change who can see ${entry.name}`} onClick={() => setSharing(entry.visibility ?? EVERYONE_VISIBILITY)}>
+                    <Users size={16} />
                   </IconButton>
                 </Tooltip>
               </>
@@ -172,7 +128,7 @@ function UploadRow({
           </Stack>
         )}
       </Box>
-      {(active || entry.detail || relabel !== null || error) && (
+      {(active || entry.detail || sharing !== null || error) && (
         <Box sx={uploadRowBodySx}>
           {entry.status === 'uploading' && <LinearProgress variant="determinate" value={entry.progress} aria-label={`${entry.name} upload`} sx={progressBarSx} />}
           {(entry.status === 'queued' || entry.status === 'indexing') && <LinearProgress variant="indeterminate" aria-label={`${entry.name} indexing`} sx={progressBarSx} />}
@@ -191,18 +147,18 @@ function UploadRow({
               {entry.detail}
             </Typography>
           )}
-          {relabel !== null && (
-            <Stack direction="row" gap={1} alignItems="flex-start" sx={{ mt: 1 }}>
-              <Box sx={{ flex: 1 }}>
-                <LabelSelect id={`relabel-${entry.recordId}`} labels={labels} value={relabel} onChange={setRelabel} onAdd={onAddLabel} label="Visible to" />
-              </Box>
-              <Button size="small" variant="contained" disabled={saving} onClick={() => void save()} sx={{ mt: 0.5 }}>
-                {saving ? 'Saving…' : 'Save'}
-              </Button>
-              <Button size="small" variant="text" disabled={saving} onClick={() => setRelabel(null)} sx={{ mt: 0.5 }}>
-                Cancel
-              </Button>
-            </Stack>
+          {sharing !== null && (
+            <Box sx={{ mt: 1.5 }}>
+              <FileVisibilityField id={`share-${entry.recordId}`} label={`Who can see ${entry.name}`} orgHandle={orgHandle} queryRoles={queryRoles} value={sharing} onChange={setSharing} />
+              <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.5 }}>
+                <Button size="small" variant="text" disabled={saving} onClick={() => setSharing(null)}>
+                  Cancel
+                </Button>
+                <Button size="small" variant="contained" disabled={saving || !!visibilityError(sharing)} onClick={() => void save()}>
+                  {saving ? 'Saving…' : 'Save'}
+                </Button>
+              </Stack>
+            </Box>
           )}
           {error && (
             <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
@@ -220,11 +176,11 @@ function UploadRow({
  * upload and index, and manage what is there. Uploads keep going after the
  * drawer closes; the Sources card shows the same progress.
  */
-export default function FilesDrawer({ engineId, source, open, onClose }: FilesDrawerProps): JSX.Element {
+export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, open, onClose }: FilesDrawerProps): JSX.Element {
   const entries = useSourceUploads(engineId, source.id);
-  const { labels, addLabel } = useSourceLabels(source.id);
+  const { everyone, roleNames } = useUploadAudience(orgHandle, queryRoles);
   const [staged, setStaged] = useState<StagedFileMeta[]>([]);
-  const [label, setLabel] = useState('');
+  const [visibility, setVisibility] = useState<FileVisibility>(EVERYONE_VISIBILITY);
   const [filter, setFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState<UploadFileStatus | 'all'>('all');
   const [removing, setRemoving] = useState<UploadEntry | null>(null);
@@ -236,9 +192,6 @@ export default function FilesDrawer({ engineId, source, open, onClose }: FilesDr
   useEffect(() => {
     if (open) refreshUploads(engineId, source.id);
   }, [open, engineId, source.id]);
-  useEffect(() => {
-    if (!label && labels.length) setLabel(labels[0]);
-  }, [labels, label]);
 
   const existingNames = useMemo(() => entries.map((e) => e.name), [entries]);
   const sum = stagedSummary(staged, existingNames);
@@ -253,8 +206,8 @@ export default function FilesDrawer({ engineId, source, open, onClose }: FilesDr
 
   const upload = () => {
     const files = toUploads(staged);
-    if (!files.length || !label) return;
-    startUploads(engineId, source.id, files, label);
+    if (!files.length || visibilityError(visibility)) return;
+    startUploads(engineId, source.id, files, visibility, visibilityTags(visibility, everyone));
     staged.forEach((m) => dropStagedFile(m.id));
     setStaged([]);
   };
@@ -263,7 +216,10 @@ export default function FilesDrawer({ engineId, source, open, onClose }: FilesDr
     const target = replaceTarget.current;
     const file = files[0];
     if (!target || !file) return;
-    startUploads(engineId, source.id, [{ content: file, name: target.name, size: file.size, contentType: contentTypeForFile(file.name, file.type) || target.contentType }], target.label);
+    const content = [{ content: file, name: target.name, size: file.size, contentType: contentTypeForFile(file.name, file.type) || target.contentType }];
+    // A new version keeps who could see the old one; "everyone" is re-read so newly created roles are included.
+    if (target.visibility) startUploads(engineId, source.id, content, target.visibility, visibilityTags(target.visibility, everyone));
+    else startUploads(engineId, source.id, content, undefined, target.audience, target.label);
     replaceTarget.current = null;
   };
 
@@ -332,7 +288,7 @@ export default function FilesDrawer({ engineId, source, open, onClose }: FilesDr
               }}
             />
             <Box sx={{ mt: 2 }}>
-              <LabelSelect id="upload-label" labels={labels} value={label} onChange={setLabel} onAdd={addLabel} label={`Who can see these ${sum.ready} file${sum.ready === 1 ? '' : 's'}`} />
+              <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
             </Box>
             <Stack direction="row" justifyContent="flex-end" gap={1.5} sx={{ mt: 2 }}>
               <Button
@@ -343,7 +299,7 @@ export default function FilesDrawer({ engineId, source, open, onClose }: FilesDr
                 }}>
                 Clear
               </Button>
-              <Button variant="contained" startIcon={<Upload size={16} />} disabled={sum.ready === 0 || !label} onClick={upload}>
+              <Button variant="contained" startIcon={<Upload size={16} />} disabled={sum.ready === 0 || !!visibilityError(visibility)} onClick={upload}>
                 Upload {sum.ready} file{sum.ready === 1 ? '' : 's'}
               </Button>
             </Stack>
@@ -384,16 +340,17 @@ export default function FilesDrawer({ engineId, source, open, onClose }: FilesDr
                   <UploadRow
                     key={entry.recordId}
                     entry={entry}
-                    labels={labels}
+                    orgHandle={orgHandle}
+                    queryRoles={queryRoles}
+                    roleNames={roleNames}
                     canRetry={entry.status === 'failed' && !entry.jobId}
                     onRetry={() => retryUpload(engineId, source.id, entry.recordId)}
                     onReplace={() => {
                       replaceTarget.current = entry;
                       replaceInput.current?.click();
                     }}
-                    onRelabel={(next) => relabelUpload(engineId, source.id, entry.recordId, next)}
+                    onChangeVisibility={(next) => changeUploadVisibility(engineId, source.id, entry.recordId, next, visibilityTags(next, everyone))}
                     onRemove={() => setRemoving(entry)}
-                    onAddLabel={addLabel}
                   />
                 ))
               )}

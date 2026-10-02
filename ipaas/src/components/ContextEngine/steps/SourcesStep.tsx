@@ -20,7 +20,7 @@ import { Box, Button, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen
 import { Check, CircleAlert, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { POPULAR_CONNECTORS, SOURCE_CONNECTORS } from '../../../constants/contextEngine';
-import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeAudience, summarizeSource } from '../../../utils/contextEngine';
+import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSourceVisibility, summarizeSource } from '../../../utils/contextEngine';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
 import { emptySourcesCardSx, marksRowSx, quickAddButtonSx, quickAddRowSx, sourceListSx, sourceRowSx, sourceRowTextSx, sourcesToolbarSx, stepHeadingSx, stepHintSx } from '../styles';
@@ -32,6 +32,8 @@ interface SourcesStepProps {
   onAdd: (source: ContextSourceConfig) => void;
   onUpdate: (index: number, source: ContextSourceConfig) => void;
   onRemove: (index: number) => void;
+  /** Role handle → display name, for each row's visibility line. */
+  roleNames?: Record<string, string>;
 }
 
 interface DrawerState {
@@ -41,7 +43,7 @@ interface DrawerState {
   start?: SourceDrawerStart;
 }
 
-function SourceRow({ source, onEdit, onRemove }: { source: ContextSourceConfig; onEdit: () => void; onRemove: () => void }): JSX.Element {
+function SourceRow({ source, roleNames, onEdit, onRemove }: { source: ContextSourceConfig; roleNames: Record<string, string>; onEdit: () => void; onRemove: () => void }): JSX.Element {
   const name = source.name.trim() || sourceTypeName(source.type);
   const reason = sourceIncompleteReason(source);
   return (
@@ -55,7 +57,7 @@ function SourceRow({ source, onEdit, onRemove }: { source: ContextSourceConfig; 
           {summarizeSource(source)}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
-          Visible to: {summarizeAudience(source.audience)}
+          Visible to: {summarizeSourceVisibility(source, roleNames)}
         </Typography>
       </Box>
       <Chip size="small" variant="outlined" label={sourceTypeName(source.type)} />
@@ -79,7 +81,7 @@ function SourceRow({ source, onEdit, onRemove }: { source: ContextSourceConfig; 
  * lists what has been added; browsing the catalog and filling a connector's
  * form happen in a drawer, so the page stays short however many connectors exist.
  */
-export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRemove }: SourcesStepProps): JSX.Element {
+export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRemove, roleNames = {} }: SourcesStepProps): JSX.Element {
   const [drawer, setDrawer] = useState<DrawerState>({ open: false, session: 0 });
   const openDrawer = (start?: SourceDrawerStart) => setDrawer((d) => ({ open: true, session: d.session + 1, start }));
   const closeDrawer = () => setDrawer((d) => ({ ...d, open: false }));
@@ -149,7 +151,7 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
           </Box>
           <Box sx={sourceListSx}>
             {sources.map((s, i) => (
-              <SourceRow key={`${s.type}-${i}`} source={s} onEdit={() => openDrawer({ config: s, index: i })} onRemove={() => onRemove(i)} />
+              <SourceRow key={`${s.type}-${i}`} source={s} roleNames={roleNames} onEdit={() => openDrawer({ config: s, index: i })} onRemove={() => onRemove(i)} />
             ))}
           </Box>
         </>

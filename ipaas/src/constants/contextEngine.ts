@@ -20,6 +20,7 @@ import type {
   ContextEngineStorage,
   ContextGraphState,
   ContextSourceConfig,
+  FileVisibility,
   LlmConfig,
   LlmProvider,
   McpClientId,
@@ -529,11 +530,11 @@ export const CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX = 'contextEngine:enrichment:';
 /** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
 export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';
 
-/** localStorage key of the visibility labels known for a source, until the engine reports a source's audience mapping. */
-export const CONTEXT_ENGINE_LABELS_KEY_PREFIX = 'contextEngine:labels:';
-
-/** localStorage key of a source's visibility rules as this browser last saved them, for the edit form. */
+/** localStorage key of a source's visibility rules as this browser last saved them, for the edit form and the upload rules check. */
 export const CONTEXT_ENGINE_RULES_KEY_PREFIX = 'contextEngine:rules:';
+
+/** The default for uploads: anyone who can query the engine can find the files. */
+export const EVERYONE_VISIBILITY: FileVisibility = { kind: 'everyone' };
 
 /** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
 export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];

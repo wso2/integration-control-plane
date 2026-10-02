@@ -26,13 +26,20 @@ import {
   deliveryIdentity,
   engineMessage,
   formatBytes,
-  labelsFromRules,
+  describeUploadAudience,
+  describeVisibility,
+  everyoneRoles,
+  sharingMismatches,
   stagedBlocker,
   stagedFileNote,
   stagedSummary,
   summarizeUploads,
+  uploadSourceRules,
   uploadStatusFromRecord,
-  withStagedLabel,
+  visibilityError,
+  visibilityTags,
+  visibilityWarnings,
+  withUploadRules,
   buildMcpClientConfig,
   evidenceLocationLabel,
   ownerGrantId,
@@ -164,7 +171,7 @@ describe('source validation', () => {
     expect(isSourceValid(withValues('website', { urls: 'https://a.com\nnot-a-url' }))).toBe(false);
     expect(isSourceValid(withValues('website', { urls: 'https://a.com' }))).toBe(true);
     expect(isSourceValid(upload())).toBe(true);
-    expect(isSourceValid(blankSource('upload'))).toBe(false); // no visibility rule yet
+    expect(isSourceValid(blankSource('upload'))).toBe(true); // uploads choose who can see them per upload; no rules to type
     expect(isSourceValid({ type: 'gone', name: 'x', values: {}, audience: [RULE] })).toBe(false);
   });
 
@@ -174,8 +181,11 @@ describe('source validation', () => {
     expect(sourceIncompleteReason(src)).toBe('Base URL invalid');
     expect(sourceIncompleteReason(withValues('confluence', { baseUrl: 'https://x.atlassian.net/wiki' }))).toBe('Space Key missing');
     expect(sourceIncompleteReason(upload())).toBe('');
-    expect(sourceIncompleteReason(blankSource('upload'))).toBe('Visibility missing');
-    expect(sourceIncompleteReason({ ...upload(), audience: [{ group: 'engineering', role: '' }] })).toBe('Visibility incomplete');
+    // Uploads need no rules; connectors still do.
+    expect(sourceIncompleteReason(blankSource('upload'))).toBe('');
+    const drive = withValues('gdrive', { folderId: 'abc', apiKey: 'k' });
+    expect(sourceIncompleteReason({ ...drive, audience: [] })).toBe('Visibility missing');
+    expect(sourceIncompleteReason({ ...drive, audience: [{ group: 'engineering', role: '' }] })).toBe('Visibility incomplete');
   });
 
   it('rejects empty and duplicate names', () => {
@@ -191,7 +201,7 @@ describe('source validation', () => {
     expect(sourcesStepBlocker([a])).toBeNull();
     expect(sourcesStepBlocker([a, upload()])).toBe('Give each source a unique name');
     expect(sourcesStepBlocker([a, withValues('github', {}, 'Platform docs')])).toBe('Complete “Platform docs” to continue');
-    expect(sourcesStepBlocker([a, { ...upload('Second'), audience: [] }])).toBe('Complete “Second” to continue');
+    expect(sourcesStepBlocker([a, { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Second'), audience: [] }])).toBe('Complete “Second” to continue');
     expect(isSourcesStepValid([a, upload('Second')])).toBe(true);
   });
 
@@ -705,15 +715,54 @@ describe('file uploads', () => {
     expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size, pdfs: 1 });
   });
 
-  it('lists labels from rules without blanks or repeats', () => {
-    expect(
-      labelsFromRules([
-        { group: ' engineering ', role: 'admin' },
-        { group: '', role: '' },
-        { group: 'engineering', role: 'developer' },
-        { group: 'support', role: 'developer' },
-      ]),
-    ).toEqual(['engineering', 'support']);
+  it('turns a file visibility choice into role tags and identity rules', () => {
+    const everyone = everyoneRoles(['admin', 'developer', 'viewer'], ['developer', 'project-admin']);
+    expect(everyone).toEqual(['admin', 'developer', 'viewer', 'project-admin']);
+    // Without org roles, the granted roles and the uploader's own groups stand in.
+    expect(everyoneRoles(undefined, ['developer'], ['admin', 'operators'])).toEqual(['developer', 'admin', 'operators']);
+    expect(visibilityTags({ kind: 'everyone' }, everyone)).toEqual(everyone);
+    expect(visibilityTags(undefined, everyone)).toEqual(everyone);
+    expect(visibilityTags({ kind: 'roles', roles: [' viewer ', 'viewer', 'admin'] }, everyone)).toEqual(['viewer', 'admin']);
+    expect(uploadSourceRules(['admin', 'viewer', 'admin'])).toEqual([
+      { group: 'admin', role: 'admin' },
+      { group: 'viewer', role: 'viewer' },
+    ]);
+    const sources = withUploadRules([upload('Files'), withValues('gdrive', { folderId: 'abc', apiKey: 'k' })], ['admin']);
+    expect(sources[0].audience).toEqual([{ group: 'admin', role: 'admin' }]);
+    expect(sources[1].audience).toEqual([RULE]);
+    expect(visibilityError({ kind: 'roles', roles: [] })).toBe('Choose at least one role');
+    expect(visibilityError({ kind: 'everyone' })).toBe('');
+  });
+
+  it('describes who can see uploaded files', () => {
+    const names = { admin: 'Admin', viewer: 'Viewer' };
+    expect(describeVisibility(undefined)).toBe('Everyone who can query');
+    expect(describeVisibility({ kind: 'roles', roles: ['admin', 'viewer'] }, names)).toBe('Admin, Viewer');
+    expect(describeUploadAudience({ label: 'eng' })).toBe('Label “eng”');
+    expect(describeUploadAudience({ visibility: { kind: 'roles', roles: ['viewer'] } }, names)).toBe('Viewer');
+  });
+
+  it('warns when shared roles cannot query or the uploader is left out', () => {
+    const everyone = ['admin', 'developer', 'viewer'];
+    const names = { viewer: 'Viewer', developer: 'Developer' };
+    expect(visibilityWarnings({ visibility: { kind: 'everyone' }, everyone, queryRoles: ['admin'], myGroups: ['admin', 'operators'] })).toEqual([]);
+    expect(visibilityWarnings({ visibility: { kind: 'roles', roles: ['viewer'] }, everyone, queryRoles: ['admin'], myGroups: ['admin', 'operators'], roleNames: names })).toEqual([
+      "Viewer can't query this engine, so it won't find these files until granted access.",
+      "You aren't in any of these roles, so these files won't show in your own answers.",
+    ]);
+    expect(visibilityWarnings({ visibility: { kind: 'roles', roles: ['viewer', 'developer'] }, everyone, queryRoles: ['admin'], roleNames: names })[0]).toBe("Viewer and Developer can't query this engine, so they won't find these files until granted access.");
+    // In the wizard's first step query access is not chosen yet, so only the uploader check applies.
+    expect(visibilityWarnings({ visibility: { kind: 'roles', roles: ['admin'] }, everyone, myGroups: ['admin'] })).toEqual([]);
+  });
+
+  it('finds where query access and visibility disagree across an engine', () => {
+    const everyone = ['admin', 'developer', 'viewer'];
+    const drive = { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Drive'), audience: [{ group: 'eng', role: 'viewer' }] };
+    const files = { ...upload('Files'), stagedVisibility: { kind: 'everyone' as const } };
+    // Uploads shared with everyone cover every role, so nobody gets empty answers.
+    expect(sharingMismatches([drive, files], ['developer'], everyone, ['admin'])).toEqual({ seeNothing: [], cannotQuery: ['viewer'], hiddenFromMe: ['Drive'] });
+    // With only the connector, Developer can query but sees nothing.
+    expect(sharingMismatches([drive], ['developer', 'viewer'], everyone, ['viewer'])).toEqual({ seeNothing: ['developer'], cannotQuery: [], hiddenFromMe: [] });
   });
 
   it('maps record status to a file status', () => {
@@ -722,7 +771,10 @@ describe('file uploads', () => {
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
     expect(uploadStatusFromRecord(record({ indexState: 'not_indexed' })).status).toBe('stored');
-    expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({ status: 'held', detail: 'Its label has no visibility rule, so nobody can see it.' });
+    expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
+      status: 'held',
+      detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
+    });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
     expect(summarizeUploads([])).toBe('No files yet');
   });
@@ -734,11 +786,11 @@ describe('file uploads', () => {
     expect(deliveryIdentity('a.md', '17')).toBe('4:a.md:17');
   });
 
-  it('blocks a File Upload source whose staged files lack a label or their bytes', () => {
-    const src: ContextSourceConfig = { ...upload('Files'), staged: [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedLabel: '' };
+  it('blocks a File Upload source whose staged files lack a role choice or their bytes', () => {
+    const src: ContextSourceConfig = { ...upload('Files'), staged: [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedVisibility: { kind: 'roles', roles: [] } };
     expect(stagedBlocker(src)).toBe('Choose who can see the files');
     expect(isSourceValid(src)).toBe(false);
-    const labelled = { ...src, stagedLabel: 'engineering' };
+    const labelled: ContextSourceConfig = { ...src, stagedVisibility: { kind: 'everyone' } };
     expect(stagedBlocker(labelled)).toBe('Re-add 1 file');
     expect(sourceIncompleteReason(labelled)).toBe('Re-add 1 file');
     putStagedFile('f1', new Blob(['# a']));
@@ -749,24 +801,15 @@ describe('file uploads', () => {
     expect(summarizeSource(upload())).toBe('Upload files after the engine is created');
   });
 
-  it('keeps the staged label to one a rule defines', () => {
-    const src = {
-      ...upload('Files'),
-      audience: [
-        { group: 'engineering', role: 'admin' },
-        { group: 'support', role: 'developer' },
-      ],
-    };
-    expect(withStagedLabel({ ...src, stagedLabel: 'support' }).stagedLabel).toBe('support');
-    expect(withStagedLabel({ ...src, stagedLabel: 'legal' }).stagedLabel).toBe('engineering');
-    expect(withStagedLabel({ ...src, audience: [], stagedLabel: 'x' }).stagedLabel).toBe('');
-  });
-
-  it('keeps staged file names in a restored draft', () => {
-    const form = { ...completeForm(), sources: [{ ...upload('Files'), staged: [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedLabel: 'engineering' }] };
+  it('keeps staged file names and their role choice in a restored draft', () => {
+    const staged = [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }];
+    const form = { ...completeForm(), sources: [{ ...upload('Files'), staged, stagedVisibility: { kind: 'roles' as const, roles: ['viewer'] } }] };
     const restored = fromDraft(JSON.stringify(toDraft(form, 'x')))!.form.sources[0];
-    expect(restored.staged).toEqual([{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }]);
-    expect(restored.stagedLabel).toBe('engineering');
+    expect(restored.staged).toEqual(staged);
+    expect(restored.stagedVisibility).toEqual({ kind: 'roles', roles: ['viewer'] });
+    // A draft saved with the old label falls back to everyone who can query.
+    const old = JSON.stringify({ v: 1, savedAt: 'x', form: { ...form, sources: [{ ...upload('Files'), staged, stagedLabel: 'eng' }] } });
+    expect(fromDraft(old)!.form.sources[0].stagedVisibility).toEqual({ kind: 'everyone' });
   });
 
   it('offers the upload step first on an engine that only has an upload source', () => {

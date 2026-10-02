@@ -19,11 +19,11 @@
 import { Alert, Box, Button, Chip, CircularProgress, Grid, Link, Stack, Typography } from '@wso2/oxygen-ui';
 import { Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
-import { useAddContextSource, useAskedFlag, useContextEngineProgress, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine } from '../../../hooks/useContextEngine';
+import { useAddContextSource, useAskedFlag, useContextEngineProgress, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
-import { CONTEXT_JOB_TERMINAL_STATES, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { CONTEXT_JOB_TERMINAL_STATES, EVERYONE_VISIBILITY, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, sourceAsConfig, summarizeEngineProgress } from '../../../utils/contextEngine';
+import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, sourceAsConfig, summarizeEngineProgress, visibilityTags, withUploadRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GraphStatusChip from '../GraphStatusChip';
@@ -122,10 +122,13 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
   const [editSource, setEditSource] = useState<ContextSource | null>(null);
   const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
+  const { everyone } = useUploadAudience(orgHandle, engine.queryRoles);
   const existingConfigs = engine.sources.map((s) => sourceAsConfig(s, rememberedSourceRules(s.id)));
 
-  const submitNewSource = (config: ContextSourceConfig) => {
+  const submitNewSource = (picked: ContextSourceConfig) => {
     setSourceNotice(null);
+    // A File Upload source maps every role to itself, so its files can be shared with roles directly.
+    const [config] = withUploadRules([picked], everyone);
     addSource.mutate(config, {
       onSuccess: (created) => {
         setAddOpen(false);
@@ -136,8 +139,9 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
           return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
         });
         staged.forEach((m) => dropStagedFile(m.id));
-        if (files.length && config.stagedLabel) {
-          startUploads(engine.id, created.id, files, config.stagedLabel);
+        if (files.length) {
+          const visibility = config.stagedVisibility ?? EVERYONE_VISIBILITY;
+          startUploads(engine.id, created.id, files, visibility, visibilityTags(visibility, everyone));
           openFiles(created);
         }
         if ((connectorFor(config.type)?.fields.length ?? 0) > 0) {
@@ -146,7 +150,7 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
       },
       onError: (e) => {
         const forbidden = e instanceof HttpError && e.status === 403;
-        setSourceNotice({ severity: 'error', forbidden, message: forbidden ? 'Adding a source needs the manage permission on this engine.' : engineMessage(e, "Couldn't add the source."), retry: () => submitNewSource(config) });
+        setSourceNotice({ severity: 'error', forbidden, message: forbidden ? 'Adding a source needs the manage permission on this engine.' : engineMessage(e, "Couldn't add the source."), retry: () => submitNewSource(picked) });
       },
     });
   };
@@ -331,9 +335,20 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
         </Grid>
       </Grid>
 
-      {filesSource && <FilesDrawer engineId={engine.id} source={filesSource} open={filesOpen} onClose={() => setFilesOpen(false)} />}
-      <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
-      {editSource && <EditSourceDrawer key={editSource.id} engineId={engine.id} orgHandle={orgHandle} source={editSource} otherNames={engine.sources.filter((s) => s.id !== editSource.id).map((s) => s.name)} open onClose={() => setEditSource(null)} />}
+      {filesSource && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
+      <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} queryRoles={engine.queryRoles} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
+      {editSource && (
+        <EditSourceDrawer
+          key={editSource.id}
+          engineId={engine.id}
+          orgHandle={orgHandle}
+          source={editSource}
+          otherNames={engine.sources.filter((s) => s.id !== editSource.id).map((s) => s.name)}
+          queryRoles={engine.queryRoles}
+          open
+          onClose={() => setEditSource(null)}
+        />
+      )}
     </>
   );
 }

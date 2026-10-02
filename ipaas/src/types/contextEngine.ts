@@ -175,9 +175,17 @@ export interface ContextSourceConfig {
   audience: AudienceRule[];
   /** File Upload only: files chosen in the wizard, uploaded right after the engine exists. The bytes live in {@link stagedFiles}, not here. */
   staged?: StagedFileMeta[];
-  /** File Upload only: the visibility label the staged files are uploaded under. */
-  stagedLabel?: string;
+  /** File Upload only: who can see the staged files; everyone who can query when unset. */
+  stagedVisibility?: FileVisibility;
 }
+
+/**
+ * Who can see uploaded files. `everyone` is anyone who can query the engine;
+ * `roles` narrows that to members of the chosen org roles. The UI sends the role
+ * handles as the files' audience tags and keeps the source's rules mapping each
+ * handle to itself, so there are no labels to invent.
+ */
+export type FileVisibility = { kind: 'everyone' } | { kind: 'roles'; roles: string[] };
 
 // ── Source progress ─────────────────────────────────────────────────────────
 
@@ -276,7 +284,12 @@ export interface UploadedFile {
   name: string;
   size: number;
   contentType: string;
-  label: string;
+  /** Who the file was shared with. Absent on files uploaded under a label before this choice existed. */
+  visibility?: FileVisibility;
+  /** The audience tags sent with the file: role handles, or the legacy label. */
+  audience: string[];
+  /** The label of a file uploaded before visibility was chosen by role. */
+  label?: string;
   version: string;
   uploadedAt: string;
   /** The engine job that applied, or will apply, the latest delivery; followed after a reload until it finishes. */
@@ -299,8 +312,8 @@ export interface IngestFileInput {
   recordId: string;
   content: Blob;
   contentType: string;
-  /** The source's audience label the file is visible under. */
-  label: string;
+  /** Audience tags the source's rules map to engine groups: here, org role handles. */
+  audience: string[];
   /** Numeric, growing: epoch milliseconds. */
   version: string;
   onProgress?: (fraction: number) => void;
@@ -312,7 +325,8 @@ export interface RecordEventInput {
   sourceId: string;
   recordId: string;
   operation: 'delete' | 'acl_changed';
-  label: string;
+  /** Audience tags; a delete ignores them, a visibility change replaces them. */
+  audience: string[];
   version: string;
 }
 

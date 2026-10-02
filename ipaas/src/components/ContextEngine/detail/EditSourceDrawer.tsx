@@ -22,7 +22,7 @@ import { useState, type JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { rememberedSourceRules, rememberSourceRules } from '../../../hooks/contextUploads';
 import { useUpdateContextSource } from '../../../hooks/useContextEngine';
-import { audienceError, engineMessage, sourceNameError, sourceTypeName } from '../../../utils/contextEngine';
+import { audienceError, engineMessage, needsAudienceRules, sourceNameError, sourceTypeName } from '../../../utils/contextEngine';
 import { HttpError } from '../../../types/http';
 import AudienceRulesEditor from '../AudienceRulesEditor';
 import OwnerAccessButton from './OwnerAccessButton';
@@ -36,31 +36,35 @@ interface EditSourceDrawerProps {
   source: ContextSource;
   /** Names of the engine's other sources, for the uniqueness check. */
   otherNames: string[];
+  /** Roles granted query access, to flag rules whose role cannot query. */
+  queryRoles: string[];
   open: boolean;
   onClose: () => void;
 }
 
 /**
- * Rename a registered source or replace its visibility rules. The engine keeps
- * rules but does not return them, so the form starts from what this browser
- * last saved; saving replaces the whole set.
+ * Rename a registered source or replace a connector's visibility rules. The
+ * engine keeps rules but does not return them, so the form starts from what this
+ * browser last saved; saving replaces the whole set. A File Upload source has no
+ * rules to edit: each file's visibility is chosen in the Files drawer.
  */
-export default function EditSourceDrawer({ engineId, orgHandle, source, otherNames, open, onClose }: EditSourceDrawerProps): JSX.Element {
+export default function EditSourceDrawer({ engineId, orgHandle, source, otherNames, queryRoles, open, onClose }: EditSourceDrawerProps): JSX.Element {
+  const withRules = needsAudienceRules(source);
   const remembered = rememberedSourceRules(source.id);
   const [name, setName] = useState(source.name);
   const [rules, setRules] = useState<AudienceRule[]>(remembered.length ? remembered : [{ group: '', role: '' }]);
   const update = useUpdateContextSource(engineId);
   const nameError = sourceNameError(name, otherNames);
-  const rulesError = audienceError(rules);
+  const rulesError = withRules ? audienceError(rules) : '';
   const canSave = nameError === '' && rulesError === '' && !update.isPending;
   const forbidden = update.error instanceof HttpError && update.error.status === 403;
 
   const save = () => {
     update.mutate(
-      { sourceId: source.id, name: name.trim(), audience: rules },
+      { sourceId: source.id, name: name.trim(), ...(withRules ? { audience: rules } : {}) },
       {
         onSuccess: () => {
-          rememberSourceRules(source.id, rules);
+          if (withRules) rememberSourceRules(source.id, rules);
           onClose();
         },
       },
@@ -105,13 +109,25 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
           />
         </Stack>
 
-        {remembered.length === 0 && (
-          <Alert severity="info" variant="outlined">
-            This browser has no record of the source&apos;s current rules, and the engine does not report them. Saving replaces all of its rules with the ones below.
-          </Alert>
+        {withRules ? (
+          <>
+            {remembered.length === 0 && (
+              <Alert severity="info" variant="outlined">
+                This browser has no record of the source&apos;s current rules, and the engine does not report them. Saving replaces all of its rules with the ones below.
+              </Alert>
+            )}
+            <AudienceRulesEditor orgHandle={orgHandle} connectorName={sourceTypeName(source.type)} rules={rules} queryRoles={queryRoles} onChange={setRules} />
+          </>
+        ) : (
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Who can see uploaded files
+            </Typography>
+            <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5, lineHeight: 1.5 }}>
+              Each file is shared when it is uploaded: with everyone who can query this engine, or with some roles. Change it per file from the Files drawer.
+            </Typography>
+          </Box>
         )}
-
-        <AudienceRulesEditor orgHandle={orgHandle} variant={source.type === 'upload' ? 'labels' : 'groups'} connectorName={sourceTypeName(source.type)} rules={rules} onChange={setRules} />
 
         {update.isError && (
           <Alert severity="error" variant="outlined" action={forbidden ? <OwnerAccessButton engineId={engineId} onGranted={save} /> : undefined}>

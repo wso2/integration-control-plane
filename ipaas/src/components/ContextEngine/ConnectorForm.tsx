@@ -19,10 +19,10 @@
 import { Alert, Box, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
-import { sourceFieldError, sourceNameError, withStagedLabel } from '../../utils/contextEngine';
+import { sourceFieldError, sourceNameError } from '../../utils/contextEngine';
 import SecretField from '../RagIngestion/SecretField';
 import AudienceRulesEditor from './AudienceRulesEditor';
-import { StagedFilesSection, StagedLabelField } from './files/StagedFilesSection';
+import { StagedFilesSection, StagedVisibilityField } from './files/StagedFilesSection';
 import SourceMark from './SourceMark';
 import { connectorHeaderSx, fieldStackSx } from './styles';
 import type { ContextSourceConfig, SourceConnector, SourceFieldDef } from '../../types/contextEngine';
@@ -36,6 +36,8 @@ interface ConnectorFormProps {
   onChange: (draft: ContextSourceConfig) => void;
   /** Shown as a "Change source" link when adding; absent when editing an existing source. */
   onChangeSource?: () => void;
+  /** Roles granted query access, for visibility warnings. Set on a running engine; absent in the wizard, where access is chosen in a later step. */
+  queryRoles?: string[];
 }
 
 function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; onChange: (value: string) => void }): JSX.Element {
@@ -62,10 +64,10 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
 }
 
 /** The configuration form for one connector, rendered from its field schema. */
-export default function ConnectorForm({ orgHandle, connector, draft, otherNames, onChange, onChangeSource }: ConnectorFormProps): JSX.Element {
+export default function ConnectorForm({ orgHandle, connector, draft, otherNames, onChange, onChangeSource, queryRoles }: ConnectorFormProps): JSX.Element {
   const nameError = sourceNameError(draft.name, otherNames);
   const upload = connector.id === 'upload';
-  const change = (next: ContextSourceConfig) => onChange(upload ? withStagedLabel(next) : next);
+  const change = onChange;
   const setValue = (key: string, value: string) => change({ ...draft, values: { ...draft.values, [key]: value } });
 
   return (
@@ -103,7 +105,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
           <Field key={def.key} def={def} value={draft.values[def.key] ?? ''} onChange={(v) => setValue(def.key, v)} />
         ))}
         {upload ? (
-          <StagedFilesSection draft={draft} onChange={change} />
+          <StagedFilesSection draft={draft} onChange={change} onRunningEngine={queryRoles !== undefined} />
         ) : (
           connector.fields.length === 0 && (
             <Alert severity="info" variant="outlined">
@@ -113,11 +115,12 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
         )}
       </Stack>
 
-      <AudienceRulesEditor orgHandle={orgHandle} variant={upload ? 'labels' : 'groups'} connectorName={connector.name} rules={draft.audience ?? []} onChange={(audience) => change({ ...draft, audience })} />
-      {upload && (
+      {upload ? (
         <Box sx={{ mt: 2.5 }}>
-          <StagedLabelField draft={draft} onChange={change} />
+          <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} />
         </Box>
+      ) : (
+        <AudienceRulesEditor orgHandle={orgHandle} connectorName={connector.name} rules={draft.audience ?? []} queryRoles={queryRoles} onChange={(audience) => change({ ...draft, audience })} />
       )}
     </>
   );

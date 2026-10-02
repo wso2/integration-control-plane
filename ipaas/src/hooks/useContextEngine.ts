@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   addContextSource,
@@ -38,7 +38,8 @@ import {
 import { IS_WIP } from '../features';
 import { getAccessToken } from '../auth/tokenManager';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, CONTEXT_OWNER_ACTIONS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS } from '../constants/contextEngine';
-import { fromDraft, isEngineProgressActive, ownerGrantId, resolveGraphStatus, toDraft } from '../utils/contextEngine';
+import { everyoneRoles, fromDraft, isEngineProgressActive, ownerGrantId, resolveGraphStatus, toDraft } from '../utils/contextEngine';
+import { useRoles } from './useAuth';
 import { HttpError } from '../types/http';
 import type { ContextEngineExposure, ContextEngineForm, ContextGraphStatus, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextSourceInput } from '../types/contextEngine';
 
@@ -215,6 +216,30 @@ export function useContextPrincipal() {
     retry: false,
     staleTime: 60_000,
   });
+}
+
+/**
+ * What choosing who can see uploaded files needs: the org roles to pick from and
+ * their names, the caller's groups for the "you won't see these" check, and the
+ * role handles "everyone who can query" stands for. `queryRoles` are the roles
+ * granted query access, chosen or already granted.
+ */
+export function useUploadAudience(orgHandle: string, queryRoles: string[]) {
+  const roles = useRoles(orgHandle);
+  const principal = useContextPrincipal();
+  const myGroups = useMemo(() => principal.data?.groups ?? [], [principal.data]);
+  const roleKey = queryRoles.join('\u0000');
+  const everyone = useMemo(
+    () =>
+      everyoneRoles(
+        roles.data?.map((r) => r.roleId),
+        roleKey ? roleKey.split('\u0000') : [],
+        myGroups,
+      ),
+    [roles.data, roleKey, myGroups],
+  );
+  const roleNames = useMemo(() => Object.fromEntries((roles.data ?? []).map((r) => [r.roleId, r.roleName])), [roles.data]);
+  return { roles: roles.data ?? [], rolesLoading: roles.isLoading, rolesFailed: roles.isError, roleNames, myGroups, everyone };
 }
 
 // ── Enrichment status (no engine route reports it yet) ──

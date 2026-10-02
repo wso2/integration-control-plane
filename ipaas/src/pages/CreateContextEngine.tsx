@@ -21,8 +21,9 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine } from '../hooks/useContextEngine';
-import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput } from '../utils/contextEngine';
+import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
+import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withUploadRules } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -73,6 +74,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const create = useCreateContextEngine();
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
+  // The roles "everyone who can query" stands for when files are shared, and the creator's groups for the review's checks.
+  const { everyone, myGroups } = useUploadAudience(scope.org, form.roles);
   const base = contextEnginesUrl(scope.org);
   const dirty = isFormDirty(form);
 
@@ -107,23 +110,26 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const submit = () => {
     if (!canCreate || create.isPending) return;
     setError(null);
-    create.mutate(toCreateInput(form), {
+    // File Upload sources map every role to itself, so their files can be shared with roles directly.
+    const withRules = withUploadRules(form.sources, everyone);
+    create.mutate(toCreateInput({ ...form, sources: withRules }), {
       onSuccess: ({ id, sources, warnings }) => {
         draft.clear();
         const uploads: SetupUploadSource[] = [];
-        for (const source of form.sources) {
+        for (const source of withRules) {
           const sourceId = sources[source.name.trim()];
           if (!sourceId) continue;
           rememberSourceRules(sourceId, source.audience ?? []);
           const staged = source.staged ?? [];
-          if (source.type !== 'upload' || staged.length === 0 || !source.stagedLabel) continue;
+          if (source.type !== 'upload' || staged.length === 0) continue;
           const files = staged.flatMap((m) => {
             const content = getStagedFile(m.id);
             return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
           });
           staged.forEach((m) => dropStagedFile(m.id));
           if (files.length === 0) continue;
-          startUploads(id, sourceId, files, source.stagedLabel);
+          const visibility = source.stagedVisibility ?? EVERYONE_VISIBILITY;
+          startUploads(id, sourceId, files, visibility, visibilityTags(visibility, everyone));
           uploads.push({ sourceId, name: source.name.trim() });
         }
         if (uploads.length === 0) {
@@ -188,6 +194,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 onAdd={(source) => dispatch({ type: 'addSource', source })}
                 onUpdate={(index, source) => dispatch({ type: 'updateSource', index, source })}
                 onRemove={(index) => dispatch({ type: 'removeSource', index })}
+                roleNames={roleNames}
               />
             )}
             {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />}
@@ -203,7 +210,16 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             )}
             {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
             {activeStep === 4 && (
-              <ReviewStep form={form} roleNames={roleNames} draftSavedAt={draft.savedAt} onNameChange={(value) => dispatch({ type: 'name', value })} onDescriptionChange={(value) => dispatch({ type: 'description', value })} onEdit={setActiveStep} />
+              <ReviewStep
+                form={form}
+                roleNames={roleNames}
+                everyone={everyone}
+                myGroups={myGroups}
+                draftSavedAt={draft.savedAt}
+                onNameChange={(value) => dispatch({ type: 'name', value })}
+                onDescriptionChange={(value) => dispatch({ type: 'description', value })}
+                onEdit={setActiveStep}
+              />
             )}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>

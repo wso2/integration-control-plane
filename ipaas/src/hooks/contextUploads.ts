@@ -25,14 +25,19 @@
  * and the Files drawer there shows the same rows. Files this browser uploaded are
  * remembered in localStorage per source, because the engine has no route that
  * lists a source's records yet; their statuses are re-read from the engine.
+ *
+ * Files are shared with roles directly: each is tagged with role handles, and
+ * the source's rules map every handle to itself. Before sending, the rules this
+ * browser last saved are checked for the tags, and the source is updated when
+ * one is missing, because the engine holds back a file with an unmapped tag.
  */
 
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
-import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent } from '#api/contextEngine';
-import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_LABELS_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
-import { engineMessage, labelsFromRules, uploadStatusFromRecord } from '../utils/contextEngine';
+import { useEffect, useSyncExternalStore } from 'react';
+import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent, updateContextSource } from '#api/contextEngine';
+import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
+import { engineMessage, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
-import type { AudienceRule, UploadedFile, UploadEntry } from '../types/contextEngine';
+import type { AudienceRule, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
 
 export interface FileToUpload {
   content: Blob;
@@ -53,7 +58,6 @@ const queues = new Map<string, (() => Promise<void>)[]>();
 
 const entryKey = (sourceId: string, recordId: string): string => `${sourceId}\u0000${recordId}`;
 const filesKey = (sourceId: string): string => `${CONTEXT_ENGINE_FILES_KEY_PREFIX}${sourceId}`;
-const labelsKey = (sourceId: string): string => `${CONTEXT_ENGINE_LABELS_KEY_PREFIX}${sourceId}`;
 const rulesKey = (sourceId: string): string => `${CONTEXT_ENGINE_RULES_KEY_PREFIX}${sourceId}`;
 
 function readJson<T>(key: string, fallback: T): T {
@@ -84,7 +88,7 @@ function entriesOf(sourceId: string): UploadEntry[] {
 function persist(sourceId: string): void {
   const remembered: UploadedFile[] = entriesOf(sourceId)
     .filter((e) => e.status !== 'failed' || e.jobId)
-    .map(({ recordId, name, size, contentType, label, version, uploadedAt, jobId }) => ({ recordId, name, size, contentType, label, version, uploadedAt, jobId }));
+    .map(({ recordId, name, size, contentType, visibility, audience, label, version, uploadedAt, jobId }) => ({ recordId, name, size, contentType, visibility, audience, label, version, uploadedAt, jobId }));
   writeJson(filesKey(sourceId), remembered);
 }
 
@@ -112,7 +116,8 @@ function clearTimer(key: string): void {
 function ensureLoaded(engineId: string, sourceId: string): void {
   if (loadedSources.has(sourceId)) return;
   loadedSources.add(sourceId);
-  const remembered = readJson<UploadedFile[]>(filesKey(sourceId), []);
+  // Files remembered before visibility was chosen by role carry only their label.
+  const remembered = readJson<UploadedFile[]>(filesKey(sourceId), []).map((f) => ({ ...f, audience: Array.isArray(f.audience) ? f.audience : f.label ? [f.label] : [] }));
   if (remembered.length === 0) return;
   const restored: UploadEntry[] = remembered.map((f) => ({ ...f, status: 'indexing', progress: 100 }));
   setEntries(sourceId, [...restored, ...entriesOf(sourceId).filter((e) => !remembered.some((f) => f.recordId === e.recordId))]);
@@ -201,7 +206,39 @@ function pump(engineId: string, sourceId: string): void {
   }
 }
 
-function enqueue(engineId: string, sourceId: string, file: FileToUpload, label: string, version: string): void {
+// ── Source rules for the tags ───────────────────────────────────────────────
+
+/** One check at a time per source, so concurrent uploads update the rules once. */
+const ruleChecks = new Map<string, Promise<void>>();
+
+/**
+ * Make sure the source maps every tag to itself before a file is sent with them.
+ * Rules this browser saved are checked first; a missing tag updates the source,
+ * keeping the other saved rules. Someone without manage rights cannot update it,
+ * and the file is sent anyway: the engine then holds it back and its row says why.
+ */
+function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
+  const previous = ruleChecks.get(sourceId) ?? Promise.resolve();
+  const next = previous.then(async () => {
+    const saved = rememberedSourceRules(sourceId);
+    const missing = tags.filter((t) => !saved.some((r) => r.group === t && r.role === t));
+    if (missing.length === 0) return;
+    const rules = [...saved.filter((r) => !missing.includes(r.group)), ...uploadSourceRules(missing)];
+    try {
+      await updateContextSource({ sourceId, audience: rules });
+      rememberSourceRules(sourceId, rules);
+    } catch {
+      // Uploading needs no manage rights; the file's row explains a hold-back.
+    }
+  });
+  ruleChecks.set(
+    sourceId,
+    next.catch(() => undefined),
+  );
+  return next;
+}
+
+function enqueue(engineId: string, sourceId: string, file: FileToUpload, audience: string[], version: string): void {
   const recordId = file.name;
   const key = entryKey(sourceId, recordId);
   pendingBytes.set(key, file);
@@ -210,7 +247,9 @@ function enqueue(engineId: string, sourceId: string, file: FileToUpload, label: 
   queue.push(async () => {
     patchEntry(sourceId, recordId, { status: 'uploading', progress: 0, detail: undefined, forbidden: false });
     try {
-      const handle = await ingestContextFile({ engineId, sourceId, recordId, content: file.content, contentType: file.contentType, label, version, onProgress: (f) => patchEntry(sourceId, recordId, { progress: Math.round(f * 100) }) });
+      // A file still under its old label keeps the source's label rule; role tags must map to themselves.
+      if (entriesOf(sourceId).find((e) => e.recordId === recordId)?.visibility) await ensureSourceRules(sourceId, audience);
+      const handle = await ingestContextFile({ engineId, sourceId, recordId, content: file.content, contentType: file.contentType, audience, version, onProgress: (f) => patchEntry(sourceId, recordId, { progress: Math.round(f * 100) }) });
       patchEntry(sourceId, recordId, { status: 'queued', progress: 100, jobId: handle.jobId });
       persist(sourceId);
       await watchJob(engineId, sourceId, recordId, handle.jobId);
@@ -223,18 +262,19 @@ function enqueue(engineId: string, sourceId: string, file: FileToUpload, label: 
 }
 
 /**
- * Upload files to a source under one visibility label. Each file is one
- * request; a few run at once. A file whose name is already in the source
- * becomes its new version.
+ * Upload files to a source, shared with one choice of roles. `audience` is that
+ * choice as role handles (see `visibilityTags`). Each file is one request; a few
+ * run at once. A file whose name is already in the source becomes its new version.
+ * `visibility` is undefined only when replacing a file kept under its old label.
  */
-export function startUploads(engineId: string, sourceId: string, files: FileToUpload[], label: string): void {
+export function startUploads(engineId: string, sourceId: string, files: FileToUpload[], visibility: FileVisibility | undefined, audience: string[], label?: string): void {
   ensureLoaded(engineId, sourceId);
   const version = String(Date.now());
   const uploadedAt = new Date(Number(version)).toISOString();
-  const fresh: UploadEntry[] = files.map((f) => ({ recordId: f.name, name: f.name, size: f.size, contentType: f.contentType, label, version, uploadedAt, status: 'uploading', progress: 0 }));
+  const fresh: UploadEntry[] = files.map((f) => ({ recordId: f.name, name: f.name, size: f.size, contentType: f.contentType, visibility, audience, ...(visibility ? {} : { label }), version, uploadedAt, status: 'uploading', progress: 0 }));
   const names = new Set(fresh.map((f) => f.recordId));
   setEntries(sourceId, [...fresh, ...entriesOf(sourceId).filter((e) => !names.has(e.recordId))]);
-  files.forEach((f) => enqueue(engineId, sourceId, f, label, version));
+  files.forEach((f) => enqueue(engineId, sourceId, f, audience, version));
 }
 
 /** Send a failed upload again, with a new version so the engine treats it as fresh. */
@@ -244,7 +284,7 @@ export function retryUpload(engineId: string, sourceId: string, recordId: string
   if (!file || !entry) return;
   const version = String(Date.now());
   patchEntry(sourceId, recordId, { version, uploadedAt: new Date(Number(version)).toISOString() });
-  enqueue(engineId, sourceId, file, entry.label, version);
+  enqueue(engineId, sourceId, file, entry.audience, version);
 }
 
 /** Retry every upload the engine refused for lack of access, e.g. after the owner grant was added. */
@@ -268,7 +308,7 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
     persist(sourceId);
     return;
   }
-  await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'delete', label: entry?.label ?? '', version: String(Date.now()) });
+  await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'delete', audience: entry?.audience ?? [], version: String(Date.now()) });
   clearTimer(entryKey(sourceId, recordId));
   setEntries(
     sourceId,
@@ -277,10 +317,11 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
   persist(sourceId);
 }
 
-/** Move a record to another label; a held-back record becomes visible once its new label has a rule. */
-export async function relabelUpload(engineId: string, sourceId: string, recordId: string, label: string): Promise<void> {
-  const handle = await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'acl_changed', label, version: String(Date.now()) });
-  patchEntry(sourceId, recordId, { label, status: 'queued', detail: undefined, jobId: handle.jobId });
+/** Share a file with other roles. A held-back file becomes visible once the source maps its new roles, which this checks first. */
+export async function changeUploadVisibility(engineId: string, sourceId: string, recordId: string, visibility: FileVisibility, audience: string[]): Promise<void> {
+  await ensureSourceRules(sourceId, audience);
+  const handle = await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'acl_changed', audience, version: String(Date.now()) });
+  patchEntry(sourceId, recordId, { visibility, audience, label: undefined, status: 'queued', detail: undefined, jobId: handle.jobId });
   persist(sourceId);
   timers.set(
     entryKey(sourceId, recordId),
@@ -314,53 +355,17 @@ export function useSourceUploads(engineId: string, sourceId: string): UploadEntr
   return entries;
 }
 
-// ── Labels ──────────────────────────────────────────────────────────────────
-// The engine does not report a source's audience mapping yet, so the labels the
-// wizard defined are kept per browser, and the drawer lets the user add one.
-
-const labelListeners = new Set<() => void>();
-const labelCache = new Map<string, string[]>();
-
-function labelsOf(sourceId: string): string[] {
-  let cached = labelCache.get(sourceId);
-  if (!cached) {
-    cached = readJson<string[]>(labelsKey(sourceId), []);
-    labelCache.set(sourceId, cached);
-  }
-  return cached;
-}
-
-export function rememberSourceLabels(sourceId: string, labels: string[]): void {
-  const merged = [...labelsOf(sourceId), ...labels].filter((l, i, all) => l.trim() !== '' && all.indexOf(l) === i);
-  labelCache.set(sourceId, merged);
-  writeJson(labelsKey(sourceId), merged);
-  labelListeners.forEach((l) => l());
-}
-
-/** Labels known for a source, and a way to add one the user typed. */
-export function useSourceLabels(sourceId: string): { labels: string[]; addLabel: (label: string) => void } {
-  const labels = useSyncExternalStore(
-    (l) => {
-      labelListeners.add(l);
-      return () => labelListeners.delete(l);
-    },
-    () => labelsOf(sourceId),
-    () => EMPTY_LABELS,
-  );
-  const addLabel = useCallback((label: string) => rememberSourceLabels(sourceId, [label]), [sourceId]);
-  return { labels, addLabel };
-}
-
-const EMPTY_LABELS: string[] = [];
+// ── Rules ───────────────────────────────────────────────────────────────────
+// The engine keeps a source's rules but does not return them, so the rules this
+// browser last saved are kept for the edit form and the upload rules check.
 
 /** A source's rules as this browser last saved them; empty when it never did. The engine does not return them. */
 export function rememberedSourceRules(sourceId: string): AudienceRule[] {
   return readJson<AudienceRule[]>(rulesKey(sourceId), []).filter((r) => typeof r?.group === 'string' && typeof r?.role === 'string');
 }
 
-/** Keep a source's rules after saving them to the engine, and the labels they define. */
+/** Keep a source's rules after saving them to the engine. */
 export function rememberSourceRules(sourceId: string, rules: AudienceRule[]): void {
   const complete = rules.filter((r) => r.group.trim() !== '' && r.role.trim() !== '').map((r) => ({ group: r.group.trim(), role: r.role.trim() }));
   writeJson(rulesKey(sourceId), complete);
-  rememberSourceLabels(sourceId, labelsFromRules(complete));
 }
