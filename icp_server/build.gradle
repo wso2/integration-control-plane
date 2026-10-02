@@ -212,10 +212,11 @@ task initH2Database {
         logger.lifecycle("Using init script: ${h2InitScript.absolutePath}")
         logger.lifecycle("Database file: ${h2DbFile.absolutePath}")
         
-        // Execute H2 initialization using Ant SQL task
+        // Execute H2 initialization using Ant SQL task. TIME ZONE=UTC makes the seed rows'
+        // CURRENT_TIMESTAMP defaults UTC, as the server stores them, not the build host's zone.
         ant.sql(
             driver: 'org.h2.Driver',
-            url: "jdbc:h2:file:${h2DbFile.absolutePath};MODE=MySQL;DB_CLOSE_DELAY=-1",
+            url: "jdbc:h2:file:${h2DbFile.absolutePath};MODE=MySQL;DB_CLOSE_DELAY=-1;TIME ZONE=UTC",
             userid: 'icp_user',
             password: 'icp_password',
             src: h2InitScript.absolutePath,
@@ -252,7 +253,7 @@ task initH2CredentialsDatabase {
         // Execute H2 initialization using Ant SQL task
         ant.sql(
             driver: 'org.h2.Driver',
-            url: "jdbc:h2:file:${credentialsDbFile.absolutePath};MODE=MySQL;DB_CLOSE_DELAY=-1",
+            url: "jdbc:h2:file:${credentialsDbFile.absolutePath};MODE=MySQL;DB_CLOSE_DELAY=-1;TIME ZONE=UTC",
             userid: 'icp_user',
             password: 'icp_password',
             src: credentialsInitScript.absolutePath,
@@ -292,7 +293,7 @@ def loadH2(dbName, scripts) {
     scripts.each { script ->
         ant.sql(
             driver: 'org.h2.Driver',
-            url: "jdbc:h2:file:${dbFile.absolutePath};MODE=MySQL",
+            url: "jdbc:h2:file:${dbFile.absolutePath};MODE=MySQL;TIME ZONE=UTC",
             userid: 'icp_user', password: 'icp_password',
             src: file(script).absolutePath,
             classpath: buildscript.configurations.classpath.asPath,
