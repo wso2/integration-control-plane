@@ -13,6 +13,7 @@
 // KIND, either express or implied.  See the License for the
 // specific language governing permissions and limitations
 // under the License.
+import ballerina/jballerina.java;
 import ballerina/log;
 import ballerina/sql;
 import ballerinax/h2.driver as _;
@@ -34,12 +35,35 @@ public enum DatabaseType {
     ORACLE = "oracle"
 }
 
+// Timestamp columns are naive (TIMESTAMP / DATETIME2, no zone) and hold UTC wall-clock.
+// Values ICP computes itself are written as explicit UTC, but column defaults and the
+// CURRENT_TIMESTAMP in many queries are evaluated in the session time zone. The
+// PostgreSQL and Oracle drivers set that zone from the JVM default zone, and the embedded
+// H2 uses the JVM zone directly, so on a host outside UTC those rows were stored in local
+// time next to UTC ones. Pin the JVM default zone to UTC before any connection is opened,
+// so every session evaluates CURRENT_TIMESTAMP in UTC regardless of the host's zone.
+isolated function pinJvmDefaultTimeZoneToUtc() {
+    setDefaultTimeZone(getTimeZone(java:fromString("UTC")));
+}
+
+isolated function getTimeZone(handle id) returns handle = @java:Method {
+    name: "getTimeZone",
+    'class: "java.util.TimeZone",
+    paramTypes: ["java.lang.String"]
+} external;
+
+isolated function setDefaultTimeZone(handle zone) = @java:Method {
+    name: "setDefault",
+    'class: "java.util.TimeZone"
+} external;
+
 public client class DatabaseConnectionManager {
     private final sql:Client dbClient;
     private final string dbType;
 
     public function init(string dbType, string dbHost, int dbPort, string dbName, string dbUser, string dbPassword, boolean useTLS = false) returns error? {
         self.dbType = dbType;
+        pinJvmDefaultTimeZoneToUtc();
         sql:ConnectionPool pool = {
             maxOpenConnections: maxOpenConnections,
             minIdleConnections: minIdleConnections,

@@ -76,9 +76,20 @@ export interface DateTimeFormatOptions {
 
 type DateInput = string | number | Date | undefined | null;
 
-function parse(value: DateInput): Date | null {
+// Database timestamps come back without a zone, e.g. "2026-09-30 10:50:07.088562" (the
+// fraction varies by database). The server stores them in UTC, but `new Date` would read
+// that form as browser-local time (and Safari rejects it), so read it as UTC explicitly.
+const NAIVE_TIMESTAMP = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)(?:\.(\d+))?$/;
+
+export function parseDateTime(value: DateInput): Date | null {
   if (value === undefined || value === null || value === '') return null;
-  const d = value instanceof Date ? value : new Date(value);
+  let d: Date;
+  if (value instanceof Date) {
+    d = value;
+  } else {
+    const naive = typeof value === 'string' ? NAIVE_TIMESTAMP.exec(value.trim()) : null;
+    d = naive ? new Date(`${naive[1]}T${naive[2]}${naive[3] ? `.${naive[3].slice(0, 3).padEnd(3, '0')}` : ''}Z`) : new Date(value);
+  }
   return isNaN(d.getTime()) ? null : d;
 }
 
@@ -107,32 +118,32 @@ function clock(d: Date, p: Record<string, string>, opts: DateTimeFormatOptions):
 }
 
 export function formatDateTime(value: DateInput, opts: DateTimeFormatOptions = {}): string {
-  const d = parse(value);
+  const d = parseDateTime(value);
   if (!d) return value === undefined || value === null || value === '' ? '—' : String(value);
   const p = parts(d, opts.zone ?? current);
   return `${p.year}-${p.month}-${p.day} ${clock(d, p, opts)}`;
 }
 
 export function formatDate(value: DateInput, zone: TimeZonePreference = current): string {
-  const d = parse(value);
+  const d = parseDateTime(value);
   if (!d) return '—';
   const p = parts(d, zone);
   return `${p.year}-${p.month}-${p.day}`;
 }
 
 export function formatClock(value: DateInput, opts: DateTimeFormatOptions = {}): string {
-  const d = parse(value);
+  const d = parseDateTime(value);
   if (!d) return '—';
   return clock(d, parts(d, opts.zone ?? current), opts);
 }
 
 export function toIsoUtc(value: DateInput): string {
-  const d = parse(value);
+  const d = parseDateTime(value);
   return d ? d.toISOString() : '—';
 }
 
 export function formatDistanceToNow(dateStr: string | number | Date): string {
-  const d = parse(dateStr);
+  const d = parseDateTime(dateStr);
   if (!d) return '—';
   const diff = Date.now() - d.getTime();
   if (diff < 0) return 'just now';
