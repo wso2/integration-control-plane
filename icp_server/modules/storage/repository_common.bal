@@ -171,8 +171,11 @@ type ArtifactInfoRecord record {|
 # enable/disable, tracing, statistics and task trigger — then ride the heartbeat like every
 # other MI management call, rather than dialling an address that behind a load balancer
 # nothing routes to.
+#
+# The writer returns `true` once it has queued the write, and `false` for a runtime that
+# cannot execute tunneled commands, which is then dialled on its management port as before.
 public type MIManagementWriter isolated function (string runtimeId, string method, string path, json body)
-        returns error?;
+        returns boolean|error;
 
 isolated MIManagementWriter? miManagementWriter = ();
 
@@ -276,10 +279,10 @@ public isolated function sendMIControlCommandAsync(string runtimeId, string arti
         [string, json] [artifactPath, payload] = request;
 
         MIManagementWriter? writer = currentMIManagementWriter();
-        if writer is MIManagementWriter {
-            // Queued for the runtime's next heartbeat. The outcome comes back on the tunnel,
-            // and reconcile learns whether it took from the state the runtime reports next.
-            check writer(runtimeId, http:POST, artifactPath, payload);
+        // Queued for the runtime's next heartbeat, unless the runtime cannot execute tunneled
+        // commands. The outcome comes back on the tunnel, and reconcile learns whether it
+        // took from the state the runtime reports next.
+        if writer is MIManagementWriter && check writer(runtimeId, http:POST, artifactPath, payload) {
             log:printDebug("MI control command queued for the heartbeat tunnel", runtimeId = runtimeId,
                     path = artifactPath, artifactType = artifactType, artifactName = artifactName, action = action);
             return;

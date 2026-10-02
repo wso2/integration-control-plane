@@ -110,15 +110,79 @@ isolated function miRequestDocument(string method, string path, json body, strin
         clientIp: clientIp
     }.toJsonString();
 
-# Whether a runtime can be asked at all: RUNNING, and MI.
-#
-# There is no capability check. An MI that predates the agent's command loop ignores the
-# `commands` array in its heartbeat response — it reads only `acknowledged` and
-# `fullHeartbeatRequired` — so an old runtime does not fail, it simply never answers, and
-# the read reports a failure after its deadline. `miTunnelEnabled` is the operator's switch
-# for that, off by default.
+# Whether a runtime can be asked through the tunnel at all: RUNNING, MI, and able to execute
+# tunneled commands.
 isolated function miTargetAvailable(types:Runtime runtime) returns boolean =>
-    miTunnelEnabled && runtime.status == types:RUNNING && runtime.runtimeType == types:MI;
+    miUsesTunnel(runtime) && runtime.status == types:RUNNING;
+
+# The first MI release line whose agent executes tunneled management commands
+# (wso2/product-integrator-mi#5054).
+final readonly & int[] MI_TUNNEL_MIN_VERSION = [4, 7, 0];
+
+# Pre-releases of that line that shipped before the agent could, and so ignore the tunnel.
+final readonly & string[] MI_TUNNEL_PREDATING_QUALIFIERS = ["alpha"];
+
+# Whether this runtime's management goes over the tunnel rather than to its management port.
+#
+# `miTunnelEnabled` alone is not enough. An MI that predates the agent's command loop ignores
+# the `commands` array in its heartbeat response — it reads only `acknowledged` and
+# `fullHeartbeatRequired` — so it does not fail, it never answers: a read is abandoned at its
+# deadline and asked again forever, and an artifact control is reported dispatched while the
+# runtime never changes. Such a runtime is dialled directly, exactly as with the tunnel off,
+# so one old MI in a fleet does not lose its management screens.
+isolated function miUsesTunnel(types:Runtime runtime) returns boolean {
+    if !miTunnelEnabled || runtime.runtimeType != types:MI {
+        return false;
+    }
+    if miVersionSupportsTunnel(runtime.version) {
+        return true;
+    }
+    warnTunnelUnsupportedOnce(runtime);
+    return false;
+}
+
+# Whether an MI reporting `version` executes tunneled commands.
+#
+# The agent advertises no capability, so its version is the only signal. Anything from 4.7.0
+# on does, except the pre-releases named in `MI_TUNNEL_PREDATING_QUALIFIERS`; a version that
+# cannot be read does not, because dialling the management port is what every MI supports.
+isolated function miVersionSupportsTunnel(string? version) returns boolean {
+    if version is () {
+        return false;
+    }
+    string trimmed = version.trim();
+    int? dash = trimmed.indexOf("-");
+    string release = dash is int ? trimmed.substring(0, dash) : trimmed;
+    string qualifier = dash is int ? trimmed.substring(dash + 1).toLowerAscii() : "";
+
+    string[] parts = re `\.`.split(release);
+    foreach int i in 0 ..< MI_TUNNEL_MIN_VERSION.length() {
+        int|error part = i < parts.length() ? int:fromString(parts[i]) : 0;
+        if part is error {
+            return false;
+        }
+        if part != MI_TUNNEL_MIN_VERSION[i] {
+            return part > MI_TUNNEL_MIN_VERSION[i];
+        }
+    }
+    return MI_TUNNEL_PREDATING_QUALIFIERS.indexOf(qualifier) is ();
+}
+
+# Runtimes already warned about, so a busy console does not repeat the warning per request.
+isolated map<boolean> tunnelUnsupportedWarned = {};
+
+isolated function warnTunnelUnsupportedOnce(types:Runtime runtime) {
+    lock {
+        if tunnelUnsupportedWarned.hasKey(runtime.runtimeId) {
+            return;
+        }
+        tunnelUnsupportedWarned[runtime.runtimeId] = true;
+    }
+    log:printWarn("miTunnelEnabled is on, but this MI runtime cannot execute tunneled " +
+            "management commands (that needs MI 4.7.0 or later, excluding 4.7.0-alpha); " +
+            "dialling its management port instead", runtimeId = runtime.runtimeId,
+            version = runtime.version ?: "unknown");
+}
 
 # Serves a management read: the generic tunnel with this feature's owner, kind and key.
 isolated function ensureMIRead(types:Runtime runtime, string path, boolean forceRefresh = false)
@@ -414,15 +478,22 @@ final readonly & types:UserContextV2 MI_RECONCILE_CALLER = {
 #
 # Each call is its own operation: reconcile decides when to try again, from the state the
 # runtime reports, so there is no caller-supplied requestId to coalesce on.
+#
+# + return - `true` once queued; `false` for a runtime that cannot execute tunneled
+#            commands, which the caller then dials directly
 isolated function tunnelMIControlWrite(string runtimeId, string method, string path, json body)
-        returns error? {
+        returns boolean|error {
     types:Runtime? runtime = check storage:getRuntimeById(runtimeId);
     if runtime is () {
         return error(string `Runtime ${runtimeId} not found`);
+    }
+    if !miUsesTunnel(runtime) {
+        return false;
     }
     if !miTargetAvailable(runtime) {
         return error(MI_OFFLINE_MESSAGE);
     }
     _ = check enqueueMIMutation(runtime, method, path, body, MI_RECONCILE_CALLER,
             miOperationId(runtimeId, uuid:createType4AsString()));
+    return true;
 }
