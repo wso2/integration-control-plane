@@ -85,6 +85,17 @@ function testDirectoryFails() returns error? {
 function testConfigData() {
     test:assertEquals(validateConfigData(VALID_TOML), ());
     test:assertTrue(validateConfigData("logLevel = \"INFO") is error);
+    test:assertEquals(validateConfigData(""), ());
+}
+
+@test:Config {}
+function testConfigDataWithLiteralEscapes() {
+    // One-line content as a container env var would carry it: literal backslash-n between
+    // entries, and a stray literal backslash-t, both of which the runtime rewrites before parsing.
+    string oneLine = string `serverPort = 9446\nlogLevel = "INFO"\t\n[icp_server.storage]\ndbType = "mysql"`;
+    test:assertEquals(validateConfigData(oneLine), ());
+    // Inside a quoted value the escape is left alone, as in the runtime.
+    test:assertEquals(cleanConfigData(string `a = "x\ny"`), string `a = "x\ny"`);
 }
 
 @test:Config {}

@@ -16,7 +16,6 @@
 
 import ballerina/file;
 import ballerina/jballerina.java;
-import ballerina/os;
 
 // The Ballerina runtime only warns when a config file it was given cannot be found, read or
 // parsed, then drops the whole file and resolves every configurable to its default. A typo or a
@@ -35,17 +34,18 @@ function init() returns error? {
 }
 
 // Mirrors the runtime's choice of config sources (LaunchUtils.populateConfigDetails):
-// BAL_CONFIG_FILES if set, else BAL_CONFIG_DATA if set, else ./Config.toml if it exists.
+// BAL_CONFIG_FILES if set, else BAL_CONFIG_DATA if set, else ./Config.toml if it exists. A
+// variable that is set but empty still selects its source, as it does in the runtime.
 function validateConfigSources() returns error? {
-    string configFiles = os:getEnv(CONFIG_FILES_ENV);
-    if configFiles != "" {
+    string? configFiles = getEnv(CONFIG_FILES_ENV);
+    if configFiles is string {
         foreach string path in splitPathList(configFiles) {
             check validateConfigFile(path);
         }
         return;
     }
-    string configData = os:getEnv(CONFIG_DATA_ENV);
-    if configData != "" {
+    string? configData = getEnv(CONFIG_DATA_ENV);
+    if configData is string {
         return validateConfigData(configData);
     }
     if check file:test(DEFAULT_CONFIG_FILE, file:EXISTS) {
@@ -73,8 +73,24 @@ function validateConfigFile(string path) returns error? {
 # + content - TOML text
 # + return - an error describing the problem, or `()` if the content parses cleanly
 function validateConfigData(string content) returns error? {
-    return checkDiagnostics(readTomlString(java:fromString(content), java:fromString(CONFIG_DATA_ENV)),
+    string cleaned = cleanConfigData(content);
+    if cleaned == "" {
+        return;
+    }
+    return checkDiagnostics(readTomlString(java:fromString(cleaned), java:fromString(CONFIG_DATA_ENV)),
             CONFIG_DATA_ENV);
+}
+
+// The runtime rewrites BAL_CONFIG_DATA before parsing it (TomlContentProvider.cleanContent): a
+// literal `\n` outside a quoted value becomes a line break, and a literal `\r` or `\t` outside a
+// quoted value is dropped. Apply the same rewrite, with the same patterns, so that one-line
+// content the runtime accepts is accepted here too.
+function cleanConfigData(string content) returns string {
+    handle withLineBreaks = stringReplaceAll(java:fromString(content),
+            java:fromString(string `\\n(?=(?:[^"]*"[^"]*")*[^"]*$)`), lineSeparator());
+    handle cleaned = stringReplaceAll(withLineBreaks,
+            java:fromString(string `(\\r|\\t)(?=(?:[^"]*"[^"]*")*[^"]*$)`), java:fromString(""));
+    return java:toString(cleaned) ?: "";
 }
 
 function checkDiagnostics(handle toml, string origin) returns error? {
@@ -112,6 +128,25 @@ function splitPathList(string paths) returns string[] {
         remaining = remaining.substring(index + separator.length());
     }
 }
+
+// System.getenv, unlike os:getEnv, tells an unset variable (null) apart from an empty one.
+function getEnv(string name) returns string? => java:toString(systemGetenv(java:fromString(name)));
+
+function systemGetenv(handle name) returns handle = @java:Method {
+    name: "getenv",
+    'class: "java.lang.System",
+    paramTypes: ["java.lang.String"]
+} external;
+
+function lineSeparator() returns handle = @java:Method {
+    name: "lineSeparator",
+    'class: "java.lang.System"
+} external;
+
+function stringReplaceAll(handle value, handle regex, handle replacement) returns handle = @java:Method {
+    name: "replaceAll",
+    'class: "java.lang.String"
+} external;
 
 function pathSeparator() returns handle = @java:FieldGet {
     name: "pathSeparator",
