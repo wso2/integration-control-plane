@@ -403,20 +403,43 @@ export function useEngineGraphStatus(engineId: string, reported: ContextGraphSta
  * stripped. `restore()` is meant for a reducer initializer; `save` and `clear`
  * are stable so a sync effect can depend on them.
  */
+// Web storage can be unavailable (private mode, blocked site data, a sandboxed frame), and then
+// even reading it throws. The wizard and the engine page must still render, so these never throw.
+
+function readStorage(storage: () => Storage, key: string): string | null {
+  try {
+    return storage().getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(storage: () => Storage, key: string, value: string | null): void {
+  try {
+    if (value === null) storage().removeItem(key);
+    else storage().setItem(key, value);
+  } catch {
+    // Unavailable: what was written lasts for this page only.
+  }
+}
+
+const session = () => sessionStorage;
+const local = () => localStorage;
+
 export function useContextEngineDraft(orgHandle: string) {
   const key = `${CONTEXT_ENGINE_DRAFT_KEY_PREFIX}${orgHandle}`;
-  const [savedAt, setSavedAt] = useState<string | null>(() => fromDraft(sessionStorage.getItem(key))?.savedAt ?? null);
-  const restore = useCallback((): ContextEngineForm | null => fromDraft(sessionStorage.getItem(key))?.form ?? null, [key]);
+  const [savedAt, setSavedAt] = useState<string | null>(() => fromDraft(readStorage(session, key))?.savedAt ?? null);
+  const restore = useCallback((): ContextEngineForm | null => fromDraft(readStorage(session, key))?.form ?? null, [key]);
   const save = useCallback(
     (form: ContextEngineForm) => {
       const now = new Date().toISOString();
-      sessionStorage.setItem(key, JSON.stringify(toDraft(form, now)));
+      writeStorage(session, key, JSON.stringify(toDraft(form, now)));
       setSavedAt(now);
     },
     [key],
   );
   const clear = useCallback(() => {
-    sessionStorage.removeItem(key);
+    writeStorage(session, key, null);
     setSavedAt(null);
   }, [key]);
   return { savedAt, restore, save, clear };
@@ -425,9 +448,9 @@ export function useContextEngineDraft(orgHandle: string) {
 /** Whether this user has asked the engine anything yet — drives the "Ask it something" checklist step. */
 export function useAskedFlag(engineId: string) {
   const key = `${CONTEXT_ENGINE_ASKED_KEY_PREFIX}${engineId}`;
-  const [asked, setAsked] = useState(() => localStorage.getItem(key) === 'true');
+  const [asked, setAsked] = useState(() => readStorage(local, key) === 'true');
   const markAsked = useCallback(() => {
-    localStorage.setItem(key, 'true');
+    writeStorage(local, key, 'true');
     setAsked(true);
   }, [key]);
   return { asked, markAsked };
