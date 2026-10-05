@@ -20,6 +20,10 @@ import ballerina/os;
 import ballerina/lang.array;
 import ballerina/log;
 
+// Imported for its init(): it fails startup when the config file cannot be parsed, before the
+// secrets below (or anything that depends on this module) are resolved from defaults.
+import icp_server.config_check as _;
+
 const string CIPHER_SECRET_PREFIX = "$secret{";
 const string CIPHER_SECRET_SUFFIX = "}";
 
