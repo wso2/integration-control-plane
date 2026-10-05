@@ -35,7 +35,7 @@
  */
 
 import { contextEngineClient } from './httpClients';
-import { getAccessToken } from '../../auth/tokenManager';
+import { getAccessToken, isAccessTokenExpired, refreshAccessToken } from '../../auth/tokenManager';
 import { getServer, getServerAdminUser } from './platformServices';
 import { CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
 import {
@@ -572,9 +572,18 @@ export async function updateContextSource(input: UpdateContextSourceInput): Prom
 
 const sourcePath = (id: string): string => `${V1}/sources/${encodeURIComponent(id)}`;
 
-/** The bearer for requests the browser sends itself: the dev token when configured, else the platform token. */
-function engineBearer(): string | null {
-  const token = window.API_CONFIG?.contextEngineApiToken || getAccessToken();
+/** A static engine token from runtime config, for local development; the platform token is used otherwise. */
+const staticEngineToken = (): string | undefined => window.API_CONFIG?.contextEngineApiToken || undefined;
+
+/**
+ * The bearer for requests the browser sends itself: the dev token when
+ * configured, else the platform token, refreshed first when it has expired,
+ * as the JSON client's fetch does.
+ */
+async function engineBearer(): Promise<string | null> {
+  const fixed = staticEngineToken();
+  if (!fixed && isAccessTokenExpired()) await refreshAccessToken();
+  const token = fixed || getAccessToken();
   return token ? `Bearer ${token}` : null;
 }
 
@@ -589,12 +598,11 @@ async function deliveryKey(sourceId: string, operation: string, recordId: string
   return `${sourceId}:${operation}:${await sha256Hex(deliveryIdentity(recordId, version))}`;
 }
 
-/** An XHR rather than fetch, because only XHR reports upload progress. Errors carry the engine's status like the fetch client. */
-function sendMultipart(url: string, form: FormData, headers: Record<string, string>, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
+/** One multipart POST with a given bearer; the caller decides whether to try again. */
+function postMultipart(url: string, form: FormData, headers: Record<string, string>, bearer: string | null, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', url);
-    const bearer = engineBearer();
     if (bearer) xhr.setRequestHeader('Authorization', bearer);
     for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => {
@@ -623,6 +631,21 @@ function sendMultipart(url: string, form: FormData, headers: Record<string, stri
     }
     xhr.send(form);
   });
+}
+
+/**
+ * An XHR rather than fetch, because only XHR reports upload progress. Like
+ * the fetch client, it refreshes an expired platform token before sending and
+ * once more after a 401, then tries again. Errors carry the engine's status.
+ */
+async function sendMultipart(url: string, form: FormData, headers: Record<string, string>, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
+  try {
+    return await postMultipart(url, form, headers, await engineBearer(), onProgress, signal);
+  } catch (err) {
+    if (!(err instanceof HttpError && err.status === 401) || staticEngineToken()) throw err;
+    await refreshAccessToken();
+    return postMultipart(url, form, headers, await engineBearer(), onProgress, signal);
+  }
 }
 
 /** The job accepted under a delivery key, or null when the engine has none: the check after a lost reply. */
