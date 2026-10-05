@@ -310,6 +310,8 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
   }
   await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'delete', audience: entry?.audience ?? [], version: String(Date.now()) });
   clearTimer(entryKey(sourceId, recordId));
+  // A failed upload kept its bytes for a retry; nothing will retry a removed record.
+  pendingBytes.delete(entryKey(sourceId, recordId));
   setEntries(
     sourceId,
     entriesOf(sourceId).filter((e) => e.recordId !== recordId),
