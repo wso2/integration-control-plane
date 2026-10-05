@@ -414,6 +414,12 @@ describe('drafts', () => {
     expect(fromDraft(null)).toBeNull();
     expect(fromDraft('not json')).toBeNull();
     expect(fromDraft(JSON.stringify({ v: 2, form: {} }))).toBeNull();
+    // Malformed models in an old draft are dropped or coerced, never handed to the wizard's checks.
+    const malformed = { v: 1, savedAt: 'x', form: { sources: [], roles: [], name: 'E', embedding: 'openai', llm: { provider: 'openai' }, storage: {} } };
+    const bad = fromDraft(JSON.stringify(malformed))!.form;
+    expect(bad.embedding).toBeNull();
+    expect(bad.llm).toEqual({ provider: 'openai', model: '', apiKey: '', azureBaseUrl: '', azureApiVersion: '' });
+    expect(fromDraft(JSON.stringify({ ...malformed, form: { ...malformed.form, llm: { provider: 'nope', model: 'x' } } }))!.form.llm).toBeNull();
     expect(fromDraft(JSON.stringify({ v: 1, form: { name: 'x' } }))).toBeNull();
   });
 

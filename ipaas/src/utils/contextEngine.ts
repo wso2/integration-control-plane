@@ -24,6 +24,7 @@ import {
   OWNER_GRANT_PREFIX,
   defaultStorage,
   GRAPH_STATE_LABEL,
+  LLM_PROVIDERS,
   MCP_CLIENTS,
   PLAYGROUND_SUGGESTIONS,
   ROLE_GRANT_PREFIX,
@@ -36,6 +37,7 @@ import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
 import { formatDistanceToNow } from './time';
 import { isEmbeddingValid } from './ragIngestion';
+import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type {
   AudienceRule,
   ContextEngineDetail,
@@ -292,6 +294,20 @@ export function toDraft(form: ContextEngineForm, savedAt: string): ContextEngine
   };
 }
 
+/**
+ * A model choice restored from storage, with every field a string, or null when
+ * it is not an object or names no known provider. The validity checks call
+ * `.trim()` on the fields, so a malformed draft must never reach them.
+ */
+function sanitizeModel<T extends { provider: string; model: string; apiKey: string; azureBaseUrl: string; azureApiVersion: string }>(raw: unknown, providers: readonly { id: T['provider'] }[]): T | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const r = raw as Partial<Record<keyof T, unknown>>;
+  const provider = providers.find((p) => p.id === r.provider)?.id;
+  if (!provider) return null;
+  const str = (v: unknown): string => (typeof v === 'string' ? v : '');
+  return { provider, model: str(r.model), apiKey: str(r.apiKey), azureBaseUrl: str(r.azureBaseUrl), azureApiVersion: str(r.azureApiVersion) } as T;
+}
+
 /** A source restored from storage, with every field coerced to its shape; drafts saved before visibility rules existed get one blank rule. */
 function sanitizeSourceConfig(raw: unknown): ContextSourceConfig {
   const r = (raw ?? {}) as Partial<ContextSourceConfig>;
@@ -326,8 +342,8 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
       form: {
         sources: f.sources.map(sanitizeSourceConfig),
         roles: f.roles,
-        embedding: f.embedding ?? null,
-        llm: f.llm ?? null,
+        embedding: sanitizeModel(f.embedding, EMBEDDING_PROVIDERS),
+        llm: sanitizeModel(f.llm, LLM_PROVIDERS),
         shareApiKey: !!f.shareApiKey,
         storage: sanitizeStorage(f.storage),
         name: f.name,
