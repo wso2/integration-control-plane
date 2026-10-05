@@ -615,7 +615,8 @@ function sendMultipart(url: string, form: FormData, headers: Record<string, stri
     xhr.onabort = () => reject(new DOMException('The upload was cancelled.', 'AbortError'));
     if (signal) {
       if (signal.aborted) {
-        xhr.abort();
+        // Before send(), abort() fires no abort event, so onabort would never settle the promise.
+        reject(new DOMException('The upload was cancelled.', 'AbortError'));
         return;
       }
       signal.addEventListener('abort', () => xhr.abort(), { once: true });
