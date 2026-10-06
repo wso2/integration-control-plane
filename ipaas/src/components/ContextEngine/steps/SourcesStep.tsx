@@ -19,7 +19,7 @@
 import { Box, Button, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, CircleAlert, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { POPULAR_CONNECTORS, SOURCE_CONNECTORS } from '../../../constants/contextEngine';
+import { POPULAR_CONNECTORS, QUICK_ADD_CONNECTORS, SOURCE_CONNECTORS } from '../../../constants/contextEngine';
 import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSourceVisibility, summarizeSource } from '../../../utils/contextEngine';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
@@ -124,7 +124,7 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
             <Typography variant="body2" color="text.secondary">
               Quick add
             </Typography>
-            {POPULAR_CONNECTORS.map((c) => (
+            {QUICK_ADD_CONNECTORS.map((c) => (
               <Button key={c.id} size="small" variant="outlined" startIcon={<SourceMark type={c.id} size={16} />} endIcon={<Plus size={14} />} onClick={() => openDrawer({ connectorId: c.id })} aria-label={`Quick add ${c.name}`} sx={quickAddButtonSx}>
                 {c.name}
               </Button>

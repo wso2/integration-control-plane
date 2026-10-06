@@ -19,11 +19,11 @@
 import { Box, Button, Chip, InputAdornment, TextField, Typography } from '@wso2/oxygen-ui';
 import { Search } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { CATALOG_PAGE_SIZE, contextLogoUrl, POPULAR_CONNECTORS, SOURCE_CATEGORIES, SOURCE_CONNECTORS } from '../../constants/contextEngine';
+import { CATALOG_PAGE_SIZE, contextLogoUrl, isConnectorEnabled, POPULAR_CONNECTORS, SOURCE_CATEGORIES, SOURCE_CONNECTORS } from '../../constants/contextEngine';
 import { connectorCountsByCategory, filterConnectors } from '../../utils/contextEngine';
 import SelectableCard from '../Databases/create/SelectableCard';
 import { sourceTypeIcon } from './SourceMark';
-import { catalogChipsSx, catalogGridSx, catalogSectionSx, catalogSentinelSx } from './styles';
+import { catalogChipsSx, catalogGridSx, catalogSectionSx, catalogSentinelSx, catalogTileWrapSx, comingSoonBadgeSx } from './styles';
 import type { SourceCategory, SourceConnector } from '../../types/contextEngine';
 
 interface ConnectorCatalogProps {
@@ -34,17 +34,24 @@ interface ConnectorCatalogProps {
 
 type CategoryFilter = SourceCategory | 'all';
 
-function ConnectorTile({ connector, disabled, onPick }: { connector: SourceConnector; disabled: boolean; onPick: () => void }): JSX.Element {
-  return (
+function ConnectorTile({ connector, disabled, comingSoon, onPick }: { connector: SourceConnector; disabled: boolean; comingSoon: boolean; onPick: () => void }): JSX.Element {
+  const card = (
     <SelectableCard
       title={connector.name}
-      description={disabled ? 'Already added' : connector.description}
+      description={disabled && !comingSoon ? 'Already added' : connector.description}
       logo={connector.logo ? contextLogoUrl(connector.logo) : undefined}
       icon={sourceTypeIcon(connector.id, 24)}
       selected={false}
-      disabled={disabled}
+      disabled={disabled || comingSoon}
       onSelect={onPick}
     />
+  );
+  if (!comingSoon) return card;
+  return (
+    <Box sx={catalogTileWrapSx}>
+      <Chip label="Coming soon" size="small" sx={comingSoonBadgeSx} />
+      {card}
+    </Box>
   );
 }
 
@@ -65,7 +72,8 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
   const shown = results.slice(0, visible);
   const remaining = results.length - shown.length;
   const added = new Set(addedIds);
-  const isDisabled = (c: SourceConnector) => !!c.single && added.has(c.id);
+  const isComingSoon = (c: SourceConnector) => !isConnectorEnabled(c.id);
+  const isAlreadyAdded = (c: SourceConnector) => !!c.single && added.has(c.id);
 
   const changeQuery = (next: string) => {
     setQuery(next);
@@ -122,7 +130,7 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
           </Typography>
           <Box sx={catalogGridSx}>
             {POPULAR_CONNECTORS.map((c) => (
-              <ConnectorTile key={c.id} connector={c} disabled={isDisabled(c)} onPick={() => onPick(c.id)} />
+              <ConnectorTile key={c.id} connector={c} disabled={isAlreadyAdded(c)} comingSoon={isComingSoon(c)} onPick={() => onPick(c.id)} />
             ))}
           </Box>
         </>
@@ -139,7 +147,7 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
       ) : (
         <Box sx={catalogGridSx}>
           {shown.map((c) => (
-            <ConnectorTile key={c.id} connector={c} disabled={isDisabled(c)} onPick={() => onPick(c.id)} />
+            <ConnectorTile key={c.id} connector={c} disabled={isAlreadyAdded(c)} comingSoon={isComingSoon(c)} onPick={() => onPick(c.id)} />
           ))}
         </Box>
       )}

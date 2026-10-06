@@ -389,7 +389,21 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
 
 export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntries(SOURCE_CONNECTORS.map((c) => [c.id, c]));
 
+/**
+ * Connectors a source can be created from today. Every other connector is listed
+ * in the catalog as "Coming soon" and cannot be added yet. Flip an id in here as
+ * its backend lands — the catalog, quick-add row and forms pick it up with no
+ * other change.
+ */
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'salesforce']);
+
+/** Whether a source can be created from this connector yet. */
+export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
+
 export const POPULAR_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => c.popular);
+
+/** Live connectors offered as quick-add shortcuts, most useful first. */
+export const QUICK_ADD_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => isConnectorEnabled(c.id));
 
 /** Connectors rendered per catalog page; the next page loads as the list scrolls into view. */
 export const CATALOG_PAGE_SIZE = 24;

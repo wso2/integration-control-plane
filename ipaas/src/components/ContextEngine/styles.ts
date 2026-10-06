@@ -166,6 +166,17 @@ export const catalogSentinelSx = {
   py: 1,
 } as const;
 
+/** Wraps a catalog tile so the "Coming soon" badge can sit over its top-right corner. */
+export const catalogTileWrapSx = { position: 'relative' } as const;
+
+export const comingSoonBadgeSx = {
+  position: 'absolute',
+  top: 8,
+  right: 8,
+  zIndex: 1,
+  pointerEvents: 'none',
+} as const;
+
 export const connectorHeaderSx = {
   display: 'flex',
   alignItems: 'center',

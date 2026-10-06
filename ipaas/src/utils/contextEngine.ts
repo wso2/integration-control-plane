@@ -24,6 +24,7 @@ import {
   OWNER_GRANT_PREFIX,
   defaultStorage,
   GRAPH_STATE_LABEL,
+  isConnectorEnabled,
   LLM_PROVIDERS,
   MCP_CLIENTS,
   PLAYGROUND_SUGGESTIONS,
@@ -205,7 +206,7 @@ export function filterConnectors(connectors: SourceConnector[], query: string, c
   return connectors
     .filter((c) => category === 'all' || c.category === category)
     .filter((c) => !q || c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q) || c.id.includes(q))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .sort((a, b) => Number(isConnectorEnabled(b.id)) - Number(isConnectorEnabled(a.id)) || a.name.localeCompare(b.name));
 }
 
 /** How many connectors each category holds (for the filter chips). */
