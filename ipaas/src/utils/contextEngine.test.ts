@@ -182,7 +182,7 @@ describe('source validation', () => {
 
   it('requires the per-connector fields', () => {
     expect(isSourceValid(blankSource('gdrive'))).toBe(false);
-    expect(isSourceValid(withValues('gdrive', { folderId: 'abc', apiKey: 'k' }))).toBe(true);
+    expect(isSourceValid(withValues('gdrive', { folderId: 'abc', clientId: 'c', clientSecret: 's', refreshToken: 'r' }))).toBe(true);
     expect(isSourceValid(withValues('website', { urls: 'https://a.com\nnot-a-url' }))).toBe(false);
     expect(isSourceValid(withValues('website', { urls: 'https://a.com' }))).toBe(true);
     expect(isSourceValid(upload())).toBe(true);
@@ -198,7 +198,7 @@ describe('source validation', () => {
     expect(sourceIncompleteReason(upload())).toBe('');
     expect(sourceIncompleteReason(blankSource('upload'))).toBe('');
     // Every source defaults to "everyone who can query"; only an empty "only some roles" choice is incomplete.
-    const drive = withValues('gdrive', { folderId: 'abc', apiKey: 'k' });
+    const drive = withValues('gdrive', { folderId: 'abc', clientId: 'c', clientSecret: 's', refreshToken: 'r' });
     expect(sourceIncompleteReason(drive)).toBe('');
     expect(sourceIncompleteReason({ ...drive, stagedVisibility: { kind: 'roles', roles: [] } })).toBe('Choose who can see this content');
   });
@@ -245,6 +245,25 @@ describe('source validation', () => {
     expect(isSourceValid(withValues('salesforce', { ...base, authType: 'bearer', token: 't' }))).toBe(true);
 
     expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
+  });
+
+  it('shows and requires only the fields of the chosen Google Drive auth flow', () => {
+    const gd = SOURCE_CONNECTORS.find((c) => c.id === 'gdrive')!;
+    const clientEmail = gd.fields.find((f) => f.key === 'clientEmail')!;
+    const refreshToken = gd.fields.find((f) => f.key === 'refreshToken')!;
+
+    // Default flow is refresh token: its credentials show, the service-account fields do not.
+    expect(blankSource('gdrive').values.authType).toBe('refresh_token');
+    expect(isFieldVisible(refreshToken, { authType: 'refresh_token' })).toBe(true);
+    expect(isFieldVisible(clientEmail, { authType: 'refresh_token' })).toBe(false);
+    expect(isFieldVisible(clientEmail, { authType: 'service_account' })).toBe(true);
+
+    // Refresh-token flow needs the client id, secret and refresh token besides the folder.
+    expect(isSourceValid(withValues('gdrive', { folderId: 'f', clientId: 'c', clientSecret: 's' }))).toBe(false);
+    expect(isSourceValid(withValues('gdrive', { folderId: 'f', clientId: 'c', clientSecret: 's', refreshToken: 'r' }))).toBe(true);
+    // Bearer flow needs only the access token; service account needs the email and key path (subject is optional).
+    expect(isSourceValid(withValues('gdrive', { folderId: 'f', authType: 'bearer', token: 't' }))).toBe(true);
+    expect(invalidSourceFields(withValues('gdrive', { folderId: 'f', authType: 'service_account' })).map((f) => f.key)).toEqual(['clientEmail', 'privateKeyPath']);
   });
 
   it('needs at least one complete, unique visibility rule', () => {

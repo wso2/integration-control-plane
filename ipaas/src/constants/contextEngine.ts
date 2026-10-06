@@ -67,10 +67,8 @@ const G = (group: string | { label: string; collapsed?: boolean }, ...fields: So
 
 const MS_GRAPH_APP = [F('tenantId', 'Tenant ID', 'text'), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret')];
 
-/** Show a field only for the chosen Salesforce OAuth2 flow (matches the connector's `authType` discriminator). */
-const sfAuthIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'authType', equals: flows });
-/** The two flows backed by a Connected App, which share a consumer key and secret. */
-const SF_AUTH_OAUTH_APP = sfAuthIs('client_credentials', 'refresh_token');
+/** Show a field only for the chosen auth flow (matches a connector's `authType` discriminator). */
+const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'authType', equals: flows });
 const SQL_TABLES = (port: string) => [
   F('host', 'Host', 'text'),
   F('port', 'Port', 'text', { defaultValue: port }),
@@ -130,12 +128,35 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'gdrive',
     name: 'Google Drive',
-    description: 'Documents in a shared folder.',
+    description: 'A Drive folder subtree, backfilled and kept in sync by the Changes API.',
     category: 'cloud-storage',
     popular: true,
     logo: `${RAG_LOGO_BASE}googledrive.svg`,
     icon: 'folder',
-    fields: [F('folderId', 'Folder ID', 'text'), F('apiKey', 'API Key', 'secret')],
+    // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
+    // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
+    fields: [
+      ...G(
+        'Connection',
+        F('authType', 'Authentication', 'select', {
+          defaultValue: 'refresh_token',
+          options: [
+            { value: 'refresh_token', label: 'Refresh token' },
+            { value: 'bearer', label: 'Access token' },
+            { value: 'service_account', label: 'Service account' },
+          ],
+          helper: 'OAuth2 flow used to connect.',
+        }),
+        F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
+        F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
+        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+        F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
+        F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'Path to the service account private key in PEM form.' }),
+        O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional user to impersonate under domain-wide delegation.' }),
+      ),
+      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' })),
+    ],
     summaryKeys: ['folderId'],
   },
   {
@@ -355,16 +376,16 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
         F('authType', 'Authentication', 'select', {
           defaultValue: 'client_credentials',
           options: [
-            { value: 'client_credentials', label: 'Client credentials (recommended)' },
+            { value: 'client_credentials', label: 'Client credentials' },
             { value: 'refresh_token', label: 'Refresh token' },
             { value: 'bearer', label: 'Access token' },
           ],
-          helper: 'OAuth2 flow used to connect. Client credentials is best for server-to-server sync — no refresh-token rotation.',
+          helper: 'OAuth2 flow used to connect.',
         }),
-        F('clientId', 'Consumer Key', 'text', { showWhen: SF_AUTH_OAUTH_APP }),
-        F('clientSecret', 'Consumer Secret', 'secret', { showWhen: SF_AUTH_OAUTH_APP }),
-        F('refreshToken', 'Refresh Token', 'secret', { showWhen: sfAuthIs('refresh_token') }),
-        F('token', 'Access Token', 'secret', { showWhen: sfAuthIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+        F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token') }),
+        F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token') }),
+        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
       ),
       ...G(
         'Data to sync',
