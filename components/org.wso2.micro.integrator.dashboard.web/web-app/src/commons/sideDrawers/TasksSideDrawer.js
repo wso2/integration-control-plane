@@ -28,6 +28,14 @@ import { Table, TableCell, TableRow } from '@material-ui/core';
 import HeadingSection from './commons/HeadingSection'
 import SourceViewSection from './commons/SourceViewSection'
 
+function getTriggerIntervalInSeconds(triggerInterval) {
+    if (triggerInterval === undefined || triggerInterval === null || triggerInterval === '') {
+        return triggerInterval;
+    }
+    const interval = Number(triggerInterval);
+    return Number.isFinite(interval) ? interval / 1000 : triggerInterval;
+}
+
 export default function TasksSideDrawer(props) {
     var nodeData = props.nodeData;
     const nodeId = nodeData.nodeId;
@@ -92,7 +100,7 @@ function TriggerDetails(props) {
                 </TableRow>
                 <TableRow>
                     <TableCell>Interval (In seconds)</TableCell>
-                    <TableCell>{task.triggerInterval}</TableCell>
+                    <TableCell>{getTriggerIntervalInSeconds(task.triggerInterval)}</TableCell>
                 </TableRow>
             </Table>
         </Box>
