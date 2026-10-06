@@ -34,9 +34,39 @@ public enum DatabaseType {
     ORACLE = "oracle"
 }
 
-// Password of the bundled H2 quick-start databases (see initH2Database in build.gradle).
-// It is public knowledge, so it must never protect a real database server.
-const string SAMPLE_DB_PASSWORD = "icp_password";
+// Credentials of the bundled H2 quick-start databases (see initH2Database in build.gradle).
+// They are public knowledge: used only as a deprecated fallback for H2 when no credentials are
+// configured, and never for a real database server.
+const string H2_QUICKSTART_USER = "icp_user";
+const string H2_QUICKSTART_PASSWORD = "icp_password";
+
+boolean h2WarningLogged = false;
+
+public type DbCredentials record {|
+    string user;
+    string password;
+|};
+
+// Resolves the credentials to connect with from the configured (secret-resolved) values, where ""
+// means unset. For H2, unset values fall back to the bundled quick-start credentials with a
+// deprecation warning, so older configurations keep working. For any other database, unset
+// values are a startup error. configKeys names the settings in log and error messages.
+public function resolveDbCredentials(string dbType, string user, string password, string configKeys)
+        returns DbCredentials|error {
+    if user != "" && password != "" {
+        return {user, password};
+    }
+    if dbType != H2 {
+        return error(string `Database credentials are not configured for the ${dbType} database. ` +
+                string `Set ${configKeys} in deployment.toml.`);
+    }
+    log:printWarn(string `Database credentials are not configured; using the bundled H2 quick-start credentials. ` +
+            string `This fallback is deprecated: set ${configKeys} in deployment.toml.`);
+    return {
+        user: user == "" ? H2_QUICKSTART_USER : user,
+        password: password == "" ? H2_QUICKSTART_PASSWORD : password
+    };
+}
 
 public client class DatabaseConnectionManager {
     private final sql:Client dbClient;
@@ -50,7 +80,13 @@ public client class DatabaseConnectionManager {
             maxConnectionLifeTime: maxConnectionLifeTime
         };
 
-        if dbType != H2 && dbPassword == SAMPLE_DB_PASSWORD {
+        if dbType == H2 {
+            if !h2WarningLogged {
+                h2WarningLogged = true;
+                log:printWarn("H2 is an embedded database intended for evaluation and development only. " +
+                        "Use MySQL, PostgreSQL, MSSQL or Oracle in production.");
+            }
+        } else if dbPassword == H2_QUICKSTART_PASSWORD {
             log:printWarn(string `Database '${dbName}' (${dbType}) uses the sample password from the ICP H2 quick-start ` +
                     "configuration. Set a strong, unique database password before using this deployment in production.");
         }

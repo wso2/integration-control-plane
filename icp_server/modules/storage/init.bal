@@ -22,8 +22,9 @@ import ballerina/sql;
 final sql:Client dbClient = check createDbClient();
 
 function createDbClient() returns sql:Client|error {
-    string resolvedUser = check utils:resolveConfig(dbUser, secrets);
-    string resolvedPassword = check utils:resolveConfig(dbPassword, secrets);
-    DatabaseConnectionManager dbManager = check new (dbType, dbHost, dbPort, dbName, resolvedUser, resolvedPassword, dbUseTLS);
+    DbCredentials credentials = check resolveDbCredentials(dbType,
+            check utils:resolveConfig(dbUser, secrets), check utils:resolveConfig(dbPassword, secrets),
+            "dbUser and dbPassword under [icp_server.storage]");
+    DatabaseConnectionManager dbManager = check new (dbType, dbHost, dbPort, dbName, credentials.user, credentials.password, dbUseTLS);
     return dbManager.getClient();
 }

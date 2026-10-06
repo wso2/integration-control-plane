@@ -75,9 +75,9 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # credentialsDbPort = 5432          # Not used for H2
 # credentialsDbName = "credentials_db"
 
-# Credentials database user and password (required). These values match the bundled H2
-# quick-start database. For any other database, replace them with a dedicated user and a
-# strong password, preferably encrypted (see SECRETS ALIAS CONFIGURATION below).
+# Credentials database user and password (required for every database except H2). These
+# values match the bundled H2 quick-start database. For any other database, replace them with
+# a dedicated user and a strong password, preferably encrypted (see SECRETS ALIAS CONFIGURATION below).
 credentialsDbUser = "icp_user"
 credentialsDbPassword = "icp_password"
 
@@ -226,9 +226,9 @@ credentialsDbPassword = "icp_password"
 # Primary database connection settings
 # Database type: h2 (in-memory), mysql, mssql, postgresql, or oracle. Default is h2
 
-# Database user and password (required). These values match the bundled H2 quick-start
-# database. For any other database, replace them with a dedicated user and a strong
-# password, preferably encrypted (see DATABASE SECRETS ALIAS CONFIGURATION below).
+# Database user and password (required for every database except H2). These values match the
+# bundled H2 quick-start database. For any other database, replace them with a dedicated user
+# and a strong password, preferably encrypted (see DATABASE SECRETS ALIAS CONFIGURATION below).
 dbUser = "icp_user"
 dbPassword = "icp_password"
 
