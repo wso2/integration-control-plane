@@ -34,6 +34,10 @@ public enum DatabaseType {
     ORACLE = "oracle"
 }
 
+// Password of the bundled H2 quick-start databases (see initH2Database in build.gradle).
+// It is public knowledge, so it must never protect a real database server.
+const string SAMPLE_DB_PASSWORD = "icp_password";
+
 public client class DatabaseConnectionManager {
     private final sql:Client dbClient;
     private final string dbType;
@@ -45,6 +49,11 @@ public client class DatabaseConnectionManager {
             minIdleConnections: minIdleConnections,
             maxConnectionLifeTime: maxConnectionLifeTime
         };
+
+        if dbType != H2 && dbPassword == SAMPLE_DB_PASSWORD {
+            log:printWarn(string `Database '${dbName}' (${dbType}) uses the sample password from the ICP H2 quick-start ` +
+                    "configuration. Set a strong, unique database password before using this deployment in production.");
+        }
 
         if dbType == MYSQL {
             log:printInfo("Initializing MySQL Database...");

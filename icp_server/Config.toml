@@ -74,8 +74,12 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # credentialsDbHost = "localhost"   # Not used for H2
 # credentialsDbPort = 5432          # Not used for H2
 # credentialsDbName = "credentials_db"
-# credentialsDbUser = "icp_user"
-# credentialsDbPassword = "icp_password"
+
+# Credentials database user and password (required). These values match the bundled H2
+# quick-start database. For any other database, replace them with a dedicated user and a
+# strong password, preferably encrypted (see SECRETS ALIAS CONFIGURATION below).
+credentialsDbUser = "icp_user"
+credentialsDbPassword = "icp_password"
 
 # Token expiry settings
 # defaultTokenExpiryTime = 3600  # 1 hour - JWT access token expiry
@@ -201,7 +205,8 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # SECRETS ALIAS CONFIGURATION
 # =============================================================================
 # frontendJwtHMACSecret = "$secret{secretJWTsecret}"
-# credentialsDbPassword = "$secret{secCredsDbPassword}"
+# To use an encrypted credentials DB password, set the credentialsDbPassword value above
+# to an alias, e.g. credentialsDbPassword = "$secret{secCredsDbPassword}"
 
 # =============================================================================
 # ENCRYPTED SECRETS CONFIGURATION
@@ -221,12 +226,17 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # Primary database connection settings
 # Database type: h2 (in-memory), mysql, mssql, postgresql, or oracle. Default is h2
 
+# Database user and password (required). These values match the bundled H2 quick-start
+# database. For any other database, replace them with a dedicated user and a strong
+# password, preferably encrypted (see DATABASE SECRETS ALIAS CONFIGURATION below).
+dbUser = "icp_user"
+dbPassword = "icp_password"
+
 # MySQL Configuration
 # dbHost = "mysql-db"
 # dbPort = 3306
 # dbName = "icp_database"
-# dbUser = "root"
-# dbPassword = "my-secret-pw"
+# (dbUser/dbPassword: set above, e.g. "root" / "my-secret-pw" for docker-compose.mysql.yml)
 # maxOpenConnections = 10
 # minIdleConnections = 5
 # maxConnectionLifeTime = 1800.0  # 30 minutes
@@ -236,8 +246,7 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # dbHost = "localhost"
 # dbPort = 5432
 # dbName = "icp_database"
-# dbUser = "postgres"
-# dbPassword = "my-secret-pw"
+# (dbUser/dbPassword: set above, e.g. "postgres" / "my-secret-pw" for docker-compose.postgresql.yml)
 # maxOpenConnections = 10
 # minIdleConnections = 5
 # maxConnectionLifeTime = 1800.0  # 30 minutes
@@ -247,8 +256,7 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # dbHost = "localhost"
 # dbPort = 1433
 # dbName = "icp_database"
-# dbUser = "sa"
-# dbPassword = "YourStrong@Passw0rd"
+# (dbUser/dbPassword: set above, e.g. "sa" / "YourStrong@Passw0rd" for docker-compose.mssql.yml)
 # maxOpenConnections = 10
 # minIdleConnections = 5
 # maxConnectionLifeTime = 1800.0
@@ -258,8 +266,7 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # dbHost = "localhost"
 # dbPort = 1521
 # dbName = "ORCLPDB1"   # Oracle service name (PDB)
-# dbUser = "icp_user"
-# dbPassword = "my-secret-pw"
+# (dbUser/dbPassword: set above to your Oracle schema user and its password)
 # dbUseTLS = false      # set true for TCPS endpoints, e.g. Oracle Autonomous Database
 # maxOpenConnections = 10
 # minIdleConnections = 5
@@ -269,6 +276,7 @@ frontendJwtHMACSecret = "default-secret-key-at-least-32-characters-long-for-hs25
 # =============================================================================
 # DATABASE SECRETS ALIAS CONFIGURATION
 # =============================================================================
+# To use an encrypted password, set the dbPassword value above to an alias, e.g.
 # dbPassword = "$secret{secDbPassword}"
 
 # =============================================================================

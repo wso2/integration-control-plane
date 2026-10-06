@@ -58,6 +58,8 @@ public final class E2EEnvironment implements AutoCloseable {
     private static final String DB_NAME = "icp_database";
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD = "my-secret-pw";
+    private static final String CREDENTIALS_DB_USER = "icp_user";
+    private static final String CREDENTIALS_DB_PASSWORD = "icp_password";
     private static E2EEnvironment current;
 
     private final Path runDir;
@@ -519,8 +521,8 @@ public final class E2EEnvironment implements AutoCloseable {
                 "-cp", icpHome.resolve("bin/icp-server.jar").toString(),
                 "org.h2.tools.RunScript",
                 "-url", "jdbc:h2:file:" + icpHome.resolve("bin/database").resolve(dbName) + ";MODE=MySQL",
-                "-user", "icp_user",
-                "-password", "icp_password",
+                "-user", CREDENTIALS_DB_USER,
+                "-password", CREDENTIALS_DB_PASSWORD,
                 "-script", script.toString()
         ).directory(icpHome.resolve("bin").toFile()), Duration.ofSeconds(60), "initialize " + dbName);
     }
@@ -544,6 +546,8 @@ public final class E2EEnvironment implements AutoCloseable {
         vars.put("DB_NAME", DB_NAME);
         vars.put("DB_USER", DB_USER);
         vars.put("DB_PASSWORD", DB_PASSWORD);
+        vars.put("CREDENTIALS_DB_USER", CREDENTIALS_DB_USER);
+        vars.put("CREDENTIALS_DB_PASSWORD", CREDENTIALS_DB_PASSWORD);
         Files.writeString(icpHome.resolve("conf/deployment.toml"), render("icp/deployment.toml", vars));
     }
 

@@ -42,8 +42,10 @@ configurable storage:DatabaseType credentialsDbType = "h2";
 configurable string credentialsDbHost = "localhost";
 configurable int credentialsDbPort = 5432;
 configurable string credentialsDbName = "credentials_db";
-configurable string credentialsDbUser = "icp_user";
-configurable string credentialsDbPassword = "icp_password";
+// Required (no defaults) so a deployment never silently falls back to well-known credentials.
+// The shipped deployment.toml sets the values for the bundled H2 quick-start database.
+configurable string credentialsDbUser = ?;
+configurable string credentialsDbPassword = ?;
 configurable boolean credentialsDbUseTLS = false; // TLS (TCPS) for Oracle, e.g. Autonomous Database
 
 configurable int lockoutThreshold = 5;
