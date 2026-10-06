@@ -94,11 +94,13 @@ import {
   filterConnectors,
   grantAllowsQuery,
   invalidSourceFields,
+  isFieldVisible,
   isFormComplete,
   isHttpUrl,
   isLlmValid,
   isNameStepValid,
   isSourceValid,
+  visibleFields,
   isSourcesStepValid,
   resolveEngineBaseUrl,
   roleGrantId,
@@ -216,6 +218,33 @@ describe('source validation', () => {
     expect(sourcesStepBlocker([a, withValues('github', {}, 'Platform docs')])).toBe('Complete “Platform docs” to continue');
     expect(sourcesStepBlocker([a, { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Second'), audience: [] }])).toBe('Complete “Second” to continue');
     expect(isSourcesStepValid([a, upload('Second')])).toBe(true);
+  });
+
+  it('shows and requires only the fields of the chosen Salesforce auth flow', () => {
+    const sf = SOURCE_CONNECTORS.find((c) => c.id === 'salesforce')!;
+    const refreshToken = sf.fields.find((f) => f.key === 'refreshToken')!;
+    const token = sf.fields.find((f) => f.key === 'token')!;
+    const clientId = sf.fields.find((f) => f.key === 'clientId')!;
+
+    // Default flow is client credentials: the Connected App fields show, the flow-specific secrets do not.
+    expect(blankSource('salesforce').values.authType).toBe('client_credentials');
+    expect(isFieldVisible(clientId, { authType: 'client_credentials' })).toBe(true);
+    expect(isFieldVisible(refreshToken, { authType: 'client_credentials' })).toBe(false);
+    expect(isFieldVisible(refreshToken, { authType: 'refresh_token' })).toBe(true);
+    expect(isFieldVisible(token, { authType: 'bearer' })).toBe(true);
+    expect(isFieldVisible(clientId, { authType: 'bearer' })).toBe(false);
+
+    const base = { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name' };
+    // Client credentials is complete with the app key and secret; its hidden refresh token is not demanded.
+    expect(isSourceValid(withValues('salesforce', { ...base, clientId: 'c', clientSecret: 's' }))).toBe(true);
+    // Refresh-token flow additionally requires the refresh token.
+    expect(isSourceValid(withValues('salesforce', { ...base, authType: 'refresh_token', clientId: 'c', clientSecret: 's' }))).toBe(false);
+    expect(isSourceValid(withValues('salesforce', { ...base, authType: 'refresh_token', clientId: 'c', clientSecret: 's', refreshToken: 'r' }))).toBe(true);
+    // Bearer flow needs only the access token.
+    expect(invalidSourceFields(withValues('salesforce', { ...base, authType: 'bearer' })).map((f) => f.key)).toEqual(['token']);
+    expect(isSourceValid(withValues('salesforce', { ...base, authType: 'bearer', token: 't' }))).toBe(true);
+
+    expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
   });
 
   it('needs at least one complete, unique visibility rule', () => {
@@ -349,6 +378,16 @@ describe('wire payloads', () => {
     expect(payload.sources[0].credentials).toEqual({ accessToken: 'ghp_x' });
     expect(payload.llm).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6', apiKey: 'sk-ant' });
     expect(payload.embedding.baseUrl).toBeUndefined();
+  });
+
+  it('sends only the settings and credentials the chosen auth flow uses', () => {
+    const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale' });
+    const form = { ...completeForm(), sources: [sf] };
+    const source = toConfigurationPayload(toCreateInput(form)).sources[0];
+    // Client credentials is the default flow: the Connected App key is a setting, the hidden refresh token is dropped.
+    expect(source.settings).toMatchObject({ authType: 'client_credentials', baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', apiVersion: '59.0' });
+    expect(source.credentials).toEqual({ clientSecret: 's' });
+    expect(source.credentials.refreshToken).toBeUndefined();
   });
 
   it('summarizes sources for review', () => {

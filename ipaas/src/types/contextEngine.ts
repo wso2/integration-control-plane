@@ -155,9 +155,26 @@ export interface ContextSource {
 
 /**
  * How a connector field is entered. `url` must be one http(s) URL; `urls` is a
- * newline-separated list of them; `secret` is masked and travels as a credential.
+ * newline-separated list of them; `secret` is masked and travels as a credential;
+ * `select` is one of a fixed set of `options`.
  */
-export type SourceFieldKind = 'text' | 'secret' | 'url' | 'urls' | 'multiline';
+export type SourceFieldKind = 'text' | 'secret' | 'url' | 'urls' | 'multiline' | 'select';
+
+/** One choice in a `select` field. */
+export interface SourceFieldOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * A field shows only when another field holds one of these values — how a connector
+ * with alternative modes (e.g. Salesforce's OAuth2 flows) reveals just the inputs
+ * that mode needs. Hidden fields are skipped by validation and left out of the payload.
+ */
+export interface SourceFieldCondition {
+  field: string;
+  equals: string[];
+}
 
 export interface SourceFieldDef {
   key: string;
@@ -167,6 +184,19 @@ export interface SourceFieldDef {
   placeholder?: string;
   helper?: string;
   defaultValue?: string;
+  /** Choices for a `select` field. */
+  options?: SourceFieldOption[];
+  /** Render this field only when its condition is met; always shown when absent. */
+  showWhen?: SourceFieldCondition;
+  /**
+   * Section this field belongs to. Consecutive fields sharing a group render under
+   * one collapsible subheading, so a connector with many inputs (e.g. Salesforce)
+   * reads as Connection / Data / Sync options instead of one long column. Fields
+   * without a group, and connectors with only one group, render flat with no heading.
+   */
+  group?: string;
+  /** Start this field's group collapsed (e.g. advanced options). */
+  groupCollapsed?: boolean;
 }
 
 export type SourceCategory = 'documentation' | 'cloud-storage' | 'code' | 'collaboration' | 'databases' | 'saas' | 'web-files';

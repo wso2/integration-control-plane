@@ -110,6 +110,16 @@ export function connectorFor(type: string): SourceConnector | undefined {
 }
 
 /** Validation message for one connector field; empty when the value is acceptable. */
+/** Whether a conditional field is currently shown, given the other values entered. Unconditional fields are always shown. */
+export function isFieldVisible(def: SourceFieldDef, values: Record<string, string>): boolean {
+  return !def.showWhen || def.showWhen.equals.includes(values[def.showWhen.field] ?? '');
+}
+
+/** A connector's fields that currently apply to these values: conditional fields whose condition is met, in schema order. */
+export function visibleFields(connector: SourceConnector, values: Record<string, string>): SourceFieldDef[] {
+  return connector.fields.filter((f) => isFieldVisible(f, values));
+}
+
 export function sourceFieldError(def: SourceFieldDef, value: string | undefined): string {
   const v = (value ?? '').trim();
   if (!v) return def.required ? `${def.label} is required.` : '';
@@ -133,7 +143,7 @@ export function sourceNameError(name: string, otherNames: string[]): string {
 export function invalidSourceFields(source: ContextSourceConfig): SourceFieldDef[] {
   const connector = connectorFor(source.type);
   if (!connector) return [];
-  return connector.fields.filter((f) => sourceFieldError(f, source.values[f.key]) !== '');
+  return visibleFields(connector, source.values).filter((f) => sourceFieldError(f, source.values[f.key]) !== '');
 }
 
 /** Rules with anything typed in; fully blank rows are placeholders and ignored. */
@@ -1188,13 +1198,15 @@ export function sourceAsConfig(source: ContextSource, rules: AudienceRule[] = []
 /** Non-secret field values — where a source points. */
 function sourceSettings(source: ContextSourceConfig): Record<string, string> {
   const connector = connectorFor(source.type);
-  return Object.fromEntries((connector?.fields ?? []).filter((f) => f.kind !== 'secret').map((f) => [f.key, f.kind === 'urls' ? splitUrls(source.values[f.key] ?? '').join('\n') : (source.values[f.key] ?? '').trim()]));
+  if (!connector) return {};
+  return Object.fromEntries(visibleFields(connector, source.values).filter((f) => f.kind !== 'secret').map((f) => [f.key, f.kind === 'urls' ? splitUrls(source.values[f.key] ?? '').join('\n') : (source.values[f.key] ?? '').trim()]));
 }
 
 /** Secret field values, sent separately so the engine can store them as credentials. */
 function sourceSecrets(source: ContextSourceConfig): Record<string, string> {
   const connector = connectorFor(source.type);
-  return Object.fromEntries((connector?.fields ?? []).filter((f) => f.kind === 'secret').map((f) => [f.key, source.values[f.key] ?? '']));
+  if (!connector) return {};
+  return Object.fromEntries(visibleFields(connector, source.values).filter((f) => f.kind === 'secret').map((f) => [f.key, source.values[f.key] ?? '']));
 }
 
 export interface ContextEngineConfigurationPayload {
