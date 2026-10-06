@@ -23,7 +23,7 @@ import { useAddContextSource, useAskedFlag, useContextEngineProgress, useContext
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { CONTEXT_JOB_TERMINAL_STATES, EVERYONE_VISIBILITY, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withUploadRules } from '../../../utils/contextEngine';
+import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GraphStatusChip from '../GraphStatusChip';
@@ -148,8 +148,8 @@ export default function OverviewTab({ engine, orgHandle, roleNames, onGoTab, ope
 
   const submitNewSource = (picked: ContextSourceConfig) => {
     setSourceNotice(null);
-    // A File Upload source maps every role to itself, so its files can be shared with roles directly.
-    const [config] = withUploadRules([picked], everyone);
+    // The source's visibility becomes audience rules that map the chosen roles to themselves.
+    const [config] = withSourceVisibilityRules([picked], everyone);
     addSource.mutate(config, {
       onSuccess: (created) => {
         setAddOpen(false);

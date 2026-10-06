@@ -19,10 +19,11 @@
 import { Alert, Box, ButtonBase, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ChevronRight } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useState, type JSX } from 'react';
+import { EVERYONE_VISIBILITY } from '../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { sourceFieldError, sourceNameError, visibleFields } from '../../utils/contextEngine';
 import SecretField from '../RagIngestion/SecretField';
-import AudienceRulesEditor from './AudienceRulesEditor';
+import FileVisibilityField from './files/FileVisibilityField';
 import { StagedFilesSection, StagedVisibilityField } from './files/StagedFilesSection';
 import SourceMark from './SourceMark';
 import { connectorHeaderSx, fieldGroupBodySx, fieldGroupChevronSx, fieldGroupToggleSx, fieldStackSx } from './styles';
@@ -151,13 +152,20 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
         )}
       </Stack>
 
-      {upload ? (
-        <Box sx={{ mt: 2.5 }}>
+      <Box sx={{ mt: 2.5 }}>
+        {upload ? (
           <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} />
-        </Box>
-      ) : (
-        <AudienceRulesEditor orgHandle={orgHandle} connectorName={connector.name} rules={draft.audience ?? []} queryRoles={queryRoles} onChange={(audience) => change({ ...draft, audience })} />
-      )}
+        ) : (
+          <FileVisibilityField
+            id="source-visibility"
+            label="Who can see this content"
+            orgHandle={orgHandle}
+            queryRoles={queryRoles}
+            value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}
+            onChange={(stagedVisibility) => change({ ...draft, stagedVisibility })}
+          />
+        )}
+      </Box>
     </>
   );
 }

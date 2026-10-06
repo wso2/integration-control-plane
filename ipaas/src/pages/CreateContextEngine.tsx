@@ -23,7 +23,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
-import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withUploadRules } from '../utils/contextEngine';
+import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -110,8 +110,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const submit = () => {
     if (!canCreate || create.isPending) return;
     setError(null);
-    // File Upload sources map every role to itself, so their files can be shared with roles directly.
-    const withRules = withUploadRules(form.sources, everyone);
+    // Each source's visibility becomes audience rules now that the query roles are known.
+    const withRules = withSourceVisibilityRules(form.sources, everyone);
     create.mutate(toCreateInput({ ...form, sources: withRules }), {
       onSuccess: ({ id, sources, warnings }) => {
         draft.clear();

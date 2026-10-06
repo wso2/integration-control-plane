@@ -21,6 +21,7 @@ import {
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
   CONTEXT_QUERY_ACTIONS,
+  EVERYONE_VISIBILITY,
   OWNER_GRANT_PREFIX,
   defaultStorage,
   GRAPH_STATE_LABEL,
@@ -109,7 +110,6 @@ export function connectorFor(type: string): SourceConnector | undefined {
   return CONNECTOR_BY_ID[type];
 }
 
-/** Validation message for one connector field; empty when the value is acceptable. */
 /** Whether a conditional field is currently shown, given the other values entered. Unconditional fields are always shown. */
 export function isFieldVisible(def: SourceFieldDef, values: Record<string, string>): boolean {
   return !def.showWhen || def.showWhen.equals.includes(values[def.showWhen.field] ?? '');
@@ -120,6 +120,7 @@ export function visibleFields(connector: SourceConnector, values: Record<string,
   return connector.fields.filter((f) => isFieldVisible(f, values));
 }
 
+/** Validation message for one connector field; empty when the value is acceptable. */
 export function sourceFieldError(def: SourceFieldDef, value: string | undefined): string {
   const v = (value ?? '').trim();
   if (!v) return def.required ? `${def.label} is required.` : '';
@@ -139,7 +140,7 @@ export function sourceNameError(name: string, otherNames: string[]): string {
   return '';
 }
 
-/** Fields of a source that are missing or invalid, in schema order. */
+/** Fields of a source that are missing or invalid, in schema order. Hidden conditional fields are not checked. */
 export function invalidSourceFields(source: ContextSourceConfig): SourceFieldDef[] {
   const connector = connectorFor(source.type);
   if (!connector) return [];
@@ -176,12 +177,9 @@ export function stagedBlocker(source: ContextSourceConfig): string {
   return missing > 0 ? `Re-add ${plural(missing, 'file')}` : '';
 }
 
-/** Whether a source needs visibility rules typed in: connectors do; File Upload sources get theirs from the roles each upload is shared with. */
-export const needsAudienceRules = (source: Pick<ContextSourceConfig, 'type'>): boolean => source.type !== 'upload';
-
-/** Whether one source names a known connector, has a name, passes every field check, has visibility rules and its staged files are ready. */
+/** Whether one source names a known connector, has a name, passes every field check, has a usable visibility choice and its staged files are ready. */
 export function isSourceValid(source: ContextSourceConfig): boolean {
-  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && (!needsAudienceRules(source) || audienceError(source.audience) === '') && stagedBlocker(source) === '';
+  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && visibilityError(source.stagedVisibility) === '' && stagedBlocker(source) === '';
 }
 
 /** Short reason a source is incomplete, for its status chip; empty when it is complete. */
@@ -190,7 +188,7 @@ export function sourceIncompleteReason(source: ContextSourceConfig): string {
   if (!nonEmpty(source.name)) return 'Name missing';
   const first = invalidSourceFields(source)[0];
   if (first) return (source.values[first.key] ?? '').trim() ? `${first.label} invalid` : `${first.label} missing`;
-  if (needsAudienceRules(source) && audienceError(source.audience)) return typedRules(source.audience).length ? 'Visibility incomplete' : 'Visibility missing';
+  if (visibilityError(source.stagedVisibility)) return 'Choose who can see this content';
   return stagedBlocker(source);
 }
 
@@ -210,7 +208,7 @@ export function sourcesStepBlocker(sources: ContextSourceConfig[]): string | nul
 
 // ── Catalog ─────────────────────────────────────────────────────────────────
 
-/** Connectors matching a free-text query (name, description, category) and a category filter, sorted by name. */
+/** Connectors matching a free-text query (name, description, category) and a category filter. Live connectors lead, then alphabetical, so the ones a source can be created from today are reachable before the "Coming soon" ones. */
 export function filterConnectors(connectors: SourceConnector[], query: string, category: SourceCategory | 'all'): SourceConnector[] {
   const q = query.trim().toLowerCase();
   return connectors
@@ -330,7 +328,7 @@ function sanitizeSourceConfig(raw: unknown): ContextSourceConfig {
         .map((f) => ({ id: str((f as Partial<StagedFileMeta>)?.id), name: str((f as Partial<StagedFileMeta>)?.name), size: Number((f as Partial<StagedFileMeta>)?.size) || 0, contentType: str((f as Partial<StagedFileMeta>)?.contentType) }))
         .filter((f) => f.id && f.name)
     : [];
-  return { type: str(r.type), name: str(r.name), values, audience: audience.length ? audience : [{ group: '', role: '' }], ...(staged.length ? { staged, stagedVisibility: sanitizeVisibility(r.stagedVisibility) } : {}) };
+  return { type: str(r.type), name: str(r.name), values, audience, stagedVisibility: sanitizeVisibility(r.stagedVisibility), ...(staged.length ? { staged } : {}) };
 }
 
 /** A stored visibility choice, coerced; anything unreadable, including a draft's old label, becomes everyone who can query. */
@@ -779,14 +777,19 @@ export function visibilityTags(visibility: FileVisibility | undefined, everyone:
   return visibility?.kind === 'roles' ? uniqueTrimmed(visibility.roles) : uniqueTrimmed(everyone);
 }
 
-/** A File Upload source's rules: each role handle maps to itself. */
+/** A source's rules from a set of role handles: each role maps to itself, so a role tag resolves to the same org role. */
 export function uploadSourceRules(roles: string[]): AudienceRule[] {
   return uniqueTrimmed(roles).map((role) => ({ group: role, role }));
 }
 
-/** Every File Upload source gets rules mapping the given roles to themselves; other sources keep their own. */
-export function withUploadRules(sources: ContextSourceConfig[], roles: string[]): ContextSourceConfig[] {
-  return sources.map((s) => (s.type === 'upload' ? { ...s, audience: uploadSourceRules(roles) } : s));
+/**
+ * Give each source the audience rules its visibility implies, once the engine's
+ * query roles (`everyone`) are known. A File Upload source allows every granted
+ * role and lets each file's own tags narrow it; a connector allows the roles its
+ * visibility names, or all of them for "everyone who can query".
+ */
+export function withSourceVisibilityRules(sources: ContextSourceConfig[], everyone: string[]): ContextSourceConfig[] {
+  return sources.map((s) => ({ ...s, audience: uploadSourceRules(s.type === 'upload' ? everyone : visibilityTags(s.stagedVisibility, everyone)) }));
 }
 
 /** Why a visibility choice cannot be used, or '' when it can: "only some roles" needs at least one. */
@@ -807,9 +810,9 @@ export function describeUploadAudience(entry: Pick<UploadedFile, 'visibility' | 
   return entry.label ? `Label “${entry.label}”` : 'Everyone who can query';
 }
 
-/** Who a source's content reaches, for the wizard's rows: connectors by their rules, uploads by the files' choice. */
+/** Who a source's content reaches, for the wizard's rows: every source states it as a visibility choice now. */
 export function summarizeSourceVisibility(source: ContextSourceConfig, roleNames: Record<string, string> = {}): string {
-  return needsAudienceRules(source) ? summarizeAudience(source.audience, roleNames) : describeVisibility(source.stagedVisibility, roleNames);
+  return describeVisibility(source.stagedVisibility, roleNames);
 }
 
 /**
@@ -839,20 +842,15 @@ export interface SharingMismatches {
   hiddenFromMe: string[];
 }
 
-/** The roles a source shares content with: a connector's mapped roles, an upload's chosen roles or everyone. */
+/** The roles a source shares content with: the roles its visibility names, or everyone who can query. */
 function sourceSharedRoles(source: ContextSourceConfig, everyone: string[]): string[] {
-  if (!needsAudienceRules(source)) return visibilityTags(source.stagedVisibility, everyone);
-  return uniqueTrimmed(
-    typedRules(source.audience)
-      .filter((r) => nonEmpty(r.group) && nonEmpty(r.role))
-      .map((r) => r.role),
-  );
+  return visibilityTags(source.stagedVisibility, everyone);
 }
 
 export function sharingMismatches(sources: ContextSourceConfig[], queryRoles: string[], everyone: string[], myGroups: string[] = []): SharingMismatches {
   const shared = new Set(sources.flatMap((s) => sourceSharedRoles(s, everyone)));
-  // "Everyone who can query" names every role on purpose, so only explicit choices can name a role that cannot query.
-  const named = new Set(sources.filter((s) => needsAudienceRules(s) || s.stagedVisibility?.kind === 'roles').flatMap((s) => sourceSharedRoles(s, everyone)));
+  // "Everyone who can query" names every role on purpose, so only an explicit "only some roles" choice can name a role that cannot query.
+  const named = new Set(sources.filter((s) => s.stagedVisibility?.kind === 'roles').flatMap((s) => sourceSharedRoles(s, everyone)));
   return {
     seeNothing: queryRoles.filter((r) => !shared.has(r)),
     cannotQuery: [...named].filter((r) => !queryRoles.includes(r)),
@@ -1192,17 +1190,17 @@ export function audienceMappingFromRules(rules: AudienceRule[] | undefined): Rec
 
 /** A registered source as the wizard's drawer understands it: for name checks, single-instance connectors and the edit form. */
 export function sourceAsConfig(source: ContextSource, rules: AudienceRule[] = []): ContextSourceConfig {
-  return { type: source.type, name: source.name, values: {}, audience: rules.length ? rules : [{ group: '', role: '' }] };
+  return { type: source.type, name: source.name, values: {}, audience: rules, stagedVisibility: EVERYONE_VISIBILITY };
 }
 
-/** Non-secret field values — where a source points. */
+/** Non-secret field values — where a source points. Only fields that currently apply are sent (a hidden alternative-mode field is left out). */
 function sourceSettings(source: ContextSourceConfig): Record<string, string> {
   const connector = connectorFor(source.type);
   if (!connector) return {};
   return Object.fromEntries(visibleFields(connector, source.values).filter((f) => f.kind !== 'secret').map((f) => [f.key, f.kind === 'urls' ? splitUrls(source.values[f.key] ?? '').join('\n') : (source.values[f.key] ?? '').trim()]));
 }
 
-/** Secret field values, sent separately so the engine can store them as credentials. */
+/** Secret field values, sent separately so the engine can store them as credentials. Only the secrets the chosen mode uses are sent. */
 function sourceSecrets(source: ContextSourceConfig): Record<string, string> {
   const connector = connectorFor(source.type);
   if (!connector) return {};

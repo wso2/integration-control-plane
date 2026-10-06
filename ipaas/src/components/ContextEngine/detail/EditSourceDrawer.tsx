@@ -19,16 +19,16 @@
 import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
+import { EVERYONE_VISIBILITY } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { rememberedSourceRules, rememberSourceRules } from '../../../hooks/contextUploads';
 import { useUpdateContextSource } from '../../../hooks/useContextEngine';
-import { audienceError, engineMessage, needsAudienceRules, sourceNameError, sourceTypeName } from '../../../utils/contextEngine';
+import { engineMessage, sourceNameError, sourceTypeName, uploadSourceRules, visibilityError, visibilityTags } from '../../../utils/contextEngine';
 import { HttpError } from '../../../types/http';
-import AudienceRulesEditor from '../AudienceRulesEditor';
+import FileVisibilityField from '../files/FileVisibilityField';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourceMark from '../SourceMark';
 import { connectorHeaderSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fieldStackSx, filesDrawerSx, mutedSx } from '../styles';
-import type { AudienceRule, ContextSource } from '../../../types/contextEngine';
+import type { ContextSource, FileVisibility } from '../../../types/contextEngine';
 
 interface EditSourceDrawerProps {
   engineId: string;
@@ -49,25 +49,19 @@ interface EditSourceDrawerProps {
  * rules to edit: each file's visibility is chosen in the Files drawer.
  */
 export default function EditSourceDrawer({ engineId, orgHandle, source, otherNames, queryRoles, open, onClose }: EditSourceDrawerProps): JSX.Element {
-  const withRules = needsAudienceRules(source);
-  const remembered = rememberedSourceRules(source.id);
+  const isUpload = source.type === 'upload';
   const [name, setName] = useState(source.name);
-  const [rules, setRules] = useState<AudienceRule[]>(remembered.length ? remembered : [{ group: '', role: '' }]);
+  const [visibility, setVisibility] = useState<FileVisibility>(EVERYONE_VISIBILITY);
   const update = useUpdateContextSource(engineId);
   const nameError = sourceNameError(name, otherNames);
-  const rulesError = withRules ? audienceError(rules) : '';
-  const canSave = nameError === '' && rulesError === '' && !update.isPending;
+  const visError = isUpload ? '' : visibilityError(visibility);
+  const canSave = nameError === '' && visError === '' && !update.isPending;
   const forbidden = update.error instanceof HttpError && update.error.status === 403;
 
   const save = () => {
     update.mutate(
-      { sourceId: source.id, name: name.trim(), ...(withRules ? { audience: rules } : {}) },
-      {
-        onSuccess: () => {
-          if (withRules) rememberSourceRules(source.id, rules);
-          onClose();
-        },
-      },
+      { sourceId: source.id, name: name.trim(), ...(isUpload ? {} : { audience: uploadSourceRules(visibilityTags(visibility, queryRoles)) }) },
+      { onSuccess: onClose },
     );
   };
 
@@ -109,16 +103,7 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
           />
         </Stack>
 
-        {withRules ? (
-          <>
-            {remembered.length === 0 && (
-              <Alert severity="info" variant="outlined">
-                This browser has no record of the source&apos;s current rules, and the engine does not report them. Saving replaces all of its rules with the ones below.
-              </Alert>
-            )}
-            <AudienceRulesEditor orgHandle={orgHandle} connectorName={sourceTypeName(source.type)} rules={rules} queryRoles={queryRoles} onChange={setRules} />
-          </>
-        ) : (
+        {isUpload ? (
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
               Who can see uploaded files
@@ -127,6 +112,13 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
               Each file is shared when it is uploaded: with everyone who can query this engine, or with some roles. Change it per file from the Files drawer.
             </Typography>
           </Box>
+        ) : (
+          <>
+            <Alert severity="info" variant="outlined">
+              The engine does not report a source&apos;s current visibility, so this starts from everyone who can query. Saving replaces who can see this content.
+            </Alert>
+            <FileVisibilityField id="edit-source-visibility" label="Who can see this content" orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
+          </>
         )}
 
         {update.isError && (

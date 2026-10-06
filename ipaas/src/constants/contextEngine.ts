@@ -445,11 +445,11 @@ export const QUICK_ADD_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter(
 /** Connectors rendered per catalog page; the next page loads as the list scrolls into view. */
 export const CATALOG_PAGE_SIZE = 24;
 
-/** Blank config for a connector; `name` defaults to the connector's display name and fields to their defaults. */
+/** Blank config for a connector; `name` defaults to the connector's display name, fields to their defaults, and visibility to everyone who can query. */
 export function blankSource(connectorId: string): ContextSourceConfig {
   const connector = CONNECTOR_BY_ID[connectorId];
   if (!connector) throw new Error(`Unknown source connector: ${connectorId}`);
-  return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [{ group: '', role: '' }] };
+  return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [], stagedVisibility: EVERYONE_VISIBILITY };
 }
 
 // ── Step 3: LLM providers (embedding providers are shared with RAG) ─────────
