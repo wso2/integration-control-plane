@@ -69,6 +69,20 @@ const MS_GRAPH_APP = [F('tenantId', 'Tenant ID', 'text'), F('clientId', 'Client 
 
 /** Show a field only for the chosen auth flow (matches a connector's `authType` discriminator). */
 const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'authType', equals: flows });
+
+/**
+ * Optional RML mapping section, appended to connectors whose `isStructuredData` is
+ * set. A provided .rml.ttl is used to generate the context graph from the source's
+ * records; left empty, the engine generates the graph with the LLM. Its own collapsible section.
+ */
+export const RML_MAPPING = G(
+  { label: 'RML Mapping', collapsed: true },
+  O('rmlMapping', 'Mapping file', 'file', {
+    accept: '.rml.ttl,.ttl',
+    helper: 'Optional. Upload an .rml.ttl to control how your records are turned into a graph. Leave it empty and AI builds the graph for you.',
+  }),
+);
+
 const SQL_TABLES = (port: string) => [
   F('host', 'Host', 'text'),
   F('port', 'Port', 'text', { defaultValue: port }),
@@ -395,6 +409,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...G({ label: 'Sync options', collapsed: true }, O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' })),
     ],
     summaryKeys: ['baseUrl', 'sobject'],
+    isStructuredData: true,
   },
   { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },
   { id: 'intercom', name: 'Intercom', description: 'Help center articles and conversations.', category: 'saas', icon: 'headset', fields: [F('accessToken', 'Access Token', 'secret')], summaryKeys: [] },
