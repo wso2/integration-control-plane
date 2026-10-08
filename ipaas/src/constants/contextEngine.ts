@@ -93,6 +93,42 @@ const SQL_TABLES = (port: string) => [
 ];
 
 /**
+ * Grouped form fields for a SQL database connector, mirroring the Ballerina
+ * `DatabaseSettings`: connect to a table, pick the columns to ingest, and stream
+ * changes with CDC. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
+ * MySQL has no schema layer and omits it.
+ */
+const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[] => [
+  ...G(
+    'Connection',
+    F('host', 'Host', 'text', { defaultValue: 'localhost' }),
+    F('port', 'Port', 'text', { defaultValue: port }),
+    F('database', 'Database', 'text'),
+    ...(schemaDefault !== undefined ? [O('schema', 'Schema', 'text', { defaultValue: schemaDefault })] : []),
+    F('username', 'Username', 'text'),
+    F('password', 'Password', 'secret'),
+  ),
+  ...G(
+    'Data to sync',
+    F('tableName', 'Table', 'text', { helper: 'Each row becomes one record.' }),
+    F('primaryKey', 'Primary Key', 'text', { helper: 'Column that uniquely identifies each row.' }),
+    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated columns to ingest. Empty ingests every column.' }),
+    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Column holding each row’s last-updated time (epoch ms). Recommended for clean re-syncs.' }),
+  ),
+  ...G(
+    { label: 'Sync options', collapsed: true },
+    F('cdcEnabled', 'Change Data Capture', 'select', {
+      defaultValue: 'true',
+      options: [
+        { value: 'true', label: 'Enabled' },
+        { value: 'false', label: 'Disabled' },
+      ],
+      helper: 'Keep syncing new inserts, updates and deletes after the first import.',
+    }),
+  ),
+];
+
+/**
  * The connectors a context engine can read from. Order within a category is
  * irrelevant; the catalog is searched, filtered and sorted by name at render time.
  */
@@ -325,8 +361,26 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   { id: 'google-chat', name: 'Google Chat', description: 'Conversations in a space.', category: 'collaboration', icon: 'chat', fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')], summaryKeys: ['spaceId'] },
 
   // Databases
-  { id: 'postgresql', name: 'PostgreSQL', description: 'Rows from selected tables.', category: 'databases', logo: `${DB_LOGO_BASE}postgresql.svg`, icon: 'database', fields: SQL_TABLES('5432'), summaryKeys: ['host', 'database'] },
-  { id: 'mysql', name: 'MySQL', description: 'Rows from selected tables.', category: 'databases', logo: `${DB_LOGO_BASE}mysql.svg`, icon: 'database', fields: SQL_TABLES('3306'), summaryKeys: ['host', 'database'] },
+  {
+    id: 'postgresql',
+    name: 'PostgreSQL',
+    description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.',
+    category: 'databases',
+    logo: `${DB_LOGO_BASE}postgresql.svg`,
+    icon: 'database',
+    fields: [
+      ...DATABASE_FIELDS('5432', 'public'),
+      ...G(
+        { label: 'Sync options', collapsed: true },
+        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional logical replication slot name; a default is used when empty.' }),
+        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional publication name; a default is used when empty.' }),
+      ),
+    ],
+    summaryKeys: ['host', 'database'],
+    isStructuredData: true,
+  },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', logo: `${DB_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
   {
     id: 'mongodb',
     name: 'MongoDB',
@@ -468,7 +522,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'salesforce']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'salesforce', 'mysql', 'postgresql', 'mssql']);
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
