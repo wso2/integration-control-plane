@@ -205,7 +205,12 @@ public isolated function faultStackTrace(json answer, string subject) returns st
 # Security: the URL's host is replaced with the trusted management hostname before use. MI
 # reports its own configured hostname, which may differ from the one the ICP reaches it by,
 # and honouring it would let a runtime's configuration point the ICP at any host it liked.
-public isolated function fetchWsdlContent(string wsdlUrl, string trustedHost, boolean allowInsecureTLS) returns string|error {
+#
+# `secureSocket` is the same TLS setting the management calls use (see
+# `storage:managementSecureSocket`): this dial reaches the same host, often through the same
+# gateway and certificate.
+public isolated function fetchWsdlContent(string wsdlUrl, string trustedHost,
+        http:ClientSecureSocket? secureSocket) returns string|error {
     log:printInfo("Fetching WSDL content", wsdlUrl = wsdlUrl, trustedHost = trustedHost);
     int? schemeEndPos = wsdlUrl.indexOf("://");
     if schemeEndPos is () {
@@ -263,9 +268,7 @@ public isolated function fetchWsdlContent(string wsdlUrl, string trustedHost, bo
 
     log:printInfo("WSDL URL host replaced for security", originalUrl = wsdlUrl, trustedBaseUrl = wsdlBaseUrl);
 
-    http:Client wsdlClient = check (allowInsecureTLS
-        ? new (wsdlBaseUrl, {secureSocket: {enable: false}})
-        : new (wsdlBaseUrl));
+    http:Client wsdlClient = check new (wsdlBaseUrl, {secureSocket});
 
     http:Response wsdlResp = check wsdlClient->get(wsdlPath, {"Accept": CONTENT_TYPE_XML});
     if wsdlResp.statusCode != http:STATUS_OK {

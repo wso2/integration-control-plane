@@ -67,7 +67,7 @@ function cleanupWorkflowMetadataTests() {
     // The promotion test deliberately changes this component's integration type. Restore it
     // here rather than at the end of a later test, so the fixture is right regardless of
     // which tests ran, in what order, or whether they passed.
-    error? restored = storage:updateComponent(WF_COMPONENT_2_ID, (), (), (),
+    error? restored = storage:updateComponent(WF_COMPONENT_2_ID, (), (),
             SUPER_ADMIN_USER_ID, "service");
     if restored is error {
         io:println("Failed to restore the workflow-metadata component fixture: ", restored.message());
@@ -125,7 +125,7 @@ function testWorkflowMetadataUpsertFromHeartbeat() returns error? {
 function testWorkflowMetadataRecordsWorkflowIntegrationType() returns error? {
     cleanupRuntime(WF_META_RUNTIME_ID);
     // Put the component back to the generic type so this holds whatever else has run.
-    check storage:updateComponent(WF_COMPONENT_2_ID, (), (), (), SUPER_ADMIN_USER_ID, "service");
+    check storage:updateComponent(WF_COMPONENT_2_ID, (), (), SUPER_ADMIN_USER_ID, "service");
     types:Component generic = check storage:getComponentById(WF_COMPONENT_2_ID);
     test:assertEquals(generic.displayType, "service", "Precondition: the generic integration type");
 
@@ -152,7 +152,7 @@ function testWorkflowMetadataRecordsWorkflowIntegrationType() returns error? {
 @test:Config {groups: ["workflow-metadata"]}
 function testWorkflowMetadataKeepsDeliberateIntegrationType() returns error? {
     cleanupRuntime(WF_META_RUNTIME_ID);
-    check storage:updateComponent(WF_COMPONENT_2_ID, (), (), (), SUPER_ADMIN_USER_ID, "ballerinaService");
+    check storage:updateComponent(WF_COMPONENT_2_ID, (), (), SUPER_ADMIN_USER_ID, "ballerinaService");
 
     types:HeartbeatResponse response = check storage:processHeartbeat(
             buildWorkflowMetadataHeartbeat(WF_META_RUNTIME_ID, "wf-meta-type-keep", true),

@@ -47,6 +47,9 @@ enableMetrics = true
 # =============================================================================
 # NOTE: Must remain in the top-level section (before any [section] header).
 # artifactsApiAllowInsecureTLS = true  # set false in production with proper trust
+# The same flag also appears under [icp_server.storage]; set both. To trust a runtime
+# management API whose certificate comes from an internal CA, set artifactsApiTrustStorePath
+# under [icp_server.storage].
 
 # =============================================================================
 # AUTHENTICATION BACKEND CONFIGURATION
@@ -136,7 +139,7 @@ credentialsDbPassword = "icp_password"
 # ldapTrustStorePath = ""             # Path to a JKS truststore for verifying the LDAP server's CA cert
 # ldapTrustStorePassword = ""
 
-# Secrets alias form (use with [icp_server.secrets] block below):
+# Secrets alias form (use with the [secrets] table at the end of this file):
 # ldapConnectionPassword = "$secret{ldapConnectionPassword}"
 # ldapTrustStorePassword = "$secret{ldapTrustStorePassword}"
 
@@ -204,18 +207,11 @@ credentialsDbPassword = "icp_password"
 # =============================================================================
 # SECRETS ALIAS CONFIGURATION
 # =============================================================================
+# Reference an encrypted value as "$secret{alias}". The alias is defined in the
+# [secrets] table at the end of this file.
 # frontendJwtHMACSecret = "$secret{secretJWTsecret}"
 # To use an encrypted credentials DB password, set the credentialsDbPassword value above
 # to an alias, e.g. credentialsDbPassword = "$secret{secCredsDbPassword}"
-
-# =============================================================================
-# ENCRYPTED SECRETS CONFIGURATION
-# =============================================================================
-[icp_server.secrets]
-# secretJWTsecret = "encrypted-value-for-jwt-secret"
-# secCredsDbPassword = "encrypted-value-for-credentials-db-password"
-# ldapConnectionPassword = "encrypted-value-for-ldap-connection-password"
-# ldapTrustStorePassword = "encrypted-value-for-ldap-truststore-password"
 
 # =============================================================================
 # DATABASE CONFIGURATION
@@ -223,6 +219,12 @@ credentialsDbPassword = "icp_password"
 [icp_server.storage]
 # heartbeatTimeoutSeconds = 30
 # artifactsApiAllowInsecureTLS = true  # set false in production with proper trust
+# Truststore (JKS or PKCS12) used to verify runtime management API certificates, for every
+# ICP-to-runtime management call. It replaces the JVM's default cacerts for these calls,
+# so also import the CAs of any publicly signed runtimes; empty keeps cacerts. Only takes effect
+# while artifactsApiAllowInsecureTLS is false (here and at the top level).
+# artifactsApiTrustStorePath = "../conf/security/mi-truststore.p12"
+# artifactsApiTrustStorePassword = "$secret{artifactsApiTrustStorePassword}"  # alias in [icp_server.storage.secrets]
 # Primary database connection settings
 # Database type: h2 (in-memory), mysql, mssql, postgresql, or oracle. Default is h2
 
@@ -277,13 +279,8 @@ dbPassword = "icp_password"
 # DATABASE SECRETS ALIAS CONFIGURATION
 # =============================================================================
 # To use an encrypted password, set the dbPassword value above to an alias, e.g.
-# dbPassword = "$secret{secDbPassword}"
-
-# =============================================================================
-# DATABASE ENCRYPTED SECRETS CONFIGURATION
-# =============================================================================
-[icp_server.storage.secrets]
-# secDbPassword = "encrypted-value-for-db-password"
+# dbPassword = "$secret{secDbPassword}". The alias is defined in the [secrets] table
+# at the end of this file.
 
 
 [[ballerina.log.modules]]
@@ -293,3 +290,20 @@ level = "INFO"
 [ballerina.http.traceLogAdvancedConfig]
 # Enable printing trace logs on the Console. The default value is `false`.
 console = false
+
+# =============================================================================
+# ENCRYPTED SECRETS CONFIGURATION
+# =============================================================================
+# Holds every value referenced as "$secret{alias}" above, for all sections.
+# 1. Uncomment [secrets] and add each value as plain text wrapped in [], e.g.
+#      secretJWTsecret = "[my-jwt-secret-at-least-32-characters-long]"
+# 2. Run bin/ciphertool.sh -Dconfigure (bin\ciphertool.bat on Windows).
+#    The tool replaces each [plain-text] value with its encrypted form.
+# Keep this as a top-level [secrets] table: the cipher tool only processes this
+# table, and ICP fails to start if [icp_server.secrets] is also present.
+# [secrets]
+# secretJWTsecret = "encrypted-value-for-jwt-secret"
+# secCredsDbPassword = "encrypted-value-for-credentials-db-password"
+# secDbPassword = "encrypted-value-for-db-password"
+# ldapConnectionPassword = "encrypted-value-for-ldap-connection-password"
+# ldapTrustStorePassword = "encrypted-value-for-ldap-truststore-password"

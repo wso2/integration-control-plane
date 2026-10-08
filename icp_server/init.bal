@@ -41,6 +41,11 @@ function init() returns error? {
     };
 
     log:printInfo("Initializing ICP server");
+    if artifactsApiAllowInsecureTLS && storage:managementSecureSocket(false) !is () {
+        log:printWarn("artifactsApiTrustStorePath is set, but the top-level artifactsApiAllowInsecureTLS "
+            + "is true: console management calls (artifact source, WSDL, loggers, MI users) skip "
+            + "certificate validation and do not use the truststore");
+    }
     authBackendClient = check new (ldapUserStoreEnabled ? ldapAuthBackendUrl : authBackendUrl,
         secureSocket = authBackendSecureSocket,
         auth = authBackendJwtConfig
@@ -103,7 +108,7 @@ function init() returns error? {
 }
 
 // Resolves a configurable value for the default module.
-// If the value matches "$secret{alias}", looks up the alias in the [icp_server.secrets] map and decrypts it.
+// If the value matches "$secret{alias}", looks up the alias in the [secrets] map and decrypts it.
 // Otherwise returns the value unchanged (plain-text config).
 function resolveSecret(string configValue) returns string|error {
     return utils:resolveConfig(configValue, secrets);

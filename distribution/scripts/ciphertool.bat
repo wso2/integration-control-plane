@@ -28,8 +28,10 @@ REM
 REM   JAVA_OPTS     (Optional) Java runtime options
 REM
 REM Usage:
-REM   ciphertool.bat -Dconfigure          Encrypt passwords interactively
-REM   ciphertool.bat -Dconfigure -Dvalue=<plaintext>   Encrypt a specific value
+REM   ciphertool.bat -Dconfigure   Encrypt the [plain-text] values in the top-level
+REM                                [secrets] table of conf\deployment.toml
+REM   ciphertool.bat               Prompt for a single value and print it encrypted
+REM   ciphertool.bat -help         Show all options
 REM ---------------------------------------------------------------------------
 
 REM Make sure prerequisite environment variables are set

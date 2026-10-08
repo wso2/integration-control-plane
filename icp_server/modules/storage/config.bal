@@ -39,7 +39,16 @@ configurable types:DeploymentType deploymentType = "VM";
 // Artifacts API configuration
 configurable boolean artifactsApiAllowInsecureTLS = true;
 
+// Truststore (JKS or PKCS12) used to verify the certificate of a runtime's management API,
+// for example an MI behind a gateway whose certificate is issued by an internal CA. Applies
+// to every ICP-to-runtime management call, including those made with the top-level
+// artifactsApiAllowInsecureTLS. Ignored while certificate validation is disabled. When empty,
+// the JVM's default truststore (cacerts) is used, as before.
+configurable string artifactsApiTrustStorePath = "";
+configurable string artifactsApiTrustStorePassword = "";
+
 // Secrets map for the storage module — populated from [icp_server.storage.secrets] in Config.toml.
+// Aliases are also resolved from the top-level [secrets] table (see createDbClient).
 configurable map<string> secrets = {};
 
 // Runtime auth configuration (runtime and server communication)

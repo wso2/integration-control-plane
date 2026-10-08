@@ -2239,7 +2239,8 @@ service /graphql on graphqlListener {
         return true;
     }
 
-    // Update environment name, description, and/or critical status (requires management permission)
+    // Update environment name, description, and/or critical status (requires management permission).
+    // `handler` is only accepted when it equals the current handler, because handlers are immutable.
     isolated remote function updateEnvironment(graphql:Context context, string environmentId, string? name, string? handler, string? description, boolean? critical) returns types:Environment?|error {
         types:UserContextV2 userContext = check extractUserContext(context);
 
@@ -2270,13 +2271,14 @@ service /graphql on graphqlListener {
             }
         }
 
-        // Only a changed handler is validated, so environments created before handlers were
-        // validated can still be edited without being forced to rename.
+        // The handler is immutable: runtimes name their environment by handler in their config, and
+        // heartbeats are resolved by it. Resending the current value is accepted so clients that send
+        // every field still work.
         if handler is string && handler.trim() != currentEnv.handler {
-            check storage:validateHandler("Environment handler", handler.trim(), storage:MAX_ENVIRONMENT_HANDLER_LENGTH);
+            return error("Environment handler cannot be changed");
         }
 
-        check storage:updateEnvironment(environmentId, name, handler, description, critical);
+        check storage:updateEnvironment(environmentId, name, description, critical);
         types:Environment? updated = check storage:getEnvironmentById(environmentId);
         storage:logAuditEvent(storage:AUDIT_ENVIRONMENT_UPDATE, userId = userContext.userId,
                 resourceType = storage:AUDIT_RESOURCE_ENVIRONMENT, resourceId = environmentId,
@@ -3087,20 +3089,21 @@ service /graphql on graphqlListener {
             return error("Insufficient permissions to update this component");
         }
 
-        // The name is the component handler. Validate it only when it changes, as for environments.
-        if targetName is string {
-            types:Component? current = check storage:getComponentById(targetComponentId);
-            if current is () || targetName != current.name {
-                check storage:validateHandler("Component name", targetName, storage:MAX_COMPONENT_HANDLER_LENGTH);
-            }
+        types:Component current = check storage:getComponentById(targetComponentId);
+
+        // The name is the component handler and is immutable: runtimes name their integration by it
+        // in their config, and console URLs use it. Resending the current value is accepted so clients
+        // that send every field still work.
+        if targetName is string && targetName != current.name {
+            return error("Component name cannot be changed");
         }
 
         // Call the existing backend method to maintain consistency
-        check storage:updateComponent(targetComponentId, targetName, targetDisplayName, targetDescription, userContext.userId,
+        check storage:updateComponent(targetComponentId, targetDisplayName, targetDescription, userContext.userId,
                 component.displayType, component.componentSubType);
         storage:logAuditEvent(storage:AUDIT_COMPONENT_UPDATE, userId = userContext.userId,
                 resourceType = storage:AUDIT_RESOURCE_COMPONENT, resourceId = targetComponentId,
-                details = string `Component '${targetName ?: targetComponentId}' updated by '${userContext.username}'`,
+                details = string `Component '${current.name}' updated by '${userContext.username}'`,
                 clientIp = userContext.clientIp, userAgent = userContext.userAgent);
         return check storage:getComponentById(targetComponentId);
     }
@@ -3604,7 +3607,7 @@ service /graphql on graphqlListener {
         return {
             ...fetchableOf(answer),
             content: check mi_management:fetchWsdlContent(wsdlUrl, trustedHost,
-                    artifactsApiAllowInsecureTLS)
+                    storage:managementSecureSocket(artifactsApiAllowInsecureTLS))
         };
     }
 

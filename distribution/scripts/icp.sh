@@ -18,6 +18,8 @@
 
 # ICP Server Launcher Script
 # Usage: ./icp.sh [start|stop|restart|run|version]
+# Set JAVA_OPTS to a single line of whitespace-separated JVM flags, e.g. "-Xms512m -Xmx2g".
+# Flags are split literally (no shell quoting or expansion) and follow product defaults.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 JAR_FILE="$SCRIPT_DIR/icp-server.jar"
@@ -27,7 +29,6 @@ PID_FILE="$PARENT_DIR/icp.pid"
 LOG_DIR="$PARENT_DIR/logs"
 LOG_FILE="$LOG_DIR/icp.log"
 TMP_DIR="$PARENT_DIR/tmp"
-JAVA_OPTS=()
 
 resolve_version() {
     if [ -f "$PARENT_DIR/version.txt" ]; then
@@ -57,6 +58,8 @@ resolve_version() {
 }
 
 detect_java_opts() {
+    local -a user_opts
+    read -r -a user_opts <<< "${JAVA_OPTS:-}"
     JAVA_OPTS=("-Djava.io.tmpdir=$TMP_DIR")
     if [ -f /etc/alpine-release ] || (command -v ldd >/dev/null 2>&1 && ldd --version 2>&1 | grep -qi musl); then
         echo "Alpine Linux detected - disabling native Netty tcnative libraries"
@@ -83,6 +86,7 @@ detect_java_opts() {
             esac
             ;;
     esac
+    JAVA_OPTS+=("${user_opts[@]}")
 }
 
 build_classpath() {

@@ -196,16 +196,18 @@ ldapTrustStorePassword = "truststore-password"
 
 ## Secrets
 
-Passwords can be encrypted using the WSO2 cipher tool and referenced via the secrets map:
+Passwords can be encrypted using the WSO2 cipher tool and referenced via the secrets map. Add the plain-text values, wrapped in `[]`, to a top-level `[secrets]` table in `conf/deployment.toml`:
 
 ```toml
 ldapConnectionPassword = "$secret{ldapConnectionPassword}"
 ldapTrustStorePassword = "$secret{ldapTrustStorePassword}"
 
 [secrets]
-ldapConnectionPassword = "<encrypted-value>"
-ldapTrustStorePassword = "<encrypted-value>"
+ldapConnectionPassword = "[connection-password]"
+ldapTrustStorePassword = "[truststore-password]"
 ```
+
+Then run `bin/ciphertool.sh -Dconfigure` (`bin\ciphertool.bat -Dconfigure` on Windows). The tool replaces each `[plain-text]` value with its encrypted form. Keep the table as a top-level `[secrets]`: the cipher tool does not process `[icp_server.secrets]`, and ICP fails to start if both tables are present.
 
 ---
 

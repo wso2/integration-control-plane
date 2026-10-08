@@ -26,6 +26,7 @@ import CodeViewer from './CodeViewer';
 import { ListingTable, TablePagination } from '@wso2/oxygen-ui';
 const emptySx = { py: 4, textAlign: 'center', color: 'text.secondary' };
 import { useUpdateListenerState } from '../api/mutations';
+import { pollPendingListeners } from '../utils/listenerSync';
 import { useQueryClient } from '@tanstack/react-query';
 import type { TabProps } from './artifact-config';
 import { HTTP_METHOD_BADGE_COLORS, DEFAULT_METHOD_BADGE_COLOR, METHOD_BADGE_TEXT_SX, RESOURCE_LABEL_TEXT_SX } from '../constants/methodBadgeStyles';
@@ -190,6 +191,24 @@ export function ServiceListeners({ artifact, artifactType, envId, componentId }:
       return changed ? next : prev;
     });
   }, [listeners]);
+
+  // The Service query only polls while the service's own state is out of sync, and a listener
+  // toggle never changes that, so nothing would refetch after the one refetch onSettled does —
+  // which lands before the runtime has applied the command and heartbeated the new state.
+  // Poll here instead while any listener is still busy.
+  const pendingNames = Object.keys(actions).sort().join(',');
+  useEffect(
+    () =>
+      pollPendingListeners(
+        pendingNames ? pendingNames.split(',') : [],
+        () => queryClient.invalidateQueries({ queryKey: ['artifacts', artifactType, envId, componentId] }),
+        (names) => {
+          setActions({});
+          setError(`Timed out waiting for ${names.join(', ')} to change state. Refresh to see the current state.`);
+        },
+      ),
+    [pendingNames, queryClient, artifactType, envId, componentId],
+  );
 
   const confirmToggle = () => {
     if (!pending) return;

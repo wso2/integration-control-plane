@@ -27,8 +27,10 @@
 #   JAVA_HOME   Must point at your Java Development Kit installation.
 #
 # Usage:
-#   ./ciphertool.sh -Dconfigure          Encrypt passwords interactively
-#   ./ciphertool.sh -Dconfigure -Dvalue=<plaintext>   Encrypt a specific value
+#   ./ciphertool.sh -Dconfigure   Encrypt the [plain-text] values in the top-level
+#                                 [secrets] table of conf/deployment.toml
+#   ./ciphertool.sh               Prompt for a single value and print it encrypted
+#   ./ciphertool.sh -help         Show all options
 
 # if JAVA_HOME is not set we're not happy
 if [ -z "$JAVA_HOME" ]; then
@@ -106,8 +108,8 @@ do
 done
 ICP_CLASSPATH=$ICP_CLASSPATH:$CLASSPATH
 
-# For Cygwin, switch paths to Windows format before running java
-if $cygwin; then
+# For Cygwin and Mingw (Git Bash), switch paths to Windows format before running java
+if $cygwin || $mingw; then
   JAVA_HOME=`cygpath --absolute --windows "$JAVA_HOME"`
   ICP_HOME=`cygpath --absolute --windows "$ICP_HOME"`
   CLASSPATH=`cygpath --path --windows "$CLASSPATH"`

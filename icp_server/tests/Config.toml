@@ -66,6 +66,9 @@ dbName = "icp_test_db"
 dbUser = "icp_user"
 dbPassword = "icp_password"
 heartbeatTimeoutSeconds = 30
+# Holds only the internal CA that signed the mock management API's certificate (mi_management_tls_tests.bal)
+artifactsApiTrustStorePath = "tests/resources/keys/mi_internal_ca_truststore.p12"
+artifactsApiTrustStorePassword = "changeit"
 
 [[ballerina.log.modules]]
 name = "wso2/icp_server"

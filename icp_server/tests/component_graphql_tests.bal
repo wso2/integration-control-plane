@@ -606,7 +606,7 @@ function testRuntimeRegistrationDefaultsToUnspecifiedType() returns error? {
         test:assertEquals(discovered.displayType, "unspecified");
 
         string selectedType = runtimeType == "BI" ? "ballerinaService" : "miApiService";
-        check storage:updateComponent(componentId, (), (), (), SUPER_ADMIN_USER_ID, selectedType, "aiAgent");
+        check storage:updateComponent(componentId, (), (), SUPER_ADMIN_USER_ID, selectedType, "aiAgent");
         string resolvedId = check storage:resolveOrCreateComponent(
             PROJECT_1_ID, name, runtimeType, SUPER_ADMIN_USER_ID);
         test:assertEquals(resolvedId, componentId);

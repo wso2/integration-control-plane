@@ -321,9 +321,8 @@ public isolated function sendMIControlCommandAsync(string runtimeId, string arti
 
         string baseUrl = check buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
 
-        http:Client|error mgmtClientResult = artifactsApiAllowInsecureTLS
-            ? new (baseUrl, {secureSocket: {enable: false}})
-            : new (baseUrl);
+        http:Client|error mgmtClientResult =
+            new (baseUrl, {secureSocket: managementSecureSocket(artifactsApiAllowInsecureTLS)});
 
         if mgmtClientResult is error {
             log:printError("Failed to create management API client for MI command", runtimeId = runtimeId, 'error = mgmtClientResult);
@@ -614,6 +613,24 @@ isolated function resolveArtifactTableMetadata(string artifactType) returns Arti
     return ();
 }
 
+# TLS settings for a call to a runtime's management API.
+#
+# Every ICP-to-runtime management client takes its `secureSocket` from here, so the one
+# truststore setting covers all of them.
+#
+# + allowInsecureTLS - the caller's `artifactsApiAllowInsecureTLS`; true skips certificate validation
+# + return - `{enable: false}` when validation is skipped, the configured truststore when one is
+# set, and `()` otherwise, which leaves the JVM's default truststore in use
+public isolated function managementSecureSocket(boolean allowInsecureTLS) returns http:ClientSecureSocket? {
+    if allowInsecureTLS {
+        return {enable: false};
+    }
+    if artifactsApiTrustStorePath.trim() == "" {
+        return ();
+    }
+    return {cert: {path: artifactsApiTrustStorePath, password: resolvedArtifactsApiTrustStorePassword}};
+}
+
 public isolated function buildManagementBaseUrl(string? managementHost, string? managementPort) returns string|error {
     if managementHost is () {
         return error("Management hostname not configured for this runtime");
@@ -634,9 +651,8 @@ public isolated function sendArtifactTracingChange(types:Runtime runtime, string
 
     string baseUrl = check buildManagementBaseUrl(runtime.managementHostname, runtime.managementPort);
 
-    http:Client|error mgmtClient = artifactsApiAllowInsecureTLS
-        ? new (baseUrl, {secureSocket: {enable: false}})
-        : new (baseUrl);
+    http:Client|error mgmtClient =
+        new (baseUrl, {secureSocket: managementSecureSocket(artifactsApiAllowInsecureTLS)});
 
     if mgmtClient is error {
         log:printError("Failed to create management API client for runtime", runtimeId = runtime.runtimeId, 'error = mgmtClient);

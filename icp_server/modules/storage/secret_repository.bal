@@ -436,17 +436,6 @@ public isolated function resolveOrCreateComponent(string projectId, string name,
     return componentId;
 }
 
-public isolated function updateOrgSecretsComponentName(string componentId, string newName) returns error? {
-    log:printDebug(string `updateOrgSecretsComponentName: componentId=${componentId}, newName=${newName}`);
-
-    sql:ExecutionResult result = check dbClient->execute(`
-        UPDATE org_secrets SET component_name = ${newName}
-        WHERE component_id = ${componentId}
-    `);
-
-    log:printInfo(string `updateOrgSecretsComponentName: updated ${result.affectedRowCount ?: 0} rows for componentId=${componentId}`);
-}
-
 // Resolve the key_id and HMAC key material for a runtime via runtimes.key_id → org_secrets.key_material.
 // Returns error if the runtime has no key_id (hasn't sent a full heartbeat yet).
 public isolated function resolveKeyIdAndMaterialByRuntimeId(string runtimeId) returns record {|string keyId; string keyMaterial;|}|error {

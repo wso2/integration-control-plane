@@ -222,9 +222,8 @@ isolated function callMIManagement(types:Runtime runtime, string method, string 
     }
     string baseUrl = check storage:buildManagementBaseUrl(runtime.managementHostname,
             runtime.managementPort);
-    http:Client mgmtClient = check (artifactsApiAllowInsecureTLS
-        ? new (baseUrl, {secureSocket: {enable: false}})
-        : new (baseUrl));
+    http:Client mgmtClient = check new (baseUrl,
+        {secureSocket: storage:managementSecureSocket(artifactsApiAllowInsecureTLS)});
     map<string> headers = {
         "Authorization": "Bearer " + check storage:issueRuntimeHmacToken(runtime.runtimeId),
         "Accept": "application/json"

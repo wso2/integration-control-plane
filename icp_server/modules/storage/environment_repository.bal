@@ -322,30 +322,14 @@ public isolated function createEnvironment(types:EnvironmentInput environment) r
     return check getEnvironmentById(envId);
 }
 
-// Update environment name and/or description
-public isolated function updateEnvironment(string environmentId, string? name, string? handler, string? description, boolean? critical) returns error? {
+// Update environment name, description and/or critical status.
+// The handler is immutable once the environment is created, so it can't be updated here.
+public isolated function updateEnvironment(string environmentId, string? name, string? description, boolean? critical) returns error? {
     sql:ParameterizedQuery whereClause = ` WHERE environment_id = ${environmentId} `;
     sql:ParameterizedQuery updateFields = ` SET updated_at = CURRENT_TIMESTAMP `;
 
     if name is string {
         updateFields = sql:queryConcat(updateFields, `, name = ${name} `);
-    }
-    if handler is string {
-        // Trim and validate handler the same way as createEnvironment
-        string trimmedHandler = handler.trim();
-        if trimmedHandler == "" {
-            return error("Environment handler cannot be empty");
-        }
-
-        // Check for duplicate handler (excluding current environment)
-        sql:ParameterizedQuery handlerCheckQuery = `SELECT COUNT(*) as cnt FROM environments WHERE handler = ${trimmedHandler} AND environment_id != ${environmentId}`;
-        stream<record {|int cnt;|}, sql:Error?> handlerCheckStream = dbClient->query(handlerCheckQuery);
-        record {|int cnt;|}[] handlerCheckResult = check from record {|int cnt;|} r in handlerCheckStream
-            select r;
-        if handlerCheckResult.length() > 0 && handlerCheckResult[0].cnt > 0 {
-            return error(string `Environment handler '${trimmedHandler}' is already taken`);
-        }
-        updateFields = sql:queryConcat(updateFields, `, handler = ${trimmedHandler} `);
     }
     if description is string {
         updateFields = sql:queryConcat(updateFields, `, description = ${description} `);

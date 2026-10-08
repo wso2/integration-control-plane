@@ -15,6 +15,7 @@
 // under the License.
 
 import icp_server.storage;
+import icp_server.types;
 
 import ballerina/test;
 
@@ -83,15 +84,36 @@ function testCreateEnvironmentRejectsInvalidHandler() returns error? {
 @test:Config {
     groups: ["handler-validation", "environment-graphql"]
 }
-function testUpdateEnvironmentRejectsInvalidHandler() returns error? {
+function testUpdateEnvironmentRejectsHandlerChange() returns error? {
+    // Environment handlers are immutable, whether the new value is a valid slug or not.
+    foreach string newHandler in ["dev-renamed", "dev/../x"] {
+        json response = check updateEnvironmentHandler(DEV_ENV_ID, newHandler);
+        string body = response.toJsonString();
+        test:assertTrue(response.errors is json, string `Changing the handler to '${newHandler}' must be rejected, got: ${body}`);
+        test:assertTrue(body.includes("Environment handler cannot be changed"),
+                string `Rejection must come from the immutability check, got: ${body}`);
+    }
+    types:Environment env = check storage:getEnvironmentById(DEV_ENV_ID);
+    test:assertEquals(env.handler, "dev", "The handler must be unchanged");
+}
+
+@test:Config {
+    groups: ["handler-validation", "environment-graphql"]
+}
+function testUpdateEnvironmentAcceptsUnchangedHandler() returns error? {
+    // Clients that resend the current handler along with the other fields keep working.
+    json response = check updateEnvironmentHandler(DEV_ENV_ID, "dev");
+    test:assertFalse(response.errors is json, string `Resending the current handler must be accepted, got: ${response.toJsonString()}`);
+    test:assertEquals(check response.data.updateEnvironment.handler, "dev");
+}
+
+function updateEnvironmentHandler(string environmentId, string handler) returns json|error {
     string mutation = string `
         mutation UpdateEnvironment($environmentId: String!, $handler: String) {
-            updateEnvironment(environmentId: $environmentId, handler: $handler) { id }
+            updateEnvironment(environmentId: $environmentId, handler: $handler) { id handler }
         }
     `;
-    json variables = {environmentId: DEV_ENV_ID, handler: "dev/../x"};
-    json response = check executeGraphQL(mutation, adminToken, variables);
-    assertHandlerRejected(response, "Environment handler");
+    return executeGraphQL(mutation, adminToken, {environmentId, handler});
 }
 
 @test:Config {
@@ -127,15 +149,36 @@ function testCreateComponentRejectsInvalidName() returns error? {
 @test:Config {
     groups: ["handler-validation", "component-graphql"]
 }
-function testUpdateComponentRejectsInvalidName() returns error? {
+function testUpdateComponentRejectsNameChange() returns error? {
+    // The component name is its handler, which is immutable, whether the new value is a valid slug or not.
+    foreach string newName in ["sample-integration-renamed", "Sample Integration/.."] {
+        json response = check updateComponentName(COMPONENT_1_ID, newName);
+        string body = response.toJsonString();
+        test:assertTrue(response.errors is json, string `Renaming to '${newName}' must be rejected, got: ${body}`);
+        test:assertTrue(body.includes("Component name cannot be changed"),
+                string `Rejection must come from the immutability check, got: ${body}`);
+    }
+    types:Component component = check storage:getComponentById(COMPONENT_1_ID);
+    test:assertEquals(component.name, "sample-integration", "The name must be unchanged");
+}
+
+@test:Config {
+    groups: ["handler-validation", "component-graphql"]
+}
+function testUpdateComponentAcceptsUnchangedName() returns error? {
+    // Clients that resend the current name along with the other fields keep working.
+    json response = check updateComponentName(COMPONENT_1_ID, "sample-integration");
+    test:assertFalse(response.errors is json, string `Resending the current name must be accepted, got: ${response.toJsonString()}`);
+    test:assertEquals(check response.data.updateComponent.name, "sample-integration");
+}
+
+function updateComponentName(string componentId, string name) returns json|error {
     string mutation = string `
         mutation UpdateComponent($component: ComponentUpdateInput!) {
-            updateComponent(component: $component) { id }
+            updateComponent(component: $component) { id name }
         }
     `;
-    json variables = {component: {id: COMPONENT_1_ID, name: "Sample Integration/.."}};
-    json response = check executeGraphQL(mutation, project1AdminToken, variables);
-    assertHandlerRejected(response, "Component name");
+    return executeGraphQL(mutation, project1AdminToken, {component: {id: componentId, name}});
 }
 
 // Assert on the message too, so an unrelated failure (permissions, duplicates) cannot pass.

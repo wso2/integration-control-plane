@@ -18,50 +18,31 @@
 
 import { Alert, Button, Checkbox, CircularProgress, FormControlLabel, PageContent, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
-import { useState, useEffect, useRef, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useAllEnvironments, useEnvironmentHandlerAvailability, type GqlEnvironment } from '../api/queries';
+import { useAllEnvironments, type GqlEnvironment } from '../api/queries';
 import { useUpdateEnvironment } from '../api/mutations';
 import { resourceUrl } from '../nav';
-import { HANDLER_RULE, isValidHandler } from '../utils/handler';
 
 function EditEnvironmentForm({ env, orgHandler }: { env: GqlEnvironment; orgHandler: string }): JSX.Element {
   const navigate = useNavigate();
   const [name, setName] = useState(env.name);
-  const [handler, setHandler] = useState(env.handler);
   const [description, setDescription] = useState(env.description ?? '');
   const [critical, setCritical] = useState(env.critical);
   const [error, setError] = useState<string | null>(null);
-  const [debouncedHandler, setDebouncedHandler] = useState(env.handler);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mutation = useUpdateEnvironment();
   const backUrl = resourceUrl({ level: 'organizations', org: orgHandler }, 'environments');
 
   // Normalize string fields once for consistent use everywhere
   const trimmedName = name.trim();
-  const trimmedHandler = handler.trim();
   const trimmedDescription = description.trim();
 
-  const isDirty = trimmedName !== env.name || trimmedHandler !== env.handler || trimmedDescription !== (env.description ?? '') || critical !== env.critical;
-
-  useEffect(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(() => setDebouncedHandler(trimmedHandler), 400);
-    return () => {
-      if (debounceRef.current) clearTimeout(debounceRef.current);
-    };
-  }, [trimmedHandler]);
-
-  const availability = useEnvironmentHandlerAvailability(debouncedHandler);
-  const handlerChanged = trimmedHandler !== env.handler;
-  const handlerTaken = handlerChanged && debouncedHandler !== '' && availability.data?.handlerUnique === false;
-  // An unchanged handler is left alone, so environments created before validation stay editable.
-  const handlerInvalid = handlerChanged && trimmedHandler !== '' && !isValidHandler(trimmedHandler);
+  const isDirty = trimmedName !== env.name || trimmedDescription !== (env.description ?? '') || critical !== env.critical;
 
   const save = () => {
     setError(null);
     mutation.mutate(
-      { environmentId: env.id, name: trimmedName, handler: handlerChanged ? trimmedHandler : undefined, description: trimmedDescription, critical },
+      { environmentId: env.id, name: trimmedName, description: trimmedDescription, critical },
       {
         onSuccess: () => navigate(backUrl, { state: { updated: true, name: trimmedName } }),
         onError: (err) => setError(err.message ?? 'Failed to update environment. Please try again.'),
@@ -87,14 +68,8 @@ function EditEnvironmentForm({ env, orgHandler }: { env: GqlEnvironment; orgHand
 
       <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
         <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-        <TextField
-          label="Handler"
-          value={handler}
-          onChange={(e) => setHandler(e.target.value)}
-          fullWidth
-          error={handlerInvalid || handlerTaken}
-          helperText={handlerInvalid ? HANDLER_RULE : handlerTaken ? 'This handler is already taken. Please choose a different one.' : undefined}
-        />
+        {/* Runtimes name their environment by handler in their config, so it can't change after creation. */}
+        <TextField label="Handler" value={env.handler} fullWidth disabled helperText="Handler cannot be changed" />
         <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
         <FormControlLabel control={<Checkbox checked={critical} onChange={(_, v) => setCritical(v)} />} label="Mark as Critical Environment" />
       </Stack>
@@ -103,7 +78,7 @@ function EditEnvironmentForm({ env, orgHandler }: { env: GqlEnvironment; orgHand
         <Button variant="outlined" onClick={() => navigate(backUrl)}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={save} disabled={!trimmedName || !trimmedHandler || handlerInvalid || handlerTaken || !isDirty || mutation.isPending}>
+        <Button variant="contained" onClick={save} disabled={!trimmedName || !isDirty || mutation.isPending}>
           Save
         </Button>
       </Stack>
