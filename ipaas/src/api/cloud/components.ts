@@ -99,11 +99,11 @@ const DISPLAY_TYPE_MAP: Record<DisplayType, { componentType: string; workflow: s
   manualTrigger: { componentType: 'cronjob/scheduled-task', workflow: 'ballerina-buildpack-builder' },
   webhook: { componentType: 'deployment/event-integration', workflow: 'ballerina-buildpack-builder' },
   ballerinaEventHandler: { componentType: 'deployment/event-integration', workflow: 'ballerina-buildpack-builder' },
-  miApiService: { componentType: 'deployment/integration-as-api', workflow: 'mi-buildpack-builder' },
-  miCronjob: { componentType: 'cronjob/scheduled-task', workflow: 'mi-buildpack-builder' },
-  miJob: { componentType: 'cronjob/scheduled-task', workflow: 'mi-buildpack-builder' },
-  miWebhook: { componentType: 'deployment/event-integration', workflow: 'mi-buildpack-builder' },
-  miEventHandler: { componentType: 'deployment/event-integration', workflow: 'mi-buildpack-builder' },
+  miApiService: { componentType: 'deployment/integration-as-api', workflow: 'mi-image-builder' },
+  miCronjob: { componentType: 'cronjob/scheduled-task', workflow: 'mi-image-builder' },
+  miJob: { componentType: 'cronjob/scheduled-task', workflow: 'mi-image-builder' },
+  miWebhook: { componentType: 'deployment/event-integration', workflow: 'mi-image-builder' },
+  miEventHandler: { componentType: 'deployment/event-integration', workflow: 'mi-image-builder' },
 };
 
 // Reverse map (read path): the BFF returns a composite displayType from
