@@ -115,7 +115,7 @@ import {
   toCreateInput,
   toSourceRegistration,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
 import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
@@ -282,6 +282,26 @@ describe('source validation', () => {
     const mapped = withValues('salesforce', { ...base, rmlMapping: '@prefix ex: <http://ex> .' });
     const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] })).sources[0].settings;
     expect(settings.rmlMapping).toBe('@prefix ex: <http://ex> .');
+  });
+
+  it('models and enables the supported SQL databases', () => {
+    const keys = (id: string) => SOURCE_CONNECTORS.find((c) => c.id === id)!.fields.map((f) => f.key);
+    // Only MySQL, PostgreSQL and SQL Server are supported, and they are enabled.
+    for (const id of ['mysql', 'postgresql', 'mssql']) expect(isConnectorEnabled(id)).toBe(true);
+    // Core DatabaseSettings fields are present on each.
+    for (const id of ['mysql', 'postgresql', 'mssql']) {
+      expect(keys(id)).toEqual(expect.arrayContaining(['host', 'port', 'database', 'username', 'password', 'tableName', 'primaryKey', 'columns', 'updatedAtColumn', 'cdcEnabled']));
+    }
+    // MySQL has no schema layer; PostgreSQL and SQL Server do.
+    expect(keys('mysql')).not.toContain('schema');
+    expect(keys('postgresql')).toContain('schema');
+    expect(keys('mssql')).toContain('schema');
+    // PostgreSQL exposes its CDC replication overrides.
+    expect(keys('postgresql')).toEqual(expect.arrayContaining(['slotName', 'publicationName']));
+    // Per-dialect default ports and CDC on by default.
+    expect(blankSource('mysql').values.port).toBe('3306');
+    expect(blankSource('mssql').values.port).toBe('1433');
+    expect(blankSource('postgresql').values.cdcEnabled).toBe('true');
   });
 
   it('needs at least one complete, unique visibility rule', () => {
