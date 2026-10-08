@@ -156,9 +156,10 @@ export interface ContextSource {
 /**
  * How a connector field is entered. `url` must be one http(s) URL; `urls` is a
  * newline-separated list of them; `secret` is masked and travels as a credential;
- * `select` is one of a fixed set of `options`.
+ * `select` is one of a fixed set of `options`; `file` is a text file whose contents
+ * become the value.
  */
-export type SourceFieldKind = 'text' | 'secret' | 'url' | 'urls' | 'multiline' | 'select';
+export type SourceFieldKind = 'text' | 'secret' | 'url' | 'urls' | 'multiline' | 'select' | 'file';
 
 /** One choice in a `select` field. */
 export interface SourceFieldOption {
@@ -186,6 +187,8 @@ export interface SourceFieldDef {
   defaultValue?: string;
   /** Choices for a `select` field. */
   options?: SourceFieldOption[];
+  /** Accepted file types for a `file` field, as an input `accept` string (e.g. ".rml.ttl,.ttl"). */
+  accept?: string;
   /** Render this field only when its condition is met; always shown when absent. */
   showWhen?: SourceFieldCondition;
   /**
@@ -224,6 +227,8 @@ export interface SourceConnector {
   summaryKeys: string[];
   /** Only one instance can be added (e.g. file upload). */
   single?: boolean;
+  /** Reads structured records, so it can take an optional RML mapping that maps them into the graph. */
+  isStructuredData?: boolean;
 }
 
 /** A configured source in the wizard: the connector, a display name and the connector's field values. */

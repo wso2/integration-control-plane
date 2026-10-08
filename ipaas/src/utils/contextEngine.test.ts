@@ -266,6 +266,24 @@ describe('source validation', () => {
     expect(invalidSourceFields(withValues('gdrive', { folderId: 'f', authType: 'service_account' })).map((f) => f.key)).toEqual(['clientEmail', 'privateKeyPath']);
   });
 
+  it('offers an optional RML mapping on structured connectors', () => {
+    const connector = (id: string) => SOURCE_CONNECTORS.find((c) => c.id === id)!;
+    const rmlOf = (id: string) => visibleFields(connector(id), { authType: 'client_credentials' }).find((f) => f.key === 'rmlMapping');
+    // The mapping is driven by the connector's isStructuredData flag, not declared in its fields.
+    expect(connector('salesforce').isStructuredData).toBe(true);
+    expect(connector('gdrive').isStructuredData).toBeUndefined();
+    expect(rmlOf('salesforce')).toMatchObject({ kind: 'file', required: false, group: 'RML Mapping' });
+    expect(rmlOf('gdrive')).toBeUndefined();
+    expect(rmlOf('upload')).toBeUndefined();
+
+    // Optional: a source is valid without it, and its contents travel as a setting when provided.
+    const base = { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name', clientId: 'c', clientSecret: 's' };
+    expect(isSourceValid(withValues('salesforce', base))).toBe(true);
+    const mapped = withValues('salesforce', { ...base, rmlMapping: '@prefix ex: <http://ex> .' });
+    const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] })).sources[0].settings;
+    expect(settings.rmlMapping).toBe('@prefix ex: <http://ex> .');
+  });
+
   it('needs at least one complete, unique visibility rule', () => {
     expect(audienceError([])).toMatch(/nobody will see/);
     expect(audienceError([{ group: '', role: '' }])).toMatch(/nobody will see/);

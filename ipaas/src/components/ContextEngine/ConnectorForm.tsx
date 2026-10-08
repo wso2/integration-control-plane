@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Alert, Box, ButtonBase, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { ChevronRight } from '@wso2/oxygen-ui-icons-react';
-import { Fragment, useState, type JSX } from 'react';
+import { Alert, Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { ChevronRight, Upload } from '@wso2/oxygen-ui-icons-react';
+import { Fragment, useRef, useState, type JSX } from 'react';
 import { EVERYONE_VISIBILITY } from '../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { sourceFieldError, sourceNameError, visibleFields } from '../../utils/contextEngine';
@@ -42,10 +42,49 @@ interface ConnectorFormProps {
   queryRoles?: string[];
 }
 
+/** A field whose value is the text contents of an uploaded file (e.g. an RML mapping). The file name is kept only for display this session; a restored draft still has the contents. */
+function FileField({ def, value, onChange }: { def: SourceFieldDef; value: string; onChange: (value: string) => void }): JSX.Element {
+  const [name, setName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+  const read = (file: File | undefined) => {
+    if (!file) return;
+    setName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => onChange(typeof reader.result === 'string' ? reader.result : '');
+    reader.readAsText(file);
+  };
+  const clear = () => {
+    setName('');
+    onChange('');
+    if (inputRef.current) inputRef.current.value = '';
+  };
+  return (
+    <Box>
+      <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.75 }}>
+        {def.label}
+        {def.required ? ' *' : ''}
+      </Typography>
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+        <Button component="label" variant="outlined" size="small" startIcon={<Upload size={16} />}>
+          {value ? 'Replace file' : 'Upload file'}
+          <input ref={inputRef} type="file" hidden accept={def.accept} onChange={(e) => read(e.target.files?.[0])} />
+        </Button>
+        {value && <Chip label={name || 'File uploaded'} size="small" onDelete={clear} />}
+      </Stack>
+      {def.helper && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.75 }}>
+          {def.helper}
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; onChange: (value: string) => void }): JSX.Element {
   // Required-but-empty is signalled by the disabled submit button, not red fields on first open.
   const error = value ? sourceFieldError(def, value) : '';
   if (def.kind === 'secret') return <SecretField label={def.label} required={def.required} value={value} placeholder={def.placeholder} onChange={onChange} error={error || undefined} />;
+  if (def.kind === 'file') return <FileField def={def} value={value} onChange={onChange} />;
   const select = def.kind === 'select';
   const multiline = def.kind === 'urls' || def.kind === 'multiline';
   return (
@@ -84,7 +123,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
   const renderField = (def: SourceFieldDef) => <Field key={def.key} def={def} value={draft.values[def.key] ?? ''} onChange={(v) => setValue(def.key, v)} />;
 
-  // Fields split into consecutive same-group runs; headers (and collapsing) only apply once there are two or more groups.
+  // Fields split into consecutive same-group runs; headers (and collapsing) apply once the form has more than one section.
   const fields = visibleFields(connector, draft.values);
   const sections: { group?: string; collapsed?: boolean; fields: SourceFieldDef[] }[] = [];
   for (const def of fields) {
@@ -92,7 +131,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
     if (last && last.group === def.group) last.fields.push(def);
     else sections.push({ group: def.group, collapsed: def.groupCollapsed, fields: [def] });
   }
-  const showHeaders = new Set(fields.filter((f) => f.group).map((f) => f.group)).size > 1;
+  const showHeaders = sections.length > 1;
 
   return (
     <>

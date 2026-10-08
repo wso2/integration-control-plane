@@ -28,6 +28,7 @@ import {
   isConnectorEnabled,
   LLM_PROVIDERS,
   MCP_CLIENTS,
+  RML_MAPPING,
   PLAYGROUND_SUGGESTIONS,
   ROLE_GRANT_PREFIX,
   STORAGE_BACKEND_BY_KIND,
@@ -115,9 +116,10 @@ export function isFieldVisible(def: SourceFieldDef, values: Record<string, strin
   return !def.showWhen || def.showWhen.equals.includes(values[def.showWhen.field] ?? '');
 }
 
-/** A connector's fields that currently apply to these values: conditional fields whose condition is met, in schema order. */
+/** A connector's fields that currently apply to these values: conditional fields whose condition is met, in schema order. Structured connectors also offer the optional RML mapping. */
 export function visibleFields(connector: SourceConnector, values: Record<string, string>): SourceFieldDef[] {
-  return connector.fields.filter((f) => isFieldVisible(f, values));
+  const fields = connector.isStructuredData ? [...connector.fields, ...RML_MAPPING] : connector.fields;
+  return fields.filter((f) => isFieldVisible(f, values));
 }
 
 /** Validation message for one connector field; empty when the value is acceptable. */
