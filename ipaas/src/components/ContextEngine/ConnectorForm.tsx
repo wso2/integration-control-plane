@@ -46,14 +46,26 @@ interface ConnectorFormProps {
 function FileField({ def, value, onChange }: { def: SourceFieldDef; value: string; onChange: (value: string) => void }): JSX.Element {
   const [name, setName] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  // The reader for the latest pick; a superseded read's result or error is ignored.
+  const currentReader = useRef<FileReader | null>(null);
   const read = (file: File | undefined) => {
     if (!file) return;
     setName(file.name);
     const reader = new FileReader();
-    reader.onload = () => onChange(typeof reader.result === 'string' ? reader.result : '');
+    currentReader.current = reader;
+    reader.onload = () => {
+      if (currentReader.current === reader) onChange(typeof reader.result === 'string' ? reader.result : '');
+    };
+    reader.onerror = () => {
+      if (currentReader.current === reader) {
+        setName('');
+        onChange('');
+      }
+    };
     reader.readAsText(file);
   };
   const clear = () => {
+    currentReader.current = null;
     setName('');
     onChange('');
     if (inputRef.current) inputRef.current.value = '';
@@ -67,7 +79,17 @@ function FileField({ def, value, onChange }: { def: SourceFieldDef; value: strin
       <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
         <Button component="label" variant="outlined" size="small" startIcon={<Upload size={16} />}>
           {value ? 'Replace file' : 'Upload file'}
-          <input ref={inputRef} type="file" hidden accept={def.accept} onChange={(e) => read(e.target.files?.[0])} />
+          <input
+            ref={inputRef}
+            type="file"
+            hidden
+            accept={def.accept}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = ''; // reset so re-selecting the same file fires change again
+              read(file);
+            }}
+          />
         </Button>
         {value && <Chip label={name || 'File uploaded'} size="small" onDelete={clear} />}
       </Stack>
@@ -117,7 +139,10 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
   const nameError = sourceNameError(draft.name, otherNames);
   const upload = connector.id === 'upload';
   const change = onChange;
-  const setValue = (key: string, value: string) => change({ ...draft, values: { ...draft.values, [key]: value } });
+  // A ref tracks the latest draft so a value set from an async callback (a file read finishing) merges into the current draft, not the snapshot captured when the read began.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const setValue = (key: string, value: string) => change({ ...draftRef.current, values: { ...draftRef.current.values, [key]: value } });
 
   // User-toggled collapse state, keyed by group; falls back to each group's default.
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
