@@ -31,9 +31,12 @@ final sql:Client dbClient = check createDbClient();
 final string resolvedArtifactsApiTrustStorePassword = check loadArtifactsApiTrustStore();
 
 function createDbClient() returns sql:Client|error {
-    map<string> dbSecrets = check resolveSecretsTable(dbUser, dbPassword);
-    DbCredentials credentials = check resolveDbCredentials(dbType,
-            check utils:resolveConfig(dbUser, dbSecrets), check utils:resolveConfig(dbPassword, dbSecrets),
+    string? user = dbUser;
+    string? password = dbPassword;
+    map<string> dbSecrets = check resolveSecretsTable(user ?: "", password ?: "");
+    DbCredentials credentials = check resolveDbCredentials(dbType, dbName,
+            user is () ? () : check utils:resolveConfig(user, dbSecrets),
+            password is () ? () : check utils:resolveConfig(password, dbSecrets),
             "dbUser and dbPassword under [icp_server.storage]");
     DatabaseConnectionManager dbManager = check new (dbType, dbHost, dbPort, dbName, credentials.user, credentials.password, dbUseTLS);
     return dbManager.getClient();

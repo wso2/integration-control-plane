@@ -19,35 +19,61 @@ import icp_server.storage;
 import ballerina/test;
 
 const string TEST_DB_CONFIG_KEYS = "dbUser and dbPassword under [icp_server.storage]";
+const string TEST_DB_NAME = "icp_db";
 
 @test:Config {}
 function testConfiguredDbCredentialsAreUsedAsIs() returns error? {
-    storage:DbCredentials credentials = check storage:resolveDbCredentials("postgresql", "icp", "S3cret", TEST_DB_CONFIG_KEYS);
+    storage:DbCredentials credentials = check storage:resolveDbCredentials("postgresql", TEST_DB_NAME, "icp", "S3cret",
+            TEST_DB_CONFIG_KEYS);
     test:assertEquals(credentials, {user: "icp", password: "S3cret"});
 }
 
 @test:Config {}
+function testEmptyDbPasswordIsAllowed() returns error? {
+    storage:DbCredentials credentials = check storage:resolveDbCredentials("mysql", TEST_DB_NAME, "root", "",
+            TEST_DB_CONFIG_KEYS);
+    test:assertEquals(credentials, {user: "root", password: ""});
+}
+
+@test:Config {}
 function testUnsetH2CredentialsFallBackToQuickStart() returns error? {
-    storage:DbCredentials credentials = check storage:resolveDbCredentials("h2", "", "", TEST_DB_CONFIG_KEYS);
+    storage:DbCredentials credentials = check storage:resolveDbCredentials("h2", TEST_DB_NAME, (), (), TEST_DB_CONFIG_KEYS);
     test:assertEquals(credentials, {user: "icp_user", password: "icp_password"});
 }
 
 @test:Config {}
-function testPartiallySetH2CredentialsKeepConfiguredValue() returns error? {
-    storage:DbCredentials credentials = check storage:resolveDbCredentials("h2", "admin", "", TEST_DB_CONFIG_KEYS);
-    test:assertEquals(credentials, {user: "admin", password: "icp_password"});
+function testPartiallySetH2CredentialsFail() {
+    storage:DbCredentials|error noPassword = storage:resolveDbCredentials("h2", TEST_DB_NAME, "admin", (), TEST_DB_CONFIG_KEYS);
+    test:assertTrue(noPassword is error, "expected an error for H2 with only a user");
+
+    storage:DbCredentials|error noUser = storage:resolveDbCredentials("h2", TEST_DB_NAME, (), "secret", TEST_DB_CONFIG_KEYS);
+    test:assertTrue(noUser is error, "expected an error for H2 with only a password");
+}
+
+@test:Config {}
+function testBlankDbCredentialsFail() {
+    storage:DbCredentials|error blankUser = storage:resolveDbCredentials("postgresql", TEST_DB_NAME, " ", "S3cret",
+            TEST_DB_CONFIG_KEYS);
+    test:assertTrue(blankUser is error, "expected an error for a blank user");
+
+    storage:DbCredentials|error whitespacePassword = storage:resolveDbCredentials("postgresql", TEST_DB_NAME, "icp", "  ",
+            TEST_DB_CONFIG_KEYS);
+    test:assertTrue(whitespacePassword is error, "expected an error for a whitespace-only password");
 }
 
 @test:Config {}
 function testUnsetCredentialsFailForExternalDatabases() {
-    foreach string dbType in ["mysql", "postgresql", "mssql", "oracle"] {
-        storage:DbCredentials|error noCredentials = storage:resolveDbCredentials(dbType, "", "", TEST_DB_CONFIG_KEYS);
+    storage:DatabaseType[] externalDbTypes = [storage:MYSQL, storage:POSTGRESQL, storage:MSSQL, storage:ORACLE];
+    foreach storage:DatabaseType dbType in externalDbTypes {
+        storage:DbCredentials|error noCredentials = storage:resolveDbCredentials(dbType, TEST_DB_NAME, (), (),
+                TEST_DB_CONFIG_KEYS);
         if noCredentials !is error {
             test:assertFail(string `expected an error for ${dbType} without credentials`);
         }
         test:assertTrue(noCredentials.message().includes(TEST_DB_CONFIG_KEYS));
 
-        storage:DbCredentials|error noPassword = storage:resolveDbCredentials(dbType, "icp", "", TEST_DB_CONFIG_KEYS);
+        storage:DbCredentials|error noPassword = storage:resolveDbCredentials(dbType, TEST_DB_NAME, "icp", (),
+                TEST_DB_CONFIG_KEYS);
         test:assertTrue(noPassword is error, string `expected an error for ${dbType} without a password`);
     }
 }

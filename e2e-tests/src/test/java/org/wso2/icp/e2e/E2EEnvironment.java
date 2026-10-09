@@ -58,8 +58,9 @@ public final class E2EEnvironment implements AutoCloseable {
     private static final String DB_NAME = "icp_database";
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD = "my-secret-pw";
-    private static final String CREDENTIALS_DB_USER = "icp_user";
-    private static final String CREDENTIALS_DB_PASSWORD = "icp_password";
+    // Bundled H2 quick-start credentials, passed from gradle.properties
+    private static final String CREDENTIALS_DB_USER = requiredProperty("icp.e2e.h2QuickStartUser");
+    private static final String CREDENTIALS_DB_PASSWORD = requiredProperty("icp.e2e.h2QuickStartPassword");
     private static E2EEnvironment current;
 
     private final Path runDir;
@@ -761,6 +762,14 @@ public final class E2EEnvironment implements AutoCloseable {
                 .replace("\"", "&quot;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;");
+    }
+
+    private static String requiredProperty(String name) {
+        String value = System.getProperty(name);
+        if (value == null || value.isEmpty()) {
+            throw new IllegalStateException("System property " + name + " is not set; run the E2E suites through Gradle");
+        }
+        return value;
     }
 
     private static String javaBin() {
