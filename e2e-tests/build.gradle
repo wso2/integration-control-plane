@@ -61,6 +61,7 @@ def commandOutput(String... args) {
 dependencies {
     testImplementation 'com.microsoft.playwright:playwright:1.49.0'
     testImplementation 'org.junit.jupiter:junit-jupiter:5.11.3'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.11.3'
     testImplementation 'org.testcontainers:testcontainers:1.20.4'
     testRuntimeOnly 'org.slf4j:slf4j-simple:2.0.13'
     testImplementation 'org.jacoco:org.jacoco.core:0.8.12'
@@ -107,6 +108,10 @@ def configureE2eSuite = { Test task, String suite, List<String> includes ->
     task.group = 'verification'
     task.description = "Run the ${suite} E2E suite."
     task.useJUnitPlatform()
+    // Gradle 9 no longer wires a registered Test task to the test source set; without these the
+    // suite reports NO-SOURCE and passes having run nothing.
+    task.testClassesDirs = sourceSets.test.output.classesDirs
+    task.classpath = sourceSets.test.runtimeClasspath
     includes.each { task.include it }
 
     task.dependsOn rootProject.tasks.named('packageICP')
@@ -114,11 +119,18 @@ def configureE2eSuite = { Test task, String suite, List<String> includes ->
     task.dependsOn tasks.named('buildBiE2eArtifact')
     task.dependsOn(project.hasProperty('playwrightWithDeps') ? 'playwrightInstallDeps' : 'playwrightInstall')
 
+    // A suite exercises the packaged product, not only this test code: rerun (and re-key the build
+    // cache) whenever the product or the runtimes it drives change.
+    def distributionZip = rootProject.layout.buildDirectory.file("distribution/wso2-integration-control-plane-${rootProject.version}.zip")
+    task.inputs.files(distributionZip, configurations.miDistribution, tasks.named('buildBiE2eArtifact'))
+            .withPropertyName('product')
+            .withPathSensitivity(PathSensitivity.NONE)
+
     task.systemProperties System.getProperties().findAll { key, _ -> key.toString().startsWith('icp.e2e.') }
     def coverageEnabled = System.getProperty('icp.e2e.coverage', 'true')
     task.systemProperty 'icp.e2e.selfContained', System.getProperty('icp.e2e.selfContained', 'true')
     task.systemProperty 'icp.e2e.coverage', coverageEnabled
-    task.systemProperty 'icp.e2e.distributionZip', rootProject.layout.buildDirectory.file("distribution/wso2-integration-control-plane-${rootProject.version}.zip").get().asFile.absolutePath
+    task.systemProperty 'icp.e2e.distributionZip', distributionZip.get().asFile.absolutePath
     task.systemProperty 'icp.e2e.workDir', layout.buildDirectory.dir("runtime/${suite}").get().asFile.absolutePath
     task.doFirst {
         // Forward local Docker/Testcontainers config. Docker CLI contexts are not env vars, so pass
