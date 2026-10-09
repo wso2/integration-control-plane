@@ -51,7 +51,12 @@ function validateConfigSources() returns error? {
 # + configFiles - path list, split the way the runtime splits it
 # + return - an error describing the first problem, or `()` if every file parses cleanly
 function validateConfigFiles(string configFiles) returns error? {
-    foreach string path in splitPathList(configFiles) {
+    string[] paths = splitPathList(configFiles);
+    // A separator-only value splits to nothing, which would leave the runtime on defaults.
+    if paths.length() == 0 {
+        return error(string `${CONFIG_FILES_ENV} names no configuration file: "${configFiles}"`);
+    }
+    foreach string path in paths {
         if path.trim() == "" {
             return error(string `${CONFIG_FILES_ENV} contains an empty entry: "${configFiles}"`);
         }

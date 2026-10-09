@@ -112,6 +112,7 @@ function testSplitPathList() {
     test:assertEquals(splitPathList(string `${sep}a.toml`), ["", "a.toml"]);
     test:assertEquals(splitPathList(string `a.toml${sep}${sep}b.toml`), ["a.toml", "", "b.toml"]);
     test:assertEquals(splitPathList(""), [""]);
+    test:assertEquals(splitPathList(sep), []);
 }
 
 @test:Config {}
@@ -123,7 +124,9 @@ function testEmptyConfigFilesEntryFails() returns error? {
     error? empty = validateConfigFiles("");
     error? leadingEmpty = validateConfigFiles(string `${sep}${path}`);
     error? interiorEmpty = validateConfigFiles(string `${path}${sep}${sep}${path}`);
+    error? separatorOnly = validateConfigFiles(string `${sep}${sep}`);
     check file:remove(path);
+    test:assertTrue(separatorOnly is error, "a separator-only BAL_CONFIG_FILES must fail validation");
     test:assertEquals(valid, ());
     test:assertTrue(empty is error, "a set but empty BAL_CONFIG_FILES must fail validation");
     test:assertTrue(leadingEmpty is error, "a leading empty entry must fail validation");
