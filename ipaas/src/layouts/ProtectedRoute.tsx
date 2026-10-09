@@ -60,6 +60,7 @@ export default function ProtectedRoute(): JSX.Element {
     return <Navigate to={loginUrl()} replace />;
   }
 
+  // Only WIP local login sets this; cloud sign-in never does. Remove with the WIP auth.
   if (requirePasswordChange && pathname !== forceChangePasswordUrl()) {
     return <Navigate to={forceChangePasswordUrl()} replace />;
   }

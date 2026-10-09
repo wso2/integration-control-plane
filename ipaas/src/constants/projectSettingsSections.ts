@@ -16,27 +16,14 @@
  * under the License.
  */
 
-import { IS_CLOUD } from '../features';
 import { Permissions } from './permissions';
 import { isSettingsSectionVisible, type SettingsSectionDef } from './orgSettingsSections';
 
 /**
- * Project Settings sections, in display order (Devant's order, minus Ballerina
- * Connector Configs and VPN Configuration). Project sections are gated by
- * project-management permissions; egress by environment management.
+ * Project Settings sections, in display order. Only the Project section is backed by
+ * the BFF so far; it is gated by project-management permissions.
  */
-export const PROJECT_SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
-  { id: 'project-overview', label: 'Project', path: 'project-overview', permissions: [Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT] },
-  // Cloud keeps only the Project section; the rest are unsupported there.
-  ...(IS_CLOUD
-    ? []
-    : [
-        { id: 'access-control', label: 'Access Control', path: 'access-control/roles', permissions: [Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT] },
-        { id: 'application-security', label: 'Application Security', path: 'application-security', permissions: [Permissions.PROJECT_MANAGE] },
-        { id: 'egress-control', label: 'Egress Control', path: 'egress-control', permissions: [Permissions.ENVIRONMENT_MANAGE] },
-        { id: 'vpn-configuration', label: 'VPN Configuration', path: 'vpn-configuration', permissions: [Permissions.PROJECT_MANAGE] },
-      ]),
-];
+export const PROJECT_SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [{ id: 'project-overview', label: 'Project', path: 'project-overview', permissions: [Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT] }];
 
 /** The first project section the user is allowed to see, or `null` if none. */
 export function firstAvailableProjectSettingsSection(hasAnyPermission: (perms: string[]) => boolean): SettingsSectionDef | null {

@@ -18,12 +18,11 @@
 
 import { Alert, Box, Button, Dialog, DialogContent, DialogTitle, InputBase, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Send } from '@wso2/oxygen-ui-icons-react';
-import { Fragment, useContext, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useAuth } from '#auth';
-import { CopilotContext } from '../contexts/CopilotContext';
 import { useChoreoSampleImages } from '../hooks/useRepository';
 import { useProjectId } from '../hooks/useProjects';
 import { useOrgUuid } from '../hooks/useOrgUuid';
@@ -52,7 +51,6 @@ function AiIntegrationBuilderView(scope: ProjectScope): JSX.Element {
   const navigate = useAppNavigate();
   const location = useLocation() as { state?: { query?: string } };
   const { userId } = useAuth();
-  const { setShowCopilot } = useContext(CopilotContext);
   const { projectId = '' } = useProjectId(scope.project);
   const orgUuid = useOrgUuid() ?? '';
   const { data: sampleImages } = useChoreoSampleImages(orgUuid, projectId);
@@ -116,7 +114,7 @@ function AiIntegrationBuilderView(scope: ProjectScope): JSX.Element {
       case 'unsupported':
         return <UnsupportedCard response={response} onTryAgain={handleTryAgain} />;
       case 'invalid':
-        return <InvalidPromptCard response={response} onGoBack={handleTryAgain} onOpenCopilot={() => setShowCopilot(true)} />;
+        return <InvalidPromptCard response={response} onGoBack={handleTryAgain} />;
       case 'error':
         return <ErrorCard response={response} onRetry={handleTryAgain} />;
       default:

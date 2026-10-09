@@ -25,21 +25,15 @@ import { renderBold } from './renderBold';
 interface InvalidPromptCardProps {
   response: InvalidPromptResponse;
   onGoBack: () => void;
-  onOpenCopilot: () => void;
 }
 
-export function InvalidPromptCard({ response, onGoBack, onOpenCopilot }: InvalidPromptCardProps): JSX.Element {
+export function InvalidPromptCard({ response, onGoBack }: InvalidPromptCardProps): JSX.Element {
   return (
     <ResponseCard
       actions={
-        <>
-          <Button variant="outlined" size="small" onClick={onOpenCopilot}>
-            Ask Copilot
-          </Button>
-          <Button variant="contained" color="primary" size="small" onClick={onGoBack}>
-            Try Again
-          </Button>
-        </>
+        <Button variant="contained" color="primary" size="small" onClick={onGoBack}>
+          Try Again
+        </Button>
       }>
       <Typography variant="body2" sx={{ mb: 2 }}>
         {response.message && renderBold(response.message)}

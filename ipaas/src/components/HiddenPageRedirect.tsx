@@ -22,25 +22,11 @@ import { componentUrl, orgHomeUrl, projectHomeUrl } from '../paths';
 import type { Level } from '../nav';
 
 /**
- * Stand-in for a page the current product hides (see `CLOUD_HIDDEN_NAV_IDS` in
- * `nav.ts`). The path stays registered so a hand-typed or bookmarked URL bounces
- * to the enclosing scope's landing page instead of rendering an empty shell.
+ * Target of the level catch-all routes in `config/routes.tsx`: an unknown or retired
+ * URL bounces to the enclosing scope's landing page instead of rendering an empty shell.
  */
 export default function HiddenPageRedirect({ level }: { level: Level }): JSX.Element {
   const { orgHandler = '', projectHandler = '', componentHandler = '' } = useParams();
   const to = level === 'components' ? componentUrl(orgHandler, projectHandler, componentHandler) : level === 'projects' ? projectHomeUrl(orgHandler, projectHandler) : orgHomeUrl(orgHandler);
   return <Navigate to={to} replace />;
-}
-
-/** Level-bound forms for the resource MATRIX, whose `pages` slots take a page component. */
-export function HiddenOrgPage(): JSX.Element {
-  return <HiddenPageRedirect level="organizations" />;
-}
-
-export function HiddenProjectPage(): JSX.Element {
-  return <HiddenPageRedirect level="projects" />;
-}
-
-export function HiddenIntegrationPage(): JSX.Element {
-  return <HiddenPageRedirect level="components" />;
 }

@@ -51,4 +51,21 @@ export default [
       'no-restricted-imports': ['error', { patterns: [{ group: ['**/auth/**'], message: 'Import auth from #auth (see src/auth/contract.ts).' }] }],
     },
   },
+  {
+    // src/unported holds features the cloud BFF can't serve yet. It may import live
+    // code, never the reverse. Repeats the auth pattern: this block replaces the rule above.
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/auth/**', 'src/unported/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            { group: ['**/auth/**'], message: 'Import auth from #auth (see src/auth/contract.ts).' },
+            { group: ['**/unported/**'], message: 'Live code must not import from src/unported.' },
+          ],
+        },
+      ],
+    },
+  },
 ];

@@ -3,9 +3,6 @@
 > [!NOTE]
 > This directory contains React Context providers used across the ICP application. Each context is purpose-built for a specific concern and is intentionally kept narrow in scope.
 
-> [!IMPORTANT]
-> **Product gating**: `CopilotContext` and `CopilotProvider` are wip-only. They are conditionally rendered in `AppLayout.tsx` behind `IS_WIP` from `src/features.ts`. Do not reference them in shared code paths that run for all products. All other contexts here are shared across products.
-
 ---
 
 ## 1. Access Control Context
@@ -87,38 +84,3 @@ Other approaches are less suitable:
 - **Global/app-level state** — introduces coupling to an unrelated part of the app.
 
 Context provides the right balance: data is **transient, isolated, and cleaned up as soon as the flow completes**.
-
----
-
-## 4. Copilot Context
-
-**File:** `CopilotContext.tsx`
-
-### Purpose
-
-This context manages **AI Copilot chat state** for the sliding drawer panel accessible from the app header. It owns the full lifecycle of a copilot session including the message history, region selection, streaming error state, and the derived copilot URL.
-
-State held:
-
-- `messages` — the full conversation history (`IMessage[]`) for the current session
-- `showCopilot` — controls whether the copilot drawer is open
-- `copilotUrl` — the SSE endpoint URL, derived from the selected region's `external_gateway_virtual_host`
-- `selectedRegion` / `availableRegions` — the user-selected data plane region and all available options
-- `isMultiRegionAvailable` — whether the region selector should be shown to the user
-- `messageSendingError` — error string set by the streaming hook when the SSE call fails
-- `chatInputValue` — controlled value of the chat text input (shared so NotificationBanner can clear it)
-- `orgId` — the current organisation UUID, passed to data-collector hooks for feedback/permission calls
-- `isDataPlanesLoading` / `dataPlanesError` / `refetchDataPlanes` — loading/error state for the data planes fetch
-
-Key behaviours:
-
-- On org change, clears the session ID from `sessionStorage`, resets messages, and clears the URL
-- Auto-selects the first available region when data planes load; shows the region selector only when more than one region is available
-- Derives `copilotUrl` reactively from the selected region's `externalVhost` via `copilotApiUrl()`
-
-#### Why Context
-
-> [!IMPORTANT]
-> The copilot panel is a **cross-cutting drawer** rendered inside `AppLayout` but its state must be readable and writable by components nested several levels deep: the header button toggles `showCopilot`, the chat input updates `chatInputValue`, the streaming hook writes `messageSendingError`, and the notification banner reads `selectedRegion` and `messages`. This fan-out across unrelated subtrees — with no natural common parent below `AppLayout` — makes prop drilling impractical.
->
-> Additionally, `CopilotProvider` must sit **inside** `AppLayout` (not at app root) because it calls `useScope()` and `useOrgs()`, which require the `ScopeResolver` and query providers that `AppLayout` depends on. A `useMemo`-stabilised value object prevents unnecessary re-renders in consumers that only read a subset of the context.

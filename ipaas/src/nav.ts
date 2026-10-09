@@ -22,7 +22,6 @@ import { capitalize } from './utils/string';
 import { SETTINGS_SECTIONS, type SettingsSectionDef } from './constants/orgSettingsSections';
 import { PROJECT_SETTINGS_SECTIONS } from './constants/projectSettingsSections';
 import { COMPONENT_SETTINGS_SECTIONS } from './constants/componentSettingsSections';
-import { IS_CLOUD } from './features';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -37,7 +36,7 @@ export type Scope = OrgScope | ProjectScope | ComponentScope;
 
 export type ScopeForLevel = { organizations: OrgScope; projects: ProjectScope; components: ComponentScope };
 
-export type Resource = 'overview' | 'logs' | 'alerts' | 'environments' | 'access-control' | 'build' | 'deploy';
+export type Resource = 'overview' | 'logs' | 'environments' | 'build' | 'deploy';
 
 export type Matrix = { [R in Resource]: { segment: string; pages: Partial<{ [L in Level]: FC<ScopeForLevel[L]> }> } };
 
@@ -108,17 +107,12 @@ function urlPattern(level: Level, segment: string): string {
 
 export function resourceUrl(scope: Scope, resource: Resource): string {
   const effective = MATRIX[resource].levels.includes(scope.level) ? resource : 'overview';
-  let seg = MATRIX[effective].segment;
-  // Replace route parameters with default values based on scope level
-  if (effective === 'access-control') {
-    seg = seg.replace(':tab', scope.level === 'organizations' ? 'users' : 'roles');
-  }
+  const seg = MATRIX[effective].segment;
   const prefix = scopePrefix(scope);
   return seg ? `${prefix}/${seg}` : prefix;
 }
 
-// The Settings sections available at each level. Component scope only exposes
-// Access Control (handled by the resource matrix), so it has no section list here.
+// The Settings sections available at each level.
 function settingsSectionsForLevel(level: Level): readonly SettingsSectionDef[] {
   if (level === 'organizations') return SETTINGS_SECTIONS;
   if (level === 'projects') return PROJECT_SETTINGS_SECTIONS;
@@ -265,154 +259,48 @@ export interface NavEntry {
   sidebar?: boolean;
 }
 
-const NAV_ALL: Record<Level, NavEntry[]> = {
+const NAV: Record<Level, NavEntry[]> = {
   organizations: [
     { key: 'overview', navId: 'overview', segment: 'home' },
-    { key: 'develop', navId: 'org-develop', segment: 'develop' },
     { key: 'build', navId: 'build', segment: 'build' },
     { key: 'deploy', navId: 'org-deploy', segment: 'deploy' },
     { key: 'test', navId: 'org-test', segment: 'test' },
-    { key: 'insights-usage', navId: 'org-usage', segment: 'insights/usage', parent: 'org-insights' },
-    { key: 'insights-delivery', navId: 'org-delivery', segment: 'insights/delivery', parent: 'org-insights' },
-    { key: 'insights-compliance', navId: 'org-compliance', segment: 'insights/compliance', parent: 'org-insights' },
     { key: 'logs', navId: 'org-logs', segment: 'logs', parent: 'org-observability' },
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
-    { key: 'rag-ingestion', navId: 'org-scheduled-ingestion', segment: 'rag/scheduled-ingestion', parent: 'org-rag' },
-    { key: 'rag-service', navId: 'org-service', segment: 'rag/service', parent: 'org-rag' },
-    { key: 'rag-retrieval', navId: 'org-retrieval', segment: 'rag/retrieval', parent: 'org-rag' },
-    { key: 'databases', navId: 'org-databases', segment: 'admin/databases', parent: 'org-admin' },
-    { key: 'vector-databases', navId: 'org-vector-databases', segment: 'admin/vector-databases', parent: 'org-admin' },
-    { key: 'message-brokers', navId: 'org-message-brokers', segment: 'admin/message-brokers', parent: 'org-admin' },
-    { key: 'third-party', navId: 'org-third-party', segment: 'admin/third-party', parent: 'org-admin' },
-    { key: 'genai-services', navId: 'org-genai-services', segment: 'admin/genai-services', parent: 'org-admin' },
-    { key: 'config-groups', navId: 'org-config-groups', segment: 'admin/config-groups', parent: 'org-admin' },
-    { key: 'governance', navId: 'org-governance', segment: 'admin/governance', parent: 'org-admin' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
-    { key: 'data-planes', navId: 'org-data-planes', segment: 'admin/data-planes', parent: 'org-admin' },
     { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
-    { key: 'audit-logs', navId: 'org-audit-logs', segment: 'admin/audit-logs', parent: 'org-admin' },
-    { key: 'approvals', navId: 'org-approvals', segment: 'admin/approvals', parent: 'org-admin' },
-    { key: 'certificates', navId: 'org-certificates', segment: 'admin/certificates', parent: 'org-admin' },
-    { key: 'settings', navId: 'org-settings', segment: 'settings', parent: 'org-admin' },
+    { key: 'settings', navId: 'org-settings', segment: 'settings' },
   ],
   projects: [
     { key: 'overview', navId: 'proj-overview', segment: 'home' },
-    { key: 'develop', navId: 'proj-develop', segment: 'develop' },
     { key: 'build', navId: 'proj-build', segment: 'build' },
     { key: 'deploy', navId: 'proj-deploy', segment: 'deploy' },
     { key: 'test', navId: 'proj-test', segment: 'test' },
-    { key: 'insights-usage', navId: 'proj-usage', segment: 'insights/usage', parent: 'proj-insights' },
-    { key: 'insights-delivery', navId: 'proj-delivery', segment: 'insights/delivery', parent: 'proj-insights' },
-    { key: 'insights-compliance', navId: 'proj-compliance', segment: 'insights/compliance', parent: 'proj-insights' },
     { key: 'logs', navId: 'proj-logs', segment: 'observe/runtimelogs', parent: 'proj-observability' },
     { key: 'metrics', navId: 'proj-metrics', segment: 'observe/metrics', parent: 'proj-observability' },
-    { key: 'connections', navId: 'proj-connections', segment: 'admin/connections', parent: 'proj-admin' },
-    { key: 'third-party', navId: 'proj-third-party', segment: 'admin/third-party-services', parent: 'proj-admin' },
-    { key: 'genai-services', navId: 'proj-genai-services', segment: 'admin/gen-ai-services', parent: 'proj-admin' },
     { key: 'cd-pipelines', navId: 'proj-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'proj-admin' },
-    { key: 'environments', navId: 'proj-environments', segment: 'devops/environments', parent: 'proj-admin' },
-    { key: 'settings', navId: 'proj-settings', segment: 'settings', parent: 'proj-admin' },
+    { key: 'settings', navId: 'proj-settings', segment: 'settings' },
   ],
   components: [
     { key: 'overview', navId: 'overview', segment: 'overview' },
-    { key: 'develop', navId: 'integration', segment: 'develop/integration', parent: 'develop' },
-    { key: 'api-info', navId: 'api-info', segment: 'manage/api-info', parent: 'develop' },
-    { key: 'lifecycle', navId: 'lifecycle', segment: 'manage/lifecycle', parent: 'develop' },
-    { key: 'documents', navId: 'documents', segment: 'document', parent: 'develop' },
-    { key: 'plans', navId: 'plans', segment: 'manage/usage', parent: 'develop' },
-    { key: 'policies', navId: 'policies', segment: 'manage/policies', parent: 'develop', sidebar: false },
     { key: 'build', navId: 'build', segment: 'build' },
     { key: 'deploy', navId: 'deploy', segment: 'deploy' },
     { key: 'test', navId: 'test', segment: 'test' },
     { key: 'console', navId: 'console', segment: 'test/console', parent: 'test' },
     { key: 'api-chat', navId: 'api-chat', segment: 'test/api-chat', parent: 'test' },
     { key: 'agent-chat', navId: 'agent-chat', segment: 'test/agent-chat', parent: 'test' },
-    { key: 'insights-usage', navId: 'usage', segment: 'insights/usage', parent: 'insights' },
-    { key: 'insights-delivery', navId: 'delivery', segment: 'insights/delivery', parent: 'insights' },
-    { key: 'insights-compliance', navId: 'compliance', segment: 'insights/compliance', parent: 'insights' },
-    { key: 'alerts', navId: 'alerts', segment: 'alerts', parent: 'observability' },
     { key: 'logs', navId: 'logs', segment: 'logs', parent: 'observability' },
     { key: 'metrics', navId: 'metrics', segment: 'metrics', parent: 'observability' },
-    { key: 'connections', navId: 'connections', segment: 'admin/connections', parent: 'admin' },
     { key: 'runtime', navId: 'runtime', segment: 'runtimes', parent: 'operate' },
     { key: 'containers', navId: 'containers', segment: 'admin/containers', parent: 'operate' },
     { key: 'configs-secrets', navId: 'configs-secrets', segment: 'admin/configs', parent: 'operate' },
     { key: 'health-checks', navId: 'health-checks', segment: 'admin/health-checks', parent: 'operate' },
-    { key: 'scaling', navId: 'scaling', segment: 'admin/scaling', parent: 'admin' },
-    { key: 'storage', navId: 'storage', segment: 'admin/storage', parent: 'admin' },
-    { key: 'external-ci', navId: 'external-ci', segment: 'admin/external-ci', parent: 'admin' },
-    { key: 'settings', navId: 'component-settings', segment: 'settings', parent: 'admin' },
   ],
 };
 
-// Pages Cloud hides
-const CLOUD_HIDDEN_NAV_IDS = new Set([
-  // Admin
-  'proj-connections',
-  'connections',
-  'storage',
-  'scaling',
-  'component-settings',
-  'org-databases',
-  'org-vector-databases',
-  'org-message-brokers',
-  'org-third-party',
-  'org-genai-services',
-  'org-config-groups',
-  'org-governance',
-  'org-audit-logs',
-  'org-approvals',
-  'org-certificates',
-  'proj-third-party',
-  'proj-genai-services',
-  // Environments are org-scoped in OpenChoreo; cloud exposes them at org level only.
-  'proj-environments',
-  'org-data-planes',
-  // RAG
-  'org-rag',
-  'org-scheduled-ingestion',
-  'org-service',
-  'org-retrieval',
-  // Develop
-  'org-develop',
-  'proj-develop',
-  'integration',
-  'api-info',
-  'lifecycle',
-  'documents',
-  'plans',
-  'policies',
-  // Alerts
-  'alerts',
-  // Insights
-  'org-usage',
-  'org-delivery',
-  'org-compliance',
-  'proj-usage',
-  'proj-delivery',
-  'proj-compliance',
-  'usage',
-  'delivery',
-  'compliance',
-]);
-
-// Cloud renders Settings as a top-level item, not inside Infrastructure. Keeping the parent
-// would auto-expand a group the item does not live in whenever Settings is opened.
-const CLOUD_TOP_LEVEL_NAV_IDS = new Set(['org-settings', 'proj-settings']);
-
-const forCloud = (entries: NavEntry[]): NavEntry[] => entries.filter((e) => !CLOUD_HIDDEN_NAV_IDS.has(e.navId)).map((e) => (CLOUD_TOP_LEVEL_NAV_IDS.has(e.navId) ? { ...e, parent: undefined } : e));
-
-const NAV: Record<Level, NavEntry[]> = IS_CLOUD
-  ? {
-      organizations: forCloud(NAV_ALL.organizations),
-      projects: forCloud(NAV_ALL.projects),
-      components: forCloud(NAV_ALL.components),
-    }
-  : NAV_ALL;
-
 // Keys that exist only for generic (deployable) service types — switching to a
 // non-generic integration must fall back to overview instead of a dead tab.
-export const GENERIC_ONLY_COMPONENT_KEYS = new Set(['api-info', 'lifecycle', 'documents', 'plans', 'health-checks', 'scaling']);
+export const GENERIC_ONLY_COMPONENT_KEYS = new Set(['health-checks']);
 
 /** The resource key a URL resolves to at its scope (for cross-scope guards). */
 export function resolveResourceKey(pathname: string, scope: Scope): string {

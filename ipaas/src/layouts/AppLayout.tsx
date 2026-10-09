@@ -43,7 +43,7 @@ import {
   useAppShell,
 } from '@wso2/oxygen-ui';
 import TextField from '../components/common/TextField';
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
@@ -51,68 +51,35 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import Logo from '../components/Logo';
 import NotFound from '../components/NotFound';
 import {
-  Activity,
-  Award,
   BarChart3,
-  Bell,
   Boxes,
-  Brain,
   ChevronDown,
   ChevronRight,
-  ClipboardCheck,
-  ClipboardList,
-  Clock,
   Cog,
-  CreditCard,
-  Cpu,
-  Database,
-  DatabaseZap,
-  Diamond,
   Eye,
-  FileText,
   FlaskConical,
   GitBranch,
   Hammer,
-  HardDrive,
   HeartPulse,
   KeyRound,
   Layers,
   LayoutDashboard,
-  Lightbulb,
-  Link2,
   LogOut,
-  Maximize2,
-  MessageSquare,
-  Network,
   Plus,
-  Puzzle,
-  Recycle,
   Rocket,
-  ScanEye,
-  Scale,
   ScrollText,
   Search,
   Server,
   Settings2,
-  ShieldCheck,
   SlidersHorizontal,
-  Sparkles,
-  Terminal,
-  Truck,
-  Workflow,
   X,
-  Webhook,
 } from '@wso2/oxygen-ui-icons-react';
-import FeaturePreviewModal from '../components/FeaturePreview/FeaturePreviewModal';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
 import { useFreshDefaultProject } from '../hooks/useFreshDefaultProject';
 import { useOrgs } from '../hooks/useOrg';
 import { useBillingOrg } from '../hooks/useBillingOrg';
-import { isSupportedIntegration, isByoiComponent, GENERIC_SERVICE_TYPES } from '../constants/integrations';
-import { useSubscriptions } from '../hooks/useSubscription';
-import { isExternalCiEnabled } from '../hooks/useExternalCi';
-import { PAID_SUBSCRIPTION_TYPE } from '../constants/subscription';
+import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useOrgPermissions } from '../hooks/useAuth';
 import { switchOrgToken, useAuth } from '#auth';
@@ -138,20 +105,14 @@ import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/
 import { componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, registerOrgUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
-import { CopilotProvider } from '../contexts/CopilotContext';
-const CopilotDrawer = lazy(() => import('../components/AiCopilot/CopilotDrawer'));
 
 // ComplexSelect is content-sized, and at org level there is no card beside the icon to stretch against.
-import CopilotButton from '../components/CopilotButton';
-import UpgradeButton from '../components/UpgradeButton';
-import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useLoadedImage } from '../hooks/useLoadedImage';
-import { IS_WIP, IS_CLOUD } from '../features';
-import { ALL_USER_MGT_PERMISSIONS, Permissions } from '../constants/permissions';
+import { Permissions } from '../constants/permissions';
 import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 
-function AppLayoutInner(): JSX.Element {
+export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const scope = useScope();
@@ -164,8 +125,7 @@ function AppLayoutInner(): JSX.Element {
   const userAvatar = loadedPicture ?? userInitials(userName);
   const { hasAnyPermission, setOrgPermissions } = useAccessControl();
 
-  // Cloud-only billing trial indicator. useBillingOrg is gated to IS_CLOUD, so
-  // wip/icp return null here and the chip below is never rendered or bundled.
+  // Billing trial indicator shown in the header.
   const { org: billingOrg } = useBillingOrg('integration-platform');
   const billingTrial = billingOrg?.subscription?.status === 'trial' ? billingOrg.subscription.trial : null;
   const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
@@ -203,10 +163,6 @@ function AppLayoutInner(): JSX.Element {
   }, [activeNavId]);
 
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
-  const [featurePreviewOpen, setFeaturePreviewOpen] = useState(false);
-  const orgUuid = useOrgUuid();
-  const { data: subscriptions } = useSubscriptions(orgUuid ?? '');
-  const isSubscribed = (subscriptions?.list ?? []).some((s) => s.subscriptionType === PAID_SUBSCRIPTION_TYPE);
   const orgCardRef = useRef<HTMLDivElement>(null);
   const projectCardRef = useRef<HTMLDivElement>(null);
   const integrationCardRef = useRef<HTMLDivElement>(null);
@@ -218,9 +174,6 @@ function AppLayoutInner(): JSX.Element {
   const [componentMenuDir, setComponentMenuDir] = useState<'right' | 'below'>('right');
   const [componentSearch, setComponentSearch] = useState('');
   const componentSearchRef = useRef<HTMLInputElement>(null);
-  const [orgMenuAnchor, setOrgMenuAnchor] = useState<HTMLElement | null>(null);
-  const [orgSearch, setOrgSearch] = useState('');
-  const orgSearchRef = useRef<HTMLInputElement>(null);
   const { data: orgsData = [], isLoading: orgsLoading } = useOrgs();
 
   const projectParam = hasProject(scope) ? scope.project : '';
@@ -391,15 +344,6 @@ function AppLayoutInner(): JSX.Element {
     return settingsCrossScopeUrl(pathname, scope, targetScope, canSee);
   };
 
-  const accessControlPerms: string[] = [...ALL_USER_MGT_PERMISSIONS];
-  if (hasProject(scope)) {
-    accessControlPerms.push(Permissions.PROJECT_EDIT, Permissions.PROJECT_MANAGE);
-  }
-  if (hasComponent(scope)) {
-    accessControlPerms.push(Permissions.INTEGRATION_EDIT, Permissions.INTEGRATION_MANAGE);
-  }
-  const canSeeAccessControl = hasAnyPermission(accessControlPerms, projectId || undefined, componentId);
-
   const navigateTo = useAppNavigate();
 
   // The URL now moves only once the destination's code is in, so the highlight
@@ -428,7 +372,7 @@ function AppLayoutInner(): JSX.Element {
             </Header.BrandLogo>
           </Header.Brand>
           <Header.Switchers showDivider={false}>
-            {/* Matches the Project/Integration cards; the chevron appears only when there is another org to switch to. */}
+            {/* Matches the Project/Integration cards. */}
             <Box
               ref={orgCardRef}
               role="button"
@@ -448,31 +392,7 @@ function AppLayoutInner(): JSX.Element {
                 onOpen={() => {}}
                 size="small"
                 sx={{ minWidth: 180, maxWidth: 220, '& .MuiListItemText-root': { minWidth: 0, overflow: 'hidden' } }}
-                IconComponent={
-                  IS_CLOUD || orgsData.length === 1
-                    ? () => null
-                    : ({ ownerState: _ownerState, ...props }) => (
-                        <span
-                          {...props}
-                          role="button"
-                          tabIndex={0}
-                          aria-label="Change organization"
-                          style={{ position: 'absolute', top: 'auto', bottom: '0', right: '6px', display: 'flex', pointerEvents: 'all', cursor: 'pointer' }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setOrgMenuAnchor(orgCardRef.current);
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              setOrgMenuAnchor(orgCardRef.current);
-                            }
-                          }}>
-                          <ChevronDown size={18} />
-                        </span>
-                      )
-                }
+                IconComponent={() => null}
                 SelectDisplayProps={{ 'aria-label': 'Select organization' }}
                 renderValue={() => <ComplexSelect.MenuItem.Text primary={scope.org} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: scope.org }} />}
                 label="Organization">
@@ -481,69 +401,6 @@ function AppLayoutInner(): JSX.Element {
                 </ComplexSelect.MenuItem>
               </ComplexSelect>
             </Box>
-            <Popover
-              anchorEl={orgMenuAnchor}
-              open={Boolean(orgMenuAnchor)}
-              onClose={() => {
-                setOrgMenuAnchor(null);
-                setOrgSearch('');
-              }}
-              anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-              transformOrigin={{ vertical: 'top', horizontal: 'left' }}
-              TransitionProps={{ onEntered: () => orgSearchRef.current?.focus() }}
-              PaperProps={{ sx: { width: 260, mt: 0.5 } }}>
-              <Box sx={{ px: 2, pt: 1.5, pb: 1 }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-                  Organization
-                </Typography>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder="Search"
-                  inputRef={orgSearchRef}
-                  value={orgSearch}
-                  onChange={(e) => setOrgSearch(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Search size={16} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
-              </Box>
-              <Divider />
-              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
-                All Organizations
-              </Typography>
-              {(orgsData.length > 0 ? orgsData : [{ handle: scope.org, numericId: 0 }])
-                .filter((o) => !orgSearch.trim() || o.handle.toLowerCase().includes(orgSearch.trim().toLowerCase()))
-                .map((o) => (
-                  <MenuItem
-                    key={o.handle}
-                    selected={scope.org === o.handle}
-                    onClick={() => {
-                      setOrgMenuAnchor(null);
-                      setOrgSearch('');
-                      if (o.handle === scope.org) {
-                        navigateTo(orgHomeUrl(o.handle));
-                        return;
-                      }
-                      switchOrgToken(o.handle)
-                        .then(() => {
-                          if (o.numericId > 0) {
-                            window.API_CONFIG.asgardeoOrgNumericId = o.numericId;
-                            localStorage.setItem('org_numeric_id', String(o.numericId));
-                          }
-                          queryClient.clear();
-                          navigateTo(orgHomeUrl(o.handle));
-                        })
-                        .catch(() => navigateTo(orgHomeUrl(o.handle)));
-                    }}>
-                    {o.handle}
-                  </MenuItem>
-                ))}
-            </Popover>
             {!hasProject(scope) && !projectMenuAnchor && (
               <Tooltip title="Select project">
                 <IconButton
@@ -868,18 +725,15 @@ function AppLayoutInner(): JSX.Element {
           </Header.Switchers>
           <Header.Spacer />
           <Header.Actions>
-            {IS_CLOUD && billingTrial && (
+            {billingTrial && (
               <Tooltip title={trialEndLabel}>
                 <Chip label={`Trial · ${billingTrial.days_remaining} day${billingTrial.days_remaining === 1 ? '' : 's'} remaining`} color="warning" size="medium" sx={{ fontWeight: 500, mx: 0.75 }} />
               </Tooltip>
             )}
             <ColorSchemeToggle />
-            {IS_WIP && <CopilotButton />}
-            {IS_WIP && <UpgradeButton orgUuid={orgUuid ?? ''} />}
             <UserMenu>
               <UserMenu.Trigger name={userName} avatar={userAvatar} />
               <UserMenu.Header name={userName} email={username} role="Admin" avatar={userAvatar} />
-              {!IS_CLOUD && <UserMenu.Item icon={<ScanEye size={18} />} label="Feature Preview" onClick={() => setFeaturePreviewOpen(true)} />}
               <UserMenu.Divider />
               <UserMenu.Logout icon={<LogOut size={18} />} label="Sign Out" onClick={() => setConfirmDialogOpen(true)} />
             </UserMenu>
@@ -913,15 +767,6 @@ function AppLayoutInner(): JSX.Element {
                     </Sidebar.Category>,
 
                     <Sidebar.Category key="org-main">
-                      {!IS_CLOUD && (
-                        <Sidebar.Item id="org-develop">
-                          <Sidebar.ItemIcon>
-                            <Lightbulb size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Develop</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                      )}
-
                       <Sidebar.Item id="build">
                         <Sidebar.ItemIcon>
                           <Hammer size={20} />
@@ -943,33 +788,6 @@ function AppLayoutInner(): JSX.Element {
                         <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
                       </Sidebar.Item>
 
-                      {!IS_CLOUD && (
-                        <Sidebar.Item id="org-insights">
-                          <Sidebar.ItemIcon>
-                            <BarChart3 size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Insights</Sidebar.ItemLabel>
-                          <Sidebar.Item id="org-usage">
-                            <Sidebar.ItemIcon>
-                              <Activity size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Usage</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-delivery">
-                            <Sidebar.ItemIcon>
-                              <Truck size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Delivery</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-compliance">
-                            <Sidebar.ItemIcon>
-                              <ShieldCheck size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Compliance</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        </Sidebar.Item>
-                      )}
-
                       <Sidebar.Item id="org-observability">
                         <Sidebar.ItemIcon>
                           <Eye size={20} />
@@ -988,171 +806,42 @@ function AppLayoutInner(): JSX.Element {
                           <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       </Sidebar.Item>
-
-                      {!IS_CLOUD && (
-                        <Sidebar.Item id="org-rag">
-                          <Sidebar.ItemIcon>
-                            <Brain size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>RAG</Sidebar.ItemLabel>
-                          <Sidebar.Item id="org-scheduled-ingestion">
-                            <Sidebar.ItemIcon>
-                              <Clock size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Scheduled Ingestion</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-service">
-                            <Sidebar.ItemIcon>
-                              <Cpu size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Service</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-retrieval">
-                            <Sidebar.ItemIcon>
-                              <Diamond size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Retrieval</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        </Sidebar.Item>
-                      )}
                     </Sidebar.Category>,
 
                     <Sidebar.Category key="org-infra">
-                      {/* Cloud drops CD Pipelines/Data Planes/Environments entirely and pulls Settings
-                      out to a standalone item below, so the whole Admin group has nothing left to show. */}
-                      {!IS_CLOUD && (
-                        <Sidebar.Item id="org-admin">
+                      {/* Environments come before the pipelines that promote across them. */}
+                      <Sidebar.Item id="org-admin">
+                        <Sidebar.ItemIcon>
+                          <Settings2 size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
+                        <Sidebar.Item id="org-environments">
                           <Sidebar.ItemIcon>
-                            <Settings2 size={20} />
+                            <Layers size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                          <Sidebar.Item id="org-databases">
-                            <Sidebar.ItemIcon>
-                              <Database size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Databases</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-vector-databases">
-                            <Sidebar.ItemIcon>
-                              <DatabaseZap size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Vector Databases</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-message-brokers">
-                            <Sidebar.ItemIcon>
-                              <MessageSquare size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Message Brokers</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-third-party">
-                            <Sidebar.ItemIcon>
-                              <Puzzle size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Third Party Services</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-genai-services">
-                            <Sidebar.ItemIcon>
-                              <Sparkles size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>GenAI Services</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-config-groups">
-                            <Sidebar.ItemIcon>
-                              <SlidersHorizontal size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Config Groups</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-governance">
-                            <Sidebar.ItemIcon>
-                              <Scale size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Governance</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-cd-pipelines">
-                            <Sidebar.ItemIcon>
-                              <GitBranch size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>CD Pipelines</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-data-planes">
-                            <Sidebar.ItemIcon>
-                              <Network size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Data Planes</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-environments">
-                            <Sidebar.ItemIcon>
-                              <Layers size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-audit-logs">
-                            <Sidebar.ItemIcon>
-                              <ClipboardList size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Audit Logs</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-approvals">
-                            <Sidebar.ItemIcon>
-                              <ClipboardCheck size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Approvals</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-certificates">
-                            <Sidebar.ItemIcon>
-                              <Award size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Certificates</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          {canSeeAccessControl && (
-                            <Sidebar.Item id="org-settings">
-                              <Sidebar.ItemIcon>
-                                <Cog size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          )}
+                          <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
                         </Sidebar.Item>
-                      )}
+                        <Sidebar.Item id="org-cd-pipelines">
+                          <Sidebar.ItemIcon>
+                            <GitBranch size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      </Sidebar.Item>
 
-                      {/* Cloud's Infrastructure group: environments come before the pipelines that promote across them. */}
-                      {IS_CLOUD && (
-                        <Sidebar.Item id="org-admin">
-                          <Sidebar.ItemIcon>
-                            <Settings2 size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                          <Sidebar.Item id="org-environments">
-                            <Sidebar.ItemIcon>
-                              <Layers size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="org-cd-pipelines">
-                            <Sidebar.ItemIcon>
-                              <GitBranch size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        </Sidebar.Item>
-                      )}
-
-                      {/* Cloud has no Access Control, but Settings still carries Org Details + Package Registries. */}
-                      {IS_CLOUD && (
-                        <Sidebar.Item id="org-settings">
-                          <Sidebar.ItemIcon>
-                            <Cog size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                      )}
+                      {/* Settings carries Org Details and Package Registries. */}
+                      <Sidebar.Item id="org-settings">
+                        <Sidebar.ItemIcon>
+                          <Cog size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                      </Sidebar.Item>
                     </Sidebar.Category>,
                   ]
                 : hasComponent(scope)
                   ? (() => {
                       const isGenericService = GENERIC_SERVICE_TYPES.has(currentComponent?.displayType ?? '');
                       // External CI is a paid, Bring-Your-Own-Image-only feature.
-                      const showExternalCI = isExternalCiEnabled() && isByoiComponent(currentComponent?.displayType ?? '') && isSubscribed;
                       const integrationType = identifyIntegration(currentComponent?.displayType ?? '', currentComponent?.componentSubType ?? null).type;
                       const runtimeLogsType = ['file-integration', 'event-integration'].includes(integrationType);
                       const aiAgentType = integrationType === 'ai-agent';
@@ -1170,53 +859,6 @@ function AppLayoutInner(): JSX.Element {
                         </Sidebar.Category>,
 
                         <Sidebar.Category key="int-main">
-                          {!IS_CLOUD && (
-                            <Sidebar.Item id="develop">
-                              <Sidebar.ItemIcon>
-                                <Lightbulb size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Develop</Sidebar.ItemLabel>
-                              <Sidebar.Item id="integration">
-                                <Sidebar.ItemIcon>
-                                  <Workflow size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Integration</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                              {isGenericService && (
-                                <Sidebar.Item id="api-info">
-                                  <Sidebar.ItemIcon>
-                                    <FileText size={20} />
-                                  </Sidebar.ItemIcon>
-                                  <Sidebar.ItemLabel>API Info</Sidebar.ItemLabel>
-                                </Sidebar.Item>
-                              )}
-                              {isGenericService && (
-                                <Sidebar.Item id="lifecycle">
-                                  <Sidebar.ItemIcon>
-                                    <Recycle size={20} />
-                                  </Sidebar.ItemIcon>
-                                  <Sidebar.ItemLabel>Lifecycle</Sidebar.ItemLabel>
-                                </Sidebar.Item>
-                              )}
-                              {isGenericService && (
-                                <Sidebar.Item id="documents">
-                                  <Sidebar.ItemIcon>
-                                    <FileText size={20} />
-                                  </Sidebar.ItemIcon>
-                                  <Sidebar.ItemLabel>Document</Sidebar.ItemLabel>
-                                </Sidebar.Item>
-                              )}
-                              {isGenericService && (
-                                <Sidebar.Item id="plans">
-                                  <Sidebar.ItemIcon>
-                                    <CreditCard size={20} />
-                                  </Sidebar.ItemIcon>
-                                  <Sidebar.ItemLabel>Plans</Sidebar.ItemLabel>
-                                </Sidebar.Item>
-                              )}
-                            </Sidebar.Item>
-                          )}
-
                           <Sidebar.Item id="build">
                             <Sidebar.ItemIcon>
                               <Hammer size={20} />
@@ -1245,25 +887,6 @@ function AppLayoutInner(): JSX.Element {
                               </Sidebar.ItemIcon>
                               <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
                             </Sidebar.Item>
-                          ) : IS_WIP ? (
-                            <Sidebar.Item id="test">
-                              <Sidebar.ItemIcon>
-                                <FlaskConical size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
-                              <Sidebar.Item id="console">
-                                <Sidebar.ItemIcon>
-                                  <Terminal size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Console</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                              <Sidebar.Item id="api-chat">
-                                <Sidebar.ItemIcon>
-                                  <MessageSquare size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>API Chat</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            </Sidebar.Item>
                           ) : (
                             <Sidebar.Item id="test">
                               <Sidebar.ItemIcon>
@@ -1273,46 +896,11 @@ function AppLayoutInner(): JSX.Element {
                             </Sidebar.Item>
                           )}
 
-                          {!IS_CLOUD && (
-                            <Sidebar.Item id="insights">
-                              <Sidebar.ItemIcon>
-                                <BarChart3 size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Insights</Sidebar.ItemLabel>
-                              <Sidebar.Item id="usage">
-                                <Sidebar.ItemIcon>
-                                  <Activity size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Usage</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                              <Sidebar.Item id="delivery">
-                                <Sidebar.ItemIcon>
-                                  <Truck size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Delivery</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                              <Sidebar.Item id="compliance">
-                                <Sidebar.ItemIcon>
-                                  <ShieldCheck size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Compliance</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            </Sidebar.Item>
-                          )}
-
                           <Sidebar.Item id="observability">
                             <Sidebar.ItemIcon>
                               <Eye size={20} />
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Observe</Sidebar.ItemLabel>
-                            {!IS_CLOUD && (
-                              <Sidebar.Item id="alerts">
-                                <Sidebar.ItemIcon>
-                                  <Bell size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Alerts</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
                             <Sidebar.Item id="logs">
                               <Sidebar.ItemIcon>
                                 <ScrollText size={20} />
@@ -1372,62 +960,18 @@ function AppLayoutInner(): JSX.Element {
                             {/* Neither page exists at integration level — these link up, and lead the group.
                               Rendered as separate children: a fragment hides them from the Sidebar's
                               child scan, which is what decides sub-item indentation. */}
-                            {IS_CLOUD && (
-                              <Sidebar.Item id="org-environments">
-                                <Sidebar.ItemIcon>
-                                  <Layers size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {IS_CLOUD && (
-                              <Sidebar.Item id="proj-cd-pipelines">
-                                <Sidebar.ItemIcon>
-                                  <GitBranch size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {!IS_CLOUD && (
-                              <Sidebar.Item id="connections">
-                                <Sidebar.ItemIcon>
-                                  <Link2 size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Connections</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {isGenericService && !IS_CLOUD && (
-                              <Sidebar.Item id="scaling">
-                                <Sidebar.ItemIcon>
-                                  <Maximize2 size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Scaling</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {!IS_CLOUD && (
-                              <Sidebar.Item id="storage">
-                                <Sidebar.ItemIcon>
-                                  <HardDrive size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Storage</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {showExternalCI && (
-                              <Sidebar.Item id="external-ci">
-                                <Sidebar.ItemIcon>
-                                  <Webhook size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>External CI</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {!IS_CLOUD && canSeeAccessControl && (
-                              <Sidebar.Item id="component-settings">
-                                <Sidebar.ItemIcon>
-                                  <Cog size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
+                            <Sidebar.Item id="org-environments">
+                              <Sidebar.ItemIcon>
+                                <Layers size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                            <Sidebar.Item id="proj-cd-pipelines">
+                              <Sidebar.ItemIcon>
+                                <GitBranch size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
+                            </Sidebar.Item>
                           </Sidebar.Item>
                         </Sidebar.Category>,
                       ];
@@ -1444,15 +988,6 @@ function AppLayoutInner(): JSX.Element {
                       </Sidebar.Category>,
 
                       <Sidebar.Category key="proj-main">
-                        {!IS_CLOUD && (
-                          <Sidebar.Item id="proj-develop">
-                            <Sidebar.ItemIcon>
-                              <Lightbulb size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Develop</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        )}
-
                         <Sidebar.Item id="proj-build">
                           <Sidebar.ItemIcon>
                             <Hammer size={20} />
@@ -1473,33 +1008,6 @@ function AppLayoutInner(): JSX.Element {
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
                         </Sidebar.Item>
-
-                        {!IS_CLOUD && (
-                          <Sidebar.Item id="proj-insights">
-                            <Sidebar.ItemIcon>
-                              <BarChart3 size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Insights</Sidebar.ItemLabel>
-                            <Sidebar.Item id="proj-usage">
-                              <Sidebar.ItemIcon>
-                                <Activity size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Usage</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-delivery">
-                              <Sidebar.ItemIcon>
-                                <Truck size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Delivery</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-compliance">
-                              <Sidebar.ItemIcon>
-                                <ShieldCheck size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Compliance</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          </Sidebar.Item>
-                        )}
 
                         <Sidebar.Item id="proj-observability">
                           <Sidebar.ItemIcon>
@@ -1522,83 +1030,32 @@ function AppLayoutInner(): JSX.Element {
                       </Sidebar.Category>,
 
                       <Sidebar.Category key="proj-infra">
-                        {/* Cloud drops CD Pipelines/Environments entirely and pulls Settings out to a
-                      standalone item below, so the whole Admin group has nothing left to show. */}
-                        {!IS_CLOUD && (
-                          <Sidebar.Item id="proj-admin">
-                            <Sidebar.ItemIcon>
-                              <Settings2 size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                            <Sidebar.Item id="proj-connections">
-                              <Sidebar.ItemIcon>
-                                <Link2 size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Connections</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-third-party">
-                              <Sidebar.ItemIcon>
-                                <Puzzle size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Third Party Services</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-genai-services">
-                              <Sidebar.ItemIcon>
-                                <Sparkles size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>GenAI Services</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-cd-pipelines">
-                              <Sidebar.ItemIcon>
-                                <GitBranch size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>CD Pipelines</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-environments">
-                              <Sidebar.ItemIcon>
-                                <Layers size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-settings">
-                              <Sidebar.ItemIcon>
-                                <Cog size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          </Sidebar.Item>
-                        )}
-
                         {/* Environments link up to the org page; the pipeline is this project's own. */}
-                        {IS_CLOUD && (
-                          <Sidebar.Item id="proj-admin">
+                        <Sidebar.Item id="proj-admin">
+                          <Sidebar.ItemIcon>
+                            <Settings2 size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
+                          <Sidebar.Item id="org-environments">
                             <Sidebar.ItemIcon>
-                              <Settings2 size={20} />
+                              <Layers size={20} />
                             </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                            <Sidebar.Item id="org-environments">
-                              <Sidebar.ItemIcon>
-                                <Layers size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-cd-pipelines">
-                              <Sidebar.ItemIcon>
-                                <GitBranch size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                            </Sidebar.Item>
+                            <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
                           </Sidebar.Item>
-                        )}
+                          <Sidebar.Item id="proj-cd-pipelines">
+                            <Sidebar.ItemIcon>
+                              <GitBranch size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        </Sidebar.Item>
 
-                        {IS_CLOUD && (
-                          <Sidebar.Item id="proj-settings">
-                            <Sidebar.ItemIcon>
-                              <Cog size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        )}
+                        <Sidebar.Item id="proj-settings">
+                          <Sidebar.ItemIcon>
+                            <Cog size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                        </Sidebar.Item>
                       </Sidebar.Category>,
                     ]}
             </Sidebar.Nav>
@@ -1640,11 +1097,6 @@ function AppLayoutInner(): JSX.Element {
               </Suspense>
             )}
           </Box>
-          {IS_WIP && (
-            <Suspense fallback={null}>
-              <CopilotDrawer />
-            </Suspense>
-          )}
         </Box>
       </AppShell.Main>
 
@@ -1675,8 +1127,6 @@ function AppLayoutInner(): JSX.Element {
       {/* Notifications removed console-wide; this slot is kept as the mount point for
           the app-level modals below. */}
       <AppShell.NotificationPanel>
-        <FeaturePreviewModal open={featurePreviewOpen} onClose={() => setFeaturePreviewOpen(false)} />
-
         {/* Confirm Dialog - managed locally */}
         <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)} maxWidth="sm" fullWidth>
           <DialogTitle>Sign Out</DialogTitle>
@@ -1698,13 +1148,5 @@ function AppLayoutInner(): JSX.Element {
         </Dialog>
       </AppShell.NotificationPanel>
     </AppShell>
-  );
-}
-
-export default function AppLayout(): JSX.Element {
-  return (
-    <CopilotProvider>
-      <AppLayoutInner />
-    </CopilotProvider>
   );
 }

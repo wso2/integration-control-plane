@@ -19,6 +19,7 @@ src/
   pages/         # One file per page/route (~51 pages)
   components/    # Shared and composite components
   api/           # API call modules
+  unported/      # Features the cloud BFF can't serve yet (ni() stubs); live code never imports from here
 public/
   config.json    # Runtime config (API URLs, Asgardeo client ID, etc.)
 tests/e2e/       # Playwright smoke suite (see tests/e2e/README.md)
