@@ -42,8 +42,10 @@ configurable storage:DatabaseType credentialsDbType = "h2";
 configurable string credentialsDbHost = "localhost";
 configurable int credentialsDbPort = 5432;
 configurable string credentialsDbName = "credentials_db";
-configurable string credentialsDbUser = "icp_user";
-configurable string credentialsDbPassword = "icp_password";
+// No credentials in code: () means unset, which is an error for every database except H2
+// (see storage:resolveDbCredentials). The shipped deployment.toml sets the H2 quick-start values.
+configurable string? credentialsDbUser = ();
+configurable string? credentialsDbPassword = ();
 configurable boolean credentialsDbUseTLS = false; // TLS (TCPS) for Oracle, e.g. Autonomous Database
 
 configurable int lockoutThreshold = 5;
@@ -51,11 +53,14 @@ configurable int lockoutBaseMinutes = 15;
 configurable int lockoutMaxMinutes = 60;
 
 
-final string resolvedCredDbUser = check resolveSecret(credentialsDbUser);
-final string resolvedCredDbPassword = check resolveSecret(credentialsDbPassword);
+final storage:DbCredentials credentialsDbCredentials = check storage:resolveDbCredentials(
+    credentialsDbType, credentialsDbName, check resolveOptionalSecret(credentialsDbUser),
+    check resolveOptionalSecret(credentialsDbPassword),
+    "credentialsDbUser and credentialsDbPassword (top-level keys)"
+);
 final storage:DatabaseConnectionManager credentialsDbManager = check new storage:DatabaseConnectionManager(
     credentialsDbType, credentialsDbHost, credentialsDbPort,
-    credentialsDbName, resolvedCredDbUser, resolvedCredDbPassword, credentialsDbUseTLS
+    credentialsDbName, credentialsDbCredentials.user, credentialsDbCredentials.password, credentialsDbUseTLS
 );
 final sql:Client credentialsDbClient = credentialsDbManager.getClient();
 

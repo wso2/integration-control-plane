@@ -141,6 +141,8 @@ def configureE2eSuite = { Test task, String suite, List<String> includes ->
     def coverageEnabled = System.getProperty('icp.e2e.coverage', 'true')
     task.systemProperty 'icp.e2e.selfContained', System.getProperty('icp.e2e.selfContained', 'true')
     task.systemProperty 'icp.e2e.coverage', coverageEnabled
+    task.systemProperty 'icp.e2e.h2QuickStartUser', h2QuickStartUser
+    task.systemProperty 'icp.e2e.h2QuickStartPassword', h2QuickStartPassword
     task.systemProperty 'icp.e2e.distributionZip', distributionZip.get().asFile.absolutePath
     task.systemProperty 'icp.e2e.workDir', layout.buildDirectory.dir("runtime/${suite}").get().asFile.absolutePath
     task.doFirst {

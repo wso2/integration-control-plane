@@ -58,6 +58,9 @@ public final class E2EEnvironment implements AutoCloseable {
     private static final String DB_NAME = "icp_database";
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD = "my-secret-pw";
+    // Bundled H2 quick-start credentials, passed from gradle.properties
+    private static final String CREDENTIALS_DB_USER = requiredProperty("icp.e2e.h2QuickStartUser");
+    private static final String CREDENTIALS_DB_PASSWORD = requiredProperty("icp.e2e.h2QuickStartPassword");
     // The Temporal CLI's dev server: a single container with in-memory persistence.
     private static final String TEMPORAL_IMAGE = "temporalio/temporal:1.8.3";
     private static final int TEMPORAL_PORT = 7233;
@@ -568,8 +571,8 @@ public final class E2EEnvironment implements AutoCloseable {
                 "-cp", icpHome.resolve("bin/icp-server.jar").toString(),
                 "org.h2.tools.RunScript",
                 "-url", "jdbc:h2:file:" + icpHome.resolve("bin/database").resolve(dbName) + ";MODE=MySQL",
-                "-user", "icp_user",
-                "-password", "icp_password",
+                "-user", CREDENTIALS_DB_USER,
+                "-password", CREDENTIALS_DB_PASSWORD,
                 "-script", script.toString()
         ).directory(icpHome.resolve("bin").toFile()), Duration.ofSeconds(60), "initialize " + dbName);
     }
@@ -593,6 +596,8 @@ public final class E2EEnvironment implements AutoCloseable {
         vars.put("DB_NAME", DB_NAME);
         vars.put("DB_USER", DB_USER);
         vars.put("DB_PASSWORD", DB_PASSWORD);
+        vars.put("CREDENTIALS_DB_USER", CREDENTIALS_DB_USER);
+        vars.put("CREDENTIALS_DB_PASSWORD", CREDENTIALS_DB_PASSWORD);
         Files.writeString(icpHome.resolve("conf/deployment.toml"), render("icp/deployment.toml", vars));
     }
 
@@ -806,6 +811,14 @@ public final class E2EEnvironment implements AutoCloseable {
                 .replace("\"", "&quot;")
                 .replace("<", "&lt;")
                 .replace(">", "&gt;");
+    }
+
+    private static String requiredProperty(String name) {
+        String value = System.getProperty(name);
+        if (value == null || value.isEmpty()) {
+            throw new IllegalStateException("System property " + name + " is not set; run the E2E suites through Gradle");
+        }
+        return value;
     }
 
     private static String javaBin() {
