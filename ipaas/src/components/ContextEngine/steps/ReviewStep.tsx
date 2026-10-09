@@ -22,14 +22,14 @@ import type { JSX, ReactNode } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { engineDescriptionError, engineNameError, formatBytes, isStorageAllManaged, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
+import { engineDescriptionError, engineNameError, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import { fieldStackSx, mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
 import type { ContextEngineForm } from '../../../types/contextEngine';
 
-/** Wizard step indexes the summary cards can jump back to. */
-export type EditableStep = 0 | 1 | 2 | 3;
+/** Wizard step indexes the summary cards can jump back to (Sources, Models, Storage; 'Grant Access' is hidden). */
+export type EditableStep = 0 | 1 | 2;
 
 interface ReviewStepProps {
   form: ContextEngineForm;
@@ -46,17 +46,19 @@ interface ReviewStepProps {
   onEdit: (step: EditableStep) => void;
 }
 
-function SummaryCard({ title, editLabel, onEdit, children }: { title: string; editLabel: string; onEdit: () => void; children: ReactNode }): JSX.Element {
+function SummaryCard({ title, editLabel, onEdit, children }: { title: string; editLabel?: string; onEdit?: () => void; children: ReactNode }): JSX.Element {
   return (
     <Box sx={summaryCardSx}>
       <Box sx={summaryCardHeaderSx}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           {title}
         </Typography>
-        <Link component="button" type="button" variant="body2" onClick={onEdit} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }} aria-label={`Edit ${editLabel}`}>
-          <Pencil size={13} />
-          Edit
-        </Link>
+        {onEdit && (
+          <Link component="button" type="button" variant="body2" onClick={onEdit} sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }} aria-label={`Edit ${editLabel}`}>
+            <Pencil size={13} />
+            Edit
+          </Link>
+        )}
       </Box>
       {children}
     </Box>
@@ -68,14 +70,10 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
   const nameError = engineNameError(form.name);
   // Query access and visibility are set in different steps; say where they disagree before anything is created.
   const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
-  const stagedFiles = form.sources.flatMap((s) => s.staged ?? []);
-  const stagedCount = stagedFiles.length;
-  const stagedBytes = stagedFiles.reduce((n, f) => n + f.size, 0);
   const descriptionError = engineDescriptionError(form.description);
   const embeddingName = EMBEDDING_PROVIDERS.find((p) => p.id === form.embedding?.provider)?.name ?? form.embedding?.provider ?? '—';
   const llmName = LLM_PROVIDERS.find((p) => p.id === form.llm?.provider)?.name ?? form.llm?.provider ?? '—';
   const n = form.sources.length;
-  const r = form.roles.length;
 
   return (
     <>
@@ -133,15 +131,8 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
             </Alert>
           )}
           {mismatch.cannotQuery.length > 0 && (
-            <Alert
-              severity="warning"
-              variant="outlined"
-              action={
-                <Button size="small" onClick={() => onEdit(1)}>
-                  Edit access
-                </Button>
-              }>
-              {`Content is shared with ${roleList(mismatch.cannotQuery, roleNames)}, but ${mismatch.cannotQuery.length === 1 ? 'that role' : 'those roles'} can't query this engine. Grant access, or the sharing has no effect.`}
+            <Alert severity="warning" variant="outlined">
+              {`Content is shared with ${roleList(mismatch.cannotQuery, roleNames)}, but ${mismatch.cannotQuery.length === 1 ? 'that role' : 'those roles'} can't query this engine. Grant access later from the Access tab, or the sharing has no effect.`}
             </Alert>
           )}
           {mismatch.hiddenFromMe.length > 0 && (
@@ -176,9 +167,10 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
             ))}
           </SummaryCard>
         </Grid>
+        {/* 'Who can query' card hidden for now. 'Grant Access' step is hidden too, so it has no edit link; restore onEdit when the step returns.
         <Grid size={{ xs: 12, md: 6 }}>
-          <SummaryCard title="Who can query" editLabel="access" onEdit={() => onEdit(1)}>
-            {r === 0 ? (
+          <SummaryCard title="Who can query">
+            {form.roles.length === 0 ? (
               <Typography variant="body2" sx={mutedSx}>
                 Only you. Grant roles later from the Access tab.
               </Typography>
@@ -196,8 +188,9 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
             )}
           </SummaryCard>
         </Grid>
+        */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <SummaryCard title="Models" editLabel="models" onEdit={() => onEdit(2)}>
+          <SummaryCard title="Models" editLabel="models" onEdit={() => onEdit(1)}>
             <Stack direction="row" gap={4}>
               <Box>
                 <Typography variant="caption" sx={mutedSx}>
@@ -226,7 +219,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           </SummaryCard>
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(3)}>
+          <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(2)}>
             <Stack direction="row" gap={3} flexWrap="wrap">
               {STORAGE_BACKENDS.map((b) => {
                 const sum = summarizeStorage(b.kind, form.storage[b.kind]);
@@ -246,33 +239,6 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
               })}
             </Stack>
           </SummaryCard>
-        </Grid>
-        <Grid size={{ xs: 12 }}>
-          <Box sx={{ ...summaryCardSx, borderColor: 'primary.light' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-              What happens when you create
-            </Typography>
-            <Stack gap={0.75}>
-              <Typography variant="body2">
-                {n} source{n === 1 ? '' : 's'} {n === 1 ? 'is' : 'are'} registered with {n === 1 ? 'its' : 'their'} visibility rules, and {n === 1 ? 'its' : 'their'} credentials are stored on the engine.
-              </Typography>
-              <Typography variant="body2">You get query and enrichment access as the creator.</Typography>
-              <Typography variant="body2">{r === 0 ? 'No roles are granted yet; only you can query.' : `${r} role${r === 1 ? '' : 's'} ${r === 1 ? 'is' : 'are'} granted query access.`}</Typography>
-              <Typography variant="body2">
-                {isStorageAllManaged(form.storage) ? 'All three stores are embedded in the engine; nothing is provisioned on your Infrastructure.' : 'Stores placed on Infrastructure are written to your servers; the rest stay embedded in the engine.'}
-              </Typography>
-              {stagedCount > 0 ? (
-                <Typography variant="body2">
-                  <Box component="span" sx={{ fontWeight: 500 }}>
-                    {stagedCount} file{stagedCount === 1 ? '' : 's'} ({formatBytes(stagedBytes)}) upload right after the engine exists
-                  </Box>{' '}
-                  and become searchable as they index. Keep this tab open until they finish.
-                </Typography>
-              ) : (
-                <Typography variant="body2">Items become searchable as each connector delivers them; the Overview shows the progress.</Typography>
-              )}
-            </Stack>
-          </Box>
         </Grid>
       </Grid>
     </>

@@ -59,7 +59,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, onEmbeddingCha
         Configure Models
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        The embedding model indexes your sources; the language model composes answers from what it finds.
+        The embedding model indexes your sources for search; the language model is used both to build the graph during ingestion and to answer questions.
       </Typography>
 
       <Box sx={recommendedBannerSx}>

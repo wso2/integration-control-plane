@@ -16,23 +16,23 @@
  * under the License.
  */
 
-import { Alert, Box, Button, ListingTable, Stack, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, /* ListingTable, */ Stack, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useContextEngineBearer } from '../../../hooks/useContextEngine';
-import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
+// import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
 import { buildMcpClientConfigs, mcpEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
 import McpPlayground from '../../McpPlayground/McpPlayground';
 import ExposureToggle from './ExposureToggle';
-import { clientTabsSx, endpointFieldSx, endpointRowSx, mutedSx, playgroundFrameSx } from '../styles';
+import { clientTabsSx, endpointFieldSx, endpointRowSx, /* mutedSx, */ playgroundFrameSx } from '../styles';
 import type { ContextEngineDetail, McpClientId } from '../../../types/contextEngine';
 
 interface McpTabProps {
   engine: ContextEngineDetail;
 }
 
-const toolsTableSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', mb: 3 } as const;
+// const toolsTableSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', mb: 3 } as const;
 
 /** Expose as MCP — endpoint, a config per client, an in-place test, and the tools agents get. */
 export default function McpTab({ engine }: McpTabProps): JSX.Element {
@@ -69,9 +69,11 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
         <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} onClick={() => setTesting((t) => !t)}>
           {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
         </Button>
+        {/* Hidden along with the Tools section.
         <Typography variant="body2" sx={mutedSx}>
           Lists the tools below and lets you call them with your own identity — the same playground integrations already use.
         </Typography>
+        */}
       </Stack>
 
       {testing && (
@@ -80,6 +82,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
         </Box>
       )}
 
+      {/* Tools section hidden for now.
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Tools
       </Typography>
@@ -109,6 +112,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
           </ListingTable.Body>
         </ListingTable>
       </ListingTable.Container>
+      */}
 
       <Alert severity="info" variant="outlined">
         Every tool call and evidence read is authorized on the caller's own identity — an agent acting for a user sees exactly what that user may see, and no more.
