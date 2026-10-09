@@ -72,7 +72,17 @@ function cleanupWorkflowMetadataTests() {
     if restored is error {
         io:println("Failed to restore the workflow-metadata component fixture: ", restored.message());
     }
+    string? registeredId = wfMetaRegisteredComponentId;
+    if registeredId is string {
+        error? deleted = storage:deleteComponent(registeredId);
+        if deleted is error {
+            io:println("Failed to delete the registered workflow-metadata component: ", deleted.message());
+        }
+    }
 }
+
+// The component the registration-path promotion test creates, deleted with the group.
+string? wfMetaRegisteredComponentId = ();
 
 // The server advertises the workflowMetadata field so bridges know to attach it, and a
 // full heartbeat carrying the document lands as this runtime's bi_workflow_metadata row
@@ -114,13 +124,36 @@ function testWorkflowMetadataUpsertFromHeartbeat() returns error? {
         "A full heartbeat without metadata must clear the stored row");
 }
 
-// A component auto-created from a heartbeat carries the generic integration type: the
-// bridge registers the runtime before anything knows whether the integration contains
-// workflows. The first heartbeat carrying workflow metadata records it as a workflow
-// integration — without which an auto-registered integration shows no workflow features
-// even though its workflows are registered and its metadata is stored, which is the
-// difference between the auto-registration path and creating the integration by hand and
-// picking Workflow.
+// A component auto-created from a heartbeat starts unclassified: the bridge registers the
+// runtime before anything knows whether the integration contains workflows. The first
+// heartbeat carrying workflow metadata records it as a workflow integration — without
+// which an auto-registered integration shows no workflow features even though its
+// workflows are registered and its metadata is stored, which is the difference between
+// the auto-registration path and creating the integration by hand and picking Workflow.
+@test:Config {groups: ["workflow-metadata"]}
+function testWorkflowMetadataPromotesRegisteredIntegration() returns error? {
+    cleanupRuntime(WF_META_RUNTIME_ID);
+    // The registration path: the component exists before any heartbeat, untyped and unedited.
+    string componentId = check storage:resolveOrCreateComponent(PROJECT_1_ID,
+            "wf-meta-registered-integration", "BI", SUPER_ADMIN_USER_ID);
+    wfMetaRegisteredComponentId = componentId;
+    types:Component registered = check storage:getComponentById(componentId);
+    test:assertEquals(registered.displayType, "unspecified", "Precondition: registration leaves the type unset");
+
+    types:Heartbeat heartbeat = buildWorkflowHeartbeat(WF_META_RUNTIME_ID, "wf-meta-type-runtime",
+            componentId, WF_PROD_ENV_ID);
+    heartbeat.workflowMetadata = WF_META_DOCUMENT.clone();
+    heartbeat.capabilities = ["workflowCommands"];
+    types:HeartbeatResponse response = check storage:processHeartbeat(heartbeat, preResolved = true);
+    test:assertTrue(response.acknowledged);
+
+    types:Component promoted = check storage:getComponentById(componentId);
+    test:assertEquals(promoted.displayType, "ballerinaWorkflow",
+        "A registered integration whose runtime reports workflow metadata must become a workflow one");
+}
+
+// Components created before integration types existed carry the legacy generic type and
+// are promoted the same way.
 @test:Config {groups: ["workflow-metadata"]}
 function testWorkflowMetadataRecordsWorkflowIntegrationType() returns error? {
     cleanupRuntime(WF_META_RUNTIME_ID);

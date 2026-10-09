@@ -981,9 +981,9 @@ isolated function insertRuntimeArtifacts(string runtimeId, types:Heartbeat heart
 }
 
 // A runtime that reports workflow metadata belongs to a workflow integration. Record that
-// on the component, because a component auto-created from a heartbeat carries the generic
-// integration type and the integration-level Workflows view keys on the type — see
-// `promoteToWorkflowIntegration`, which leaves any deliberately chosen type alone.
+// on the component, because a component auto-created from a heartbeat starts unclassified
+// and the integration-level Workflows view keys on the type — see
+// `promoteToWorkflowIntegration`, which leaves a type an operator edited alone.
 isolated function recordWorkflowIntegrationType(types:Heartbeat heartbeat) returns error? {
     map<json>? workflowMetadata = heartbeat?.workflowMetadata;
     if workflowMetadata is () || workflowMetadata.length() == 0 {

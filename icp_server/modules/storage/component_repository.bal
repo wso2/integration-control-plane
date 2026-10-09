@@ -29,8 +29,11 @@ import ballerina/uuid;
 // adding its value under every runtime that offers it; a type one runtime cannot
 // run is simply absent there, as Workflow is for MI.
 // The legacy generic integration type: the column default and what older clients
-// wrote. Runtime registration now explicitly writes "unspecified".
+// wrote. Runtime registration now explicitly writes UNSPECIFIED_DISPLAY_TYPE.
 const string GENERIC_DISPLAY_TYPE = "service";
+
+// What a runtime-registered integration starts as: nothing has classified it yet.
+const string UNSPECIFIED_DISPLAY_TYPE = "unspecified";
 
 // The workflow integration type. The integration-level Workflows view keys on it, so a
 // workflow integration that carries the generic type shows no workflow features.
@@ -927,19 +930,20 @@ isolated function mapToComponent(types:ComponentInDB component) returns types:Co
 // Records that a component is a workflow integration, if it is not already typed as
 // something an operator chose.
 //
-// A component auto-created by older versions carries the generic integration type: the
-// bridge registers a runtime before anything knows whether the integration contains
-// workflows, so registration cannot tell. The first heartbeat that carries workflow
-// metadata settles it — the integration registered workflows with its runtime — and the
-// integration-level Workflows view keys on the integration type, so without this an
-// auto-registered workflow integration shows no workflow features at all. (Creating the
-// integration by hand and picking Workflow sets the type up front, which is why that
-// path has always worked.)
+// A component auto-created from a heartbeat starts unclassified (older versions wrote the
+// legacy generic type): the bridge registers a runtime before anything knows whether the
+// integration contains workflows, so registration cannot tell. The first heartbeat that
+// carries workflow metadata settles it — the integration registered workflows with its
+// runtime — and the integration-level Workflows view keys on the integration type, so
+// without this an auto-registered workflow integration shows no workflow features at all.
+// (Creating the integration by hand and picking Workflow sets the type up front, which is
+// why that path has always worked.)
 //
-// Only the generic type is promoted, and only for Ballerina components, since the
-// workflow engine is Ballerina-only: a type an operator chose deliberately is left
-// alone, and re-running this is a no-op. New registrations use "unspecified" and
-// stay unclassified until an operator selects a type.
+// Only the legacy generic type and an untouched unclassified one are promoted, and only
+// for Ballerina components, since the workflow engine is Ballerina-only. "unspecified" is
+// also what an operator sets to clear the type of a multi-type integration, and only
+// `updateComponent` writes updated_by, so a row with it set has been edited and is left
+// alone. Re-running this is a no-op.
 //
 // + componentId - The component the reporting runtime belongs to
 // + return - An error only if the update itself fails
@@ -949,7 +953,8 @@ public isolated function promoteToWorkflowIntegration(string componentId) return
         SET display_type = ${WORKFLOW_DISPLAY_TYPE}
         WHERE component_id = ${componentId}
             AND component_type = ${types:BI}
-            AND display_type = ${GENERIC_DISPLAY_TYPE}
+            AND (display_type = ${GENERIC_DISPLAY_TYPE}
+                OR (display_type = ${UNSPECIFIED_DISPLAY_TYPE} AND updated_by IS NULL))
     `);
     int? affected = result.affectedRowCount;
     if affected is int && affected > 0 {
