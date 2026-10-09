@@ -17,32 +17,25 @@
 import ballerina/file;
 import ballerina/jballerina.java;
 
-// The Ballerina runtime only warns when a config file it was given cannot be found, read or
-// parsed, then drops the whole file and resolves every configurable to its default. A typo or a
-// UTF-8 byte-order mark in conf/deployment.toml would bring ICP up on embedded H2 and default
-// ports with nothing but a warning at the top of the log. This module re-checks the same config
-// sources with the runtime's own TOML parser and fails startup instead. It must initialise before
-// any module that acts on configuration, so it is imported by `utils`, which everything with
-// startup side effects depends on.
+// Fails startup when a config source the runtime would only warn about and drop is not valid TOML.
 
 const CONFIG_FILES_ENV = "BAL_CONFIG_FILES";
 const CONFIG_DATA_ENV = "BAL_CONFIG_DATA";
 const DEFAULT_CONFIG_FILE = "Config.toml";
+// Only on the classpath under `bal test`, which reads tests/Config.toml instead of these sources.
+const TEST_RUNNER_CLASS = "org.ballerinalang.test.runtime.BTestMain";
 
 function init() returns error? {
-    check validateConfigSources();
+    if loadClass(java:fromString(TEST_RUNNER_CLASS)) is error {
+        check validateConfigSources();
+    }
 }
 
-// Mirrors the runtime's choice of config sources (LaunchUtils.populateConfigDetails):
-// BAL_CONFIG_FILES if set, else BAL_CONFIG_DATA if set, else ./Config.toml if it exists. A
-// variable that is set but empty still selects its source, as it does in the runtime.
+// Same source selection as LaunchUtils.populateConfigDetails; a set but empty variable still counts.
 function validateConfigSources() returns error? {
     string? configFiles = getEnv(CONFIG_FILES_ENV);
     if configFiles is string {
-        foreach string path in splitPathList(configFiles) {
-            check validateConfigFile(path);
-        }
-        return;
+        return validateConfigFiles(configFiles);
     }
     string? configData = getEnv(CONFIG_DATA_ENV);
     if configData is string {
@@ -50,6 +43,19 @@ function validateConfigSources() returns error? {
     }
     if check file:test(DEFAULT_CONFIG_FILE, file:EXISTS) {
         return validateConfigFile(DEFAULT_CONFIG_FILE);
+    }
+}
+
+# Fails if any entry in `configFiles`, as given in BAL_CONFIG_FILES, is empty or not a valid TOML file.
+#
+# + configFiles - path list, split the way the runtime splits it
+# + return - an error describing the first problem, or `()` if every file parses cleanly
+function validateConfigFiles(string configFiles) returns error? {
+    foreach string path in splitPathList(configFiles) {
+        if path.trim() == "" {
+            return error(string `${CONFIG_FILES_ENV} contains an empty entry: "${configFiles}"`);
+        }
+        check validateConfigFile(path);
     }
 }
 
@@ -65,7 +71,7 @@ function validateConfigFile(string path) returns error? {
     if toml is error {
         return error(string `Cannot read configuration file ${path}: ${toml.message()}`);
     }
-    return checkDiagnostics(toml, path);
+    return checkDiagnostics(toml, path, true);
 }
 
 # Fails if `content`, as given in BAL_CONFIG_DATA, is not valid TOML.
@@ -78,13 +84,10 @@ function validateConfigData(string content) returns error? {
         return;
     }
     return checkDiagnostics(readTomlString(java:fromString(cleaned), java:fromString(CONFIG_DATA_ENV)),
-            CONFIG_DATA_ENV);
+            CONFIG_DATA_ENV, false);
 }
 
-// The runtime rewrites BAL_CONFIG_DATA before parsing it (TomlContentProvider.cleanContent): a
-// literal `\n` outside a quoted value becomes a line break, and a literal `\r` or `\t` outside a
-// quoted value is dropped. Apply the same rewrite, with the same patterns, so that one-line
-// content the runtime accepts is accepted here too.
+// Same rewrite as TomlContentProvider.cleanContent: literal \n, \r and \t outside quoted values.
 function cleanConfigData(string content) returns string {
     handle withLineBreaks = stringReplaceAll(java:fromString(content),
             java:fromString(string `\\n(?=(?:[^"]*"[^"]*")*[^"]*$)`), lineSeparator());
@@ -93,40 +96,41 @@ function cleanConfigData(string content) returns string {
     return java:toString(cleaned) ?: "";
 }
 
-function checkDiagnostics(handle toml, string origin) returns error? {
+function checkDiagnostics(handle toml, string origin, boolean isFile) returns error? {
     handle diagnostics = tomlDiagnostics(toml);
     int count = listSize(diagnostics);
     if count == 0 {
         return;
     }
     string details = "";
+    boolean startsAtFirstChar = false;
     foreach int i in 0 ..< count {
         handle diagnostic = listGet(diagnostics, i);
         handle startLine = lineRangeStartLine(locationLineRange(diagnosticLocation(diagnostic)));
         // LinePosition is zero-based; report it one-based, as editors and the runtime do.
-        details += string `${"\n"}  line ${linePositionLine(startLine) + 1}, column ${linePositionOffset(startLine) + 1}: `
+        int line = linePositionLine(startLine) + 1;
+        int column = linePositionOffset(startLine) + 1;
+        if i == 0 {
+            startsAtFirstChar = line == 1 && column == 1;
+        }
+        details += string `${"\n"}  line ${line}, column ${column}: `
             + (java:toString(diagnosticMessage(diagnostic)) ?: "");
     }
+    string bomHint = isFile && startsAtFirstChar
+        ? " (a UTF-8 byte-order mark at the start of the file also causes this; save it as UTF-8 without BOM)"
+        : "";
     return error(string `Configuration in ${origin} is not valid TOML, so ICP will not start on default `
-        + string `settings in its place. Fix the following and restart (a UTF-8 byte-order mark at the start `
-        + string `of the file also causes this; save it as UTF-8 without BOM):${details}`);
+        + string `settings in its place. Fix the following and restart${bomHint}:${details}`);
 }
 
+// String.split, as the runtime uses: keeps leading and interior empty entries, drops trailing ones.
 function splitPathList(string paths) returns string[] {
-    string separator = java:toString(pathSeparator()) ?: ":";
+    handle entries = arrayAsList(stringSplit(java:fromString(paths), patternQuote(pathSeparator())));
     string[] result = [];
-    string remaining = paths;
-    while true {
-        int? index = remaining.indexOf(separator);
-        string entry = index is int ? remaining.substring(0, index) : remaining;
-        if entry.trim() != "" {
-            result.push(entry);
-        }
-        if index is () {
-            return result;
-        }
-        remaining = remaining.substring(index + separator.length());
+    foreach int i in 0 ..< listSize(entries) {
+        result.push(java:toString(listGet(entries, i)) ?: "");
     }
+    return result;
 }
 
 // System.getenv, unlike os:getEnv, tells an unset variable (null) apart from an empty one.
@@ -146,6 +150,29 @@ function lineSeparator() returns handle = @java:Method {
 function stringReplaceAll(handle value, handle regex, handle replacement) returns handle = @java:Method {
     name: "replaceAll",
     'class: "java.lang.String"
+} external;
+
+function stringSplit(handle value, handle regex) returns handle = @java:Method {
+    name: "split",
+    'class: "java.lang.String",
+    paramTypes: ["java.lang.String"]
+} external;
+
+function patternQuote(handle value) returns handle = @java:Method {
+    name: "quote",
+    'class: "java.util.regex.Pattern"
+} external;
+
+function arrayAsList(handle array) returns handle = @java:Method {
+    name: "asList",
+    'class: "java.util.Arrays",
+    paramTypes: [{'class: "java.lang.Object", dimensions: 1}]
+} external;
+
+function loadClass(handle name) returns handle|error = @java:Method {
+    name: "forName",
+    'class: "java.lang.Class",
+    paramTypes: ["java.lang.String"]
 } external;
 
 function pathSeparator() returns handle = @java:FieldGet {

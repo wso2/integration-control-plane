@@ -26,43 +26,43 @@ logLevel = "INFO"
 dbType = "mysql"
 `;
 
-function writeTempToml(byte[] content) returns string|error {
+// Validates `content` written to a temp file, removing the file before the caller asserts.
+function validateTempToml(byte[] content) returns [error?]|error {
     string path = check file:createTemp(".toml");
     check io:fileWriteBytes(path, content);
-    return path;
+    error? result = validateConfigFile(path);
+    check file:remove(path);
+    return [result];
 }
 
 @test:Config {}
 function testValidFilePasses() returns error? {
-    string path = check writeTempToml(VALID_TOML.toBytes());
-    test:assertEquals(validateConfigFile(path), ());
-    check file:remove(path);
+    [error?] [result] = check validateTempToml(VALID_TOML.toBytes());
+    test:assertEquals(result, ());
 }
 
 @test:Config {}
 function testMissingClosingQuoteFails() returns error? {
-    string path = check writeTempToml(re `"INFO"`.replace(VALID_TOML, "\"INFO").toBytes());
-    error? result = validateConfigFile(path);
+    [error?] [result] = check validateTempToml(re `"INFO"`.replace(VALID_TOML, "\"INFO").toBytes());
     if result !is error {
         test:assertFail("a missing closing quote must fail validation");
     }
     // The parser reports an unterminated string where it gives up: the start of the next line.
     test:assertTrue(result.message().includes("line 3, column 1"), result.message());
     test:assertTrue(result.message().includes("missing double quote"), result.message());
-    check file:remove(path);
+    test:assertFalse(result.message().includes("byte-order mark"), result.message());
 }
 
 @test:Config {}
 function testByteOrderMarkFails() returns error? {
     byte[] content = [0xEF, 0xBB, 0xBF];
     content.push(...VALID_TOML.toBytes());
-    string path = check writeTempToml(content);
-    error? result = validateConfigFile(path);
+    [error?] [result] = check validateTempToml(content);
     if result !is error {
         test:assertFail("a UTF-8 byte-order mark must fail validation");
     }
     test:assertTrue(result.message().includes("line 1, column 1"), result.message());
-    check file:remove(path);
+    test:assertTrue(result.message().includes("byte-order mark"), result.message());
 }
 
 @test:Config {}
@@ -77,14 +77,20 @@ function testMissingFileFails() returns error? {
 @test:Config {}
 function testDirectoryFails() returns error? {
     string dir = check file:createTempDir();
-    test:assertTrue(validateConfigFile(dir) is error, "a directory must fail validation");
+    error? result = validateConfigFile(dir);
     check file:remove(dir);
+    test:assertTrue(result is error, "a directory must fail validation");
 }
 
 @test:Config {}
 function testConfigData() {
     test:assertEquals(validateConfigData(VALID_TOML), ());
-    test:assertTrue(validateConfigData("logLevel = \"INFO") is error);
+    error? result = validateConfigData("logLevel = \"INFO");
+    if result !is error {
+        test:assertFail("an unterminated string must fail validation");
+    }
+    // BAL_CONFIG_DATA is not a file, so the byte-order-mark hint does not apply.
+    test:assertFalse(result.message().includes("byte-order mark"), result.message());
     test:assertEquals(validateConfigData(""), ());
 }
 
@@ -103,4 +109,29 @@ function testSplitPathList() {
     string sep = java:toString(pathSeparator()) ?: ":";
     test:assertEquals(splitPathList(string `a.toml${sep}b.toml`), ["a.toml", "b.toml"]);
     test:assertEquals(splitPathList(string `a.toml${sep}${sep}`), ["a.toml"]);
+    test:assertEquals(splitPathList(string `${sep}a.toml`), ["", "a.toml"]);
+    test:assertEquals(splitPathList(string `a.toml${sep}${sep}b.toml`), ["a.toml", "", "b.toml"]);
+    test:assertEquals(splitPathList(""), [""]);
+}
+
+@test:Config {}
+function testEmptyConfigFilesEntryFails() returns error? {
+    string sep = java:toString(pathSeparator()) ?: ":";
+    string path = check file:createTemp(".toml");
+    check io:fileWriteBytes(path, VALID_TOML.toBytes());
+    error? valid = validateConfigFiles(path);
+    error? empty = validateConfigFiles("");
+    error? leadingEmpty = validateConfigFiles(string `${sep}${path}`);
+    error? interiorEmpty = validateConfigFiles(string `${path}${sep}${sep}${path}`);
+    check file:remove(path);
+    test:assertEquals(valid, ());
+    test:assertTrue(empty is error, "a set but empty BAL_CONFIG_FILES must fail validation");
+    test:assertTrue(leadingEmpty is error, "a leading empty entry must fail validation");
+    test:assertTrue(interiorEmpty is error, "an interior empty entry must fail validation");
+}
+
+@test:Config {}
+function testCheckSkippedUnderTests() {
+    // init() relies on this to skip the check during `bal test`.
+    test:assertFalse(loadClass(java:fromString(TEST_RUNNER_CLASS)) is error);
 }
