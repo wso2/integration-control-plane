@@ -58,6 +58,9 @@ public final class E2EEnvironment implements AutoCloseable {
     private static final String DB_NAME = "icp_database";
     private static final String DB_USER = "root";
     private static final String DB_PASSWORD = "my-secret-pw";
+    // The Temporal CLI's dev server: a single container with in-memory persistence.
+    private static final String TEMPORAL_IMAGE = "temporalio/temporal:1.8.3";
+    private static final int TEMPORAL_PORT = 7233;
     private static E2EEnvironment current;
 
     private final Path runDir;
@@ -65,6 +68,7 @@ public final class E2EEnvironment implements AutoCloseable {
     private final Path icpHome;
     private final Path miZip;
     private final Path biJar;
+    private final Path biWorkflowJar;
     private final Ports ports;
     private final boolean observability;
     private final boolean coverage;
@@ -79,16 +83,18 @@ public final class E2EEnvironment implements AutoCloseable {
     private GenericContainer<?> fluentBit;
     private GenericContainer<?> thunderId;
     private GenericContainer<?> mysql;
+    private GenericContainer<?> temporal;
     private String opensearchHost;
     private int opensearchPort;
 
-    private E2EEnvironment(Path runDir, Path reportDir, Path icpHome, Path miZip, Path biJar, Ports ports,
-                           boolean observability, boolean coverage, boolean sso, String jacocoAgentJar) {
+    private E2EEnvironment(Path runDir, Path reportDir, Path icpHome, Path miZip, Path biJar, Path biWorkflowJar,
+                           Ports ports, boolean observability, boolean coverage, boolean sso, String jacocoAgentJar) {
         this.runDir = runDir;
         this.reportDir = reportDir;
         this.icpHome = icpHome;
         this.miZip = miZip;
         this.biJar = biJar;
+        this.biWorkflowJar = biWorkflowJar;
         this.ports = ports;
         this.observability = observability;
         this.coverage = coverage;
@@ -120,8 +126,9 @@ public final class E2EEnvironment implements AutoCloseable {
                     "wso2-integration-control-plane-");
             Path miZip = config.miZip().isBlank() ? null : Path.of(config.miZip()).toAbsolutePath();
             Path biJar = config.biJar().isBlank() ? null : Path.of(config.biJar()).toAbsolutePath();
+            Path biWorkflowJar = config.biWorkflowJar().isBlank() ? null : Path.of(config.biWorkflowJar()).toAbsolutePath();
             Ports ports = Ports.allocate();
-            E2EEnvironment env = new E2EEnvironment(runDir, reportDir, icpHome, miZip, biJar, ports,
+            E2EEnvironment env = new E2EEnvironment(runDir, reportDir, icpHome, miZip, biJar, biWorkflowJar, ports,
                     config.observability(), config.coverage(), config.sso(), config.jacocoAgentJar());
             environment = env;
             env.startObservability();
@@ -138,13 +145,20 @@ public final class E2EEnvironment implements AutoCloseable {
         }
     }
 
-    // Release the heavy per-scenario runtimes (BI/MI/Fluent Bit) while keeping the shared
+    // Release the heavy per-scenario runtimes (BI/MI/Fluent Bit/Temporal) while keeping the shared
     // ICP and OpenSearch, so memory is freed for the remaining UI tests.
     public static synchronized void stopRuntimes() {
         if (current == null) return;
         current.runtimeProcesses.reversed().forEach(E2EEnvironment::destroyTree);
         current.runtimeProcesses.clear();
         current.removeFluentBit();
+        current.removeTemporal();
+    }
+
+    private void removeTemporal() {
+        if (temporal == null) return;
+        temporal.stop();
+        temporal = null;
     }
 
     private void removeFluentBit() {
@@ -167,6 +181,13 @@ public final class E2EEnvironment implements AutoCloseable {
                                                 String secret) throws Exception {
         if (current == null) throw new IllegalStateException("E2E environment is not running");
         return current.startBi(runtimeId, environment, project, component, secret);
+    }
+
+    // A BI runtime hosting a durable workflow, backed by its own Temporal server.
+    public static RuntimeProcess startWorkflowRuntime(String runtimeId, String environment, String project,
+                                                      String component, String secret) throws Exception {
+        if (current == null) throw new IllegalStateException("E2E environment is not running");
+        return current.startWorkflowBi(runtimeId, environment, project, component, secret);
     }
 
     public static RuntimeProcess startMiRuntime(String runtimeId, String environment, String project, String component,
@@ -410,12 +431,41 @@ public final class E2EEnvironment implements AutoCloseable {
     private RuntimeProcess startBi(String runtimeId, String environment, String project, String component, String secret)
             throws Exception {
         if (biJar == null || !Files.exists(biJar)) throw new IllegalStateException("icp.e2e.biJar is required");
-        int port = freePort();
-        Path home = runDir.resolve("bi-runtime");
-        recreate(home);
         Files.createDirectories(runDir.resolve("logs/bi/e2e-bi"));
-        Files.writeString(home.resolve(".icp_runtime_id"), runtimeId);
         Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("LOG_PATH", escapeToml(runDir.resolve("logs/bi/e2e-bi/app.log").toString()));
+        return launchBi(biJar, "bi/Config.toml", vars, "/greeting", runtimeId, environment, project, component, secret);
+    }
+
+    private RuntimeProcess startWorkflowBi(String runtimeId, String environment, String project, String component,
+                                           String secret) throws Exception {
+        if (biWorkflowJar == null || !Files.exists(biWorkflowJar)) {
+            throw new IllegalStateException("icp.e2e.biWorkflowJar is required");
+        }
+        startTemporal();
+        Map<String, String> vars = new LinkedHashMap<>();
+        vars.put("TEMPORAL_URL", temporal.getHost() + ":" + temporal.getMappedPort(TEMPORAL_PORT));
+        return launchBi(biWorkflowJar, "bi/workflow/Config.toml.template", vars, "/health",
+                runtimeId, environment, project, component, secret);
+    }
+
+    private void startTemporal() {
+        if (temporal != null) return;
+        temporal = new GenericContainer<>(TEMPORAL_IMAGE)
+                .withCommand("server", "start-dev", "--ip", "0.0.0.0")
+                .withExposedPorts(TEMPORAL_PORT)
+                .waitingFor(Wait.forLogMessage(".*Temporal Server:.*", 1).withStartupTimeout(Duration.ofMinutes(2)));
+        temporal.start();
+    }
+
+    private RuntimeProcess launchBi(Path jar, String configTemplate, Map<String, String> appVars, String readinessPath,
+                                    String runtimeId, String environment, String project, String component,
+                                    String secret) throws Exception {
+        int port = freePort();
+        Path home = runDir.resolve("bi-runtime-" + runtimeId);
+        recreate(home);
+        Files.writeString(home.resolve(".icp_runtime_id"), runtimeId);
+        Map<String, String> vars = new LinkedHashMap<>(appVars);
         vars.put("HTTP_PORT", Integer.toString(port));
         vars.put("RUNTIME_ID", escapeToml(runtimeId));
         vars.put("SERVER_URL", runtimeListenerUrl());
@@ -423,16 +473,15 @@ public final class E2EEnvironment implements AutoCloseable {
         vars.put("INTEGRATION", escapeToml(component));
         vars.put("PROJECT", escapeToml(project));
         vars.put("ENVIRONMENT", escapeToml(environment));
-        vars.put("LOG_PATH", escapeToml(runDir.resolve("logs/bi/e2e-bi/app.log").toString()));
-        Files.writeString(home.resolve("Config.toml"), render("bi/Config.toml", vars));
+        Files.writeString(home.resolve("Config.toml"), render(configTemplate, vars));
 
-        Process process = new ProcessBuilder(javaBin(), "-jar", biJar.toString())
+        Process process = new ProcessBuilder(javaBin(), "-jar", jar.toString())
                 .directory(home.toFile())
                 .redirectErrorStream(true)
                 .redirectOutput(ProcessBuilder.Redirect.appendTo(reportDir.resolve("bi-stdout.log").toFile()))
                 .start();
         runtimeProcesses.add(process);
-        String url = "http://localhost:" + port + "/greeting";
+        String url = "http://localhost:" + port + readinessPath;
         waitForUrl(url, Duration.ofSeconds(90));
         return new RuntimeProcess("BI", runtimeId, url);
     }
@@ -810,6 +859,7 @@ public final class E2EEnvironment implements AutoCloseable {
             thunderId.stop();
         }
         if (mysql != null) mysql.stop();
+        removeTemporal();
         if (opensearch != null) opensearch.stop();
         if (network != null) network.close();
     }

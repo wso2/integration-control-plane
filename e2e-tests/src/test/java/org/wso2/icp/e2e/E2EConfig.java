@@ -18,6 +18,7 @@ public record E2EConfig(
         String distributionZip,
         String miZip,
         String biJar,
+        String biWorkflowJar,
         String workDir,
         String reportDir) {
 
@@ -41,6 +42,7 @@ public record E2EConfig(
                 value("icp.e2e.distributionZip", "ICP_E2E_DISTRIBUTION_ZIP", ""),
                 value("icp.e2e.miZip", "ICP_E2E_MI_ZIP", ""),
                 value("icp.e2e.biJar", "ICP_E2E_BI_JAR", ""),
+                value("icp.e2e.biWorkflowJar", "ICP_E2E_BI_WORKFLOW_JAR", ""),
                 value("icp.e2e.workDir", "ICP_E2E_WORK_DIR", "build/e2e-runtime"),
                 value("icp.e2e.reportDir", "ICP_E2E_REPORT_DIR", "build/reports/e2e"));
     }
@@ -65,7 +67,7 @@ public record E2EConfig(
     private E2EConfig copy(String baseUrl, boolean observability, boolean sso) {
         return new E2EConfig(baseUrl, adminUsername, adminPassword, headless, slowMoMs, timeoutMs, observability,
                 coverage, sso, jacocoAgentJar, logsProject, logsBiComponent, logsMiComponent, selfContained, distributionZip,
-                miZip, biJar, workDir, reportDir);
+                miZip, biJar, biWorkflowJar, workDir, reportDir);
     }
 
     public String url(String path) {

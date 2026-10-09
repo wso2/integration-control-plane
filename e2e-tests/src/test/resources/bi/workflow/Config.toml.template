@@ -1,0 +1,18 @@
+httpPort = {{HTTP_PORT}}
+
+[wso2.icp.runtime.bridge]
+serverUrl = "{{SERVER_URL}}"
+secret = "{{SECRET}}"
+integration = "{{INTEGRATION}}"
+project = "{{PROJECT}}"
+environment = "{{ENVIRONMENT}}"
+heartbeatInterval = 2
+enableSSL = false
+runtimeIdFile = ".icp_runtime_id"
+enableWorkflowManagement = true
+
+[ballerina.workflow]
+mode = "SELF_HOSTED"
+url = "{{TEMPORAL_URL}}"
+namespace = "default"
+taskQueue = "E2E_WORKFLOW"
