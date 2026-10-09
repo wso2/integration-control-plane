@@ -1,0 +1,18 @@
+[package]
+org = "wso2_e2e"
+name = "icp_e2e_workflow"
+version = "0.1.0"
+distribution = "2201.13.6"
+
+[build-options]
+remoteManagement = true
+
+[[dependency]]
+org = "ballerina"
+name = "workflow"
+version = "0.10.1"
+
+[[dependency]]
+org = "wso2"
+name = "icp.runtime.bridge"
+version = "1.0.2"
