@@ -6,7 +6,8 @@ Default flow:
 
 1. build/package the ICP distribution,
 2. resolve the latest released MI zip from Maven (`-PmiVersion=` overrides it),
-3. build the BI test app from `src/test/resources/bi/hello-world` using released `wso2/icp.runtime.bridge:0.1.9`,
+3. build the BI test apps from `src/test/resources/bi/hello-world` (released `wso2/icp.runtime.bridge:0.1.9`)
+   and `src/test/resources/bi/workflow` (released `ballerina/workflow:0.10.1` and bridge `1.0.2`),
 4. run the core, observability, and SSO suites; each suite unzips and starts ICP
    from the packaged distribution against a MySQL storage DB started via
    Testcontainers (credentials store stays on local H2),
@@ -46,7 +47,10 @@ To run against an already running ICP instead of the self-contained fixture:
 
 The core suite covers login, failed login, protected-route redirect, logout,
 public policy pages, project listing, environment listing, project validation,
-and not-found resources.
+not-found resources, and workflows: a workflow integration registers itself with an
+org secret, is typed Workflow, and has a run started, its human task completed and
+its result read in the console. The workflow scenario starts a Temporal dev server
+(`temporalio/temporal`) via Testcontainers.
 
 ## SSO (ThunderID)
 

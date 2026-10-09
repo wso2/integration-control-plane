@@ -82,27 +82,36 @@ tasks.register('resolveMiDistribution') {
     }
 }
 
-tasks.register('buildBiE2eArtifact') {
-    group = 'verification'
-    description = 'Build the BI E2E artifact from source kept inside ./icp.'
-    inputs.dir('src/test/resources/bi/hello-world')
-    outputs.file(layout.buildDirectory.file('bi/hello-world/target/bin/icp_e2e_hello_world.jar'))
-    // Two concurrent `bal build`s corrupt the shared ~/.ballerina cache; serialize after the ICP build.
-    mustRunAfter rootProject.tasks.named('buildICP')
+def biAppJar = { String app, String packageName ->
+    layout.buildDirectory.file("bi/${app}/target/bin/${packageName}.jar")
+}
 
-    doLast {
-        def workDir = layout.buildDirectory.dir('bi/hello-world').get().asFile
-        delete workDir
-        copy {
-            from 'src/test/resources/bi/hello-world'
-            into workDir
-        }
-        execOps.exec {
-            workingDir workDir
-            commandLine 'bal', 'build'
+def registerBiAppBuild = { String taskName, String app, String packageName, List<String> runsAfter ->
+    tasks.register(taskName) {
+        group = 'verification'
+        description = "Build the '${app}' BI E2E artifact from source kept inside ./icp."
+        inputs.dir("src/test/resources/bi/${app}")
+        outputs.file(biAppJar(app, packageName))
+        // Two concurrent `bal build`s corrupt the shared ~/.ballerina cache; serialize after the ICP build.
+        mustRunAfter([rootProject.tasks.named('buildICP')] + runsAfter.collect { tasks.named(it) })
+
+        doLast {
+            def workDir = layout.buildDirectory.dir("bi/${app}").get().asFile
+            delete workDir
+            copy {
+                from "src/test/resources/bi/${app}"
+                into workDir
+            }
+            execOps.exec {
+                workingDir workDir
+                commandLine 'bal', 'build'
+            }
         }
     }
 }
+
+registerBiAppBuild('buildBiE2eArtifact', 'hello-world', 'icp_e2e_hello_world', [])
+registerBiAppBuild('buildBiWorkflowE2eArtifact', 'workflow', 'icp_e2e_workflow', ['buildBiE2eArtifact'])
 
 def configureE2eSuite = { Test task, String suite, List<String> includes ->
     task.group = 'verification'
@@ -117,12 +126,14 @@ def configureE2eSuite = { Test task, String suite, List<String> includes ->
     task.dependsOn rootProject.tasks.named('packageICP')
     task.dependsOn tasks.named('resolveMiDistribution')
     task.dependsOn tasks.named('buildBiE2eArtifact')
+    task.dependsOn tasks.named('buildBiWorkflowE2eArtifact')
     task.dependsOn(project.hasProperty('playwrightWithDeps') ? 'playwrightInstallDeps' : 'playwrightInstall')
 
     // A suite exercises the packaged product, not only this test code: rerun (and re-key the build
     // cache) whenever the product or the runtimes it drives change.
     def distributionZip = rootProject.layout.buildDirectory.file("distribution/wso2-integration-control-plane-${rootProject.version}.zip")
-    task.inputs.files(distributionZip, configurations.miDistribution, tasks.named('buildBiE2eArtifact'))
+    task.inputs.files(distributionZip, configurations.miDistribution,
+            tasks.named('buildBiE2eArtifact'), tasks.named('buildBiWorkflowE2eArtifact'))
             .withPropertyName('product')
             .withPathSensitivity(PathSensitivity.NONE)
 
@@ -150,7 +161,8 @@ def configureE2eSuite = { Test task, String suite, List<String> includes ->
             environment 'TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE', '/var/run/docker.sock'
         }
         systemProperty 'icp.e2e.miZip', configurations.miDistribution.singleFile.absolutePath
-        systemProperty 'icp.e2e.biJar', layout.buildDirectory.file('bi/hello-world/target/bin/icp_e2e_hello_world.jar').get().asFile.absolutePath
+        systemProperty 'icp.e2e.biJar', biAppJar('hello-world', 'icp_e2e_hello_world').get().asFile.absolutePath
+        systemProperty 'icp.e2e.biWorkflowJar', biAppJar('workflow', 'icp_e2e_workflow').get().asFile.absolutePath
         systemProperty 'icp.e2e.reportDir', layout.buildDirectory.dir("reports/e2e/${suite}").get().asFile.absolutePath
         // Ballerina compiles to JVM bytecode carrying .bal SourceFile/line info, so the JaCoCo agent
         // on the packaged ICP process yields Ballerina line coverage. Resolve the agent only when needed.
