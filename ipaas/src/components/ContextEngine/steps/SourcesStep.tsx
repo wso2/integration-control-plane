@@ -19,7 +19,7 @@
 import { Box, Button, Chip, IconButton, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, CircleAlert, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { POPULAR_CONNECTORS, QUICK_ADD_CONNECTORS, SOURCE_CONNECTORS } from '../../../constants/contextEngine';
+import { POPULAR_CONNECTORS, QUICK_ADD_CONNECTORS } from '../../../constants/contextEngine';
 import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSourceVisibility, summarizeSource } from '../../../utils/contextEngine';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
@@ -99,7 +99,7 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
         Choose Sources
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        Pick where the context graph is built from. Add as many sources as you need; each one is configured in its own panel.
+        Choose the data sources for your context graph.
       </Typography>
 
       {sources.length === 0 ? (
@@ -114,7 +114,7 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
               No sources yet
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
-              Browse {SOURCE_CONNECTORS.length} connectors across cloud storage, wikis, code, ticketing, databases and the web, or upload files directly.
+              Browse connectors across cloud storage, wikis, code, ticketing, databases and the web, or upload files directly.
             </Typography>
             <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => openDrawer()} sx={{ mt: 0.5 }}>
               Add source

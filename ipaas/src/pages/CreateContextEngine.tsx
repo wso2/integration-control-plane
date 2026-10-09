@@ -29,7 +29,7 @@ import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import VerticalStepper from '../components/VerticalStepper';
 import SourcesStep from '../components/ContextEngine/steps/SourcesStep';
-import AccessStep from '../components/ContextEngine/steps/AccessStep';
+// import AccessStep from '../components/ContextEngine/steps/AccessStep'; — 'Grant Access' step hidden
 import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
 import StorageStep from '../components/ContextEngine/steps/StorageStep';
 import ReviewStep from '../components/ContextEngine/steps/ReviewStep';
@@ -39,7 +39,8 @@ import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
 import type { OrgScope } from '../nav';
 
-const STEP_LABELS = ['Choose Sources', 'Grant Access', 'Configure Models', 'Configure Storage', 'Name & Create'];
+// 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
+const STEP_LABELS = ['Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Name & Create'];
 const LAST_STEP = STEP_LABELS.length - 1;
 
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
@@ -93,7 +94,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
   const stepBlocker: (string | null)[] = [
     sourcesStepBlocker(form.sources),
-    null,
+    // null, — 'Grant Access' step hidden
     modelsStepBlocker(form),
     storageStepBlocker(form.storage),
     !form.name.trim() ? 'Enter a name for the engine' : engineNameError(form.name) || engineDescriptionError(form.description) || null,
@@ -174,7 +175,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
             <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
           </Box>
-          <Box sx={{ flex: 1, maxWidth: activeStep === 3 ? 1080 : 960, mt: 2 }}>
+          <Box sx={{ flex: 1, maxWidth: activeStep === 2 ? 1080 : 960, mt: 2 }}>
             {showRestored && (
               <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
                 We restored the draft you left in this session. API keys and tokens are never stored, so re-enter them before creating.
@@ -197,8 +198,9 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 roleNames={roleNames}
               />
             )}
-            {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />}
-            {activeStep === 2 && (
+            {/* 'Grant Access' step hidden — restore this branch (as activeStep === 1) and renumber the steps below to bring it back.
+            {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />} */}
+            {activeStep === 1 && (
               <ModelsStep
                 embedding={form.embedding}
                 llm={form.llm}
@@ -208,8 +210,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 onShareApiKeyChange={(value) => dispatch({ type: 'shareApiKey', value })}
               />
             )}
-            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
-            {activeStep === 4 && (
+            {activeStep === 2 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
+            {activeStep === 3 && (
               <ReviewStep
                 form={form}
                 roleNames={roleNames}

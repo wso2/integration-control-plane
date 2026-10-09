@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, /* Chip, */ CircularProgress, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
@@ -24,7 +24,7 @@ import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
 import { forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
 import { ANSWER_MODE_AVAILABLE, CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
-import { suggestedQuestions } from '../../../utils/contextEngine';
+// import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
@@ -32,7 +32,7 @@ import AnsweredTurn from './AnsweredTurn';
 import EvidenceCard from './EvidenceCard';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
-import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx, suggestionRowSx } from '../styles';
+import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx /* , suggestionRowSx */ } from '../styles';
 import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextQueryMode, ContextQueryResult } from '../../../types/contextEngine';
 
 interface PlaygroundTabProps {
@@ -117,7 +117,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const llmModel = engine.models.llm?.model;
 
   const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !query.isPending;
-  const suggestions = suggestedQuestions(engine);
+  // const suggestions = suggestedQuestions(engine);
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
   const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev));
 
@@ -327,6 +327,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           </Alert>
         )}
 
+        {/* Sample questions hidden for now.
         {turns.length === 0 && !query.isPending && canQuery && (
           <Box sx={suggestionRowSx}>
             <Typography variant="body2" sx={mutedSx}>
@@ -337,6 +338,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             ))}
           </Box>
         )}
+        */}
 
         {turns.map(renderTurn)}
 
