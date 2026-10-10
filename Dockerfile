@@ -31,7 +31,7 @@ RUN npm install -g pnpm@9 && \
     pnpm build
 
 # Stage 2: Build stage with Ballerina and Gradle
-FROM ballerina/ballerina:2201.14.0-alpha3 AS builder
+FROM ballerina/ballerina:2201.14.0 AS builder
 
 # Install required dependencies (using apk for Alpine-based image)
 USER root
