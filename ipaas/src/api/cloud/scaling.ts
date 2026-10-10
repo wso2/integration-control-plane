@@ -16,9 +16,97 @@
  * under the License.
  */
 
-import type { ClusterPod, Hpa, HpaMetric, HpaWriteData, HttpScaler, HttpScalerWriteData, PodMetrics, ScalingMethodToggle, ScalingPath, ScalingState } from '../../types/scaling';
+/**
+ * The BFF keeps one autoscaling setting per (component, environment). The devops API's
+ * release-scoped HPA, metric and HTTP-scaler resources have no cloud counterpart, so those
+ * functions stay stubs.
+ */
+
+import { bff, seg } from './_client';
+import type { Autoscaling, AutoscalingCondition, AutoscalingStatus, AutoscalingWriteData, ClusterPod, Hpa, HpaMetric, HpaWriteData, HttpScaler, HttpScalerWriteData, PodMetrics, ScalingMethodToggle, ScalingPath, ScalingState } from '../../types/scaling';
 
 const ni = (name: string): Promise<never> => Promise.reject(new Error(`[cloud] scaling.${name}: not implemented`));
+
+interface BffAutoscalingCondition {
+  type: string;
+  status: string;
+  reason?: string;
+  message?: string;
+  lastTransitionTime?: string;
+}
+
+interface BffAutoscalingStatus {
+  currentReplicas: number;
+  desiredReplicas: number;
+  currentCpuUtilizationPercentage?: number;
+  currentMemoryUtilizationPercentage?: number;
+  conditions?: BffAutoscalingCondition[];
+}
+
+interface BffAutoscaling {
+  environment: string;
+  supported: boolean;
+  effective: boolean;
+  memoryEffective: boolean;
+  enabled: boolean;
+  minReplicas?: number;
+  maxReplicas?: number;
+  cpuUtilizationPercentage?: number;
+  memoryUtilizationPercentage?: number;
+  maxReplicasLimit: number;
+  status?: BffAutoscalingStatus;
+  syncStatus?: string;
+  syncMessage?: string;
+}
+
+const autoscalingPath = (componentId: string, env: string): string => `/components/${seg(componentId)}/environments/${seg(env)}/autoscaling`;
+
+const toCondition = (c: BffAutoscalingCondition): AutoscalingCondition => ({ type: c.type, status: c.status, reason: c.reason ?? '', message: c.message ?? '', lastTransitionTime: c.lastTransitionTime });
+
+function toStatus(s: BffAutoscalingStatus): AutoscalingStatus {
+  return {
+    currentReplicas: s.currentReplicas,
+    desiredReplicas: s.desiredReplicas,
+    currentCpuUtilizationPercentage: s.currentCpuUtilizationPercentage,
+    currentMemoryUtilizationPercentage: s.currentMemoryUtilizationPercentage,
+    conditions: (s.conditions ?? []).map(toCondition),
+  };
+}
+
+function toAutoscaling(environmentId: string, a: BffAutoscaling): Autoscaling {
+  return {
+    environmentId,
+    supported: a.supported,
+    effective: a.effective,
+    memoryEffective: a.memoryEffective,
+    enabled: a.enabled,
+    minReplicas: a.minReplicas,
+    maxReplicas: a.maxReplicas,
+    cpuUtilizationPercentage: a.cpuUtilizationPercentage,
+    memoryUtilizationPercentage: a.memoryUtilizationPercentage,
+    maxReplicasLimit: a.maxReplicasLimit,
+    status: a.status ? toStatus(a.status) : undefined,
+    syncStatus: a.syncStatus || undefined,
+    syncMessage: a.syncMessage || undefined,
+  };
+}
+
+export const getAutoscaling = async (_orgUuid: string, _projectId: string, componentId: string, environmentId: string): Promise<Autoscaling> => toAutoscaling(environmentId, await bff.get<BffAutoscaling>(autoscalingPath(componentId, environmentId)));
+
+// PUT replaces the whole setting and the BFF rejects unknown fields, so the body carries exactly
+// the chosen fields: an unset memory target is left out, which removes any stored one. A 409 means
+// the deployed release predates autoscaling, or memory targets: its message says to redeploy.
+function toBffWrite(data: AutoscalingWriteData): Record<string, boolean | number> {
+  if (!data.enabled) return { enabled: false };
+  const { minReplicas, maxReplicas, cpuUtilizationPercentage, memoryUtilizationPercentage } = data;
+  const body: Record<string, boolean | number> = { enabled: true, minReplicas, maxReplicas, cpuUtilizationPercentage };
+  if (memoryUtilizationPercentage !== undefined) body.memoryUtilizationPercentage = memoryUtilizationPercentage;
+  return body;
+}
+
+export const updateAutoscaling = async (_orgUuid: string, _projectId: string, componentId: string, environmentId: string, data: AutoscalingWriteData): Promise<void> => {
+  await bff.put(autoscalingPath(componentId, environmentId), toBffWrite(data));
+};
 
 export const getScalingState = (_orgUuid: string, _projectId: string, _componentId: string, _releaseId: string): Promise<ScalingState> => ni('getScalingState');
 export const getHttpScaler = (_orgUuid: string, _projectId: string, _componentId: string, _releaseId: string): Promise<HttpScaler | null> => ni('getHttpScaler');

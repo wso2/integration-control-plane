@@ -107,7 +107,7 @@ import type {
 } from '../types/devopsConfigs';
 import type { ExternalCiToken } from '../types/externalCi';
 import type { StorageClass, Volume, VolumeCreateData, VolumeMount, VolumeMountCreateData, VolumeMountPath, VolumeMountUpdateData } from '../types/storage';
-import type { ClusterPod, Hpa, HpaMetric, HpaWriteData, HttpScaler, HttpScalerWriteData, PodMetrics, ScalingMethodToggle, ScalingPath, ScalingState } from '../types/scaling';
+import type { Autoscaling, AutoscalingWriteData, ClusterPod, Hpa, HpaMetric, HpaWriteData, HttpScaler, HttpScalerWriteData, PodMetrics, ScalingMethodToggle, ScalingPath, ScalingState } from '../types/scaling';
 import type { HealthCheck, HealthCheckWriteData } from '../types/healthChecks';
 import type { CreateUrlMappingInput, CustomDomain, CustomDomainType, CustomUrlMapping } from '../types/customDomain';
 import type { OrgWorkflowConfig, ReviewerDecisionRequest, WorkflowConfigRequest, WorkflowDefinition, WorkflowInstanceResponse, WorkflowReviewData } from '../types/workflow';
@@ -898,8 +898,11 @@ export interface StorageApi {
   listStorageClasses(orgUuid: string, projectId: string, environmentId: string): Promise<StorageClass[]>;
 }
 
-// Component scaling (devops API). wip-only for now; cloud/icp stubs throw.
+// Component scaling. The devops API methods are wip-only (the cloud stubs throw); the
+// per-environment autoscaling methods are cloud-only (the wip stubs throw).
 export interface ScalingApi {
+  getAutoscaling(orgUuid: string, projectId: string, componentId: string, environmentId: string): Promise<Autoscaling>;
+  updateAutoscaling(orgUuid: string, projectId: string, componentId: string, environmentId: string, data: AutoscalingWriteData): Promise<void>;
   getScalingState(orgUuid: string, projectId: string, componentId: string, releaseId: string): Promise<ScalingState>;
   getHttpScaler(orgUuid: string, projectId: string, componentId: string, releaseId: string): Promise<HttpScaler | null>;
   getHpa(orgUuid: string, projectId: string, componentId: string, releaseId: string): Promise<Hpa | null>;

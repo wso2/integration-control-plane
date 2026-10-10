@@ -24,10 +24,14 @@ interface ScaleMethodCardProps {
   description: string;
   selected: boolean;
   disabled?: boolean;
+  /** A short line under the description, e.g. why the method can't be chosen. */
+  note?: string;
   onSelect: () => void;
 }
 
-export default function ScaleMethodCard({ title, description, selected, disabled, onSelect }: ScaleMethodCardProps): JSX.Element {
+const noteSx = { display: 'block', mt: 1, fontWeight: 600 } as const;
+
+export default function ScaleMethodCard({ title, description, selected, disabled, note, onSelect }: ScaleMethodCardProps): JSX.Element {
   return (
     <Card
       variant="outlined"
@@ -50,6 +54,11 @@ export default function ScaleMethodCard({ title, description, selected, disabled
           <Typography variant="body2" color="text.secondary">
             {description}
           </Typography>
+          {note && (
+            <Typography variant="caption" color="text.secondary" sx={noteSx}>
+              {note}
+            </Typography>
+          )}
         </CardContent>
       </CardActionArea>
     </Card>

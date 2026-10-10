@@ -19,7 +19,13 @@
 import { choreoClient } from './httpClients';
 import { HttpError } from '../../types/http';
 import { ScalingMethod } from '../../types/scaling';
-import type { ClusterPod, ClusterQueryResponse, Hpa, HpaMetric, HpaWriteData, HttpScaler, HttpScalerWriteData, PodMetrics, ScalingMethodToggle, ScalingPath, ScalingState } from '../../types/scaling';
+import type { Autoscaling, AutoscalingWriteData, ClusterPod, ClusterQueryResponse, Hpa, HpaMetric, HpaWriteData, HttpScaler, HttpScalerWriteData, PodMetrics, ScalingMethodToggle, ScalingPath, ScalingState } from '../../types/scaling';
+
+// Per-environment autoscaling is the cloud model; wip scales through the release-scoped HPA below.
+const cloudOnly = (name: string): Promise<never> => Promise.reject(new Error(`[wip] scaling.${name}: not implemented`));
+
+export const getAutoscaling = (_orgUuid: string, _projectId: string, _componentId: string, _environmentId: string): Promise<Autoscaling> => cloudOnly('getAutoscaling');
+export const updateAutoscaling = (_orgUuid: string, _projectId: string, _componentId: string, _environmentId: string, _data: AutoscalingWriteData): Promise<void> => cloudOnly('updateAutoscaling');
 
 const BASE = '/devops/1.0.0/api/v1';
 type Wrapped<T> = { data: T };

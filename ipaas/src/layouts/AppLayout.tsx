@@ -112,7 +112,7 @@ import { useBillingOrg } from '../hooks/useBillingOrg';
 import { isSupportedIntegration, isByoiComponent, GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { useSubscriptions } from '../hooks/useSubscription';
 import { isExternalCiEnabled } from '../hooks/useExternalCi';
-import { PAID_SUBSCRIPTION_TYPE } from '../constants/subscription';
+import { BILLING_PRODUCT_CODE, PAID_SUBSCRIPTION_TYPE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useOrgPermissions } from '../hooks/useAuth';
 import { switchOrgToken, useAuth } from '#auth';
@@ -166,7 +166,7 @@ function AppLayoutInner(): JSX.Element {
 
   // Cloud-only billing trial indicator. useBillingOrg is gated to IS_CLOUD, so
   // wip/icp return null here and the chip below is never rendered or bundled.
-  const { org: billingOrg } = useBillingOrg('integration-platform');
+  const { org: billingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
   const billingTrial = billingOrg?.subscription?.status === 'trial' ? billingOrg.subscription.trial : null;
   const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
 
@@ -1360,6 +1360,14 @@ function AppLayoutInner(): JSX.Element {
                                 <Sidebar.ItemLabel>Health Checks</Sidebar.ItemLabel>
                               </Sidebar.Item>
                             )}
+                            {isGenericService && (
+                              <Sidebar.Item id="scaling">
+                                <Sidebar.ItemIcon>
+                                  <Maximize2 size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Scaling</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
                           </Sidebar.Item>
                         </Sidebar.Category>,
 
@@ -1394,14 +1402,6 @@ function AppLayoutInner(): JSX.Element {
                                   <Link2 size={20} />
                                 </Sidebar.ItemIcon>
                                 <Sidebar.ItemLabel>Connections</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {isGenericService && !IS_CLOUD && (
-                              <Sidebar.Item id="scaling">
-                                <Sidebar.ItemIcon>
-                                  <Maximize2 size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Scaling</Sidebar.ItemLabel>
                               </Sidebar.Item>
                             )}
                             {!IS_CLOUD && (

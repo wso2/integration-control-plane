@@ -16,11 +16,19 @@
  * under the License.
  */
 
-/** Free-tier billable-component allowance (mirrors Devant's FREE_COMPONENT_LIMIT). */
-export const FREE_COMPONENT_LIMIT = 5;
+export const alertSx = {
+  mb: 2,
+} as const;
 
-/** Subscription record type that marks an org as being on a paid plan. */
-export const PAID_SUBSCRIPTION_TYPE = 'devant-subscription';
+export const cardsRowSx = {
+  mb: 3,
+} as const;
 
-/** The cloud billing product this console belongs to; the billing org is read for it. */
-export const BILLING_PRODUCT_CODE = 'integration-platform';
+export const sectionTitleSx = {
+  fontWeight: 600,
+  mb: 1.5,
+} as const;
+
+export const sectionSx = {
+  mb: 4,
+} as const;

@@ -163,3 +163,11 @@ export interface CalculatedUsage {
   cpu: { limits: number; used: number; usagePercent: number };
   memory: { limits: number; used: number; usagePercent: number };
 }
+
+/** A resource's utilization from a more direct source than {@link CalculatedUsage}, such as the autoscaler's own measurement. */
+export interface UsageReading {
+  /** Utilization in percent of the resource's request. */
+  percent: number;
+  /** The autoscaler's target for the resource, when it scales on it. */
+  target?: number;
+}

@@ -16,11 +16,12 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, FormControlLabel, Paper, Slider, Stack, Switch, Typography } from '@wso2/oxygen-ui';
+import { Button, CircularProgress, Stack } from '@wso2/oxygen-ui';
 import { useEffect, useState, type JSX } from 'react';
 import { useCreateHpa, useHpaMetricMutations, useUpdateHpa } from '../../hooks/useScaling';
 import { CPU_THRESHOLD, MEMORY_THRESHOLD } from '../../constants/scaling';
 import RangeInput from './RangeInput';
+import ThresholdSlider from './ThresholdSlider';
 import type { Hpa, HpaMetric, MetricResource, ScalingPath } from '../../types/scaling';
 
 interface HpaConfigProps {
@@ -41,38 +42,6 @@ function findMetric(hpa: Hpa | null, name: MetricResource): HpaMetric | undefine
 
 function buildMetric(name: MetricResource, value: number): HpaMetric {
   return { type: 'Resource', rule: { resource: { name, value: String(value), type: 'utilization' } } };
-}
-
-function ThresholdSlider({
-  label,
-  enabled,
-  value,
-  min,
-  max,
-  onToggle,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  enabled: boolean;
-  value: number;
-  min: number;
-  max: number;
-  onToggle: (v: boolean) => void;
-  onChange: (v: number) => void;
-  disabled: boolean;
-}): JSX.Element {
-  return (
-    <Paper variant="outlined" sx={{ p: 2, flex: 1, minWidth: 260 }}>
-      <FormControlLabel control={<Switch checked={enabled} onChange={(e) => onToggle(e.target.checked)} disabled={disabled} />} label={label} />
-      <Box sx={{ px: 1, mt: 1, opacity: enabled ? 1 : 0.5 }}>
-        <Slider value={value} min={min} max={max} onChange={(_e, v) => onChange(v as number)} disabled={disabled || !enabled} valueLabelDisplay="auto" />
-        <Typography variant="caption" color="text.secondary">
-          {value}% utilization
-        </Typography>
-      </Box>
-    </Paper>
-  );
 }
 
 export default function HpaConfig({ orgUuid, projectId, path, version, maxReplicaCap, hpa, canManage, onSaved, onError }: HpaConfigProps): JSX.Element {

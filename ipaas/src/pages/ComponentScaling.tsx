@@ -16,23 +16,27 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, MenuItem, PageContent, PageTitle, Select, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
+import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import ScaleMethodCard from '../components/Scaling/ScaleMethodCard';
 import ScaleToZeroConfig from '../components/Scaling/ScaleToZeroConfig';
 import HpaConfig from '../components/Scaling/HpaConfig';
+import CloudAutoscaling from '../components/Scaling/CloudAutoscaling';
+import CloudReplicas from '../components/Scaling/CloudReplicas';
 import ReplicasTable from '../components/Scaling/ReplicasTable';
 import ComingSoon from './ComingSoon';
 import { Permissions } from '../constants/permissions';
 import { GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { CLOUD_DP_MAX_REPLICAS, HPA_CARD, SCALE_TO_ZERO_CARD } from '../constants/scaling';
-import { isScalingEnabled, useHpa, useHttpScaler, useScalingState, useSetScalingMethod } from '../hooks/useScaling';
+import { isAutoscalingEnabled, isScalingEnabled, useHpa, useHttpScaler, useScalingState, useSetScalingMethod } from '../hooks/useScaling';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
 import { useRelease } from '../hooks/useDevopsConfigs';
 import { useEnvironments } from '../hooks/useEnvironments';
+import { useLoadComponentPermissions } from '../hooks/usePermissionLoader';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { mainContainer } from '../utils/devopsConfigs';
@@ -45,6 +49,9 @@ export default function ComponentScaling({ org, project, component }: ComponentS
   const { projectId } = useProjectId(project);
   const { hasPermission } = useAccessControl();
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
+  // Landing straight on this page skips the Overview, which is where component-scoped
+  // permissions are normally loaded.
+  useLoadComponentPermissions(org, projectId, comp?.id ?? '');
   const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, comp?.id);
 
   const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
@@ -63,7 +70,8 @@ export default function ComponentScaling({ org, project, component }: ComponentS
   const releaseId = deployment?.releaseId ?? '';
   const { data: release } = useRelease(projectId, comp?.id, releaseId);
   const containerId = useMemo(() => mainContainer(release?.containers)?.ID ?? '', [release]);
-  const clusterId = environments.find((e) => e.id === envId)?.dpId ?? '';
+  const selectedEnv = environments.find((e) => e.id === envId);
+  const clusterId = selectedEnv?.dpId ?? '';
 
   const { data: state, isLoading: loadingState } = useScalingState(projectId, comp?.id ?? '', releaseId);
   const { data: httpScaler = null } = useHttpScaler(projectId, comp?.id ?? '', releaseId);
@@ -75,7 +83,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
 
   useEffect(() => setAlert(null), [trackId, envId]);
 
-  if (!isScalingEnabled()) {
+  if (!isScalingEnabled() && !isAutoscalingEnabled()) {
     return <ComingSoon title="Coming Soon" description="Scaling configuration is currently under development." />;
   }
 
@@ -108,20 +116,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
     );
   };
 
-  const envSelect = !IS_CLOUD && environments.length > 1 && (
-    <Select
-      size="small"
-      value={environments.some((e) => e.id === envId) ? envId : ''}
-      onChange={(e) => setEnvId(e.target.value as string)}
-      inputProps={{ 'aria-label': 'Environment' }}
-      sx={{ fontSize: '0.8125rem', '& .MuiSelect-select': { py: 0.5, px: 1.5 }, minWidth: 140 }}>
-      {environments.map((e) => (
-        <MenuItem key={e.id} value={e.id}>
-          {e.name}
-        </MenuItem>
-      ))}
-    </Select>
-  );
+  const envSelect = environments.length > 1 ? <EnvironmentSelect environments={environments} value={envId} onChange={setEnvId} deployment={{ orgHandler: org, orgUuid: orgUuid ?? '', componentId: comp?.id ?? '', versionId: trackId }} /> : null;
 
   const onSaved = (message: string) => setAlert({ type: 'success', message });
   const onError = (message: string) => setAlert({ type: 'error', message });
@@ -166,29 +161,43 @@ export default function ComponentScaling({ org, project, component }: ComponentS
               </Alert>
             )}
 
-            <Stack direction={{ xs: 'column', md: 'row' }} gap={2} sx={{ mb: 3 }}>
-              <ScaleMethodCard title={SCALE_TO_ZERO_CARD.title} description={SCALE_TO_ZERO_CARD.description} selected={currentMethod === ScalingMethod.ScaleToZero} disabled={!canManage} onSelect={() => onSelectMethod(ScalingMethod.ScaleToZero)} />
-              <ScaleMethodCard title={HPA_CARD.title} description={HPA_CARD.description} selected={currentMethod === ScalingMethod.HPA} disabled={!canManage} onSelect={() => onSelectMethod(ScalingMethod.HPA)} />
-            </Stack>
-
-            {currentMethod === ScalingMethod.ScaleToZero && (
-              <Alert severity="info" sx={{ mb: 3 }}>
-                Please refer to the documentation to troubleshoot your scaled-to-zero integration.
-              </Alert>
-            )}
-
-            <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
-              Scaling Configuration
-            </Typography>
-            <Box sx={{ mb: 4 }}>
-              {currentMethod === ScalingMethod.ScaleToZero ? (
-                <ScaleToZeroConfig projectId={projectId} path={path} scaler={httpScaler} maxReplicaCap={CLOUD_DP_MAX_REPLICAS} canManage={canManage} onSaved={onSaved} onError={onError} />
+            {IS_CLOUD ? (
+              selectedEnv ? (
+                <>
+                  {/* Keyed by environment so an unsaved HPA choice never carries over to another one. */}
+                  <CloudAutoscaling key={selectedEnv.id} projectId={projectId} componentId={comp.id} environmentId={selectedEnv.id} environmentName={selectedEnv.name} canManage={canManage} onSaved={onSaved} onError={onError} />
+                  <CloudReplicas key={`replicas-${selectedEnv.id}`} projectId={projectId} componentId={comp.id} componentHandler={component} releaseId={releaseId} environmentId={selectedEnv.id} orgHandler={org} projectHandler={project} canManage={canManage} />
+                </>
               ) : (
-                <HpaConfig orgUuid={orgUuid ?? ''} projectId={projectId} path={path} version={state?.version ?? ''} maxReplicaCap={CLOUD_DP_MAX_REPLICAS} hpa={hpa} canManage={canManage} onSaved={onSaved} onError={onError} />
-              )}
-            </Box>
+                <Alert severity="info">Select an environment to configure scaling.</Alert>
+              )
+            ) : (
+              <>
+                <Stack direction={{ xs: 'column', md: 'row' }} gap={2} sx={{ mb: 3 }}>
+                  <ScaleMethodCard title={SCALE_TO_ZERO_CARD.title} description={SCALE_TO_ZERO_CARD.description} selected={currentMethod === ScalingMethod.ScaleToZero} disabled={!canManage} onSelect={() => onSelectMethod(ScalingMethod.ScaleToZero)} />
+                  <ScaleMethodCard title={HPA_CARD.title} description={HPA_CARD.description} selected={currentMethod === ScalingMethod.HPA} disabled={!canManage} onSelect={() => onSelectMethod(ScalingMethod.HPA)} />
+                </Stack>
 
-            {clusterId && <ReplicasTable projectId={projectId} clusterId={clusterId} releaseId={releaseId} dataPlaneLabel="Choreo Cloud Data Plane" />}
+                {currentMethod === ScalingMethod.ScaleToZero && (
+                  <Alert severity="info" sx={{ mb: 3 }}>
+                    Please refer to the documentation to troubleshoot your scaled-to-zero integration.
+                  </Alert>
+                )}
+
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1.5 }}>
+                  Scaling Configuration
+                </Typography>
+                <Box sx={{ mb: 4 }}>
+                  {currentMethod === ScalingMethod.ScaleToZero ? (
+                    <ScaleToZeroConfig projectId={projectId} path={path} scaler={httpScaler} maxReplicaCap={CLOUD_DP_MAX_REPLICAS} canManage={canManage} onSaved={onSaved} onError={onError} />
+                  ) : (
+                    <HpaConfig orgUuid={orgUuid ?? ''} projectId={projectId} path={path} version={state?.version ?? ''} maxReplicaCap={CLOUD_DP_MAX_REPLICAS} hpa={hpa} canManage={canManage} onSaved={onSaved} onError={onError} />
+                  )}
+                </Box>
+
+                {clusterId && <ReplicasTable projectId={projectId} clusterId={clusterId} releaseId={releaseId} dataPlaneLabel="Choreo Cloud Data Plane" />}
+              </>
+            )}
           </>
         )}
       </PageContent>

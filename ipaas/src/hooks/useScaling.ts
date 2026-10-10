@@ -17,16 +17,48 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createHpa, createHpaMetric, deleteHpaMetric, getHpa, getHttpScaler, getScalingState, listPodMetrics, listPods, setScalingMethod, updateHpa, updateHpaMetric, updateHttpScaler } from '#api/scaling';
-import { IS_WIP } from '../features';
+import { createHpa, createHpaMetric, deleteHpaMetric, getAutoscaling, getHpa, getHttpScaler, getScalingState, listPodMetrics, listPods, setScalingMethod, updateAutoscaling, updateHpa, updateHpaMetric, updateHttpScaler } from '#api/scaling';
+import { IS_CLOUD, IS_WIP } from '../features';
 import { useOrgUuid } from './useOrgUuid';
-import type { HpaMetric, HpaWriteData, HttpScalerWriteData, ScalingMethodToggle, ScalingPath } from '../types/scaling';
+import { pollsAutoscaling } from '../utils/scaling';
+import type { AutoscalingWriteData, HpaMetric, HpaWriteData, HttpScalerWriteData, ScalingMethodToggle, ScalingPath } from '../types/scaling';
 
 const ROOT = 'scaling';
 
-/** Scaling is a wip-only surface for now (cloud/icp API stubs throw). */
+/** The devops-API scaling surface is wip-only (the cloud stubs throw). */
 export function isScalingEnabled(): boolean {
   return IS_WIP;
+}
+
+/** Per-environment autoscaling is cloud-only (the wip stubs throw). */
+export function isAutoscalingEnabled(): boolean {
+  return IS_CLOUD;
+}
+
+const AUTOSCALING_POLL_MS = 10_000;
+
+export function useAutoscaling(projectId: string, componentId: string | undefined, environmentId: string) {
+  const orgUuid = useOrgUuid();
+  return useQuery({
+    queryKey: [ROOT, 'autoscaling', orgUuid, projectId, componentId, environmentId],
+    queryFn: () => getAutoscaling(orgUuid!, projectId, componentId!, environmentId),
+    enabled: isAutoscalingEnabled() && !!orgUuid && !!projectId && !!componentId && !!environmentId,
+    retry: false,
+    refetchInterval: (query) => (pollsAutoscaling(query.state.data) ? AUTOSCALING_POLL_MS : false),
+  });
+}
+
+export function useUpdateAutoscaling(projectId: string) {
+  const orgUuid = useOrgUuid();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ componentId, environmentId, data }: { componentId: string; environmentId: string; data: AutoscalingWriteData }) => {
+      if (!orgUuid) throw new Error('Organization is not available.');
+      return updateAutoscaling(orgUuid, projectId, componentId, environmentId, data);
+    },
+    // Resync after failures too: a rejected write leaves the saved setting as the truth to show.
+    onSettled: () => qc.invalidateQueries({ queryKey: [ROOT, 'autoscaling'] }),
+  });
 }
 
 export function useScalingState(projectId: string, componentId: string, releaseId: string) {

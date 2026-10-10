@@ -16,11 +16,13 @@
  * under the License.
  */
 
-/** Free-tier billable-component allowance (mirrors Devant's FREE_COMPONENT_LIMIT). */
-export const FREE_COMPONENT_LIMIT = 5;
+import type { BillingOrg } from '../types/billing';
 
-/** Subscription record type that marks an org as being on a paid plan. */
-export const PAID_SUBSCRIPTION_TYPE = 'devant-subscription';
-
-/** The cloud billing product this console belongs to; the billing org is read for it. */
-export const BILLING_PRODUCT_CODE = 'integration-platform';
+/**
+ * Whether the org is on a paid plan. Billing attaches a billing account when an org upgrades, while
+ * its status reads "active" for free and paid plans alike. An org billing could not be read for
+ * (`null`) counts as not paid, matching the BFF, which refuses paid features it cannot verify.
+ */
+export function isPaidPlan(org: BillingOrg | null): boolean {
+  return !!org?.subscription?.billing_account_id;
+}

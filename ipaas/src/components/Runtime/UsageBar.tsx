@@ -18,13 +18,21 @@
 
 import { Box } from '@wso2/oxygen-ui';
 import { type JSX } from 'react';
+import * as styles from './UsageBar.styles';
 
-/** A thin horizontal usage bar; `percent` is clamped to 0–100. */
-export default function UsageBar({ percent }: { percent: number }): JSX.Element {
-  const clamped = Math.max(0, Math.min(100, percent));
+const clamp = (value: number): number => Math.max(0, Math.min(100, value));
+
+/**
+ * A thin horizontal usage bar; `percent` is clamped to 0–100. `target`, when given, is marked with a
+ * tick so usage can be read against it; the card around the bar states the value in words.
+ */
+export default function UsageBar({ percent, target }: { percent: number; target?: number }): JSX.Element {
   return (
-    <Box sx={{ width: '100%', height: 6, borderRadius: 3, bgcolor: 'action.hover', overflow: 'hidden' }}>
-      <Box sx={{ width: `${clamped}%`, height: '100%', borderRadius: 3, bgcolor: 'primary.main' }} />
+    <Box sx={styles.wrapper}>
+      <Box sx={styles.track}>
+        <Box sx={styles.fill(clamp(percent))} />
+      </Box>
+      {target !== undefined && <Box sx={styles.target(clamp(target))} aria-hidden />}
     </Box>
   );
 }

@@ -24,6 +24,8 @@ export interface BillingOrg {
     id: string;
     org_id: string;
     status: 'trial' | 'active' | 'past_due' | 'cancelled' | string;
+    /** Set once the org upgrades to a paid plan, absent on free plans; `status` reads "active" for both. */
+    billing_account_id?: string | null;
     billing_period?: string;
     current_period_start?: string;
     current_period_end?: string;
