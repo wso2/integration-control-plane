@@ -68,23 +68,10 @@ jobs:
           distribution: "temurin"
           java-version: "25"
 
-      # setup-ballerina downloads from dist.ballerina.io, which does not carry pre-release
-      # builds — it answers 403 for 2201.14.0-alpha3 — so the action cannot install this
-      # version. Install the .deb from the GitHub release instead. Note the asset is named
-      # for the base version, without the -alpha3 the tag carries. The package puts `bal`
-      # on PATH itself (/usr/bin/bal), so nothing needs exporting. Restore the action once
-      # a non-pre-release build is published.
       - name: Setup Ballerina
-        env:
-          BALLERINA_TAG: v2201.14.0-alpha3
-          BALLERINA_DEB: ballerina-2201.14.0-swan-lake-linux-x64.deb
-        run: |
-          set -euo pipefail
-          curl -fLsS -o "$BALLERINA_DEB" \
-            "https://github.com/ballerina-platform/ballerina-distribution/releases/download/${BALLERINA_TAG}/${BALLERINA_DEB}"
-          sudo dpkg -i "$BALLERINA_DEB"
-          rm -f "$BALLERINA_DEB"
-          bal version
+        uses: ballerina-platform/setup-ballerina@v1.1.0
+        with:
+          version: 2201.14.0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
