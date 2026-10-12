@@ -195,7 +195,8 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   // An engine whose only sources are uploads starts with an upload, not a wait for a connector.
   const uploadSources = engine.sources.filter((s) => s.type === 'upload');
   const uploadFirst = uploadSources.length > 0 && uploadSources.length === engine.sources.length && (!progressSummary || (progressSummary.processed === 0 && progressSummary.active === 0));
-  const steps = getStartedSteps({ ...engine, graph }, asked, progressSummary, uploadFirst);
+  // 'Grant access' step hidden along with the Access tab: roles can't be granted from the UI, so it would never complete.
+  const steps = getStartedSteps({ ...engine, graph }, asked, progressSummary, uploadFirst).filter((s) => s.id !== 'grant');
   const allDone = steps.every((s) => s.state === 'done');
 
   const startEnrichment = () => {
@@ -211,7 +212,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
     else if (id === 'index') document.getElementById(SOURCES_CARD_ID)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     else if (id === 'ask') onGoTab('playground');
     else if (id === 'publish') onGoTab('api');
-    else onGoTab('access');
+    // else onGoTab('access'); — 'Grant access' step hidden with the Access tab
   };
 
   return (
