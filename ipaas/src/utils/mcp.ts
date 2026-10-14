@@ -170,13 +170,24 @@ export function coerceFieldValue(type: string | undefined, raw: string | number 
 
 /** Normalize the MCP SDK's tool-call result into the playground's display shape. */
 export function formatToolResult(raw: unknown): McpToolResult {
-  const result = (raw ?? {}) as { content?: unknown; isError?: boolean };
+  const result = (raw ?? {}) as { content?: unknown; structuredContent?: unknown; isError?: boolean };
   const rawContent = Array.isArray(result.content) ? result.content : [];
   const content: McpToolContent[] = rawContent.map((item) => {
     if (item && typeof item === 'object') return item as McpToolContent;
     return { type: 'text', text: String(item) };
   });
-  return { content, isError: result.isError ?? false };
+  const structured = result.structuredContent;
+  return { content, ...(structured !== undefined && structured !== null ? { structuredContent: structured as JsonValue } : {}), isError: result.isError ?? false };
+}
+
+/** Whether a text block only repeats the structured result as JSON, as servers do for older clients. */
+export function repeatsStructuredContent(block: McpToolContent, structured: JsonValue | undefined): boolean {
+  if (structured === undefined || block.type !== 'text' || typeof block.text !== 'string') return false;
+  try {
+    return JSON.stringify(JSON.parse(block.text)) === JSON.stringify(structured);
+  } catch {
+    return false;
+  }
 }
 
 /** Friendly messages for the standard JSON-RPC error codes an MCP server can return. */

@@ -40,6 +40,7 @@ import {
   isMcpUnauthorizedError,
   isSimpleObjectSchema,
   MCP_REDIRECT_MESSAGE,
+  repeatsStructuredContent,
   withNullableTypes,
 } from './mcp';
 import type { McpTool } from '../types/mcp';
@@ -259,6 +260,20 @@ describe('formatToolResult', () => {
   it('is safe on missing/empty content', () => {
     expect(formatToolResult(null)).toEqual({ content: [], isError: false });
     expect(formatToolResult({})).toEqual({ content: [], isError: false });
+  });
+  it('keeps the structured result', () => {
+    const raw = { content: [{ type: 'text', text: '{"state": "completed"}' }], structuredContent: { state: 'completed' } };
+    expect(formatToolResult(raw).structuredContent).toEqual({ state: 'completed' });
+    expect(formatToolResult({ content: [], structuredContent: null })).not.toHaveProperty('structuredContent');
+  });
+});
+
+describe('repeatsStructuredContent', () => {
+  it('recognizes a text block that only repeats the structured result', () => {
+    const structured = { state: 'completed', evidence: [] };
+    expect(repeatsStructuredContent({ type: 'text', text: '{"state": "completed", "evidence": []}' }, structured)).toBe(true);
+    expect(repeatsStructuredContent({ type: 'text', text: 'access_denied: not available' }, structured)).toBe(false);
+    expect(repeatsStructuredContent({ type: 'text', text: '{"state": "completed"}' }, undefined)).toBe(false);
   });
 });
 

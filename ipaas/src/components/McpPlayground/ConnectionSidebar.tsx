@@ -31,6 +31,8 @@ interface ConnectionSidebarProps {
   onDisconnect: () => void;
   onReconnect: () => void;
   onGetTestKey?: () => void;
+  /** `sidebar` (default) stacks the controls in a column; `bar` lays them out in one row above the panel. */
+  layout?: 'sidebar' | 'bar';
   /** The connection takes no key: the token field gives way to a note on why. */
   keyless?: boolean;
   /** The endpoint's visibility, shown read-only. */
@@ -45,9 +47,12 @@ const STATUS_META: Record<McpConnectionStatus, { label: string; color: string }>
 };
 
 const readOnlyInputSx = { bgcolor: 'action.hover', fontFamily: 'monospace', fontSize: 12.5 } as const;
+const sidebarSx = { width: 300, flexShrink: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2.5, alignSelf: 'flex-start' } as const;
+const barSx = { width: '100%', flexWrap: 'wrap', alignItems: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 } as const;
 
 /** The playground's left panel: the endpoint selector, the derived URL + test key, and connect controls. */
-export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, visibility }: ConnectionSidebarProps): JSX.Element {
+export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, keyless = false, visibility, layout = 'sidebar' }: ConnectionSidebarProps): JSX.Element {
+  const bar = layout === 'bar';
   const [showToken, setShowToken] = useState(false);
   const connected = status === 'connected';
   const connecting = status === 'connecting';
@@ -55,7 +60,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
   const copy = (value: string) => void navigator.clipboard?.writeText(value).catch(() => undefined);
 
   return (
-    <Stack gap={2} sx={{ width: 300, flexShrink: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2.5, alignSelf: 'flex-start' }}>
+    <Stack direction={bar ? 'row' : 'column'} gap={bar ? 1.5 : 2} sx={bar ? barSx : sidebarSx}>
       {endpointSwitcher && (
         <Tooltip title={connected || connecting ? 'Disconnect to select a different endpoint.' : ''}>
           <Box component="span" sx={{ display: 'block' }}>
@@ -76,7 +81,8 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         labelPlacement="top"
         label="URL"
         size="small"
-        fullWidth
+        fullWidth={!bar}
+        sx={bar ? { flex: '3 1 320px' } : undefined}
         value={url}
         // Through the relay the page needs no URL to connect; the one shown is where agents call, which
         // the AI gateway gives only once it has published the server.
@@ -105,7 +111,8 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
           labelPlacement="top"
           label="Token"
           size="small"
-          fullWidth
+          fullWidth={!bar}
+          sx={bar ? { flex: '1 1 200px' } : undefined}
           type={showToken ? 'text' : 'password'}
           value={token}
           InputProps={{
@@ -136,10 +143,10 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
 
       {connected ? (
         <Stack direction="row" gap={1}>
-          <Button variant="outlined" size="small" fullWidth startIcon={<RefreshCw size={14} />} onClick={onReconnect}>
+          <Button variant="outlined" size="small" fullWidth={!bar} startIcon={<RefreshCw size={14} />} onClick={onReconnect}>
             Reconnect
           </Button>
-          <Button variant="outlined" size="small" fullWidth color="error" onClick={onDisconnect}>
+          <Button variant="outlined" size="small" fullWidth={!bar} color="error" onClick={onDisconnect}>
             Disconnect
           </Button>
         </Stack>

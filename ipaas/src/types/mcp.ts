@@ -65,6 +65,8 @@ export type McpToolContent = { type: 'text'; text: string } | { type: string; [k
 /** Normalized result of a tool invocation. */
 export interface McpToolResult {
   content: McpToolContent[];
+  /** The tool's structured result, when it declares an output schema (MCP 2025-06-18+). */
+  structuredContent?: JsonValue;
   isError?: boolean;
 }
 
