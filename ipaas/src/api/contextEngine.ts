@@ -19,47 +19,31 @@
 /**
  * Context Engines — backed by the Context Engine REST API (`/v1`).
  *
- * The engine ships milestone by milestone. Routes that exist today: spaces,
- * sources, ingestion jobs, grants, `auth/me` and the read-only progress routes
- * (`/v1/progress/...`). Routes taken from its OpenAPI contract that are not
- * served yet answer 404/405: traces. Answer mode answers 404 when the engine is
- * deployed without answers (`CONTEXT_ENGINE_ANSWERS_ENABLED=false`). This console
- * uses the engine's internal API; integrators use the engine's public routes,
- * `/v1/context`, `/v1/answer` and `/v1/mcp`, which the API and MCP tabs show.
- * `PUT/GET /v1/spaces/{id}/configuration` stores the models; the engine encrypts
- * literal API keys, which needs its secrets key, and ignores the storage and
- * source settings sent alongside. Whether the public routes and MCP are served,
- * and the engine's name and description, are deployment settings the control
- * plane provisions; the engine has no route to change them.
+ * Each context engine runs as its own instance (the engine's ADR 0019), and this
+ * console is the UI for the one at the configured URL: it is shown as the single
+ * engine with id `engine`, which is also the engine's grant resource. Its
+ * description, models, stores and served interfaces come from `GET /v1/engine`,
+ * read-only; creating and deleting engines, their names, models and switches are
+ * provisioning, which the control plane will own, so those calls are refused here.
+ * Sources live at `/v1/sources`, progress at `/v1/progress`, enrichment at
+ * `/v1/enrichments`. Answer mode answers 404 when the engine is deployed without
+ * answers. Integrators use the engine's public routes, `/v1/context`,
+ * `/v1/answer` and `/v1/mcp`, which the API and MCP tabs show.
  *
  * Reads that hit a missing route degrade to an empty section so the detail page
- * still renders; the create flow reports them as warnings instead of failing.
+ * still renders.
  */
 
 import { getAccessToken } from '#auth';
 import { contextEngineClient, isAccessTokenExpired, refreshAccessToken } from './httpClients';
-import { getServer, getServerAdminUser } from './platformServices';
-import { CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
-import {
-  audienceMappingFromRules,
-  deliveryIdentity,
-  engineMessage,
-  infrastructureStorageKinds,
-  ownerGrantId,
-  roleGrantId,
-  rolesFromGrants,
-  summarizeEngineProgress,
-  toConfigurationPayload,
-  toSourceRegistration,
-  type ResolvedConnection,
-} from '../../utils/contextEngine';
+import { CONTEXT_ENGINE_ID, DEFAULT_CONTEXT_ENGINE_NAME } from '../../constants/contextEngine';
+import { audienceMappingFromRules, deliveryIdentity, rolesFromGrants, summarizeEngineProgress, toSourceRegistration } from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
   ContextEngine,
   ContextEngineDetail,
   ContextEngineExposure,
   ContextEngineModels,
-  ContextModelInput,
   ContextModelSummary,
   ContextEngineProgress,
   ContextEngineState,
@@ -91,23 +75,17 @@ import type {
 } from '../../types/contextEngine';
 
 const V1 = '/v1';
-const spacePath = (id: string): string => `${V1}/spaces/${encodeURIComponent(id)}`;
 const grantsPath = (resourceId: string): string => `${V1}/resources/${encodeURIComponent(resourceId)}/grants`;
-const progressPath = (spaceId: string): string => `${V1}/progress/spaces/${encodeURIComponent(spaceId)}`;
+
+/** Engines are provisioned by the control plane; this console only shows the engine it is pointed at. */
+export const supportsContextEngineProvisioning = false;
+
+const provisioningRefused = (what: string): Error => new Error(`${what} is provisioning, which the control plane owns; this console shows the engine it is configured for.`);
 
 // ── Raw wire shapes — private to this file ──────────────────────────────────
 
-interface RawContextSpace {
-  id: string;
-  name: string;
-  description?: string;
-  state: string;
-  createdAt: string;
-}
-
 interface RawSource {
   id: string;
-  spaceId: string;
   name: string;
   type: string;
   state: string;
@@ -164,27 +142,20 @@ interface RawPrincipal {
   groups?: string[];
 }
 
-/** `GET /v1/spaces/{id}/configuration`: models without their keys, whether the embedding is locked, and where each store runs. */
+/** `GET /v1/engine`: what the engine's environment configured, never keys. */
 interface RawModelSummary {
   provider: string;
   model: string;
-  keyKind?: string;
-  dimensions?: number | null;
-  baseUrl?: string | null;
-  apiVersion?: string | null;
 }
 
-interface RawConfiguration {
-  embedding?: RawModelSummary | null;
-  llm?: RawModelSummary | null;
-  embeddingLocked?: boolean;
-  version?: number;
-  updatedAt?: string;
-  graph?: { state?: string; builtAt?: string; jobId?: string; progress?: { done: number; total: number } } | null;
-  storage?: Partial<Record<StorageKind, { provider?: string; label?: string; detail?: string } | null>> | null;
+interface RawEngine {
+  description?: string | null;
+  models?: { embedding?: RawModelSummary | null; llm?: RawModelSummary | null } | null;
+  storage?: Partial<Record<StorageKind, { provider?: string } | null>> | null;
+  interfaces?: { publicApi?: boolean; mcp?: boolean; answers?: boolean } | null;
 }
 
-/** `GET /v1/progress/spaces/{id}` — one entry per source the caller may inspect. */
+/** `GET /v1/progress` — one entry per source the caller may inspect. */
 interface RawSourceProgress {
   sourceId: string;
   reading: { state: string; runId?: string | null; startedAt?: string | null; completedAt?: string | null };
@@ -204,19 +175,19 @@ interface RawRecordStatus {
   updatedAt: string;
 }
 
-interface RawSpaceProgress {
-  spaceId: string;
+interface RawEngineProgress {
   sources: RawSourceProgress[];
 }
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
-const toEngine = (raw: RawContextSpace): ContextEngine => ({
-  id: raw.id,
-  name: raw.name,
-  description: raw.description ?? '',
-  state: raw.state as ContextEngineState,
-  createdAt: raw.createdAt,
+/** The one engine: its name is the console's configuration, since the engine itself has none. */
+const toEngine = (raw: RawEngine | null): ContextEngine => ({
+  id: CONTEXT_ENGINE_ID,
+  name: window.API_CONFIG?.contextEngineName || DEFAULT_CONTEXT_ENGINE_NAME,
+  description: raw?.description ?? '',
+  state: 'ready' as ContextEngineState,
+  createdAt: '',
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -236,15 +207,13 @@ const toEvidence = (raw: RawEvidence): ContextEvidence => ({
   sourceUrl: raw.sourceUrl,
 });
 
-const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary | null =>
-  raw ? { provider: raw.provider, model: raw.model, keyKind: raw.keyKind, dimensions: raw.dimensions ?? undefined, baseUrl: raw.baseUrl ?? undefined, apiVersion: raw.apiVersion ?? undefined } : null;
+const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary | null => (raw ? { provider: raw.provider, model: raw.model } : null);
 
-const toModels = (raw: RawConfiguration | null | undefined): ContextEngineModels => ({
-  embedding: toModel(raw?.embedding),
-  llm: toModel(raw?.llm),
-  embeddingLocked: raw?.embeddingLocked ?? false,
-  version: raw?.version,
-  updatedAt: raw?.updatedAt,
+/** The environment's models; they change only by redeploying the engine, so nothing here is editable. */
+const toModels = (raw: RawEngine | null): ContextEngineModels => ({
+  embedding: toModel(raw?.models?.embedding),
+  llm: toModel(raw?.models?.llm),
+  embeddingLocked: true,
 });
 
 const READING_STATES: ReadonlySet<string> = new Set<SourceReadingState>(['idle', 'reading', 'completed']);
@@ -280,22 +249,11 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
   },
 });
 
-const GRAPH_STATES: ReadonlySet<string> = new Set<ContextGraphState>(['not_built', 'building', 'built', 'failed']);
+/** The engine does not report a graph status; nothing the console knows of has been built. */
+const toGraph = (): ContextGraphStatus => ({ state: 'not_built' as ContextGraphState });
 
-/** Graph status from the configuration route; an engine that does not report one has not built anything we know of. */
-const toGraph = (raw: RawConfiguration['graph']): ContextGraphStatus => ({
-  state: raw?.state && GRAPH_STATES.has(raw.state) ? (raw.state as ContextGraphState) : 'not_built',
-  builtAt: raw?.builtAt,
-  jobId: raw?.jobId,
-  progress: raw?.progress,
-});
-
-/**
- * The engine serves its public API and MCP unless its deployment switches them off, and it does
- * not report those switches; the control plane, which provisions them, will. Until then the
- * console shows the default.
- */
-const toExposure = (): ContextEngineExposure => ({ api: true, mcp: true });
+/** Which public surfaces the deployment serves, as the engine reports them; unknown counts as off. */
+const toExposure = (raw: RawEngine | null): ContextEngineExposure => ({ api: raw?.interfaces?.publicApi ?? false, mcp: raw?.interfaces?.mcp ?? false });
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
@@ -307,36 +265,17 @@ const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = 
   neo4j: { label: 'Neo4j', detail: 'External' },
 };
 
-/** Per-store placement from the configuration route; null until the engine reports any. */
-const toStorage = (raw: RawConfiguration | null | undefined): Record<StorageKind, StorageSummary> | null => {
+/** Per-store placement as the engine reports it; null until it reports any. */
+const toStorage = (raw: RawEngine | null): Record<StorageKind, StorageSummary> | null => {
   const st = raw?.storage;
   if (!st) return null;
   const one = (kind: StorageKind): StorageSummary => {
     const s = st[kind];
     const known = s?.provider ? STORE_PROVIDER_LABEL[s.provider] : undefined;
-    return { provider: s?.provider ?? 'unknown', label: s?.label ?? known?.label ?? (s?.provider ? s.provider : 'Not reported'), detail: s?.detail ?? known?.detail };
+    return { provider: s?.provider ?? 'unknown', label: known?.label ?? (s?.provider ? s.provider : 'Not reported'), detail: known?.detail };
   };
   return { vector: one('vector'), relational: one('relational'), graph: one('graph') };
 };
-
-/**
- * Connection details for every store that points at an Infrastructure server:
- * host/port/database from the server, user and password from its admin user.
- * Mirrors how the RAG wizard resolves a managed vector store.
- */
-async function resolveInfrastructureConnections(input: CreateContextEngineInput): Promise<Partial<Record<StorageKind, ResolvedConnection>>> {
-  const kinds = infrastructureStorageKinds(input.storage);
-  const entries = await Promise.all(
-    kinds.map(async (kind) => {
-      const sel = input.storage[kind];
-      if (sel.mode !== 'infrastructure') return [kind, undefined] as const;
-      const [server, admin] = await Promise.all([getServer(sel.serverId), getServerAdminUser(sel.serverId)]);
-      const conn = server.connection_params;
-      return [kind, { host: conn.host, port: conn.port, user: conn.user || admin.username, password: admin.password, sslRequired: conn.ssl_required }] as const;
-    }),
-  );
-  return Object.fromEntries(entries.filter(([, v]) => v !== undefined)) as Partial<Record<StorageKind, ResolvedConnection>>;
-}
 
 const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
   queryId: raw.queryId,
@@ -367,161 +306,85 @@ async function optional<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 // ── Engines ─────────────────────────────────────────────────────────────────
 
-/** Sources, grants and configuration of one space, each degrading to empty when the engine cannot serve it. */
-async function fetchSpaceFacets(engineId: string): Promise<{ sources: RawSource[]; grants: RawGrant[]; configuration: RawConfiguration | null }> {
-  const [sources, grants, configuration] = await Promise.all([
-    optional(() => contextEngineClient.get<RawSource[]>(`${spacePath(engineId)}/sources`), [] as RawSource[]),
-    optional(() => contextEngineClient.get<RawGrant[]>(grantsPath(engineId)), [] as RawGrant[]),
-    optional(() => contextEngineClient.get<RawConfiguration>(`${spacePath(engineId)}/configuration`), null as RawConfiguration | null),
+/** Only the engine this console is configured for exists here; any other id is not found. */
+function requireThisEngine(engineId: string): void {
+  if (engineId !== CONTEXT_ENGINE_ID) throw new HttpError(404, `HTTP 404: no context engine "${engineId}"`);
+}
+
+/** The engine's configuration, sources and grants, each degrading to empty when the caller may not read it. */
+async function fetchEngineFacets(): Promise<{ engine: RawEngine | null; sources: RawSource[]; grants: RawGrant[] }> {
+  const [engine, sources, grants] = await Promise.all([
+    optional(() => contextEngineClient.get<RawEngine>(`${V1}/engine`), null as RawEngine | null),
+    optional(() => contextEngineClient.get<RawSource[]>(`${V1}/sources`), [] as RawSource[]),
+    optional(() => contextEngineClient.get<RawGrant[]>(grantsPath(CONTEXT_ENGINE_ID)), [] as RawGrant[]),
   ]);
-  return { sources: sources ?? [], grants: grants ?? [], configuration };
+  return { engine, sources: sources ?? [], grants: grants ?? [] };
 }
 
 /** Listing-only progress: any failure just leaves the progress line out, it never fails the listing. */
-async function fetchSpaceProgressQuietly(engineId: string): Promise<RawSpaceProgress | null> {
+async function fetchProgressQuietly(): Promise<RawEngineProgress | null> {
   try {
-    return await contextEngineClient.get<RawSpaceProgress>(progressPath(engineId));
+    return await contextEngineClient.get<RawEngineProgress>(`${V1}/progress`);
   } catch {
     return null;
   }
 }
 
-/**
- * Context engines visible to the caller, each with an at-a-glance summary.
- * The engine lists only spaces the principal holds an action on. Until it
- * offers `GET /v1/spaces?include=summary`, the summary is assembled here with
- * one facet round-trip per space, plus its progress roll-up.
- */
+/** The one engine this console shows, with an at-a-glance summary. */
 export async function listContextEngines(): Promise<ContextEngine[]> {
-  const raw = await contextEngineClient.get<RawContextSpace[]>(`${V1}/spaces`);
-  return Promise.all(
-    (raw ?? []).map(async (space) => {
-      const [facets, progress] = await Promise.all([fetchSpaceFacets(space.id), fetchSpaceProgressQuietly(space.id)]);
-      const summary: ContextEngineSummary = {
-        sourceCount: facets.sources.length,
-        sourceTypes: facets.sources.map((s) => s.type),
-        roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
-        exposure: toExposure(),
-        graph: toGraph(facets.configuration?.graph),
-        progress: progress
-          ? summarizeEngineProgress(
-              facets.sources.map((src) => src.id),
-              (progress.sources ?? []).map(toSourceProgress),
-            )
-          : null,
-      };
-      return { ...toEngine(space), summary };
-    }),
-  );
+  const [facets, progress] = await Promise.all([fetchEngineFacets(), fetchProgressQuietly()]);
+  const summary: ContextEngineSummary = {
+    sourceCount: facets.sources.length,
+    sourceTypes: facets.sources.map((s) => s.type),
+    roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
+    exposure: toExposure(facets.engine),
+    graph: toGraph(),
+    progress: progress
+      ? summarizeEngineProgress(
+          facets.sources.map((src) => src.id),
+          (progress.sources ?? []).map(toSourceProgress),
+        )
+      : null,
+  };
+  return [{ ...toEngine(facets.engine), summary }];
 }
 
-/** One engine with its sources, models, query roles and exposure. Only the space itself is required to exist. */
+/** The engine with its sources, models, query roles and exposure. */
 export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
-  const space = await contextEngineClient.get<RawContextSpace>(spacePath(engineId));
-  const { sources, grants, configuration } = await fetchSpaceFacets(engineId);
+  requireThisEngine(engineId);
+  const { engine, sources, grants } = await fetchEngineFacets();
   return {
-    ...toEngine(space),
+    ...toEngine(engine),
     sources: sources.map(toSource),
-    models: toModels(configuration),
+    models: toModels(engine),
     queryRoles: rolesFromGrants(grants.map(toGrant)),
-    exposure: toExposure(),
-    graph: toGraph(configuration?.graph),
-    storage: toStorage(configuration),
+    exposure: toExposure(engine),
+    graph: toGraph(),
+    storage: toStorage(engine),
   };
 }
 
-/**
- * Create the space, then grant its creator query and enrichment access, register
- * sources with their visibility rules, grant the chosen roles and store the
- * model configuration. Steps the engine does not serve yet are reported as
- * warnings; any other failure rolls the space back and rethrows.
- */
-export async function createContextEngine(input: CreateContextEngineInput): Promise<CreateContextEngineResult> {
-  // Resolve Infrastructure connections first so a missing or powered-off server fails before anything is created.
-  const connections = await resolveInfrastructureConnections(input);
-  const space = await contextEngineClient.post<RawContextSpace>(`${V1}/spaces`, { name: input.name, ...(input.description ? { description: input.description } : {}) });
-  const warnings: string[] = [];
-  const sources: Record<string, string> = {};
-
-  // A step the engine does not serve is skipped with a note. A step marked `tolerate`
-  // may also fail outright without sinking the engine: it is reported with the engine's
-  // reason instead, because the space and its sources are already usable and the
-  // engine cannot delete a space yet, so rolling back would only leave an orphan.
-  const attempt = async (label: string, fn: () => Promise<unknown>, tolerate = false): Promise<void> => {
-    try {
-      await fn();
-    } catch (err) {
-      if (isMissingRoute(err)) {
-        warnings.push(`${label}: the engine does not serve this yet`);
-        return;
-      }
-      if (tolerate) {
-        warnings.push(`${label}: ${engineMessage(err, 'the engine refused it')}`);
-        return;
-      }
-      throw err;
-    }
-  };
-
-  try {
-    // The engine gives a space's creator nothing by itself: without this grant they could neither query nor enrich it.
-    await attempt('Give you query and enrichment access', async () => {
-      const me = await getContextPrincipal();
-      await contextEngineClient.put(`${grantsPath(space.id)}/${encodeURIComponent(ownerGrantId(me.id))}`, { principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
-    });
-    for (const source of input.sources) {
-      await attempt(`Register source “${source.name}”`, async () => {
-        const raw = await contextEngineClient.post<RawSource>(`${spacePath(space.id)}/sources`, toSourceRegistration(source));
-        if (raw?.id) sources[source.name.trim()] = raw.id;
-      });
-    }
-    for (const role of input.roles) {
-      await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(`${grantsPath(space.id)}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
-    }
-    await attempt('Save the models', () => contextEngineClient.put(`${spacePath(space.id)}/configuration`, toConfigurationPayload(input, connections)), true);
-  } catch (err) {
-    // Best-effort rollback so a half-configured engine does not linger in the listing.
-    await optional(() => contextEngineClient.delete(spacePath(space.id)), undefined).catch(() => undefined);
-    throw err;
-  }
-
-  return { id: space.id, sources, warnings };
+/** Creating an engine is provisioning, which the control plane owns. */
+export async function createContextEngine(_input: CreateContextEngineInput): Promise<CreateContextEngineResult> {
+  throw provisioningRefused('Creating a context engine');
 }
 
-/**
- * Delete an engine. The engine queues a deletion job and answers 202 with its
- * handle; the engine stays listed as `deleting` until the job finishes, and a
- * repeated request returns the running job or, after a failure, a new attempt.
- */
-export async function deleteContextEngine(engineId: string): Promise<ContextJobHandle | null> {
-  const raw = await contextEngineClient.delete<RawJobAccepted | undefined>(spacePath(engineId));
-  return raw?.jobId ? { jobId: raw.jobId, statusUrl: raw.statusUrl } : null;
+/** Deleting an engine is deprovisioning its instance, which the control plane owns. */
+export async function deleteContextEngine(_engineId: string): Promise<ContextJobHandle | null> {
+  throw provisioningRefused('Deleting a context engine');
 }
 
-/** A model as `PUT .../configuration` takes it: the key or reference only when one was entered. */
-const toModelPayload = (m: ContextModelInput) => ({
-  provider: m.provider,
-  model: m.model.trim(),
-  ...(m.apiKey ? { apiKey: m.apiKey } : m.apiKeyRef ? { apiKeyRef: m.apiKeyRef.trim() } : {}),
-  ...(m.baseUrl ? { baseUrl: m.baseUrl } : {}),
-  ...(m.apiVersion ? { apiVersion: m.apiVersion } : {}),
-  ...(m.dimensions ? { dimensions: m.dimensions } : {}),
-});
-
-/** Replace the engine's models. Needs `space.manage`; 409 when a locked embedding changes, 503 when a typed key cannot be stored. */
-export async function updateContextModels(input: UpdateContextModelsInput): Promise<ContextEngineModels> {
-  const body = {
-    ...(input.embedding ? { embedding: toModelPayload(input.embedding) } : {}),
-    ...(input.llm ? { llm: toModelPayload(input.llm) } : {}),
-  };
-  return toModels(await contextEngineClient.put<RawConfiguration>(`${spacePath(input.engineId)}/configuration`, body));
+/** The engine's models come from its environment; changing them is a redeploy. */
+export async function updateContextModels(_input: UpdateContextModelsInput): Promise<ContextEngineModels> {
+  throw provisioningRefused('Changing the models');
 }
 
 // ── Build jobs ──────────────────────────────────────────────────────────────
 
 /** Start an enrichment (graph build) over the engine's sources; returns the job handle to poll. */
 export async function rebuildContextEngine(engineId: string): Promise<ContextJobHandle> {
-  const raw = await contextEngineClient.post<RawJobAccepted>(`${spacePath(engineId)}/enrichments`, undefined, { 'Idempotency-Key': crypto.randomUUID() });
+  requireThisEngine(engineId);
+  const raw = await contextEngineClient.post<RawJobAccepted>(`${V1}/enrichments`, undefined, { 'Idempotency-Key': crypto.randomUUID() });
   return { jobId: raw.jobId, statusUrl: raw.statusUrl };
 }
 
@@ -537,8 +400,9 @@ export async function getContextJob(jobId: string): Promise<ContextJob> {
  * fewer entries than sources. An engine without the route reports `available: false`.
  */
 export async function getContextEngineProgress(engineId: string): Promise<ContextEngineProgress> {
+  requireThisEngine(engineId);
   try {
-    const raw = await contextEngineClient.get<RawSpaceProgress>(progressPath(engineId));
+    const raw = await contextEngineClient.get<RawEngineProgress>(`${V1}/progress`);
     return { available: true, sources: (raw?.sources ?? []).map(toSourceProgress) };
   } catch (err) {
     if (isMissingRoute(err)) return { available: false, sources: [] };
@@ -550,7 +414,8 @@ export async function getContextEngineProgress(engineId: string): Promise<Contex
 
 /** Register a source on a running engine with its visibility rules. Connection settings still wait for the configuration route. */
 export async function addContextSource(engineId: string, source: ContextSourceConfig): Promise<ContextSource> {
-  return toSource(await contextEngineClient.post<RawSource>(`${spacePath(engineId)}/sources`, toSourceRegistration(source)));
+  requireThisEngine(engineId);
+  return toSource(await contextEngineClient.post<RawSource>(`${V1}/sources`, toSourceRegistration(source)));
 }
 
 /** Rename a source, replace its visibility rules, or pause and resume it. */
@@ -583,7 +448,7 @@ const staticEngineToken = (): string | undefined => window.API_CONFIG?.contextEn
 async function engineBearer(): Promise<string | null> {
   const fixed = staticEngineToken();
   if (!fixed && isAccessTokenExpired()) await refreshAccessToken();
-  const token = fixed || (await getAccessToken());
+  const token = fixed || getAccessToken();
   return token ? `Bearer ${token}` : null;
 }
 
@@ -669,7 +534,6 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
   const bytes = await input.content.arrayBuffer();
   const event = {
     schemaVersion: '1',
-    spaceId: input.engineId,
     sourceId: input.sourceId,
     sourceRecordId: input.recordId,
     sourceVersion: input.version,
@@ -701,7 +565,6 @@ export async function sendContextRecordEvent(input: RecordEventInput): Promise<C
   const key = await deliveryKey(input.sourceId, input.operation, input.recordId, input.version);
   const event = {
     schemaVersion: '1',
-    spaceId: input.engineId,
     sourceId: input.sourceId,
     sourceRecordId: input.recordId,
     sourceVersion: input.version,
@@ -726,7 +589,7 @@ export async function getContextRecordStatus(sourceId: string, recordId: string)
 // ── Query ───────────────────────────────────────────────────────────────────
 
 export async function queryContextEngine(input: ContextQueryInput): Promise<ContextQueryResult> {
-  const raw = await contextEngineClient.post<RawQueryResponse>(`${V1}/queries`, { spaceId: input.engineId, question: input.question, mode: input.mode, ...(input.limit ? { limit: input.limit } : {}) });
+  const raw = await contextEngineClient.post<RawQueryResponse>(`${V1}/queries`, { question: input.question, mode: input.mode, ...(input.limit ? { limit: input.limit } : {}) });
   return toQueryResult(raw);
 }
 

@@ -19,7 +19,7 @@
 import { Alert, Box, /* Button, */ Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { EyeOff, Info, KeyRound, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
-import { useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine, useUploadAudience } from '../../../hooks/useContextEngine';
+import { CONTEXT_ENGINE_PROVISIONING, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useEngineGraphStatus, useInvalidateContextEngine, useRebuildContextEngine, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { CONTEXT_JOB_TERMINAL_STATES, EVERYONE_VISIBILITY, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
@@ -94,8 +94,8 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
   );
 }
 
-/** Who can see the models: the configuration route needs source or space management rights. */
-const canSeeModels = (actions: string[] | undefined): boolean => !actions || actions.includes('space.manage') || actions.includes('source.manage');
+/** Who can see the models: the engine shows them to anyone with a grant on it. */
+const canSeeModels = (actions: string[] | undefined): boolean => !actions || actions.length > 0;
 
 const SOURCES_CARD_ID = 'context-engine-sources';
 
@@ -136,7 +136,8 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
   const permissions = useContextPermissions(engine.id);
-  const canEditModels = !readOnly && !!permissions.data?.includes('space.manage');
+  // Models come from the engine's environment; changing them is provisioning, the control plane's.
+  const canEditModels = CONTEXT_ENGINE_PROVISIONING && !readOnly && !!permissions.data?.includes('engine.manage');
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
   const openModels = () => {

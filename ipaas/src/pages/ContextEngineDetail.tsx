@@ -22,7 +22,7 @@ import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useDeletionJob } from '../hooks/useContextEngine';
+import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useDeletionJob } from '../hooks/useContextEngine';
 import { deletionFailureText, engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
@@ -154,7 +154,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             {engine.description || 'No description'}
           </Typography>
         </Box>
-        {!deleting && (
+        {!deleting && CONTEXT_ENGINE_PROVISIONING && (
           <Tooltip title="Delete engine">
             <IconButton color="error" aria-label={`Delete ${engine.name}`} onClick={() => setConfirmDelete(true)}>
               <Trash2 size={18} />

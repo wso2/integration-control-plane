@@ -35,6 +35,7 @@ import {
   putContextGrant,
   queryContextEngine,
   rebuildContextEngine,
+  supportsContextEngineProvisioning,
   updateContextModels,
   updateContextSource,
 } from '#api/contextEngine';
@@ -59,6 +60,9 @@ import type { ContextEngineForm, ContextGraphStatus, ContextQueryInput, ContextS
 const ROOT_KEY = 'contextEngines';
 
 /** Context Engines: wip build with the engine URL configured and the feature flag on. */
+/** Whether engines can be created, deleted and reconfigured here; that is the control plane's provisioning. */
+export const CONTEXT_ENGINE_PROVISIONING: boolean = supportsContextEngineProvisioning;
+
 export function isContextEngineEnabled(): boolean {
   return IS_WIP && !!window.API_CONFIG?.enableContextEngineFeature && !!window.API_CONFIG?.contextEngineApiUrl;
 }

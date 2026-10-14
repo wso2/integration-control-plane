@@ -21,7 +21,7 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
-import { isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
 import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
@@ -90,6 +90,10 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
   }
+  // Creating an engine is provisioning, which the control plane will own; this console shows the engine it is configured for.
+  if (!CONTEXT_ENGINE_PROVISIONING) {
+    return <ComingSoon title="Created by the control plane" description="Context engines are provisioned by the control plane. This console shows the engine it is configured for." />;
+  }
 
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
   const stepBlocker: (string | null)[] = [
@@ -142,7 +146,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
       onError: (e) => {
         if (e instanceof HttpError && e.status === 409) setError('A context engine with this name already exists.');
         else if (e instanceof HttpError && e.status === 401) setError('The context engine rejected the credential. Check the engine token in runtime config.');
-        else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines. Ask an engine administrator for the space.manage action.");
+        else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines. Ask an engine administrator for the engine.manage action.");
         else if (e instanceof HttpError) setError(`Couldn't create the context engine: ${engineMessage(e)}`);
         else setError("Couldn't create the context engine. Please try again.");
       },

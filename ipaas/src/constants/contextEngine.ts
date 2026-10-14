@@ -568,7 +568,17 @@ export function blankLlm(provider: LlmProvider): LlmConfig {
 
 // ── Engine limits and access model ──────────────────────────────────────────
 
-/** Mirrors the engine's `CreateContextSpace` schema limits. */
+/**
+ * Each context engine runs as its own instance, and the console shows the one at its configured
+ * URL under this id. It is also the engine's root grant resource, so grants and permissions on the
+ * engine use it as is.
+ */
+export const CONTEXT_ENGINE_ID = 'engine';
+
+/** Shown when the console's configuration names no engine (`CONTEXT_ENGINE_NAME`). */
+export const DEFAULT_CONTEXT_ENGINE_NAME = 'Context engine';
+
+/** Limits for an engine's name and description, which the control plane provisions. */
 export const CONTEXT_ENGINE_NAME_MAX = 120;
 export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Shown under the description field: people browsing engines and AI agents connected over MCP both read it. */

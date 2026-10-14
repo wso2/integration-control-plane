@@ -20,7 +20,7 @@ import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, PageCon
 import { Play, Plus, RotateCcw, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX, type MouseEvent } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { isContextEngineEnabled, useContextEngines, useDeleteContextEngine, useDeletionFailed } from '../hooks/useContextEngine';
+import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngines, useDeleteContextEngine, useDeletionFailed } from '../hooks/useContextEngine';
 import { contextEngineUrl, newContextEngineUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -67,7 +67,7 @@ function RowActions({ engine, onPlayground, onDelete, onRetry, retrying }: { eng
             </IconButton>
           </span>
         </Tooltip>
-      ) : (
+      ) : CONTEXT_ENGINE_PROVISIONING ? (
         <Tooltip title={deleting ? 'Being deleted' : 'Delete'}>
           <span>
             <IconButton size="small" color="error" aria-label={`Delete ${engine.name}`} disabled={deleting} onClick={stop(onDelete)}>
@@ -75,7 +75,7 @@ function RowActions({ engine, onPlayground, onDelete, onRetry, retrying }: { eng
             </IconButton>
           </span>
         </Tooltip>
-      )}
+      ) : null}
     </>
   );
 }
@@ -131,9 +131,11 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
         {!!engines?.length && (
           <Stack direction="row" alignItems="center" gap={1.5}>
             <SearchField value={search} onChange={setSearch} placeholder="Search engines..." sx={{ minWidth: 220 }} />
-            <Button variant="contained" startIcon={<Plus size={20} />} onClick={goCreate} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-              Create
-            </Button>
+            {CONTEXT_ENGINE_PROVISIONING && (
+              <Button variant="contained" startIcon={<Plus size={20} />} onClick={goCreate} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                Create
+              </Button>
+            )}
           </Stack>
         )}
       </Stack>
