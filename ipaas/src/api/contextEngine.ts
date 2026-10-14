@@ -36,8 +36,8 @@
  * still renders; the create flow reports them as warnings instead of failing.
  */
 
-import { contextEngineClient } from './httpClients';
-import { getAccessToken, isAccessTokenExpired, refreshAccessToken } from '../../auth/tokenManager';
+import { getAccessToken } from '#auth';
+import { contextEngineClient, isAccessTokenExpired, refreshAccessToken } from './httpClients';
 import { getServer, getServerAdminUser } from './platformServices';
 import { CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../../constants/contextEngine';
 import {
@@ -583,7 +583,7 @@ const staticEngineToken = (): string | undefined => window.API_CONFIG?.contextEn
 async function engineBearer(): Promise<string | null> {
   const fixed = staticEngineToken();
   if (!fixed && isAccessTokenExpired()) await refreshAccessToken();
-  const token = fixed || getAccessToken();
+  const token = fixed || (await getAccessToken());
   return token ? `Bearer ${token}` : null;
 }
 

@@ -35,8 +35,9 @@ interface ToolsTabProps {
 const LONG_DESCRIPTION_CHARS = 200;
 const clampedDescriptionSx = { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as const;
 const runPaneSx = { flex: 1, minWidth: 0, p: 2.5, overflow: 'auto', position: 'relative' } as const;
-// Form and result sit side by side when the pane is wide enough for both, and stack when not.
-const runGridSx = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))', gap: 3, alignItems: 'start' } as const;
+// Form and result sit side by side when the pane is wide enough for both, and stack when not;
+// a pane narrower than one column still fits it without overflowing.
+const runGridSx = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: 3, alignItems: 'start' } as const;
 
 /** Argument form + Run + result for a single selected tool (keyed by tool name, so state resets on switch). */
 function ToolPanel({ tool, callTool, paneRef }: { tool: McpTool; callTool: ToolsTabProps['callTool']; paneRef: RefObject<HTMLDivElement | null> }): JSX.Element {

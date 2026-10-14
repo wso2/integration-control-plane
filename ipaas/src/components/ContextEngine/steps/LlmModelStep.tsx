@@ -20,8 +20,8 @@ import { Grid, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxyg
 import type { JSX } from 'react';
 import { blankLlm, contextLogoUrl, LLM_PROVIDERS } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import SelectableCard from '../../Databases/create/SelectableCard';
-import SecretField from '../../RagIngestion/SecretField';
+import SelectableCard from '../../common/SelectableCard';
+import SecretField from '../../common/SecretField';
 import { fieldStackSx, stepHeadingSx, stepHintSx, tileGridSx } from '../styles';
 import type { LlmConfig } from '../../../types/contextEngine';
 

@@ -19,7 +19,7 @@
 import { Box, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Copy } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { repeatsStructuredContent } from '../../utils/mcp';
+import { copyableToolResult, repeatsStructuredContent } from '../../utils/mcp';
 import type { McpToolContent, McpToolResult } from '../../types/mcp';
 
 const codeBlockSx = {
@@ -67,7 +67,7 @@ function ContentBlock({ block }: { block: McpToolContent }): JSX.Element {
 export default function ToolResult({ result }: { result: McpToolResult }): JSX.Element {
   const structured = result.structuredContent;
   const blocks = result.content.filter((block) => !repeatsStructuredContent(block, structured));
-  const copyAll = () => void navigator.clipboard?.writeText(JSON.stringify(structured ?? result.content, null, 2)).catch(() => undefined);
+  const copyAll = () => void navigator.clipboard?.writeText(JSON.stringify(copyableToolResult(structured, blocks), null, 2)).catch(() => undefined);
   return (
     <Stack gap={1}>
       <Stack direction="row" alignItems="center" gap={1}>

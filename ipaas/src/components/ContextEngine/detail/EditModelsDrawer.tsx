@@ -25,8 +25,8 @@ import { AZURE_DEFAULT_API_VERSION, EMBEDDING_PROVIDERS, ragLogoUrl } from '../.
 import { engineMessage, isSameModel, modelDraftError, toModelInput } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { HttpError } from '../../../types/http';
-import SelectableCard from '../../Databases/create/SelectableCard';
-import SecretField from '../../RagIngestion/SecretField';
+import SelectableCard from '../../common/SelectableCard';
+import SecretField from '../../common/SecretField';
 import { drawerBodySx, drawerFooterSx, drawerHeaderSx, filesDrawerSx, modelTileGridSx, mutedSx, summaryCardSx } from '../styles';
 import type { ContextEngineModels, ContextModelSummary, ModelDraft } from '../../../types/contextEngine';
 
@@ -78,9 +78,9 @@ function KeyFields({ draft, current, onChange, idPrefix }: { draft: ModelDraft; 
       </Stack>
       {draft.keyMode === 'key' ? (
         <Box>
-          <SecretField label="API key" value={draft.apiKey} placeholder={unchanged ? keyKindText(current) : undefined} onChange={(v) => onChange({ ...draft, apiKey: v })} />
+          <SecretField label="API key" value={draft.apiKey} onChange={(v) => onChange({ ...draft, apiKey: v })} />
           <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.5, ml: 1.75 }}>
-            {unchanged ? 'Leave empty to keep it.' : 'A different model needs its own key.'}
+            {unchanged ? `${keyKindText(current)}. Leave empty to keep it.` : 'A different model needs its own key.'}
           </Typography>
         </Box>
       ) : (

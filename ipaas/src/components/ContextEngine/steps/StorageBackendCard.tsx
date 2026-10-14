@@ -23,7 +23,7 @@ import { useServerDatabases } from '../../../hooks/usePlatformServices';
 import { STORAGE_DEFAULT_DATABASE, type StorageBackendInfo } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { isGraphUri } from '../../../utils/contextEngine';
-import SecretField from '../../RagIngestion/SecretField';
+import SecretField from '../../common/SecretField';
 import { sourceTileMarkSx, storageCardSx, storageEmptySx, storageLinksSx, storageOptionBodySx, storageOptionSx, storageRadioGroupSx } from '../styles';
 import type { ExternalStorage, InfrastructureStorage, StorageSelection } from '../../../types/contextEngine';
 import type { DatabaseServer } from '../../../types/platformServices';

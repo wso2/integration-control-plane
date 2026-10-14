@@ -22,7 +22,7 @@ import { Fragment, useRef, useState, type JSX } from 'react';
 import { EVERYONE_VISIBILITY } from '../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { sourceFieldError, sourceNameError, visibleFields } from '../../utils/contextEngine';
-import SecretField from '../RagIngestion/SecretField';
+import SecretField from '../common/SecretField';
 import FileVisibilityField from './files/FileVisibilityField';
 import { StagedFilesSection, StagedVisibilityField } from './files/StagedFilesSection';
 import SourceMark from './SourceMark';
@@ -105,7 +105,7 @@ function FileField({ def, value, onChange }: { def: SourceFieldDef; value: strin
 function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; onChange: (value: string) => void }): JSX.Element {
   // Required-but-empty is signalled by the disabled submit button, not red fields on first open.
   const error = value ? sourceFieldError(def, value) : '';
-  if (def.kind === 'secret') return <SecretField label={def.label} required={def.required} value={value} placeholder={def.placeholder} onChange={onChange} error={error || undefined} />;
+  if (def.kind === 'secret') return <SecretField label={def.label} required={def.required} value={value} onChange={onChange} error={error || undefined} />;
   if (def.kind === 'file') return <FileField def={def} value={value} onChange={onChange} />;
   const select = def.kind === 'select';
   const multiline = def.kind === 'urls' || def.kind === 'multiline';

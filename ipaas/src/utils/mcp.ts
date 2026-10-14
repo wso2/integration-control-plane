@@ -190,6 +190,16 @@ export function repeatsStructuredContent(block: McpToolContent, structured: Json
   }
 }
 
+/**
+ * What "Copy result" copies: exactly what is shown. The structured result alone when it is all
+ * there is, the content blocks alone when there is no structured result, and both when a server
+ * adds blocks beyond the structured result.
+ */
+export function copyableToolResult(structured: JsonValue | undefined, blocks: McpToolContent[]): JsonValue | McpToolContent[] | { structuredContent: JsonValue; content: McpToolContent[] } {
+  if (structured === undefined) return blocks;
+  return blocks.length > 0 ? { structuredContent: structured, content: blocks } : structured;
+}
+
 /** Friendly messages for the standard JSON-RPC error codes an MCP server can return. */
 const RPC_ERROR_MESSAGES: Record<number, string> = {
   [-32700]: 'The server could not parse the request.',

@@ -39,7 +39,7 @@ import {
   updateContextSource,
 } from '#api/contextEngine';
 import { IS_WIP } from '../features';
-import { getAccessToken } from '../auth/tokenManager';
+import { getAccessToken } from '#auth';
 import {
   CONTEXT_ENGINE_ASKED_KEY_PREFIX,
   CONTEXT_ENGINE_DELETION_KEY_PREFIX,
@@ -447,9 +447,11 @@ export function useAskedFlag(engineId: string) {
   return { asked, markAsked };
 }
 
-/** The bearer credential the browser would send to the engine — the dev token when configured, else the platform token. */
+/** The bearer credential the browser would send to the engine — the dev token when configured, else the platform token, read once it resolves. */
 export function useContextEngineBearer(): string | null {
-  const token = window.API_CONFIG?.contextEngineApiToken || getAccessToken();
+  const fixed = window.API_CONFIG?.contextEngineApiToken;
+  const platform = useQuery({ queryKey: [ROOT_KEY, 'bearer'], queryFn: getAccessToken, enabled: !fixed, staleTime: 60 * 1000 });
+  const token = fixed || platform.data;
   return token ? `Bearer ${token}` : null;
 }
 

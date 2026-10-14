@@ -19,8 +19,8 @@
 import { Box, Checkbox, FormControlLabel, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import SelectableCard from '../../Databases/create/SelectableCard';
-import SecretField from '../../RagIngestion/SecretField';
+import SelectableCard from '../../common/SelectableCard';
+import SecretField from '../../common/SecretField';
 import { modelColumnSx, modelTileGridSx } from '../styles';
 
 /** The fields every model config shares, whichever provider union it belongs to. */
