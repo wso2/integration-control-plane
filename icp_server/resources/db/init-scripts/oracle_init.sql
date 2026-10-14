@@ -1517,13 +1517,13 @@ END;
 CREATE TABLE mi_composite_app_artifacts (
     runtime_id CHAR(36) NOT NULL,
     app_name VARCHAR2(200 CHAR) NOT NULL,
-    version VARCHAR2(50 CHAR) NULL,
+    version VARCHAR2(50 CHAR) DEFAULT '__UNVERSIONED__' NOT NULL,
     state VARCHAR2(20 CHAR) DEFAULT 'Active' NOT NULL CHECK (state IN ('Active', 'Faulty')),
     error_message CLOB NULL, -- Error message when state is Faulty
     artifacts VARCHAR2(4000 CHAR) NULL, -- JSON array serialized as string (convert to JSON in app code when needed)
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    PRIMARY KEY (runtime_id, app_name),
+    PRIMARY KEY (runtime_id, app_name, version),
     CONSTRAINT fk_mi_composite_app_artifacts_runtime FOREIGN KEY (runtime_id) REFERENCES runtimes (runtime_id) ON DELETE CASCADE
 );
 
