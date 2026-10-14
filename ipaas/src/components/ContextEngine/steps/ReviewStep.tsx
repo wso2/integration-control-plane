@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Chip, Grid, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
-import { CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { CONTEXT_ENGINE_DESCRIPTION_HINT, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { engineDescriptionError, engineNameError, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
@@ -111,7 +111,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           size="small"
           value={form.description}
           error={!!descriptionError}
-          helperText={descriptionError || `${form.description.length}/${CONTEXT_ENGINE_DESCRIPTION_MAX}`}
+          helperText={descriptionError || `${CONTEXT_ENGINE_DESCRIPTION_HINT} ${form.description.length}/${CONTEXT_ENGINE_DESCRIPTION_MAX}`}
           onChange={(e) => onDescriptionChange(e.target.value)}
         />
       </Stack>

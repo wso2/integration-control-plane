@@ -458,18 +458,22 @@ describe('wire payloads', () => {
 });
 
 describe('exposure snippets', () => {
-  it('builds a curl against the queries route', () => {
-    const curl = buildQueryCurl('https://engine.example.com', 'space-1');
-    expect(curl).toContain('https://engine.example.com/v1/queries');
-    expect(curl).toContain('"spaceId": "space-1"');
-    expect(curl).toContain('"mode": "context"');
+  it("builds a curl against the engine's public routes", () => {
+    const curl = buildQueryCurl('https://engine.example.com');
+    expect(curl).toContain('https://engine.example.com/v1/context');
+    expect(curl).toContain('"question": "What is our rollback procedure?"');
+    // The mode is in the URL and the engine is its address; neither is in the body.
+    expect(curl).not.toContain('spaceId');
+    expect(curl).not.toContain('"mode"');
     expect(curl).toContain('Authorization: Bearer $TOKEN');
+    expect(buildQueryCurl('https://engine.example.com', 'q', 'answer')).toContain('https://engine.example.com/v1/answer');
   });
 
   it('builds an mcp client config keyed by the engine name', () => {
-    const cfg = JSON.parse(buildMcpClientConfig('https://engine.example.com/', 'space-1', 'Support Knowledge!'));
+    const cfg = JSON.parse(buildMcpClientConfig('https://engine.example.com/', 'Support Knowledge!'));
     expect(Object.keys(cfg.mcpServers)).toEqual(['support-knowledge']);
     expect(cfg.mcpServers['support-knowledge'].url).toBe('https://engine.example.com/v1/mcp');
+    expect(cfg.mcpServers['support-knowledge'].headers).toEqual({ Authorization: 'Bearer <token>' });
   });
 });
 
@@ -632,7 +636,7 @@ describe('playground helpers', () => {
 
 describe('mcp client configs', () => {
   it('shapes the same server for each client', () => {
-    const cfgs = buildMcpClientConfigs('https://engine.example.com', 'spc_1', 'Support Knowledge');
+    const cfgs = buildMcpClientConfigs('https://engine.example.com', 'Support Knowledge');
     expect(cfgs.map((c) => c.id)).toEqual(['claude-desktop', 'cursor', 'vscode', 'generic']);
     const claude = JSON.parse(cfgs[0].json);
     expect(claude.mcpServers['support-knowledge'].url).toBe('https://engine.example.com/v1/mcp');

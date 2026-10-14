@@ -1242,25 +1242,37 @@ export function resolveEngineBaseUrl(configured: string, origin: string): string
   return base.startsWith('/') ? `${trimSlash(origin)}${base}` : base;
 }
 
-export function queryEndpointUrl(baseUrl: string): string {
-  return `${trimSlash(baseUrl)}/v1/queries`;
+/**
+ * Each context engine runs as its own instance, so its public routes carry no engine id: the
+ * engine's own address identifies it (ADRs 0018 and 0019 in the engine).
+ */
+const publicUrl = (baseUrl: string, route: string): string => `${trimSlash(baseUrl)}/v1/${route}`;
+
+/** The public route that returns the passages answering a question. */
+export function contextEndpointUrl(baseUrl: string): string {
+  return publicUrl(baseUrl, 'context');
 }
 
+/** The public route that answers a question with checked citations. */
+export function answerEndpointUrl(baseUrl: string): string {
+  return publicUrl(baseUrl, 'answer');
+}
+
+/** The engine's MCP endpoint. */
 export function mcpEndpointUrl(baseUrl: string): string {
-  return `${trimSlash(baseUrl)}/v1/mcp`;
+  return publicUrl(baseUrl, 'mcp');
 }
 
-export function buildQueryCurl(baseUrl: string, engineId: string, question = 'What is our rollback procedure?'): string {
-  const body = JSON.stringify({ spaceId: engineId, question, mode: 'context', limit: 5 }, null, 2);
-  return `curl -X POST ${queryEndpointUrl(baseUrl)} \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`;
+export function buildQueryCurl(baseUrl: string, question = 'What is our rollback procedure?', route: 'context' | 'answer' = 'context'): string {
+  const body = JSON.stringify({ question, limit: 5 }, null, 2);
+  const url = route === 'answer' ? answerEndpointUrl(baseUrl) : contextEndpointUrl(baseUrl);
+  return `curl -X POST ${url} \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`;
 }
 
-/** An MCP client `mcpServers` entry pointing at this engine, ready to paste into a client config. */
-/** The shape of a context-mode response, for the API tab. Mirrors the engine's `ContextQueryResponse`. */
+/** The shape of a `/v1/context` response, for the API tab; `/v1/answer` adds `answer`. */
 export function buildQueryResponseExample(sourceId = 'src_…'): string {
   return JSON.stringify(
     {
-      queryId: 'qry_…',
       state: 'completed',
       evidence: [
         {
@@ -1273,7 +1285,6 @@ export function buildQueryResponseExample(sourceId = 'src_…'): string {
           sourceUrl: 'https://docs.example.com/runbooks/rollback',
         },
       ],
-      insufficientEvidence: false,
       traceId: 'trace_…',
     },
     null,
@@ -1281,7 +1292,8 @@ export function buildQueryResponseExample(sourceId = 'src_…'): string {
   );
 }
 
-export function buildMcpClientConfig(baseUrl: string, engineId: string, engineName: string): string {
+/** An MCP client `mcpServers` entry pointing at this engine, ready to paste into a client config. */
+export function buildMcpClientConfig(baseUrl: string, engineName: string): string {
   const key = engineName
     .trim()
     .toLowerCase()
@@ -1293,7 +1305,7 @@ export function buildMcpClientConfig(baseUrl: string, engineId: string, engineNa
       mcpServers: {
         [key || 'context-engine']: {
           url: mcpEndpointUrl(baseUrl),
-          headers: { Authorization: 'Bearer <token>', 'X-Context-Space': engineId },
+          headers: { Authorization: 'Bearer <token>' },
         },
       },
     },
@@ -1303,7 +1315,7 @@ export function buildMcpClientConfig(baseUrl: string, engineId: string, engineNa
 }
 
 /** The same server entry shaped for each supported client. */
-export function buildMcpClientConfigs(baseUrl: string, engineId: string, engineName: string): McpClientConfig[] {
+export function buildMcpClientConfigs(baseUrl: string, engineName: string): McpClientConfig[] {
   const key =
     engineName
       .trim()
@@ -1311,7 +1323,7 @@ export function buildMcpClientConfigs(baseUrl: string, engineId: string, engineN
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 63) || 'context-engine';
-  const server = { url: mcpEndpointUrl(baseUrl), headers: { Authorization: 'Bearer <token>', 'X-Context-Space': engineId } };
+  const server = { url: mcpEndpointUrl(baseUrl), headers: { Authorization: 'Bearer <token>' } };
   return MCP_CLIENTS.map((c) => ({
     ...c,
     json: JSON.stringify(c.id === 'vscode' ? { servers: { [key]: { type: 'http', ...server } } } : { mcpServers: { [key]: server } }, null, 2),

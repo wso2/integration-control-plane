@@ -571,6 +571,8 @@ export function blankLlm(provider: LlmProvider): LlmConfig {
 /** Mirrors the engine's `CreateContextSpace` schema limits. */
 export const CONTEXT_ENGINE_NAME_MAX = 120;
 export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
+/** Shown under the description field: people browsing engines and AI agents connected over MCP both read it. */
+export const CONTEXT_ENGINE_DESCRIPTION_HINT = 'Tells people and AI agents what this engine contains, so they know when to search it.';
 
 /** Engine actions a querying role receives — read context, open evidence, see the trace. */
 export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
@@ -600,12 +602,10 @@ export interface ContextMcpToolInfo {
   description: string;
 }
 
-/** Read tools the engine's MCP facade publishes (from its MCP contract). */
+/** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
-  { name: 'list_context_spaces', description: 'List context engines visible to the caller.' },
-  { name: 'query_context', description: 'Ask a natural-language question against this engine.' },
-  { name: 'get_evidence', description: 'Read one authorized evidence item behind an answer.' },
-  { name: 'explain_query', description: 'Return a caller-safe explanation of how evidence was selected.' },
+  { name: 'get_context', description: 'Returns the passages the caller may read that best answer a question, each with its source, version and link.' },
+  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage. Offered when the engine offers answers.' },
 ];
 
 // ── Recommended models ──────────────────────────────────────────────────────

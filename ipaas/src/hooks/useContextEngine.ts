@@ -35,7 +35,6 @@ import {
   putContextGrant,
   queryContextEngine,
   rebuildContextEngine,
-  updateContextEngineExposure,
   updateContextModels,
   updateContextSource,
 } from '#api/contextEngine';
@@ -55,7 +54,7 @@ import {
 import { everyoneRoles, fromDraft, isEngineProgressActive, ownerGrantId, resolveGraphStatus, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import { HttpError } from '../types/http';
-import type { ContextEngineExposure, ContextEngineForm, ContextGraphStatus, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
+import type { ContextEngineForm, ContextGraphStatus, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
 const ROOT_KEY = 'contextEngines';
 
@@ -176,14 +175,6 @@ export function useDeleteContextEngine() {
       qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
       if (handle?.jobId) qc.invalidateQueries({ queryKey: [ROOT_KEY, 'job', handle.jobId] });
     },
-  });
-}
-
-export function useUpdateContextEngineExposure(engineId: string) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (exposure: ContextEngineExposure) => updateContextEngineExposure(engineId, exposure),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] }),
   });
 }
 

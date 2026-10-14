@@ -19,9 +19,9 @@
 import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router';
-import { buildQueryCurl, buildQueryResponseExample, queryEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
+import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
-import ExposureToggle from './ExposureToggle';
+import SurfaceHeader from './SurfaceHeader';
 import { endpointFieldSx, endpointRowSx, mutedSx } from '../styles';
 import type { ContextEngineDetail } from '../../../types/contextEngine';
 
@@ -29,24 +29,29 @@ interface ApiTabProps {
   engine: ContextEngineDetail;
 }
 
-/** Expose as API — the REST query endpoint, how to authenticate, and a ready-to-run request. */
+/** Expose as API — the engine's public endpoints, how to authenticate, and a ready-to-run request. */
 export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
   const [params] = useSearchParams();
   // "Use in API" on the Playground lands here with the question in the URL.
   const question = params.get('q')?.trim() || undefined;
   const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
-  const endpoint = queryEndpointUrl(base);
+  const endpoints = [
+    { label: 'Context', url: contextEndpointUrl(base) },
+    { label: 'Answer', url: answerEndpointUrl(base) },
+  ];
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <ExposureToggle engine={engine} surface="api" title="REST API" description="Integrations call one endpoint with a question and receive the source-linked passages the caller may read." />
+      <SurfaceHeader title="REST API" description="Integrations send a question and receive the source-linked passages, or a cited answer, from what the caller may read." />
 
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-        Query endpoint
+        Endpoints
       </Typography>
-      <Box sx={endpointRowSx}>
-        <TextField size="small" value={endpoint} slotProps={{ input: { readOnly: true } }} inputProps={{ 'aria-label': 'Query endpoint' }} sx={endpointFieldSx} />
-      </Box>
+      {endpoints.map((e) => (
+        <Box key={e.label} sx={endpointRowSx}>
+          <TextField size="small" label={e.label} value={e.url} slotProps={{ input: { readOnly: true } }} sx={endpointFieldSx} />
+        </Box>
+      ))}
 
       <Stack gap={2} sx={{ mb: 3 }}>
         <Alert severity="info" variant="outlined">
@@ -54,8 +59,8 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
           the engine exists.
         </Alert>
         <Typography variant="body2" sx={mutedSx}>
-          Send <code>mode: "context"</code> to get ranked passages, each with its source, item, version and link. A question nothing visible matches returns <code>insufficientEvidence: true</code> with no passages. Composed answers (<code>mode: "answer"</code>
-          ) arrive with a later engine release and are rejected until then.
+          Send <code>{'{"question": "…"}'}</code>. <code>context</code> returns ranked passages, each with its source, item, version and link. <code>answer</code> returns an answer written from those passages, where each <code>[n]</code> cites the nth passage.
+          A question nothing visible answers returns <code>state: "insufficient_evidence"</code>, with no answer.
         </Typography>
       </Stack>
 
@@ -64,7 +69,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
           Pre-filled with the question you asked in the Playground.
         </Typography>
       )}
-      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, engine.id, question)} showCopyButton wrapLongLines />
+      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, question)} showCopyButton wrapLongLines />
       <Box sx={{ mt: 2 }}>
         <CodeViewer title="Example response" language="json" code={buildQueryResponseExample(engine.sources[0]?.id)} showCopyButton wrapLongLines />
       </Box>

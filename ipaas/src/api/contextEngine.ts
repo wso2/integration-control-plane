@@ -22,13 +22,15 @@
  * The engine ships milestone by milestone. Routes that exist today: spaces,
  * sources, ingestion jobs, grants, `auth/me` and the read-only progress routes
  * (`/v1/progress/...`). Routes taken from its OpenAPI contract that are not
- * served yet answer 404/405: evidence, traces, space deletion. Queries serve
- * context mode only (answer mode is rejected until the engine's M5), and both
- * queries and enrichments answer 503 when the engine runs without its knowledge backend.
+ * served yet answer 404/405: traces. Answer mode answers 404 when the engine is
+ * deployed without answers (`CONTEXT_ENGINE_ANSWERS_ENABLED=false`). This console
+ * uses the engine's internal API; integrators use the engine's public routes,
+ * `/v1/context`, `/v1/answer` and `/v1/mcp`, which the API and MCP tabs show.
  * `PUT/GET /v1/spaces/{id}/configuration` stores the models; the engine encrypts
  * literal API keys, which needs its secrets key, and ignores the storage and
- * source settings sent alongside. `PUT /v1/spaces/{id}/exposures` (API/MCP
- * publishing) is still a proposal this UI needs the engine to add.
+ * source settings sent alongside. Whether the public routes and MCP are served,
+ * and the engine's name and description, are deployment settings the control
+ * plane provisions; the engine has no route to change them.
  *
  * Reads that hit a missing route degrade to an empty section so the detail page
  * still renders; the create flow reports them as warnings instead of failing.
@@ -178,7 +180,6 @@ interface RawConfiguration {
   embeddingLocked?: boolean;
   version?: number;
   updatedAt?: string;
-  exposure?: { api?: boolean; mcp?: boolean } | null;
   graph?: { state?: string; builtAt?: string; jobId?: string; progress?: { done: number; total: number } } | null;
   storage?: Partial<Record<StorageKind, { provider?: string; label?: string; detail?: string } | null>> | null;
 }
@@ -289,7 +290,12 @@ const toGraph = (raw: RawConfiguration['graph']): ContextGraphStatus => ({
   progress: raw?.progress,
 });
 
-const toExposure = (raw: RawConfiguration | null | undefined): ContextEngineExposure => ({ api: raw?.exposure?.api ?? false, mcp: raw?.exposure?.mcp ?? false });
+/**
+ * The engine serves its public API and MCP unless its deployment switches them off, and it does
+ * not report those switches; the control plane, which provisions them, will. Until then the
+ * console shows the default.
+ */
+const toExposure = (): ContextEngineExposure => ({ api: true, mcp: true });
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
@@ -395,7 +401,7 @@ export async function listContextEngines(): Promise<ContextEngine[]> {
         sourceCount: facets.sources.length,
         sourceTypes: facets.sources.map((s) => s.type),
         roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
-        exposure: toExposure(facets.configuration),
+        exposure: toExposure(),
         graph: toGraph(facets.configuration?.graph),
         progress: progress
           ? summarizeEngineProgress(
@@ -418,7 +424,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     sources: sources.map(toSource),
     models: toModels(configuration),
     queryRoles: rolesFromGrants(grants.map(toGrant)),
-    exposure: toExposure(configuration),
+    exposure: toExposure(),
     graph: toGraph(configuration?.graph),
     storage: toStorage(configuration),
   };
@@ -509,12 +515,6 @@ export async function updateContextModels(input: UpdateContextModelsInput): Prom
     ...(input.llm ? { llm: toModelPayload(input.llm) } : {}),
   };
   return toModels(await contextEngineClient.put<RawConfiguration>(`${spacePath(input.engineId)}/configuration`, body));
-}
-
-/** Proposed `PUT /v1/spaces/{id}/exposures` — publish or unpublish the API and MCP surfaces. */
-export async function updateContextEngineExposure(engineId: string, exposure: ContextEngineExposure): Promise<ContextEngineExposure> {
-  const raw = await contextEngineClient.put<{ api?: boolean; mcp?: boolean } | undefined>(`${spacePath(engineId)}/exposures`, exposure);
-  return { api: raw?.api ?? exposure.api, mcp: raw?.mcp ?? exposure.mcp };
 }
 
 // ── Build jobs ──────────────────────────────────────────────────────────────

@@ -413,13 +413,7 @@ export const questionBubbleSx = {
 
 // ── Exposure tabs ───────────────────────────────────────────────────────────
 
-export const exposureHeaderSx = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 2,
-  mb: 3,
-} as const;
+export const surfaceHeaderSx = { mb: 3 } as const;
 
 export const endpointRowSx = {
   display: 'flex',
@@ -613,7 +607,8 @@ export const answerFooterSx = {
 
 export const clientTabsSx = { minHeight: 36, mb: 1.5, '& .MuiTab-root': { minHeight: 36, py: 0.5 } } as const;
 
-export const playgroundFrameSx = { mt: 2, height: 560, display: 'flex', flexDirection: 'column' } as const;
+// Fills the window below the tab header, so a tool's form and its result fit without scrolling.
+export const playgroundFrameSx = { mt: 2, height: { xs: 680, md: 'max(680px, calc(100vh - 140px))' }, display: 'flex', flexDirection: 'column' } as const;
 
 // ── Storage step ────────────────────────────────────────────────────────────
 
