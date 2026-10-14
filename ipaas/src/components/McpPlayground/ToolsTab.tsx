@@ -18,7 +18,7 @@
 
 import { Box, Button, CircularProgress, IconButton, List, ListItemButton, ListItemText, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
-import { useRef, useState, type JSX, type RefObject } from 'react';
+import { useEffect, useRef, useState, type JSX, type RefObject } from 'react';
 import { generateDefaultValue } from '../../utils/mcp';
 import DynamicJsonForm from './DynamicJsonForm';
 import ToolResult from './ToolResult';
@@ -46,6 +46,13 @@ function ToolPanel({ tool, callTool, paneRef }: { tool: McpTool; callTool: Tools
   const [result, setResult] = useState<McpToolResult | null>(null);
   const [runs, setRuns] = useState(0);
   const [running, setRunning] = useState(false);
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll the tool pane, never the page, to each new result; editing the form must not move it.
+  useEffect(() => {
+    const el = resultRef.current;
+    if (runs > 0 && el) paneRef.current?.scrollTo({ top: el.offsetTop - 12, behavior: 'smooth' });
+  }, [runs, paneRef]);
 
   const run = async () => {
     setRunning(true);
@@ -85,14 +92,8 @@ function ToolPanel({ tool, callTool, paneRef }: { tool: McpTool; callTool: Tools
           </Box>
         </Stack>
 
-        {/* Keyed by run, so every new result mounts and scrolls the tool pane — never the page — to itself. */}
         {result && (
-          <Box
-            key={runs}
-            sx={{ minWidth: 0 }}
-            ref={(el: HTMLDivElement | null) => {
-              if (el) paneRef.current?.scrollTo({ top: el.offsetTop - 12, behavior: 'smooth' });
-            }}>
+          <Box sx={{ minWidth: 0 }} ref={resultRef}>
             <ToolResult result={result} />
           </Box>
         )}
