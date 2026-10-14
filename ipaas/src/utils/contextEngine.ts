@@ -24,7 +24,6 @@ import {
   EVERYONE_VISIBILITY,
   OWNER_GRANT_PREFIX,
   defaultStorage,
-  GRAPH_STATE_LABEL,
   isConnectorEnabled,
   LLM_PROVIDERS,
   MCP_CLIENTS,
@@ -50,8 +49,6 @@ import type {
   ContextEngineProgressSummary,
   ContextEngineStorage,
   ContextGrant,
-  ContextGraphStatus,
-  ContextJob,
   ContextRecordStatus,
   ContextSource,
   ContextSourceConfig,
@@ -930,57 +927,16 @@ export function deliveryIdentity(recordId: string, version: string): string {
   return `${recordId.length}:${recordId}:${version}`;
 }
 
-// ── Graph status and first-run guidance ─────────────────────────────────────
-
-/** Human enrichment status, e.g. "Not enriched", "Enriching · 2 of 3 sources", "Enriched 12 min ago". */
-export function graphStatusText(graph: ContextGraphStatus): string {
-  switch (graph.state) {
-    case 'building':
-      return graph.progress ? `${GRAPH_STATE_LABEL.building} · ${graph.progress.done} of ${graph.progress.total} sources` : GRAPH_STATE_LABEL.building;
-    case 'built':
-      if (!graph.builtAt) return GRAPH_STATE_LABEL.built;
-      {
-        const rel = formatDistanceToNow(graph.builtAt);
-        return rel ? `${GRAPH_STATE_LABEL.built} ${rel.charAt(0).toLowerCase()}${rel.slice(1)}` : GRAPH_STATE_LABEL.built;
-      }
-    default:
-      return GRAPH_STATE_LABEL[graph.state];
-  }
-}
-
-/** Not enriched is neutral: indexing already makes sources searchable, enrichment is optional. */
-export function graphStatusTone(graph: ContextGraphStatus): 'success' | 'default' | 'info' | 'error' {
-  switch (graph.state) {
-    case 'built':
-      return 'success';
-    case 'building':
-      return 'info';
-    case 'failed':
-      return 'error';
-    default:
-      return 'default';
-  }
-}
-
-/**
- * Enrichment status to show: what the engine reports, unless it reports nothing
- * and we know of a job started from this browser. A job still running always wins.
- */
-export function resolveGraphStatus(reported: ContextGraphStatus, job: ContextJob | undefined, starting = false): ContextGraphStatus {
-  if (starting) return { state: 'building' };
-  if (job && job.state !== 'succeeded' && job.state !== 'failed') return { state: 'building', jobId: job.id };
-  if (reported.state !== 'not_built' || !job) return reported;
-  return job.state === 'succeeded' ? { state: 'built', builtAt: job.createdAt, jobId: job.id } : { state: 'failed', jobId: job.id };
-}
+// ── First-run guidance ──────────────────────────────────────────────────────
 
 /**
  * The four first-run steps with their state; the first unfinished one is current.
  * Indexing happens as connectors deliver, so the first step completes from
- * source progress. Engines without progress fall back to a finished enrichment.
+ * source progress.
  */
 export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, progress: ContextEngineProgressSummary | null = null, uploadFirst = false): GetStartedStep[] {
   const done: Record<GetStartedStep['id'], boolean> = {
-    index: progress ? progress.processed > 0 && progress.active === 0 : engine.graph.state === 'built',
+    index: !!progress && progress.processed > 0 && progress.active === 0,
     ask: asked,
     publish: engine.exposure.api || engine.exposure.mcp,
     grant: engine.queryRoles.length > 0,

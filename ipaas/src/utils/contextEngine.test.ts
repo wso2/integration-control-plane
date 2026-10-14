@@ -56,7 +56,6 @@ import {
   buildMcpClientConfig,
   evidenceLocationLabel,
   ownerGrantId,
-  resolveGraphStatus,
   summarizeAudience,
   formatProgressPercent,
   isEngineProgressActive,
@@ -76,8 +75,6 @@ import {
   effectiveLlm,
   fromDraft,
   getStartedSteps,
-  graphStatusText,
-  graphStatusTone,
   isFormDirty,
   isGraphUri,
   modelsStepBlocker,
@@ -544,41 +541,19 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     models: { embedding: null, llm: null },
     queryRoles: [],
     exposure: { api: false, mcp: false },
-    graph: { state: 'not_built' },
     storage: null,
     ...over,
   };
 }
 
-describe('graph status and first run', () => {
-  it('describes the graph state', () => {
-    expect(graphStatusText({ state: 'not_built' })).toBe('Not enriched');
-    expect(graphStatusText({ state: 'building', progress: { done: 2, total: 3 } })).toBe('Enriching · 2 of 3 sources');
-    expect(graphStatusText({ state: 'built', builtAt: new Date(Date.now() - 5 * 60_000).toISOString() })).toBe('Enriched 5 min ago');
-    expect(graphStatusText({ state: 'failed' })).toBe('Enrichment failed');
-    expect(graphStatusTone({ state: 'built' })).toBe('success');
-    expect(graphStatusTone({ state: 'not_built' })).toBe('default');
-  });
-
-  it('fills in enrichment status from a job this browser started when the engine reports none', () => {
-    const job = (state: string) => ({ id: 'job_1', state, operation: 'enrichment', traceId: 't', attemptCount: 1, createdAt: '2026-09-25T10:00:00Z' });
-    const none = { state: 'not_built' as const };
-    expect(resolveGraphStatus(none, undefined)).toEqual(none);
-    expect(resolveGraphStatus(none, undefined, true)).toEqual({ state: 'building' });
-    expect(resolveGraphStatus(none, job('queued'))).toEqual({ state: 'building', jobId: 'job_1' });
-    expect(resolveGraphStatus(none, job('succeeded'))).toEqual({ state: 'built', builtAt: '2026-09-25T10:00:00Z', jobId: 'job_1' });
-    expect(resolveGraphStatus(none, job('failed'))).toEqual({ state: 'failed', jobId: 'job_1' });
-    const reported = { state: 'built' as const, builtAt: '2026-09-25T12:00:00Z' };
-    expect(resolveGraphStatus(reported, job('failed'))).toEqual(reported); // the engine's own report wins once it has one
-    expect(resolveGraphStatus(reported, job('running'))).toEqual({ state: 'building', jobId: 'job_1' });
-  });
-
+describe('first run', () => {
   it('marks the first unfinished step current and the rest todo', () => {
     const steps = getStartedSteps(engineDetail(), false);
     expect(steps.map((s) => s.id)).toEqual(['index', 'ask', 'publish', 'grant']);
     expect(steps.map((s) => s.state)).toEqual(['current', 'todo', 'todo', 'todo']);
     expect(steps[0].description).toBe('Items become searchable as the connector delivers them from 2 sources.');
-    const later = getStartedSteps(engineDetail({ graph: { state: 'built' }, queryRoles: ['admin'] }), true);
+    const indexed = { sourceCount: 2, processed: 2, active: 0, reading: 0, waiting: 0, hidden: 0, percent: 100, failedItems: 0 };
+    const later = getStartedSteps(engineDetail({ queryRoles: ['admin'] }), true, indexed);
     expect(later.map((s) => s.state)).toEqual(['done', 'done', 'current', 'done']);
     expect(later[3].description).toBe('1 role can query.');
   });
@@ -941,7 +916,8 @@ describe('file uploads', () => {
   it('offers the upload step first on an engine that only has an upload source', () => {
     const steps = getStartedSteps(engineDetail(), false, null, true);
     expect(steps[0]).toMatchObject({ id: 'index', title: 'Upload your first files', action: 'Upload files', state: 'current' });
-    expect(getStartedSteps(engineDetail({ graph: { state: 'built' } }), false, null, true)[0].title).toBe('Index your sources');
+    const indexed = { sourceCount: 1, processed: 1, active: 0, reading: 0, waiting: 0, hidden: 0, percent: 100, failedItems: 0 };
+    expect(getStartedSteps(engineDetail(), false, indexed, true)[0].title).toBe('Index your sources');
   });
 });
 

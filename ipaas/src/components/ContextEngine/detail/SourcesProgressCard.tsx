@@ -37,7 +37,7 @@ import {
 } from '../../../utils/contextEngine';
 import SourceMark from '../SourceMark';
 import { mutedSx, progressBarSx, progressCaptionSx, progressHeadlineSx, progressOverallSx, sourceProgressBodySx, sourceProgressHeadSx, sourceProgressRowSx, summaryCardHeaderSx, summaryCardSx } from '../styles';
-import type { ContextGraphStatus, ContextSource, SourceProgress } from '../../../types/contextEngine';
+import type { ContextSource, SourceProgress } from '../../../types/contextEngine';
 
 interface SourcesProgressCardProps {
   /** DOM id, so the checklist can scroll here. */
@@ -45,7 +45,6 @@ interface SourcesProgressCardProps {
   engineId: string;
   sources: ContextSource[];
   /** Drives the fallback chip on engines that do not report progress yet. */
-  graph: ContextGraphStatus;
   /** Opens the Files drawer for a File Upload source. */
   onManageFiles?: (source: ContextSource) => void;
   /** Register another source on this engine. */
@@ -64,10 +63,10 @@ function FilesAction({ engineId, source, onManage }: { engineId: string; source:
   );
 }
 
-/** Chip for engines without the progress route: the old graph-derived guess. */
-function FallbackChip({ source, graph }: { source: ContextSource; graph: ContextGraphStatus }): JSX.Element {
-  const label = graph.state === 'built' ? source.state : graph.state === 'building' ? 'Indexing' : 'Waiting for first build';
-  const color = graph.state === 'built' && source.state === 'ready' ? 'success' : source.state === 'failed' ? 'error' : 'default';
+/** Chip for engines without the progress route: the source's own state. */
+function FallbackChip({ source }: { source: ContextSource }): JSX.Element {
+  const label = source.state;
+  const color = source.state === 'ready' ? 'success' : source.state === 'failed' ? 'error' : 'default';
   return <Chip size="small" variant="outlined" color={color} label={label} />;
 }
 
@@ -117,7 +116,7 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  * how many delivered items the engine has processed, and, once the engine
  * collects it, how much the search index has caught up. Polls while anything moves.
  */
-export default function SourcesProgressCard({ id, engineId, sources, graph, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
+export default function SourcesProgressCard({ id, engineId, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
   const progressQuery = useContextEngineProgress(engineId);
   const progress = progressQuery.data;
   const available = !!progress?.available;
@@ -208,7 +207,7 @@ export default function SourcesProgressCard({ id, engineId, sources, graph, onMa
                   </Box>
                 </Stack>
                 <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
-                  {p ? <ProgressChip progress={p} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} graph={graph} />}
+                  {p ? <ProgressChip progress={p} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} />}
                   {s.type === 'upload' && onManageFiles && <FilesAction engineId={engineId} source={s} onManage={onManageFiles} />}
                   {onEditSource && (
                     <Tooltip title="Edit source">

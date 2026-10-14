@@ -35,19 +35,6 @@ export type ContextEngineState = 'provisioning' | 'ready' | 'failed' | 'deleting
 /** Tabs on the engine detail page; the active one is a URL segment. */
 export type ContextEngineTabKey = 'overview' | 'playground' | 'api' | 'mcp' | 'access';
 
-/** Lifecycle of the knowledge graph built from the sources — distinct from the engine's own state. */
-export type ContextGraphState = 'not_built' | 'building' | 'built' | 'failed';
-
-export interface ContextGraphStatus {
-  state: ContextGraphState;
-  /** When the current graph finished building. */
-  builtAt?: string;
-  /** The running or last build job. */
-  jobId?: string;
-  /** Sources processed so far while building. */
-  progress?: { done: number; total: number };
-}
-
 /** At-a-glance facts for the listing; absent when the engine could not report them. */
 export interface ContextEngineSummary {
   sourceCount: number;
@@ -55,7 +42,6 @@ export interface ContextEngineSummary {
   sourceTypes: string[];
   roleCount: number;
   exposure: ContextEngineExposure;
-  graph: ContextGraphStatus;
   /** Source progress roll-up; null when the engine does not report progress. */
   progress: ContextEngineProgressSummary | null;
 }
@@ -135,7 +121,6 @@ export interface ContextEngineDetail extends ContextEngine {
   /** Org role handles granted query access (derived from group grants). */
   queryRoles: string[];
   exposure: ContextEngineExposure;
-  graph: ContextGraphStatus;
   /** Per-store placement as the engine reports it; null when it has not reported configuration. */
   storage: Record<StorageKind, StorageSummary> | null;
 }

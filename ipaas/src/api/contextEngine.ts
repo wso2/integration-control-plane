@@ -25,8 +25,8 @@
  * description, models, stores and served interfaces come from `GET /v1/engine`,
  * read-only; creating and deleting engines, their names, models and switches are
  * provisioning, which the control plane will own, so those calls are refused here.
- * Sources live at `/v1/sources`, progress at `/v1/progress`, enrichment at
- * `/v1/enrichments`. Answer mode answers 404 when the engine is deployed without
+ * Sources live at `/v1/sources` and progress at `/v1/progress`.
+ * Answer mode answers 404 when the engine is deployed without
  * answers. Integrators use the engine's public routes, `/v1/context`,
  * `/v1/answer` and `/v1/mcp`, which the API and MCP tabs show.
  *
@@ -48,8 +48,6 @@ import type {
   ContextEngineProgress,
   ContextEngineState,
   ContextEngineSummary,
-  ContextGraphState,
-  ContextGraphStatus,
   ContextEvidence,
   ContextGrant,
   ContextJob,
@@ -249,9 +247,6 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
   },
 });
 
-/** The engine does not report a graph status; nothing the console knows of has been built. */
-const toGraph = (): ContextGraphStatus => ({ state: 'not_built' as ContextGraphState });
-
 /** Which public surfaces the deployment serves, as the engine reports them; unknown counts as off. */
 const toExposure = (raw: RawEngine | null): ContextEngineExposure => ({ api: raw?.interfaces?.publicApi ?? false, mcp: raw?.interfaces?.mcp ?? false });
 
@@ -338,7 +333,6 @@ export async function listContextEngines(): Promise<ContextEngine[]> {
     sourceTypes: facets.sources.map((s) => s.type),
     roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
     exposure: toExposure(facets.engine),
-    graph: toGraph(),
     progress: progress
       ? summarizeEngineProgress(
           facets.sources.map((src) => src.id),
@@ -359,7 +353,6 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     models: toModels(engine),
     queryRoles: rolesFromGrants(grants.map(toGrant)),
     exposure: toExposure(engine),
-    graph: toGraph(),
     storage: toStorage(engine),
   };
 }
@@ -379,14 +372,7 @@ export async function updateContextModels(_input: UpdateContextModelsInput): Pro
   throw provisioningRefused('Changing the models');
 }
 
-// ── Build jobs ──────────────────────────────────────────────────────────────
-
-/** Start an enrichment (graph build) over the engine's sources; returns the job handle to poll. */
-export async function rebuildContextEngine(engineId: string): Promise<ContextJobHandle> {
-  requireThisEngine(engineId);
-  const raw = await contextEngineClient.post<RawJobAccepted>(`${V1}/enrichments`, undefined, { 'Idempotency-Key': crypto.randomUUID() });
-  return { jobId: raw.jobId, statusUrl: raw.statusUrl };
-}
+// ── Jobs ────────────────────────────────────────────────────────────────────
 
 export async function getContextJob(jobId: string): Promise<ContextJob> {
   return toJob(await contextEngineClient.get<RawJob>(`${V1}/jobs/${encodeURIComponent(jobId)}`));

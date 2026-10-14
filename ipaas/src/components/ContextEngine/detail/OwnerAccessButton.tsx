@@ -29,7 +29,7 @@ interface OwnerAccessButtonProps {
 
 /**
  * Offered where the engine refused the signed-in user: gives them the creator's
- * grant (query + enrich). Engines created before the wizard added that grant
+ * grant (query and upload). Engines created before the wizard added that grant
  * need it once; the engine allows it only for holders of access.manage.
  */
 export default function OwnerAccessButton({ engineId, onGranted }: OwnerAccessButtonProps): JSX.Element {

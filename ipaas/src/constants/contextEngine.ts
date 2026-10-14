@@ -18,7 +18,6 @@
 
 import type {
   ContextEngineStorage,
-  ContextGraphState,
   ContextSourceConfig,
   FileVisibility,
   LlmConfig,
@@ -587,8 +586,8 @@ export const CONTEXT_ENGINE_DESCRIPTION_HINT = 'Tells people and AI agents what 
 /** Engine actions a querying role receives — read context, open evidence, see the trace. */
 export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
 
-/** What the creator of an engine gets on it: query it, start enrichments, upload files and manage its sources. The engine grants creators nothing by itself. */
-export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'context.enrich', 'ingest.write', 'source.manage'] as const;
+/** What the creator of an engine gets on it: query it, upload files and manage its sources. The engine grants creators nothing by itself. */
+export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'ingest.write', 'source.manage'] as const;
 
 /** The creator's grant is keyed `owner-<principalId>`. */
 export const OWNER_GRANT_PREFIX = 'owner-';
@@ -626,15 +625,7 @@ export const RECOMMENDED_MODELS: { embedding: { provider: EmbeddingProvider; mod
   llm: { provider: 'openai', model: 'gpt-4.1' },
 };
 
-// ── Graph status ────────────────────────────────────────────────────────────
-
-/** Indexing already builds the graph; enrichment is the optional pass that derives more from it. */
-export const GRAPH_STATE_LABEL: Record<ContextGraphState, string> = {
-  not_built: 'Not enriched',
-  building: 'Enriching',
-  built: 'Enriched',
-  failed: 'Enrichment failed',
-};
+// ── Source progress ─────────────────────────────────────────────────────────
 
 /** Chip text for a source's place in the pipeline. */
 export const SOURCE_PROGRESS_LABEL: Record<SourceProgressStatus, string> = {
@@ -675,8 +666,6 @@ export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
 /** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
 export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
 
-/** localStorage key of the last enrichment job started from this browser, per engine. The engine has no route that reports enrichment state yet. */
-export const CONTEXT_ENGINE_ENRICHMENT_KEY_PREFIX = 'contextEngine:enrichment:';
 
 /** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
 export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';

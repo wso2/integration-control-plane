@@ -120,7 +120,7 @@ export default function SetupProgress({ engineId, engineName, sourceCount, roleC
         <Step tone="done" aside={engineId}>
           Engine created
         </Step>
-        <Step tone="done">You have query, enrichment and upload access</Step>
+        <Step tone="done">You have query and upload access</Step>
         <Step tone="done">{`${sourceCount} source${sourceCount === 1 ? '' : 's'} registered with visibility rules`}</Step>
         {roleCount > 0 && <Step tone="done">{`${roleCount} role${roleCount === 1 ? '' : 's'} granted query access`}</Step>}
         {configSkipped && (
