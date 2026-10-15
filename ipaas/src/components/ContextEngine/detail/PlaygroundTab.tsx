@@ -23,7 +23,7 @@ import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
 import { forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
-import { ANSWER_MODE_AVAILABLE, CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
+import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
@@ -48,9 +48,9 @@ interface Turn {
   reopened?: { askedAt: string; passagesThen: number };
 }
 
-const MODES: { value: ContextQueryMode; label: string; hint: string; available: boolean }[] = [
-  { value: 'context', label: 'Passages', hint: 'Returns the source-linked passages you are allowed to read — exactly what an agent receives.', available: true },
-  { value: 'answer', label: 'Answer', hint: 'Answers in prose from the passages you are allowed to read, and cites each one.', available: ANSWER_MODE_AVAILABLE },
+const MODES: { value: ContextQueryMode; label: string; hint: string }[] = [
+  { value: 'context', label: 'Passages', hint: 'Returns the source-linked passages you are allowed to read — exactly what an agent receives.' },
+  { value: 'answer', label: 'Answer', hint: 'Answers in prose from the passages you are allowed to read, and cites each one.' },
 ];
 
 interface QueryFailure {
@@ -296,12 +296,12 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               }}
               aria-label="Query mode">
               {MODES.map((m) =>
-                m.available ? (
+                m.value !== 'answer' || engine.exposure.answers ? (
                   <ToggleButton key={m.value} value={m.value}>
                     {m.label}
                   </ToggleButton>
                 ) : (
-                  <Tooltip key={m.value} title="Answers arrive with a later engine release. For now the engine returns passages.">
+                  <Tooltip key={m.value} title="This engine is set up without answers, so it returns passages only.">
                     <span>
                       <ToggleButton value={m.value} disabled>
                         {m.label}

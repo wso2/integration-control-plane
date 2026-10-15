@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Box, Button, Chip, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Checkbox, Chip, FormControlLabel, Stack, Switch, Typography } from '@wso2/oxygen-ui';
 import { Sparkles } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { blankLlm, contextLogoUrl, LLM_PROVIDERS, RECOMMENDED_MODELS } from '../../../constants/contextEngine';
 import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
 import { canShareApiKey } from '../../../utils/contextEngine';
 import ModelProviderColumn from './ModelProviderColumn';
-import { modelColumnsSx, recommendedBannerSx, stepHeadingSx, stepHintSx } from '../styles';
+import { modelColumnSx, modelColumnsSx, recommendedBannerSx, stepHeadingSx, stepHintSx } from '../styles';
 import type { LlmConfig, LlmProvider } from '../../../types/contextEngine';
 import type { EmbeddingConfig, EmbeddingProvider } from '../../../types/ragIngestion';
 
@@ -31,16 +31,21 @@ interface ModelsStepProps {
   embedding: EmbeddingConfig | null;
   llm: LlmConfig | null;
   shareApiKey: boolean;
+  answersEnabled: boolean;
+  /** A separate answer model; null answers with the language model. */
+  answerLlm: LlmConfig | null;
   onEmbeddingChange: (value: EmbeddingConfig) => void;
   onLlmChange: (value: LlmConfig) => void;
   onShareApiKeyChange: (value: boolean) => void;
+  onAnswersEnabledChange: (value: boolean) => void;
+  onAnswerLlmChange: (value: LlmConfig | null) => void;
 }
 
 const EMBEDDING_OPTIONS = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), models: p.models }));
 const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
 
-/** Step 3 — embedding and language model side by side, with a one-click recommended pair. */
-export default function ModelsStep({ embedding, llm, shareApiKey, onEmbeddingChange, onLlmChange, onShareApiKeyChange }: ModelsStepProps): JSX.Element {
+/** Step 3 — embedding and language model side by side, with a one-click recommended pair, then whether and with what the engine answers. */
+export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled, answerLlm, onEmbeddingChange, onLlmChange, onShareApiKeyChange, onAnswersEnabledChange, onAnswerLlmChange }: ModelsStepProps): JSX.Element {
   const rec = RECOMMENDED_MODELS;
   const isRecommended = embedding?.provider === rec.embedding.provider && embedding.model === rec.embedding.model && llm?.provider === rec.llm.provider && llm.model === rec.llm.model;
   const embeddingName = EMBEDDING_PROVIDERS.find((p) => p.id === rec.embedding.provider)?.name ?? rec.embedding.provider;
@@ -59,7 +64,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, onEmbeddingCha
         Configure Models
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        The embedding model indexes your sources for search; the language model is used both to build the graph during ingestion and to answer questions.
+        The embedding model indexes your sources for search; the language model builds the graph during ingestion and, unless you choose a separate answer model, answers questions.
       </Typography>
 
       <Box sx={recommendedBannerSx}>
@@ -95,7 +100,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, onEmbeddingCha
         />
         <ModelProviderColumn<LlmConfig>
           title="Language model"
-          purpose="Writes the answer from retrieved evidence."
+          purpose={answersEnabled && !answerLlm ? 'Builds the graph during ingestion and writes answers from retrieved evidence.' : 'Builds the graph during ingestion.'}
           providers={LLM_OPTIONS}
           value={llm}
           onChange={onLlmChange}
@@ -104,6 +109,40 @@ export default function ModelsStep({ embedding, llm, shareApiKey, onEmbeddingCha
           shareKey={{ available: canShareApiKey(embedding, llm), checked: shareApiKey, onChange: onShareApiKeyChange }}
         />
       </Box>
+
+      <Box sx={{ ...modelColumnSx, mt: 2.5 }}>
+        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Answers
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Uses an LLM to compose an answer from the evidence each person or agent may read, citing every passage it draws on. Turned off, the engine returns the passages only.
+            </Typography>
+          </Box>
+          <Switch checked={answersEnabled} onChange={(_e, checked) => onAnswersEnabledChange(checked)} inputProps={{ 'aria-label': 'Offer answers' }} />
+        </Stack>
+        {answersEnabled && (
+          <FormControlLabel
+            control={<Checkbox size="small" checked={answerLlm !== null} onChange={(_e, checked) => onAnswerLlmChange(checked ? blankLlm(llm?.provider ?? LLM_PROVIDERS[0].id) : null)} />}
+            label="Use a different model for answers than the language model"
+          />
+        )}
+      </Box>
+
+      {answersEnabled && answerLlm && (
+        <Box sx={{ ...modelColumnsSx, mt: 2.5 }}>
+          <ModelProviderColumn<LlmConfig>
+            title="Answer model"
+            purpose="Writes answers from retrieved evidence instead of the language model."
+            providers={LLM_OPTIONS}
+            value={answerLlm}
+            onChange={onAnswerLlmChange}
+            blank={(id) => blankLlm(id as LlmProvider)}
+            modelLabel="Answer model"
+          />
+        </Box>
+      )}
     </>
   );
 }

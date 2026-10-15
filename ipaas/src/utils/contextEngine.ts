@@ -245,11 +245,12 @@ export function effectiveLlm(form: Pick<ContextEngineForm, 'embedding' | 'llm' |
 }
 
 /** Why the Models step cannot proceed, or null. */
-export function modelsStepBlocker(form: Pick<ContextEngineForm, 'embedding' | 'llm' | 'shareApiKey'>): string | null {
+export function modelsStepBlocker(form: Pick<ContextEngineForm, 'embedding' | 'llm' | 'shareApiKey' | 'answersEnabled' | 'answerLlm'>): string | null {
   if (!form.embedding) return 'Choose an embedding model';
   if (!isEmbeddingValid(form.embedding)) return 'Complete the embedding model';
   if (!form.llm) return 'Choose a language model';
   if (!isLlmValid(effectiveLlm(form))) return 'Complete the language model';
+  if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) return 'Complete the answer model';
   return null;
 }
 
@@ -277,12 +278,14 @@ export function isFormComplete(form: ContextEngineForm): boolean {
 export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput {
   const llm = effectiveLlm(form);
   if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
-  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, storage: form.storage };
+  if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer model configuration is incomplete.');
+  const answers = { enabled: form.answersEnabled, model: form.answersEnabled ? form.answerLlm : null };
+  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
 }
 
 /** Whether the wizard holds anything worth keeping. */
 export function isFormDirty(form: ContextEngineForm): boolean {
-  return form.sources.length > 0 || form.roles.length > 0 || form.embedding !== null || form.llm !== null || !isStorageAllManaged(form.storage) || form.name.trim() !== '' || form.description.trim() !== '';
+  return form.sources.length > 0 || form.roles.length > 0 || form.embedding !== null || form.llm !== null || !form.answersEnabled || form.answerLlm !== null || !isStorageAllManaged(form.storage) || form.name.trim() !== '' || form.description.trim() !== '';
 }
 
 // ── Drafts ──────────────────────────────────────────────────────────────────
@@ -298,7 +301,7 @@ export function toDraft(form: ContextEngineForm, savedAt: string): ContextEngine
   return {
     v: 1,
     savedAt,
-    form: { ...form, sources, storage, embedding: form.embedding ? { ...form.embedding, apiKey: '' } : null, llm: form.llm ? { ...form.llm, apiKey: '' } : null },
+    form: { ...form, sources, storage, embedding: form.embedding ? { ...form.embedding, apiKey: '' } : null, llm: form.llm ? { ...form.llm, apiKey: '' } : null, answerLlm: form.answerLlm ? { ...form.answerLlm, apiKey: '' } : null },
   };
 }
 
@@ -353,6 +356,9 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
         embedding: sanitizeModel(f.embedding, EMBEDDING_PROVIDERS),
         llm: sanitizeModel(f.llm, LLM_PROVIDERS),
         shareApiKey: !!f.shareApiKey,
+        // Drafts saved before the answers switch existed offered answers with the language model.
+        answersEnabled: f.answersEnabled !== false,
+        answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS),
         storage: sanitizeStorage(f.storage),
         name: f.name,
         description: typeof f.description === 'string' ? f.description : '',

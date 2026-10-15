@@ -222,7 +222,8 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
         ) : (
           <FileVisibilityField
             id="source-visibility"
-            label="Who can see this content"
+            label="Who can see this source"
+            hint="Access is set per source: everything this source brings in is visible to the same people."
             orgHandle={orgHandle}
             queryRoles={queryRoles}
             value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}

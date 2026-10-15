@@ -249,6 +249,11 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
               <>
                 <ModelRow label="Embedding" provider={engine.models.embedding ? providerName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
                 <ModelRow label="Language model" provider={engine.models.llm ? providerName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
+                <ModelRow
+                  label="Answer model"
+                  provider={!engine.exposure.answers ? 'Answers off' : engine.models.answer ? providerName('llm', engine.models.answer.provider) : 'Engine default'}
+                  model={engine.exposure.answers ? engine.models.answer?.model : undefined}
+                />
                 {modelKeysLabel(engine.models) ? (
                   <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
                     <KeyRound size={14} aria-hidden />

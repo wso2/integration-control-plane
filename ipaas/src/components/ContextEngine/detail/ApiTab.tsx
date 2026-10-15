@@ -36,8 +36,9 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
   const question = params.get('q')?.trim() || undefined;
   const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
   const endpoints = [
-    { label: 'Context', url: contextEndpointUrl(base) },
-    { label: 'Answer', url: answerEndpointUrl(base) },
+    { label: 'Context', url: contextEndpointUrl(base), off: false },
+    // Served only when the engine offers answers; otherwise it returns not-found.
+    { label: 'Answer', url: answerEndpointUrl(base), off: !engine.exposure.answers },
   ];
 
   return (
@@ -49,7 +50,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
       </Typography>
       {endpoints.map((e) => (
         <Box key={e.label} sx={endpointRowSx}>
-          <TextField size="small" label={e.label} value={e.url} slotProps={{ input: { readOnly: true } }} sx={endpointFieldSx} />
+          <TextField size="small" label={e.label} value={e.url} disabled={e.off} helperText={e.off ? 'Answers are turned off for this engine.' : undefined} slotProps={{ input: { readOnly: true } }} sx={endpointFieldSx} />
         </Box>
       ))}
 

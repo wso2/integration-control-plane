@@ -73,6 +73,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
   const descriptionError = engineDescriptionError(form.description);
   const embeddingName = EMBEDDING_PROVIDERS.find((p) => p.id === form.embedding?.provider)?.name ?? form.embedding?.provider ?? '—';
   const llmName = LLM_PROVIDERS.find((p) => p.id === form.llm?.provider)?.name ?? form.llm?.provider ?? '—';
+  const answerName = form.answerLlm ? (LLM_PROVIDERS.find((p) => p.id === form.answerLlm?.provider)?.name ?? form.answerLlm.provider) : 'Language model';
   const n = form.sources.length;
 
   return (
@@ -158,7 +159,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
                       {summarizeSource(s)}
                     </Typography>
                     <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }} noWrap>
-                      Visible to: {summarizeSourceVisibility(s, roleNames)}
+                      Source visible to: {summarizeSourceVisibility(s, roleNames)}
                     </Typography>
                   </Box>
                 </Stack>
@@ -191,7 +192,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
         */}
         <Grid size={{ xs: 12, md: 6 }}>
           <SummaryCard title="Models" editLabel="models" onEdit={() => onEdit(1)}>
-            <Stack direction="row" gap={4}>
+            <Stack direction="row" gap={4} flexWrap="wrap">
               <Box>
                 <Typography variant="caption" sx={mutedSx}>
                   Embedding
@@ -213,6 +214,17 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
                 <Typography variant="caption" sx={mutedSx}>
                   {form.llm?.model || '—'}
                   {form.shareApiKey && form.llm && form.embedding?.provider === form.llm.provider ? ' · shares the embedding key' : ''}
+                </Typography>
+              </Box>
+              <Box>
+                <Typography variant="caption" sx={mutedSx}>
+                  Answers
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                  {form.answersEnabled ? answerName : 'Off'}
+                </Typography>
+                <Typography variant="caption" sx={mutedSx}>
+                  {!form.answersEnabled ? 'Passages only' : form.answerLlm ? form.answerLlm.model || '—' : 'Same as the language model'}
                 </Typography>
               </Box>
             </Stack>

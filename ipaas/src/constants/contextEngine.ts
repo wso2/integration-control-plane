@@ -574,8 +574,11 @@ export function blankLlm(provider: LlmProvider): LlmConfig {
  */
 export const CONTEXT_ENGINE_ID = 'engine';
 
-/** Shown when the console's configuration names no engine (`CONTEXT_ENGINE_NAME`). */
+/** Shown for an engine set up from another browser, whose name this browser never saw. */
 export const DEFAULT_CONTEXT_ENGINE_NAME = 'Context engine';
+
+/** localStorage key of the running engine's name and description, which the engine itself does not hold. */
+export const CONTEXT_ENGINE_LOCAL_KEY = 'contextEngine:local';
 
 /** Limits for an engine's name and description, which the control plane provisions. */
 export const CONTEXT_ENGINE_NAME_MAX = 120;
@@ -592,8 +595,6 @@ export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.re
 /** The creator's grant is keyed `owner-<principalId>`. */
 export const OWNER_GRANT_PREFIX = 'owner-';
 
-/** The engine answers in prose with checked citations since its M5 answer release. */
-export const ANSWER_MODE_AVAILABLE = true;
 
 /** Grants created for an org role are keyed `role-<handle>` so they can be told apart from ad-hoc grants. */
 export const ROLE_GRANT_PREFIX = 'role-';

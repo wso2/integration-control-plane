@@ -69,7 +69,6 @@ interface RuntimeConfig {
   CONTEXT_ENGINE_API_URL?: string;
   /** Local-development only: a static engine token when the engine cannot verify platform tokens yet. */
   CONTEXT_ENGINE_API_TOKEN?: string;
-  CONTEXT_ENGINE_NAME?: string;
   ENABLE_CONTEXT_ENGINE_FEATURE?: string | boolean;
   SCOPES_ENFORCED?: string | boolean;
 }
@@ -162,8 +161,6 @@ export interface ApiConfig {
   contextEngineApiUrl: string;
   /** Dev-only static bearer token for the engine; unset sends the platform token. */
   contextEngineApiToken?: string;
-  /** The name shown for the engine at `contextEngineApiUrl`; the engine itself has none, the control plane owns it. */
-  contextEngineName?: string;
   /** Gates the org-level Context Engines feature. */
   enableContextEngineFeature?: boolean;
   /** Hide actions the user's role doesn't allow. Set from the same deployment variable as ipaas-service's SCOPES_ENFORCED, so the console hides what ipaas-service refuses. */
@@ -296,7 +293,6 @@ export async function loadConfig(): Promise<void> {
       moesifAppApiKey: typeof config.MOESIF_APP_API_KEY === 'string' ? config.MOESIF_APP_API_KEY.trim() || undefined : undefined,
       contextEngineApiUrl: config.CONTEXT_ENGINE_API_URL ? trim(config.CONTEXT_ENGINE_API_URL) : DEFAULT_CONFIG.contextEngineApiUrl,
       contextEngineApiToken: config.CONTEXT_ENGINE_API_TOKEN?.trim() || undefined,
-      contextEngineName: config.CONTEXT_ENGINE_NAME?.trim() || undefined,
       enableContextEngineFeature: config.ENABLE_CONTEXT_ENGINE_FEATURE === 'true' || config.ENABLE_CONTEXT_ENGINE_FEATURE === true,
       scopesEnforced: config.SCOPES_ENFORCED === 'true' || config.SCOPES_ENFORCED === true,
     };

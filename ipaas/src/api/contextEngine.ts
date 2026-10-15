@@ -20,15 +20,16 @@
  * Context Engines — backed by the Context Engine REST API (`/v1`).
  *
  * Each context engine runs as its own instance (the engine's ADR 0019), and this
- * console is the UI for the one at the configured URL: it is shown as the single
- * engine with id `engine`, which is also the engine's grant resource. Its
- * description, models, stores and served interfaces come from `GET /v1/engine`,
- * read-only; creating and deleting engines, their names, models and switches are
- * provisioning, which the control plane will own, so those calls are refused here.
- * Sources live at `/v1/sources` and progress at `/v1/progress`.
- * Answer mode answers 404 when the engine is deployed without
- * answers. Integrators use the engine's public routes, `/v1/context`,
- * `/v1/answer` and `/v1/mcp`, which the API and MCP tabs show.
+ * console is the UI for the one at the configured URL, shown under the id
+ * `engine`, which is also the engine's grant resource. Until the control plane
+ * provisions engines, creating one sets up that running engine: the wizard
+ * registers its sources and grants, and its name and description stay in this
+ * browser, since the engine holds no name. Models, stores and served interfaces
+ * come from the engine's environment through `GET /v1/engine`, read-only;
+ * deleting an engine and changing its models are provisioning, refused here.
+ * Sources live at `/v1/sources` and progress at `/v1/progress`. Answer mode
+ * answers 404 when the engine is deployed without answers. Integrators use the
+ * public routes, `/v1/context`, `/v1/answer` and `/v1/mcp`.
  *
  * Reads that hit a missing route degrade to an empty section so the detail page
  * still renders.
@@ -36,8 +37,8 @@
 
 import { getAccessToken } from '#auth';
 import { contextEngineClient, isAccessTokenExpired, refreshAccessToken } from './httpClients';
-import { CONTEXT_ENGINE_ID, DEFAULT_CONTEXT_ENGINE_NAME } from '../../constants/contextEngine';
-import { audienceMappingFromRules, deliveryIdentity, rolesFromGrants, summarizeEngineProgress, toSourceRegistration } from '../../utils/contextEngine';
+import { CONTEXT_ENGINE_ID, CONTEXT_ENGINE_LOCAL_KEY, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS, DEFAULT_CONTEXT_ENGINE_NAME } from '../../constants/contextEngine';
+import { audienceMappingFromRules, deliveryIdentity, engineMessage, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toSourceRegistration } from '../../utils/contextEngine';
 import { HttpError } from '../../types/http';
 import type {
   ContextEngine,
@@ -75,7 +76,7 @@ import type {
 const V1 = '/v1';
 const grantsPath = (resourceId: string): string => `${V1}/resources/${encodeURIComponent(resourceId)}/grants`;
 
-/** Engines are provisioned by the control plane; this console only shows the engine it is pointed at. */
+/** Engines are provisioned by the control plane; here, creating one sets up the running engine. */
 export const supportsContextEngineProvisioning = false;
 
 const provisioningRefused = (what: string): Error => new Error(`${what} is provisioning, which the control plane owns; this console shows the engine it is configured for.`);
@@ -148,7 +149,7 @@ interface RawModelSummary {
 
 interface RawEngine {
   description?: string | null;
-  models?: { embedding?: RawModelSummary | null; llm?: RawModelSummary | null } | null;
+  models?: { embedding?: RawModelSummary | null; llm?: RawModelSummary | null; answer?: RawModelSummary | null } | null;
   storage?: Partial<Record<StorageKind, { provider?: string } | null>> | null;
   interfaces?: { publicApi?: boolean; mcp?: boolean; answers?: boolean } | null;
 }
@@ -179,13 +180,37 @@ interface RawEngineProgress {
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
-/** The one engine: its name is the console's configuration, since the engine itself has none. */
-const toEngine = (raw: RawEngine | null): ContextEngine => ({
+/** The engine's name and description as the wizard set it up, kept in this browser: the engine holds no name. */
+interface LocalEngineRecord {
+  name: string;
+  description: string;
+  createdAt: string;
+}
+
+function readLocalEngine(): LocalEngineRecord | null {
+  try {
+    const raw = localStorage.getItem(CONTEXT_ENGINE_LOCAL_KEY);
+    return raw ? (JSON.parse(raw) as LocalEngineRecord) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeLocalEngine(record: LocalEngineRecord): void {
+  try {
+    localStorage.setItem(CONTEXT_ENGINE_LOCAL_KEY, JSON.stringify(record));
+  } catch {
+    // Storage may be unavailable (private mode); the engine then shows under the default name.
+  }
+}
+
+/** The one engine: its name and description from this browser's setup, else the engine's own description. */
+const toEngine = (raw: RawEngine | null, local: LocalEngineRecord | null): ContextEngine => ({
   id: CONTEXT_ENGINE_ID,
-  name: window.API_CONFIG?.contextEngineName || DEFAULT_CONTEXT_ENGINE_NAME,
-  description: raw?.description ?? '',
+  name: local?.name || DEFAULT_CONTEXT_ENGINE_NAME,
+  description: local?.description || raw?.description || '',
   state: 'ready' as ContextEngineState,
-  createdAt: '',
+  createdAt: local?.createdAt ?? '',
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -211,6 +236,7 @@ const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary |
 const toModels = (raw: RawEngine | null): ContextEngineModels => ({
   embedding: toModel(raw?.models?.embedding),
   llm: toModel(raw?.models?.llm),
+  answer: toModel(raw?.models?.answer),
   embeddingLocked: true,
 });
 
@@ -248,7 +274,7 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
 });
 
 /** Which public surfaces the deployment serves, as the engine reports them; unknown counts as off. */
-const toExposure = (raw: RawEngine | null): ContextEngineExposure => ({ api: raw?.interfaces?.publicApi ?? false, mcp: raw?.interfaces?.mcp ?? false });
+const toExposure = (raw: RawEngine | null): ContextEngineExposure => ({ api: raw?.interfaces?.publicApi ?? false, mcp: raw?.interfaces?.mcp ?? false, answers: raw?.interfaces?.answers ?? false });
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
@@ -306,6 +332,9 @@ function requireThisEngine(engineId: string): void {
   if (engineId !== CONTEXT_ENGINE_ID) throw new HttpError(404, `HTTP 404: no context engine "${engineId}"`);
 }
 
+/** The engine counts as created once this browser set it up, or once it holds sources, for example from another browser. */
+const isSetUp = (local: LocalEngineRecord | null, sources: RawSource[]): boolean => !!local || sources.length > 0;
+
 /** The engine's configuration, sources and grants, each degrading to empty when the caller may not read it. */
 async function fetchEngineFacets(): Promise<{ engine: RawEngine | null; sources: RawSource[]; grants: RawGrant[] }> {
   const [engine, sources, grants] = await Promise.all([
@@ -325,9 +354,11 @@ async function fetchProgressQuietly(): Promise<RawEngineProgress | null> {
   }
 }
 
-/** The one engine this console shows, with an at-a-glance summary. */
+/** The one engine this console shows, once it is set up, with an at-a-glance summary. */
 export async function listContextEngines(): Promise<ContextEngine[]> {
+  const local = readLocalEngine();
   const [facets, progress] = await Promise.all([fetchEngineFacets(), fetchProgressQuietly()]);
+  if (!isSetUp(local, facets.sources)) return [];
   const summary: ContextEngineSummary = {
     sourceCount: facets.sources.length,
     sourceTypes: facets.sources.map((s) => s.type),
@@ -340,15 +371,17 @@ export async function listContextEngines(): Promise<ContextEngine[]> {
         )
       : null,
   };
-  return [{ ...toEngine(facets.engine), summary }];
+  return [{ ...toEngine(facets.engine, local), summary }];
 }
 
 /** The engine with its sources, models, query roles and exposure. */
 export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
   requireThisEngine(engineId);
+  const local = readLocalEngine();
   const { engine, sources, grants } = await fetchEngineFacets();
+  if (!isSetUp(local, sources)) throw new HttpError(404, 'HTTP 404: the context engine is not set up yet');
   return {
-    ...toEngine(engine),
+    ...toEngine(engine, local),
     sources: sources.map(toSource),
     models: toModels(engine),
     queryRoles: rolesFromGrants(grants.map(toGrant)),
@@ -357,9 +390,41 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
   };
 }
 
-/** Creating an engine is provisioning, which the control plane owns. */
-export async function createContextEngine(_input: CreateContextEngineInput): Promise<CreateContextEngineResult> {
-  throw provisioningRefused('Creating a context engine');
+/**
+ * Set up the running engine: grant its creator query and upload access,
+ * register the sources with their visibility rules, grant the chosen roles, and
+ * keep the name and description in this browser. The models, answers and storage
+ * come from the engine's environment, so the wizard's choices for them are not sent.
+ * One instance is one engine for now, so a second setup is refused.
+ */
+export async function createContextEngine(input: CreateContextEngineInput): Promise<CreateContextEngineResult> {
+  const existing = await optional(() => contextEngineClient.get<RawSource[]>(`${V1}/sources`), [] as RawSource[]);
+  if (isSetUp(readLocalEngine(), existing ?? [])) throw new HttpError(409, "HTTP 409: this console's context engine is already set up");
+  const warnings: string[] = [];
+  const sources: Record<string, string> = {};
+  // A step the engine refuses is reported rather than undone: what succeeded is already usable.
+  const attempt = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
+    try {
+      await fn();
+    } catch (err) {
+      warnings.push(`${label}: ${engineMessage(err, 'the engine refused it')}`);
+    }
+  };
+  await attempt('Give you query and upload access', async () => {
+    const me = await getContextPrincipal();
+    await contextEngineClient.put(`${grantsPath(CONTEXT_ENGINE_ID)}/${encodeURIComponent(ownerGrantId(me.id))}`, { principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
+  });
+  for (const source of input.sources) {
+    await attempt(`Register source “${source.name}”`, async () => {
+      const raw = await contextEngineClient.post<RawSource>(`${V1}/sources`, toSourceRegistration(source));
+      if (raw?.id) sources[source.name.trim()] = raw.id;
+    });
+  }
+  for (const role of input.roles) {
+    await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(`${grantsPath(CONTEXT_ENGINE_ID)}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
+  }
+  writeLocalEngine({ name: input.name.trim(), description: input.description.trim(), createdAt: new Date().toISOString() });
+  return { id: CONTEXT_ENGINE_ID, sources, warnings };
 }
 
 /** Deleting an engine is deprovisioning its instance, which the control plane owns. */

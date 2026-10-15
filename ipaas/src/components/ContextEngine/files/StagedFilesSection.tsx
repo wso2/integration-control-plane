@@ -86,7 +86,7 @@ export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }
           Who can see uploaded files
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.5 }}>
-          Each upload chooses: everyone who can query this engine, or only some roles. There are no labels or rules to set up.
+          Access is set when you upload: each batch of files is visible to everyone who can query this engine, or only to some roles.
         </Typography>
       </Box>
     );
@@ -95,6 +95,7 @@ export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }
     <FileVisibilityField
       id="staged-visibility"
       label={`Who can see ${staged.length === 1 ? 'this file' : `these ${staged.length} files`}`}
+      hint="Applies to the files you add here; later uploads to this source choose again."
       orgHandle={orgHandle}
       queryRoles={queryRoles}
       value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}

@@ -139,6 +139,8 @@ function completeForm(): ContextEngineForm {
     embedding,
     llm: { ...blankLlm('anthropic'), model: 'claude-sonnet-4-6', apiKey: 'sk-ant' },
     shareApiKey: false,
+    answersEnabled: true,
+    answerLlm: null,
     storage: defaultStorage(),
     name: 'Support knowledge',
     description: 'Runbooks and docs',
@@ -487,8 +489,20 @@ describe('shared api key', () => {
   });
 
   it('names the first missing piece of the models step', () => {
-    expect(modelsStepBlocker({ embedding: null, llm: null, shareApiKey: false })).toBe('Choose an embedding model');
-    expect(modelsStepBlocker({ embedding, llm: null, shareApiKey: false })).toBe('Choose a language model');
+    const noAnswerModel = { answersEnabled: true, answerLlm: null };
+    expect(modelsStepBlocker({ embedding: null, llm: null, shareApiKey: false, ...noAnswerModel })).toBe('Choose an embedding model');
+    expect(modelsStepBlocker({ embedding, llm: null, shareApiKey: false, ...noAnswerModel })).toBe('Choose a language model');
+  });
+
+  it('checks a separate answer model only while answers are offered', () => {
+    const form = { ...completeForm(), answerLlm: blankLlm('openai') };
+    expect(modelsStepBlocker(form)).toBe('Complete the answer model');
+    expect(modelsStepBlocker({ ...form, answersEnabled: false })).toBeNull();
+    const chosen = { ...form, answerLlm: { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' } };
+    expect(modelsStepBlocker(chosen)).toBeNull();
+    expect(toCreateInput(chosen).answers).toEqual({ enabled: true, model: chosen.answerLlm });
+    expect(toCreateInput({ ...chosen, answersEnabled: false }).answers).toEqual({ enabled: false, model: null });
+    expect(toCreateInput(completeForm()).answers).toEqual({ enabled: true, model: null });
   });
 });
 
@@ -505,6 +519,12 @@ describe('drafts', () => {
     expect(restored?.savedAt).toBe('2026-09-23T10:00:00Z');
     expect(restored?.form.name).toBe('Support knowledge');
     expect(restored?.form.roles).toEqual(['admin']);
+    expect(restored?.form.answersEnabled).toBe(true);
+    const separate = toDraft({ ...form, answersEnabled: false, answerLlm: { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' } }, 'x');
+    expect(separate.form.answerLlm?.apiKey).toBe('');
+    const reopened = fromDraft(JSON.stringify(separate))!.form;
+    expect(reopened.answersEnabled).toBe(false);
+    expect(reopened.answerLlm?.model).toBe('gpt-5');
   });
 
   it('rejects malformed or foreign drafts', () => {
@@ -521,8 +541,10 @@ describe('drafts', () => {
   });
 
   it('knows when there is nothing worth keeping', () => {
-    expect(isFormDirty({ sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, storage: defaultStorage(), name: '', description: '  ' })).toBe(false);
-    expect(isFormDirty({ sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, storage: { ...defaultStorage(), vector: { mode: 'infrastructure', serverId: 's1', serverName: 'v', database: 'd' } }, name: '', description: '' })).toBe(true);
+    const empty = { sources: [], roles: [], embedding: null, llm: null, shareApiKey: false, answersEnabled: true, answerLlm: null };
+    expect(isFormDirty({ ...empty, storage: defaultStorage(), name: '', description: '  ' })).toBe(false);
+    expect(isFormDirty({ ...empty, answersEnabled: false, storage: defaultStorage(), name: '', description: '' })).toBe(true);
+    expect(isFormDirty({ ...empty, storage: { ...defaultStorage(), vector: { mode: 'infrastructure', serverId: 's1', serverName: 'v', database: 'd' } }, name: '', description: '' })).toBe(true);
     expect(isFormDirty({ ...completeForm(), sources: [], roles: [], embedding: null, llm: null, description: '' })).toBe(true); // name
   });
 });
@@ -540,7 +562,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     ],
     models: { embedding: null, llm: null },
     queryRoles: [],
-    exposure: { api: false, mcp: false },
+    exposure: { api: false, mcp: false, answers: true },
     storage: null,
     ...over,
   };

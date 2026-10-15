@@ -21,7 +21,7 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
-import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngineDraft, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngineDraft, useContextEngines, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
 import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
@@ -73,6 +73,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const [showRestored, setShowRestored] = useState(restored);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const create = useCreateContextEngine();
+  const engines = useContextEngines();
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
   // The roles "everyone who can query" stands for when files are shared, and the creator's groups for the review's checks.
@@ -90,9 +91,9 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
   }
-  // Creating an engine is provisioning, which the control plane will own; this console shows the engine it is configured for.
-  if (!CONTEXT_ENGINE_PROVISIONING) {
-    return <ComingSoon title="Created by the control plane" description="Context engines are provisioned by the control plane. This console shows the engine it is configured for." />;
+  // Temporary: until the control plane provisions engines, this console sets up the one engine it runs against.
+  if (!CONTEXT_ENGINE_PROVISIONING && engines.data?.length && !setup && !create.isSuccess) {
+    return <ComingSoon title="Already set up" description="This console's context engine has already been created. Only one engine is supported for now." />;
   }
 
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
@@ -144,7 +145,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         setSetup({ id, name: form.name.trim(), warnings, uploads, sourceCount: form.sources.length, roleCount: form.roles.length });
       },
       onError: (e) => {
-        if (e instanceof HttpError && e.status === 409) setError('A context engine with this name already exists.');
+        if (e instanceof HttpError && e.status === 409) setError(CONTEXT_ENGINE_PROVISIONING ? 'A context engine with this name already exists.' : 'A context engine has already been created. Only one engine is supported for now.');
         else if (e instanceof HttpError && e.status === 401) setError('The context engine rejected the credential. Check the engine token in runtime config.');
         else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines. Ask an engine administrator for the engine.manage action.");
         else if (e instanceof HttpError) setError(`Couldn't create the context engine: ${engineMessage(e)}`);
@@ -209,9 +210,13 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 embedding={form.embedding}
                 llm={form.llm}
                 shareApiKey={form.shareApiKey}
+                answersEnabled={form.answersEnabled}
+                answerLlm={form.answerLlm}
                 onEmbeddingChange={(value) => dispatch({ type: 'embedding', value })}
                 onLlmChange={(value) => dispatch({ type: 'llm', value })}
                 onShareApiKeyChange={(value) => dispatch({ type: 'shareApiKey', value })}
+                onAnswersEnabledChange={(value) => dispatch({ type: 'answersEnabled', value })}
+                onAnswerLlmChange={(value) => dispatch({ type: 'answerLlm', value })}
               />
             )}
             {activeStep === 2 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}

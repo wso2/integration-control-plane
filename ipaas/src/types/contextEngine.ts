@@ -60,6 +60,8 @@ export interface ContextEngine {
 export interface ContextEngineExposure {
   api: boolean;
   mcp: boolean;
+  /** The engine offers answers; off, answer requests return not-found. */
+  answers: boolean;
 }
 
 /** Provider + model, without credentials — what the engine reports back. */
@@ -76,6 +78,8 @@ export interface ContextModelSummary {
 export interface ContextEngineModels {
   embedding: ContextModelSummary | null;
   llm: ContextModelSummary | null;
+  /** The model that writes answers; null when the engine offers none. */
+  answer?: ContextModelSummary | null;
   /** The engine holds indexed content, so the embedding model cannot change until it can re-index. */
   embeddingLocked?: boolean;
   /** Configuration version and when it last changed, when the engine reports them. */
@@ -454,6 +458,10 @@ export interface ContextEngineForm {
   llm: LlmConfig | null;
   /** Reuse the embedding API key for the language model when both use the same provider. */
   shareApiKey: boolean;
+  /** Offer answers (answer mode, `/v1/answer`, MCP's `get_answer`); off, the engine returns passages only. */
+  answersEnabled: boolean;
+  /** A separate model for writing answers; null uses the language model. */
+  answerLlm: LlmConfig | null;
   storage: ContextEngineStorage;
   name: string;
   description: string;
@@ -473,6 +481,8 @@ export interface CreateContextEngineInput {
   roles: string[];
   embedding: EmbeddingConfig;
   llm: LlmConfig;
+  /** Whether the engine offers answers, and the model that writes them; a null model is the language model. */
+  answers: { enabled: boolean; model: LlmConfig | null };
   storage: ContextEngineStorage;
 }
 

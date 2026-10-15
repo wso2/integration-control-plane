@@ -57,7 +57,7 @@ function SourceRow({ source, roleNames, onEdit, onRemove }: { source: ContextSou
           {summarizeSource(source)}
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }} noWrap>
-          Visible to: {summarizeSourceVisibility(source, roleNames)}
+          Source visible to: {summarizeSourceVisibility(source, roleNames)}
         </Typography>
       </Box>
       <Chip size="small" variant="outlined" label={sourceTypeName(source.type)} />
@@ -99,7 +99,7 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
         Choose Sources
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        Choose the data sources for your context graph.
+        Choose the data sources for your context graph. Each source sets who can see its content.
       </Typography>
 
       {sources.length === 0 ? (

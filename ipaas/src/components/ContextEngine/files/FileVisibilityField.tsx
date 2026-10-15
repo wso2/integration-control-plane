@@ -26,6 +26,8 @@ interface FileVisibilityFieldProps {
   id: string;
   /** The question, e.g. "Who can see these 3 files". */
   label: string;
+  /** What the choice applies to, shown under the question. */
+  hint?: string;
   orgHandle: string;
   value: FileVisibility;
   onChange: (value: FileVisibility) => void;
@@ -38,7 +40,7 @@ interface FileVisibilityFieldProps {
  * org roles. One choice instead of a label plus a rule; warnings say when the
  * choice would hide the files from their uploader or from roles that cannot query.
  */
-export default function FileVisibilityField({ id, label, orgHandle, value, onChange, queryRoles }: FileVisibilityFieldProps): JSX.Element {
+export default function FileVisibilityField({ id, label, hint, orgHandle, value, onChange, queryRoles }: FileVisibilityFieldProps): JSX.Element {
   const { roles, rolesLoading, rolesFailed, roleNames, myGroups, everyone } = useUploadAudience(orgHandle, queryRoles ?? []);
   const chosen = value.kind === 'roles' ? value.roles : [];
   const error = visibilityError(value);
@@ -49,6 +51,11 @@ export default function FileVisibilityField({ id, label, orgHandle, value, onCha
       <Typography id={`${id}-label`} variant="subtitle2" sx={{ fontWeight: 600 }}>
         {label}
       </Typography>
+      {hint && (
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.5 }}>
+          {hint}
+        </Typography>
+      )}
       <RadioGroup value={value.kind} onChange={(_e, kind) => onChange(kind === 'roles' ? { kind: 'roles', roles: chosen } : { kind: 'everyone' })} sx={{ mt: 0.5 }}>
         <FormControlLabel
           value="everyone"
