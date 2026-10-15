@@ -332,8 +332,11 @@ function requireThisEngine(engineId: string): void {
   if (engineId !== CONTEXT_ENGINE_ID) throw new HttpError(404, `HTTP 404: no context engine "${engineId}"`);
 }
 
-/** The engine counts as created once this browser set it up, or once it holds sources, for example from another browser. */
-const isSetUp = (local: LocalEngineRecord | null, sources: RawSource[]): boolean => !!local || sources.length > 0;
+/**
+ * The engine counts as created once this browser set it up. Deleting only forgets it here and
+ * leaves the engine's data in place, so the engine's own data cannot decide this.
+ */
+const isSetUp = (local: LocalEngineRecord | null): boolean => !!local;
 
 /** The engine's configuration, sources and grants, each degrading to empty when the caller may not read it. */
 async function fetchEngineFacets(): Promise<{ engine: RawEngine | null; sources: RawSource[]; grants: RawGrant[] }> {
@@ -358,7 +361,7 @@ async function fetchProgressQuietly(): Promise<RawEngineProgress | null> {
 export async function listContextEngines(): Promise<ContextEngine[]> {
   const local = readLocalEngine();
   const [facets, progress] = await Promise.all([fetchEngineFacets(), fetchProgressQuietly()]);
-  if (!isSetUp(local, facets.sources)) return [];
+  if (!isSetUp(local)) return [];
   const summary: ContextEngineSummary = {
     sourceCount: facets.sources.length,
     sourceTypes: facets.sources.map((s) => s.type),
@@ -379,7 +382,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
   requireThisEngine(engineId);
   const local = readLocalEngine();
   const { engine, sources, grants } = await fetchEngineFacets();
-  if (!isSetUp(local, sources)) throw new HttpError(404, 'HTTP 404: the context engine is not set up yet');
+  if (!isSetUp(local)) throw new HttpError(404, 'HTTP 404: the context engine is not set up yet');
   return {
     ...toEngine(engine, local),
     sources: sources.map(toSource),
@@ -395,11 +398,11 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
  * register the sources with their visibility rules, grant the chosen roles, and
  * keep the name and description in this browser. The models, answers and storage
  * come from the engine's environment, so the wizard's choices for them are not sent.
- * One instance is one engine for now, so a second setup is refused.
+ * One instance is one engine for now, so a second setup is refused. Setting it up again
+ * after deleting it adds to whatever the running engine still holds.
  */
 export async function createContextEngine(input: CreateContextEngineInput): Promise<CreateContextEngineResult> {
-  const existing = await optional(() => contextEngineClient.get<RawSource[]>(`${V1}/sources`), [] as RawSource[]);
-  if (isSetUp(readLocalEngine(), existing ?? [])) throw new HttpError(409, "HTTP 409: this console's context engine is already set up");
+  if (isSetUp(readLocalEngine())) throw new HttpError(409, "HTTP 409: this console's context engine is already set up");
   const warnings: string[] = [];
   const sources: Record<string, string> = {};
   // A step the engine refuses is reported rather than undone: what succeeded is already usable.
@@ -428,8 +431,18 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
 }
 
 /** Deleting an engine is deprovisioning its instance, which the control plane owns. */
-export async function deleteContextEngine(_engineId: string): Promise<ContextJobHandle | null> {
-  throw provisioningRefused('Deleting a context engine');
+/**
+ * Forget the engine in this console. Deleting its container will be the control plane's, through
+ * the provisioning API; either way its data stays in the engine's databases until they are cleared.
+ */
+export async function deleteContextEngine(engineId: string): Promise<ContextJobHandle | null> {
+  requireThisEngine(engineId);
+  try {
+    localStorage.removeItem(CONTEXT_ENGINE_LOCAL_KEY);
+  } catch {
+    throw new Error("Couldn't forget the engine: this browser's storage is unavailable.");
+  }
+  return null;
 }
 
 /** The engine's models come from its environment; changing them is a redeploy. */
@@ -499,7 +512,7 @@ const staticEngineToken = (): string | undefined => window.API_CONFIG?.contextEn
 async function engineBearer(): Promise<string | null> {
   const fixed = staticEngineToken();
   if (!fixed && isAccessTokenExpired()) await refreshAccessToken();
-  const token = fixed || getAccessToken();
+  const token = fixed || (await getAccessToken());
   return token ? `Bearer ${token}` : null;
 }
 

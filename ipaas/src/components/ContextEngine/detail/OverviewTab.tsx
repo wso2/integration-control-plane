@@ -272,7 +272,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             ) : (
               <Stack direction="row" gap={1} sx={mutedSx}>
                 <EyeOff size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-                <Typography variant="body2">Only people who manage this engine&apos;s sources or settings can see its models.</Typography>
+                <Typography variant="body2">Only people with access to the whole engine can see its models; access to a single source isn&apos;t enough.</Typography>
               </Stack>
             )}
           </Card>

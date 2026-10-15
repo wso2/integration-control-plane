@@ -66,7 +66,7 @@ function RowActions({ engine, onPlayground, onDelete, onRetry, retrying }: { eng
             </IconButton>
           </span>
         </Tooltip>
-      ) : CONTEXT_ENGINE_PROVISIONING ? (
+      ) : (
         <Tooltip title={deleting ? 'Being deleted' : 'Delete'}>
           <span>
             <IconButton size="small" color="error" aria-label={`Delete ${engine.name}`} disabled={deleting} onClick={stop(onDelete)}>
@@ -74,7 +74,7 @@ function RowActions({ engine, onPlayground, onDelete, onRetry, retrying }: { eng
             </IconButton>
           </span>
         </Tooltip>
-      ) : null}
+      )}
     </>
   );
 }
@@ -111,9 +111,9 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const startDelete = (engine: ContextEngine, fromDialog: boolean) => {
     setDeleteError(null);
     remove.mutate(engine.id, {
-      onSuccess: () => {
+      onSuccess: (handle) => {
         setToDelete(null);
-        setAlert({ type: 'info', message: `“${engine.name}” is being deleted. It leaves this list once the engine finishes.` });
+        setAlert({ type: 'info', message: handle ? `“${engine.name}” is being deleted. It leaves this list once the engine finishes.` : `“${engine.name}” was deleted.` });
       },
       onError: (e) => (fromDialog ? setDeleteError(deletionError(e, engine.name)) : setAlert({ type: 'error', message: deletionError(e, engine.name) })),
     });
@@ -251,6 +251,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
           isPending={remove.isPending}
           error={deleteError}
           onConfirm={() => startDelete(toDelete, true)}
+          forgetOnly={!CONTEXT_ENGINE_PROVISIONING}
           onClose={() => {
             if (remove.isPending) return;
             setToDelete(null);

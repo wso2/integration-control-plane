@@ -123,7 +123,8 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const onDelete = () => {
     setDeleteError(null);
     remove.mutate(engine.id, {
-      onSuccess: () => setConfirmDelete(false),
+      // Without a deletion job the engine is gone from this console at once.
+      onSuccess: (handle) => (handle ? setConfirmDelete(false) : navigate(base)),
       onError: (e) =>
         setDeleteError(
           e instanceof HttpError && e.status === 403
@@ -152,7 +153,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             {engine.description || 'No description'}
           </Typography>
         </Box>
-        {!deleting && CONTEXT_ENGINE_PROVISIONING && (
+        {!deleting && (
           <Tooltip title="Delete engine">
             <IconButton color="error" aria-label={`Delete ${engine.name}`} onClick={() => setConfirmDelete(true)}>
               <Trash2 size={18} />
@@ -222,6 +223,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
           isPending={remove.isPending}
           error={deleteError}
           onConfirm={onDelete}
+          forgetOnly={!CONTEXT_ENGINE_PROVISIONING}
           onClose={() => {
             if (remove.isPending) return;
             setConfirmDelete(false);
