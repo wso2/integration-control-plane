@@ -113,3 +113,8 @@ function init() returns error? {
 function resolveSecret(string configValue) returns string|error {
     return utils:resolveConfig(configValue, secrets);
 }
+
+// Same as resolveSecret, for an optional configurable where () means unset.
+function resolveOptionalSecret(string? configValue) returns string?|error {
+    return configValue is () ? () : resolveSecret(configValue);
+}

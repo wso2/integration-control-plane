@@ -20,8 +20,10 @@ import icp_server.types;
 configurable string dbHost = "localhost";
 configurable int dbPort = 5432;
 configurable string dbName = "icp_db";
-configurable string dbUser = "icp_user";
-configurable string dbPassword = "icp_password";
+// No credentials in code: () means unset, which is an error for every database except H2
+// (see resolveDbCredentials). The shipped deployment.toml sets the H2 quick-start values.
+configurable string? dbUser = ();
+configurable string? dbPassword = ();
 configurable int maxOpenConnections = 10;
 configurable int minIdleConnections = 5;
 configurable decimal maxConnectionLifeTime = 1800.0; // 30 minutes
