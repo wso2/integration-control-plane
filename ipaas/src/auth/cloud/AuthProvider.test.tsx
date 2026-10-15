@@ -31,6 +31,7 @@ interface FakeSdk {
   getDecodedIdToken: ReturnType<typeof vi.fn>;
   clearSession: ReturnType<typeof vi.fn>;
   signIn: ReturnType<typeof vi.fn>;
+  signInSilently: ReturnType<typeof vi.fn>;
   signOut: ReturnType<typeof vi.fn>;
 }
 
@@ -97,6 +98,7 @@ function sdkWith(patch: Partial<FakeSdk> = {}): void {
     getDecodedIdToken: vi.fn(async () => ID_CLAIMS),
     clearSession: vi.fn(),
     signIn: vi.fn(async () => undefined),
+    signInSilently: vi.fn(async () => false),
     signOut: vi.fn(async () => ''),
     ...patch,
   });
@@ -306,6 +308,70 @@ describe('cloud AuthProvider — settling the session', () => {
     expect(screen()).toBe('signed-out');
     expect(sdk.get().clearSession).toHaveBeenCalled();
     expect(getOrgUuidFromToken()).toBeNull();
+  });
+});
+
+describe('cloud AuthProvider — joining a Thunder session', () => {
+  it('asks Thunder once, without its sign-in page, before settling signed out', async () => {
+    sdkWith();
+    await render();
+    expect(sdk.get().signInSilently).toHaveBeenCalledTimes(1);
+    expect(sdk.get().signInSilently).toHaveBeenCalledWith({ resource: 'urn:wso2:amp' });
+    expect(screen()).toBe('signed-out');
+  });
+
+  it('signs in from the session Thunder already holds', async () => {
+    const token = accessToken();
+    sdkWith({
+      signInSilently: vi.fn(async () => {
+        sdk.set({ getAccessToken: vi.fn(async () => token) });
+        return true;
+      }),
+    });
+    await render();
+    expect(screen()).toBe('loading');
+
+    // The SDK confirms the session on a later poll.
+    act(() => sdk.set({ isSignedIn: true }));
+    await settle();
+    expect(screen()).toBe('signed-in');
+    expect(sdk.get().signIn).not.toHaveBeenCalled();
+  });
+
+  it('settles signed out when the silent attempt fails', async () => {
+    sdkWith({ signInSilently: vi.fn(async () => Promise.reject(new Error('iframe gone'))) });
+    await render();
+    expect(screen()).toBe('signed-out');
+    expect(sdk.get().signInSilently).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles signed out when Thunder does not answer within 3s', async () => {
+    sdkWith({ signInSilently: vi.fn(() => new Promise<boolean>(() => {})) });
+    await render();
+    expect(screen()).toBe('loading');
+    await settle(3_000);
+    expect(screen()).toBe('signed-out');
+    expect(sdk.get().signInSilently).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask on a sign-in landing, which carries Thunder’s answer', async () => {
+    window.history.replaceState({}, '', '/signin?code=abc&state=instance_0_request_0');
+    sdkWith();
+    await render();
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+  });
+
+  it('does not ask on a sign-in landing that carries an error, not a code', async () => {
+    window.history.replaceState({}, '', '/signin?error=access_denied&state=instance_0_request_0');
+    sdkWith();
+    await render();
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+  });
+
+  it('does not ask when a stored session is restored', async () => {
+    signedInSdk();
+    await render();
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
   });
 });
 

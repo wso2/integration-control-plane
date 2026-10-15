@@ -22,7 +22,7 @@ import { BrowserRouter } from 'react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import { AuthProvider } from '#auth';
+import { AuthProvider, relaySilentSignIn } from '#auth';
 import { loadConfig } from './config/runtimeConfig';
 import { AccessControlProvider } from './contexts/AccessControlContext';
 import { FeaturePreviewProvider } from './contexts/FeaturePreviewContext';
@@ -30,23 +30,25 @@ import './index.css';
 
 const queryClient = new QueryClient();
 
-// Load runtime configuration before rendering the app
-loadConfig().then(() => {
-  createRoot(document.getElementById('root')!).render(
-    <StrictMode>
-      <OxygenUIThemeProvider themes={[{ key: 'acrylicOrange', label: 'Acrylic Orange Theme', theme: AcrylicOrangeTheme }]} initialTheme="acrylicOrange">
-        <QueryClientProvider client={queryClient}>
-          <BrowserRouter>
-            <AuthProvider>
-              <AccessControlProvider>
-                <FeaturePreviewProvider>
-                  <App />
-                </FeaturePreviewProvider>
-              </AccessControlProvider>
-            </AuthProvider>
-          </BrowserRouter>
-        </QueryClientProvider>
-      </OxygenUIThemeProvider>
-    </StrictMode>,
-  );
-});
+// The SDK's prompt=none iframe only hands Thunder's answer to the console around it, so it
+// loads no config and renders nothing. Otherwise, load runtime configuration before rendering the app.
+if (!relaySilentSignIn())
+  loadConfig().then(() => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <OxygenUIThemeProvider themes={[{ key: 'acrylicOrange', label: 'Acrylic Orange Theme', theme: AcrylicOrangeTheme }]} initialTheme="acrylicOrange">
+          <QueryClientProvider client={queryClient}>
+            <BrowserRouter>
+              <AuthProvider>
+                <AccessControlProvider>
+                  <FeaturePreviewProvider>
+                    <App />
+                  </FeaturePreviewProvider>
+                </AccessControlProvider>
+              </AuthProvider>
+            </BrowserRouter>
+          </QueryClientProvider>
+        </OxygenUIThemeProvider>
+      </StrictMode>,
+    );
+  });
