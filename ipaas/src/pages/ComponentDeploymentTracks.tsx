@@ -125,7 +125,7 @@ function TrackDialog({ orgUuid, componentId, repository, tracks, track, onClose,
   // Typed in when the branches can't be listed, so checked here as well as in the list.
   const taken = tracks.some((t) => t.id !== track?.id && t.branch === branch.trim());
   // The default track builds the integration's own branch, which the BFF keeps it on.
-  const lockedReason = track?.latest ? "The default track builds the integration's branch. Change it in the integration's build settings." : undefined;
+  const lockedReason = track?.latest ? "The default track's branch can't be changed." : undefined;
   const onError = (e: unknown) => setError(e instanceof Error ? e.message : `Failed to ${track ? 'update' : 'create'} the deployment track.`);
 
   const handleSave = () => {
