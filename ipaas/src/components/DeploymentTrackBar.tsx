@@ -49,14 +49,17 @@ function TrackLabel({ track }: { track: DeploymentTrack }) {
 
 /**
  * The band at the top of integration-level pages: the deployment track picker,
- * for an integration that has tracks, and the page's environment selector.
+ * for an integration with more than one track, and the page's environment
+ * selector. A page with neither has no band.
  */
 export default function DeploymentTrackBar({ component, extra }: DeploymentTrackBarProps) {
   const navigate = useAppNavigate();
   const scope = useScope();
   const { tracks, trackId, selectTrack } = useSelectedTrack(component);
-  // An integration created before deployment tracks has one implicit track, so there is nothing to pick.
-  const picker = !!component?.releaseLinesEnabled && tracks.length > 0;
+  // A single track leaves nothing to pick, whether it is an integration's only
+  // track or the implicit one of an integration created before tracks. More
+  // tracks are created from Settings, and the picker shows once there are two.
+  const picker = !!component?.releaseLinesEnabled && tracks.length > 1;
   if (!picker && !extra) return null;
 
   const tracksUrl = hasComponent(scope) ? componentSettingsSectionUrl(scope, 'deployment-tracks') : '';
