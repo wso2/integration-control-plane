@@ -23,7 +23,15 @@ const resolveComponentProject = vi.hoisted(() => vi.fn());
 
 vi.mock('./logs', () => ({ queryObsLogEntries, resolveComponentProject }));
 
-import { executionLogWindow, fetchExecutionLogs, podBelongsToJob, toExecutionLogEntry } from './executions';
+const get = vi.hoisted(() => vi.fn());
+const post = vi.hoisted(() => vi.fn());
+
+vi.mock('./_client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./_client')>();
+  return { ...actual, bff: { ...actual.bff, get, post } };
+});
+
+import { executionLogWindow, fetchExecutionConfigs, fetchExecutionLogs, fetchTaskExecutions, podBelongsToJob, stopSchedule, toExecutionLogEntry } from './executions';
 import { formatExecutionLogLine, spansMultipleContainers } from '../utils/logs';
 import { HttpError } from '../types/http';
 import type { ObsLogEntry } from './logs';
@@ -242,5 +250,33 @@ describe('fetchExecutionLogs', () => {
     queryObsLogEntries.mockRejectedValue(new HttpError(500, 'HTTP 500: {"errorCode":"OBS-V1-L-29"}'));
 
     await expect(fetchExecutionLogs('scheduled-logger', 'track', JOB, 'development', run)).rejects.toThrow('OBS-V1-L-29');
+  });
+});
+
+// Each deployment track has its own schedule and runs. The console addresses a
+// scheduled task by its environment card's release, which belongs to one track.
+describe('scheduled tasks by release', () => {
+  afterEach(() => {
+    get.mockReset();
+    post.mockReset();
+  });
+
+  it("reads the schedule of the release's track", async () => {
+    get.mockResolvedValue({ cronExpression: '*/5 * * * *' });
+    await fetchExecutionConfigs('hello', 'hello-next-r1', 'development');
+    expect(get).toHaveBeenCalledWith('/components/hello/schedules/development?releaseId=hello-next-r1');
+  });
+
+  it("stops the schedule of the release's track", async () => {
+    post.mockResolvedValue(undefined);
+    await stopSchedule({ componentId: 'hello', envId: 'development', orgHandler: 'acme', releaseId: 'hello-next-r1' });
+    expect(post).toHaveBeenCalledWith('/components/hello/schedules?releaseId=hello-next-r1', { environment: 'development', cronExpression: '' });
+  });
+
+  it("lists the release's runs, and the environment's without a release", async () => {
+    get.mockResolvedValue({ items: [] });
+    await fetchTaskExecutions('hello-next-r1', 'hello', 'development', 'proj');
+    await fetchTaskExecutions('', 'hello', 'development', 'proj');
+    expect(get.mock.calls.map(([url]) => (url as string).split('?')[0])).toEqual(['/releases/hello-next-r1/executions/history', '/components/hello/environments/development/executions/history']);
   });
 });
