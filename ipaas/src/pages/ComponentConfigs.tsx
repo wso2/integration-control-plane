@@ -31,6 +31,7 @@ import { useConfigMaps, useContainerConfigMounts, useDeleteConfig, useRelease, u
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { buildConfigRows, mainContainer } from '../utils/devopsConfigs';
 import type { ConfigRow } from '../types/devopsConfigs';
 import type { ComponentScope } from '../nav';
@@ -42,11 +43,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
   const { projectId } = useProjectId(project);
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
 
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  const [trackId, setTrackId] = useState('');
-  useEffect(() => {
-    if (tracks.length) setTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [tracks]);
+  const { trackId } = useSelectedTrack(comp);
 
   const { data: environments = [] } = useEnvironments(org, projectId);
   const [envId, setEnvId] = useState('');
@@ -56,15 +53,15 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
 
   const { data: deployment } = useComponentDeployment(org, orgUuid ?? '', comp?.id ?? '', trackId, envId);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release } = useRelease(projectId, comp?.id, releaseId);
+  const { data: release } = useRelease(projectId, comp?.id, releaseId, trackId);
   const containerId = useMemo(() => mainContainer(release?.containers)?.ID ?? '', [release]);
 
-  const { data: mounts = [], isLoading: loadingMounts } = useContainerConfigMounts(projectId, comp?.id, releaseId, containerId);
-  const { data: configMaps = [] } = useConfigMaps(projectId, envId);
-  const { data: secrets = [] } = useSecrets(projectId, envId);
+  const { data: mounts = [], isLoading: loadingMounts } = useContainerConfigMounts(projectId, comp?.id, releaseId, containerId, trackId);
+  const { data: configMaps = [] } = useConfigMaps(projectId, envId, trackId);
+  const { data: secrets = [] } = useSecrets(projectId, envId, trackId);
   const rows = useMemo(() => buildConfigRows(mounts, configMaps, secrets), [mounts, configMaps, secrets]);
 
-  const del = useDeleteConfig(projectId);
+  const del = useDeleteConfig(projectId, trackId);
   const [view, setView] = useState<View>({ kind: 'list' });
   const [deleting, setDeleting] = useState<ConfigRow | null>(null);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string; detail?: string } | null>(null);
@@ -101,7 +98,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
     return () => clearTimeout(timer);
   }, [alert]);
 
-  const ctx: EditorContext = { projectId, componentId: comp?.id ?? '', releaseId, containerId, envId };
+  const ctx: EditorContext = { projectId, componentId: comp?.id ?? '', releaseId, containerId, envId, deploymentTrackId: trackId };
   const onEditorDone = (message: string) => {
     setView({ kind: 'list' });
     // Config writes go out with deploy_changes set, so a redeploy always follows a save.
@@ -110,7 +107,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
 
   return (
     <>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
+      {comp && <DeploymentTrackBar component={comp} extra={envSelect} />}
       <PageContent>
         {/* The heading stays put through every state — loading, not-deployed, editor — so the
             page never reads as just a floating notice. Only the action is state-dependent. */}

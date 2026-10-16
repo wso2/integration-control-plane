@@ -32,6 +32,8 @@ export interface EditorContext {
   releaseId: string;
   containerId: string;
   envId: string;
+  /** The deployment track; absent is the default track. */
+  deploymentTrackId?: string;
 }
 
 interface ConfigEditorProps {
@@ -79,10 +81,10 @@ function TypeCard({ title, description, selected, disabled, onSelect }: { title:
 /** The "Create a Config or Secret" form — env-var set or file mount, optionally a secret. */
 export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }: ConfigEditorProps): JSX.Element {
   const isEdit = !!existing;
-  const save = useSaveConfig(ctx.projectId);
+  const save = useSaveConfig(ctx.projectId, ctx.deploymentTrackId);
   const configId = existing ? (existing.mount.configmap_id ?? existing.mount.secret_id ?? '') : '';
   // Prefill values for an existing ConfigMap (secret values are write-only, so re-entered).
-  const { data: details } = useConfigMapDetails(ctx.projectId, existing && !existing.isSecret ? ctx.envId : undefined, existing && !existing.isSecret ? configId : undefined);
+  const { data: details } = useConfigMapDetails(ctx.projectId, existing && !existing.isSecret ? ctx.envId : undefined, existing && !existing.isSecret ? configId : undefined, ctx.deploymentTrackId);
 
   const [kind, setKind] = useState<ConfigKind>(existing?.kind ?? 'envVars');
   const [isSecret, setIsSecret] = useState(existing?.isSecret ?? false);

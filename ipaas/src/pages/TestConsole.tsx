@@ -35,6 +35,7 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import NotFound from '../components/NotFound';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import type { EndpointRef } from '../types/consumers';
 import { trackEvent } from '../services/tracking/tracking';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
@@ -67,9 +68,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // Deployment track selection (default to latest) — derived rather than synced via an effect,
   // since an effect+render round trip here would delay useComponentDeployment/useEnvEndpoints below.
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const selectedTrackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { tracks, trackId: selectedTrackId } = useSelectedTrack(component);
 
   // Environment selection (by ID for stability across refetches) — same reasoning.
   const [selectedEnvIdState, setSelectedEnvId] = useState('');
@@ -193,7 +192,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelector} />}
+      {tracks.length > 0 && <DeploymentTrackBar component={component} extra={envSelector} />}
 
       <PageContent>
         <Typography variant="h1" sx={{ mb: 3 }}>

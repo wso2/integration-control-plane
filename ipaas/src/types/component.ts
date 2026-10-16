@@ -42,6 +42,8 @@ export interface Component {
   /** 'BI' | 'MI' | 'other' — 'other' is another platform's runtime. Cloud only. */
   buildpackType?: string;
   deploymentTracks?: DeploymentTrack[];
+  /** Created with deployment tracks: the only kind that can have more than one. Cloud only. */
+  releaseLinesEnabled?: boolean;
 }
 
 export interface DeploymentTrack {
@@ -57,14 +59,35 @@ export interface DeploymentTrack {
   createdAt?: string;
   updatedAt?: string;
   versionStrategy?: string;
+  /** Where the track is deployed. Cloud only. */
+  environments?: DeploymentTrackEnvironment[];
+}
+
+export interface DeploymentTrackEnvironment {
+  environment: string;
+  release?: string;
+  ready: boolean;
 }
 
 export interface CreateDeploymentTrackInput {
   orgUuid: string;
   componentId: string;
-  apiVersion: string;
+  /** Devant only: cloud tracks carry no API version. */
+  apiVersion?: string;
   branch: string;
   description?: string;
+  /** Left out, the track follows the integration's auto-deploy setting. */
+  enableAutoDeploy?: boolean;
+}
+
+/** A field left out keeps the track's current value. */
+export interface UpdateDeploymentTrackInput {
+  componentId: string;
+  deploymentTrackId: string;
+  branch?: string;
+  /** An empty string removes the description. */
+  description?: string;
+  enableAutoDeploy?: boolean;
 }
 
 /** Result of `deleteDeploymentTrack` (also used for proxy versions, which share the mutation). */

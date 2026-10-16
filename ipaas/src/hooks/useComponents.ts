@@ -31,12 +31,13 @@ import {
   updateEndpoint,
   generateComponentEndpoints,
   createDeploymentTrack,
+  updateDeploymentTrack,
   deleteDeploymentTrack,
   checkDeploymentTrackDeletable,
 } from '../api/components';
 import { trackEvent } from '../services/tracking/tracking';
 import { pollWhileDeleting } from '../utils/deletionPolling';
-import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput } from '../types/component';
+import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput, UpdateDeploymentTrackInput } from '../types/component';
 
 export function useComponents(orgHandler: string, projectId: string) {
   return useQuery({
@@ -135,6 +136,14 @@ export function useCreateDeploymentTrack() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateDeploymentTrackInput) => createDeploymentTrack(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['component'] }),
+  });
+}
+
+export function useUpdateDeploymentTrack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateDeploymentTrackInput) => updateDeploymentTrack(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['component'] }),
   });
 }

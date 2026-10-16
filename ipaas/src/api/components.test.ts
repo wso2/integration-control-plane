@@ -19,14 +19,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const post = vi.hoisted(() => vi.fn());
+const get = vi.hoisted(() => vi.fn());
 const put = vi.hoisted(() => vi.fn());
 
 vi.mock('./_client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./_client')>();
-  return { ...actual, bff: { ...actual.bff, post, put } };
+  return { ...actual, bff: { ...actual.bff, post, get, put } };
 });
 
-import { createComponent, updateEndpoint } from './components';
+import { createComponent, createDeploymentTrack, fetchComponentByHandler, updateDeploymentTrack, updateEndpoint } from './components';
 import type { CreateComponentInput } from '../types/component';
 
 const baseInput: CreateComponentInput = {
@@ -148,5 +149,52 @@ describe('updateEndpoint visibility reconciliation', () => {
       visibility: ['project', 'public'],
       displayProjectUrl: false,
     });
+  });
+});
+
+describe('deployment tracks', () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+    put.mockReset();
+    post.mockResolvedValue({ id: 'next-bbbbbb' });
+    put.mockResolvedValue({ id: 'next-bbbbbb' });
+  });
+
+  it('reads the tracks from the component detail', async () => {
+    get.mockResolvedValue({
+      id: 'uid-1',
+      handler: 'hello',
+      releaseLinesEnabled: true,
+      deploymentTracks: [
+        { id: 'main-aaaaaa', branch: 'main', latest: true },
+        { id: 'next-bbbbbb', branch: 'next' },
+      ],
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(get).toHaveBeenCalledWith('/projects/proj/components/hello');
+    expect(c.deploymentTracks?.map((t) => t.id)).toEqual(['main-aaaaaa', 'next-bbbbbb']);
+    expect(c.apiVersions?.map((v) => [v.id, v.branch, v.latest])).toEqual([
+      ['main-aaaaaa', 'main', true],
+      ['next-bbbbbb', 'next', false],
+    ]);
+  });
+
+  // Pages key their track-scoped queries off a track id, so a component the BFF
+  // reports no tracks for still gets one: its own id, which the BFF reads as the default.
+  it('gives a component without tracks one track named by its id', async () => {
+    get.mockResolvedValue({ id: 'uid-1', handler: 'hello' });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', latest: true }]);
+  });
+
+  it('creates a track from a branch, with no API version', async () => {
+    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', apiVersion: 'v1.0', branch: 'next', description: 'preview' });
+    expect(post).toHaveBeenCalledWith('/components/hello/deployment-tracks', { branch: 'next', description: 'preview', enableAutoDeploy: undefined });
+  });
+
+  it('updates a track in place', async () => {
+    await updateDeploymentTrack({ componentId: 'hello', deploymentTrackId: 'next-bbbbbb', branch: 'release' });
+    expect(put).toHaveBeenCalledWith('/components/hello/deployment-tracks/next-bbbbbb', expect.objectContaining({ branch: 'release' }));
   });
 });

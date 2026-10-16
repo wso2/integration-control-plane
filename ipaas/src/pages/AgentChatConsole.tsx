@@ -24,6 +24,7 @@ import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import NotFound from '../components/NotFound';
 import AgentChat from '../components/AgentChat';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
@@ -44,9 +45,7 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
   // Agents can only be chatted with in non-critical environments.
   const testableEnvs = useMemo(() => environments.filter((e) => !e.critical), [environments]);
 
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const selectedTrackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { trackId: selectedTrackId } = useSelectedTrack(component);
   const selectedEnv = testableEnvs[0] ?? null;
 
   const { data: deployment } = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', component?.id ?? '', selectedTrackId, selectedEnv?.id ?? '');

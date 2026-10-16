@@ -23,11 +23,11 @@ import { useOrgUuid } from './useOrgUuid';
 
 const ROOT = 'healthChecks';
 
-export function useHealthChecks(projectId: string, componentId: string | undefined, releaseId: string | undefined, environmentId: string | undefined) {
+export function useHealthChecks(projectId: string, componentId: string | undefined, releaseId: string | undefined, environmentId: string | undefined, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   return useQuery<HealthCheck[]>({
-    queryKey: [ROOT, orgUuid, projectId, componentId, releaseId, environmentId],
-    queryFn: () => getHealthChecks(orgUuid!, projectId, componentId!, releaseId!, environmentId!),
+    queryKey: [ROOT, orgUuid, projectId, componentId, releaseId, environmentId, deploymentTrackId],
+    queryFn: () => getHealthChecks(orgUuid!, projectId, componentId!, releaseId!, environmentId!, deploymentTrackId),
     enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && !!environmentId,
   });
 }
@@ -37,15 +37,17 @@ interface WritePath {
   releaseId: string;
   environmentId: string;
   containerId: string;
+  /** The deployment track; absent is the default track. */
+  deploymentTrackId?: string;
 }
 
 export function useCreateHealthCheck(projectId: string) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ componentId, releaseId, environmentId, containerId, data }: WritePath & { data: HealthCheckWriteData }) => {
+    mutationFn: ({ componentId, releaseId, environmentId, containerId, deploymentTrackId, data }: WritePath & { data: HealthCheckWriteData }) => {
       if (!orgUuid) throw new Error('Organization is not available.');
-      return createHealthCheck(orgUuid, projectId, componentId, releaseId, environmentId, containerId, data);
+      return createHealthCheck(orgUuid, projectId, componentId, releaseId, environmentId, containerId, data, deploymentTrackId);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT] }),
   });
@@ -55,9 +57,9 @@ export function useUpdateHealthCheck(projectId: string) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ componentId, releaseId, environmentId, containerId, healthCheckId, data }: WritePath & { healthCheckId: string; data: HealthCheckWriteData }) => {
+    mutationFn: ({ componentId, releaseId, environmentId, containerId, deploymentTrackId, healthCheckId, data }: WritePath & { healthCheckId: string; data: HealthCheckWriteData }) => {
       if (!orgUuid) throw new Error('Organization is not available.');
-      return updateHealthCheck(orgUuid, projectId, componentId, releaseId, environmentId, containerId, healthCheckId, data);
+      return updateHealthCheck(orgUuid, projectId, componentId, releaseId, environmentId, containerId, healthCheckId, data, deploymentTrackId);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT] }),
   });
@@ -67,9 +69,9 @@ export function useDeleteHealthCheck(projectId: string) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ componentId, releaseId, environmentId, containerId, healthCheckId }: WritePath & { healthCheckId: string }) => {
+    mutationFn: ({ componentId, releaseId, environmentId, containerId, deploymentTrackId, healthCheckId }: WritePath & { healthCheckId: string }) => {
       if (!orgUuid) throw new Error('Organization is not available.');
-      return deleteHealthCheck(orgUuid, projectId, componentId, releaseId, environmentId, containerId, healthCheckId);
+      return deleteHealthCheck(orgUuid, projectId, componentId, releaseId, environmentId, containerId, healthCheckId, deploymentTrackId);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT] }),
   });

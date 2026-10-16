@@ -24,6 +24,8 @@ import { useDeploymentStatus } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgs } from '../hooks/useOrg';
 import BuildHistory from '../components/Build/BuildHistory';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import ComingSoon from './ComingSoon';
 import type { ComponentScope } from '../nav';
 import { UUID_RE } from '../utils/string';
@@ -38,9 +40,7 @@ export default function Build(scope: ComponentScope): JSX.Element {
   const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
   const componentId = component?.id ?? '';
 
-  const apiVersions = component?.apiVersions ?? [];
-  const activeVersion = apiVersions.find((v) => v.latest) ?? apiVersions[0];
-  const versionId = activeVersion?.id ?? '';
+  const { track, trackId: versionId } = useSelectedTrack(component);
 
   const { data: orgs, isLoading: loadingOrgs } = useOrgs();
   const orgUuid = orgs?.find((o) => o.handle === scope.org)?.uuid ?? '';
@@ -48,7 +48,8 @@ export default function Build(scope: ComponentScope): JSX.Element {
   const { data: environments = [], isLoading: loadingEnvironments } = useEnvironments(orgUuid, projectId);
 
   const { data: repository, isLoading: loadingRepository } = useComponentRepository(projectId, scope.component);
-  const branch = repository?.branch ?? '';
+  // Each track builds its own branch.
+  const branch = track?.branch || repository?.branch || '';
 
   const { data: builds = [], isLoading: loadingBuilds } = useDeploymentStatus(componentId, versionId);
   const { data: commits = [], isLoading: loadingCommits } = useCommitHistory(componentId, branch);
@@ -90,8 +91,11 @@ export default function Build(scope: ComponentScope): JSX.Element {
   const envId = environments[0]?.id ?? '';
 
   return (
-    <PageContent>
-      <BuildHistory componentId={componentId} versionId={versionId} envId={envId} branch={branch} builds={builds} buildsLoading={loadingBuilds} commits={commits} commitsLoading={loadingCommits} repository={repository ?? null} />
-    </PageContent>
+    <>
+      <DeploymentTrackBar component={component} />
+      <PageContent>
+        <BuildHistory componentId={componentId} versionId={versionId} envId={envId} branch={branch} builds={builds} buildsLoading={loadingBuilds} commits={commits} commitsLoading={loadingCommits} repository={repository ?? null} />
+      </PageContent>
+    </>
   );
 }
