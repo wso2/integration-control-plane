@@ -38,6 +38,10 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
   const url = repoUrl(repository);
 
   const versionConfig = buildpackConfig?.find((c) => c.versionId === versionId) ?? buildpackConfig?.[0];
+  // Without buildpackConfig the stored settings are unknown: the builder takes none, or
+  // they could not be read. They are then neither shown nor sent, since saving the empty
+  // defaults would overwrite what is stored.
+  const hasBuildSettings = versionConfig !== undefined;
 
   const initialEnvVars: BuildEnvVar[] = versionConfig?.keyValues?.map(({ id, key, value }) => ({ id, key, value })) ?? [];
 
@@ -66,8 +70,8 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
         versionId,
         buildContext: versionConfig?.buildContext ?? '',
         languageVersion: versionConfig?.languageVersion ?? '',
-        environmentVariables: envVars,
-        isUnitTestEnabled,
+        environmentVariables: hasBuildSettings ? envVars : undefined,
+        isUnitTestEnabled: hasBuildSettings ? isUnitTestEnabled : undefined,
         pullLatestSubmodules: isPullLatestSubmodules,
         enableTrivyScan: versionConfig?.enableTrivyScan ?? false,
       },
@@ -135,19 +139,25 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
 
           <Divider />
 
-          <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Stack gap={0.25}>
-              <Typography variant="body2">Run Unit Tests</Typography>
-              <Typography variant="caption" color="text.secondary">
-                Execute unit tests as part of the build process
-              </Typography>
+          {hasBuildSettings ? (
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+              <Stack gap={0.25}>
+                <Typography variant="body2">Run Unit Tests</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Execute unit tests as part of the build process
+                </Typography>
+              </Stack>
+              <FormControlLabel
+                control={<Switch checked={isUnitTestEnabled} onChange={(e) => setIsUnitTestEnabled(e.target.checked)} size="small" />}
+                label=""
+                sx={{ m: 0 }}
+              />
             </Stack>
-            <FormControlLabel
-              control={<Switch checked={isUnitTestEnabled} onChange={(e) => setIsUnitTestEnabled(e.target.checked)} size="small" />}
-              label=""
-              sx={{ m: 0 }}
-            />
-          </Stack>
+          ) : (
+            <Typography variant="caption" color="text.secondary">
+              Unit tests and build environment variables aren&apos;t available for this component.
+            </Typography>
+          )}
 
           {isBuildConfigurationMigrated && (
             <>
@@ -168,9 +178,12 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
             </>
           )}
 
-          <Divider />
-
-          <BuildEnvVarsEditor value={envVars} onChange={handleEnvVarsChange} onHasError={handleEnvVarError} />
+          {hasBuildSettings && (
+            <>
+              <Divider />
+              <BuildEnvVarsEditor value={envVars} onChange={handleEnvVarsChange} onHasError={handleEnvVarError} />
+            </>
+          )}
 
           <Stack direction="row" justifyContent="flex-end" sx={{ pt: 0.5 }}>
             <Button

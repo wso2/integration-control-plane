@@ -68,6 +68,12 @@ describe('updateBuildpackConfigs', () => {
     expect(put.mock.calls[0][1]).toEqual({ isUnitTestEnabled: true, environmentVariables: [] });
   });
 
+  it('sends neither setting when the panel could not load them', async () => {
+    await updateBuildpackConfigs({ ...baseInput, isUnitTestEnabled: undefined, environmentVariables: undefined });
+
+    expect(JSON.parse(JSON.stringify(put.mock.calls[0][1]))).toEqual({});
+  });
+
   it('leaves the stored variables untouched when none are given', async () => {
     await updateBuildpackConfigs(baseInput);
 

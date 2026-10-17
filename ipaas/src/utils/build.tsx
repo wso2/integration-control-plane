@@ -26,7 +26,14 @@ import BitbucketIcon from '../assets/icons/BitbucketIcon';
 import GitLogoIcon from '../assets/icons/GitLogoIcon';
 import type { BuildRunLogs } from '../types/build';
 import type { Repository } from '../types/repository';
-import { BUILD_STAGES } from '../constants/build';
+import {
+  BAL_BUILD_ARG_FLAGS,
+  BUILD_STAGES,
+  MAX_BUILD_ENV_KEY_LENGTH,
+  MAX_BUILD_ENV_VALUE_BYTES,
+  RESERVED_BUILD_ENV_KEYS,
+  RESERVED_BUILD_ENV_PREFIXES,
+} from '../constants/build';
 
 export function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
   return (
@@ -162,11 +169,27 @@ export function repoUrl(repository: Repository): string {
   }
 }
 
+// C0 control characters other than tab, and DEL.
+const hasControlCharacter = (value: string) =>
+  [...value].some((c) => {
+    const code = c.charCodeAt(0);
+    return (code < 0x20 && code !== 0x09) || code === 0x7f;
+  });
+
 export function validateBuildEnvVar(vars: Array<{ key: string; value: string }>, index: number, envKeyRegex: RegExp): string | null {
   const { key, value } = vars[index];
   if (!key.trim()) return 'Key is required';
-  if (!envKeyRegex.test(key)) return 'Key must start with a letter or _ and contain only letters, digits, or _';
+  if (!envKeyRegex.test(key)) return 'Key must start with an uppercase letter or _ and contain only uppercase letters, digits, or _';
+  if (key.length > MAX_BUILD_ENV_KEY_LENGTH) return `Key must be at most ${MAX_BUILD_ENV_KEY_LENGTH} characters`;
+  if (RESERVED_BUILD_ENV_KEYS.includes(key) || RESERVED_BUILD_ENV_PREFIXES.some((p) => key.startsWith(p))) {
+    return 'This name is reserved by the platform';
+  }
   if (vars.some((v, i) => i !== index && v.key === key)) return 'Key already exists';
   if (!value.trim()) return 'Value is required';
+  if (new TextEncoder().encode(value).length > MAX_BUILD_ENV_VALUE_BYTES) return `Value must be at most ${MAX_BUILD_ENV_VALUE_BYTES} bytes`;
+  if (hasControlCharacter(value)) return 'Value must be a single line without control characters';
+  if (key === 'OTHER_BAL_BUILD_ARGS' && value.split(' ').some((flag) => flag && !BAL_BUILD_ARG_FLAGS.includes(flag))) {
+    return `Only these flags are allowed: ${BAL_BUILD_ARG_FLAGS.join(', ')}`;
+  }
   return null;
 }
