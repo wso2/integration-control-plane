@@ -69,7 +69,10 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   // Only a live deployment can answer MCP calls; every other state explains itself.
   const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
 
-  const accessRef: EndpointRef | null = useMemo(() => (component && selectedEnv && activeEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id } : null), [component, selectedEnv, activeEndpoint]);
+  const accessRef: EndpointRef | null = useMemo(
+    () => (component && selectedEnv && activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id } : null),
+    [projectId, component, selectedEnv, activeEndpoint],
+  );
   const access = useEndpointTestAccess(accessRef, !!accessRef && isActive);
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.

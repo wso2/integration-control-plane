@@ -49,7 +49,7 @@ export function useGatewayLogScope(orgHandler: string, orgUuid: string, componen
   const { data: envEndpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', versionId, releaseId);
 
   const fronted = useMemo(() => gatewayFrontedEndpoints(envEndpoints), [envEndpoints]);
-  const refs = useMemo(() => (component ? fronted.map((e) => ({ componentName: component.id, environmentName: environmentId, endpointName: e.id })) : []), [component, fronted, environmentId]);
+  const refs = useMemo(() => (component ? fronted.map((e) => ({ projectName: component.projectId, componentName: component.id, environmentName: environmentId, endpointName: e.id })) : []), [component, fronted, environmentId]);
   const securities = useEndpointSecurities(refs);
   const publicUrlsKey = securities.map((q) => q.data?.publicUrl ?? '').join('|');
 

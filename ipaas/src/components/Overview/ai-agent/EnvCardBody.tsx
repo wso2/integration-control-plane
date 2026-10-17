@@ -26,7 +26,7 @@ import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 
 //AI Agent env-card body
-export default function EnvCardBody({ component, env, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
+export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
@@ -34,7 +34,7 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
 
   // The enforcing API Platform gateway URL for the selected endpoint. Shown in place of the raw OpenChoreo external route, as the
   // integration-as-api card does.
-  const securityRef = selectedEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id } : null;
+  const securityRef = selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id } : null;
   const { data: apiSecurity } = useEndpointSecurity(securityRef, !!selectedEndpoint);
 
   // The panel must never fall back to the raw OpenChoreo route for an agent — it's a second front
@@ -67,7 +67,7 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
     <>
       <Divider sx={{ my: 2 }} />
       {showEndpoints && <EndpointUrlsPanel endpoints={endpointsForPanel} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
-      <AgentChat componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
+      <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
     </>
   );
 }

@@ -21,9 +21,9 @@ import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, 
 import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
 
 /** Endpoint refs are only usable once every segment is known. */
-const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.componentName && !!ref.environmentName && !!ref.endpointName;
+const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.projectName && !!ref.componentName && !!ref.environmentName && !!ref.endpointName;
 
-const refKey = (ref: EndpointRef | null | undefined) => [ref?.componentName ?? '', ref?.environmentName ?? '', ref?.endpointName ?? ''] as const;
+const refKey = (ref: EndpointRef | null | undefined) => [ref?.projectName ?? '', ref?.componentName ?? '', ref?.environmentName ?? '', ref?.endpointName ?? ''] as const;
 
 const consumersKey = (projectName: string | null | undefined, ref: EndpointRef | null | undefined) => ['consumers', projectName ?? '', ...refKey(ref)] as const;
 

@@ -38,8 +38,8 @@ const bffEndpoint = (visibility: string[], urls: { external?: typeof EXTERNAL; i
 describe('toEnvEndpoint visibility URLs', () => {
   // The reported bug: the env card showed one row because projectUrl was never populated.
   it('gives a public+project endpoint both a public and a project URL', () => {
-    const ep = toEnvEndpoint(bffEndpoint(['external', 'project']), 'r1');
-    expect(ep.networkVisibilities).toEqual(['Public', 'Project']);
+    const ep = toEnvEndpoint(bffEndpoint(['public', 'project']), 'r1');
+    expect(ep.networkVisibilities).toEqual(['Project', 'Public']);
     expect(ep.publicUrl).toBe(EXTERNAL_URL);
     expect(ep.projectUrl).toBe(INTERNAL_URL);
     expect(ep.organizationUrl).toBe('');
@@ -54,26 +54,44 @@ describe('toEnvEndpoint visibility URLs', () => {
 
   // Both scopes reach the same Service, so both rows carry the same URL — one row per visibility.
   it('gives organization+project the same in-cluster URL on both fields', () => {
-    const ep = toEnvEndpoint(bffEndpoint(['internal', 'project'], { internal: INTERNAL }), 'r1');
+    const ep = toEnvEndpoint(bffEndpoint(['organization', 'project'], { internal: INTERNAL }), 'r1');
     expect(ep.organizationUrl).toBe(INTERNAL_URL);
     expect(ep.projectUrl).toBe(INTERNAL_URL);
   });
 
-  it('leaves the project URL unset when project visibility is not declared', () => {
-    const ep = toEnvEndpoint(bffEndpoint(['internal'], { internal: INTERNAL }), 'r1');
+  it('adds implicit project visibility even if an older response omits it', () => {
+    const ep = toEnvEndpoint(bffEndpoint(['organization'], { internal: INTERNAL }), 'r1');
     expect(ep.organizationUrl).toBe(INTERNAL_URL);
-    expect(ep.projectUrl).toBe('');
+    expect(ep.projectUrl).toBe(INTERNAL_URL);
   });
 
   // An endpoint whose visibility has not reconciled yet must not render a blank card.
-  it('still exposes the internal URL as organization when no visibility is reported', () => {
+  it('treats an empty visibility list as project-only', () => {
     const ep = toEnvEndpoint(bffEndpoint([], { internal: INTERNAL }), 'r1');
-    expect(ep.organizationUrl).toBe(INTERNAL_URL);
+    expect(ep.organizationUrl).toBe('');
+    expect(ep.projectUrl).toBe(INTERNAL_URL);
+  });
+
+  it('hides only the project URL when its display preference is disabled', () => {
+    const ep = toEnvEndpoint({ ...bffEndpoint(['project', 'public']), displayProjectUrl: false }, 'r1');
+    expect(ep.networkVisibilities).toEqual(['Public']);
     expect(ep.projectUrl).toBe('');
+    expect(ep.publicUrl).toBe(EXTERNAL_URL);
+  });
+
+  it('shows Public while its default APIP deployment is enabling', () => {
+    const ep = toEnvEndpoint(
+      {
+        ...bffEndpoint(['project']),
+        visibilityStatus: { public: { status: 'ENABLING' as const }, organization: { status: 'UNAVAILABLE' as const } },
+      },
+      'r1',
+    );
+    expect(ep.networkVisibilities).toEqual(['Project', 'Public']);
   });
 
   it('falls back to the internal URL for invokeUrl when there is no external one', () => {
     expect(toEnvEndpoint(bffEndpoint(['project'], { internal: INTERNAL }), 'r1').invokeUrl).toBe(INTERNAL_URL);
-    expect(toEnvEndpoint(bffEndpoint(['external', 'project']), 'r1').invokeUrl).toBe(EXTERNAL_URL);
+    expect(toEnvEndpoint(bffEndpoint(['public', 'project']), 'r1').invokeUrl).toBe(EXTERNAL_URL);
   });
 });

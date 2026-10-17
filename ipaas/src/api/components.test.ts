@@ -19,13 +19,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const post = vi.hoisted(() => vi.fn());
+const put = vi.hoisted(() => vi.fn());
 
 vi.mock('./_client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./_client')>();
-  return { ...actual, bff: { ...actual.bff, post } };
+  return { ...actual, bff: { ...actual.bff, post, put } };
 });
 
-import { createComponent } from './components';
+import { createComponent, updateEndpoint } from './components';
 import type { CreateComponentInput } from '../types/component';
 
 const baseInput: CreateComponentInput = {
@@ -109,5 +110,43 @@ describe('createComponent component-type mapping', () => {
     await createComponent({ ...baseInput, displayType } as CreateComponentInput);
     expect(bodyOf().spec.componentType.name).toBe(expected);
     expect(bodyOf().spec.workflow?.name).toBe('mi-image-builder');
+  });
+});
+
+describe('updateEndpoint visibility reconciliation', () => {
+  it('targets one environment and sends product-facing values', async () => {
+    put.mockResolvedValue({});
+    await updateEndpoint({
+      projectId: 'project-a',
+      componentId: 'orders',
+      environmentId: 'development',
+      versionId: 'v1',
+      releaseId: 'r1',
+      endpointId: 'http',
+      displayName: 'HTTP',
+      networkVisibilities: ['Project', 'Public'],
+    });
+    expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?projectName=project-a', {
+      visibility: ['project', 'public'],
+      displayProjectUrl: true,
+    });
+  });
+
+  it('keeps implicit project access while hiding its URL', async () => {
+    put.mockResolvedValue({});
+    await updateEndpoint({
+      projectId: 'project-a',
+      componentId: 'orders',
+      environmentId: 'development',
+      versionId: 'v1',
+      releaseId: 'r1',
+      endpointId: 'http',
+      displayName: 'HTTP',
+      networkVisibilities: ['Public'],
+    });
+    expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?projectName=project-a', {
+      visibility: ['project', 'public'],
+      displayProjectUrl: false,
+    });
   });
 });

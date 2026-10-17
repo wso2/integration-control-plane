@@ -23,6 +23,7 @@ import { toEndpointOptions } from '../../utils/endpoints';
 interface EndpointConfigDrawerProps {
   open: boolean;
   onClose: () => void;
+  projectId: string;
   componentId: string;
   versionId: string;
   firstEnvReleaseId: string;
@@ -31,7 +32,7 @@ interface EndpointConfigDrawerProps {
 }
 
 /** Endpoint security settings, scoped to the first environment's endpoints. */
-export default function EndpointConfigDrawer({ open, onClose, componentId, versionId, firstEnvReleaseId, firstEnvId }: EndpointConfigDrawerProps) {
+export default function EndpointConfigDrawer({ open, onClose, projectId, componentId, versionId, firstEnvReleaseId, firstEnvId }: EndpointConfigDrawerProps) {
   const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, firstEnvReleaseId);
 
   const handleClose = () => {
@@ -39,5 +40,5 @@ export default function EndpointConfigDrawer({ open, onClose, componentId, versi
     onClose();
   };
 
-  return <ApiSecurityDrawer open={open} onClose={handleClose} componentName={componentId} envName={firstEnvId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={endpoints[0]?.id} />;
+  return <ApiSecurityDrawer open={open} onClose={handleClose} projectName={projectId} componentName={componentId} envName={firstEnvId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={endpoints[0]?.id} />;
 }

@@ -75,6 +75,8 @@ interface BffEndpointResources {
   port?: number;
   basePath?: string;
   visibility?: string[];
+  visibilityStatus?: EnvEndpoint['visibilityStatus'];
+  displayProjectUrl?: boolean;
   urls?: { external?: BffEndpointURL; internal?: BffEndpointURL };
   schemaContent?: string;
 }
@@ -88,11 +90,15 @@ function buildUrl(u?: BffEndpointURL): string {
 }
 
 export function toEnvEndpoint(ep: BffEndpointResources, releaseId: string): EnvEndpoint {
-  const networkVisibilities = (ep.visibility ?? []).map(toVisibilityLabel);
+  const displayProjectUrl = ep.displayProjectUrl !== false;
+  const effectiveLabels = (ep.visibility ?? []).map(toVisibilityLabel).filter((label) => label !== 'Project');
+  const publicStatus = ep.visibilityStatus?.public.status;
+  if ((publicStatus === 'ENABLING' || publicStatus === 'ENABLED') && !effectiveLabels.includes('Public')) effectiveLabels.push('Public');
+  const networkVisibilities = Array.from(new Set([...(displayProjectUrl ? ['Project'] : []), ...effectiveLabels]));
   const publicUrl = buildUrl(ep.urls?.external);
   const internalUrl = buildUrl(ep.urls?.internal);
-  const organizationUrl = networkVisibilities.length === 0 || networkVisibilities.includes('Organization') ? internalUrl : '';
-  const projectUrl = networkVisibilities.includes('Project') ? internalUrl : '';
+  const organizationUrl = networkVisibilities.includes('Organization') ? internalUrl : '';
+  const projectUrl = displayProjectUrl ? internalUrl : '';
   return {
     id: ep.name,
     releaseId,
@@ -102,6 +108,8 @@ export function toEnvEndpoint(ep: BffEndpointResources, releaseId: string): EnvE
     port: ep.port ?? null,
     visibility: networkVisibilities[0] ?? '',
     networkVisibilities,
+    visibilityStatus: ep.visibilityStatus,
+    displayProjectUrl,
     publicUrl,
     organizationUrl,
     projectUrl,

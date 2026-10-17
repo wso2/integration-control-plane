@@ -37,6 +37,7 @@ const TIMEOUT_UNAVAILABLE = 'Endpoint timeout is not configurable from here yet'
 interface ApiSettingsDrawerProps {
   open: boolean;
   onClose: () => void;
+  projectName: string;
   /** Component name — the BFF's `componentName` path segment. */
   componentName: string;
   /** Environment name (the RFC 1123 slug) — the BFF's `environmentName` path segment. */
@@ -48,18 +49,18 @@ interface ApiSettingsDrawerProps {
 }
 
 /** Cloud-only "API Settings" drawer: CORS and rate limiting. Authentication lives in ApiSecurityDrawer. */
-export default function ApiSettingsDrawer({ open, onClose, componentName, envName, endpoints, activeEndpointName }: ApiSettingsDrawerProps): JSX.Element {
+export default function ApiSettingsDrawer({ open, onClose, projectName, componentName, envName, endpoints, activeEndpointName }: ApiSettingsDrawerProps): JSX.Element {
   const [cors, setCors] = useState<CorsConfig | null>(null);
   const [rateLimit, setRateLimit] = useState<RateLimitConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, endpoints, activeEndpointName });
+  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, projectName, componentName, envName, endpoints, activeEndpointName });
 
   const { data: policies, isLoading, error: loadError } = useEndpointPolicies(endpointRef, open);
   const setPolicies = useSetEndpointPolicies(endpointRef);
   const saving = setPolicies.isPending;
 
-  /** Routes come from the exposed API, not the endpoint's schema: without one there is only `/*`. */
+  /** Routes come from the APIP proxy generated from the released endpoint schema. */
   const operations = useMemo(() => toRateLimitOperations(policies?.operations), [policies?.operations]);
 
   // Seed the form once per (endpoint, open), so later edits survive a refetch.
@@ -79,7 +80,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
   }, [open, policies, syncKey]);
 
   const notice = endpointLoadNotice(loadError, {
-    notExposed: 'This endpoint isn’t exposed as an API yet. Set its visibility to Public and deploy, then come back to configure API settings.',
+    notExposed: 'This endpoint isn’t exposed as an API yet. Enable Public in Configure → Edit endpoint, then come back to configure API settings.',
     unavailable: 'API settings aren’t available in this environment.',
     readFailed: 'Could not read the current API settings.',
   });

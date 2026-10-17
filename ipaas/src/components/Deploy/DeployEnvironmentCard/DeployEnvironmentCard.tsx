@@ -397,7 +397,7 @@ export default function DeployEnvironmentCard({
 
       <DeploymentHistoryDrawer open={historyOpen} onClose={() => setHistoryOpen(false)} orgUuid={orgUuid} projectId={projectId} componentId={componentId} versionId={versionId} environmentId={env.id} envName={env.name} />
 
-      {showEndpoints && <EndpointsDrawer open={endpointsOpen} onClose={() => setEndpointsOpen(false)} endpoints={endpoints} isLoading={endpointsLoading} envName={env.name} componentId={componentId} environmentId={env.id} />}
+      {showEndpoints && <EndpointsDrawer open={endpointsOpen} onClose={() => setEndpointsOpen(false)} endpoints={endpoints} isLoading={endpointsLoading} envName={env.name} projectId={projectId} componentId={componentId} environmentId={env.id} />}
     </>
   );
 }

@@ -29,6 +29,7 @@ import ConsumersPanel from './ConsumersPanel';
 import ServiceInsights from './ServiceInsights';
 import SwaggerOperationsList, { type SwaggerDocument } from './SwaggerOperationsList';
 import GraphqlOperationsList from './GraphqlOperationsList';
+import { toEndpointOptions } from '../../../utils/endpoints';
 
 /**
  * Integration-as-API's content-only body: a deployment-in-progress spinner, the
@@ -54,7 +55,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
 
   // The enforcing API Platform gateway URL for the selected endpoint. Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
   // of the raw OpenChoreo external route.
-  const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null;
+  const securityRef = activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null;
   const { data: apiSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint);
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
@@ -127,7 +128,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
           component/environment/endpoint triple — the component name is the
           component id and the endpoint name is the endpoint id. */}
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (
-        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={envEndpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id }))} />
+        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={toEndpointOptions(envEndpoints)} />
       )}
 
       {showInsights && <ServiceInsights envName={env.name} envId={env.id} apimEnvId={env.apimEnvId} projectId={projectId} apiId={insightsApiId} />}
