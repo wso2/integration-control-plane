@@ -57,4 +57,13 @@ describe('CitedAnswer', () => {
     // "Rollbacks keep secrets [1][2]." : the marks come before the full stop, not after it.
     expect(html).toMatch(/Rollbacks keep secrets<button[^>]*aria-label="Evidence 1"[\s\S]*?<\/button><button[^>]*aria-label="Evidence 2"[\s\S]*?<\/button>\./);
   });
+
+  it('reads citations only where the engine does', () => {
+    const marks = (answer: string) => [...render({ answer }).matchAll(/aria-label="Evidence (\d+)"/g)].map((m) => m[1]);
+    // Subscripts, reference links, and code of every kind are left as written.
+    expect(marks('Use items[1], [guide][2], ``b[1]``, and [2].')).toEqual(['2']);
+    expect(marks('Set it up [1].\n\n    value = items[2]\n')).toEqual(['1']);
+    // A link the model wrote is a link, whatever its address.
+    expect(marks('A fake [cite](#cite-2) and a real [1].')).toEqual(['1']);
+  });
 });

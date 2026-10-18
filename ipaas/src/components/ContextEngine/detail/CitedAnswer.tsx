@@ -20,7 +20,7 @@ import { Box, ButtonBase } from '@wso2/oxygen-ui';
 import { Children, cloneElement, createContext, isValidElement, useContext, type JSX, type ReactElement, type ReactNode } from 'react';
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { citationLinks, endsSentence, splitSentences } from '../../../utils/contextEngine';
+import { CITE_PROPERTY, endsSentence, remarkCitations, splitSentences } from '../../../utils/contextEngine';
 import { answerMarkdownSx, citationMarkSx, litSentenceSx } from '../styles';
 
 /** A citation someone is pointing at: its evidence number and, from the answer, the sentence it sits in. */
@@ -60,12 +60,16 @@ function Mark({ n, sentence = '' }: { n: number; sentence?: string }): JSX.Eleme
   );
 }
 
-const CITE_HREF = /^#cite-(\d+)$/;
+/** The passage number a citation link stands for; links the model wrote carry none. */
+function citeNumber(node: ExtraProps['node']): number | null {
+  const n = node?.properties?.[CITE_PROPERTY];
+  return typeof n === 'number' ? n : null;
+}
 
-/** The Markdown renderer's link: a `#cite-n` link becomes a mark, anything else opens in a new tab. The grouping block fills in `sentence`. */
-function CiteLink({ href, children, sentence, node: _node, ...props }: JSX.IntrinsicElements['a'] & ExtraProps & { sentence?: string }): JSX.Element {
-  const cite = href ? CITE_HREF.exec(href) : null;
-  if (cite) return <Mark n={Number(cite[1])} sentence={sentence} />;
+/** The Markdown renderer's link: a citation link becomes a mark, anything else opens in a new tab. The grouping block fills in `sentence`. */
+function CiteLink({ href, children, sentence, node, ...props }: JSX.IntrinsicElements['a'] & ExtraProps & { sentence?: string }): JSX.Element {
+  const n = citeNumber(node);
+  if (n !== null) return <Mark n={n} sentence={sentence} />;
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" {...props}>
       {children}
@@ -76,8 +80,7 @@ function CiteLink({ href, children, sentence, node: _node, ...props }: JSX.Intri
 /** The citation number a child of a block stands for, or null when it is text or something else. */
 function citeOf(node: ReactNode): number | null {
   if (!isValidElement(node) || node.type !== CiteLink) return null;
-  const m = CITE_HREF.exec((node as ReactElement<{ href?: string }>).props.href ?? '');
-  return m ? Number(m[1]) : null;
+  return citeNumber((node as ReactElement<ExtraProps>).props.node);
 }
 
 interface Group {
@@ -190,8 +193,8 @@ export default function CitedAnswer({ answer, passages, active, pinned, onHover,
   return (
     <LinkContext.Provider value={{ active, pinned, onHover, onPin }}>
       <Box sx={answerMarkdownSx}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
-          {citationLinks(answer, passages)}
+        <ReactMarkdown remarkPlugins={[remarkGfm, remarkCitations(passages, answer)]} components={components}>
+          {answer}
         </ReactMarkdown>
       </Box>
     </LinkContext.Provider>

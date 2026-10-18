@@ -35,6 +35,10 @@ import {
   UPLOAD_CONTENT_TYPES,
   UPLOAD_MAX_BYTES,
 } from '../constants/contextEngine';
+import type { Link, Parent, Root, RootContent, Text } from 'mdast';
+import remarkGfm from 'remark-gfm';
+import remarkParse from 'remark-parse';
+import { unified } from 'unified';
 import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
 import { formatDistanceToNow } from './time';
@@ -984,23 +988,6 @@ export function suggestedQuestions(engine: Pick<ContextEngineDetail, 'sources'>)
   return out.slice(0, 4);
 }
 
-export type AnswerPart = { kind: 'text'; text: string } | { kind: 'cite'; n: number };
-
-/** Split an answer into text and `[n]` citation markers so the markers can link to evidence. */
-export function splitCitations(answer: string): AnswerPart[] {
-  const parts: AnswerPart[] = [];
-  const re = /\[(\d{1,3})\]/g;
-  let last = 0;
-  for (const m of answer.matchAll(re)) {
-    const idx = m.index ?? 0;
-    if (idx > last) parts.push({ kind: 'text', text: answer.slice(last, idx) });
-    parts.push({ kind: 'cite', n: Number(m[1]) });
-    last = idx + m[0].length;
-  }
-  if (last < answer.length) parts.push({ kind: 'text', text: answer.slice(last) });
-  return parts;
-}
-
 /** Why an engine's deletion job failed, in words, from its error code. */
 export function deletionFailureText(code: string | undefined): string {
   const lead = code === 'residue_found' ? 'A removed item was still searchable, so the engine kept this engine and its data.' : 'The engine kept this engine and its data.';
@@ -1076,21 +1063,80 @@ export function endsSentence(piece: string): boolean {
   return /([.!?]+["”')\]]*\s+|\n+)$/.test(piece);
 }
 
+// ── Citations ───────────────────────────────────────────────────────────────
+
 /**
- * Turn the `[n]` markers of an answer into Markdown links `[n](#cite-n)`, so a
- * Markdown renderer hands them over as links to draw as citation marks. Only
- * numbers that name a passage are converted, and nothing inside code is touched.
+ * The property a citation link carries to the renderer. Markdown has no way to
+ * write it, so a link the model wrote, `#cite-` address or not, never becomes a mark.
  */
-export function citationLinks(answer: string, passages: number): string {
-  return answer
-    .split(/(```[\s\S]*?```|`[^`\n]*`)/)
-    .map((part, i) => (i % 2 ? part : part.replace(/\[(\d{1,3})\](?!\()/g, (m, d: string) => (Number(d) >= 1 && Number(d) <= passages ? `[${d}](#cite-${d})` : m))))
-    .join('');
+export const CITE_PROPERTY = 'dataCite';
+
+const CITATION = /\[(\d{1,3})\]/g;
+// Scripts written without spaces between words put a citation right after the
+// last character, as in 天[1], so a letter of theirs does not make a subscript.
+const UNSPACED = /[\u0e00-\u0eff\u1000-\u109f\u1780-\u17ff\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uf900-\ufaff\uff66-\uff9f]/;
+const WORD = /[\p{L}\p{N}_]/u;
+// Text inside these is a link's own text; a citation mark there would be a link inside a link.
+const LINK_TYPES = new Set(['link', 'linkReference']);
+
+/** Split one text node into text and citation links, recording each passage number cited. */
+function splitText(node: Text, passages: number, source: string, cited: Set<number>): RootContent[] {
+  const out: RootContent[] = [];
+  let last = 0;
+  let citeEnd = -1;
+  for (const m of node.value.matchAll(CITATION)) {
+    const idx = m.index ?? 0;
+    const n = Number(m[1]);
+    const offset = node.position?.start.offset;
+    const before = idx > 0 ? node.value[idx - 1] : offset ? source[offset - 1] : '';
+    // As the engine reads them: a bracket after a letter, digit, or underscore is a
+    // subscript, as in items[1]; one after another bracket is a subscript or a
+    // reference link, as in grid[1][2] or [guide][1], unless it follows a citation, as in [1][2].
+    const subscript = (WORD.test(before) && !UNSPACED.test(before)) || (before === ']' && idx !== citeEnd);
+    if (subscript || n < 1 || n > passages) continue;
+    if (idx > last) out.push({ type: 'text', value: node.value.slice(last, idx) });
+    const link: Link = { type: 'link', url: `#cite-${n}`, children: [{ type: 'text', value: String(n) }], data: { hProperties: { [CITE_PROPERTY]: n } } };
+    out.push(link);
+    cited.add(n);
+    last = idx + m[0].length;
+    citeEnd = last;
+  }
+  if (!out.length) return [node];
+  if (last < node.value.length) out.push({ type: 'text', value: node.value.slice(last) });
+  return out;
 }
 
-/** The evidence numbers an answer cites, from its `[n]` markers. */
-export function citedNumbers(answer: string | undefined): Set<number> {
-  return new Set(answer ? splitCitations(answer).flatMap((p) => (p.kind === 'cite' ? [p.n] : [])) : []);
+/**
+ * Turn the `[n]` citations in a parsed answer into citation links, and return
+ * the passage numbers cited. Only plain text is read, so code, link addresses,
+ * and HTML never hold a citation, and only numbers that name a passage count.
+ */
+export function markCitations(tree: Root, passages: number, source: string): Set<number> {
+  const cited = new Set<number>();
+  const visit = (parent: Parent) => {
+    if (LINK_TYPES.has(parent.type)) return;
+    parent.children = parent.children.flatMap((child) => {
+      if (child.type === 'text') return splitText(child, passages, source, cited);
+      if ('children' in child) visit(child);
+      return [child];
+    }) as Parent['children'];
+  };
+  visit(tree);
+  return cited;
+}
+
+/** A remark plugin that draws an answer's citations as citation links. */
+export function remarkCitations(passages: number, source: string) {
+  return () => (tree: Root) => {
+    markCitations(tree, passages, source);
+  };
+}
+
+/** The evidence numbers an answer cites, read the way the answer is rendered. */
+export function citedNumbers(answer: string | undefined, passages: number): Set<number> {
+  if (!answer) return new Set();
+  const tree = unified().use(remarkParse).use(remarkGfm).parse(answer);
+  return markCitations(tree, passages, answer);
 }
 
 // ── Passage places ──────────────────────────────────────────────────────────
@@ -1161,14 +1207,22 @@ export function sourceAsConfig(source: ContextSource, rules: AudienceRule[] = []
 function sourceSettings(source: ContextSourceConfig): Record<string, string> {
   const connector = connectorFor(source.type);
   if (!connector) return {};
-  return Object.fromEntries(visibleFields(connector, source.values).filter((f) => f.kind !== 'secret').map((f) => [f.key, f.kind === 'urls' ? splitUrls(source.values[f.key] ?? '').join('\n') : (source.values[f.key] ?? '').trim()]));
+  return Object.fromEntries(
+    visibleFields(connector, source.values)
+      .filter((f) => f.kind !== 'secret')
+      .map((f) => [f.key, f.kind === 'urls' ? splitUrls(source.values[f.key] ?? '').join('\n') : (source.values[f.key] ?? '').trim()]),
+  );
 }
 
 /** Secret field values, sent separately so the engine can store them as credentials. Only the secrets the chosen mode uses are sent. */
 function sourceSecrets(source: ContextSourceConfig): Record<string, string> {
   const connector = connectorFor(source.type);
   if (!connector) return {};
-  return Object.fromEntries(visibleFields(connector, source.values).filter((f) => f.kind === 'secret').map((f) => [f.key, source.values[f.key] ?? '']));
+  return Object.fromEntries(
+    visibleFields(connector, source.values)
+      .filter((f) => f.kind === 'secret')
+      .map((f) => [f.key, source.values[f.key] ?? '']),
+  );
 }
 
 export interface ContextEngineConfigurationPayload {

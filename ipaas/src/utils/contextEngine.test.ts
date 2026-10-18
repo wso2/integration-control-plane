@@ -27,7 +27,6 @@ import {
   engineMessage,
   formatBytes,
   describeUploadAudience,
-  citationLinks,
   endsSentence,
   splitSentences,
   askedQuestionMeta,
@@ -83,7 +82,6 @@ import {
   storageStepBlocker,
   summarizeStorage,
   toStoragePayload,
-  splitCitations,
   suggestedQuestions,
   toDraft,
   engineDescriptionError,
@@ -618,17 +616,6 @@ describe('playground helpers', () => {
     expect(qs.length).toBeLessThanOrEqual(4);
     expect(suggestedQuestions({ sources: [] })).toEqual(['What should a new team member read first?', 'Which documents mention rate limits or quotas?']);
   });
-
-  it('splits [n] markers out of an answer', () => {
-    expect(splitCitations('Redeploy the last release [1]. Confirm the checkpoint [2] first.')).toEqual([
-      { kind: 'text', text: 'Redeploy the last release ' },
-      { kind: 'cite', n: 1 },
-      { kind: 'text', text: '. Confirm the checkpoint ' },
-      { kind: 'cite', n: 2 },
-      { kind: 'text', text: ' first.' },
-    ]);
-    expect(splitCitations('No markers here')).toEqual([{ kind: 'text', text: 'No markers here' }]);
-  });
 });
 
 describe('mcp client configs', () => {
@@ -846,10 +833,7 @@ describe('file uploads', () => {
       { group: 'viewer', role: 'viewer' },
     ]);
     // An upload allows every granted role; a connector's audience comes from its own visibility.
-    const sources = withSourceVisibilityRules(
-      [upload('Files'), withValues('gdrive', { folderId: 'abc', apiKey: 'k' }), { ...withValues('gdrive', { folderId: 'x', apiKey: 'y' }), stagedVisibility: { kind: 'roles', roles: ['viewer'] } }],
-      ['admin'],
-    );
+    const sources = withSourceVisibilityRules([upload('Files'), withValues('gdrive', { folderId: 'abc', apiKey: 'k' }), { ...withValues('gdrive', { folderId: 'x', apiKey: 'y' }), stagedVisibility: { kind: 'roles', roles: ['viewer'] } }], ['admin']);
     expect(sources[0].audience).toEqual([{ group: 'admin', role: 'admin' }]);
     expect(sources[1].audience).toEqual([{ group: 'admin', role: 'admin' }]);
     expect(sources[2].audience).toEqual([{ group: 'viewer', role: 'viewer' }]);
@@ -982,18 +966,22 @@ describe('provenance and evidence', () => {
     expect(splitSentences('')).toEqual([]);
   });
 
-  it('turns citation markers into links, leaving code and unknown numbers alone', () => {
-    expect(citationLinks('Promote [1]. Keep secrets [1][2].', 2)).toBe('Promote [1](#cite-1). Keep secrets [1](#cite-1)[2](#cite-2).');
-    expect(citationLinks('Out of range [3] and zero [0].', 2)).toBe('Out of range [3] and zero [0].');
-    expect(citationLinks('Use `arr[1]` here [1].', 1)).toBe('Use `arr[1]` here [1](#cite-1).');
-    expect(citationLinks('```js\nconst x = arr[1];\n```\nSee [1].', 1)).toBe('```js\nconst x = arr[1];\n```\nSee [1](#cite-1).');
-    // An existing link stays a link.
-    expect(citationLinks('[1](https://example.com) and [1]', 1)).toBe('[1](https://example.com) and [1](#cite-1)');
-  });
-
   it('collects the evidence an answer cites', () => {
-    expect([...citedNumbers('Do this [2]. Then that [1][2].')].sort()).toEqual([1, 2]);
-    expect(citedNumbers(undefined).size).toBe(0);
+    const cited = (answer: string | undefined, passages = 3) => [...citedNumbers(answer, passages)].sort();
+    expect(cited('Do this [2]. Then that [1][2].')).toEqual([1, 2]);
+    expect(cited(undefined)).toEqual([]);
+    // Only numbers that name a passage count.
+    expect(cited('Out of range [4] and zero [0], kept [1].')).toEqual([1]);
+    // Code of every kind holds no citation.
+    expect(cited('Use `arr[1]`, ``b[2]``, and [3].')).toEqual([3]);
+    expect(cited('```js\nconst x = arr[1];\n```\n\n    y = arr[2]\n\nSee [3].')).toEqual([3]);
+    // Nor do links: their address, or their text, which a mark would nest a link inside.
+    expect(cited('[1](https://example.com), [see [2]](https://example.com), and [3]')).toEqual([3]);
+    // Subscripts and reference links are not citations; scripts without spaces cite after the last character.
+    expect(cited('items[1], café[2], grid[3][1], and [guide][2] are not citations.')).toEqual([]);
+    expect(cited('\u4fdd\u7559\u671f\u4e3a30\u5929[2]\u3002')).toEqual([2]);
+    // A table cell cites like any other text.
+    expect(cited('| a | b |\n|---|---|\n| fact [1] | `y[2]` |')).toEqual([1]);
   });
 
   it('describes a stored question for the recent list', () => {
