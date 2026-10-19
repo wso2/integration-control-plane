@@ -1,6 +1,7 @@
 import icp_server.types as types;
 import icp_server.utils as utils;
 
+import ballerina/data.jsondata;
 import ballerina/http;
 import ballerina/jwt;
 import ballerina/log;
@@ -121,7 +122,8 @@ public isolated function exchangeCodeForTokens(string code, types:SSOConfig conf
         return utils:createInternalServerError("Invalid response from OIDC provider");
     }
 
-    types:OIDCTokenResponse|error tokenData = tokenPayload.cloneWithType();
+    // Projection drops provider-specific fields (e.g. Keycloak's session_state)
+    types:OIDCTokenResponse|error tokenData = jsondata:parseAsType(tokenPayload);
     if tokenData is error {
         log:printError("Token response does not match expected schema", tokenData);
         return utils:createInternalServerError("Invalid token response from OIDC provider");
