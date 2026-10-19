@@ -24,8 +24,8 @@ export interface BillingOrg {
     id: string;
     org_id: string;
     status: 'trial' | 'active' | 'past_due' | 'cancelled' | string;
-    /** The plan's summary carries no free/paid type: read the plan by its code for that. */
-    plan?: { id?: string; code: string; name?: string };
+    /** The plan the subscription is on; `type` says whether it is paid. */
+    plan?: { id?: string; code: string; name?: string; type?: 'free' | 'paid' | string };
     billing_period?: string;
     current_period_start?: string;
     current_period_end?: string;
@@ -35,11 +35,4 @@ export interface BillingOrg {
     };
     product?: { id: string; name: string; code: string };
   };
-}
-
-/** A plan of the billing catalog, as GET /plans/{code} returns it. */
-export interface BillingPlan {
-  code: string;
-  name?: string;
-  type?: 'free' | 'paid' | string;
 }

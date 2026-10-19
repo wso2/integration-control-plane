@@ -28,7 +28,7 @@
 
 import { authenticatedFetch } from '../auth';
 import { q } from './_client';
-import type { BillingOrg, BillingPlan } from '../types/billing';
+import type { BillingOrg } from '../types/billing';
 
 const billingBaseUrl = (): string => window.API_CONFIG?.billingApiBaseUrl ?? '';
 
@@ -47,23 +47,6 @@ export async function fetchBillingOrg(product: string): Promise<BillingOrg> {
   if (!res.ok) throw new Error(`Billing API error ${res.status}: ${text || res.statusText}`);
   try {
     return JSON.parse(text) as BillingOrg;
-  } catch {
-    throw new Error(`Billing API returned invalid JSON (HTTP ${res.status})`);
-  }
-}
-
-/** Fetch a plan of the billing catalog by its code; its `type` says whether it is paid. */
-export async function fetchBillingPlan(code: string): Promise<BillingPlan> {
-  const base = billingBaseUrl();
-  if (!base) throw new Error('billingApiBaseUrl is not configured');
-
-  const res = await authenticatedFetch(`${base}/plans/${encodeURIComponent(code)}`, {
-    headers: { Accept: 'application/json' },
-  });
-  const text = await res.text().catch(() => '');
-  if (!res.ok) throw new Error(`Billing API error ${res.status}: ${text || res.statusText}`);
-  try {
-    return JSON.parse(text) as BillingPlan;
   } catch {
     throw new Error(`Billing API returned invalid JSON (HTTP ${res.status})`);
   }
