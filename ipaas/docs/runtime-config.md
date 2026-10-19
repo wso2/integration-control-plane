@@ -31,6 +31,8 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_AUTH_REDIRECTION_URL` | GitHub App authorization and installation. GitHub is off without the client ID.                                          |
 | `EDITOR_CALLBACK_ORIGINS`, `EDITOR_CALLBACK_DOMAINS`                         | Comma-separated https origins and parent domains an editor's sign-in or GitHub result may be sent to. Empty allows none. |
 | `CHOREO_URL_MANAGER_URL`, `ENABLE_CUSTOM_URL_MAPPINGS_FEATURE`               | URL settings for an integration. Both are needed.                                                                        |
+| `ENABLE_ENVIRONMENT_MANAGED_MODE`                                            | `true` hides the Environments pages, when environments are managed outside the console.                                  |
+| `ENABLE_DEPLOYMENT_PIPELINE_MANAGED_MODE`                                    | `true` hides the organization Pipelines pages, when pipelines are managed outside the console.                           |
 | `SAMPLES_URL`, `PREBUILT_INTEGRATIONS_URL`                                   | Sample and prebuilt integration catalogs. Both default to GitHub raw.                                                    |
 | `RAG_INGESTION_IMAGE`                                                        | Image the RAG ingestion wizard deploys                                                                                   |
 | `INTEGRATION_BUILDER_*`                                                      | AI Integration Builder: copilot base URL, model, max tokens, connectors GraphQL URL                                      |

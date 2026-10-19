@@ -24,6 +24,7 @@ import UnknownRoute from '../components/UnknownRoute';
 import Logout from '../pages/Logout';
 import { createElement } from 'react';
 import { lazyPage } from './lazyPage';
+import { hideWhen } from './hideWhen';
 const PrebuiltIntegrationConfigProvider = lazyPage(() => import('../contexts/PrebuiltIntegrationConfigContext').then((m) => ({ default: m.PrebuiltIntegrationConfigProvider })));
 
 // Eager — needed on first paint for unauthenticated pages, and the authenticated
@@ -54,7 +55,12 @@ const AiIntegrationBuilderView = lazyPage(() => import('../pages/AiIntegrationBu
 const ImportIntegration = lazyPage(() => import('../pages/ImportIntegration'));
 const McpProxyFromApi = lazyPage(() => import('../pages/McpProxyFromApi'));
 const ComponentTest = lazyPage(() => import('../pages/ComponentTest'));
-const OrgCdPipelines = lazyPage(() => import('../pages/OrgCdPipelines'));
+const isPipelineManaged = (): boolean => window.API_CONFIG.enableDeploymentPipelineManagedMode === true;
+const isEnvironmentManaged = (): boolean => window.API_CONFIG.enableEnvironmentManagedMode === true;
+const OrgCdPipelines = hideWhen(
+  lazyPage(() => import('../pages/OrgCdPipelines')),
+  isPipelineManaged,
+);
 const ProjectCdPipelines = lazyPage(() => import('../pages/ProjectCdPipelines'));
 const OrgDataPlanes = lazyPage(() => import('../pages/OrgDataPlanes'));
 const OrgPackageRegistries = lazyPage(() => import('../pages/OrgPackageRegistries'));
@@ -65,7 +71,10 @@ const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
 const ComponentContainers = lazyPage(() => import('../pages/ComponentContainers'));
 const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChecks'));
 const ComponentScaling = lazyPage(() => import('../pages/ComponentScaling'));
-const CdPipelineEditor = lazyPage(() => import('../pages/CdPipelineEditor'));
+const CdPipelineEditor = hideWhen(
+  lazyPage(() => import('../pages/CdPipelineEditor')),
+  isPipelineManaged,
+);
 const OrgSettings = lazyPage(() => import('../pages/OrgSettings'));
 const BrowseSamples = lazyPage(() => import('../pages/BrowseSamples'));
 const BrowsePrebuiltIntegrations = lazyPage(() => import('../pages/BrowsePrebuiltIntegrations'));
@@ -81,9 +90,18 @@ const ProjectDeploy = lazyPage(() => import('../pages/ProjectDeploy'));
 const Deploy = lazyPage(() => import('../pages/Deploy'));
 const TestConsole = lazyPage(() => import('../pages/TestConsole'));
 const AgentChatTestRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.AgentChatTestRoute })));
-const Environments = lazyPage(() => import('../pages/Environments'));
-const CreateEnvironment = lazyPage(() => import('../pages/CreateEnvironment'));
-const EditEnvironment = lazyPage(() => import('../pages/EditEnvironment'));
+const Environments = hideWhen(
+  lazyPage(() => import('../pages/Environments')),
+  isEnvironmentManaged,
+);
+const CreateEnvironment = hideWhen(
+  lazyPage(() => import('../pages/CreateEnvironment')),
+  isEnvironmentManaged,
+);
+const EditEnvironment = hideWhen(
+  lazyPage(() => import('../pages/EditEnvironment')),
+  isEnvironmentManaged,
+);
 const RuntimeLogsOrg = lazyPage(() => import('../pages/RuntimeLogsOrg'));
 const RuntimeLogsProject = lazyPage(() => import('../pages/RuntimeLogsProject'));
 const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegration'));

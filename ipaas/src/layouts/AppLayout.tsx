@@ -122,6 +122,7 @@ export default function AppLayout(): JSX.Element {
   const loadedPicture = useLoadedImage(pictureUrl);
   const userAvatar = loadedPicture ?? userInitials(userName);
   const { hasAnyPermission } = useAccessControl();
+  const { enableEnvironmentManagedMode, enableDeploymentPipelineManagedMode } = window.API_CONFIG;
 
   // Billing trial indicator shown in the header.
   const { org: billingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
@@ -725,24 +726,30 @@ export default function AppLayout(): JSX.Element {
 
                     <Sidebar.Category key="org-infra">
                       {/* Environments come before the pipelines that promote across them. */}
-                      <Sidebar.Item id="org-admin">
-                        <Sidebar.ItemIcon>
-                          <Settings2 size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                        <Sidebar.Item id="org-environments">
+                      {!(enableEnvironmentManagedMode && enableDeploymentPipelineManagedMode) && (
+                        <Sidebar.Item id="org-admin">
                           <Sidebar.ItemIcon>
-                            <Layers size={20} />
+                            <Settings2 size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
+                          <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
+                          {!enableEnvironmentManagedMode && (
+                            <Sidebar.Item id="org-environments">
+                              <Sidebar.ItemIcon>
+                                <Layers size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                          {!enableDeploymentPipelineManagedMode && (
+                            <Sidebar.Item id="org-cd-pipelines">
+                              <Sidebar.ItemIcon>
+                                <Workflow size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
                         </Sidebar.Item>
-                        <Sidebar.Item id="org-cd-pipelines">
-                          <Sidebar.ItemIcon>
-                            <Workflow size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                      </Sidebar.Item>
+                      )}
 
                       {/* Settings carries Package Registries. */}
                       <Sidebar.Item id="org-settings">
@@ -883,12 +890,14 @@ export default function AppLayout(): JSX.Element {
                             {/* Neither page exists at integration level — these link up, and lead the group.
                               Rendered as separate children: a fragment hides them from the Sidebar's
                               child scan, which is what decides sub-item indentation. */}
-                            <Sidebar.Item id="org-environments">
-                              <Sidebar.ItemIcon>
-                                <Layers size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                            </Sidebar.Item>
+                            {!enableEnvironmentManagedMode && (
+                              <Sidebar.Item id="org-environments">
+                                <Sidebar.ItemIcon>
+                                  <Layers size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
                             <Sidebar.Item id="proj-cd-pipelines">
                               <Sidebar.ItemIcon>
                                 <Workflow size={20} />
@@ -959,12 +968,14 @@ export default function AppLayout(): JSX.Element {
                             <Settings2 size={20} />
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                          <Sidebar.Item id="org-environments">
-                            <Sidebar.ItemIcon>
-                              <Layers size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                          </Sidebar.Item>
+                          {!enableEnvironmentManagedMode && (
+                            <Sidebar.Item id="org-environments">
+                              <Sidebar.ItemIcon>
+                                <Layers size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
                           <Sidebar.Item id="proj-cd-pipelines">
                             <Sidebar.ItemIcon>
                               <Workflow size={20} />

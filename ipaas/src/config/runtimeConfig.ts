@@ -42,6 +42,8 @@ interface RuntimeConfig {
   EDITOR_CALLBACK_DOMAINS?: string;
   CHOREO_URL_MANAGER_URL?: string;
   ENABLE_CUSTOM_URL_MAPPINGS_FEATURE?: string | boolean;
+  ENABLE_ENVIRONMENT_MANAGED_MODE?: string | boolean;
+  ENABLE_DEPLOYMENT_PIPELINE_MANAGED_MODE?: string | boolean;
   RAG_INGESTION_IMAGE?: string;
   INTEGRATION_BUILDER_COPILOT_BASE_URL?: string;
   INTEGRATION_BUILDER_LLM_MODEL?: string;
@@ -98,6 +100,10 @@ export interface ApiConfig {
   urlManagerUrl?: string;
   /** Feature flag mirroring Devant's ENABLE_CUSTOM_URL_MAPPINGS_FEATURE. */
   enableCustomUrlMappings?: boolean;
+  /** Hides the Environments pages, for deployments that manage environments outside the console. */
+  enableEnvironmentManagedMode?: boolean;
+  /** Hides the organization's Pipelines pages, for deployments that manage deployment pipelines outside the console. */
+  enableDeploymentPipelineManagedMode?: boolean;
   /** Container image deployed by the RAG Ingestion wizard. Falls back to {@link RAG_INGESTION_DEFAULT_IMAGE} when unset. */
   ragIngestionImage?: string;
   /** AI Integration Builder copilot base URL. */
@@ -183,6 +189,8 @@ export async function loadConfig(): Promise<void> {
       aiCopilotUrlSuffix: config.AI_COPILOT_URL_SUFFIX || DEFAULT_CONFIG.aiCopilotUrlSuffix,
       urlManagerUrl: config.CHOREO_URL_MANAGER_URL ? trim(config.CHOREO_URL_MANAGER_URL) : undefined,
       enableCustomUrlMappings: config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === 'true' || config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === true,
+      enableEnvironmentManagedMode: config.ENABLE_ENVIRONMENT_MANAGED_MODE === 'true' || config.ENABLE_ENVIRONMENT_MANAGED_MODE === true,
+      enableDeploymentPipelineManagedMode: config.ENABLE_DEPLOYMENT_PIPELINE_MANAGED_MODE === 'true' || config.ENABLE_DEPLOYMENT_PIPELINE_MANAGED_MODE === true,
       billingConsoleUrl: config.BILLING_CONSOLE_URL ? trim(config.BILLING_CONSOLE_URL) : undefined,
       choreoSaasOfferUrl: config.CHOREO_SAAS_OFFER_URL || undefined,
       enableBillingFeature: config.ENABLE_BILLING_FEATURE === 'true' || config.ENABLE_BILLING_FEATURE === true,
