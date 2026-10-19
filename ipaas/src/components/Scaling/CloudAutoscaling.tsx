@@ -188,15 +188,17 @@ interface CloudAutoscalingProps {
   componentId: string;
   environmentId: string;
   environmentName: string;
+  /** The deployment track whose binding carries the setting; '' is the default track. */
+  deploymentTrackId: string;
   canManage: boolean;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
 }
 
 /** Cloud's scaling body: one per-environment HPA setting, on or off. Scale to zero is shown but cannot be chosen yet. */
-export default function CloudAutoscaling({ projectId, componentId, environmentId, environmentName, canManage, onSaved, onError }: CloudAutoscalingProps): JSX.Element {
+export default function CloudAutoscaling({ projectId, componentId, environmentId, environmentName, deploymentTrackId, canManage, onSaved, onError }: CloudAutoscalingProps): JSX.Element {
   // dataUpdatedAt is when the status was read, the moment its conditions describe.
-  const { data: autoscaling, dataUpdatedAt, isLoading, isError, error, refetch } = useAutoscaling(projectId, componentId, environmentId);
+  const { data: autoscaling, dataUpdatedAt, isLoading, isError, error, refetch } = useAutoscaling(projectId, componentId, environmentId, deploymentTrackId);
   const update = useUpdateAutoscaling(projectId);
   // Autoscaling is a paid feature. The billing org is the one the app shell already loads, so this
   // reads from the shared cache rather than asking billing again; its plan summary carries no type,
@@ -259,7 +261,7 @@ export default function CloudAutoscaling({ projectId, componentId, environmentId
   const send = (values: HpaValues) => {
     writing.current = true;
     update.mutate(
-      { componentId, environmentId, data: { enabled: true, ...values } },
+      { componentId, environmentId, deploymentTrackId, data: { enabled: true, ...values } },
       {
         // Applied only once nothing else is waiting to go out; until then the change is still being applied.
         onSuccess: () => {
@@ -292,7 +294,7 @@ export default function CloudAutoscaling({ projectId, componentId, environmentId
     clearTimeout(hideTimer.current);
     setApplyOpen(false);
     update.mutate(
-      { componentId, environmentId, data: turningOn ? { enabled: true, ...startValues } : { enabled: false } },
+      { componentId, environmentId, deploymentTrackId, data: turningOn ? { enabled: true, ...startValues } : { enabled: false } },
       {
         // An HPA change is part of the deployment, so applying it replaces the running replicas once.
         onSuccess: () => onSaved(turningOn ? 'Autoscaling turned on. It takes effect within a few minutes as the replicas are replaced.' : 'Autoscaling turned off. The integration returns to a fixed number of replicas within a few minutes.'),
