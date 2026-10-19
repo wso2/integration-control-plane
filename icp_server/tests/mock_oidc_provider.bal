@@ -71,6 +71,13 @@ service /oauth2 on mockOidcListener {
     resource function post token(http:Request request) returns http:Response {
         http:Response response = new;
 
+        // Reject HTTP/2 (h2c) like Keycloak on plain http, which loses the form body on upgrade
+        if request.httpVersion != "1.1" || request.hasHeader("upgrade") {
+            response.statusCode = 400;
+            response.setJsonPayload({"error": "invalid_request", "error_description": "HTTP/2 not supported"});
+            return response;
+        }
+
         do {
             // Parse form data
             string payload = check request.getTextPayload();
