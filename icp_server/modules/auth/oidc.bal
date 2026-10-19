@@ -63,10 +63,12 @@ public isolated function exchangeCodeForTokens(string code, types:SSOConfig conf
 
     log:printInfo("Exchanging authorization code with OIDC provider", tokenEndpoint = config.tokenEndpoint);
 
-    // Create HTTP client for the token endpoint
-    http:Client|error oidcClient = config.allowInsecureTLS
-        ? new (config.tokenEndpoint, {secureSocket: {enable: false}})
-        : new (config.tokenEndpoint);
+    // Use HTTP/1.1: some providers (e.g. Keycloak over plain http) drop the form body on an h2c upgrade
+    http:ClientConfiguration clientConfig = {httpVersion: http:HTTP_1_1};
+    if config.allowInsecureTLS {
+        clientConfig.secureSocket = {enable: false};
+    }
+    http:Client|error oidcClient = new (config.tokenEndpoint, clientConfig);
     if oidcClient is error {
         log:printError("Failed to create OIDC client", oidcClient);
         return utils:createInternalServerError("Failed to connect to OIDC provider");
@@ -95,7 +97,12 @@ public isolated function exchangeCodeForTokens(string code, types:SSOConfig conf
 
     if statusCode == http:STATUS_BAD_REQUEST || statusCode == http:STATUS_UNAUTHORIZED {
         // Get error details from response
-        json|error errorPayload = tokenHttpResponse.getJsonPayload();
+        string|error errorBody = tokenHttpResponse.getTextPayload();
+        if errorBody is error {
+            log:printError("Failed to read error response from OIDC token endpoint", errorBody, statusCode = statusCode);
+            return utils:createInternalServerError("Failed to communicate with OIDC provider");
+        }
+        json|error errorPayload = errorBody.fromJsonString();
         string errorMessage = "Invalid authorization code or authentication failed";
 
         if errorPayload is json {
