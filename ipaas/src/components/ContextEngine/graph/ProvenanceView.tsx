@@ -146,6 +146,11 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   const given = data.evidence.length;
   const state = data.answerWithheld ? 'Answer hidden' : data.answer ? 'Answered' : data.insufficientEvidence ? 'No answer' : 'Passages';
   const passageOf = (id: string) => data.evidence.findIndex((e) => e.id === id) + 1;
+  // An `[n]` beyond the passages the model was given names nothing, so it selects nothing.
+  const selectPassage = (n: number) => {
+    const id = data.evidence[n - 1]?.id;
+    if (id) select(`p:${id}`);
+  };
   const chosenPassage = focus.evidenceId ? passageOf(focus.evidenceId) : 0;
   const entityName = focus.entity ?? null;
   // The explorer selects by the engine's id, which only the graph shown knows; without it there is nothing to open.
@@ -268,7 +273,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             onExplore={exploreId ? () => onExploreEntity(exploreId) : undefined}
           />
         ) : selectedKey === 'answer' ? (
-          <AnswerPanel result={data} onSelectPassage={(n) => select(`p:${data.evidence[n - 1]?.id}`)} onClose={() => select(null)} />
+          <AnswerPanel result={data} onSelectPassage={selectPassage} onClose={() => select(null)} />
         ) : (
           <DerivationSteps
             result={data}
@@ -277,7 +282,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             permissionsKnown={!!permissions.data}
             modelName={trace.data?.models.answer?.model ?? engine.models.llm?.model}
             sourceName={(id) => engine.sources.find((s) => s.id === id)?.name}
-            onSelectPassage={(n) => select(`p:${data.evidence[n - 1]?.id}`)}
+            onSelectPassage={selectPassage}
             onReadAnswer={data.answer && !data.answerWithheld ? () => select('answer') : undefined}
           />
         )}
