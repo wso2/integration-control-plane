@@ -178,10 +178,10 @@ interface TracksBodyProps {
   projectId: string;
   componentId: string;
   tracks: DeploymentTrack[];
-  releaseLinesEnabled: boolean;
+  deploymentTracksEnabled: boolean;
 }
 
-function TracksBody({ scope, projectId, componentId, tracks, releaseLinesEnabled }: TracksBodyProps): JSX.Element {
+function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEnabled }: TracksBodyProps): JSX.Element {
   const orgUuid = useOrgUuid();
   const { data: environments = [] } = useEnvironments(orgUuid ?? '', projectId);
   const { data: repository = null } = useComponentRepository(projectId, scope.component);
@@ -198,7 +198,7 @@ function TracksBody({ scope, projectId, componentId, tracks, releaseLinesEnabled
         </Alert>
       )}
 
-      {releaseLinesEnabled ? (
+      {deploymentTracksEnabled ? (
         <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
           <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
             <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setDialog({})} disabled={!orgUuid}>
@@ -223,7 +223,7 @@ function TracksBody({ scope, projectId, componentId, tracks, releaseLinesEnabled
                 <ListingTable.Cell>Description</ListingTable.Cell>
                 <ListingTable.Cell>Auto Deploy</ListingTable.Cell>
                 <ListingTable.Cell>Environments</ListingTable.Cell>
-                {releaseLinesEnabled && <ListingTable.Cell align="right">Actions</ListingTable.Cell>}
+                {deploymentTracksEnabled && <ListingTable.Cell align="right">Actions</ListingTable.Cell>}
               </ListingTable.Row>
             </ListingTable.Head>
             <ListingTable.Body>
@@ -241,7 +241,7 @@ function TracksBody({ scope, projectId, componentId, tracks, releaseLinesEnabled
                   <ListingTable.Cell>
                     <TrackEnvironments track={t} environments={environments} />
                   </ListingTable.Cell>
-                  {releaseLinesEnabled && (
+                  {deploymentTracksEnabled && (
                     <ListingTable.Cell align="right">
                       <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
                         <Stack direction="row" justifyContent="flex-end" gap={0.5}>
@@ -309,7 +309,7 @@ export default function ComponentDeploymentTracks(scope: ComponentScope): JSX.El
       ) : !comp ? (
         <Typography>Integration not found</Typography>
       ) : (
-        <TracksBody scope={scope} projectId={projectId} componentId={comp.id} tracks={comp.deploymentTracks ?? []} releaseLinesEnabled={!!comp.releaseLinesEnabled} />
+        <TracksBody scope={scope} projectId={projectId} componentId={comp.id} tracks={comp.deploymentTracks ?? []} deploymentTracksEnabled={!!comp.deploymentTracksEnabled} />
       )}
     </PageContent>
   );

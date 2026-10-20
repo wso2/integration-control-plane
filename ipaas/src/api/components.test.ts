@@ -165,7 +165,7 @@ describe('deployment tracks', () => {
     get.mockResolvedValue({
       id: 'uid-1',
       handler: 'hello',
-      releaseLinesEnabled: true,
+      deploymentTracksEnabled: true,
       deploymentTracks: [
         { id: 'main-aaaaaa', branch: 'main', latest: true },
         { id: 'next-bbbbbb', branch: 'next' },

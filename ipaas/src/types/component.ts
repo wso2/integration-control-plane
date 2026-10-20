@@ -43,7 +43,7 @@ export interface Component {
   buildpackType?: string;
   deploymentTracks?: DeploymentTrack[];
   /** Created with deployment tracks: the only kind that can have more than one. Cloud only. */
-  releaseLinesEnabled?: boolean;
+  deploymentTracksEnabled?: boolean;
 }
 
 export interface DeploymentTrack {

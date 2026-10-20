@@ -59,7 +59,7 @@ export default function DeploymentTrackBar({ component, extra }: DeploymentTrack
   // A single track leaves nothing to pick, whether it is an integration's only
   // track or the implicit one of an integration created before tracks. More
   // tracks are created from Settings, and the picker shows once there are two.
-  const picker = !!component?.releaseLinesEnabled && tracks.length > 1;
+  const picker = !!component?.deploymentTracksEnabled && tracks.length > 1;
   if (!picker && !extra) return null;
 
   const tracksUrl = hasComponent(scope) ? componentSettingsSectionUrl(scope, 'deployment-tracks') : '';
