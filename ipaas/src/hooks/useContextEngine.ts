@@ -25,9 +25,12 @@ import {
   deleteContextGrant,
   getContextEngine,
   getContextEngineProgress,
+  getContextEntity,
   getContextEvidence,
+  getContextGraph,
   getContextJob,
   getContextPermissions,
+  getContextQueryTrace,
   getContextPrincipal,
   getContextQuery,
   listContextEngines,
@@ -109,6 +112,53 @@ export function useUpdateContextModels(engineId: string) {
 /** Reopen a question this caller asked; every passage is checked again. */
 export function useReopenContextQuery() {
   return useMutation({ mutationFn: (queryId: string) => getContextQuery(queryId) });
+}
+
+/**
+ * A stored query, reopened for the graph's provenance view. The engine checks
+ * every passage again, so what comes back is what the reader may still see.
+ */
+export function useContextQueryResult(queryId: string | null) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'query', queryId],
+    queryFn: () => getContextQuery(queryId as string),
+    enabled: isContextEngineEnabled() && !!queryId,
+    retry: false,
+    staleTime: 30_000,
+  });
+}
+
+/** How a stored query ran; null when the reader lacks `trace.read` or the engine serves no traces. */
+export function useContextQueryTrace(queryId: string | null, enabled = true) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'trace', queryId],
+    queryFn: () => getContextQueryTrace(queryId as string),
+    enabled: isContextEngineEnabled() && !!queryId && enabled,
+    retry: false,
+    staleTime: 30_000,
+  });
+}
+
+/** The part of the knowledge graph the reader may see; null when the engine does not serve its graph. */
+export function useContextGraph(engineId: string, limit: number, enabled = true) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'graph', engineId, limit],
+    queryFn: () => getContextGraph(engineId, limit),
+    enabled: isContextEngineEnabled() && !!engineId && enabled,
+    retry: false,
+    staleTime: 60_000,
+  });
+}
+
+/** One entity's passages and relationships; a 404 means nothing the reader may read names it. */
+export function useContextEntity(engineId: string, name: string | null) {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'entity', engineId, name],
+    queryFn: () => getContextEntity(engineId, name as string, 10),
+    enabled: isContextEngineEnabled() && !!engineId && !!name,
+    retry: false,
+    staleTime: 60_000,
+  });
 }
 
 /** One passage behind a citation link. A 404 means it is gone or out of reach, which the engine does not tell apart. */

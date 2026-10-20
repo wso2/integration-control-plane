@@ -32,6 +32,7 @@ import DeleteEngineDialog from '../components/ContextEngine/DeleteEngineDialog';
 import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import OverviewTab from '../components/ContextEngine/detail/OverviewTab';
 import PlaygroundTab from '../components/ContextEngine/detail/PlaygroundTab';
+import GraphTab from '../components/ContextEngine/detail/GraphTab';
 import ApiTab from '../components/ContextEngine/detail/ApiTab';
 import McpTab from '../components/ContextEngine/detail/McpTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
@@ -42,6 +43,7 @@ import type { OrgScope } from '../nav';
 const TABS: { value: ContextEngineTabKey; label: string }[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'playground', label: 'Playground' },
+  { value: 'graph', label: 'Graph' },
   { value: 'api', label: 'API' },
   { value: 'mcp', label: 'MCP' },
   // { value: 'access', label: 'Access' },
@@ -212,6 +214,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
       {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={deleting} />}
       {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
+      {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'api' && <ApiTab engine={engine} />}
       {shownTab === 'mcp' && <McpTab engine={engine} />}
       {/* {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />} */}

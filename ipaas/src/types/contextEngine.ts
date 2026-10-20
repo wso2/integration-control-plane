@@ -33,7 +33,7 @@ import type { EmbeddingConfig } from './ragIngestion';
 export type ContextEngineState = 'provisioning' | 'ready' | 'failed' | 'deleting';
 
 /** Tabs on the engine detail page; the active one is a URL segment. */
-export type ContextEngineTabKey = 'overview' | 'playground' | 'api' | 'mcp' | 'access';
+export type ContextEngineTabKey = 'overview' | 'playground' | 'graph' | 'api' | 'mcp' | 'access';
 
 /** At-a-glance facts for the listing; absent when the engine could not report them. */
 export interface ContextEngineSummary {
@@ -565,6 +565,23 @@ export interface ContextEvidence {
   sourceUrl?: string;
 }
 
+/**
+ * A relationship from the engine's knowledge graph, returned with a query in
+ * graph mode. It stands on passages of the same result: every id in
+ * `evidenceIds` names one of its `evidence`. The words were written by the
+ * language model while indexing, so they guide; the passages are cited.
+ */
+export interface ContextFact {
+  subject: string;
+  relation: string;
+  object: string;
+  evidenceIds: string[];
+  /** The entity the graph walk went through to reach this fact; absent for a fact about the passages the question found. */
+  linkedThrough?: string;
+  /** The relationship as one sentence, written while indexing; absent when the engine has none. It keeps what the short relation can lose, such as a "not". */
+  text?: string;
+}
+
 export interface ContextQueryResult {
   queryId: string;
   state: 'completed' | 'insufficient_evidence' | string;
@@ -573,8 +590,85 @@ export interface ContextQueryResult {
   /** A reopened answer whose passages the reader can no longer all see: the text is withheld, the visible evidence stays. */
   answerWithheld?: boolean;
   evidence: ContextEvidence[];
+  /** Graph mode only: relationships that stand on `evidence`; empty in chunks mode. */
+  facts: ContextFact[];
   insufficientEvidence: boolean;
   traceId: string;
+}
+
+/**
+ * How a stored query ran, for its asker holding `trace.read`. It never names
+ * what the access check withheld: only the counts taken when the query ran.
+ */
+export interface ContextQueryTrace {
+  queryId: string;
+  traceId: string;
+  mode: ContextQueryMode;
+  outcome: 'completed' | 'insufficient_evidence' | string;
+  limit: number;
+  /** Absent for a query the engine recorded before it kept the mode. */
+  retrievalMode?: 'chunks' | 'graph' | string;
+  /** The query's passages the reader may still read, in the order it returned them. */
+  selectedEvidenceIds: string[];
+  retrieved: number;
+  suppressed: number;
+  factsFound?: number;
+  factsKept?: number;
+  linkedThrough: string[];
+  models: { embedding?: { provider: string; model: string }; answer?: { provider: string; model: string } };
+  createdAt: string;
+}
+
+/** An entity in the graph view; its name and kind were written by the language model while indexing. */
+export interface ContextGraphEntity {
+  /** The engine's id, derived from the name. */
+  id: string;
+  name: string;
+  kind?: string;
+  /** Chunks of records the reader may read that name it. */
+  mentions: number;
+}
+
+export interface ContextGraphRecord {
+  /** The graph id mentions and relationships use. */
+  id: string;
+  sourceId: string;
+  recordId: string;
+}
+
+export interface ContextGraphMention {
+  entityId: string;
+  recordNodeId: string;
+  chunks: number;
+}
+
+export interface ContextGraphRelation {
+  subjectId: string;
+  relation: string;
+  objectId: string;
+  /** Graph ids of the records it was taken from; every one passed the access check. */
+  recordNodeIds: string[];
+  /** The relationship as one sentence, written while indexing; absent when the engine has none. */
+  text?: string;
+}
+
+/** The part of the engine's graph the reader may see. */
+export interface ContextGraph {
+  entities: ContextGraphEntity[];
+  records: ContextGraphRecord[];
+  mentions: ContextGraphMention[];
+  relations: ContextGraphRelation[];
+  /** Less-mentioned entities were left out to keep within the limit. */
+  truncated: boolean;
+}
+
+/** One entity with the passages that name it and its relationships as facts on them. */
+export interface ContextEntityView {
+  entity: ContextGraphEntity;
+  evidence: ContextEvidence[];
+  /** Ids of `evidence` whose passage names the entity. */
+  mentionedIn: string[];
+  facts: ContextFact[];
 }
 
 /**

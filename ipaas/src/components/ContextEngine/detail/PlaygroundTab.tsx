@@ -18,7 +18,7 @@
 
 import { Alert, Box, Button, /* Chip, */ CircularProgress, IconButton, Stack, TextField, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '@wso2/oxygen-ui-icons-react';
-import { useRef, useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
@@ -111,6 +111,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const [notice, setNotice] = useState<string | null>(null);
   const query = useQueryContextEngine();
   const reopen = useReopenContextQuery();
+  // The question being reopened, kept here because the mutation's own pending state goes stale with its observer.
+  const [openingId, setOpeningId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const asked = useAskedQuestions(engine.id);
   const sourcesById = new Map(engine.sources.map((s) => [s.id, s]));
@@ -139,23 +141,29 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   };
 
   // Opening a recent question replaces the conversation with it and brings it into view; follow-ups then build on it.
+  // The promise, not per-call callbacks: those are dropped when the observer unsubscribes, as React's
+  // development double mount does to the reopen started by `?open=` below.
   const reopenQuestion = (q: AskedQuestion) => {
     setNotice(null);
-    reopen.mutate(q.queryId, {
-      onSuccess: (result) => {
-        setTurns([{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }]);
-        setMode(q.mode);
-        query.reset();
-        if (result.answerWithheld && q.outcome !== 'hidden') updateQuestion(engine.id, q.queryId, { outcome: 'hidden' });
-        window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
-      },
-      onError: (e) => {
-        if (e instanceof HttpError && e.status === 404) {
-          forgetQuestion(engine.id, q.queryId);
-          setNotice('That question is no longer stored on the engine, so it was removed from your list.');
-        } else setNotice("Couldn't open that question. Please try again.");
-      },
-    });
+    setOpeningId(q.queryId);
+    reopen
+      .mutateAsync(q.queryId)
+      .then(
+        (result) => {
+          setTurns([{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }]);
+          setMode(q.mode);
+          query.reset();
+          if (result.answerWithheld && q.outcome !== 'hidden') updateQuestion(engine.id, q.queryId, { outcome: 'hidden' });
+          window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+        },
+        (e: unknown) => {
+          if (e instanceof HttpError && e.status === 404) {
+            forgetQuestion(engine.id, q.queryId);
+            setNotice('That question is no longer stored on the engine, so it was removed from your list.');
+          } else setNotice("Couldn't open that question. Please try again.");
+        },
+      )
+      .finally(() => setOpeningId((current) => (current === q.queryId ? null : current)));
   };
 
   const copyResult = (turn: Turn) => {
@@ -167,6 +175,20 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   };
 
   const openInApi = (turn: Turn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}`);
+  // The Graph tab draws an answer's derivation from the stored query; a passage given here opens chosen.
+  const showDerivation = (queryId: string, ev?: ContextEvidence) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'graph')}?query=${encodeURIComponent(queryId)}${ev ? `&node=${encodeURIComponent(`p:${ev.id}`)}` : ''}`);
+
+  // "Back to the answer" from the Graph tab lands here with `?open=` naming the question to reopen.
+  const openRef = useRef<string | null>(null);
+  const openId = params.get('open');
+  useEffect(() => {
+    if (!openId || openRef.current === openId) return;
+    openRef.current = openId;
+    const known = asked.find((q) => q.queryId === openId);
+    reopenQuestion(known ?? { queryId: openId, engineId: engine.id, question: 'An earlier question', mode: 'answer', askedAt: new Date().toISOString(), outcome: 'answered', passages: 0 });
+    // Reopen once per id; the question list and handlers need not retrigger it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openId]);
 
   const renderTurn = (t: Turn, i: number) => {
     const { result } = t;
@@ -202,7 +224,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else if (answered) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = <AnsweredTurn answer={result.answer!} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} />;
+      body = <AnsweredTurn answer={result.answer!} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} onShowDerivation={(ev) => showDerivation(result.queryId, ev)} />;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = (
@@ -385,7 +407,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </Stack>
       </Stack>
 
-      <RecentQuestions questions={asked} selectedId={shown} openingId={reopen.isPending ? reopen.variables : undefined} onOpen={reopenQuestion} />
+      <RecentQuestions questions={asked} selectedId={shown} openingId={openingId ?? undefined} onOpen={reopenQuestion} />
     </Box>
   );
 }

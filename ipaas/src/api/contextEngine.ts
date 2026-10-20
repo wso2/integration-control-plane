@@ -71,6 +71,12 @@ import type {
   SourceReadingState,
   StorageKind,
   StorageSummary,
+  ContextEntityView,
+  ContextFact,
+  ContextGraph,
+  ContextGraphEntity,
+  ContextQueryMode,
+  ContextQueryTrace,
 } from '../../types/contextEngine';
 
 const V1 = '/v1';
@@ -124,14 +130,56 @@ interface RawEvidence {
   sourceUrl?: string;
 }
 
+interface RawFact {
+  subject: string;
+  relation: string;
+  object: string;
+  evidenceIds?: string[];
+  linkedThrough?: string;
+  text?: string;
+}
+
 interface RawQueryResponse {
   queryId: string;
   state: string;
   answer?: string;
   answerWithheld?: boolean;
   evidence?: RawEvidence[];
+  facts?: RawFact[];
   insufficientEvidence?: boolean;
   traceId: string;
+}
+
+interface RawQueryTrace {
+  traceId: string;
+  queryId: string;
+  mode: ContextQueryMode;
+  outcome: string;
+  limit: number;
+  retrievalMode?: string;
+  selectedEvidenceIds?: string[];
+  retrieved?: number;
+  suppressed?: number;
+  factsFound?: number;
+  factsKept?: number;
+  linkedThrough?: string[];
+  models?: { embedding?: { provider: string; model: string }; answer?: { provider: string; model: string } };
+  createdAt: string;
+}
+
+interface RawGraph {
+  entities?: { id: string; name: string; kind?: string; mentions?: number }[];
+  records?: { id: string; sourceId: string; recordId: string }[];
+  mentions?: { entity: string; record: string; chunks?: number }[];
+  relations?: { subject: string; relation: string; object: string; records?: string[]; text?: string }[];
+  truncated?: boolean;
+}
+
+interface RawEntityView {
+  entity: { id: string; name: string; kind?: string; mentions?: number };
+  evidence?: RawEvidence[];
+  mentionedIn?: string[];
+  facts?: RawFact[];
 }
 
 interface RawPrincipal {
@@ -298,14 +346,51 @@ const toStorage = (raw: RawEngine | null): Record<StorageKind, StorageSummary> |
   return { vector: one('vector'), relational: one('relational'), graph: one('graph') };
 };
 
+const toFact = (raw: RawFact): ContextFact => ({
+  subject: raw.subject,
+  relation: raw.relation,
+  object: raw.object,
+  evidenceIds: raw.evidenceIds ?? [],
+  ...(raw.linkedThrough ? { linkedThrough: raw.linkedThrough } : {}),
+  ...(raw.text ? { text: raw.text } : {}),
+});
+
 const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
   queryId: raw.queryId,
   state: raw.state,
   answer: raw.answer,
   answerWithheld: raw.answerWithheld ?? false,
   evidence: (raw.evidence ?? []).map(toEvidence),
+  facts: (raw.facts ?? []).map(toFact),
   insufficientEvidence: raw.insufficientEvidence ?? raw.state === 'insufficient_evidence',
   traceId: raw.traceId,
+});
+
+const toTrace = (raw: RawQueryTrace): ContextQueryTrace => ({
+  queryId: raw.queryId,
+  traceId: raw.traceId,
+  mode: raw.mode,
+  outcome: raw.outcome,
+  limit: raw.limit,
+  retrievalMode: raw.retrievalMode,
+  selectedEvidenceIds: raw.selectedEvidenceIds ?? [],
+  retrieved: raw.retrieved ?? 0,
+  suppressed: raw.suppressed ?? 0,
+  factsFound: raw.factsFound,
+  factsKept: raw.factsKept,
+  linkedThrough: raw.linkedThrough ?? [],
+  models: raw.models ?? {},
+  createdAt: raw.createdAt,
+});
+
+const toGraphEntity = (raw: NonNullable<RawGraph['entities']>[number]): ContextGraphEntity => ({ id: raw.id, name: raw.name, ...(raw.kind ? { kind: raw.kind } : {}), mentions: raw.mentions ?? 0 });
+
+const toGraph = (raw: RawGraph): ContextGraph => ({
+  entities: (raw.entities ?? []).map(toGraphEntity),
+  records: (raw.records ?? []).map((r) => ({ id: r.id, sourceId: r.sourceId, recordId: r.recordId })),
+  mentions: (raw.mentions ?? []).map((m) => ({ entityId: m.entity, recordNodeId: m.record, chunks: m.chunks ?? 1 })),
+  relations: (raw.relations ?? []).map((r) => ({ subjectId: r.subject, relation: r.relation, objectId: r.object, recordNodeIds: r.records ?? [], ...(r.text ? { text: r.text } : {}) })),
+  truncated: raw.truncated ?? false,
 });
 
 // ── Degradation helpers ─────────────────────────────────────────────────────
@@ -673,6 +758,43 @@ export async function getContextQuery(queryId: string): Promise<ContextQueryResu
  */
 export async function getContextEvidence(evidenceId: string): Promise<ContextEvidence> {
   return toEvidence(await contextEngineClient.get<RawEvidence>(`${V1}/evidence/${encodeURIComponent(evidenceId)}`));
+}
+
+/**
+ * How a stored query ran, for its asker holding `trace.read`. Null when the
+ * reader may not have it or the engine does not serve traces yet, so the
+ * console simply leaves the trace out.
+ */
+export async function getContextQueryTrace(queryId: string): Promise<ContextQueryTrace | null> {
+  const raw = await optional(() => contextEngineClient.get<RawQueryTrace>(`${V1}/queries/${encodeURIComponent(queryId)}/trace`), null as RawQueryTrace | null);
+  return raw ? toTrace(raw) : null;
+}
+
+/**
+ * The part of the engine's knowledge graph the reader may see: entities, the
+ * records naming them, and their relationships. Null when the engine does not
+ * serve its graph yet.
+ */
+export async function getContextGraph(engineId: string, limit: number): Promise<ContextGraph | null> {
+  requireThisEngine(engineId);
+  try {
+    return toGraph(await contextEngineClient.get<RawGraph>(`${V1}/graph?limit=${encodeURIComponent(String(limit))}`));
+  } catch (err) {
+    if (isMissingRoute(err)) return null;
+    throw err;
+  }
+}
+
+/** One entity, by its name as the graph returns it, with the passages that name it and its relationships. 404 when nothing the reader may read names it. */
+export async function getContextEntity(engineId: string, name: string, limit = 10): Promise<ContextEntityView> {
+  requireThisEngine(engineId);
+  const raw = await contextEngineClient.get<RawEntityView>(`${V1}/graph/entity?name=${encodeURIComponent(name)}&limit=${encodeURIComponent(String(limit))}`);
+  return {
+    entity: toGraphEntity(raw.entity),
+    evidence: (raw.evidence ?? []).map(toEvidence),
+    mentionedIn: raw.mentionedIn ?? [],
+    facts: (raw.facts ?? []).map(toFact),
+  };
 }
 
 /** The caller's effective engine actions on a resource they can see. */

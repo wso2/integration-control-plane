@@ -17,7 +17,7 @@
  */
 
 import { Box, Button, ButtonBase, Chip, Stack, Typography } from '@wso2/oxygen-ui';
-import { Check, ChevronDown, ChevronRight, ExternalLink, History, Link as LinkIcon } from '@wso2/oxygen-ui-icons-react';
+import { Check, ChevronDown, ChevronRight, ExternalLink, History, Link as LinkIcon, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { absoluteUrl, evidenceVersionLabel } from '../../../utils/contextEngine';
 import { EvidencePlace } from './EvidenceCard';
@@ -38,9 +38,11 @@ interface RailCardProps {
   onHover: (n: number | null) => void;
   onPin: (n: number) => void;
   onOpen: () => void;
+  /** Open this passage in the answer's derivation in the Graph tab. */
+  onShowInGraph?: () => void;
 }
 
-function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, onHover, onPin, onOpen }: RailCardProps): JSX.Element {
+function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, onHover, onPin, onOpen, onShowInGraph }: RailCardProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
   const [copied, setCopied] = useState(false);
   useEffect(() => {
@@ -81,6 +83,11 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, on
             <Button size="small" variant="text" startIcon={copied ? <Check size={14} /> : <LinkIcon size={14} />} onClick={() => void copy()}>
               {copied ? 'Link copied' : 'Copy link'}
             </Button>
+            {onShowInGraph && (
+              <Button size="small" variant="text" startIcon={<Waypoints size={14} />} onClick={onShowInGraph}>
+                In graph
+              </Button>
+            )}
           </Stack>
           <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1 }}>
             Pinned · click the number again, or press Esc, to release
@@ -103,6 +110,8 @@ interface EvidenceRailProps {
   onHover: (n: number | null) => void;
   onPin: (n: number) => void;
   onOpen: (evidence: ContextEvidence) => void;
+  /** Open the answer's derivation in the Graph tab; with a passage, that passage is chosen. */
+  onShowInGraph?: (evidence?: ContextEvidence) => void;
 }
 
 /**
@@ -111,7 +120,7 @@ interface EvidenceRailProps {
  * folded underneath. Those still count: the answer may draw on them, and the
  * engine checks all of them before showing the answer again.
  */
-export default function EvidenceRail({ evidence, sources, cited, active, pinned, hrefFor, onHover, onPin, onOpen }: EvidenceRailProps): JSX.Element {
+export default function EvidenceRail({ evidence, sources, cited, active, pinned, hrefFor, onHover, onPin, onOpen, onShowInGraph }: EvidenceRailProps): JSX.Element {
   const byId = new Map(sources.map((s) => [s.id, s]));
   const uncited = evidence.map((_, i) => i + 1).filter((n) => !cited.has(n));
   const [showUncited, setShowUncited] = useState(false);
@@ -134,6 +143,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
         onHover={onHover}
         onPin={onPin}
         onOpen={() => onOpen(ev)}
+        onShowInGraph={onShowInGraph ? () => onShowInGraph(ev) : undefined}
       />
     );
   };
@@ -144,8 +154,16 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           Evidence
         </Typography>
-        <Typography variant="caption" sx={mutedSx}>
+        <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
           Cited in the answer
+          {onShowInGraph && (
+            <>
+              <span aria-hidden>·</span>
+              <Button size="small" variant="text" startIcon={<Waypoints size={12} />} onClick={() => onShowInGraph()} sx={{ minWidth: 0, p: 0, fontSize: 11.5, fontWeight: 600, '& .MuiButton-startIcon': { mr: 0.5 } }}>
+                See in graph
+              </Button>
+            </>
+          )}
         </Typography>
       </Stack>
       {evidence
