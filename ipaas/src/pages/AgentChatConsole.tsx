@@ -27,6 +27,7 @@ import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import NotFound from '../components/NotFound';
 import AgentChat from '../components/AgentChat';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
 /**
@@ -68,6 +69,7 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+      <DeploymentTrackBar component={component} />
       <PageContent>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }} flexWrap="wrap" gap={1}>
           <Stack direction="row" alignItems="center" gap={1.5}>

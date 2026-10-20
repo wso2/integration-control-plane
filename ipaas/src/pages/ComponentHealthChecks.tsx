@@ -134,7 +134,9 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
           healthChecks.map((hc) => {
             const container = containers.find((c) => c.ID === hc.container_id);
             if (!container) return null;
-            return <HealthCheckCard key={hc.ID} healthCheck={hc} container={container} projectId={projectId} componentId={comp.id} releaseId={releaseId} deploymentTrackId={trackId} environmentId={envId} canManage={canManage} onNotify={notify} />;
+            return (
+              <HealthCheckCard key={`${trackId}/${hc.ID}`} healthCheck={hc} container={container} projectId={projectId} componentId={comp.id} releaseId={releaseId} deploymentTrackId={trackId} environmentId={envId} canManage={canManage} onNotify={notify} />
+            );
           })
         )}
       </PageContent>

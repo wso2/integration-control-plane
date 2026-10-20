@@ -108,6 +108,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
           {/* Left panel — build artifact selection + deploy trigger */}
           <Box sx={{ flexShrink: 0 }}>
             <BuildArea
+              key={versionId}
               componentId={componentId}
               versionId={versionId}
               orgHandler={scope.org}

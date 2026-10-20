@@ -87,7 +87,7 @@ export default function ComponentContainers({ org, project, component }: Compone
         ) : (
           containers.map((c) => (
             <ContainerInfoCard
-              key={c.ID}
+              key={`${trackId}/${c.ID}`}
               container={c}
               projectId={projectId}
               componentId={comp.id}
