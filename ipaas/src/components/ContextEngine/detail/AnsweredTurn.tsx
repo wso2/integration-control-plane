@@ -37,8 +37,6 @@ interface AnsweredTurnProps {
   onOpen: (evidence: ContextEvidence) => void;
   /** The Graph tab URL that shows how the answer was derived; with a passage, that passage opens chosen. */
   derivationHref?: (evidence?: ContextEvidence) => string;
-  /** Open the answer's derivation in the Graph tab, optionally with one passage chosen. */
-  onShowDerivation?: (evidence?: ContextEvidence) => void;
 }
 
 /**
@@ -47,7 +45,7 @@ interface AnsweredTurnProps {
  * until it is clicked again or Esc is pressed. On narrow screens the rail
  * follows the answer instead of sitting beside it.
  */
-export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, derivationHref, onShowDerivation }: AnsweredTurnProps): JSX.Element {
+export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, derivationHref }: AnsweredTurnProps): JSX.Element {
   const [active, setActive] = useState<CitationFocus | null>(null);
   const [pinned, setPinned] = useState<CitationFocus | null>(null);
   const cited = citedNumbers(answer, evidence.length);
@@ -79,7 +77,7 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
         onHover={(n) => setActive(n === null ? null : { n })}
         onPin={(n) => togglePin({ n })}
         onOpen={onOpen}
-        onShowInGraph={onShowDerivation}
+        graphHrefFor={derivationHref}
       />
     </Box>
   );

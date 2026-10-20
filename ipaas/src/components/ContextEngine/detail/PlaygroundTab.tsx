@@ -177,7 +177,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const openInApi = (turn: Turn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}`);
   // The Graph tab draws an answer's derivation from the stored query; a passage given here opens chosen.
   const derivationHref = (queryId: string, ev?: ContextEvidence) => `${contextEngineUrl(orgHandle, engine.id, 'graph')}?query=${encodeURIComponent(queryId)}${ev ? `&node=${encodeURIComponent(`p:${ev.id}`)}` : ''}`;
-  const showDerivation = (queryId: string, ev?: ContextEvidence) => navigate(derivationHref(queryId, ev));
 
   // "Back to the answer" from the Graph tab lands here with `?open=` naming the question to reopen.
   const openRef = useRef<string | null>(null);
@@ -225,18 +224,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       );
     } else if (answered) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = (
-        <AnsweredTurn
-          answer={result.answer!}
-          evidence={result.evidence}
-          sources={engine.sources}
-          facts={result.facts}
-          hrefFor={hrefFor}
-          onOpen={openEvidence}
-          derivationHref={(ev) => derivationHref(result.queryId, ev)}
-          onShowDerivation={(ev) => showDerivation(result.queryId, ev)}
-        />
-      );
+      body = <AnsweredTurn answer={result.answer!} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = (
