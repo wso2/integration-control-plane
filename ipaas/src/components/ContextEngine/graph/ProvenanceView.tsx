@@ -30,6 +30,7 @@ import {
   citedPassages,
   cosmosBuffers,
   derivationSummary,
+  entityId,
   entityIndex,
   exploreModel,
   factEntityNames,
@@ -62,7 +63,8 @@ interface ProvenanceViewProps {
   onSelectKey: (key: string | null) => void;
   onBackToAnswer: () => void;
   onExit: () => void;
-  onExploreEntity: (name: string) => void;
+  /** Open the explorer on an entity, by the id the graph gave it. */
+  onExploreEntity: (id: string) => void;
 }
 
 /**
@@ -146,6 +148,8 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   const passageOf = (id: string) => data.evidence.findIndex((e) => e.id === id) + 1;
   const chosenPassage = focus.evidenceId ? passageOf(focus.evidenceId) : 0;
   const entityName = focus.entity ?? null;
+  // The explorer selects by the engine's id, which only the graph shown knows; without it there is nothing to open.
+  const exploreId = entityName && served ? entityId(served, entityName) : undefined;
   const litEntities = whole?.points.length ?? 0;
 
   return (
@@ -261,7 +265,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             derivation={{ answer: data.answerWithheld ? undefined : data.answer, evidence: data.evidence }}
             onSelectEntity={selectEntity}
             onClose={() => select(null)}
-            onExplore={served ? () => onExploreEntity(entityName) : undefined}
+            onExplore={exploreId ? () => onExploreEntity(exploreId) : undefined}
           />
         ) : selectedKey === 'answer' ? (
           <AnswerPanel result={data} onSelectPassage={(n) => select(`p:${data.evidence[n - 1]?.id}`)} onClose={() => select(null)} />

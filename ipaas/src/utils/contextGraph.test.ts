@@ -22,6 +22,7 @@ import {
   citedPassages,
   cosmosBuffers,
   derivationSummary,
+  entityId,
   entityIndex,
   entitySize,
   exploreModel,
@@ -248,6 +249,8 @@ describe('facts on the graph', () => {
     expect(passage.points.map((i) => m.nodes[i].label)).toEqual(['kandy']);
     expect(passage.links).toHaveLength(0);
     expect(passage.missing).toEqual(['duty manager']);
+    expect(entityId(GRAPH, 'VAULT')).toBe('ent_v');
+    expect(entityId(GRAPH, 'nobody')).toBeUndefined();
     expect(entityIndex(m, GRAPH, 'VAULT')).toBe(m.index.get('ent_v'));
     expect(entityIndex(m, GRAPH, 'nobody')).toBeUndefined();
   });

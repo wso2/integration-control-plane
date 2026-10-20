@@ -390,11 +390,16 @@ export function factEntityNames(facts: ContextFact[]): Set<string> {
   );
 }
 
+/** The id the engine gave the entity with this name, ignoring case, or undefined when the graph shown does not hold it. */
+export function entityId(graph: ContextGraph, name: string): string | undefined {
+  const wanted = name.toLowerCase();
+  return graph.entities.find((e) => e.name.toLowerCase() === wanted)?.id;
+}
+
 /** The explore model's index of the entity with this name, ignoring case, or undefined when the graph shown does not hold it. */
 export function entityIndex(m: GraphModel, graph: ContextGraph, name: string): number | undefined {
-  const wanted = name.toLowerCase();
-  const entity = graph.entities.find((e) => e.name.toLowerCase() === wanted);
-  return entity ? m.index.get(entity.id) : undefined;
+  const id = entityId(graph, name);
+  return id === undefined ? undefined : m.index.get(id);
 }
 
 /** A short text drawn at the middle of a link: the relationship it stands for. `detail` is the whole sentence, shown on hover. */

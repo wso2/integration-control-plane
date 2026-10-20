@@ -29,14 +29,6 @@ interface GraphTabProps {
   orgHandle: string;
 }
 
-/** The engine's id for an entity, as the overview returns it: `ent_` and a hash of the name. */
-async function entityKey(name: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(name));
-  return `ent_${Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0'))
-    .join('')
-    .slice(0, 24)}`;
-}
-
 /**
  * The Graph tab: the engine's knowledge graph to explore, or, with `?query=`,
  * how one stored answer was derived from it. `?node=` keeps the chosen node in
@@ -66,7 +58,7 @@ export default function GraphTab({ engine, orgHandle }: GraphTabProps): JSX.Elem
         onSelectKey={setNode}
         onBackToAnswer={() => navigate(`${contextEngineUrl(orgHandle, engine.id, 'playground')}?open=${encodeURIComponent(queryId)}`)}
         onExit={() => setParams(new URLSearchParams())}
-        onExploreEntity={(name) => void entityKey(name).then((key) => setParams(new URLSearchParams({ node: key })))}
+        onExploreEntity={(id) => setParams(new URLSearchParams({ node: id }))}
       />
     );
   }
