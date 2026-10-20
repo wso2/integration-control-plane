@@ -19,6 +19,7 @@
 import { Box, Button, Typography } from '@wso2/oxygen-ui';
 import { ArrowRight, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
+import { Link as RouterLink } from 'react-router';
 import { citedNumbers } from '../../../utils/contextEngine';
 import { derivationSummary } from '../../../utils/contextGraph';
 import CitedAnswer, { type CitationFocus } from './CitedAnswer';
@@ -34,6 +35,8 @@ interface AnsweredTurnProps {
   facts?: ContextFact[];
   hrefFor: (evidence: ContextEvidence) => string;
   onOpen: (evidence: ContextEvidence) => void;
+  /** The Graph tab URL that shows how the answer was derived; with a passage, that passage opens chosen. */
+  derivationHref?: (evidence?: ContextEvidence) => string;
   /** Open the answer's derivation in the Graph tab, optionally with one passage chosen. */
   onShowDerivation?: (evidence?: ContextEvidence) => void;
 }
@@ -44,7 +47,7 @@ interface AnsweredTurnProps {
  * until it is clicked again or Esc is pressed. On narrow screens the rail
  * follows the answer instead of sitting beside it.
  */
-export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, onShowDerivation }: AnsweredTurnProps): JSX.Element {
+export default function AnsweredTurn({ answer, evidence, sources, facts = [], hrefFor, onOpen, derivationHref, onShowDerivation }: AnsweredTurnProps): JSX.Element {
   const [active, setActive] = useState<CitationFocus | null>(null);
   const [pinned, setPinned] = useState<CitationFocus | null>(null);
   const cited = citedNumbers(answer, evidence.length);
@@ -64,7 +67,7 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
       <Box sx={{ minWidth: 0 }}>
         <CitedAnswer answer={answer} passages={evidence.length} active={active} pinned={pinned} onHover={setActive} onPin={togglePin} />
-        {onShowDerivation && <DerivationLine answer={answer} evidence={evidence} facts={facts} onShow={() => onShowDerivation()} />}
+        {derivationHref && <DerivationLine answer={answer} evidence={evidence} facts={facts} href={derivationHref()} />}
       </Box>
       <EvidenceRail
         evidence={evidence}
@@ -84,8 +87,8 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
 
 const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
-/** Under an answer: what it was built from, and the way into its derivation in the Graph tab. */
-function DerivationLine({ answer, evidence, facts, onShow }: { answer: string; evidence: ContextEvidence[]; facts: ContextFact[]; onShow: () => void }): JSX.Element {
+/** Under an answer: what it was built from, and a link to its derivation in the Graph tab. */
+function DerivationLine({ answer, evidence, facts, href }: { answer: string; evidence: ContextEvidence[]; facts: ContextFact[]; href: string }): JSX.Element {
   const s = derivationSummary({ answer, evidence, facts });
   const parts = [count(s.sentences, 'sentence', 'sentences'), count(s.passages, 'passage', 'passages'), ...(s.entities ? [count(s.entities, 'entity', 'entities')] : [])];
   return (
@@ -94,7 +97,7 @@ function DerivationLine({ answer, evidence, facts, onShow }: { answer: string; e
       <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 12.5 }}>
         {parts.join(', ')}.
       </Typography>
-      <Button size="small" variant="text" endIcon={<ArrowRight size={14} />} onClick={onShow} sx={{ fontWeight: 600, px: 0.5 }}>
+      <Button size="small" variant="text" component={RouterLink} to={href} endIcon={<ArrowRight size={14} />} sx={{ fontWeight: 600, px: 0.5 }}>
         How this answer was derived
       </Button>
     </Box>
