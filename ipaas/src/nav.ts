@@ -187,6 +187,23 @@ export function orgCdPipelinesUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/admin/cd-pipelines`;
 }
 
+/** The org's RAG knowledge bases. */
+export function knowledgeBasesUrl(scope: { org: string }): string {
+  return `/organizations/${scope.org}/ai-services/knowledge-bases`;
+}
+
+export function newKnowledgeBaseUrl(scope: { org: string }): string {
+  return `${knowledgeBasesUrl(scope)}/new`;
+}
+
+export function knowledgeBaseUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBasesUrl(scope)}/${encodeURIComponent(name)}`;
+}
+
+export function newKnowledgeBaseDataSourceUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBaseUrl(scope, name)}/data-sources/new`;
+}
+
 /** The org Settings landing route — redirects to the first section the user can access. */
 export function orgSettingsUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/settings`;
@@ -273,6 +290,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
     { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
+    { key: 'knowledge-bases', navId: 'org-knowledge-bases', segment: 'ai-services/knowledge-bases', parent: 'org-ai-services' },
     { key: 'settings', navId: 'org-settings', segment: 'settings' },
   ],
   projects: [

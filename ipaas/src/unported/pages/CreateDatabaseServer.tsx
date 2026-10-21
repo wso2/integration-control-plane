@@ -30,7 +30,7 @@ import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { plansForProviderRegion, toCreateError } from '../utils/platformServices';
 import ComingSoon from '../../pages/ComingSoon';
 import VerticalStepper from '../../components/VerticalStepper';
-import SelectableCard from '../components/Databases/create/SelectableCard';
+import SelectableCard from '../../components/common/SelectableCard';
 import PlanCard from '../components/Databases/create/PlanCard';
 import type { OrgScope } from '../../nav';
 import type { CloudProvider, CloudRegion, CreateError, ServicePlan, ServiceType } from '../../types/platformServices';

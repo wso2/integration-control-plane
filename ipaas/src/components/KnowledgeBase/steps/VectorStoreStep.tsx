@@ -16,28 +16,28 @@
  * under the License.
  */
 
-import { Grid, MenuItem, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
-import { useMemo, type JSX } from 'react';
-import { blankVectorStore, ragLogoUrl, VECTOR_STORE_PROVIDERS } from '../../../../constants/ragIngestion';
-import { chromaCollectionNameError, pineconeIndexNameError, postgresTableNameError, weaviateCollectionNameError } from '../../../../utils/ragIngestion';
-import { useDatabaseServers } from '../../../hooks/usePlatformServices';
-import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import SelectableCard from '../../Databases/create/SelectableCard';
+import { Grid, Stack, Typography } from '@wso2/oxygen-ui';
+import TextField from '../../common/TextField';
+import { type JSX } from 'react';
+import { blankVectorStore, ragLogoUrl, VECTOR_STORE_PROVIDERS } from '../../../constants/ragIngestion';
+import { chromaCollectionNameError, pineconeIndexNameError, postgresTableNameError, weaviateCollectionNameError } from '../../../utils/ragIngestion';
+import { REQUIRED_FIELD_SX } from '../../../constants/styles';
+import SelectableCard from '../../common/SelectableCard';
 import SecretField from '../SecretField';
 import { fieldStackSx, stepHeadingSx, tileGridSx } from '../styles';
-import type { VectorStoreConfig } from '../../../../types/ragIngestion';
+import type { VectorStoreConfig } from '../../../types/ragIngestion';
 
 interface VectorStoreStepProps {
   value: VectorStoreConfig | null;
   onChange: (value: VectorStoreConfig) => void;
+  /** Secrets already stored for this vector store; their fields may stay empty to keep them. */
+  storedSecretKeys?: readonly string[];
 }
 
-export default function VectorStoreStep({ value, onChange }: VectorStoreStepProps): JSX.Element {
-  const servers = useDatabaseServers();
-  const managedServers = useMemo(() => (servers.data ?? []).filter((s) => s.is_vector_enabled), [servers.data]);
-  const hasManaged = managedServers.length > 0;
+// WSO2-managed vector databases need the platform-services API, which the BFF does not serve.
+const PROVIDERS = VECTOR_STORE_PROVIDERS.filter((p) => !p.managed);
 
+export default function VectorStoreStep({ value, onChange, storedSecretKeys = [] }: VectorStoreStepProps): JSX.Element {
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
@@ -45,39 +45,30 @@ export default function VectorStoreStep({ value, onChange }: VectorStoreStepProp
       </Typography>
 
       <Grid container spacing={2} sx={tileGridSx}>
-        {VECTOR_STORE_PROVIDERS.map((p) => {
-          // The managed option only makes sense when a vector-enabled managed DB exists.
-          const disabled = p.managed && !hasManaged;
-          const card = <SelectableCard title={p.name} description={p.description} logo={ragLogoUrl(p.logo)} selected={value?.provider === p.id} disabled={disabled} onSelect={() => onChange(blankVectorStore(p.id))} />;
-          return (
-            <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
-              {disabled ? (
-                <Tooltip title="Provision a vector-enabled database first to use this option.">
-                  <span>{card}</span>
-                </Tooltip>
-              ) : (
-                card
-              )}
-            </Grid>
-          );
-        })}
+        {PROVIDERS.map((p) => (
+          <Grid key={p.id} size={{ xs: 12, sm: 6, md: 3 }}>
+            <SelectableCard title={p.name} description={p.description} logo={ragLogoUrl(p.logo)} selected={value?.provider === p.id} onSelect={() => onChange(blankVectorStore(p.id))} />
+          </Grid>
+        ))}
       </Grid>
 
       {value && (
         <Stack sx={fieldStackSx}>
-          <ProviderFields value={value} onChange={onChange} managedServers={managedServers.map((s) => ({ id: s.id, name: s.name }))} />
+          <ProviderFields value={value} onChange={onChange} stored={new Set(storedSecretKeys)} />
         </Stack>
       )}
     </>
   );
 }
 
-function ProviderFields({ value, onChange, managedServers }: { value: VectorStoreConfig; onChange: (v: VectorStoreConfig) => void; managedServers: { id: string; name: string }[] }): JSX.Element | null {
+const KEEP_STORED = 'Leave empty to keep the stored value.';
+
+function ProviderFields({ value, onChange, stored }: { value: VectorStoreConfig; onChange: (v: VectorStoreConfig) => void; stored: ReadonlySet<string> }): JSX.Element | null {
   switch (value.provider) {
     case 'pinecone':
       return (
         <>
-          <SecretField label="API Key" required value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
+          <SecretField label="API Key" required={!stored.has('PINECONE_APIKEY')} helperText={stored.has('PINECONE_APIKEY') ? KEEP_STORED : undefined} value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
           <TextField
             label="Index Name"
             required
@@ -113,7 +104,7 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
       return (
         <>
           <TextField label="Weaviate Cluster REST URL" required fullWidth size="small" value={value.clusterUrl} onChange={(e) => onChange({ ...value, clusterUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
-          <SecretField label="API Key" required value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
+          <SecretField label="API Key" required={!stored.has('WEAVIATE_APIKEY')} helperText={stored.has('WEAVIATE_APIKEY') ? KEEP_STORED : undefined} value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
           <TextField
             label="Collection Name"
             required
@@ -133,40 +124,8 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
           <TextField label="Host" required fullWidth size="small" value={value.host} onChange={(e) => onChange({ ...value, host: e.target.value })} sx={REQUIRED_FIELD_SX} />
           <TextField label="Port" required fullWidth size="small" type="number" value={value.port} onChange={(e) => onChange({ ...value, port: e.target.value })} sx={REQUIRED_FIELD_SX} />
           <TextField label="User" required fullWidth size="small" value={value.user} onChange={(e) => onChange({ ...value, user: e.target.value })} sx={REQUIRED_FIELD_SX} />
-          <SecretField label="Password" required value={value.password} onChange={(v) => onChange({ ...value, password: v })} />
+          <SecretField label="Password" required={!stored.has('POSTGRES_PASSWORD')} helperText={stored.has('POSTGRES_PASSWORD') ? KEEP_STORED : undefined} value={value.password} onChange={(v) => onChange({ ...value, password: v })} />
           <TextField label="Database" required fullWidth size="small" value={value.dbName} onChange={(e) => onChange({ ...value, dbName: e.target.value })} sx={REQUIRED_FIELD_SX} />
-          <TextField
-            label="Table Name"
-            required
-            fullWidth
-            size="small"
-            value={value.tableName}
-            onChange={(e) => onChange({ ...value, tableName: e.target.value })}
-            error={!!postgresTableNameError(value.tableName)}
-            helperText={postgresTableNameError(value.tableName) || undefined}
-            sx={REQUIRED_FIELD_SX}
-          />
-        </>
-      );
-    case 'pgvector-devant':
-      return (
-        <>
-          <TextField
-            select
-            label="Managed Database"
-            required
-            fullWidth
-            size="small"
-            value={value.serverId}
-            onChange={(e) => onChange({ ...value, serverId: e.target.value })}
-            sx={REQUIRED_FIELD_SX}
-            helperText="Connection details are resolved from the selected server on creation.">
-            {managedServers.map((s) => (
-              <MenuItem key={s.id} value={s.id}>
-                {s.name}
-              </MenuItem>
-            ))}
-          </TextField>
           <TextField
             label="Table Name"
             required

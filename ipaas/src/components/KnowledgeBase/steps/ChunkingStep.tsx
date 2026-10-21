@@ -17,11 +17,11 @@
  */
 
 import { MenuItem, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import TextField from '../../common/TextField';
 import { type JSX } from 'react';
-import { CHUNKING_STRATEGIES } from '../../../../constants/ragIngestion';
+import { CHUNKING_STRATEGIES } from '../../../constants/ragIngestion';
 import { fieldStackSx, stepHeadingSx } from '../styles';
-import type { ChunkingConfig, ChunkingStrategy } from '../../../../types/ragIngestion';
+import type { ChunkingConfig, ChunkingStrategy } from '../../../types/ragIngestion';
 
 interface ChunkingStepProps {
   value: ChunkingConfig;

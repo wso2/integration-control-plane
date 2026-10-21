@@ -1,6 +1,6 @@
 # AGENTS.md — src/unported
 
-Features whose UI exists but whose backend calls the BFF (`ipaas-service`) does not serve yet. Examples are access control, delivery insights, RAG, governance, databases and the Copilot. The code is kept so it can be ported, not run.
+Features whose UI exists but whose backend calls the BFF (`ipaas-service`) does not serve yet. Examples are access control, delivery insights, the standalone RAG ingestion and retrieval wizards (knowledge bases are live), governance, databases and the Copilot. The code is kept so it can be ported, not run.
 
 ## How it is isolated
 

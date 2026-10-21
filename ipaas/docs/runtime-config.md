@@ -32,7 +32,7 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `EDITOR_CALLBACK_ORIGINS`, `EDITOR_CALLBACK_DOMAINS`                         | Comma-separated https origins and parent domains an editor's sign-in or GitHub result may be sent to. Empty allows none. |
 | `CHOREO_URL_MANAGER_URL`, `ENABLE_CUSTOM_URL_MAPPINGS_FEATURE`               | URL settings for an integration. Both are needed.                                                                        |
 | `SAMPLES_URL`, `PREBUILT_INTEGRATIONS_URL`                                   | Sample and prebuilt integration catalogs. Both default to GitHub raw.                                                    |
-| `RAG_INGESTION_IMAGE`                                                        | Image the RAG ingestion wizard deploys                                                                                   |
+| `RAG_INGESTION_IMAGE`                                                        | Image the unported RAG ingestion wizard deploys; knowledge bases use the images the BFF is configured with               |
 | `INTEGRATION_BUILDER_*`                                                      | AI Integration Builder: copilot base URL, model, max tokens, connectors GraphQL URL                                      |
 | `AI_COPILOT_URL_SUFFIX`                                                      | Copilot path on the system APIs gateway                                                                                  |
 

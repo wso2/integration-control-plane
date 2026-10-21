@@ -17,10 +17,10 @@
  */
 
 import { IconButton, InputAdornment } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import TextField from '../common/TextField';
 import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { REQUIRED_FIELD_SX } from '../../../constants/styles';
+import { REQUIRED_FIELD_SX } from '../../constants/styles';
 
 interface SecretFieldProps {
   label: string;
@@ -28,10 +28,12 @@ interface SecretFieldProps {
   onChange: (value: string) => void;
   required?: boolean;
   error?: string;
+  /** Shown under the field when there is no error. */
+  helperText?: string;
 }
 
 /** A masked text field with a show/hide toggle — the shared secret-input pattern. */
-export default function SecretField({ label, value, onChange, required, error }: SecretFieldProps): JSX.Element {
+export default function SecretField({ label, value, onChange, required, error, helperText }: SecretFieldProps): JSX.Element {
   const [show, setShow] = useState(false);
   return (
     <TextField
@@ -43,7 +45,7 @@ export default function SecretField({ label, value, onChange, required, error }:
       value={value}
       onChange={(e) => onChange(e.target.value)}
       error={!!error}
-      helperText={error || undefined}
+      helperText={error || helperText}
       sx={required ? REQUIRED_FIELD_SX : undefined}
       InputProps={{
         endAdornment: (

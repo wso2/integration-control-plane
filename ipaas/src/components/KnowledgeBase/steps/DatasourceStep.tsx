@@ -17,14 +17,14 @@
  */
 
 import { Grid, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import TextField from '../../common/TextField';
 import { type JSX } from 'react';
-import { blankDatasource, DATASOURCES, GDRIVE_AUTH_TYPES, ragLogoUrl } from '../../../../constants/ragIngestion';
-import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import SelectableCard from '../../Databases/create/SelectableCard';
+import { blankDatasource, DATASOURCES, GDRIVE_AUTH_TYPES, ragLogoUrl } from '../../../constants/ragIngestion';
+import { REQUIRED_FIELD_SX } from '../../../constants/styles';
+import SelectableCard from '../../common/SelectableCard';
 import SecretField from '../SecretField';
 import { fieldStackSx, stepHeadingSx, tileGridSx } from '../styles';
-import type { DatasourceConfig, GdriveAuthType } from '../../../../types/ragIngestion';
+import type { DatasourceConfig, GdriveAuthType } from '../../../types/ragIngestion';
 
 interface DatasourceStepProps {
   value: DatasourceConfig | null;

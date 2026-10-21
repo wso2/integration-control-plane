@@ -23,7 +23,7 @@ import { useActiveProjects } from '../../../../hooks/useProjects';
 import { useComponentNameAvailability } from '../../../../hooks/useRepository';
 import { componentNameError, slugify } from '../../../../utils/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import { fieldStackSx, stepHeadingSx } from '../styles';
+import { fieldStackSx, stepHeadingSx } from '../../../../components/KnowledgeBase/styles';
 import type { AutomationConfig } from '../../../../types/ragIngestion';
 
 interface AutomationStepProps {
