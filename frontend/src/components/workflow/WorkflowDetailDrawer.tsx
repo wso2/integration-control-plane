@@ -20,6 +20,7 @@ import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogCont
 import { Ban, BellRing, OctagonX, PauseCircle, PlayCircle, RotateCcw, X } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import WorkflowFlowTab from './WorkflowFlowTab';
+import { ReviewActivityDetailDialog } from './AdminPortal';
 import {
   isPreparing,
   isRefreshing,
@@ -77,6 +78,7 @@ export default function WorkflowDetailDrawer({ scope, workflowId, onClose }: { s
   const resetPoints = valueOf(resetPointsResult) ?? [];
   const [reason, setReason] = useState('');
   const [toast, setToast] = useState<{ severity: 'success' | 'error'; message: string } | null>(null);
+  const [openReviewId, setOpenReviewId] = useState<string | null>(null);
   const { sidebarWidth } = useLayout();
 
   const { data: infoResult, isLoading: loadingInfo, error: infoError } = useWorkflowInfo(scope, workflowId);
@@ -175,9 +177,11 @@ export default function WorkflowDetailDrawer({ scope, workflowId, onClose }: { s
         ) : infoError ? (
           <Typography sx={emptySx}>Could not load workflow info.</Typography>
         ) : (
-          <WorkflowFlowTab instanceGraph={instanceGraph} executionGraph={graph} events={history as Array<Record<string, unknown>>} info={info} onOpenHistory={() => setHistoryOpen(true)} environmentId={scope.environmentId} />
+          <WorkflowFlowTab instanceGraph={instanceGraph} executionGraph={graph} events={history as Array<Record<string, unknown>>} info={info} onOpenHistory={() => setHistoryOpen(true)} onOpenReview={setOpenReviewId} environmentId={scope.environmentId} />
         )}
       </Box>
+
+      {openReviewId && <ReviewActivityDetailDialog scope={scope} taskId={openReviewId} onClose={() => setOpenReviewId(null)} onToast={setToast} />}
 
       <Dialog open={historyOpen} onClose={() => setHistoryOpen(false)} maxWidth="lg" fullWidth>
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

@@ -443,7 +443,9 @@ isolated function reviewEntry(map<json> node) returns map<json> {
         label: node["name"],
         status: node["status"],
         startTime: node["startTime"],
-        endTime: node["endTime"]
+        endTime: node["endTime"],
+        // PRE_RUN (an approval) or ON_FAILURE (a review), so a console can draw each on its own side of the step.
+        trigger: node["trigger"]
     };
 }
 
