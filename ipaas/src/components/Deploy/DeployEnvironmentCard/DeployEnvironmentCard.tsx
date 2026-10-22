@@ -25,6 +25,9 @@ import { DeploymentStatus } from '../../../types/deployment';
 import { useComponentDeployment, useDeploymentStatus, useDeploymentTrackImages, useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useExecutionConfigs } from '../../../hooks/useExecutions';
 import { useGetConfigMgt, useSchemaConfig } from '../../../hooks/useConfiguration';
+import { useMiConfig } from '../../../hooks/useMiConfig';
+import { runtimeFromDisplayType } from '../../../utils/identifyIntegration';
+import { miConfigCount } from '../../../utils/miConfigs';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import { nextCronRunMs, formatTimeUntil, describeCron } from '../../../utils/cronUtils';
 import { deploymentPollInterval } from '../../../utils/deploymentStatus';
@@ -46,6 +49,7 @@ export default function DeployEnvironmentCard({
   deploymentPipelineId,
   flags,
   hideEndpoints = false,
+  displayType,
   env,
   componentName,
   projectHandler,
@@ -56,6 +60,7 @@ export default function DeployEnvironmentCard({
   // File/event integrations deploy like a service but expose no endpoints —
   // treat them as "service, minus endpoints" on the deploy card.
   const showEndpoints = !flags.isAutomation && !hideEndpoints;
+  const isMI = runtimeFromDisplayType(displayType ?? '') === 'mi';
   const qc = useQueryClient();
   const [configureOpen, setConfigureOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
@@ -197,12 +202,14 @@ export default function DeployEnvironmentCard({
     prevDeployRunIdRef.current = currentId;
   }, [deployedRunId, deployedBuildId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Configurables count — sourced from the GQL componentDeployment response.
+  // Configurables count — Ballerina's comes from the GQL componentDeployment
+  // response; MI has no schema, so it counts the env vars and secrets set.
   const envTemplateId = env.templateId ?? env.id;
   // Pre-warm cache so ConfigureDrawer opens instantly (result consumed there via shared query key).
-  useGetConfigMgt(orgHandler, projectId, componentId, flags.isAutomation ? envTemplateId : env.id, versionId, componentName, configCommitHash, !!configCommitHash && !flags.isAutomation);
-  useSchemaConfig(projectId, componentId, envTemplateId, versionId, configCommitHash);
-  const configurablesCount = rawDeployment?.configCount ?? 0;
+  useGetConfigMgt(orgHandler, projectId, componentId, flags.isAutomation ? envTemplateId : env.id, versionId, componentName, configCommitHash, !!configCommitHash && !flags.isAutomation && !isMI);
+  useSchemaConfig(isMI ? '' : projectId, componentId, envTemplateId, versionId, configCommitHash);
+  const { data: miConfig } = useMiConfig(projectId, componentId, env.id, isMI && !!releaseId);
+  const configurablesCount = isMI ? (miConfig ? miConfigCount(miConfig) : undefined) : (rawDeployment?.configCount ?? 0);
 
   const stopDeployment = useStopDeployment();
   const redeployDeployment = useRedeployDeployment();
@@ -369,13 +376,13 @@ export default function DeployEnvironmentCard({
         orgHandler={orgHandler}
         projectId={projectId}
         componentId={componentId}
-        envId={flags.isAutomation ? envTemplateId : env.id}
+        envId={flags.isAutomation && !isMI ? envTemplateId : env.id}
         versionId={versionId}
         componentName={componentName}
         projectHandler={projectHandler}
         commitHash={configCommitHash}
         releaseId={releaseId}
-        displayType={flags.isAutomation ? 'scheduledTask' : 'service'}
+        displayType={displayType}
         isAutomation={flags.isAutomation}
         envTemplateId={envTemplateId}
         hideEndpoints={hideEndpoints}
