@@ -39,6 +39,7 @@ import GitLabIcon from '../assets/icons/GitLabIcon';
 import BitbucketIcon from '../assets/icons/BitbucketIcon';
 import GitLogoIcon from '../assets/icons/GitLogoIcon';
 import { safeAtob, buildLogText, getStepStatus, formatBuildDate, gitProviderLabel, getGitProviderIcon, repoUrl, validateBuildEnvVar } from './build';
+import { ENV_KEY_RE } from '../constants/build';
 import type { BuildRunLogs, BuildStage } from '../types/build';
 import type { Repository } from '../types/repository';
 
@@ -309,14 +310,44 @@ describe('repoUrl', () => {
 });
 
 describe('validateBuildEnvVar', () => {
-  const keyRegex = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  const keyRegex = ENV_KEY_RE;
+  const one = (key: string, value: string) => validateBuildEnvVar([{ key, value }], 0, keyRegex);
 
   it('requires a non-empty key', () => {
     expect(validateBuildEnvVar([{ key: '  ', value: 'v' }], 0, keyRegex)).toBe('Key is required');
   });
 
-  it('rejects a key that does not match the regex', () => {
-    expect(validateBuildEnvVar([{ key: '1abc', value: 'v' }], 0, keyRegex)).toBe('Key must start with a letter or _ and contain only letters, digits, or _');
+  it.each(['1abc', 'foo', 'Foo', 'layers_dir', 'A-B', 'PATH\n'])('rejects the key %j', (key) => {
+    expect(one(key, 'v')).toBe('Key must start with an uppercase letter or _ and contain only uppercase letters, digits, or _');
+  });
+
+  it('caps the key length', () => {
+    expect(one('K'.repeat(256), 'v')).toBe(null);
+    expect(one('K'.repeat(257), 'v')).toBe('Key must be at most 256 characters');
+  });
+
+  it.each(['PATH', 'PRIVATE_APP_TOKEN', 'BALLERINA_DISTRIBUTION_HOST', 'IFS', 'CNB_PLATFORM_API'])('rejects the reserved key %s', (key) => {
+    expect(one(key, 'v')).toBe('This name is reserved by the platform');
+  });
+
+  it('caps the value at 4096 bytes', () => {
+    expect(one('FOO', 'v'.repeat(4096))).toBe(null);
+    expect(one('FOO', 'λ'.repeat(2049))).toBe('Value must be at most 4096 bytes');
+  });
+
+  it.each(['a\nb', 'a\rb', 'a\u0000b', '\u001b[2J'])('rejects the control characters in %j', (value) => {
+    expect(one('FOO', value)).toBe('Value must be a single line without control characters');
+  });
+
+  it('allows a tab in a value', () => {
+    expect(one('FOO', 'a\tb')).toBe(null);
+  });
+
+  it('accepts only the allowed bal build flags in OTHER_BAL_BUILD_ARGS', () => {
+    expect(one('OTHER_BAL_BUILD_ARGS', '--offline  --show-dependency-diagnostics')).toBe(null);
+    for (const value of ['--cloud=docker', '--offline; id', '--graalvm', '$(id)']) {
+      expect(one('OTHER_BAL_BUILD_ARGS', value)).toMatch(/^Only these flags are allowed: --offline/);
+    }
   });
 
   it('rejects a duplicate key', () => {

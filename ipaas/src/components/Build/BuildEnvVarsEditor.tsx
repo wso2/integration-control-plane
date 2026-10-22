@@ -64,6 +64,9 @@ export default function BuildEnvVarsEditor({ value, onChange, onHasError }: Buil
           (Optional)
         </Typography>
       </Stack>
+      <Typography variant="caption" color="text.secondary">
+        Used only during the build. Stored in plain text and visible to everyone in this organization — don&apos;t add secrets.
+      </Typography>
 
       {value.length > 0 && (
         <Stack gap={0.5}>

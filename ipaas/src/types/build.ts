@@ -36,8 +36,9 @@ export interface UpdateBuildpackConfigsInput {
   versionId: string;
   buildContext: string;
   languageVersion: string;
+  // Left out, these keep the stored values.
   environmentVariables?: { id?: string; key: string; value: string }[];
-  isUnitTestEnabled: boolean;
+  isUnitTestEnabled?: boolean;
   pullLatestSubmodules: boolean;
   enableTrivyScan: boolean;
 }
