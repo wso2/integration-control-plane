@@ -19,7 +19,7 @@
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, Tooltip } from '@wso2/oxygen-ui';
 import { Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { useCheckDeploymentTrackDeletable, useDeleteDeploymentTrack } from '../../../hooks/useComponents';
+import { useCheckDeploymentTrackDeletable, useDeleteDeploymentTrack } from '../../hooks/useComponents';
 
 interface TrackDeleteButtonProps {
   orgHandler: string;

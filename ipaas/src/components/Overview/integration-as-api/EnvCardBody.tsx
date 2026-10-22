@@ -16,13 +16,14 @@
  * under the License.
  */
 
-import { Box, CircularProgress, Divider, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, CircularProgress, Divider, Typography } from '@wso2/oxygen-ui';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useApiDefinition, useComponentDeployment, useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import type { EnvCardBodyProps } from '../../../types/integration';
+import { trackApiVersionMissing } from '../../../utils/deploymentTracks';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 import ConsumersPanel from './ConsumersPanel';
@@ -53,8 +54,8 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const isGraphql = activeEndpoint?.type === 'GraphQL';
 
   // The enforcing API Platform gateway URL for the selected endpoint. Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
-  // of the raw OpenChoreo external route.
-  const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null;
+  // of the raw OpenChoreo external route. Each track's API has its own URL.
+  const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id, deploymentTrackId: versionId } : null;
   const { data: apiSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint);
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
@@ -79,6 +80,9 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
     };
     return JSON.stringify(omitSecurity(swagger)) !== JSON.stringify(omitSecurity(prevSwagger));
   }, [swagger, prevSwagger, prevEndpoint, prevEnv, loadingPrevSwagger]);
+
+  // A tracked integration serves each track's APIs under the track's version, so a track without one exposes nothing.
+  const apiVersionMissing = trackApiVersionMissing(component, versionId);
 
   const showEndpointPanel = hasDeployment && !!envEndpoints.length;
   const serviceNotDeployed = !loadingDeployment && !hasDeployment;
@@ -124,10 +128,23 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
 
       {/* Cloud-only in-console API consumption: consumer applications and the
           exposed API's security config. Keyed by the BFF's
-          component/environment/endpoint triple — the component name is the
+          component/environment/endpoint triple and the track — the component name is the
           component id and the endpoint name is the endpoint id. */}
-      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (
-        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={envEndpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id }))} />
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && apiVersionMissing && (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Set an API version on this deployment track before exposing its APIs. Edit the track under Settings, Deployment Tracks.
+        </Alert>
+      )}
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !apiVersionMissing && (
+        <ConsumersPanel
+          componentName={component.id}
+          projectName={projectId}
+          envName={env.id}
+          envLabel={env.name}
+          endpointName={activeEndpoint.id}
+          deploymentTrackId={versionId}
+          endpoints={envEndpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id }))}
+        />
       )}
 
       {showInsights && <ServiceInsights envName={env.name} envId={env.id} apimEnvId={env.apimEnvId} projectId={projectId} apiId={insightsApiId} />}

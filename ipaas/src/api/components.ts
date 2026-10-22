@@ -32,6 +32,7 @@ import type {
   DeploymentTrack,
   ApiVersion,
   CreateDeploymentTrackInput,
+  UpdateDeploymentTrackInput,
   DeleteTrackResult,
   CheckDeletableResult,
 } from '../types/component';
@@ -52,15 +53,6 @@ interface DeleteComponentResult {
   canDelete: boolean;
   message: string;
   encodedData: string;
-}
-
-// Shape returned by GET /components/{name}/deployment-track on the BFF; fields
-// are optional because the BFF returns null when no track has been created yet.
-interface BffDeploymentTrack {
-  id?: string;
-  branch?: string;
-  latest?: boolean;
-  autoDeployEnabled?: boolean;
 }
 
 // OpenChoreo annotation keys the BFF reads displayName/description back from
@@ -231,42 +223,53 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
 
 export const fetchComponents = (_orgHandler: string, projectId: string): Promise<Component[]> => bff.get<ListResponse<Component>>(`/projects/${seg(projectId)}/components`).then((r) => items(r).map(withFrontendDisplayType));
 
-// The BFF's GET /projects/{p}/components/{name} returns an empty stub today
-// (TODO: revert to a single GET once the detail endpoint is live). Until then
-// we derive the component from the (wired) list endpoint and enrich it with
-// its deployment track — otherwise the detail page renders empty id/handler
-// and downstream writes (e.g. updateComponent) PUT to an empty name and 404.
+// The BFF answers with the component and its deployment tracks, each also listed
+// as an API version. Every track-scoped query is gated on a non-empty track id, so a
+// component the BFF reports no track for (no repository configured) gets one whose
+// id is the component's own: the BFF reads that as the default track.
+//
+// A BFF that predates the detail endpoint answers it with an empty stub, which would
+// leave the page with no id or handler and send later writes to an empty name. Its
+// answer is used only when it names the component; otherwise the component comes
+// from the list endpoint, as it did before the detail endpoint existed.
 export const fetchComponentByHandler = async (projectId: string, componentHandler: string): Promise<ComponentDetail> => {
+  const detail = withFrontendDisplayType(await bff.get<ComponentDetail>(`/projects/${seg(projectId)}/components/${seg(componentHandler)}`));
+  if (!detail?.id) return fetchComponentFromList(projectId, componentHandler);
+  const deploymentTracks: DeploymentTrack[] = detail.deploymentTracks?.length ? detail.deploymentTracks : [{ id: detail.id, latest: true }];
+  const apiVersions: ApiVersion[] = deploymentTracks.map((t) => ({ id: t.id, apiVersion: t.apiVersion ?? '', branch: t.branch ?? '', latest: t.latest ?? false }));
+  return { ...detail, deploymentTracks, apiVersions };
+};
+
+// Shape returned by GET /components/{name}/deployment-track on the BFF; fields
+// are optional because the BFF returns null when no track has been created yet.
+interface BffDeploymentTrack {
+  id?: string;
+  branch?: string;
+  latest?: boolean;
+  autoDeployEnabled?: boolean;
+}
+
+// The component as the list endpoint reports it, with its single track from
+// GET /components/{name}/deployment-track. The track is best-effort: the page is
+// usable without it, so a component without one gets a track whose id is its own.
+async function fetchComponentFromList(projectId: string, componentHandler: string): Promise<ComponentDetail> {
   const components = await fetchComponents('', projectId);
   const match = components.find((c) => c.handler === componentHandler || c.id === componentHandler);
   if (!match) throw new Error(`Component "${componentHandler}" not found in project "${projectId}"`);
 
-  // Track enrichment is best-effort: the detail page is still usable without it.
   let track: BffDeploymentTrack | null = null;
   try {
     track = await bff.get<BffDeploymentTrack | null>(`/components/${seg(match.handler)}/deployment-track`);
   } catch {
-    // Ignore — a synthetic track is used below.
+    // The synthesized track below stands in.
   }
 
-  // OpenChoreo synthesizes a track (id == UID) only for components whose
-  // spec.workflow.parameters.repository is set; otherwise the BFF returns an
-  // empty track. Consumers gate build/endpoint queries on a non-empty versionId
-  // (== selected track id), so fall back to the component id as a stable track
-  // id to keep those queries enabled. The component id is always non-empty.
   const deploymentTracks: DeploymentTrack[] = [
     track?.id ? { id: track.id, branch: track.branch, latest: track.latest, autoDeployEnabled: track.autoDeployEnabled } : { id: match.id, branch: track?.branch, latest: true, autoDeployEnabled: track?.autoDeployEnabled },
   ];
-
-  // Devant exposes the track also as apiVersions, and pages that need a
-  // versionId (Build, Alerts) read it from there. Cloud has a single implicit
-  // version per component, so mirror the synthesized track; apiVersion has no
-  // OpenChoreo equivalent and stays empty.
   const apiVersions: ApiVersion[] = deploymentTracks.map((t) => ({ id: t.id, apiVersion: '', branch: t.branch ?? '', latest: t.latest ?? true }));
-
-  // orgHandler is unused by cloud consumers but kept in the shape for parity.
   return { ...match, orgHandler: '', deploymentTracks, apiVersions };
-};
+}
 
 // awaits: real /endpoints mapping in the BFF (currently returns an empty list), which must yield EnvEndpoint.
 export const fetchComponentEndpoints = (componentId: string, _versionId: string): Promise<EnvEndpoint[]> => bff.get<ListResponse<EnvEndpoint>>(`/components/${seg(componentId)}/endpoints`).then(items);
@@ -311,9 +314,10 @@ export const generateComponentEnvironmentJwtSecret = (componentId: string, envir
 export const rotateComponentEnvironmentJwtSecret = (componentId: string, environmentId: string): Promise<string> =>
   bff.put<{ secret: string }>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/jwt-secret/rotate`).then((r) => r?.secret ?? '');
 
-// Sends visibility only; projectName resolves the component's release bindings.
+// Sends visibility only; projectName resolves the component's release bindings, and the
+// track says whose: visibility lives on each track's own Workload.
 export const updateEndpoint = (input: UpdateEndpointInput): Promise<object> =>
-  bff.put<object>(`/components/${seg(input.componentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ projectName: input.projectId })}`, {
+  bff.put<object>(`/components/${seg(input.componentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ projectName: input.projectId, deploymentTrackId: input.versionId })}`, {
     visibility: input.networkVisibilities.map(toVisibilityWire),
   });
 
@@ -322,14 +326,28 @@ export const createMcpProxyComponent = (_input: CreateMcpProxyComponentInput): P
   throw new Error('[cloud] components.createMcpProxyComponent: not implemented');
 };
 
-export const createDeploymentTrack = (_input: CreateDeploymentTrackInput): Promise<DeploymentTrack> => {
-  throw new Error('[cloud] components.createDeploymentTrack: not implemented');
-};
+// Every track of the integration with its environments, which the component detail leaves out.
+export const fetchDeploymentTracks = (componentId: string): Promise<DeploymentTrack[]> => bff.get<ListResponse<DeploymentTrack>>(`/components/${seg(componentId)}/deployment-tracks`).then(items);
 
-export const deleteDeploymentTrack = (_input: { orgHandler: string; componentId: string; projectId: string; deploymentTrackId: string }): Promise<DeleteTrackResult> => {
-  throw new Error('[cloud] components.deleteDeploymentTrack: not implemented');
-};
+export const createDeploymentTrack = (input: CreateDeploymentTrackInput): Promise<DeploymentTrack> =>
+  bff.post<DeploymentTrack>(`/components/${seg(input.componentId)}/deployment-tracks`, {
+    branch: input.branch,
+    description: input.description,
+    enableAutoDeploy: input.enableAutoDeploy,
+    apiVersion: input.apiVersion,
+  });
 
-export const checkDeploymentTrackDeletable = (_input: { orgHandler: string; componentId: string; projectId: string; deploymentTrackId: string }): Promise<CheckDeletableResult> => {
-  throw new Error('[cloud] components.checkDeploymentTrackDeletable: not implemented');
-};
+export const updateDeploymentTrack = (input: UpdateDeploymentTrackInput): Promise<DeploymentTrack> =>
+  bff.put<DeploymentTrack>(`/components/${seg(input.componentId)}/deployment-tracks/${seg(input.deploymentTrackId)}`, {
+    branch: input.branch,
+    description: input.description,
+    enableAutoDeploy: input.enableAutoDeploy,
+    apiVersion: input.apiVersion,
+  });
+
+// The BFF refuses a delete it would answer canDelete: false for, with the same reason.
+export const deleteDeploymentTrack = (input: { orgHandler: string; componentId: string; projectId: string; deploymentTrackId: string }): Promise<DeleteTrackResult> =>
+  bff.delete<unknown>(`/components/${seg(input.componentId)}/deployment-tracks/${seg(input.deploymentTrackId)}`).then(() => ({ status: 'success', canDelete: true, message: '' }));
+
+export const checkDeploymentTrackDeletable = (input: { orgHandler: string; componentId: string; projectId: string; deploymentTrackId: string }): Promise<CheckDeletableResult> =>
+  bff.get<{ canDelete: boolean; message?: string }>(`/components/${seg(input.componentId)}/deployment-tracks/${seg(input.deploymentTrackId)}/deletable`).then((r) => ({ canDelete: r.canDelete, message: r.message ?? '' }));

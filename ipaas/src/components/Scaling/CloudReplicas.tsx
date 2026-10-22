@@ -38,6 +38,8 @@ interface CloudReplicasProps {
   componentHandler: string;
   releaseId: string;
   environmentId: string;
+  /** The deployment track the release belongs to; '' is the default track. */
+  deploymentTrackId: string;
   orgHandler: string;
   projectHandler: string;
   canManage: boolean;
@@ -48,10 +50,10 @@ interface CloudReplicasProps {
  * the Runtime page's own table and cards, which already account for cloud having no per-pod
  * metrics: usage is only known summed across the release's pods.
  */
-export default function CloudReplicas({ projectId, componentId, componentHandler, releaseId, environmentId, orgHandler, projectHandler, canManage }: CloudReplicasProps): JSX.Element | null {
+export default function CloudReplicas({ projectId, componentId, componentHandler, releaseId, environmentId, deploymentTrackId, orgHandler, projectHandler, canManage }: CloudReplicasProps): JSX.Element | null {
   // Same queries as the Runtime page, so both pages share one cache entry per release.
   const { data: release } = useReleaseDetails(projectId, componentHandler, releaseId);
-  const { data: autoscaling } = useAutoscaling(projectId, componentId, environmentId);
+  const { data: autoscaling } = useAutoscaling(projectId, componentId, environmentId, deploymentTrackId);
 
   const pods = useComponentPods(projectId, componentHandler, releaseId, autoscaling?.enabled ? AUTOSCALING_PODS_POLL_MS : undefined);
   const metrics = useComponentPodMetrics(projectId, componentHandler, releaseId);

@@ -36,6 +36,26 @@ export function userFacingError(message: string, cause?: unknown): Error {
 }
 
 /**
+ * The BFF's 409 for a deployment track that has no API version, word for word. A track's API
+ * lives under its version, so such a track has no API to expose, secure or key until one is set.
+ */
+export const TRACK_API_VERSION_MISSING = 'Set an API version on this deployment track before exposing its APIs';
+
+/** What a drawer says about a deployment track without an API version, and where to set one. */
+export const TRACK_API_VERSION_MISSING_NOTICE = 'This deployment track has no API version, so its endpoints aren’t exposed as APIs. Set one under Settings, Deployment Tracks.';
+
+/** Whether the BFF rejected the call because the deployment track has no API version. */
+export function isTrackApiVersionMissing(error: unknown): boolean {
+  if (!(error instanceof Error) || error.name !== 'BffError') return false;
+  try {
+    const parsed = JSON.parse(String((error as { body?: unknown }).body)) as { message?: string } | null;
+    return parsed?.message === TRACK_API_VERSION_MISSING;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Turn a raw BFF failure into a message a user can act on.
  *
  * The cloud client throws `HTTP {status}: {body}` (see `api/_client.ts`),
@@ -62,6 +82,7 @@ export function friendlyApiError(error: unknown, fallback: string): string {
     case 404:
       return `${fallback} This endpoint is not exposed as an API on the gateway yet.`;
     case 409:
+      if (isTrackApiVersionMissing(error)) return `${fallback} ${TRACK_API_VERSION_MISSING}.`;
       return `${fallback} The endpoint is not exposed as an API yet — expose it first.`;
     case 503:
       return 'The API gateway is unavailable right now. Try again in a moment.';
@@ -77,13 +98,15 @@ export function friendlyApiError(error: unknown, fallback: string): string {
 
 /**
  * The notice an endpoint drawer shows when its configuration cannot be read. 409 (not exposed as
- * an API yet) and 503 (not configured in this environment) are states rather than failures, so
- * each gets copy saying what to do; anything else falls back to `friendlyApiError`.
+ * an API yet, or a deployment track with no API version) and 503 (not configured in this
+ * environment) are states rather than failures, so each gets copy saying what to do; anything else
+ * falls back to `friendlyApiError`.
  */
 export function endpointLoadNotice(error: unknown, copy: { notExposed: string; unavailable: string; readFailed: string }): { text: string; severity: 'info' | 'warning' } | null {
   if (!error) return null;
   switch (httpStatusOf(error)) {
     case 409:
+      if (isTrackApiVersionMissing(error)) return { text: TRACK_API_VERSION_MISSING_NOTICE, severity: 'info' };
       return { text: copy.notExposed, severity: 'info' };
     case 503:
       return { text: copy.unavailable, severity: 'warning' };

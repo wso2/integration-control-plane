@@ -16,9 +16,16 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { toEnvEndpoint } from './deployments';
+const get = vi.hoisted(() => vi.fn());
+
+vi.mock('./_client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./_client')>();
+  return { ...actual, bff: { ...actual.bff, get } };
+});
+
+import { fetchComponentDeployment, fetchDeploymentStatus, fetchDeploymentTrackImages, fetchReleaseMgtDeployments, toEnvEndpoint } from './deployments';
 
 // The two URLs OpenChoreo actually reports in a ReleaseBinding's status. There is no third,
 // project-scoped address: Project and Organization reach the same Service, gated by NetworkPolicy.
@@ -75,5 +82,23 @@ describe('toEnvEndpoint visibility URLs', () => {
   it('falls back to the internal URL for invokeUrl when there is no external one', () => {
     expect(toEnvEndpoint(bffEndpoint(['project'], { internal: INTERNAL }), 'r1').invokeUrl).toBe(INTERNAL_URL);
     expect(toEnvEndpoint(bffEndpoint(['external', 'project']), 'r1').invokeUrl).toBe(EXTERNAL_URL);
+  });
+});
+
+describe('deployment track forwarding', () => {
+  beforeEach(() => {
+    get.mockReset();
+    get.mockResolvedValue({ items: [] });
+  });
+
+  // Every one of these reads is per track on the BFF; dropping the id reads the default track's.
+  it.each([
+    ['the deployment', () => fetchComponentDeployment('acme', 'org', 'hello', 'next-bbbbbb', 'development'), '/components/hello/deployments?environmentId=development&versionId=next-bbbbbb'],
+    ['the builds', () => fetchDeploymentStatus('hello', 'next-bbbbbb'), '/components/hello/builds?deploymentTrackId=next-bbbbbb'],
+    ['the deployment history', () => fetchReleaseMgtDeployments('org', 'proj', 'hello', 'next-bbbbbb', 'development'), '/components/hello/release-mgt-deployments?environment=development&deploymentTrackId=next-bbbbbb'],
+    ['the deployable images', () => fetchDeploymentTrackImages('hello', 'next-bbbbbb'), '/components/hello/releases?deploymentTrackId=next-bbbbbb'],
+  ])('asks for the track’s %s', async (_, call, url) => {
+    await call();
+    expect(get).toHaveBeenCalledWith(url);
   });
 });

@@ -22,7 +22,7 @@
  * functions stay stubs.
  */
 
-import { bff, seg } from './_client';
+import { bff, q, seg } from './_client';
 import type { Autoscaling, AutoscalingCondition, AutoscalingStatus, AutoscalingWriteData, ClusterPod, Hpa, HpaMetric, HpaWriteData, HttpScaler, HttpScalerWriteData, PodMetrics, ScalingMethodToggle, ScalingPath, ScalingState } from '../types/scaling';
 
 const ni = (name: string): Promise<never> => Promise.reject(new Error(`[cloud] scaling.${name}: not implemented`));
@@ -59,7 +59,8 @@ interface BffAutoscaling {
   syncMessage?: string;
 }
 
-const autoscalingPath = (componentId: string, env: string): string => `/components/${seg(componentId)}/environments/${seg(env)}/autoscaling`;
+// Autoscaling is set on the track's binding; deploymentTrackId '' is the default track.
+const autoscalingPath = (componentId: string, env: string, deploymentTrackId: string): string => `/components/${seg(componentId)}/environments/${seg(env)}/autoscaling${q({ deploymentTrackId })}`;
 
 const toCondition = (c: BffAutoscalingCondition): AutoscalingCondition => ({ type: c.type, status: c.status, reason: c.reason ?? '', message: c.message ?? '', lastTransitionTime: c.lastTransitionTime });
 
@@ -91,7 +92,8 @@ function toAutoscaling(environmentId: string, a: BffAutoscaling): Autoscaling {
   };
 }
 
-export const getAutoscaling = async (_orgUuid: string, _projectId: string, componentId: string, environmentId: string): Promise<Autoscaling> => toAutoscaling(environmentId, await bff.get<BffAutoscaling>(autoscalingPath(componentId, environmentId)));
+export const getAutoscaling = async (_orgUuid: string, _projectId: string, componentId: string, environmentId: string, deploymentTrackId = ''): Promise<Autoscaling> =>
+  toAutoscaling(environmentId, await bff.get<BffAutoscaling>(autoscalingPath(componentId, environmentId, deploymentTrackId)));
 
 // PUT replaces the whole setting and the BFF rejects unknown fields, so the body carries exactly
 // the chosen fields: an unset memory target is left out, which removes any stored one. A 409 means
@@ -104,8 +106,8 @@ function toBffWrite(data: AutoscalingWriteData): Record<string, boolean | number
   return body;
 }
 
-export const updateAutoscaling = async (_orgUuid: string, _projectId: string, componentId: string, environmentId: string, data: AutoscalingWriteData): Promise<void> => {
-  await bff.put(autoscalingPath(componentId, environmentId), toBffWrite(data));
+export const updateAutoscaling = async (_orgUuid: string, _projectId: string, componentId: string, environmentId: string, data: AutoscalingWriteData, deploymentTrackId = ''): Promise<void> => {
+  await bff.put(autoscalingPath(componentId, environmentId, deploymentTrackId), toBffWrite(data));
 };
 
 export const getScalingState = (_orgUuid: string, _projectId: string, _componentId: string, _releaseId: string): Promise<ScalingState> => ni('getScalingState');

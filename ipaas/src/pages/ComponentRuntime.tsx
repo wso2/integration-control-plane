@@ -27,6 +27,8 @@ import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import { Permissions } from '../constants/permissions';
 import { useComponentPodMetrics, useComponentPods, useReleaseDetails, useRedeployRelease } from '../hooks/useRuntime';
 import { DeploymentStatus } from '../types/deployment';
@@ -38,11 +40,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
   const { projectId, isLoading: loadingProject } = useProjectId(project);
   const { data: comp, isLoading: loadingComponent } = useComponentByHandler(projectId, component);
 
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  const [trackId, setTrackId] = useState('');
-  useEffect(() => {
-    if (tracks.length) setTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [tracks]);
+  const { trackId } = useSelectedTrack(comp);
 
   const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError } = useEnvironments(orgUuid ?? '', projectId);
   const [envId, setEnvId] = useState('');
@@ -110,6 +108,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <DeploymentTrackBar component={comp} />
       <PageContent>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Runtime

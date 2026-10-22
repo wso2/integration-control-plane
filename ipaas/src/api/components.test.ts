@@ -19,13 +19,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const post = vi.hoisted(() => vi.fn());
+const get = vi.hoisted(() => vi.fn());
+const put = vi.hoisted(() => vi.fn());
 
 vi.mock('./_client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./_client')>();
-  return { ...actual, bff: { ...actual.bff, post } };
+  return { ...actual, bff: { ...actual.bff, post, get, put } };
 });
 
-import { createComponent } from './components';
+import { createComponent, createDeploymentTrack, fetchComponentByHandler, updateDeploymentTrack } from './components';
 import type { CreateComponentInput } from '../types/component';
 
 const baseInput: CreateComponentInput = {
@@ -109,5 +111,107 @@ describe('createComponent component-type mapping', () => {
     await createComponent({ ...baseInput, displayType } as CreateComponentInput);
     expect(bodyOf().spec.componentType.name).toBe(expected);
     expect(bodyOf().spec.workflow?.name).toBe('mi-image-builder');
+  });
+});
+
+describe('deployment tracks', () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+    put.mockReset();
+    post.mockResolvedValue({ id: 'next-bbbbbb' });
+    put.mockResolvedValue({ id: 'next-bbbbbb' });
+  });
+
+  it('reads the tracks from the component detail', async () => {
+    get.mockResolvedValue({
+      id: 'uid-1',
+      handler: 'hello',
+      deploymentTracksEnabled: true,
+      deploymentTracks: [
+        { id: 'main-aaaaaa', branch: 'main', latest: true },
+        { id: 'next-bbbbbb', branch: 'next' },
+      ],
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(get).toHaveBeenCalledWith('/projects/proj/components/hello');
+    expect(c.deploymentTracks?.map((t) => t.id)).toEqual(['main-aaaaaa', 'next-bbbbbb']);
+    expect(c.apiVersions?.map((v) => [v.id, v.branch, v.latest])).toEqual([
+      ['main-aaaaaa', 'main', true],
+      ['next-bbbbbb', 'next', false],
+    ]);
+  });
+
+  // Pages key their track-scoped queries off a track id, so a component the BFF
+  // reports no tracks for still gets one: its own id, which the BFF reads as the default.
+  it('gives a component without tracks one track named by its id', async () => {
+    get.mockResolvedValue({ id: 'uid-1', handler: 'hello' });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', latest: true }]);
+  });
+
+  // A BFF that predates the detail endpoint answers it with an empty stub.
+  it('falls back to the list endpoint when the detail answer names no component', async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') return { orgHandler: 'proj' };
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      if (path === '/components/hello/deployment-track') return { id: 'uid-1', branch: 'main', latest: true };
+      throw new Error(`unexpected ${path}`);
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.id).toBe('uid-1');
+    expect(c.handler).toBe('hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', branch: 'main', latest: true, autoDeployEnabled: undefined }]);
+    expect(c.apiVersions?.map((v) => [v.id, v.branch, v.latest])).toEqual([['uid-1', 'main', true]]);
+  });
+
+  it('keeps the fallback usable when the track lookup fails', async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') return {};
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      throw new Error('HTTP 500');
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', branch: undefined, latest: true, autoDeployEnabled: undefined }]);
+  });
+
+  it('reports a component the list does not have', async () => {
+    get.mockImplementation(async (path: string) => (path === '/projects/proj/components' ? { items: [] } : {}));
+    await expect(fetchComponentByHandler('proj', 'hello')).rejects.toThrow('Component "hello" not found in project "proj"');
+  });
+
+  it('creates a track from a branch with its API version', async () => {
+    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', apiVersion: 'v1.1', branch: 'next', description: 'preview' });
+    expect(post).toHaveBeenCalledWith('/components/hello/deployment-tracks', { branch: 'next', description: 'preview', enableAutoDeploy: undefined, apiVersion: 'v1.1' });
+  });
+
+  // JSON drops an undefined field, so the BFF assigns the version itself.
+  it('leaves the API version out when none is given', async () => {
+    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', branch: 'next' });
+    expect(JSON.parse(JSON.stringify(post.mock.calls[0][1]))).toEqual({ branch: 'next' });
+  });
+
+  it('updates a track in place', async () => {
+    await updateDeploymentTrack({ componentId: 'hello', deploymentTrackId: 'next-bbbbbb', branch: 'release' });
+    expect(put).toHaveBeenCalledWith('/components/hello/deployment-tracks/next-bbbbbb', expect.objectContaining({ branch: 'release' }));
+    expect(JSON.parse(JSON.stringify(put.mock.calls[0][1]))).not.toHaveProperty('apiVersion');
+  });
+
+  it('sets the API version of a track that has none', async () => {
+    await updateDeploymentTrack({ componentId: 'hello', deploymentTrackId: 'old-cccccc', apiVersion: 'v1.2' });
+    expect(put).toHaveBeenCalledWith('/components/hello/deployment-tracks/old-cccccc', expect.objectContaining({ apiVersion: 'v1.2' }));
+  });
+
+  it("lists each track's API version", async () => {
+    get.mockResolvedValue({
+      id: 'uid-1',
+      handler: 'hello',
+      deploymentTracks: [
+        { id: 'main-aaaaaa', branch: 'main', latest: true, apiVersion: 'v1.0' },
+        { id: 'old-cccccc', branch: 'old' },
+      ],
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.apiVersions?.map((v) => v.apiVersion)).toEqual(['v1.0', '']);
   });
 });

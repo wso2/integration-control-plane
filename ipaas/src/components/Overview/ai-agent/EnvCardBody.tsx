@@ -34,7 +34,7 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
 
   // The enforcing API Platform gateway URL for the selected endpoint. Shown in place of the raw OpenChoreo external route, as the
   // integration-as-api card does.
-  const securityRef = selectedEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id } : null;
+  const securityRef = selectedEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id, deploymentTrackId: versionId } : null;
   const { data: apiSecurity } = useEndpointSecurity(securityRef, !!selectedEndpoint);
 
   // The panel must never fall back to the raw OpenChoreo route for an agent — it's a second front

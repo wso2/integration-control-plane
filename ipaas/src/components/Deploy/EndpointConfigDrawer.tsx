@@ -39,5 +39,5 @@ export default function EndpointConfigDrawer({ open, onClose, componentId, versi
     onClose();
   };
 
-  return <ApiSecurityDrawer open={open} onClose={handleClose} componentName={componentId} envName={firstEnvId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={endpoints[0]?.id} />;
+  return <ApiSecurityDrawer open={open} onClose={handleClose} componentName={componentId} envName={firstEnvId ?? ''} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={endpoints[0]?.id} />;
 }

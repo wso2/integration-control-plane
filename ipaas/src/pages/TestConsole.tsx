@@ -35,6 +35,7 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import NotFound from '../components/NotFound';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import type { EndpointRef } from '../types/consumers';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
@@ -66,9 +67,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // Deployment track selection (default to latest) — derived rather than synced via an effect,
   // since an effect+render round trip here would delay useComponentDeployment/useEnvEndpoints below.
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const selectedTrackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { tracks, trackId: selectedTrackId } = useSelectedTrack(component);
 
   // Environment selection (by ID for stability across refetches) — same reasoning.
   const [selectedEnvIdState, setSelectedEnvId] = useState('');
@@ -92,8 +91,8 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   // The test key comes from the BFF's test-key route (component/environment/endpoint triple), and
   // the enforcing API Platform gateway URL from the endpoint's security config.
   const testKeyEndpointRef: EndpointRef | null = useMemo(
-    () => (component && selectedEnv && selectedEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id } : null),
-    [component, selectedEnv, selectedEndpoint],
+    () => (component && selectedEnv && selectedEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id, deploymentTrackId: selectedTrackId } : null),
+    [component, selectedEnv, selectedEndpoint, selectedTrackId],
   );
   const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef);
   // Try-it-out runs in the browser, so the gateway must return CORS headers for this origin.
@@ -187,7 +186,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelector} />}
+      {tracks.length > 0 && <DeploymentTrackBar component={component} extra={envSelector} />}
 
       <PageContent>
         <Typography variant="h1" sx={{ mb: 3 }}>

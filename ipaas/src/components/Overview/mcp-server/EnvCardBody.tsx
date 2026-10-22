@@ -24,6 +24,8 @@ import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
 import { useMcpTools } from '../../../hooks/useMcpTools';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import { trackApiVersionMissing } from '../../../utils/deploymentTracks';
+import { TRACK_API_VERSION_MISSING_NOTICE } from '../../../utils/apiSecurity';
 import type { EndpointRef } from '../../../types/consumers';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
@@ -56,8 +58,10 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
   const activeEndpoint = endpoints[activeIdx] ?? endpoints[0];
 
   // Enforcing gateway URL + a short-lived api-key from the API Platform.
-  const accessRef: EndpointRef | null = useMemo(() => (activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null), [component.id, env.id, activeEndpoint]);
-  const access = useEndpointTestAccess(accessRef, !!accessRef && isDeploymentReady);
+  const accessRef: EndpointRef | null = useMemo(() => (activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id, deploymentTrackId: versionId } : null), [component.id, env.id, activeEndpoint, versionId]);
+  // A track without an API version has no gateway API, so there is nothing to mint a key for.
+  const apiVersionMissing = trackApiVersionMissing(component, versionId);
+  const access = useEndpointTestAccess(accessRef, !!accessRef && isDeploymentReady && !apiVersionMissing);
 
   // Tools are listed through the apip gateway and nothing else. The raw external
   // route is open (no policy engine in its path), so falling back to it would hand
@@ -113,6 +117,10 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
       {!isDeploymentReady ? (
         <Alert severity="info" sx={{ mt: 1.5 }}>
           Deploy to view MCP tools.
+        </Alert>
+      ) : apiVersionMissing ? (
+        <Alert severity="info" sx={{ mt: 1.5 }}>
+          {TRACK_API_VERSION_MISSING_NOTICE}
         </Alert>
       ) : access.isUnavailable ? (
         // Terminal: with no gateway URL the tools call is never attempted, so this

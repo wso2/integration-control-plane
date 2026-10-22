@@ -43,13 +43,15 @@ interface ConsumersPanelProps {
   envLabel: string;
   /** Endpoint name — the BFF's `endpointName` path segment. */
   endpointName: string;
+  /** The deployment track whose API this is. */
+  deploymentTrackId: string;
   /** All endpoints of this environment, for the security drawer's selector. */
   endpoints: EndpointOption[];
 }
 
 /** Cloud-only "Consumers" subcard inside the API env card. */
-export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, endpoints }: ConsumersPanelProps): JSX.Element {
-  const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName }), [componentName, envName, endpointName]);
+export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, deploymentTrackId, endpoints }: ConsumersPanelProps): JSX.Element {
+  const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName, deploymentTrackId }), [componentName, envName, endpointName, deploymentTrackId]);
 
   const { data: consumers = [], isLoading, error } = useConsumers(projectName, endpointRef);
   const { data: security } = useEndpointSecurity(endpointRef);
@@ -154,7 +156,7 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
         </Box>
       )}
 
-      <ApiSecurityDrawer open={securityOpen} onClose={() => setSecurityOpen(false)} componentName={componentName} envName={envName} endpoints={endpoints} activeEndpointName={endpointName} />
+      <ApiSecurityDrawer open={securityOpen} onClose={() => setSecurityOpen(false)} componentName={componentName} envName={envName} deploymentTrackId={deploymentTrackId} endpoints={endpoints} activeEndpointName={endpointName} />
       <ConsumerDrawer open={dialogTarget !== null} onClose={() => setDialogTarget(null)} projectName={projectName} endpointRef={endpointRef} envLabel={envLabel} consumer={dialogTarget === 'new' ? null : dialogTarget} existingNames={existingNames} />
 
       {pendingDelete && (
