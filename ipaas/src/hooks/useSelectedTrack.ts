@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import type { Component, DeploymentTrack } from '../types/component';
 
@@ -30,6 +30,17 @@ export const TRACK_PARAM = 'track';
  */
 export function resolveTrack(tracks: DeploymentTrack[], requested: string | null): DeploymentTrack | undefined {
   return tracks.find((t) => t.id === requested) ?? tracks.find((t) => t.latest) ?? tracks[0];
+}
+
+/**
+ * How `?track=` should change so it names the track shown: `undefined` when it
+ * already does (or the tracks haven't loaded), `null` to drop it because the
+ * shown track is the default, which a missing param already means, or the shown
+ * track's id.
+ */
+export function staleTrackParam(tracks: DeploymentTrack[], requested: string | null, shown: DeploymentTrack | undefined): string | null | undefined {
+  if (!requested || !shown || tracks.some((t) => t.id === requested)) return undefined;
+  return shown.latest ? null : shown.id;
 }
 
 /**
@@ -63,6 +74,22 @@ export function useSelectedTrack(component: Component | undefined): SelectedTrac
   const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
   const requested = params.get(TRACK_PARAM);
   const track = useMemo(() => resolveTrack(tracks, requested), [tracks, requested]);
+
+  // A link to a track that no longer exists shows the default track; the URL is
+  // rewritten to match, so it never names one track while the page shows another.
+  const correction = staleTrackParam(tracks, requested, track);
+  useEffect(() => {
+    if (correction === undefined) return;
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (correction === null) next.delete(TRACK_PARAM);
+        else next.set(TRACK_PARAM, correction);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [correction, setParams]);
 
   const selectTrack = useCallback(
     (id: string) =>

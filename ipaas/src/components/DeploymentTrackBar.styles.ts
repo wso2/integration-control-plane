@@ -61,16 +61,7 @@ export const tooltipAnchorSx = {
   cursor: 'help',
 } as const;
 
-export const menuActionsRowSx = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  px: 1.5,
-  py: 0.5,
-} as const;
-
-export const menuActionButtonSx = {
+export const manageTracksItemSx = {
   fontSize: '0.75rem',
-  textTransform: 'none',
-  px: 0.5,
+  color: 'primary.main',
 } as const;

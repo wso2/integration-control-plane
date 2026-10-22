@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { resolveTrack, withTrackParam } from './useSelectedTrack';
+import { resolveTrack, staleTrackParam, withTrackParam } from './useSelectedTrack';
 import type { DeploymentTrack } from '../types/component';
 
 const MAIN: DeploymentTrack = { id: 'main-aaaaaa', branch: 'main', latest: true };
@@ -44,5 +44,17 @@ describe('withTrackParam', () => {
     ['leaves the URL alone without a track', '/c/hello/build', '?env=dev', '/c/hello/build'],
   ])('%s', (_, url, search, want) => {
     expect(withTrackParam(url, search)).toBe(want);
+  });
+});
+
+describe('staleTrackParam', () => {
+  it.each([
+    ['leaves a param that names a track', [MAIN, NEXT], 'next-bbbbbb', NEXT, undefined],
+    ['leaves a missing param', [MAIN, NEXT], null, MAIN, undefined],
+    ['drops a stale param when the default track is shown', [NEXT, MAIN], 'gone-cccccc', MAIN, null],
+    ['names the shown track when it is not the default', [NEXT], 'gone-cccccc', NEXT, 'next-bbbbbb'],
+    ['waits for the tracks to load', [], 'next-bbbbbb', undefined, undefined],
+  ])('%s', (_, tracks, requested, shown, want) => {
+    expect(staleTrackParam(tracks, requested, shown)).toBe(want);
   });
 });

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, Chip, Divider, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, Chip, Divider, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { GitBranch, HelpCircle } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -24,7 +24,7 @@ import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { PILL_SELECT_SX } from '../constants/styles';
 import { componentSettingsSectionUrl, hasComponent, useScope } from '../nav';
 import type { Component, DeploymentTrack } from '../types/component';
-import { bandSx, barCaptionSx, barSx, defaultChipSx, menuActionButtonSx, menuActionsRowSx, tooltipAnchorSx, trackLabelSx } from './DeploymentTrackBar.styles';
+import { bandSx, barCaptionSx, barSx, defaultChipSx, manageTracksItemSx, tooltipAnchorSx, trackLabelSx } from './DeploymentTrackBar.styles';
 
 interface DeploymentTrackBarProps {
   /** The integration whose tracks are picked from; the selection lives in the URL. */
@@ -32,6 +32,10 @@ interface DeploymentTrackBarProps {
   /** The page's environment selector. */
   extra?: ReactNode;
 }
+
+// The picker's "Manage Tracks" entry. A real option, so keyboard navigation and
+// type-ahead treat it like the others; no track id can take this value.
+const MANAGE_TRACKS = '__manage-tracks__';
 
 const TOOLTIP_TEXT = 'Each deployment track builds one branch and deploys it to its own environments, alongside the others.';
 
@@ -87,7 +91,11 @@ export default function DeploymentTrackBar({ component, extra }: DeploymentTrack
             <Select
               size="small"
               value={trackId}
-              onChange={(e) => selectTrack(e.target.value as string)}
+              onChange={(e) => {
+                const value = e.target.value as string;
+                if (value === MANAGE_TRACKS) navigate(tracksUrl);
+                else selectTrack(value);
+              }}
               renderValue={(value) => {
                 const track = tracks.find((t) => t.id === value);
                 return track ? <TrackLabel track={track} /> : null;
@@ -95,17 +103,9 @@ export default function DeploymentTrackBar({ component, extra }: DeploymentTrack
               inputProps={{ 'aria-label': 'Deployment Track' }}
               sx={{ ...PILL_SELECT_SX, minWidth: 160 }}>
               {tracksUrl && (
-                <Box sx={menuActionsRowSx} onKeyDown={(e) => e.stopPropagation()}>
-                  <Button
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(tracksUrl);
-                    }}
-                    sx={menuActionButtonSx}>
-                    Manage Tracks
-                  </Button>
-                </Box>
+                <MenuItem value={MANAGE_TRACKS} sx={manageTracksItemSx}>
+                  Manage Tracks
+                </MenuItem>
               )}
               {tracksUrl && <Divider sx={{ my: 0.5 }} />}
               {tracks.map((track) => (

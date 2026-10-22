@@ -132,7 +132,9 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
           {environments.map((env, index) => {
             const nextEnv = index < environments.length - 1 ? environments[index + 1] : undefined;
             return (
-              <Box key={env.id} sx={{ display: 'flex', alignItems: 'flex-start', flexShrink: 0 }}>
+              // Keyed on the track as well: a card's in-flight stop or redeploy and its open
+              // drawers belong to the track it was showing, not the one switched to.
+              <Box key={`${versionId}:${env.id}`} sx={{ display: 'flex', alignItems: 'flex-start', flexShrink: 0 }}>
                 <Box sx={{ width: 40, height: '1px', bgcolor: 'divider', mt: '112px', flexShrink: 0 }} />
                 <Box sx={{ width: 320 }}>
                   <DeployEnvironmentCard

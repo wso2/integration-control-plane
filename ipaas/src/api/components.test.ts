@@ -188,6 +188,36 @@ describe('deployment tracks', () => {
     expect(c.deploymentTracks).toEqual([{ id: 'uid-1', latest: true }]);
   });
 
+  // A BFF that predates the detail endpoint answers it with an empty stub.
+  it('falls back to the list endpoint when the detail answer names no component', async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') return { orgHandler: 'proj' };
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      if (path === '/components/hello/deployment-track') return { id: 'uid-1', branch: 'main', latest: true };
+      throw new Error(`unexpected ${path}`);
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.id).toBe('uid-1');
+    expect(c.handler).toBe('hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', branch: 'main', latest: true, autoDeployEnabled: undefined }]);
+    expect(c.apiVersions?.map((v) => [v.id, v.branch, v.latest])).toEqual([['uid-1', 'main', true]]);
+  });
+
+  it('keeps the fallback usable when the track lookup fails', async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') return {};
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      throw new Error('HTTP 500');
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', branch: undefined, latest: true, autoDeployEnabled: undefined }]);
+  });
+
+  it('reports a component the list does not have', async () => {
+    get.mockImplementation(async (path: string) => (path === '/projects/proj/components' ? { items: [] } : {}));
+    await expect(fetchComponentByHandler('proj', 'hello')).rejects.toThrow('Component "hello" not found in project "proj"');
+  });
+
   it('creates a track from a branch with its API version', async () => {
     await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', apiVersion: 'v1.1', branch: 'next', description: 'preview' });
     expect(post).toHaveBeenCalledWith('/components/hello/deployment-tracks', { branch: 'next', description: 'preview', enableAutoDeploy: undefined, apiVersion: 'v1.1' });

@@ -69,7 +69,8 @@ const ANN_PREBUILT = 'openchoreo.dev/prebuilt';
 const ANN_COMPONENT_TYPE = 'ipaas.wso2.com/component-type';
 const WEBHOOK_DISPLAY_TYPES = new Set(['webhook', 'miWebhook']);
 // Samples build as integration-as-api, so they carry the identity in componentSubType instead.
-const isWebhookInput = (input: CreateComponentInput): boolean => WEBHOOK_DISPLAY_TYPES.has(input.displayType) || input.componentSubType === 'webhook';
+const isWebhookInput = (input: CreateComponentInput): boolean =>
+  WEBHOOK_DISPLAY_TYPES.has(input.displayType) || input.componentSubType === 'webhook';
 
 // Frontend DisplayType -> OpenChoreo ComponentType reference + Workflow
 // (buildpack builder). `componentType` is the {workloadType}/{componentTypeName}
@@ -226,12 +227,49 @@ export const fetchComponents = (_orgHandler: string, projectId: string): Promise
 // as an API version. Every track-scoped query is gated on a non-empty track id, so a
 // component the BFF reports no track for (no repository configured) gets one whose
 // id is the component's own: the BFF reads that as the default track.
+//
+// A BFF that predates the detail endpoint answers it with an empty stub, which would
+// leave the page with no id or handler and send later writes to an empty name. Its
+// answer is used only when it names the component; otherwise the component comes
+// from the list endpoint, as it did before the detail endpoint existed.
 export const fetchComponentByHandler = async (projectId: string, componentHandler: string): Promise<ComponentDetail> => {
   const detail = withFrontendDisplayType(await bff.get<ComponentDetail>(`/projects/${seg(projectId)}/components/${seg(componentHandler)}`));
+  if (!detail?.id) return fetchComponentFromList(projectId, componentHandler);
   const deploymentTracks: DeploymentTrack[] = detail.deploymentTracks?.length ? detail.deploymentTracks : [{ id: detail.id, latest: true }];
   const apiVersions: ApiVersion[] = deploymentTracks.map((t) => ({ id: t.id, apiVersion: t.apiVersion ?? '', branch: t.branch ?? '', latest: t.latest ?? false }));
   return { ...detail, deploymentTracks, apiVersions };
 };
+
+// Shape returned by GET /components/{name}/deployment-track on the BFF; fields
+// are optional because the BFF returns null when no track has been created yet.
+interface BffDeploymentTrack {
+  id?: string;
+  branch?: string;
+  latest?: boolean;
+  autoDeployEnabled?: boolean;
+}
+
+// The component as the list endpoint reports it, with its single track from
+// GET /components/{name}/deployment-track. The track is best-effort: the page is
+// usable without it, so a component without one gets a track whose id is its own.
+async function fetchComponentFromList(projectId: string, componentHandler: string): Promise<ComponentDetail> {
+  const components = await fetchComponents('', projectId);
+  const match = components.find((c) => c.handler === componentHandler || c.id === componentHandler);
+  if (!match) throw new Error(`Component "${componentHandler}" not found in project "${projectId}"`);
+
+  let track: BffDeploymentTrack | null = null;
+  try {
+    track = await bff.get<BffDeploymentTrack | null>(`/components/${seg(match.handler)}/deployment-track`);
+  } catch {
+    // The synthesized track below stands in.
+  }
+
+  const deploymentTracks: DeploymentTrack[] = [
+    track?.id ? { id: track.id, branch: track.branch, latest: track.latest, autoDeployEnabled: track.autoDeployEnabled } : { id: match.id, branch: track?.branch, latest: true, autoDeployEnabled: track?.autoDeployEnabled },
+  ];
+  const apiVersions: ApiVersion[] = deploymentTracks.map((t) => ({ id: t.id, apiVersion: '', branch: t.branch ?? '', latest: t.latest ?? true }));
+  return { ...match, orgHandler: '', deploymentTracks, apiVersions };
+}
 
 // awaits: real /endpoints mapping in the BFF (currently returns an empty list), which must yield EnvEndpoint.
 export const fetchComponentEndpoints = (componentId: string, _versionId: string): Promise<EnvEndpoint[]> => bff.get<ListResponse<EnvEndpoint>>(`/components/${seg(componentId)}/endpoints`).then(items);
