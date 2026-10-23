@@ -49,7 +49,7 @@ interface ConsumersPanelProps {
 
 /** Cloud-only "Consumers" subcard inside the API env card. */
 export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, endpoints }: ConsumersPanelProps): JSX.Element {
-  const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName }), [componentName, envName, endpointName]);
+  const endpointRef: EndpointRef = useMemo(() => ({ projectName, componentName, environmentName: envName, endpointName }), [projectName, componentName, envName, endpointName]);
 
   const { data: consumers = [], isLoading, error } = useConsumers(projectName, endpointRef);
   const { data: security } = useEndpointSecurity(endpointRef);
@@ -154,7 +154,7 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
         </Box>
       )}
 
-      <ApiSecurityDrawer open={securityOpen} onClose={() => setSecurityOpen(false)} componentName={componentName} envName={envName} endpoints={endpoints} activeEndpointName={endpointName} />
+      <ApiSecurityDrawer open={securityOpen} onClose={() => setSecurityOpen(false)} projectName={projectName} componentName={componentName} envName={envName} endpoints={endpoints} activeEndpointName={endpointName} />
       <ConsumerDrawer open={dialogTarget !== null} onClose={() => setDialogTarget(null)} projectName={projectName} endpointRef={endpointRef} envLabel={envLabel} consumer={dialogTarget === 'new' ? null : dialogTarget} existingNames={existingNames} />
 
       {pendingDelete && (

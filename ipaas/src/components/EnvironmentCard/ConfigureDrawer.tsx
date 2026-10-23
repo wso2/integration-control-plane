@@ -91,11 +91,12 @@ interface ManageEndpointProps {
   projectId: string;
   versionId: string;
   releaseId: string;
+  environmentId: string;
   onBack: () => void;
 }
 
-function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, onBack }: ManageEndpointProps) {
-  const [visibilities, setVisibilities] = useState<string[]>(ep.networkVisibilities ?? [ep.visibility ?? 'Public']);
+function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, environmentId, onBack }: ManageEndpointProps) {
+  const [visibilities, setVisibilities] = useState<string[]>(() => Array.from(new Set([...(ep.displayProjectUrl === false ? [] : ['Project']), ...(ep.networkVisibilities ?? []).filter((value) => value !== 'Project')])));
   const [saveError, setSaveError] = useState<string | null>(null);
   const updateEp = useUpdateEndpoint();
 
@@ -106,7 +107,7 @@ function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, onBa
   const handleSave = () => {
     setSaveError(null);
     updateEp.mutate(
-      { componentId, projectId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: visibilities },
+      { componentId, projectId, environmentId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: visibilities },
       {
         onSuccess: onBack,
         onError: (err) => setSaveError(err instanceof Error ? err.message : 'Failed to update endpoint'),
@@ -185,7 +186,7 @@ function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, onBa
 
       <Stack direction="row" justifyContent="flex-end" gap={1}>
         <Button onClick={onBack}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending || visibilities.length === 0} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {updateEp.isPending ? 'Updating…' : 'Update'}
         </Button>
       </Stack>
@@ -1193,7 +1194,7 @@ function GenericServiceConfigureDrawer({
 
   const renderEndpoints = () => {
     if (managingEp) {
-      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} onBack={() => setManagingEp(null)} />;
+      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} environmentId={envId} onBack={() => setManagingEp(null)} />;
     }
     if (!endpoints.length) {
       return (
@@ -1276,7 +1277,7 @@ function GenericServiceConfigureDrawer({
         )}
       </Drawer>
 
-      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId} envName={envId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />
+      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} projectName={projectId} componentName={componentId} envName={envId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />
     </>
   );
 }

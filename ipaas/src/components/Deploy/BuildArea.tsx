@@ -317,7 +317,7 @@ export default function BuildArea({
 
       {/* Endpoint configuration drawer */}
       {!flags.isAutomation && !hideEndpoints && !!firstEnvReleaseId && (
-        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} />
+        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} projectId={projectId} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} />
       )}
 
       {/* Image selection drawer */}

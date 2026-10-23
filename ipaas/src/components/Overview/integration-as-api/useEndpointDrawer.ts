@@ -21,6 +21,7 @@ import type { EndpointOption, EndpointRef } from '../../../types/consumers';
 
 interface UseEndpointDrawerArgs {
   open: boolean;
+  projectName: string;
   componentName: string;
   envName: string;
   endpoints: EndpointOption[];
@@ -41,7 +42,7 @@ interface UseEndpointDrawerResult {
  * Endpoint selection shared by the cloud API drawers: the caller's `activeEndpointName` picks the
  * endpoint on open, the user's own choice takes over until the drawer closes.
  */
-export function useEndpointDrawer({ open, componentName, envName, endpoints, activeEndpointName }: UseEndpointDrawerArgs): UseEndpointDrawerResult {
+export function useEndpointDrawer({ open, projectName, componentName, envName, endpoints, activeEndpointName }: UseEndpointDrawerArgs): UseEndpointDrawerResult {
   const [userSelectedIdx, setUserSelectedIdx] = useState<number | null>(null);
 
   // Drop the override on close, so reopening derives the endpoint from activeEndpointName again.
@@ -57,9 +58,9 @@ export function useEndpointDrawer({ open, componentName, envName, endpoints, act
   const selectedIdx = userSelectedIdx ?? matchedIdx;
   const selectedEndpoint = endpoints[selectedIdx] ?? null;
 
-  const endpointRef: EndpointRef | null = useMemo(() => (selectedEndpoint ? { componentName, environmentName: envName, endpointName: selectedEndpoint.name } : null), [componentName, envName, selectedEndpoint]);
+  const endpointRef: EndpointRef | null = useMemo(() => (selectedEndpoint ? { projectName, componentName, environmentName: envName, endpointName: selectedEndpoint.name } : null), [projectName, componentName, envName, selectedEndpoint]);
 
-  const syncKey = JSON.stringify({ componentName, envName, endpointName: selectedEndpoint?.name ?? '', open });
+  const syncKey = JSON.stringify({ projectName, componentName, envName, endpointName: selectedEndpoint?.name ?? '', open });
 
   return { selectedIdx, selectEndpoint: setUserSelectedIdx, selectedEndpoint, endpointRef, syncKey };
 }

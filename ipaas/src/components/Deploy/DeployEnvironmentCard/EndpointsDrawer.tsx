@@ -31,6 +31,7 @@ interface EndpointsDrawerProps {
   isLoading?: boolean;
   envName: string;
   // Scope for the API settings drawer.
+  projectId: string;
   componentId?: string;
   environmentId?: string;
 }
@@ -48,7 +49,7 @@ const drawerSx = {
   },
 } as const;
 
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, projectId, componentId, environmentId }: EndpointsDrawerProps) {
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -94,7 +95,15 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
         </Box>
       </Drawer>
 
-      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId ?? ''} envName={environmentId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={selectedEndpoint?.id} />
+      <ApiSettingsDrawer
+        open={manageDrawerOpen}
+        onClose={() => setManageDrawerOpen(false)}
+        projectName={projectId}
+        componentName={componentId ?? ''}
+        envName={environmentId ?? ''}
+        endpoints={toEndpointOptions(endpoints)}
+        activeEndpointName={selectedEndpoint?.id}
+      />
     </>
   );
 }

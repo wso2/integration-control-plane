@@ -62,7 +62,7 @@ export interface EndpointTestAccess {
 const MINT_FAILED = 'Could not mint a test key.';
 
 /** Identity of the endpoint a minted key belongs to, so a key can never leak across endpoints. */
-const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.componentName ?? ''}|${ref?.environmentName ?? ''}|${ref?.endpointName ?? ''}`;
+const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.projectName ?? ''}|${ref?.componentName ?? ''}|${ref?.environmentName ?? ''}|${ref?.endpointName ?? ''}`;
 
 /**
  * Test-time access to a deployed endpoint exposed on the API Platform gateway:

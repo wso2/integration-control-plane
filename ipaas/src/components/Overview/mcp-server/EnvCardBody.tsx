@@ -38,7 +38,7 @@ import McpToolTile from './McpToolTile';
  * enforcing gateway URL come from the API Platform (`useEndpointTestAccess`).
  * Shared by both MCP flavors (server-from-source and proxy) via the registry.
  */
-export default function EnvCardBody({ component, env, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {
+export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {
   // Tools can only be listed once the server is actually deployed and running — an
   // in-progress deployment has no reachable `/mcp` endpoint yet, and a degraded one
   // (crash-looping, or never rendered) never will.
@@ -56,7 +56,7 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
   const activeEndpoint = endpoints[activeIdx] ?? endpoints[0];
 
   // Enforcing gateway URL + a short-lived api-key from the API Platform.
-  const accessRef: EndpointRef | null = useMemo(() => (activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null), [component.id, env.id, activeEndpoint]);
+  const accessRef: EndpointRef | null = useMemo(() => (activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null), [projectId, component.id, env.id, activeEndpoint]);
   const access = useEndpointTestAccess(accessRef, !!accessRef && isDeploymentReady);
 
   // Tools are listed through the apip gateway and nothing else. The raw external

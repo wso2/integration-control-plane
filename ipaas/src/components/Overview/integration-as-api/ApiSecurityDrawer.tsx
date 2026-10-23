@@ -30,6 +30,7 @@ import * as styles from './apiConsumption.styles';
 interface ApiSecurityDrawerProps {
   open: boolean;
   onClose: () => void;
+  projectName: string;
   /** Component name — the BFF's `componentName` path segment. */
   componentName: string;
   /** Environment name — the BFF's `environmentName` path segment. */
@@ -45,12 +46,12 @@ interface ApiSecurityDrawerProps {
  * the APIM SecurityDrawer's layout (endpoint selector + security-scheme table)
  * minus the Resources section, which has no cloud equivalent.
  */
-export default function ApiSecurityDrawer({ open, onClose, componentName, envName, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
+export default function ApiSecurityDrawer({ open, onClose, projectName, componentName, envName, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
   const [mode, setMode] = useState<SecurityMode>('none');
   const [apiKeyHeader, setApiKeyHeader] = useState(DEFAULT_API_KEY_HEADER);
   const [error, setError] = useState<string | null>(null);
 
-  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, endpoints, activeEndpointName });
+  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, projectName, componentName, envName, endpoints, activeEndpointName });
 
   const { data: security, isLoading: loadingSecurity, error: securityError } = useEndpointSecurity(endpointRef, open);
   const setSecurityMutation = useSetEndpointSecurity(endpointRef);
