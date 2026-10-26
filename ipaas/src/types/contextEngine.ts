@@ -194,7 +194,7 @@ export interface SourceFieldDef {
 export type SourceCategory = 'documentation' | 'cloud-storage' | 'code' | 'collaboration' | 'databases' | 'saas' | 'web-files';
 
 /** Icon keys the source mark can draw for connectors without a brand logo. */
-export type SourceIcon = 'book' | 'building' | 'github' | 'globe' | 'upload' | 'database' | 'headset' | 'hash' | 'kanban' | 'file' | 'cloud' | 'folder' | 'mail' | 'table' | 'chat' | 'box' | 'plug' | 'shield' | 'video' | 'rss' | 'cart' | 'card' | 'code';
+export type SourceIcon = 'book' | 'building' | 'github' | 'globe' | 'upload' | 'database' | 'headset' | 'hash' | 'kanban' | 'file' | 'cloud' | 'folder' | 'mail' | 'table' | 'chat' | 'box' | 'plug' | 'shield' | 'video' | 'rss' | 'cart' | 'card' | 'code' | 'calendar';
 
 /**
  * One entry in the connector catalog — everything the UI needs to list it and

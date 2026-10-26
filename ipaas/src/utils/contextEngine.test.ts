@@ -263,6 +263,19 @@ describe('source validation', () => {
     expect(invalidSourceFields(withValues('gdrive', { folderId: 'f', authType: 'service_account' })).map((f) => f.key)).toEqual(['clientEmail', 'privateKeyPath']);
   });
 
+  it('models the Google Calendar settings on the shared Google auth', () => {
+    const cal = blankSource('google-calendar');
+    // Defaults match the connector: the primary calendar, meetings and out-of-office, no private events.
+    expect(cal.values).toMatchObject({ authType: 'refresh_token', calendarId: 'primary', eventTypes: 'default, outOfOffice', includePrivateEvents: 'false', pageSize: '250' });
+    expect(isConnectorEnabled('google-calendar')).toBe(true);
+
+    // Only the credentials of the chosen flow are required; the calendar settings come prefilled.
+    expect(isSourceValid(withValues('google-calendar', { clientId: 'c', clientSecret: 's' }))).toBe(false);
+    expect(isSourceValid(withValues('google-calendar', { clientId: 'c', clientSecret: 's', refreshToken: 'r' }))).toBe(true);
+    expect(isSourceValid(withValues('google-calendar', { authType: 'bearer', token: 't' }))).toBe(true);
+    expect(invalidSourceFields(withValues('google-calendar', { authType: 'service_account', calendarId: '' })).map((f) => f.key)).toEqual(['clientEmail', 'privateKeyPath', 'calendarId']);
+  });
+
   it('offers an optional RML mapping on structured connectors', () => {
     const connector = (id: string) => SOURCE_CONNECTORS.find((c) => c.id === id)!;
     const rmlOf = (id: string) => visibleFields(connector(id), { authType: 'client_credentials' }).find((f) => f.key === 'rmlMapping');
