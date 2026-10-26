@@ -101,6 +101,10 @@ export default function CosmosCanvas({
   const tagRefs = useRef(new Map<number, HTMLDivElement>());
   const linksRef = useRef(buffers.links);
   linksRef.current = buffers.links;
+  // cosmos.gl reads point positions from a GPU buffer it only creates once there are points, so
+  // fitting or framing an empty graph throws; the camera is left alone until something is drawn.
+  const hasPointsRef = useRef(buffers.positions.length > 0);
+  hasPointsRef.current = buffers.positions.length > 0;
   const followRef = useRef<number | null>(null);
   // Set once the reader zooms or drags: the camera then stops following the layout.
   const userMovedRef = useRef(false);
@@ -223,7 +227,7 @@ export default function CosmosCanvas({
     const graph = graphRef.current;
     const host = hostRef.current;
     const to = fitToRef.current;
-    if (!graph) return;
+    if (!graph || !hasPointsRef.current) return;
     if (!to || !to.length || !host) {
       graph.fitView(duration, 0.15, true);
       return;
@@ -262,7 +266,7 @@ export default function CosmosCanvas({
     (index: number) => {
       const graph = graphRef.current;
       const host = hostRef.current;
-      if (!graph || !host) return;
+      if (!graph || !host || !hasPointsRef.current) return;
       userMovedRef.current = true;
       stopFollowing();
       const points = framePointsRef.current && framePointsRef.current.length ? framePointsRef.current : [index];
