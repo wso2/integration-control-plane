@@ -19,15 +19,15 @@
 import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Check, ChevronRight, Hash, Info, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions } from '../hooks/useContextEngine';
-import { absoluteUrl, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
+import { absoluteUrl, evidenceBackTarget, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
 import { contextEngineUrl, contextEvidenceUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../components/ContextEngine/styles';
-import type { ContextEvidence as Evidence } from '../types/contextEngine';
+import type { ContextEvidence as Evidence, ContextEvidenceLocationState } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 } as const;
@@ -81,6 +81,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   const engine = useContextEngine(engineId);
   const evidence = useContextEvidence(evidenceId);
   const permissions = useContextPermissions(engineId);
+  const { state } = useLocation() as { state: ContextEvidenceLocationState | null };
   const [copied, setCopied] = useState(false);
 
   if (!isContextEngineEnabled()) {
@@ -88,10 +89,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   }
 
   const engineName = engine.data?.name;
-  const toEngine = () => navigate(contextEngineUrl(scope.org, engineId, 'overview'));
+  // Back returns to the Playground when the passage was opened from there, so the conversation is still on screen.
+  const backTarget = evidenceBackTarget(state, engineName);
+  const toEngine = () => navigate(contextEngineUrl(scope.org, engineId, backTarget.tab));
   const back = (
     <Button startIcon={<ArrowLeft size={16} />} onClick={toEngine} sx={{ mb: 2 }}>
-      {engineName ? `Back to ${engineName}` : 'Back to the context engine'}
+      {backTarget.label}
     </Button>
   );
 
@@ -128,7 +131,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 Ask in the Playground
               </Button>
               <Button variant="outlined" onClick={toEngine}>
-                {engineName ? `Back to ${engineName}` : 'Back to the context engine'}
+                {backTarget.label}
               </Button>
             </Stack>
           </Box>

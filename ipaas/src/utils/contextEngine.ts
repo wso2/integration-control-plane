@@ -63,10 +63,12 @@ import type {
   AskedQuestion,
   ContextEngineModels,
   ContextEngineSummary,
+  ContextEngineTabKey,
   ContextModelInput,
   ContextModelSummary,
   ModelDraft,
   ContextEvidence,
+  ContextEvidenceLocationState,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -807,6 +809,12 @@ export function progressListingText(s: ContextEngineProgressSummary | null): str
   if (s.active > 0) return s.percent !== null && s.reading === 0 ? `Syncing · ${formatProgressPercent(s.percent)}` : 'Syncing';
   if (s.processed === 0) return 'Waiting for data';
   return `${s.processed} of ${s.sourceCount - s.hidden} processed`;
+}
+
+/** Where a passage page's Back goes: the tab the reader came from, else the engine's Overview. */
+export function evidenceBackTarget(state: ContextEvidenceLocationState | null | undefined, engineName: string | undefined): { tab: ContextEngineTabKey; label: string } {
+  if (state?.backTo === 'playground') return { tab: 'playground', label: 'Back to the Playground' };
+  return { tab: 'overview', label: engineName ? `Back to ${engineName}` : 'Back to the context engine' };
 }
 
 /** The listing's progress line for one engine; says so when the engine has sources but reported no progress, instead of showing nothing. */

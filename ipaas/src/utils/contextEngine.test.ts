@@ -27,6 +27,7 @@ import {
   engineMessage,
   engineErrorCode,
   sourceFailureNotice,
+  evidenceBackTarget,
   isTransientReadError,
   formatBytes,
   describeUploadAudience,
@@ -993,6 +994,12 @@ describe('file uploads', () => {
     expect(engineMessage(new HttpError(502, 'HTTP 502: Bad Gateway'))).toBe('Bad Gateway');
     expect(engineMessage(new Error('offline'))).toBe('offline');
     expect(deliveryIdentity('a.md', '17')).toBe('4:a.md:17');
+  });
+
+  it('sends a passage page back to where the reader came from', () => {
+    expect(evidenceBackTarget({ backTo: 'playground' }, 'HotpotQA engine')).toEqual({ tab: 'playground', label: 'Back to the Playground' });
+    expect(evidenceBackTarget(null, 'HotpotQA engine')).toEqual({ tab: 'overview', label: 'Back to HotpotQA engine' });
+    expect(evidenceBackTarget(undefined, undefined)).toEqual({ tab: 'overview', label: 'Back to the context engine' });
   });
 
   it('treats only unreachable or server errors as transient status reads', () => {
