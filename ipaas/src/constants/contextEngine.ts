@@ -745,6 +745,9 @@ export const CONTEXT_ENGINE_QUESTIONS_KEY_PREFIX = 'contextEngine:questions:';
 /** How many asked questions are kept per engine. */
 export const ASKED_QUESTIONS_MAX = 20;
 
+/** How many turns a Playground conversation keeps on the page. */
+export const PLAYGROUND_TURNS_MAX = 20;
+
 /** localStorage key of the deletion job started from this browser, per engine, so a failed deletion can be told apart and retried. */
 export const CONTEXT_ENGINE_DELETION_KEY_PREFIX = 'contextEngine:deletion:';
 
