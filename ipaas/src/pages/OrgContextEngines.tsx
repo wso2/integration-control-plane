@@ -30,7 +30,7 @@ import SearchField from '../components/SearchField';
 import ExposurePills from '../components/ContextEngine/ExposurePills';
 import SourceMark from '../components/ContextEngine/SourceMark';
 import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
-import { engineMessage, progressListingText } from '../utils/contextEngine';
+import { engineMessage, progressListingLine } from '../utils/contextEngine';
 import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
 import type { ContextEngine } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
@@ -216,9 +216,9 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                               {e.summary.sourceCount}
                             </Typography>
                           </Box>
-                          {progressListingText(e.summary.progress) && (
+                          {progressListingLine(e.summary) && (
                             <Typography variant="caption" color="text.secondary" sx={listProgressTextSx}>
-                              {progressListingText(e.summary.progress)}
+                              {progressListingLine(e.summary)}
                             </Typography>
                           )}
                         </>
