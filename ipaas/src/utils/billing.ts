@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { BillingOrg, BillingPlan } from '../types/billing';
+import type { BillingOrg } from '../types/billing';
 
 /** Subscription statuses billing counts as entitled; past_due is the payment grace period. */
 const ENTITLED_STATUSES = new Set(['active', 'trial', 'past_due']);
@@ -24,10 +24,10 @@ const ENTITLED_STATUSES = new Set(['active', 'trial', 'past_due']);
 /**
  * Whether the org is on a paid plan: billing types the subscription's plan as paid, and its status is
  * entitled. The plan's own type decides, not a billing account, which billing keeps after a downgrade
- * to a free plan. An org or plan billing could not be read for (`null`) counts as not paid, matching
- * the BFF, which refuses paid features it cannot verify.
+ * to a free plan. An org billing could not be read for (`null`), or a plan reported without a type,
+ * counts as not paid, matching the BFF, which refuses paid features it cannot verify.
  */
-export function isPaidPlan(org: BillingOrg | null, plan: BillingPlan | null): boolean {
+export function isPaidPlan(org: BillingOrg | null): boolean {
   const sub = org?.subscription;
-  return !!sub && ENTITLED_STATUSES.has(sub.status) && !!plan && plan.code === sub.plan?.code && plan.type === 'paid';
+  return !!sub && ENTITLED_STATUSES.has(sub.status) && sub.plan?.type === 'paid';
 }

@@ -19,7 +19,7 @@
 import { Alert, Box, Button, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useAutoscaling, useUpdateAutoscaling } from '../../hooks/useAutoscaling';
-import { useBillingOrg, useBillingPlan } from '../../hooks/useBillingOrg';
+import { useBillingOrg } from '../../hooks/useBillingOrg';
 import { BILLING_PRODUCT_CODE } from '../../constants/subscription';
 import { isPaidPlan } from '../../utils/billing';
 import { CLOUD_HPA_CARD, CLOUD_MEMORY_THRESHOLD, CPU_THRESHOLD, NO_AUTOSCALING_CARD, SCALE_TO_ZERO_CARD } from '../../constants/scaling';
@@ -199,12 +199,9 @@ export default function CloudAutoscaling({ projectId, componentId, environmentId
   const { data: autoscaling, dataUpdatedAt, isLoading, isError, error, refetch } = useAutoscaling(projectId, componentId, environmentId);
   const update = useUpdateAutoscaling(projectId);
   // Autoscaling is a paid feature. The billing org is the one the app shell already loads, so this
-  // reads from the shared cache rather than asking billing again; its plan summary carries no type,
-  // so the plan itself is read for whether it is paid.
-  const { org: billingOrg, isLoading: loadingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
-  const { plan, isLoading: loadingPlanType } = useBillingPlan(billingOrg?.subscription?.plan?.code);
-  const loadingPlan = loadingOrg || loadingPlanType;
-  const paid = isPaidPlan(billingOrg, plan);
+  // reads from the shared cache rather than asking billing again; its plan carries the paid type.
+  const { org: billingOrg, isLoading: loadingPlan } = useBillingOrg(BILLING_PRODUCT_CODE);
+  const paid = isPaidPlan(billingOrg);
   const [confirming, setConfirming] = useState<'enable' | 'disable' | null>(null);
   // Reports a settings change where it was made, under the threshold cards; `info` means still applying.
   const [applyStatus, setApplyStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);

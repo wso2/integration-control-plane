@@ -18,43 +18,43 @@
 
 import { describe, expect, it } from 'vitest';
 import { isPaidPlan } from './billing';
-import type { BillingOrg, BillingPlan } from '../types/billing';
+import type { BillingOrg } from '../types/billing';
 
-const org = (status: string, planCode?: string): BillingOrg => ({
+const org = (status: string, plan?: { code: string; type?: string }): BillingOrg => ({
   id: 'org',
   name: 'Org',
-  subscription: { id: 's', org_id: 'org', status, plan: planCode ? { code: planCode } : undefined },
+  subscription: { id: 's', org_id: 'org', status, plan },
 });
-const growth: BillingPlan = { code: 'integration-platform-growth', type: 'paid' };
-const trialPlan: BillingPlan = { code: 'integration-platform-trial', type: 'free' };
+const growth = { code: 'integration-platform-growth', type: 'paid' };
+const trialPlan = { code: 'integration-platform-trial', type: 'free' };
 
 describe('isPaidPlan', () => {
   it('is paid on a plan billing types as paid', () => {
-    expect(isPaidPlan(org('active', growth.code), growth)).toBe(true);
+    expect(isPaidPlan(org('active', growth))).toBe(true);
   });
 
   it('stays paid through the payment grace period', () => {
-    expect(isPaidPlan(org('past_due', growth.code), growth)).toBe(true);
+    expect(isPaidPlan(org('past_due', growth))).toBe(true);
   });
 
   it('is not paid on a free plan, including after a downgrade billing re-activated', () => {
-    expect(isPaidPlan(org('active', trialPlan.code), trialPlan)).toBe(false);
-    expect(isPaidPlan(org('trial', trialPlan.code), trialPlan)).toBe(false);
+    expect(isPaidPlan(org('active', trialPlan))).toBe(false);
+    expect(isPaidPlan(org('trial', trialPlan))).toBe(false);
   });
 
   it('is not paid once the subscription is suspended, cancelled or inactive', () => {
     for (const status of ['suspended', 'cancelled', 'inactive']) {
-      expect(isPaidPlan(org(status, growth.code), growth)).toBe(false);
+      expect(isPaidPlan(org(status, growth))).toBe(false);
     }
   });
 
-  it('is not paid when the plan read is for another plan than the subscription is on', () => {
-    expect(isPaidPlan(org('active', trialPlan.code), growth)).toBe(false);
+  it('is not paid when billing reports the plan without a type', () => {
+    expect(isPaidPlan(org('active', { code: growth.code }))).toBe(false);
   });
 
-  it('is not paid when billing or the plan could not be read', () => {
-    expect(isPaidPlan(null, growth)).toBe(false);
-    expect(isPaidPlan(org('active', growth.code), null)).toBe(false);
-    expect(isPaidPlan({ id: 'org', name: 'Org' }, growth)).toBe(false);
+  it('is not paid when billing could not be read or there is no plan', () => {
+    expect(isPaidPlan(null)).toBe(false);
+    expect(isPaidPlan(org('active'))).toBe(false);
+    expect(isPaidPlan({ id: 'org', name: 'Org' })).toBe(false);
   });
 });
