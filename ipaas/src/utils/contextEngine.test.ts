@@ -795,6 +795,7 @@ describe('file uploads', () => {
     expect(contentTypeForFile('notes.md', '')).toBe('text/markdown');
     expect(contentTypeForFile('README.MD', 'application/octet-stream')).toBe('text/markdown');
     expect(contentTypeForFile('data.json')).toBe('application/json');
+    expect(contentTypeForFile('accounts.CSV', 'application/vnd.ms-excel')).toBe('text/csv');
     expect(contentTypeForFile('archive', 'text/plain; charset=utf-8')).toBe('text/plain');
     expect(contentTypeForFile('photo.png', 'image/png')).toBe('');
   });

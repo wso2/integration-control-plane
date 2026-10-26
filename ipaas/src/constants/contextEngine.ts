@@ -707,6 +707,7 @@ export const UPLOAD_CONTENT_TYPES: Record<string, string> = {
   html: 'text/html',
   htm: 'text/html',
   json: 'application/json',
+  csv: 'text/csv',
   pdf: 'application/pdf',
 };
 
