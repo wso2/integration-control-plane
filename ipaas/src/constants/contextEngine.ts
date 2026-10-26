@@ -797,6 +797,15 @@ export const UPLOAD_SLOW_AFTER_MS = 2 * 60_000;
 
 /** The engine reads every file with its language model, so the time grows with the file. Seen: 3.4 MB of JSON took 58 minutes. */
 export const UPLOAD_SLOW_NOTE = 'Big files take long: a 3 MB file can take about an hour.';
+/** Status reads in flight at once from one browser, so a restored list of files does not flood the engine. */
+export const UPLOAD_CHECK_CONCURRENCY = 4;
+
+/** Waits before reading a file's status again after the engine could not be reached, then every UPLOAD_CHECK_STEADY_MS. */
+export const UPLOAD_CHECK_BACKOFF_MS = [3000, 6000, 12000] as const;
+export const UPLOAD_CHECK_STEADY_MS = 30000;
+
+/** Shown under a file whose status check did not reach the engine; its last status stays. */
+export const UPLOAD_CHECK_RETRY_DETAIL = "Couldn't reach the engine to check this file. Trying again.";
 
 export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
   uploading: 'Uploading',
