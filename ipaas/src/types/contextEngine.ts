@@ -414,6 +414,8 @@ export interface UploadEntry extends UploadedFile {
   retrying?: boolean;
   /** The engine's worker has started on the file, so the wait is the work itself, not the queue. */
   running?: boolean;
+  /** The last status read did not reach the engine: `status` is the last one read and another read is scheduled. */
+  check?: 'retrying';
 }
 
 export interface IngestFileInput {

@@ -1039,6 +1039,14 @@ export function summarizeUploads(entries: Pick<UploadEntry, 'status'>[]): string
   return parts.join(' · ');
 }
 
+/**
+ * A status read that said nothing about the file: the engine could not be reached, or
+ * answered with a server error. Only the engine's own verdicts may mark a file as failed.
+ */
+export function isTransientReadError(err: unknown): boolean {
+  return !(err instanceof HttpError) || err.status >= 500 || err.status === 0;
+}
+
 /** The engine's own message from a failed request, e.g. "Unsupported Media Type", else a fallback. */
 export function engineMessage(err: unknown, fallback = 'The request failed.'): string {
   if (!(err instanceof HttpError)) return err instanceof Error && err.message ? err.message : fallback;
