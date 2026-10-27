@@ -26,6 +26,8 @@ import { useComponentDeployment, useEnvEndpoints } from '../hooks/useDeployments
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import type { ComponentScope } from '../nav';
 import type { EndpointRef } from '../types/consumers';
 
@@ -45,9 +47,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   const { data: environments = [] } = useEnvironments(scope.org, projectId);
 
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const selectedTrackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { trackId: selectedTrackId } = useSelectedTrack(component);
 
   const [selectedEnvId, setSelectedEnvId] = useState('');
   useEffect(() => {
@@ -69,7 +69,10 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   // Only a live deployment can answer MCP calls; every other state explains itself.
   const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
 
-  const accessRef: EndpointRef | null = useMemo(() => (component && selectedEnv && activeEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id } : null), [component, selectedEnv, activeEndpoint]);
+  const accessRef: EndpointRef | null = useMemo(
+    () => (component && selectedEnv && activeEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id, deploymentTrackId: selectedTrackId } : null),
+    [component, selectedEnv, activeEndpoint, selectedTrackId],
+  );
   const access = useEndpointTestAccess(accessRef, !!accessRef && isActive);
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.
@@ -100,6 +103,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+      <DeploymentTrackBar component={component} />
       <PageContent sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
           <PageTitle>

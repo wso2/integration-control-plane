@@ -31,6 +31,7 @@ import { useRelease } from '../hooks/useDevopsConfigs';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { mainContainer } from '../utils/devopsConfigs';
 import type { ComponentScope } from '../nav';
 
@@ -41,11 +42,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
   const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, comp?.id);
 
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  const [trackId, setTrackId] = useState('');
-  useEffect(() => {
-    if (tracks.length) setTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [tracks]);
+  const { tracks, trackId } = useSelectedTrack(comp);
 
   const { data: environments = [] } = useEnvironments(org, projectId);
   const [envId, setEnvId] = useState('');
@@ -55,7 +52,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
 
   const { data: deployment } = useComponentDeployment(org, orgUuid ?? '', comp?.id ?? '', trackId, envId);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release } = useRelease(projectId, comp?.id, releaseId);
+  const { data: release } = useRelease(projectId, comp?.id, releaseId, trackId);
   const containerId = useMemo(() => mainContainer(release?.containers)?.ID ?? '', [release]);
   const selectedEnv = environments.find((e) => e.id === envId);
 
@@ -70,7 +67,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
 
   return (
     <Box>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
+      {tracks.length > 0 && <DeploymentTrackBar component={comp} extra={envSelect} />}
       <PageContent>
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
@@ -100,9 +97,30 @@ export default function ComponentScaling({ org, project, component }: ComponentS
                     {alert.message}
                   </Alert>
                 )}
-                {/* Keyed by environment so an unsaved HPA choice never carries over to another one. */}
-                <CloudAutoscaling key={selectedEnv.id} projectId={projectId} componentId={comp.id} environmentId={selectedEnv.id} environmentName={selectedEnv.name} canManage={canManage} onSaved={onSaved} onError={onError} />
-                <CloudReplicas key={`replicas-${selectedEnv.id}`} projectId={projectId} componentId={comp.id} componentHandler={component} releaseId={releaseId} environmentId={selectedEnv.id} orgHandler={org} projectHandler={project} canManage={canManage} />
+                {/* Keyed by track and environment so an unsaved HPA choice never carries over to another binding. */}
+                <CloudAutoscaling
+                  key={`${trackId}/${selectedEnv.id}`}
+                  projectId={projectId}
+                  componentId={comp.id}
+                  environmentId={selectedEnv.id}
+                  environmentName={selectedEnv.name}
+                  deploymentTrackId={trackId}
+                  canManage={canManage}
+                  onSaved={onSaved}
+                  onError={onError}
+                />
+                <CloudReplicas
+                  key={`replicas-${trackId}/${selectedEnv.id}`}
+                  projectId={projectId}
+                  componentId={comp.id}
+                  componentHandler={component}
+                  releaseId={releaseId}
+                  environmentId={selectedEnv.id}
+                  deploymentTrackId={trackId}
+                  orgHandler={org}
+                  projectHandler={project}
+                  canManage={canManage}
+                />
               </>
             )}
           </>

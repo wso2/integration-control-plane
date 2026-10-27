@@ -33,6 +33,7 @@ interface EndpointsDrawerProps {
   // Scope for the API settings drawer.
   componentId?: string;
   environmentId?: string;
+  deploymentTrackId?: string;
 }
 
 const drawerSx = {
@@ -48,7 +49,7 @@ const drawerSx = {
   },
 } as const;
 
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId, deploymentTrackId }: EndpointsDrawerProps) {
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -94,7 +95,15 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
         </Box>
       </Drawer>
 
-      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId ?? ''} envName={environmentId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={selectedEndpoint?.id} />
+      <ApiSettingsDrawer
+        open={manageDrawerOpen}
+        onClose={() => setManageDrawerOpen(false)}
+        componentName={componentId ?? ''}
+        envName={environmentId ?? ''}
+        deploymentTrackId={deploymentTrackId}
+        endpoints={toEndpointOptions(endpoints)}
+        activeEndpointName={selectedEndpoint?.id}
+      />
     </>
   );
 }

@@ -38,6 +38,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useExecutionArguments, useRuntimeArguments, useTaskExecutionCount, useTaskExecutions, useTriggerComponent } from '../hooks/useExecutions';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validateRequiredFields } from '../utils/runtimeArguments';
 import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
 import { isTerminalStatus } from '../utils/executionStatus';
@@ -58,9 +59,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
 
   // Derived rather than synced via an effect — an effect+render round trip here would delay
   // useComponentDeployment/useRuntimeArguments/useTaskExecutions below from becoming enabled.
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const trackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { tracks, trackId } = useSelectedTrack(comp);
 
   const { data: environments = [] } = useEnvironments(org, projectId);
   const [envIdState, setEnvId] = useState('');
@@ -415,7 +414,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
       {tracks.length > 0 && (
         // Pin the track bar to the top of the scroll area so it stays visible as the page scrolls.
         <Box sx={{ position: 'sticky', top: 0, zIndex: (theme) => theme.zIndex.appBar }}>
-          <DeploymentTrackBar extra={envSelect} />
+          <DeploymentTrackBar component={comp} extra={envSelect} />
         </Box>
       )}
       {/* Plain padded container (not PageContent) so the page uses the single outer scroller — the

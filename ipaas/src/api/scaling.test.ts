@@ -160,3 +160,17 @@ describe('updateAutoscaling', () => {
     await expect(updateAutoscaling('org', 'proj', 'order api', 'development', { enabled: true, minReplicas: 1, maxReplicas: 2, cpuUtilizationPercentage: 50 })).rejects.toThrow(message);
   });
 });
+
+describe('deployment tracks', () => {
+  it("reads and writes the named track's setting, and the default track's without one", async () => {
+    get.mockResolvedValue({ environment: 'development', supported: true, effective: true, enabled: false, maxReplicasLimit: 5 });
+
+    await getAutoscaling('org', 'proj', 'order api', 'development', 'next-2a46a3');
+    await updateAutoscaling('org', 'proj', 'order api', 'development', { enabled: false }, 'next-2a46a3');
+    await getAutoscaling('org', 'proj', 'order api', 'development');
+
+    expect(get).toHaveBeenNthCalledWith(1, `${PATH}?deploymentTrackId=next-2a46a3`);
+    expect(put).toHaveBeenCalledWith(`${PATH}?deploymentTrackId=next-2a46a3`, { enabled: false });
+    expect(get).toHaveBeenNthCalledWith(2, PATH);
+  });
+});

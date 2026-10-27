@@ -301,6 +301,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'configs-secrets', navId: 'configs-secrets', segment: 'admin/configs', parent: 'operate' },
     { key: 'health-checks', navId: 'health-checks', segment: 'admin/health-checks', parent: 'operate' },
     { key: 'scaling', navId: 'scaling', segment: 'admin/scaling', parent: 'operate' },
+    { key: 'settings', navId: 'component-settings', segment: 'settings' },
   ],
 };
 

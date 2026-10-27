@@ -17,7 +17,21 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createConfigMap, createSecret, getConfigMapDetails, getConfigMaps, getContainerConfigMounts, getReleaseById, getSecrets, mountConfig, removeConfigMount, updateConfigMapData, updateConfigMount, updateContainer, updateSecret } from '../api/devopsConfigs';
+import {
+  createConfigMap,
+  createSecret,
+  getConfigMapDetails,
+  getConfigMaps,
+  getContainerConfigMounts,
+  getReleaseById,
+  getSecrets,
+  mountConfig,
+  removeConfigMount,
+  updateConfigMapData,
+  updateConfigMount,
+  updateContainer,
+  updateSecret,
+} from '../api/devopsConfigs';
 import type { ConfigMapWriteData, ConfigMountPath, ConfigMountWriteData, ContainerWriteData, DevopsConfigMap, DevopsConfigMapDetails, DevopsConfigMount, DevopsSecret, ReleaseDetails, SaveConfigInput, SecretWriteData } from '../types/devopsConfigs';
 import { useOrgUuid } from './useOrgUuid';
 
@@ -25,50 +39,52 @@ const ROOT = 'devopsConfigs';
 
 // ── reads ─────────────────────────────────────────────────────────────────────
 
+// deploymentTrackId on these hooks is the deployment track the page shows; '' is the default track.
+
 /** The env's release (app-environment) — used to resolve the main container. */
-export function useRelease(projectId: string, componentId: string | undefined, releaseId: string | undefined) {
+export function useRelease(projectId: string, componentId: string | undefined, releaseId: string | undefined, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   return useQuery<ReleaseDetails>({
-    queryKey: [ROOT, 'release', orgUuid, projectId, componentId, releaseId],
-    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, releaseId!),
+    queryKey: [ROOT, 'release', orgUuid, projectId, componentId, releaseId, deploymentTrackId],
+    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, releaseId!, deploymentTrackId),
     enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId,
   });
 }
 
-export function useConfigMaps(projectId: string, environmentId: string | undefined) {
+export function useConfigMaps(projectId: string, environmentId: string | undefined, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsConfigMap[]>({
-    queryKey: [ROOT, 'configmaps', orgUuid, projectId, environmentId],
-    queryFn: () => getConfigMaps(orgUuid!, projectId, environmentId!),
+    queryKey: [ROOT, 'configmaps', orgUuid, projectId, environmentId, deploymentTrackId],
+    queryFn: () => getConfigMaps(orgUuid!, projectId, environmentId!, deploymentTrackId),
     enabled: !!orgUuid && !!projectId && !!environmentId,
   });
 }
 
-export function useSecrets(projectId: string, environmentId: string | undefined) {
+export function useSecrets(projectId: string, environmentId: string | undefined, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsSecret[]>({
-    queryKey: [ROOT, 'secrets', orgUuid, projectId, environmentId],
-    queryFn: () => getSecrets(orgUuid!, projectId, environmentId!),
+    queryKey: [ROOT, 'secrets', orgUuid, projectId, environmentId, deploymentTrackId],
+    queryFn: () => getSecrets(orgUuid!, projectId, environmentId!, deploymentTrackId),
     enabled: !!orgUuid && !!projectId && !!environmentId,
   });
 }
 
 /** Full data (incl. values) for one ConfigMap — used to prefill the edit form. */
-export function useConfigMapDetails(projectId: string, environmentId: string | undefined, configMapId: string | undefined) {
+export function useConfigMapDetails(projectId: string, environmentId: string | undefined, configMapId: string | undefined, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsConfigMapDetails>({
-    queryKey: [ROOT, 'configMapDetails', orgUuid, projectId, environmentId, configMapId],
-    queryFn: () => getConfigMapDetails(orgUuid!, projectId, environmentId!, configMapId!),
+    queryKey: [ROOT, 'configMapDetails', orgUuid, projectId, environmentId, configMapId, deploymentTrackId],
+    queryFn: () => getConfigMapDetails(orgUuid!, projectId, environmentId!, configMapId!, deploymentTrackId),
     enabled: !!orgUuid && !!projectId && !!environmentId && !!configMapId,
   });
 }
 
 /** Config-mounts on a component's container — the configs actually injected here. */
-export function useContainerConfigMounts(projectId: string, componentId: string | undefined, releaseId: string | undefined, containerId: string | undefined) {
+export function useContainerConfigMounts(projectId: string, componentId: string | undefined, releaseId: string | undefined, containerId: string | undefined, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsConfigMount[]>({
-    queryKey: [ROOT, 'mounts', orgUuid, projectId, componentId, releaseId, containerId],
-    queryFn: () => getContainerConfigMounts(orgUuid!, projectId, componentId!, releaseId!, containerId!),
+    queryKey: [ROOT, 'mounts', orgUuid, projectId, componentId, releaseId, containerId, deploymentTrackId],
+    queryFn: () => getContainerConfigMounts(orgUuid!, projectId, componentId!, releaseId!, containerId!, deploymentTrackId),
     enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && !!containerId,
   });
 }
@@ -86,7 +102,7 @@ function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
  * mounts use `config_type: File` + a `File` mount at `mountPath`. Secrets go to
  * the `/secret` endpoint with `secret_type: Opaque`. Mirrors Devant + the HAR.
  */
-export function useSaveConfig(projectId: string) {
+export function useSaveConfig(projectId: string, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
@@ -100,17 +116,17 @@ export function useSaveConfig(projectId: string) {
         if (isSecret) {
           const body: SecretWriteData = { name, metadata: {}, environment_id: envId, organization_id: orgUuid, project_id: projectId, app_environment_id: releaseId, isBase64: false, save_type: 'Save', secret_type: 'Opaque', config_type, data };
           if (existing) {
-            await updateSecret(orgUuid, projectId, existing.configId, body);
+            await updateSecret(orgUuid, projectId, existing.configId, body, deploymentTrackId);
             return existing.configId;
           }
-          return (await createSecret(orgUuid, projectId, body)).ID;
+          return (await createSecret(orgUuid, projectId, body, deploymentTrackId)).ID;
         }
         const body: ConfigMapWriteData = { name, metadata: {}, environment_id: envId, organization_id: orgUuid, project_id: projectId, app_environment_id: releaseId, isBase64: false, config_type, data };
         if (existing) {
-          await updateConfigMapData(orgUuid, projectId, existing.configId, body);
+          await updateConfigMapData(orgUuid, projectId, existing.configId, body, deploymentTrackId);
           return existing.configId;
         }
-        return (await createConfigMap(orgUuid, projectId, body)).ID;
+        return (await createConfigMap(orgUuid, projectId, body, deploymentTrackId)).ID;
       })();
 
       // 2. On create, mount the config onto the container. On edit, env-var mounts
@@ -131,7 +147,7 @@ export function useSaveConfig(projectId: string) {
                 config_key: 'data',
                 deploy_changes: true,
               };
-        await mountConfig(orgUuid, projectId, componentId, mount);
+        await mountConfig(orgUuid, projectId, componentId, mount, deploymentTrackId);
       } else if (kind === 'fileMount') {
         const mount: ConfigMountWriteData = {
           app_environment_id: releaseId,
@@ -144,7 +160,7 @@ export function useSaveConfig(projectId: string) {
           config_key: 'data',
           deploy_changes: true,
         };
-        await updateConfigMount(orgUuid, projectId, { componentId, releaseId, containerId, mountId: existing.mountId }, mount);
+        await updateConfigMount(orgUuid, projectId, { componentId, releaseId, containerId, mountId: existing.mountId }, mount, deploymentTrackId);
       }
       return configId;
     },
@@ -153,26 +169,26 @@ export function useSaveConfig(projectId: string) {
 }
 
 /** Update a release container (resources, image-pull policy, command/args). */
-export function useUpdateContainer(projectId: string, componentId: string, releaseId: string) {
+export function useUpdateContainer(projectId: string, componentId: string, releaseId: string, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ containerId, data }: { containerId: string; data: ContainerWriteData }) => {
       if (!orgUuid) throw new Error('Organization is not available.');
-      return updateContainer(orgUuid, projectId, componentId, releaseId, containerId, data);
+      return updateContainer(orgUuid, projectId, componentId, releaseId, containerId, data, deploymentTrackId);
     },
     onSuccess: () => invalidateAll(qc),
   });
 }
 
 /** Remove a config from the container by deleting its config-mount. */
-export function useDeleteConfig(projectId: string) {
+export function useDeleteConfig(projectId: string, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (path: ConfigMountPath) => {
       if (!orgUuid) throw new Error('Organization is not available.');
-      return removeConfigMount(orgUuid, projectId, path);
+      return removeConfigMount(orgUuid, projectId, path, deploymentTrackId);
     },
     onSuccess: () => invalidateAll(qc),
   });

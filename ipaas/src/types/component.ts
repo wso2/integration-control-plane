@@ -42,6 +42,8 @@ export interface Component {
   /** 'BI' | 'MI' | 'other' — 'other' is another platform's runtime. Cloud only. */
   buildpackType?: string;
   deploymentTracks?: DeploymentTrack[];
+  /** Created with deployment tracks: the only kind that can have more than one. Cloud only. */
+  deploymentTracksEnabled?: boolean;
 }
 
 export interface DeploymentTrack {
@@ -50,6 +52,10 @@ export interface DeploymentTrack {
   branch?: string;
   /** Clone URL of the repository this track builds from. Cloud only. */
   url?: string;
+  /**
+   * Part of the track's gateway API URL (`v1.0`), fixed once set. Empty for an integration
+   * created before tracks, and for a track created before tracks had API versions.
+   */
   apiVersion?: string;
   description?: string;
   latest?: boolean;
@@ -57,14 +63,37 @@ export interface DeploymentTrack {
   createdAt?: string;
   updatedAt?: string;
   versionStrategy?: string;
+  /** Where the track is deployed. Cloud only. */
+  environments?: DeploymentTrackEnvironment[];
+}
+
+export interface DeploymentTrackEnvironment {
+  environment: string;
+  release?: string;
+  ready: boolean;
 }
 
 export interface CreateDeploymentTrackInput {
   orgUuid: string;
   componentId: string;
-  apiVersion: string;
+  /** Left out, the BFF gives the track the next minor version after the integration's highest. */
+  apiVersion?: string;
   branch: string;
   description?: string;
+  /** Left out, the track follows the integration's auto-deploy setting. */
+  enableAutoDeploy?: boolean;
+}
+
+/** A field left out keeps the track's current value. */
+export interface UpdateDeploymentTrackInput {
+  componentId: string;
+  deploymentTrackId: string;
+  branch?: string;
+  /** An empty string removes the description. */
+  description?: string;
+  enableAutoDeploy?: boolean;
+  /** Accepted only for a track that has no API version yet: a set version can't change. */
+  apiVersion?: string;
 }
 
 /** Result of `deleteDeploymentTrack` (also used for proxy versions, which share the mutation). */

@@ -41,6 +41,8 @@ interface ApiSettingsDrawerProps {
   componentName: string;
   /** Environment name (the RFC 1123 slug) — the BFF's `environmentName` path segment. */
   envName: string;
+  /** The deployment track whose API is configured; absent means the default track. */
+  deploymentTrackId?: string;
   /** Endpoints of this environment; the drawer configures one at a time. */
   endpoints: EndpointOption[];
   /** Endpoint selected when the drawer opens. */
@@ -48,12 +50,12 @@ interface ApiSettingsDrawerProps {
 }
 
 /** Cloud-only "API Settings" drawer: CORS and rate limiting. Authentication lives in ApiSecurityDrawer. */
-export default function ApiSettingsDrawer({ open, onClose, componentName, envName, endpoints, activeEndpointName }: ApiSettingsDrawerProps): JSX.Element {
+export default function ApiSettingsDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSettingsDrawerProps): JSX.Element {
   const [cors, setCors] = useState<CorsConfig | null>(null);
   const [rateLimit, setRateLimit] = useState<RateLimitConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, endpoints, activeEndpointName });
+  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, deploymentTrackId, endpoints, activeEndpointName });
 
   const { data: policies, isLoading, error: loadError } = useEndpointPolicies(endpointRef, open);
   const setPolicies = useSetEndpointPolicies(endpointRef);

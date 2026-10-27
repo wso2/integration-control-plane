@@ -50,14 +50,15 @@ import { bff, items, q, seg, type ListResponse, type MessageResponse } from './_
 import { getEndpointLabel } from '../utils/endpoints';
 import { toVisibilityLabel } from './_visibility';
 
-// Underscored params (_orgHandler, _orgUuid, _projectId, _versionId) are kept
-// on these signatures for devant contract parity; cloud does not use them.
+// Underscored params (_orgHandler, _orgUuid, _projectId) are kept on these
+// signatures for devant contract parity; cloud does not use them. versionId is
+// the deployment track, and '' is the default track.
 
 // Empty 200 body (no deployment yet) → ./_client's request() resolves it as
 // `undefined`, not `null`. React Query treats an `undefined` queryFn result as a
 // bug and errors the query, so coalesce here to the declared `| null` contract.
-export const fetchComponentDeployment = (_orgHandler: string, _orgUuid: string, componentId: string, _versionId: string, environmentId: string): Promise<ComponentDeployment | null> =>
-  bff.get<ComponentDeployment | null>(`/components/${seg(componentId)}/deployments${q({ environmentId })}`).then((d) => d ?? null);
+export const fetchComponentDeployment = (_orgHandler: string, _orgUuid: string, componentId: string, versionId: string, environmentId: string): Promise<ComponentDeployment | null> =>
+  bff.get<ComponentDeployment | null>(`/components/${seg(componentId)}/deployments${q({ environmentId, versionId })}`).then((d) => d ?? null);
 
 // Shape of GET /components/{name}/releases/{releaseId}/endpoints (BFF
 // APIResourcesResponse): the workload's endpoints with resolved URLs and the
@@ -182,9 +183,9 @@ function toBuildRun(run: BffWorkflowRun & { name: string }): BuildRun {
 // is the BFF builds (WorkflowRun) list, reshaped to the same BuildRun
 // contract. (The BFF /deployments/history endpoint is release-binding state, not
 // builds, so it is intentionally not used here.)
-export const fetchDeploymentStatus = (componentId: string, _versionId: string): Promise<BuildRun[]> =>
+export const fetchDeploymentStatus = (componentId: string, versionId: string): Promise<BuildRun[]> =>
   bff
-    .get<ListResponse<BffWorkflowRun>>(`/components/${seg(componentId)}/builds`)
+    .get<ListResponse<BffWorkflowRun>>(`/components/${seg(componentId)}/builds${q({ deploymentTrackId: versionId })}`)
     .then(items)
     .then((runs) => runs.filter(hasRunName).map(toBuildRun));
 
@@ -225,12 +226,12 @@ function toReleaseMgtDeployment(d: BffReleaseMgtDeployment): ReleaseMgtDeploymen
 
 // Wired — the BFF serves this from GetDeploymentHistory (one entry per current
 // ReleaseBinding) and maps the binding's readiness to SUCCESS/FAILED/PENDING.
-export const fetchReleaseMgtDeployments = (_orgUuid: string, _projectId: string, componentId: string, _versionId: string, environmentId: string): Promise<ReleaseMgtDeployment[]> =>
-  bff.get<ListResponse<BffReleaseMgtDeployment>>(`/components/${seg(componentId)}/release-mgt-deployments${q({ environment: environmentId })}`).then((r) => items(r).map(toReleaseMgtDeployment));
+export const fetchReleaseMgtDeployments = (_orgUuid: string, _projectId: string, componentId: string, versionId: string, environmentId: string): Promise<ReleaseMgtDeployment[]> =>
+  bff.get<ListResponse<BffReleaseMgtDeployment>>(`/components/${seg(componentId)}/release-mgt-deployments${q({ environment: environmentId, deploymentTrackId: versionId })}`).then((r) => items(r).map(toReleaseMgtDeployment));
 
 // Deployable images are the component's successful builds (the BFF derives them
 // from WorkflowRuns, not ComponentReleases, which only exist post-deploy).
-export const fetchDeploymentTrackImages = (componentId: string, _versionId: string): Promise<DeploymentTrackImage[]> => bff.get<ListResponse<DeploymentTrackImage>>(`/components/${seg(componentId)}/releases`).then(items);
+export const fetchDeploymentTrackImages = (componentId: string, versionId: string): Promise<DeploymentTrackImage[]> => bff.get<ListResponse<DeploymentTrackImage>>(`/components/${seg(componentId)}/releases${q({ deploymentTrackId: versionId })}`).then(items);
 
 // The BFF has no BYOI image-history endpoint, so report an empty history.
 export const fetchByoiImageHistory = (_orgUuid: string, _projectId: string, _componentId: string, _versionId: string): Promise<ByoiImage[]> => Promise.resolve([]);

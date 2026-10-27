@@ -26,11 +26,11 @@ const ROOT = 'scaling';
 
 const AUTOSCALING_POLL_MS = 10_000;
 
-export function useAutoscaling(projectId: string, componentId: string | undefined, environmentId: string) {
+export function useAutoscaling(projectId: string, componentId: string | undefined, environmentId: string, deploymentTrackId = '') {
   const orgUuid = useOrgUuid();
   return useQuery({
-    queryKey: [ROOT, 'autoscaling', orgUuid, projectId, componentId, environmentId],
-    queryFn: () => getAutoscaling(orgUuid!, projectId, componentId!, environmentId),
+    queryKey: [ROOT, 'autoscaling', orgUuid, projectId, componentId, environmentId, deploymentTrackId],
+    queryFn: () => getAutoscaling(orgUuid!, projectId, componentId!, environmentId, deploymentTrackId),
     enabled: !!orgUuid && !!projectId && !!componentId && !!environmentId,
     retry: false,
     refetchInterval: (query) => (pollsAutoscaling(query.state.data) ? AUTOSCALING_POLL_MS : false),
@@ -41,9 +41,9 @@ export function useUpdateAutoscaling(projectId: string) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ componentId, environmentId, data }: { componentId: string; environmentId: string; data: AutoscalingWriteData }) => {
+    mutationFn: ({ componentId, environmentId, deploymentTrackId, data }: { componentId: string; environmentId: string; deploymentTrackId?: string; data: AutoscalingWriteData }) => {
       if (!orgUuid) throw new Error('Organization is not available.');
-      return updateAutoscaling(orgUuid, projectId, componentId, environmentId, data);
+      return updateAutoscaling(orgUuid, projectId, componentId, environmentId, data, deploymentTrackId);
     },
     // Resync after failures too: a rejected write leaves the saved setting as the truth to show.
     onSettled: () => qc.invalidateQueries({ queryKey: [ROOT, 'autoscaling'] }),

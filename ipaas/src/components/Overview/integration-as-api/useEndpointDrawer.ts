@@ -23,6 +23,8 @@ interface UseEndpointDrawerArgs {
   open: boolean;
   componentName: string;
   envName: string;
+  /** The deployment track whose API the drawer configures. */
+  deploymentTrackId?: string;
   endpoints: EndpointOption[];
   activeEndpointName?: string;
 }
@@ -41,7 +43,7 @@ interface UseEndpointDrawerResult {
  * Endpoint selection shared by the cloud API drawers: the caller's `activeEndpointName` picks the
  * endpoint on open, the user's own choice takes over until the drawer closes.
  */
-export function useEndpointDrawer({ open, componentName, envName, endpoints, activeEndpointName }: UseEndpointDrawerArgs): UseEndpointDrawerResult {
+export function useEndpointDrawer({ open, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: UseEndpointDrawerArgs): UseEndpointDrawerResult {
   const [userSelectedIdx, setUserSelectedIdx] = useState<number | null>(null);
 
   // Drop the override on close, so reopening derives the endpoint from activeEndpointName again.
@@ -57,9 +59,9 @@ export function useEndpointDrawer({ open, componentName, envName, endpoints, act
   const selectedIdx = userSelectedIdx ?? matchedIdx;
   const selectedEndpoint = endpoints[selectedIdx] ?? null;
 
-  const endpointRef: EndpointRef | null = useMemo(() => (selectedEndpoint ? { componentName, environmentName: envName, endpointName: selectedEndpoint.name } : null), [componentName, envName, selectedEndpoint]);
+  const endpointRef: EndpointRef | null = useMemo(() => (selectedEndpoint ? { componentName, environmentName: envName, endpointName: selectedEndpoint.name, deploymentTrackId } : null), [componentName, envName, selectedEndpoint, deploymentTrackId]);
 
-  const syncKey = JSON.stringify({ componentName, envName, endpointName: selectedEndpoint?.name ?? '', open });
+  const syncKey = JSON.stringify({ componentName, envName, endpointName: selectedEndpoint?.name ?? '', deploymentTrackId, open });
 
   return { selectedIdx, selectEndpoint: setUserSelectedIdx, selectedEndpoint, endpointRef, syncKey };
 }

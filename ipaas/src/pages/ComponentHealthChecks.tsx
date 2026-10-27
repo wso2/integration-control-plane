@@ -33,6 +33,7 @@ import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { mainContainer } from '../utils/devopsConfigs';
 import type { ComponentScope } from '../nav';
 
@@ -43,11 +44,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
   const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, comp?.id);
 
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  const [trackId, setTrackId] = useState('');
-  useEffect(() => {
-    if (tracks.length) setTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [tracks]);
+  const { tracks, trackId } = useSelectedTrack(comp);
 
   const { data: environments = [], isLoading: loadingEnvs } = useEnvironments(org, projectId);
   const [envId, setEnvId] = useState('');
@@ -57,16 +54,16 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
 
   const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(org, orgUuid ?? '', comp?.id ?? '', trackId, envId);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId);
+  const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId, trackId);
   const containers = useMemo(() => release?.containers ?? [], [release]);
   const mainC = useMemo(() => mainContainer(containers), [containers]);
 
-  const { data: healthChecks = [], isLoading: loadingHc } = useHealthChecks(projectId, comp?.id, releaseId, envId);
+  const { data: healthChecks = [], isLoading: loadingHc } = useHealthChecks(projectId, comp?.id, releaseId, envId, trackId);
 
   const syncError = healthChecks.find((hc) => hc.sync_status)?.sync_message;
 
-  // trackId/envId are picked in an effect, so their queries are briefly disabled rather than loading.
-  const resolving = isLoading || loadingEnvs || (tracks.length > 0 && !trackId) || (environments.length > 0 && !envId) || loadingDeployment || loadingRelease || loadingHc;
+  // envId is picked in an effect, so its queries are briefly disabled rather than loading.
+  const resolving = isLoading || loadingEnvs || (environments.length > 0 && !envId) || loadingDeployment || loadingRelease || loadingHc;
 
   const [creating, setCreating] = useState(false);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -81,7 +78,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
 
   return (
     <Box>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
+      {tracks.length > 0 && <DeploymentTrackBar component={comp} extra={envSelect} />}
       <PageContent>
         <PageTitle>
           <PageTitle.Header>Health Checks</PageTitle.Header>
@@ -115,6 +112,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
             projectId={projectId}
             componentId={comp.id}
             releaseId={releaseId}
+            deploymentTrackId={trackId}
             environmentId={envId}
             onClose={() => setCreating(false)}
             onSaved={(m) => {
@@ -136,7 +134,9 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
           healthChecks.map((hc) => {
             const container = containers.find((c) => c.ID === hc.container_id);
             if (!container) return null;
-            return <HealthCheckCard key={hc.ID} healthCheck={hc} container={container} projectId={projectId} componentId={comp.id} releaseId={releaseId} environmentId={envId} canManage={canManage} onNotify={notify} />;
+            return (
+              <HealthCheckCard key={`${trackId}/${hc.ID}`} healthCheck={hc} container={container} projectId={projectId} componentId={comp.id} releaseId={releaseId} deploymentTrackId={trackId} environmentId={envId} canManage={canManage} onNotify={notify} />
+            );
           })
         )}
       </PageContent>

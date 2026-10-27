@@ -34,6 +34,8 @@ interface ApiSecurityDrawerProps {
   componentName: string;
   /** Environment name — the BFF's `environmentName` path segment. */
   envName: string;
+  /** The deployment track whose API is configured; absent means the default track. */
+  deploymentTrackId?: string;
   /** Endpoints of this environment; the drawer configures one at a time. */
   endpoints: EndpointOption[];
   /** Endpoint selected when the drawer opens (the env card's active endpoint). */
@@ -45,12 +47,12 @@ interface ApiSecurityDrawerProps {
  * the APIM SecurityDrawer's layout (endpoint selector + security-scheme table)
  * minus the Resources section, which has no cloud equivalent.
  */
-export default function ApiSecurityDrawer({ open, onClose, componentName, envName, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
+export default function ApiSecurityDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
   const [mode, setMode] = useState<SecurityMode>('none');
   const [apiKeyHeader, setApiKeyHeader] = useState(DEFAULT_API_KEY_HEADER);
   const [error, setError] = useState<string | null>(null);
 
-  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, endpoints, activeEndpointName });
+  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, deploymentTrackId, endpoints, activeEndpointName });
 
   const { data: security, isLoading: loadingSecurity, error: securityError } = useEndpointSecurity(endpointRef, open);
   const setSecurityMutation = useSetEndpointSecurity(endpointRef);
