@@ -47,6 +47,7 @@ interface RuntimeConfig {
   INTEGRATION_BUILDER_LLM_MODEL?: string;
   INTEGRATION_BUILDER_MAX_TOKENS?: string;
   INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL?: string;
+  MOESIF_APP_URL?: string;
 }
 
 export interface ApiConfig {
@@ -108,6 +109,8 @@ export interface ApiConfig {
   integrationBuilderMaxTokens: number;
   /** AI Integration Builder central GraphQL URL for connectors. */
   integrationBuilderCentralGraphqlUrl: string;
+  /** Trusted Moesif embed origin; empty disables API Insights. */
+  moesifAppUrl?: string;
 }
 
 // Extend window interface
@@ -199,6 +202,7 @@ export async function loadConfig(): Promise<void> {
       integrationBuilderLlmModel: config.INTEGRATION_BUILDER_LLM_MODEL || 'claude-sonnet-4-6',
       integrationBuilderMaxTokens: parsePositiveInt(config.INTEGRATION_BUILDER_MAX_TOKENS, DEFAULT_CONFIG.integrationBuilderMaxTokens),
       integrationBuilderCentralGraphqlUrl: config.INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL || 'https://api.dev-central.ballerina.io/2.0/graphql',
+      moesifAppUrl: config.MOESIF_APP_URL?.trim() || undefined,
     };
 
     console.info('✓ Runtime configuration loaded from config.json');

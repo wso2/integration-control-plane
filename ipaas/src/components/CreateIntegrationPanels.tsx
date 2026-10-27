@@ -44,6 +44,7 @@ import { PROVIDER_ICON_SX, GITHUB_ICON_SX, SECTION_LABEL_SX } from '../constants
 import { resourceUrl, narrow, type ProjectScope } from '../nav';
 import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl } from '../paths';
 import type { Sample } from '../types/samples';
+import { sampleKey } from '../constants/samples';
 import { toHandler } from '../utils/string';
 import { buildCloudEditorUrl } from '../utils/cloudEditor';
 import { useProjectId } from '../hooks/useProjects';
@@ -103,7 +104,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
   const { data: sampleImages } = useChoreoSampleImages(orgUuid, projectId);
 
   const [selectedTab, setSelectedTab] = useState(0);
-  const [deployingSample, setDeployingSample] = useState<string | null>(null);
+  const [deployingSample, setDeployingSample] = useState<Sample | null>(null);
   const [isImportAuthenticating, setIsImportAuthenticating] = useState(false);
   const [pageError, setPageError] = useState<{ message: string; severity: 'error' | 'warning' } | null>(null);
 
@@ -179,7 +180,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const handleQuickDeploy = (sample: Sample) => {
     if (!projectId || creationBlocked) return;
-    setDeployingSample(sample.displayName);
+    setDeployingSample(sample);
     createComponent.mutate(
       {
         displayName: sample.displayName,
@@ -207,7 +208,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       <Box sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label="Integration"
-          subLabel={deployingSample || undefined}
+          subLabel={deployingSample?.displayName}
           isPending={createComponent.isPending}
           isSuccess={createComponent.isSuccess}
           error={createComponent.isError ? (createComponent.error?.message ?? 'Something went wrong. Please try again.') : null}
@@ -455,7 +456,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {featuredSamples.map((sample) => (
-                        <SampleRowCard key={sample.displayName} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample === sample.displayName} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
+                        <SampleRowCard key={sampleKey(sample)} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
                       ))}
                     </Box>
                   )}

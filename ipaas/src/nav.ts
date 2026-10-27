@@ -286,6 +286,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'build', navId: 'build', segment: 'build' },
     { key: 'deploy', navId: 'org-deploy', segment: 'deploy' },
     { key: 'test', navId: 'org-test', segment: 'test' },
+    { key: 'insights', navId: 'org-insights', segment: 'insights' },
     { key: 'logs', navId: 'org-logs', segment: 'logs', parent: 'org-observability' },
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },

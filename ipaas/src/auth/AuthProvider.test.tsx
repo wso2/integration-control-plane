@@ -31,6 +31,7 @@ interface FakeSdk {
   getDecodedIdToken: ReturnType<typeof vi.fn>;
   clearSession: ReturnType<typeof vi.fn>;
   signIn: ReturnType<typeof vi.fn>;
+  signInSilently: ReturnType<typeof vi.fn>;
   signOut: ReturnType<typeof vi.fn>;
 }
 
@@ -97,6 +98,7 @@ function sdkWith(patch: Partial<FakeSdk> = {}): void {
     getDecodedIdToken: vi.fn(async () => ID_CLAIMS),
     clearSession: vi.fn(),
     signIn: vi.fn(async () => undefined),
+    signInSilently: vi.fn(async () => false),
     signOut: vi.fn(async () => ''),
     ...patch,
   });
@@ -129,6 +131,7 @@ const screen = (): string => container.textContent ?? '';
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW });
   localStorage.clear();
+  sessionStorage.clear();
   window.history.replaceState({}, '', '/organizations/acme/home');
   window.API_CONFIG = {
     authBaseUrl: 'https://idp.example',
@@ -148,6 +151,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
   vi.useRealTimers();
 });
 
@@ -315,6 +319,107 @@ describe('cloud AuthProvider — settling the session', () => {
     expect(screen()).toBe('signed-out');
     expect(sdk.get().clearSession).toHaveBeenCalled();
     expect(getOrgUuidFromToken()).toBeNull();
+  });
+});
+
+describe('cloud AuthProvider — joining a Thunder session', () => {
+  it('asks Thunder once, without its sign-in page, before settling signed out', async () => {
+    sdkWith();
+    await render();
+    expect(sdk.get().signInSilently).toHaveBeenCalledTimes(1);
+    expect(sdk.get().signInSilently).toHaveBeenCalledWith({ resource: 'urn:wso2:amp' });
+    expect(screen()).toBe('signed-out');
+  });
+
+  it('signs in from the session Thunder already holds', async () => {
+    const token = accessToken();
+    sdkWith({
+      signInSilently: vi.fn(async () => {
+        sdk.set({ getAccessToken: vi.fn(async () => token) });
+        return true;
+      }),
+    });
+    await render();
+    expect(screen()).toBe('loading');
+
+    // The SDK confirms the session on a later poll.
+    act(() => sdk.set({ isSignedIn: true }));
+    await settle();
+    expect(screen()).toBe('signed-in');
+    expect(sdk.get().signIn).not.toHaveBeenCalled();
+  });
+
+  it('settles signed out when the silent attempt fails, and logs why', async () => {
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const error = new Error('iframe gone');
+    sdkWith({ signInSilently: vi.fn(async () => Promise.reject(error)) });
+    await render();
+    expect(screen()).toBe('signed-out');
+    expect(sdk.get().signInSilently).toHaveBeenCalledTimes(1);
+    expect(debug).toHaveBeenCalledWith(expect.any(String), error);
+  });
+
+  it('does not ask on the load right after a sign-out, and asks again on the next', async () => {
+    signedInSdk();
+    await render();
+    void auth?.logout();
+    await settle();
+    act(() => root.unmount());
+
+    sdkWith();
+    root = createRoot(container);
+    await render();
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+    expect(screen()).toBe('signed-out');
+    act(() => root.unmount());
+
+    root = createRoot(container);
+    await render();
+    expect(sdk.get().signInSilently).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders nothing of the app inside the SDK’s silent sign-in iframe', async () => {
+    vi.spyOn(window, 'parent', 'get').mockReturnValue({} as Window);
+    window.history.replaceState({}, '', '/signin?code=abc&state=instance_0_sign-in-silently_request_0');
+    sdkWith();
+    await render();
+    expect(sdk.mounts).toBeGreaterThan(0);
+    expect(screen()).toBe('');
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+  });
+
+  it('renders the app for a silent state outside an iframe or off /signin', async () => {
+    window.history.replaceState({}, '', '/signin?code=abc&state=instance_0_sign-in-silently_request_0');
+    sdkWith();
+    await render();
+    expect(screen()).not.toBe('');
+    act(() => root.unmount());
+
+    vi.spyOn(window, 'parent', 'get').mockReturnValue({} as Window);
+    window.history.replaceState({}, '', '/organizations/acme/home?state=instance_0_sign-in-silently_request_0');
+    root = createRoot(container);
+    await render();
+    expect(screen()).not.toBe('');
+  });
+
+  it('does not ask on a sign-in landing, which carries Thunder’s answer', async () => {
+    window.history.replaceState({}, '', '/signin?code=abc&state=instance_0_request_0');
+    sdkWith();
+    await render();
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+  });
+
+  it('does not ask on a sign-in landing that carries an error, not a code', async () => {
+    window.history.replaceState({}, '', '/signin?error=access_denied&state=instance_0_request_0');
+    sdkWith();
+    await render();
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+  });
+
+  it('does not ask when a stored session is restored', async () => {
+    signedInSdk();
+    await render();
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
   });
 });
 

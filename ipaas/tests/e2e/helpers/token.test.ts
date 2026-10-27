@@ -26,7 +26,7 @@ import {
   MIN_TOKEN_LIFETIME_MS,
   parseTokenBody,
   SDK_SESSION_ACTIVE_KEY,
-  SDK_STORAGE_VERSION,
+  SDK_STORAGE_VERSIONS,
   sdkSessionKey,
   tokenSubject,
   TOKEN_FETCH_ATTEMPTS,
@@ -126,13 +126,7 @@ describe('assertUsableLifetime', () => {
 });
 
 describe('buildStorageState', () => {
-  const entries = (): Record<string, string> =>
-    Object.fromEntries(
-      buildStorageState('the-token', CLAIMS, 'https://console.example.com').origins[0].localStorage.map((e) => [
-        e.name,
-        e.value,
-      ]),
-    );
+  const entries = (): Record<string, string> => Object.fromEntries(buildStorageState('the-token', CLAIMS, 'https://console.example.com').origins[0].localStorage.map((e) => [e.name, e.value]));
 
   // The record goes in sessionStorage, which storageState cannot carry, so it is parked.
   const parkedSession = (): Record<string, unknown> => {
@@ -181,9 +175,7 @@ describe('buildStorageState', () => {
   });
 
   it('scopes the storage to the console origin', () => {
-    expect(buildStorageState('t', CLAIMS, 'https://console.example.com').origins[0].origin).toBe(
-      'https://console.example.com',
-    );
+    expect(buildStorageState('t', CLAIMS, 'https://console.example.com').origins[0].origin).toBe('https://console.example.com');
   });
 });
 
@@ -216,7 +208,7 @@ describe('SDK storage format', () => {
   // The seeded keys are the SDK's internal format, verified against one version. Bumping the
   // pin should stop here until someone signs in with the new version and re-checks them.
   it.each(['@thunderid/browser', '@thunderid/react'])('was verified against the %s version package.json pins', (pkg) => {
-    expect((manifest.dependencies as Record<string, string>)[pkg]).toBe(SDK_STORAGE_VERSION);
+    expect((manifest.dependencies as Record<string, string>)[pkg]).toBe(SDK_STORAGE_VERSIONS[pkg]);
   });
 });
 

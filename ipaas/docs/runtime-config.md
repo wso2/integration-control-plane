@@ -35,8 +35,18 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `RAG_INGESTION_IMAGE`                                                        | Image the unported RAG ingestion wizard deploys; knowledge bases use the images the BFF is configured with               |
 | `INTEGRATION_BUILDER_*`                                                      | AI Integration Builder: copilot base URL, model, max tokens, connectors GraphQL URL                                      |
 | `AI_COPILOT_URL_SUFFIX`                                                      | Copilot path on the system APIs gateway                                                                                  |
+| `MOESIF_APP_URL`                                                             | API Insights. See below.                                                                                                 |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
+
+## API Insights
+
+The org-level API Insights page embeds the Moesif dashboard, the same way the API Platform console does.
+
+- `MOESIF_APP_URL` is the Moesif origin: `https://web-dev.moesif.com` or `https://www.moesif.com`. Any other value leaves the page unconfigured.
+- The console fetches a Moesif viewer token from ipaas-service (`CHOREO_BASE_API_URL`) at `/analytics/id-token`. ipaas-service forwards the call to platform-api, which serves it only on an internal route.
+
+Moesif only answers an embed from origins it allowlists, so each console origin must be added on Moesif's side. Until then the page times out with Retry.
 
 ## Verification
 

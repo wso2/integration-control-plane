@@ -44,9 +44,10 @@ describe('updateBuildpackConfigs', () => {
     put.mockResolvedValue({ success: true });
   });
 
-  it('sends the unit test opt-in and build environment variables without row ids', async () => {
+  it('sends the unit test opt-in, the submodule setting and build environment variables without row ids', async () => {
     await updateBuildpackConfigs({
       ...baseInput,
+      pullLatestSubmodules: true,
       environmentVariables: [
         { id: 'row-1', key: 'FOO', value: 'bar' },
         { key: 'MI_VERSION', value: '4.4.0' },
@@ -55,6 +56,7 @@ describe('updateBuildpackConfigs', () => {
 
     expect(put).toHaveBeenCalledWith('/components/demo-svc/buildpack-config', {
       isUnitTestEnabled: true,
+      pullLatestSubmodules: true,
       environmentVariables: [
         { key: 'FOO', value: 'bar' },
         { key: 'MI_VERSION', value: '4.4.0' },
@@ -65,13 +67,13 @@ describe('updateBuildpackConfigs', () => {
   it('sends an empty list so removing every variable clears them', async () => {
     await updateBuildpackConfigs({ ...baseInput, environmentVariables: [] });
 
-    expect(put.mock.calls[0][1]).toEqual({ isUnitTestEnabled: true, environmentVariables: [] });
+    expect(put.mock.calls[0][1]).toEqual({ isUnitTestEnabled: true, pullLatestSubmodules: false, environmentVariables: [] });
   });
 
   it('leaves the stored variables untouched when none are given', async () => {
     await updateBuildpackConfigs(baseInput);
 
     const body = put.mock.calls[0][1] as Record<string, unknown>;
-    expect(JSON.parse(JSON.stringify(body))).toEqual({ isUnitTestEnabled: true });
+    expect(JSON.parse(JSON.stringify(body))).toEqual({ isUnitTestEnabled: true, pullLatestSubmodules: false });
   });
 });

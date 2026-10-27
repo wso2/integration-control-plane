@@ -253,11 +253,12 @@ export async function fetchChoreoSampleImages(_orgUuid: string, _projectId: stri
   }
 }
 
-// Saves the unit test opt-in and the build environment variables (key/value only;
-// `id` is a UI row key). The BFF has no equivalent of the other build settings.
+// Saves the unit test opt-in, the submodule setting and the build environment
+// variables (key/value only; `id` is a UI row key).
 export async function updateBuildpackConfigs(input: UpdateBuildpackConfigsInput): Promise<string> {
   await bff.put(`/components/${seg(input.componentId)}/buildpack-config`, {
     isUnitTestEnabled: input.isUnitTestEnabled,
+    pullLatestSubmodules: input.pullLatestSubmodules,
     environmentVariables: input.environmentVariables?.map(({ key, value }) => ({ key, value })),
   });
   return '';

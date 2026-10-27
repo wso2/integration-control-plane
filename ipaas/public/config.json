@@ -15,5 +15,6 @@
   "INTEGRATION_BUILDER_COPILOT_BASE_URL": "https://apis.preview-dv.devant.dev/copilot",
   "INTEGRATION_BUILDER_LLM_MODEL": "claude-sonnet-4-6",
   "INTEGRATION_BUILDER_MAX_TOKENS": "1024",
-  "INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL": "https://api.dev-central.ballerina.io/2.0/graphql"
+  "INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL": "https://api.dev-central.ballerina.io/2.0/graphql",
+  "MOESIF_APP_URL": "https://web-dev.moesif.com"
 }

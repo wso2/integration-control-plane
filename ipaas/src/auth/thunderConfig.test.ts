@@ -48,6 +48,10 @@ describe('thunderConfig', () => {
     expect(config.tokenLifecycle?.refreshToken?.autoRefresh).toBe(true);
   });
 
+  it('gives up on a silent sign-in after 3s, not the SDK default 10s', () => {
+    expect(thunderConfig().session?.silentSignIn).toEqual({ timeout: 3_000 });
+  });
+
   it('turns off what the console does not use', () => {
     const { preferences } = thunderConfig();
     expect(preferences?.resolveFromMeta).toBe(false);

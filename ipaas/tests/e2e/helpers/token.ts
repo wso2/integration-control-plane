@@ -37,11 +37,11 @@ export interface TokenClaims {
 /**
  * Where the Thunder SDK keeps a signed-in session: the session record in sessionStorage (the
  * console's configured storage), the active flag in localStorage. This is the SDK's own,
- * internal format — read off a real sign-in with @thunderid/browser at this version, and not
- * a public API. token.test.ts fails when package.json pins another version, so an upgrade
- * re-checks these keys instead of finding out from a run that never signs in.
+ * internal format — read off a real sign-in with the SDK at these versions, and not a public
+ * API. token.test.ts fails when package.json pins other versions, so an upgrade re-checks these
+ * keys instead of finding out from a run that never signs in.
  */
-export const SDK_STORAGE_VERSION = '1.1.0';
+export const SDK_STORAGE_VERSIONS: Record<string, string> = { '@thunderid/browser': '1.2.2', '@thunderid/react': '1.3.3' };
 export const SDK_SESSION_ACTIVE_KEY = 'thunderid-session-active';
 
 /** Instance 0 is the only SDK instance the console creates. */
@@ -144,8 +144,7 @@ export function tokenSubject(token: string): string | undefined {
 export function assertClientMatchesConsole(claims: TokenClaims, consoleClientId: string): void {
   if (claims.clientId !== consoleClientId) {
     throw new Error(
-      `Token was issued to client '${claims.clientId}', but the console is configured for '${consoleClientId}' (ASGARDEO_CLIENT_ID), ` +
-        'so the console will not find the seeded session. Request a token for the console client from the provider.',
+      `Token was issued to client '${claims.clientId}', but the console is configured for '${consoleClientId}' (ASGARDEO_CLIENT_ID), ` + 'so the console will not find the seeded session. Request a token for the console client from the provider.',
     );
   }
 }
@@ -154,10 +153,7 @@ export function assertUsableLifetime(claims: TokenClaims, nowMs: number): void {
   const remainingMs = claims.exp * 1000 - nowMs;
   if (remainingMs < MIN_TOKEN_LIFETIME_MS) {
     const remaining = Math.round(remainingMs / 1000);
-    throw new Error(
-      `Token has ${remaining}s of life left, less than the ${MIN_TOKEN_LIFETIME_MS / 60_000} minutes a run needs. ` +
-        'Fetch a fresh one; if the provider keeps serving short-lived tokens, its refresh is failing.',
-    );
+    throw new Error(`Token has ${remaining}s of life left, less than the ${MIN_TOKEN_LIFETIME_MS / 60_000} minutes a run needs. ` + 'Fetch a fresh one; if the provider keeps serving short-lived tokens, its refresh is failing.');
   }
 }
 
@@ -256,9 +252,7 @@ async function fetchFromProvider(url: string, authToken: string | undefined): Pr
 
   // The hint is chosen from what actually failed. An unconditional "a 503 means..." note sent a
   // real debugging session after the provider when the tunnel was simply down.
-  const hint = last.startsWith('transport error')
-    ? 'Nothing accepted the connection: for a local run, check the port-forward to the internal gateway is still up.'
-    : 'A 503 means it holds no live token — its browser login or refresh has failed.';
+  const hint = last.startsWith('transport error') ? 'Nothing accepted the connection: for a local run, check the port-forward to the internal gateway is still up.' : 'A 503 means it holds no live token — its browser login or refresh has failed.';
   throw new Error(`Token provider at ${url} did not return a token after ${TOKEN_FETCH_ATTEMPTS} attempts (last: ${last}). ${hint}`);
 }
 

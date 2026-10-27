@@ -40,6 +40,9 @@ export function thunderConfig(): ThunderIDProviderProps {
     // Each tab also refreshes its own tokens, so tabs never race on Thunder's rotating refresh token.
     storage: 'sessionStorage',
     tokenLifecycle: { refreshToken: { autoRefresh: true } },
+    // A working prompt=none answer takes about a second. The SDK would wait 10s for an iframe that
+    // never answers (framing blocked), so give up sooner and sign in interactively.
+    session: { silentSignIn: { timeout: 3_000 } },
     // The SDK checks ID token signatures only with RSA/PS/ML-DSA algorithms, and
     // Thunder also signs with ES256. The ID token comes straight from the token
     // endpoint over TLS (OIDC Core 3.1.3.7), is only read for the profile, and
