@@ -59,7 +59,8 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
     return () => window.removeEventListener('keydown', release);
   }, [pinned]);
 
-  const togglePin = (focus: CitationFocus) => setPinned((prev) => (prev && prev.n === focus.n && prev.sentence === focus.sentence ? null : focus));
+  // The rail names only the passage, so its click releases a pin made from any sentence; a mark releases its own sentence and re-pins another.
+  const togglePin = (focus: CitationFocus) => setPinned((prev) => (prev && prev.n === focus.n && (focus.sentence === undefined || prev.sentence === focus.sentence) ? null : focus));
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>

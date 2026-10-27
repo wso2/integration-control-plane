@@ -32,10 +32,20 @@
  * one is missing, because the engine holds back a file with an unmapped tag.
  */
 
-import { useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent, updateContextSource } from '#api/contextEngine';
-import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
-import { engineMessage, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
+import {
+  CONTEXT_ENGINE_FILES_KEY_PREFIX,
+  CONTEXT_ENGINE_RULES_KEY_PREFIX,
+  CONTEXT_JOB_TERMINAL_STATES,
+  UPLOAD_CHECK_BACKOFF_MS,
+  UPLOAD_CHECK_CONCURRENCY,
+  UPLOAD_CHECK_RETRY_DETAIL,
+  UPLOAD_CHECK_STEADY_MS,
+  UPLOAD_CONCURRENCY,
+  UPLOAD_POLL_MS,
+} from '../constants/contextEngine';
+import { engineMessage, isTransientReadError, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
 import type { AudienceRule, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
 
@@ -55,6 +65,13 @@ const pendingBytes = new Map<string, FileToUpload>();
 const timers = new Map<string, number>();
 const active = new Map<string, number>();
 const queues = new Map<string, (() => Promise<void>)[]>();
+/** Files whose status is being read right now, so a second read for the same file waits for the first. */
+const checking = new Set<string>();
+const checkQueue: (() => void)[] = [];
+let checksActive = 0;
+/** Status reads that failed to reach the engine in a row, per file, for the backoff. */
+const checkAttempts = new Map<string, number>();
+let notifyTimer: number | undefined;
 
 const entryKey = (sourceId: string, recordId: string): string => `${sourceId}\u0000${recordId}`;
 const filesKey = (sourceId: string): string => `${CONTEXT_ENGINE_FILES_KEY_PREFIX}${sourceId}`;
@@ -77,8 +94,16 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
+/**
+ * Tell subscribers once per task, not once per patch: a burst of status results then
+ * costs one render, and no subscriber runs on the stack of the code that patched the store.
+ */
 function emit(): void {
-  listeners.forEach((l) => l());
+  if (notifyTimer !== undefined) return;
+  notifyTimer = window.setTimeout(() => {
+    notifyTimer = undefined;
+    listeners.forEach((l) => l());
+  }, 0);
 }
 
 function entriesOf(sourceId: string): UploadEntry[] {
@@ -112,6 +137,51 @@ function clearTimer(key: string): void {
   }
 }
 
+function pumpChecks(): void {
+  while (checksActive < UPLOAD_CHECK_CONCURRENCY) {
+    const next = checkQueue.shift();
+    if (!next) return;
+    checksActive += 1;
+    next();
+  }
+}
+
+/** Run one engine read when a slot is free, so a restored list of files does not flood the engine. */
+function queueCheck<T>(task: () => Promise<T>): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    checkQueue.push(() => {
+      task()
+        .then(resolve, reject)
+        .finally(() => {
+          checksActive -= 1;
+          pumpChecks();
+        });
+    });
+    pumpChecks();
+  });
+}
+
+/** Mark a file as being read while `run` lasts, so `follow` does not start a second read meanwhile. */
+function trackCheck(key: string, run: () => Promise<void>): Promise<void> {
+  checking.add(key);
+  return run().finally(() => checking.delete(key));
+}
+
+/**
+ * The engine could not be reached for this file. Its last status stays, the row says
+ * so, and the status is read again after 3 s, 6 s, 12 s, then every 30 s.
+ */
+function checkLater(sourceId: string, recordId: string, again: () => Promise<void>): void {
+  const key = entryKey(sourceId, recordId);
+  const attempt = checkAttempts.get(key) ?? 0;
+  checkAttempts.set(key, attempt + 1);
+  patchEntry(sourceId, recordId, { check: 'retrying', detail: UPLOAD_CHECK_RETRY_DETAIL });
+  timers.set(
+    key,
+    window.setTimeout(() => void trackCheck(key, again), UPLOAD_CHECK_BACKOFF_MS[attempt] ?? UPLOAD_CHECK_STEADY_MS),
+  );
+}
+
 /** Files this browser uploaded earlier, restored once per source; their statuses are then re-read. */
 function ensureLoaded(engineId: string, sourceId: string): void {
   if (loadedSources.has(sourceId)) return;
@@ -126,8 +196,10 @@ function ensureLoaded(engineId: string, sourceId: string): void {
 
 /** Re-read a file's status: through its job while that is still running, else straight from the record. */
 function follow(engineId: string, sourceId: string, recordId: string): Promise<void> {
+  const key = entryKey(sourceId, recordId);
+  if (checking.has(key)) return Promise.resolve();
   const entry = entriesOf(sourceId).find((e) => e.recordId === recordId);
-  return entry?.jobId ? watchJob(engineId, sourceId, recordId, entry.jobId) : watchRecord(engineId, sourceId, recordId);
+  return trackCheck(key, () => (entry?.jobId ? watchJob(engineId, sourceId, recordId, entry.jobId) : watchRecord(engineId, sourceId, recordId)));
 }
 
 /**
@@ -139,13 +211,14 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
   const key = entryKey(sourceId, recordId);
   clearTimer(key);
   try {
-    const record = await getContextRecordStatus(sourceId, recordId);
+    const record = await queueCheck(() => getContextRecordStatus(sourceId, recordId));
     const { status, detail } = uploadStatusFromRecord(record);
-    patchEntry(sourceId, recordId, { status, detail, forbidden: false, version: record.currentVersion, progress: 100 });
+    checkAttempts.delete(key);
+    patchEntry(sourceId, recordId, { status, detail, forbidden: false, check: undefined, version: record.currentVersion, progress: 100 });
     if (status === 'indexing')
       timers.set(
         key,
-        window.setTimeout(() => void watchRecord(engineId, sourceId, recordId), UPLOAD_POLL_MS),
+        window.setTimeout(() => void trackCheck(key, () => watchRecord(engineId, sourceId, recordId)), UPLOAD_POLL_MS),
       );
   } catch (err) {
     if (err instanceof HttpError && err.status === 404) {
@@ -161,6 +234,10 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
       persist(sourceId);
       return;
     }
+    if (isTransientReadError(err)) {
+      checkLater(sourceId, recordId, () => watchRecord(engineId, sourceId, recordId, afterJob));
+      return;
+    }
     patchEntry(sourceId, recordId, {
       status: 'failed',
       detail: err instanceof HttpError && err.status === 403 ? 'Seeing this file needs upload access to the source.' : engineMessage(err, "Couldn't read the file's status."),
@@ -174,22 +251,27 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
   const key = entryKey(sourceId, recordId);
   clearTimer(key);
   try {
-    const job = await getContextJob(jobId);
+    const job = await queueCheck(() => getContextJob(jobId));
+    checkAttempts.delete(key);
     if (!CONTEXT_JOB_TERMINAL_STATES.has(job.state)) {
-      patchEntry(sourceId, recordId, { status: 'queued', progress: 100 });
+      patchEntry(sourceId, recordId, { status: 'queued', progress: 100, check: undefined });
       timers.set(
         key,
-        window.setTimeout(() => void watchJob(engineId, sourceId, recordId, jobId), UPLOAD_POLL_MS),
+        window.setTimeout(() => void trackCheck(key, () => watchJob(engineId, sourceId, recordId, jobId)), UPLOAD_POLL_MS),
       );
       return;
     }
     if (job.state === 'failed') {
-      patchEntry(sourceId, recordId, { status: 'failed', detail: job.error?.message ?? 'The engine could not apply this file.' });
+      patchEntry(sourceId, recordId, { status: 'failed', check: undefined, detail: job.error?.message ?? 'The engine could not apply this file.' });
       return;
     }
     pendingBytes.delete(key);
     await watchRecord(engineId, sourceId, recordId, true);
   } catch (err) {
+    if (isTransientReadError(err)) {
+      checkLater(sourceId, recordId, () => watchJob(engineId, sourceId, recordId, jobId));
+      return;
+    }
     patchEntry(sourceId, recordId, { status: 'failed', detail: engineMessage(err, "Couldn't follow the upload.") });
   }
 }
@@ -197,7 +279,8 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
 function pump(engineId: string, sourceId: string): void {
   const queue = queues.get(sourceId) ?? [];
   while ((active.get(sourceId) ?? 0) < UPLOAD_CONCURRENCY && queue.length > 0) {
-    const run = queue.shift()!;
+    const run = queue.shift();
+    if (!run) return;
     active.set(sourceId, (active.get(sourceId) ?? 0) + 1);
     void run().finally(() => {
       active.set(sourceId, (active.get(sourceId) ?? 1) - 1);
@@ -325,10 +408,19 @@ export async function changeUploadVisibility(engineId: string, sourceId: string,
   const handle = await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'acl_changed', audience, version: String(Date.now()) });
   patchEntry(sourceId, recordId, { visibility, audience, label: undefined, status: 'queued', detail: undefined, jobId: handle.jobId });
   persist(sourceId);
+  const key = entryKey(sourceId, recordId);
   timers.set(
-    entryKey(sourceId, recordId),
-    window.setTimeout(() => void watchJob(engineId, sourceId, recordId, handle.jobId), UPLOAD_POLL_MS),
+    key,
+    window.setTimeout(() => void trackCheck(key, () => watchJob(engineId, sourceId, recordId, handle.jobId)), UPLOAD_POLL_MS),
   );
+}
+
+/** Read a file's status now, e.g. after the engine was out of reach; the backoff starts over. */
+export function checkUpload(engineId: string, sourceId: string, recordId: string): void {
+  const key = entryKey(sourceId, recordId);
+  checkAttempts.delete(key);
+  clearTimer(key);
+  void follow(engineId, sourceId, recordId);
 }
 
 /** Re-read every remembered file's status, e.g. when the drawer opens. */
@@ -345,12 +437,11 @@ function subscribe(listener: () => void): () => void {
 }
 
 /** The files this browser uploaded to a source, with live statuses. */
+const getEmpty = (): UploadEntry[] => EMPTY;
+
 export function useSourceUploads(engineId: string, sourceId: string): UploadEntry[] {
-  const entries = useSyncExternalStore(
-    subscribe,
-    () => entriesOf(sourceId),
-    () => EMPTY,
-  );
+  const getSnapshot = useCallback(() => entriesOf(sourceId), [sourceId]);
+  const entries = useSyncExternalStore(subscribe, getSnapshot, getEmpty);
   useEffect(() => {
     if (engineId && sourceId) ensureLoaded(engineId, sourceId);
   }, [engineId, sourceId]);

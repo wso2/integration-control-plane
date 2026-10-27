@@ -665,3 +665,7 @@ export const storageEmptySx = {
 } as const;
 
 export const storageLinksSx = { display: 'flex', gap: 2, alignItems: 'center' } as const;
+
+/** Under a file whose status check could not reach the engine: the caption and a "Check again" button side by side. */
+export const checkAgainRowSx = { mt: 0.75 } as const;
+export const warningCaptionSx = { color: 'warning.dark' } as const;

@@ -53,7 +53,7 @@ import {
   PROGRESS_POLL_ACTIVE_MS,
   PROGRESS_POLL_IDLE_MS,
 } from '../constants/contextEngine';
-import { everyoneRoles, fromDraft, isEngineProgressActive, ownerGrantId, toDraft } from '../utils/contextEngine';
+import { everyoneRoles, fromDraft, isEngineProgressActive, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import type { ContextEngineForm, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
@@ -67,14 +67,14 @@ export function isContextEngineEnabled(): boolean {
   return IS_WIP && !!window.API_CONFIG?.enableContextEngineFeature && !!window.API_CONFIG?.contextEngineApiUrl;
 }
 
-/** The engines the caller can see; checked again every few seconds while one is being deleted. */
+/** The engines the caller can see; checked again every few seconds while one is syncing or being deleted, so the listing's progress keeps moving. */
 export function useContextEngines() {
   return useQuery({
     queryKey: [ROOT_KEY, 'list'],
     queryFn: () => listContextEngines(),
     enabled: isContextEngineEnabled(),
     retry: false,
-    refetchInterval: (query) => (query.state.data?.some((e) => e.state === 'deleting') ? DELETION_POLL_MS : false),
+    refetchInterval: (query) => listPollInterval(query.state.data),
   });
 }
 

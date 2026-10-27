@@ -23,6 +23,7 @@ import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
 import { forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
+import { appendTurn, clearTurns, replaceTurns, setPlaygroundMode, usePlaygroundConversation } from '../../../hooks/contextTurns';
 import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
@@ -33,19 +34,11 @@ import EvidenceCard from './EvidenceCard';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
 import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx /* , suggestionRowSx */ } from '../styles';
-import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextQueryMode, ContextQueryResult } from '../../../types/contextEngine';
+import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, PlaygroundTurn } from '../../../types/contextEngine';
 
 interface PlaygroundTabProps {
   engine: ContextEngineDetail;
   orgHandle: string;
-}
-
-interface Turn {
-  question: string;
-  mode: ContextQueryMode;
-  result: ContextQueryResult;
-  /** Reopened from the recent list: when it was asked, and how many passages it had then. */
-  reopened?: { askedAt: string; passagesThen: number };
 }
 
 const MODES: { value: ContextQueryMode; label: string; hint: string }[] = [
@@ -96,9 +89,11 @@ function SectionHeading({ title, caption }: { title: string; caption?: string })
 /** Test playground — ask in natural language, read the answer or the passages the engine lets you see, follow each to its source, and reopen what you asked before. */
 export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps): JSX.Element {
   const navigate = useAppNavigate();
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const { markAsked } = useAskedFlag(engine.id);
-  const [mode, setMode] = useState<ContextQueryMode>('context');
+  // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
+  const { turns, mode } = usePlaygroundConversation(engine.id);
+  const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
   const principal = useContextPrincipal();
   const groups = principal.data?.groups ?? [];
   const permissions = useContextPermissions(engine.id);
@@ -106,7 +101,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const canGrantSelf = !!permissions.data?.includes('access.manage');
   // "Ask about this" on a passage page lands here with the question in the URL.
   const [question, setQuestion] = useState(() => params.get('q')?.trim() ?? '');
-  const [turns, setTurns] = useState<Turn[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const query = useQueryContextEngine();
@@ -121,7 +115,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !query.isPending;
   // const suggestions = suggestedQuestions(engine);
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
-  const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev));
+  const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
   const ask = (text = question, askMode = mode) => {
     const q = text.trim();
@@ -131,7 +125,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       { engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT },
       {
         onSuccess: (result) => {
-          setTurns((prev) => [...prev, { question: q, mode: askMode, result }]);
+          appendTurn(engine.id, { question: q, mode: askMode, result });
           setQuestion('');
           markAsked();
           rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
@@ -150,8 +144,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       .mutateAsync(q.queryId)
       .then(
         (result) => {
-          setTurns([{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }]);
-          setMode(q.mode);
+          replaceTurns(engine.id, [{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }], q.mode);
           query.reset();
           if (result.answerWithheld && q.outcome !== 'hidden') updateQuestion(engine.id, q.queryId, { outcome: 'hidden' });
           window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
@@ -166,7 +159,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       .finally(() => setOpeningId((current) => (current === q.queryId ? null : current)));
   };
 
-  const copyResult = (turn: Turn) => {
+  const copyResult = (turn: PlaygroundTurn) => {
     const text = turn.result.answer && !turn.result.answerWithheld ? turn.result.answer : turn.result.evidence.map((e, i) => `[${i + 1}] ${e.passage}`).join('\n');
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(turn.result.queryId);
@@ -174,7 +167,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     });
   };
 
-  const openInApi = (turn: Turn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}`);
+  const openInApi = (turn: PlaygroundTurn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}`);
   // The Graph tab draws an answer's derivation from the stored query; a passage given here opens chosen.
   const derivationHref = (queryId: string, ev?: ContextEvidence) => `${contextEngineUrl(orgHandle, engine.id, 'graph')}?query=${encodeURIComponent(queryId)}${ev ? `&node=${encodeURIComponent(`p:${ev.id}`)}` : ''}`;
 
@@ -184,16 +177,29 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   useEffect(() => {
     if (!openId || openRef.current === openId) return;
     openRef.current = openId;
-    const known = asked.find((q) => q.queryId === openId);
-    reopenQuestion(known ?? { queryId: openId, engineId: engine.id, question: 'An earlier question', mode: 'answer', askedAt: new Date().toISOString(), outcome: 'answered', passages: 0 });
+    // A conversation restored for this tab may already show the question; replacing it would drop the follow-ups.
+    if (turns.some((t) => t.result.queryId === openId)) window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    else {
+      const known = asked.find((q) => q.queryId === openId);
+      reopenQuestion(known ?? { queryId: openId, engineId: engine.id, question: 'An earlier question', mode: 'answer', askedAt: new Date().toISOString(), outcome: 'answered', passages: 0 });
+    }
+    // Handled once: drop the parameter so Back, forward or a return from a passage page does not replay it.
+    setSearchParams(
+      (next) => {
+        next.delete('open');
+        return next;
+      },
+      { replace: true },
+    );
     // Reopen once per id; the question list and handlers need not retrigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openId]);
 
-  const renderTurn = (t: Turn, i: number) => {
+  const renderTurn = (t: PlaygroundTurn, i: number) => {
     const { result } = t;
     const n = result.evidence.length;
-    const answered = t.mode === 'answer' && !!result.answer && !result.answerWithheld;
+    const answerText = t.mode === 'answer' && !result.answerWithheld ? result.answer : undefined;
+    const answered = !!answerText;
     const lost = t.reopened ? Math.max(0, t.reopened.passagesThen - n) : 0;
     // Full cards for passages, a hidden answer or an answer the engine declined; an answer gets its rail instead.
     const cards = result.evidence.map((ev, idx) => <EvidenceCard key={ev.id} evidence={ev} n={idx + 1} source={sourcesById.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => openEvidence(ev)} />);
@@ -222,9 +228,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
-    } else if (answered) {
+    } else if (answerText) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = <AnsweredTurn answer={result.answer!} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
+      body = <AnsweredTurn answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = (
@@ -335,7 +341,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             </ToggleButtonGroup>
             {turns.length > 0 && (
               <Tooltip title="Clear conversation">
-                <IconButton size="small" aria-label="Clear conversation" onClick={() => setTurns([])}>
+                <IconButton size="small" aria-label="Clear conversation" onClick={() => clearTurns(engine.id)}>
                   <Eraser size={16} />
                 </IconButton>
               </Tooltip>

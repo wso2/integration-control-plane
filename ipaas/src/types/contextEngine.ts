@@ -369,6 +369,8 @@ export interface UploadEntry extends UploadedFile {
   detail?: string;
   /** The engine refused the caller; the owner grant would fix it. */
   forbidden?: boolean;
+  /** The last status read did not reach the engine: `status` is the last one read and another read is scheduled. */
+  check?: 'retrying';
 }
 
 export interface IngestFileInput {
@@ -744,4 +746,23 @@ export interface McpClientConfig {
   /** Where the client keeps this file. */
   path: string;
   json: string;
+}
+
+/** One exchange in the Playground, kept for the life of the page so the conversation survives a tab switch or a passage page. */
+export interface PlaygroundTurn {
+  question: string;
+  mode: ContextQueryMode;
+  result: ContextQueryResult;
+  /** Reopened from the recent list: when it was asked, and how many passages it had then. */
+  reopened?: { askedAt: string; passagesThen: number };
+}
+
+export interface PlaygroundConversation {
+  turns: PlaygroundTurn[];
+  mode: ContextQueryMode;
+}
+
+/** Router state a passage page is opened with, so its Back returns to where the reader came from. */
+export interface ContextEvidenceLocationState {
+  backTo?: ContextEngineTabKey;
 }
