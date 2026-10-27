@@ -1279,10 +1279,13 @@ export function mcpEndpointUrl(baseUrl: string): string {
   return publicUrl(baseUrl, 'mcp');
 }
 
+/** The question can come from a link, so a `'` in it must not end the shell's single-quoted body. */
+const shellSingleQuoted = (text: string): string => text.replaceAll("'", "'\\''");
+
 export function buildQueryCurl(baseUrl: string, question = 'What is our rollback procedure?', route: 'context' | 'answer' = 'context'): string {
   const body = JSON.stringify({ question, limit: 5 }, null, 2);
   const url = route === 'answer' ? answerEndpointUrl(baseUrl) : contextEndpointUrl(baseUrl);
-  return `curl -X POST ${url} \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '${body}'`;
+  return `curl -X POST ${url} \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '${shellSingleQuoted(body)}'`;
 }
 
 /** The shape of a `/v1/context` response, for the API tab; `/v1/answer` adds `answer`. */
