@@ -272,6 +272,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'insights', navId: 'org-insights', segment: 'insights' },
     { key: 'logs', navId: 'org-logs', segment: 'logs', parent: 'org-observability' },
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
+    { key: 'context-engines', navId: 'org-context-engines', segment: 'context-engines' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
     { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
     { key: 'settings', navId: 'org-settings', segment: 'settings' },

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Step, StepLabel, Stepper, Typography } from '@wso2/oxygen-ui';
+import { ButtonBase, Step, StepLabel, Stepper, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 
 interface VerticalStepperProps {
@@ -24,26 +24,40 @@ interface VerticalStepperProps {
   steps: string[];
   /** Index of the current step. May exceed the last index to mark the flow complete. */
   activeStep: number;
+  /** When set, completed steps become buttons that jump back to that step. */
+  onStepClick?: (index: number) => void;
 }
+
+const stepButtonSx = { borderRadius: 1, px: 0.5, mx: -0.5, textAlign: 'left', '&:hover': { textDecoration: 'underline' } } as const;
 
 /**
  * A vertical wizard progress indicator (labels only; content is rendered separately by
  * the caller). Shared by the Prebuilt Integration creation flow and the GenAI register
  * wizard. The current step's label is emphasised; earlier steps show a completed check.
  */
-export default function VerticalStepper({ steps, activeStep }: VerticalStepperProps): JSX.Element {
+export default function VerticalStepper({ steps, activeStep, onStepClick }: VerticalStepperProps): JSX.Element {
   const lastIndex = steps.length - 1;
   return (
     <Stepper activeStep={activeStep} orientation="vertical" sx={{ '& .MuiStepConnector-line': { minHeight: 30 } }}>
       {steps.map((label, i) => {
         // The last step stays emphasised once reached (there is nothing after it).
         const isCurrent = i === lastIndex ? activeStep >= i : activeStep === i;
+        const text = (
+          <Typography variant="body2" color={isCurrent ? 'text.primary' : 'text.secondary'} sx={{ fontWeight: isCurrent ? 600 : 400, lineHeight: 1.4 }}>
+            {label}
+          </Typography>
+        );
+        const clickable = !!onStepClick && i < activeStep;
         return (
           <Step key={label} completed={activeStep > i}>
             <StepLabel>
-              <Typography variant="body2" color={isCurrent ? 'text.primary' : 'text.secondary'} sx={{ fontWeight: isCurrent ? 600 : 400, lineHeight: 1.4 }}>
-                {label}
-              </Typography>
+              {clickable ? (
+                <ButtonBase onClick={() => onStepClick(i)} aria-label={`Go back to ${label}`} sx={stepButtonSx}>
+                  {text}
+                </ButtonBase>
+              ) : (
+                text
+              )}
             </StepLabel>
           </Step>
         );

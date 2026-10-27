@@ -72,6 +72,7 @@ import {
   Server,
   Settings2,
   SlidersHorizontal,
+  Waypoints,
   Workflow,
   X,
 } from '@wso2/oxygen-ui-icons-react';
@@ -84,6 +85,7 @@ import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/inte
 import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useAuth } from '../auth';
+import { isContextEngineEnabled } from '../hooks/useContextEngine';
 import {
   useScope,
   broaden,
@@ -733,6 +735,15 @@ export default function AppLayout(): JSX.Element {
                           <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       </Sidebar.Item>
+
+                      {isContextEngineEnabled() && (
+                        <Sidebar.Item id="org-context-engines">
+                          <Sidebar.ItemIcon>
+                            <Waypoints size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Context Engines</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      )}
                     </Sidebar.Category>,
 
                     <Sidebar.Category key="org-infra">

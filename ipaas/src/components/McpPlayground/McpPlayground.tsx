@@ -48,6 +48,8 @@ interface McpPlaygroundProps {
   onTokenRegenerate?: () => void;
   /** Endpoint chooser rendered in the sidebar. */
   endpointSwitcher?: McpSwitcher;
+  /** Where the connection controls go: a `sidebar` beside the panel (default) or a `bar` above it. */
+  connectionLayout?: 'sidebar' | 'bar';
 }
 
 /**
@@ -55,14 +57,14 @@ interface McpPlaygroundProps {
  * Tools tab (list → schema-driven form → run → result), a Ping tab, and a resizable
  * activity-history panel — all over the `useMcpConnection` session.
  */
-export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, endpointSwitcher }: McpPlaygroundProps): JSX.Element {
+export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, endpointSwitcher, connectionLayout = 'sidebar' }: McpPlaygroundProps): JSX.Element {
   const conn = useMcpConnection({ url, token, headerName });
   const { status, listTools } = conn;
 
   const [tab, setTab] = useState<PlaygroundTab>('tools');
   const [tools, setTools] = useState<McpTool[]>([]);
   const [toolsLoading, setToolsLoading] = useState(false);
-  const [historyHeight, setHistoryHeight] = useState(200);
+  const [historyHeight, setHistoryHeight] = useState(140);
 
   const refreshTools = useCallback(() => {
     setToolsLoading(true);
@@ -104,8 +106,9 @@ export default function McpPlayground({ url, token, headerName = 'test-key', isT
     <Stack gap={1.5} sx={{ height: '100%', minHeight: 0 }}>
       <ConnectionAlert error={conn.error} errorKind={conn.errorKind} isTokenFetching={isTokenFetching} onGetTestKey={onTokenRegenerate} />
 
-      <Stack direction="row" gap={2} sx={{ flex: 1, minHeight: 0 }}>
+      <Stack direction={connectionLayout === 'bar' ? 'column' : 'row'} gap={connectionLayout === 'bar' ? 1.5 : 2} sx={{ flex: 1, minHeight: 0 }}>
         <ConnectionSidebar
+          layout={connectionLayout}
           url={url}
           token={token ?? ''}
           status={conn.status}

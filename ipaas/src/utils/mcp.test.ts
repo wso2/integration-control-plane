@@ -18,7 +18,21 @@
 
 import { describe, expect, it } from 'vitest';
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { classifyMcpError, coerceFieldValue, formatFieldLabel, formatMcpError, formatToolResult, generateDefaultValue, getMcpToolParameters, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError, isSimpleObjectSchema } from './mcp';
+import {
+  classifyMcpError,
+  coerceFieldValue,
+  formatFieldLabel,
+  formatMcpError,
+  formatToolResult,
+  generateDefaultValue,
+  getMcpToolParameters,
+  isMcpBlockedError,
+  isMcpForbiddenError,
+  isMcpUnauthorizedError,
+  isSimpleObjectSchema,
+  copyableToolResult,
+  repeatsStructuredContent,
+} from './mcp';
 import type { McpTool } from '../types/mcp';
 
 describe('getMcpToolParameters', () => {
@@ -96,6 +110,31 @@ describe('formatToolResult', () => {
   it('is safe on missing/empty content', () => {
     expect(formatToolResult(null)).toEqual({ content: [], isError: false });
     expect(formatToolResult({})).toEqual({ content: [], isError: false });
+  });
+  it('keeps the structured result', () => {
+    const raw = { content: [{ type: 'text', text: '{"state": "completed"}' }], structuredContent: { state: 'completed' } };
+    expect(formatToolResult(raw).structuredContent).toEqual({ state: 'completed' });
+    expect(formatToolResult({ content: [], structuredContent: null })).not.toHaveProperty('structuredContent');
+  });
+});
+
+describe('repeatsStructuredContent', () => {
+  it('recognizes a text block that only repeats the structured result', () => {
+    const structured = { state: 'completed', evidence: [] };
+    expect(repeatsStructuredContent({ type: 'text', text: '{"state": "completed", "evidence": []}' }, structured)).toBe(true);
+    expect(repeatsStructuredContent({ type: 'text', text: 'access_denied: not available' }, structured)).toBe(false);
+    expect(repeatsStructuredContent({ type: 'text', text: '{"state": "completed"}' }, undefined)).toBe(false);
+  });
+});
+
+describe('copyableToolResult', () => {
+  it('copies exactly what the result shows', () => {
+    const structured = { state: 'completed' };
+    const note = { type: 'text', text: 'Results are truncated.' } as const;
+    expect(copyableToolResult(structured, [])).toEqual(structured);
+    expect(copyableToolResult(undefined, [note])).toEqual([note]);
+    // Blocks a server adds beyond the structured result are not dropped from the copy.
+    expect(copyableToolResult(structured, [note])).toEqual({ structuredContent: structured, content: [note] });
   });
 });
 

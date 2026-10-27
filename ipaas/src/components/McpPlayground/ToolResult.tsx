@@ -19,6 +19,7 @@
 import { Box, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Copy } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
+import { copyableToolResult, repeatsStructuredContent } from '../../utils/mcp';
 import type { McpToolContent, McpToolResult } from '../../types/mcp';
 
 const codeBlockSx = {
@@ -34,7 +35,6 @@ const codeBlockSx = {
   whiteSpace: 'pre-wrap',
   wordBreak: 'break-word',
   overflow: 'auto',
-  maxHeight: 320,
 } as const;
 
 /** Render one content block — pretty-print JSON text, otherwise show it verbatim. */
@@ -59,9 +59,15 @@ function ContentBlock({ block }: { block: McpToolContent }): JSX.Element {
   );
 }
 
-/** The result of a tool invocation: a "Tool Result: Success/Error" label plus each returned content block. */
+/**
+ * The result of a tool invocation: a "Tool Result: Success/Error" label, the structured result
+ * when the tool returns one, and every content block that adds something to it. Servers repeat
+ * the structured result as a JSON text block for older clients; that copy is not shown twice.
+ */
 export default function ToolResult({ result }: { result: McpToolResult }): JSX.Element {
-  const copyAll = () => void navigator.clipboard?.writeText(JSON.stringify(result.content, null, 2)).catch(() => undefined);
+  const structured = result.structuredContent;
+  const blocks = result.content.filter((block) => !repeatsStructuredContent(block, structured));
+  const copyAll = () => void navigator.clipboard?.writeText(JSON.stringify(copyableToolResult(structured, blocks), null, 2)).catch(() => undefined);
   return (
     <Stack gap={1}>
       <Stack direction="row" alignItems="center" gap={1}>
@@ -78,12 +84,17 @@ export default function ToolResult({ result }: { result: McpToolResult }): JSX.E
           </IconButton>
         </Tooltip>
       </Stack>
-      {result.content.length === 0 ? (
+      {structured !== undefined && (
+        <Box component="pre" sx={codeBlockSx}>
+          {JSON.stringify(structured, null, 2)}
+        </Box>
+      )}
+      {structured === undefined && blocks.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
           The tool returned no content.
         </Typography>
       ) : (
-        result.content.map((block, i) => <ContentBlock key={i} block={block} />)
+        blocks.map((block, i) => <ContentBlock key={i} block={block} />)
       )}
     </Stack>
   );

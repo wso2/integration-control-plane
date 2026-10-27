@@ -290,3 +290,46 @@ export const MOESIF_ORIGINS = ['https://www.moesif.com', 'https://web-dev.moesif
 // The isolated APIs section leaves out the LLM, MCP and A2A traffic cards.
 export const moesifInsightsUrl = (origin: string): string => `${origin}/wrap/basic/apis?embedded_ui=true&isolated_section=true#auth=post`;
 export const analyticsViewerTokenUrl = (base: string): string => `${base}/analytics/id-token`;
+
+// ---------------------------------------------------------------------------
+// Context Engines (org-level)
+// ---------------------------------------------------------------------------
+
+import type { ContextEngineTabKey } from './types/contextEngine';
+
+export function contextEnginesUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/context-engines`;
+}
+
+export function newContextEngineUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/context-engines/new`;
+}
+
+export function contextEngineUrl(orgHandler: string, engineId: string, tab: ContextEngineTabKey = 'overview'): string {
+  return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/${tab}`;
+}
+
+/** One cited passage: the page a citation link opens. */
+export function contextEvidenceUrl(orgHandler: string, engineId: string, evidenceId: string): string {
+  return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/evidence/${encodeURIComponent(evidenceId)}`;
+}
+
+// ---------------------------------------------------------------------------
+// Infrastructure (org admin) — managed database servers
+// ---------------------------------------------------------------------------
+
+export function orgDatabasesUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/databases`;
+}
+
+export function newOrgDatabaseUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/databases/new`;
+}
+
+export function orgVectorDatabasesUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/vector-databases`;
+}
+
+export function newOrgVectorDatabaseUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/admin/vector-databases/new`;
+}

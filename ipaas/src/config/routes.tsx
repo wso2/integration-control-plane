@@ -59,6 +59,10 @@ const ProjectCdPipelines = lazyPage(() => import('../pages/ProjectCdPipelines'))
 const OrgDataPlanes = lazyPage(() => import('../pages/OrgDataPlanes'));
 const OrgPackageRegistries = lazyPage(() => import('../pages/OrgPackageRegistries'));
 const ComponentRuntime = lazyPage(() => import('../pages/ComponentRuntime'));
+const OrgContextEngines = lazyPage(() => import('../pages/OrgContextEngines'));
+const CreateContextEngine = lazyPage(() => import('../pages/CreateContextEngine'));
+const ContextEngineDetail = lazyPage(() => import('../pages/ContextEngineDetail'));
+const ContextEvidence = lazyPage(() => import('../pages/ContextEvidence'));
 const ProjectSettings = lazyPage(() => import('../pages/ProjectSettings'));
 const ProjectOverview = lazyPage(() => import('../pages/ProjectOverview'));
 const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
@@ -136,6 +140,11 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/test', element: createElement(withScope(OrgTest, ['organizations'])) },
               { path: 'organizations/:orgHandler/insights', element: createElement(withScope(ApiInsights, ['organizations'])) },
               { path: 'organizations/:orgHandler/metrics', element: <ComingSoon description="One view of throughput, latency and errors for every integration you run." /> },
+              { path: 'organizations/:orgHandler/context-engines', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgContextEngines, ['organizations']))) },
+              { path: 'organizations/:orgHandler/context-engines/new', element: createElement(RouteErrorBoundary, null, createElement(withScope(CreateContextEngine, ['organizations']))) },
+              { path: 'organizations/:orgHandler/context-engines/:engineId', element: createElement(RouteErrorBoundary, null, createElement(withScope(ContextEngineDetail, ['organizations']))) },
+              { path: 'organizations/:orgHandler/context-engines/:engineId/:tab', element: createElement(RouteErrorBoundary, null, createElement(withScope(ContextEngineDetail, ['organizations']))) },
+              { path: 'organizations/:orgHandler/context-engines/:engineId/evidence/:evidenceId', element: createElement(RouteErrorBoundary, null, createElement(withScope(ContextEvidence, ['organizations']))) },
               { path: 'organizations/:orgHandler/admin/cd-pipelines', element: createElement(withScope(OrgCdPipelines, ['organizations'])) },
               { path: 'organizations/:orgHandler/admin/cd-pipelines/new', element: <CdPipelineEditor /> },
               { path: 'organizations/:orgHandler/admin/cd-pipelines/:pipelineId/edit', element: <CdPipelineEditor /> },

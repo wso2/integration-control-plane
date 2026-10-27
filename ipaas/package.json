@@ -26,6 +26,11 @@
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
+    "@cosmos.gl/graph": "3.4.2",
+    "@luma.gl/core": "9.3.6",
+    "@luma.gl/engine": "9.3.6",
+    "@luma.gl/shadertools": "9.3.6",
+    "@luma.gl/webgl": "9.3.6",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.90.20",

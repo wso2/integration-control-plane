@@ -18,7 +18,7 @@
 
 import { Box, Button, CircularProgress, IconButton, List, ListItemButton, ListItemText, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX } from 'react';
+import { useEffect, useRef, useState, type JSX, type RefObject } from 'react';
 import { generateDefaultValue } from '../../utils/mcp';
 import DynamicJsonForm from './DynamicJsonForm';
 import ToolResult from './ToolResult';
@@ -31,16 +31,35 @@ interface ToolsTabProps {
   onRefresh: () => void;
 }
 
+/** Descriptions longer than this start clamped, so the form and result stay in view. */
+const LONG_DESCRIPTION_CHARS = 200;
+const clampedDescriptionSx = { display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' } as const;
+const runPaneSx = { flex: 1, minWidth: 0, p: 2.5, overflow: 'auto', position: 'relative' } as const;
+// Form and result sit side by side when the pane is wide enough for both, and stack when not;
+// a pane narrower than one column still fits it without overflowing.
+const runGridSx = { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))', gap: 3, alignItems: 'start' } as const;
+
 /** Argument form + Run + result for a single selected tool (keyed by tool name, so state resets on switch). */
-function ToolPanel({ tool, callTool }: { tool: McpTool; callTool: ToolsTabProps['callTool'] }): JSX.Element {
+function ToolPanel({ tool, callTool, paneRef }: { tool: McpTool; callTool: ToolsTabProps['callTool']; paneRef: RefObject<HTMLDivElement | null> }): JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  const long = (tool.description?.length ?? 0) > LONG_DESCRIPTION_CHARS;
   const [args, setArgs] = useState<Record<string, JsonValue>>(() => (tool.inputSchema ? (generateDefaultValue(tool.inputSchema) as Record<string, JsonValue>) : {}));
   const [result, setResult] = useState<McpToolResult | null>(null);
+  const [runs, setRuns] = useState(0);
   const [running, setRunning] = useState(false);
+  const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Scroll the tool pane, never the page, to each new result; editing the form must not move it.
+  useEffect(() => {
+    const el = resultRef.current;
+    if (runs > 0 && el) paneRef.current?.scrollTo({ top: el.offsetTop - 12, behavior: 'smooth' });
+  }, [runs, paneRef]);
 
   const run = async () => {
     setRunning(true);
     try {
       setResult(await callTool(tool.name, args));
+      setRuns((n) => n + 1);
     } finally {
       setRunning(false);
     }
@@ -53,34 +72,47 @@ function ToolPanel({ tool, callTool }: { tool: McpTool; callTool: ToolsTabProps[
           {tool.name}
         </Typography>
         {tool.description && (
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={long && !expanded ? clampedDescriptionSx : undefined}>
             {tool.description}
           </Typography>
         )}
+        {long && (
+          <Button size="small" variant="text" sx={{ px: 0, minWidth: 0 }} onClick={() => setExpanded((e) => !e)}>
+            {expanded ? 'Show less' : 'Show more'}
+          </Button>
+        )}
       </Box>
 
-      <DynamicJsonForm schema={tool.inputSchema} value={args} onChange={setArgs} />
+      <Box sx={runGridSx}>
+        <Stack gap={2} sx={{ minWidth: 0 }}>
+          <DynamicJsonForm schema={tool.inputSchema} value={args} onChange={setArgs} />
+          <Box>
+            <Button variant="contained" size="small" startIcon={running ? <CircularProgress size={14} color="inherit" /> : <Play size={16} />} disabled={running} onClick={() => void run()}>
+              {running ? 'Running…' : 'Run Tool'}
+            </Button>
+          </Box>
+        </Stack>
 
-      <Box>
-        <Button variant="contained" size="small" startIcon={running ? <CircularProgress size={14} color="inherit" /> : <Play size={16} />} disabled={running} onClick={() => void run()}>
-          {running ? 'Running…' : 'Run Tool'}
-        </Button>
+        {result && (
+          <Box sx={{ minWidth: 0 }} ref={resultRef}>
+            <ToolResult result={result} />
+          </Box>
+        )}
       </Box>
-
-      {result && <ToolResult result={result} />}
     </Stack>
   );
 }
 
 /** The Tools tab: a list of the server's tools on the left, the selected tool's runner on the right. */
 export default function ToolsTab({ tools, loading, callTool, onRefresh }: ToolsTabProps): JSX.Element {
+  const paneRef = useRef<HTMLDivElement | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const activeName = selected && tools.some((t) => t.name === selected) ? selected : (tools[0]?.name ?? null);
   const activeTool = tools.find((t) => t.name === activeName) ?? null;
 
   return (
     <Stack direction={{ xs: 'column', md: 'row' }} sx={{ height: '100%', minHeight: 0 }}>
-      <Box sx={{ width: { xs: '100%', md: 280 }, flexShrink: 0, borderRight: { md: '1px solid' }, borderColor: { md: 'divider' }, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+      <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, borderRight: { md: '1px solid' }, borderColor: { md: 'divider' }, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
         <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
             Tools
@@ -112,9 +144,9 @@ export default function ToolsTab({ tools, loading, callTool, onRefresh }: ToolsT
           )}
         </Box>
       </Box>
-      <Box sx={{ flex: 1, minWidth: 0, p: 2.5, overflow: 'auto' }}>
+      <Box ref={paneRef} sx={runPaneSx}>
         {activeTool ? (
-          <ToolPanel key={activeTool.name} tool={activeTool} callTool={callTool} />
+          <ToolPanel key={activeTool.name} tool={activeTool} callTool={callTool} paneRef={paneRef} />
         ) : (
           <Typography variant="body2" color="text.secondary">
             Select a tool to run it.

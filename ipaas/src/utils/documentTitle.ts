@@ -34,6 +34,7 @@ const TITLE_OVERRIDES: Record<string, string> = {
   'org-vector-databases': 'Vector Databases',
   'org-scheduled-ingestion': 'Scheduled Ingestion',
   'org-rag': 'RAG',
+  'org-context-engines': 'Context Engines',
   'api-info': 'API Info',
   'api-chat': 'API Chat',
   'external-ci': 'External CI',
