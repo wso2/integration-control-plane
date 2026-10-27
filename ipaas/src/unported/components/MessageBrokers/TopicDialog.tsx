@@ -19,7 +19,7 @@
 import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack } from '@wso2/oxygen-ui';
 import TextField from '../../../components/common/TextField';
 import { useState, type JSX } from 'react';
-import { useCreateKafkaTopic, useKafkaTopics, useKafkaUserConfigs, useUpdateKafkaTopic } from '../../hooks/usePlatformServices';
+import { useCreateKafkaTopic, useKafkaTopics, useKafkaUserConfigs, useUpdateKafkaTopic } from '../../../hooks/usePlatformServices';
 import type { KafkaTopic, KafkaTopicCreatePayload, KafkaTopicUpdatePayload } from '../../../types/platformServices';
 
 interface TopicDialogProps {

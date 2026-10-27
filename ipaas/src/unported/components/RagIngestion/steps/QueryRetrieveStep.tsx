@@ -21,7 +21,7 @@ import TextField from '../../../../components/common/TextField';
 import { useEffect, useState, type JSX } from 'react';
 import { MAX_RETRIEVE_CHUNKS } from '../../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import SecretField from '../SecretField';
+import SecretField from '../../../../components/common/SecretField';
 import { fieldStackSx, stepHeadingSx } from '../styles';
 import type { RetrievalQuery, RetrievedChunk } from '../../../../types/ragIngestion';
 

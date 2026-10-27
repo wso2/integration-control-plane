@@ -22,9 +22,9 @@
  * selected provider+region. No React, no I/O. Mirrors Devant's convertPlatformSvcPlans.
  */
 
-import { CLOUD_PROVIDERS, CLOUD_REGIONS, type DbMarketplaceFilter } from '../../constants/platformServices';
-import type { CloudProvider, CloudRegion, CreateError, CredentialFormValues, CredentialPayload, DatabaseInfo, MetricSeries, ServicePlan, ServicePlanRegion } from '../../types/platformServices';
-import type { EnvTemplate } from '../../types/deploymentPipeline';
+import { CLOUD_PROVIDERS, CLOUD_REGIONS, type DbMarketplaceFilter } from '../constants/platformServices';
+import type { CloudProvider, CloudRegion, CreateError, CredentialFormValues, CredentialPayload, DatabaseInfo, MetricSeries, ServicePlan, ServicePlanRegion } from '../types/platformServices';
+import type { EnvTemplate } from '../types/deploymentPipeline';
 
 /** Providers offered across all plans, in the canonical display order. */
 export function deriveProviders(plans: ServicePlan[]): CloudProvider[] {

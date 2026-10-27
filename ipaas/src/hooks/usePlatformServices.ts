@@ -53,8 +53,8 @@ import {
   updateDbCredential,
   updateKafkaTopic,
   updateMaintenanceWindow,
-} from '../../api/platformServices';
-import { useOrgUuid } from '../../hooks/useOrgUuid';
+} from '../api/platformServices';
+import { useOrgUuid } from './useOrgUuid';
 import { deriveProviders, deriveRegions } from '../utils/platformServices';
 import type {
   AllowedIpsPayload,
@@ -72,7 +72,7 @@ import type {
   ServerVariant,
   ServicePlan,
   ServiceType,
-} from '../../types/platformServices';
+} from '../types/platformServices';
 
 const ROOT_KEY = 'platformServices';
 

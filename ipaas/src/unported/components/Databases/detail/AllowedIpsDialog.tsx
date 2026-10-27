@@ -20,8 +20,8 @@ import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogT
 import TextField from '../../../../components/common/TextField';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useUpdateAllowedIps } from '../../../hooks/usePlatformServices';
-import { isValidCidr } from '../../../utils/platformServices';
+import { useUpdateAllowedIps } from '../../../../hooks/usePlatformServices';
+import { isValidCidr } from '../../../../utils/platformServices';
 import SelectableChoiceCard from './SelectableChoiceCard';
 import type { AllowedIpsPayload, DatabaseServerDetail, ServerVariant } from '../../../../types/platformServices';
 

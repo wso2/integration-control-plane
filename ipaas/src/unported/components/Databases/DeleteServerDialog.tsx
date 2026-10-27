@@ -19,7 +19,7 @@
 import { Alert, Typography } from '@wso2/oxygen-ui';
 import TextField from '../../../components/common/TextField';
 import { useState, type JSX } from 'react';
-import { useDeleteServer } from '../../hooks/usePlatformServices';
+import { useDeleteServer } from '../../../hooks/usePlatformServices';
 import ConfirmDeleteDialog from '../../../components/ConfirmDeleteDialog';
 import type { DatabaseServer, ServerVariant } from '../../../types/platformServices';
 

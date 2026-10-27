@@ -19,7 +19,7 @@
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@wso2/oxygen-ui';
 import { Store } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type MouseEvent } from 'react';
-import { useSetDatabaseMarketplace } from '../../../../hooks/usePlatformServices';
+import { useSetDatabaseMarketplace } from '../../../../../hooks/usePlatformServices';
 import { DB_STATUS } from '../../../../../constants/platformServices';
 import type { DatabaseInfo } from '../../../../../types/platformServices';
 import type { Notify } from './types';

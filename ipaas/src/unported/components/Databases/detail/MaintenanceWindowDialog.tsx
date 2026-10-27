@@ -19,7 +19,7 @@
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack } from '@wso2/oxygen-ui';
 import TextField from '../../../../components/common/TextField';
 import { useState, type JSX } from 'react';
-import { useUpdateMaintenanceWindow } from '../../../hooks/usePlatformServices';
+import { useUpdateMaintenanceWindow } from '../../../../hooks/usePlatformServices';
 import { MAINTENANCE_DAYS, MAINTENANCE_TIMES } from '../../../../constants/platformServices';
 import type { MaintenanceWindow, ServerVariant } from '../../../../types/platformServices';
 

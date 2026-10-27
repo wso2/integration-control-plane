@@ -19,8 +19,8 @@
 import { Alert, Box, Button, CircularProgress, ListingTable, Stack, Typography } from '@wso2/oxygen-ui';
 import { Archive } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { useServerBackups } from '../../../hooks/usePlatformServices';
-import { formatBytes, formatServerDateTime } from '../../../utils/platformServices';
+import { useServerBackups } from '../../../../hooks/usePlatformServices';
+import { formatBytes, formatServerDateTime } from '../../../../utils/platformServices';
 
 export default function BackupsTab({ serverId }: { serverId: string }): JSX.Element {
   const { data, isLoading, isError, refetch } = useServerBackups(serverId);

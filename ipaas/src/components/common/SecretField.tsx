@@ -17,10 +17,10 @@
  */
 
 import { IconButton, InputAdornment } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import TextField from './TextField';
 import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { REQUIRED_FIELD_SX } from '../../../constants/styles';
+import { REQUIRED_FIELD_SX } from '../../constants/styles';
 
 interface SecretFieldProps {
   label: string;

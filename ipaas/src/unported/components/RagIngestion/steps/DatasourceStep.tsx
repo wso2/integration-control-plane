@@ -21,8 +21,8 @@ import TextField from '../../../../components/common/TextField';
 import { type JSX } from 'react';
 import { blankDatasource, DATASOURCES, GDRIVE_AUTH_TYPES, ragLogoUrl } from '../../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import SelectableCard from '../../Databases/create/SelectableCard';
-import SecretField from '../SecretField';
+import SelectableCard from '../../../../components/common/SelectableCard';
+import SecretField from '../../../../components/common/SecretField';
 import { fieldStackSx, stepHeadingSx, tileGridSx } from '../styles';
 import type { DatasourceConfig, GdriveAuthType } from '../../../../types/ragIngestion';
 

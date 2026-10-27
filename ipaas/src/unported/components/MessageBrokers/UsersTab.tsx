@@ -20,7 +20,7 @@ import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, 
 import TextField from '../../../components/common/TextField';
 import { Plus, RotateCcw, Trash2, Download } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useCreateKafkaUser, useDeleteKafkaUser, useKafkaUsers, useResetKafkaUserCredentials } from '../../hooks/usePlatformServices';
+import { useCreateKafkaUser, useDeleteKafkaUser, useKafkaUsers, useResetKafkaUserCredentials } from '../../../hooks/usePlatformServices';
 
 const downloadText = (filename: string, content: string) => {
   const blob = new Blob([content], { type: 'application/x-pem-file' });

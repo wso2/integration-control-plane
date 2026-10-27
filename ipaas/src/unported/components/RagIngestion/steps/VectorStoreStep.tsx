@@ -21,10 +21,10 @@ import TextField from '../../../../components/common/TextField';
 import { useMemo, type JSX } from 'react';
 import { blankVectorStore, ragLogoUrl, VECTOR_STORE_PROVIDERS } from '../../../../constants/ragIngestion';
 import { chromaCollectionNameError, pineconeIndexNameError, postgresTableNameError, weaviateCollectionNameError } from '../../../../utils/ragIngestion';
-import { useDatabaseServers } from '../../../hooks/usePlatformServices';
+import { useDatabaseServers } from '../../../../hooks/usePlatformServices';
 import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import SelectableCard from '../../Databases/create/SelectableCard';
-import SecretField from '../SecretField';
+import SelectableCard from '../../../../components/common/SelectableCard';
+import SecretField from '../../../../components/common/SecretField';
 import { fieldStackSx, stepHeadingSx, tileGridSx } from '../styles';
 import type { VectorStoreConfig } from '../../../../types/ragIngestion';
 

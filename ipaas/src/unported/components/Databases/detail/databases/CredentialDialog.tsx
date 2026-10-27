@@ -20,11 +20,11 @@ import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, Dialo
 import TextField from '../../../../../components/common/TextField';
 import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
-import { useCreateDbCredential, useDbCredential, useUpdateDbCredential } from '../../../../hooks/usePlatformServices';
+import { useCreateDbCredential, useDbCredential, useUpdateDbCredential } from '../../../../../hooks/usePlatformServices';
 import { useEnvTemplates } from '../../../../../hooks/useDeploymentPipelines';
 import { CREDENTIAL_PRIVILEGES, MASKED_PASSWORD } from '../../../../../constants/platformServices';
 import { REQUIRED_FIELD_SX } from '../../../../../constants/styles';
-import { buildCredentialPayload, envLabel } from '../../../../utils/platformServices';
+import { buildCredentialPayload, envLabel } from '../../../../../utils/platformServices';
 import SelectableChoiceCard from '../SelectableChoiceCard';
 import type { CredentialFormValues, DbCredential } from '../../../../../types/platformServices';
 import type { Notify } from './types';
