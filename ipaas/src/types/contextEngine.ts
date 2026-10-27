@@ -595,6 +595,9 @@ export interface ContextFact {
   linkedThrough?: string;
   /** The relationship as one sentence, written while indexing; absent when the engine has none. It keeps what the short relation can lose, such as a "not". */
   text?: string;
+  /** The kind of the subject and of the object, as the graph holds them: an entity is its name and its kind, so these pick the right one when a name is more than one entity. Absent when the engine gave none. */
+  subjectKind?: string;
+  objectKind?: string;
 }
 
 export interface ContextQueryResult {

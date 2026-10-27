@@ -390,15 +390,21 @@ export function factEntityNames(facts: ContextFact[]): Set<string> {
   );
 }
 
-/** The id the engine gave the entity with this name, ignoring case, or undefined when the graph shown does not hold it. */
-export function entityId(graph: ContextGraph, name: string): string | undefined {
+/**
+ * The id the engine gave the entity with this name, ignoring case. An entity is its
+ * name and its kind, so with a kind it is the entity of that kind; without one, or
+ * when no entity of the name has it, the first of the name. Undefined when the
+ * graph shown does not hold it.
+ */
+export function entityId(graph: ContextGraph, name: string, kind?: string): string | undefined {
   const wanted = name.toLowerCase();
-  return graph.entities.find((e) => e.name.toLowerCase() === wanted)?.id;
+  const named = graph.entities.filter((e) => e.name.toLowerCase() === wanted);
+  return (kind ? named.find((e) => e.kind === kind) : undefined)?.id ?? named[0]?.id;
 }
 
-/** The explore model's index of the entity with this name, ignoring case, or undefined when the graph shown does not hold it. */
-export function entityIndex(m: GraphModel, graph: ContextGraph, name: string): number | undefined {
-  const id = entityId(graph, name);
+/** The explore model's index of the entity with this name and kind (see `entityId`), or undefined when the graph shown does not hold it. */
+export function entityIndex(m: GraphModel, graph: ContextGraph, name: string, kind?: string): number | undefined {
+  const id = entityId(graph, name, kind);
   return id === undefined ? undefined : m.index.get(id);
 }
 
@@ -417,6 +423,8 @@ export function relationTags(m: GraphModel, selection: Selection): LinkTag[] {
 /** Narrows the facts lit: those naming one entity, or those standing on one passage. */
 export interface FactFocus {
   entity?: string;
+  /** The entity's kind, when known, so a name that is more than one entity narrows to the right one. */
+  entityKind?: string;
   evidenceId?: string;
 }
 
@@ -435,18 +443,24 @@ export interface FactSelection extends Selection {
  */
 export function factSelection(m: GraphModel, graph: ContextGraph, facts: ContextFact[], focus: FactFocus = {}): FactSelection {
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-  const chosen = facts.filter((f) => (!focus.entity || same(f.subject, focus.entity) || same(f.object, focus.entity)) && (!focus.evidenceId || f.evidenceIds.includes(focus.evidenceId)));
+  // A fact end is the focused entity when the names match and, when both sides know a kind, the kinds match too.
+  const focused = (name: string, kind: string | undefined) => !!focus.entity && same(name, focus.entity) && (!kind || !focus.entityKind || kind === focus.entityKind);
+  const chosen = facts.filter((f) => (!focus.entity || focused(f.subject, f.subjectKind) || focused(f.object, f.objectKind)) && (!focus.evidenceId || f.evidenceIds.includes(focus.evidenceId)));
   const points = new Set<number>();
   const links = new Set<number>();
   const tags: LinkTag[] = [];
   const missing = new Set<string>();
   const relates = m.links.map((link, i) => ({ link, i })).filter(({ link }) => link.kind === 'relates');
   if (focus.entity) {
-    const self = entityIndex(m, graph, focus.entity);
+    const self = entityIndex(m, graph, focus.entity, focus.entityKind);
     if (self !== undefined) points.add(self);
   }
   for (const fact of chosen) {
-    const ends = [fact.subject, fact.object].map((name) => ({ name, index: entityIndex(m, graph, name) }));
+    const named: [string, string | undefined][] = [
+      [fact.subject, fact.subjectKind],
+      [fact.object, fact.objectKind],
+    ];
+    const ends = named.map(([name, kind]) => ({ name, index: entityIndex(m, graph, name, kind) }));
     for (const end of ends) {
       if (end.index === undefined) missing.add(end.name);
       else points.add(end.index);

@@ -137,6 +137,8 @@ interface RawFact {
   evidenceIds?: string[];
   linkedThrough?: string;
   text?: string;
+  subjectKind?: string;
+  objectKind?: string;
 }
 
 interface RawQueryResponse {
@@ -355,6 +357,8 @@ const toFact = (raw: RawFact): ContextFact => ({
   evidenceIds: raw.evidenceIds ?? [],
   ...(raw.linkedThrough ? { linkedThrough: raw.linkedThrough } : {}),
   ...(raw.text ? { text: raw.text } : {}),
+  ...(raw.subjectKind ? { subjectKind: raw.subjectKind } : {}),
+  ...(raw.objectKind ? { objectKind: raw.objectKind } : {}),
 });
 
 const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({

@@ -53,6 +53,8 @@ import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, nodeLabelSx, panelLa
 import type { ContextEngineDetail, ContextEvidence, ContextFact, ContextQueryResult, ContextQueryTrace } from '../../../types/contextEngine';
 
 const NO_FACTS: ContextFact[] = [];
+/** Separates an entity's name from its kind in a selection key; a control character no name holds. */
+const KIND_SEPARATOR = '\u001f';
 
 interface ProvenanceViewProps {
   engine: ContextEngineDetail;
@@ -96,21 +98,28 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   const keepNames = useMemo(() => factEntityNames(facts), [facts]);
   const model = useMemo(() => (served ? exploreModel(served, { records: true, entities: true, detail: 'key', keepNames }) : null), [served, keepNames]);
   const buffers = useMemo(() => (model ? cosmosBuffers(model, palette) : null), [model, palette]);
-  const focus = useMemo<FactFocus>(() => (selectedKey?.startsWith('e:') ? { entity: selectedKey.slice(2) } : selectedKey?.startsWith('p:') ? { evidenceId: selectedKey.slice(2) } : {}), [selectedKey]);
+  // An entity key is "e:" + name, with the kind after a separator when known, since the same name can be two entities.
+  const focus = useMemo<FactFocus>(() => {
+    if (selectedKey?.startsWith('e:')) {
+      const [entity, entityKind] = selectedKey.slice(2).split(KIND_SEPARATOR);
+      return { entity, ...(entityKind ? { entityKind } : {}) };
+    }
+    return selectedKey?.startsWith('p:') ? { evidenceId: selectedKey.slice(2) } : {};
+  }, [selectedKey]);
   const whole = useMemo(() => (model && served ? factSelection(model, served, facts) : null), [model, served, facts]);
   const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, facts, focus) : null), [model, served, facts, focus]);
   // A chosen entity or passage narrows the lit part; one with no fact on the graph shows the whole answer's part.
   const lit = part && part.points.length ? part : whole;
   const pointColors = useMemo(() => (model && lit ? litPointColors(model, palette, lit, palette.lit) : null), [model, palette, lit]);
   const linkColors = useMemo(() => (model && lit ? litLinkColors(model, palette, lit, palette.lit) : null), [model, palette, lit]);
-  const selectedIndex = focus.entity && model && served ? (entityIndex(model, served, focus.entity) ?? null) : null;
+  const selectedIndex = focus.entity && model && served ? (entityIndex(model, served, focus.entity, focus.entityKind) ?? null) : null;
   const labels = useMemo(() => (model && lit ? labelled(model, lit, selectedIndex, hovered, 0, 40) : []), [model, lit, selectedIndex, hovered]);
 
   const select = (key: string | null) => {
     setSelectedKey(key);
     onSelectKey(key);
   };
-  const selectEntity = (name: string) => select(`e:${name}`);
+  const selectEntity = (name: string, kind?: string) => select(kind ? `e:${name}${KIND_SEPARATOR}${kind}` : `e:${name}`);
 
   useEffect(() => {
     if (!selectedKey) return;
@@ -154,7 +163,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   const chosenPassage = focus.evidenceId ? passageOf(focus.evidenceId) : 0;
   const entityName = focus.entity ?? null;
   // The explorer selects by the engine's id, which only the graph shown knows; without it there is nothing to open.
-  const exploreId = entityName && served ? entityId(served, entityName) : undefined;
+  const exploreId = entityName && served ? entityId(served, entityName, focus.entityKind) : undefined;
   const litEntities = whole?.points.length ?? 0;
 
   return (
@@ -213,7 +222,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
               linkTags={lit.tags}
               onSelect={(i) => {
                 if (i === null) select(null);
-                else if (model.nodes[i].kind === 'entity') select(`e:${model.nodes[i].label}`);
+                else if (model.nodes[i].kind === 'entity') selectEntity(model.nodes[i].label, served?.entities.find((e) => e.id === model.nodes[i].key)?.kind);
               }}
               onHover={setHovered}
               accent={colors.accent}
@@ -266,6 +275,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             engineId={engine.id}
             orgHandle={orgHandle}
             name={entityName}
+            kind={focus.entityKind}
             sources={engine.sources}
             derivation={{ answer: data.answerWithheld ? undefined : data.answer, evidence: data.evidence }}
             onSelectEntity={selectEntity}

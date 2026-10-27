@@ -255,6 +255,30 @@ describe('facts on the graph', () => {
     expect(entityIndex(m, GRAPH, 'nobody')).toBeUndefined();
   });
 
+  it('tells two entities of one name apart by their kind', () => {
+    // "gateway 7" is a system and also a building: two entities, two ids.
+    const twins: ContextGraph = {
+      ...GRAPH,
+      entities: [...GRAPH.entities, { id: 'ent_gb', name: 'gateway 7', kind: 'building', mentions: 1 }],
+      mentions: [...GRAPH.mentions, { entityId: 'ent_gb', recordNodeId: 'rec_fail', chunks: 1 }],
+      relations: [...GRAPH.relations, { subjectId: 'ent_gb', relation: 'stands in', objectId: 'ent_k', recordNodeIds: ['rec_fail'] }],
+    };
+    expect(entityId(twins, 'gateway 7', 'building')).toBe('ent_gb');
+    expect(entityId(twins, 'gateway 7', 'system')).toBe('ent_g');
+    // Without a kind, or with one no entity of the name has, the first of the name.
+    expect(entityId(twins, 'gateway 7')).toBe('ent_g');
+    expect(entityId(twins, 'gateway 7', 'animal')).toBe('ent_g');
+    const m = exploreModel(twins, { records: true, entities: true, detail: 'all' });
+    const fact = { subject: 'gateway 7', subjectKind: 'building', relation: 'stands in', object: 'kandy', evidenceIds: ['e1'] };
+    const building = factSelection(m, twins, [fact], { entity: 'gateway 7', entityKind: 'building' });
+    expect(building.points.map((i) => m.nodes[i].key).sort()).toEqual(['ent_gb', 'ent_k']);
+    expect(building.links.map((i) => m.links[i].label)).toEqual(['stands in']);
+    // The system of that name has no part in the building's fact.
+    const system = factSelection(m, twins, [fact], { entity: 'gateway 7', entityKind: 'system' });
+    expect(system.points.map((i) => m.nodes[i].key)).toEqual(['ent_g']);
+    expect(system.links).toHaveLength(0);
+  });
+
   it('colours the lit points in the given colour', () => {
     const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all' });
     const colors = litPointColors(m, PALETTE, { points: [m.index.get('ent_k') as number], links: [] }, PALETTE.lit);

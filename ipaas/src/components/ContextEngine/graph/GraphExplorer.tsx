@@ -79,9 +79,12 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
     setSelectedKey(key);
     onSelectKey(key);
   };
-  const selectEntityByName = (name: string) => {
-    const entity = data?.entities.find((e) => e.name.toLowerCase() === name.toLowerCase());
-    if (!entity || !model) return;
+  const selectEntityByName = (name: string, kind?: string) => {
+    if (!data || !model) return;
+    const named = data.entities.filter((e) => e.name.toLowerCase() === name.toLowerCase());
+    // An entity is its name and its kind: with a kind, that one; without, or when none has it, the first of the name.
+    const entity = (kind ? named.find((e) => e.kind === kind) : undefined) ?? named[0];
+    if (!entity) return;
     const index = model.index.get(entity.id);
     if (index !== undefined) select(index);
   };
@@ -226,8 +229,10 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
               sourceName={sourcesById.get(data.records.find((r) => r.id === selected.key)?.sourceId ?? '')?.name}
               entities={data.mentions
                 .filter((m) => m.recordNodeId === selected.key)
-                .map((m) => data.entities.find((e) => e.id === m.entityId)?.name)
-                .filter((n): n is string => !!n)}
+                .flatMap((m) => {
+                  const e = data.entities.find((entity) => entity.id === m.entityId);
+                  return e ? [{ name: e.name, kind: e.kind }] : [];
+                })}
               onSelectEntity={selectEntityByName}
               onClose={() => select(null)}
             />
@@ -327,7 +332,13 @@ function KindToggle({ label, count, on, dot, onClick }: { label: string; count: 
   );
 }
 
-function RecordPanel({ label, sourceName, entities, onSelectEntity, onClose }: { label: string; sourceName?: string; entities: string[]; onSelectEntity: (name: string) => void; onClose: () => void }): JSX.Element {
+/** An entity named in a document: its name and, when the graph knows one, its kind, which picks the right entity when a name is two. */
+interface NamedEntity {
+  name: string;
+  kind?: string;
+}
+
+function RecordPanel({ label, sourceName, entities, onSelectEntity, onClose }: { label: string; sourceName?: string; entities: NamedEntity[]; onSelectEntity: (name: string, kind?: string) => void; onClose: () => void }): JSX.Element {
   const [allNames, setAllNames] = useState(false);
   const shown = allNames ? entities : entities.slice(0, NAMES_SHOWN);
   return (
@@ -347,7 +358,7 @@ function RecordPanel({ label, sourceName, entities, onSelectEntity, onClose }: {
         <Typography sx={panelLabelSx}>Names</Typography>
         <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ mt: 0.75 }}>
           {entities.length ? (
-            shown.map((name) => <EntityChip key={name} name={name} onSelect={onSelectEntity} />)
+            shown.map((e) => <EntityChip key={`${e.name}|${e.kind ?? ''}`} name={e.name} kind={e.kind} onSelect={onSelectEntity} />)
           ) : (
             <Typography variant="body2" sx={mutedSx}>
               No entities found in it.
