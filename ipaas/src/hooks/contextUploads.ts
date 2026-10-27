@@ -33,9 +33,9 @@
  */
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent, updateContextSource } from '#api/contextEngine';
+import { getContextJob, getContextRecordStatus, hashContent, ingestContextFile, retryContextJob, sendContextRecordEvent, updateContextSource } from '#api/contextEngine';
 import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
-import { engineMessage, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
+import { engineMessage, isUploadActive, unchangedDelivery, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
 import type { AudienceRule, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
 
@@ -55,6 +55,9 @@ const pendingBytes = new Map<string, FileToUpload>();
 const timers = new Map<string, number>();
 const active = new Map<string, number>();
 const queues = new Map<string, (() => Promise<void>)[]>();
+
+const UNCHANGED_DETAIL = 'Unchanged, so it was not sent again.';
+const BYTES_GONE_DETAIL = 'The engine no longer has this file, so it cannot run the job again. Upload the file again.';
 
 const entryKey = (sourceId: string, recordId: string): string => `${sourceId}\u0000${recordId}`;
 const filesKey = (sourceId: string): string => `${CONTEXT_ENGINE_FILES_KEY_PREFIX}${sourceId}`;
@@ -88,7 +91,7 @@ function entriesOf(sourceId: string): UploadEntry[] {
 function persist(sourceId: string): void {
   const remembered: UploadedFile[] = entriesOf(sourceId)
     .filter((e) => e.status !== 'failed' || e.jobId)
-    .map(({ recordId, name, size, contentType, visibility, audience, label, version, uploadedAt, jobId }) => ({ recordId, name, size, contentType, visibility, audience, label, version, uploadedAt, jobId }));
+    .map(({ recordId, name, size, contentType, visibility, audience, label, version, uploadedAt, jobId, contentHash }) => ({ recordId, name, size, contentType, visibility, audience, label, version, uploadedAt, jobId, contentHash }));
   writeJson(filesKey(sourceId), remembered);
 }
 
@@ -184,7 +187,7 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
       return;
     }
     if (job.state === 'failed') {
-      patchEntry(sourceId, recordId, { status: 'failed', detail: job.error?.message ?? 'The engine could not apply this file.' });
+      patchEntry(sourceId, recordId, { status: 'failed', retrying: false, detail: job.error?.message ?? 'The engine could not apply this file.' });
       return;
     }
     pendingBytes.delete(key);
@@ -238,19 +241,72 @@ function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
   return next;
 }
 
-function enqueue(engineId: string, sourceId: string, file: FileToUpload, audience: string[], version: string): void {
+/**
+ * Run a failed row's job again on the engine, as the same job, from the bytes
+ * the engine still has. True when the engine took it, or when the job turned out
+ * to be running or done already, and the row now follows it; true as well when
+ * the retry failed for another reason and the row says so. False only when the
+ * engine cannot run that job again because its bytes are gone, so the caller
+ * sends the file itself if it still has it.
+ */
+async function retryOnEngine(engineId: string, sourceId: string, recordId: string, jobId: string): Promise<boolean> {
+  patchEntry(sourceId, recordId, { status: 'queued', progress: 100, detail: undefined, forbidden: false, jobId, retrying: true });
+  try {
+    await retryContextJob(jobId);
+  } catch (err) {
+    if (err instanceof HttpError && err.status === 409) {
+      const job = await getContextJob(jobId).catch(() => null);
+      if (job && job.state !== 'failed') {
+        await watchJob(engineId, sourceId, recordId, jobId);
+        return true;
+      }
+      patchEntry(sourceId, recordId, { retrying: false });
+      return false;
+    }
+    const forbidden = err instanceof HttpError && err.status === 403;
+    patchEntry(sourceId, recordId, { status: 'failed', progress: 0, forbidden, retrying: false, detail: forbidden ? 'Retrying needs upload access to this engine.' : engineMessage(err, 'The retry failed.') });
+    return true;
+  }
+  persist(sourceId);
+  await watchJob(engineId, sourceId, recordId, jobId);
+  return true;
+}
+
+/**
+ * Queue one file. `previous` is the row the file replaces, when there is one.
+ * The hash of the bytes says whether the file changed, not the version number,
+ * which is only the engine's ordering number: the same bytes with the same
+ * roles are not sent again. A row that failed on the engine is retried there
+ * as the same job; a row that is fine is kept as it is.
+ */
+function enqueue(engineId: string, sourceId: string, file: FileToUpload, audience: string[], version: string, previous?: UploadEntry): void {
   const recordId = file.name;
   const key = entryKey(sourceId, recordId);
   pendingBytes.set(key, file);
   const queue = queues.get(sourceId) ?? [];
   queues.set(sourceId, queue);
   queue.push(async () => {
-    patchEntry(sourceId, recordId, { status: 'uploading', progress: 0, detail: undefined, forbidden: false });
+    patchEntry(sourceId, recordId, { status: 'uploading', progress: 0, detail: undefined, forbidden: false, retrying: false });
     try {
+      const contentHash = await hashContent(file.content);
+      if (previous?.jobId && unchangedDelivery(previous, contentHash, audience)) {
+        if (previous.status !== 'failed') {
+          // Already on the engine as it is: keep the row, with the version it has there.
+          pendingBytes.delete(key);
+          patchEntry(sourceId, recordId, { ...previous, progress: 100, detail: isUploadActive(previous) ? undefined : UNCHANGED_DETAIL });
+          persist(sourceId);
+          if (isUploadActive(previous)) await follow(engineId, sourceId, recordId);
+          return;
+        }
+        patchEntry(sourceId, recordId, { version: previous.version, uploadedAt: previous.uploadedAt, contentHash });
+        if (await retryOnEngine(engineId, sourceId, recordId, previous.jobId)) return;
+        // The engine no longer has the bytes; they are here, so they go up as a new version.
+        patchEntry(sourceId, recordId, { status: 'uploading', progress: 0, retrying: false, version, uploadedAt: new Date(Number(version)).toISOString() });
+      }
       // A file still under its old label keeps the source's label rule; role tags must map to themselves.
       if (entriesOf(sourceId).find((e) => e.recordId === recordId)?.visibility) await ensureSourceRules(sourceId, audience);
       const handle = await ingestContextFile({ engineId, sourceId, recordId, content: file.content, contentType: file.contentType, audience, version, onProgress: (f) => patchEntry(sourceId, recordId, { progress: Math.round(f * 100) }) });
-      patchEntry(sourceId, recordId, { status: 'queued', progress: 100, jobId: handle.jobId });
+      patchEntry(sourceId, recordId, { status: 'queued', progress: 100, jobId: handle.jobId, contentHash });
       persist(sourceId);
       await watchJob(engineId, sourceId, recordId, handle.jobId);
     } catch (err) {
@@ -271,20 +327,40 @@ export function startUploads(engineId: string, sourceId: string, files: FileToUp
   ensureLoaded(engineId, sourceId);
   const version = String(Date.now());
   const uploadedAt = new Date(Number(version)).toISOString();
+  // The rows being replaced, so an unchanged file is told from a changed one by its hash.
+  const previous = new Map(entriesOf(sourceId).map((e) => [e.recordId, e]));
   const fresh: UploadEntry[] = files.map((f) => ({ recordId: f.name, name: f.name, size: f.size, contentType: f.contentType, visibility, audience, ...(visibility ? {} : { label }), version, uploadedAt, status: 'uploading', progress: 0 }));
   const names = new Set(fresh.map((f) => f.recordId));
   setEntries(sourceId, [...fresh, ...entriesOf(sourceId).filter((e) => !names.has(e.recordId))]);
-  files.forEach((f) => enqueue(engineId, sourceId, f, audience, version));
+  files.forEach((f) => enqueue(engineId, sourceId, f, audience, version, previous.get(f.name)));
 }
 
-/** Send a failed upload again, with a new version so the engine treats it as fresh. */
+/**
+ * Try a failed file again. One that failed on the engine runs there again as the
+ * same job, with no new upload, also after a page reload. When the engine no
+ * longer has its bytes and they are still here, they go up as a new version. One
+ * that never reached the engine is sent again.
+ */
 export function retryUpload(engineId: string, sourceId: string, recordId: string): void {
-  const file = pendingBytes.get(entryKey(sourceId, recordId));
   const entry = entriesOf(sourceId).find((e) => e.recordId === recordId);
-  if (!file || !entry) return;
-  const version = String(Date.now());
-  patchEntry(sourceId, recordId, { version, uploadedAt: new Date(Number(version)).toISOString() });
-  enqueue(engineId, sourceId, file, entry.audience, version);
+  if (!entry) return;
+  const file = pendingBytes.get(entryKey(sourceId, recordId));
+  const resend = (): void => {
+    if (!file) return;
+    const version = String(Date.now());
+    patchEntry(sourceId, recordId, { version, uploadedAt: new Date(Number(version)).toISOString() });
+    enqueue(engineId, sourceId, file, entry.audience, version);
+  };
+  if (!entry.jobId) {
+    resend();
+    return;
+  }
+  const jobId = entry.jobId;
+  void retryOnEngine(engineId, sourceId, recordId, jobId).then((handled) => {
+    if (handled) return;
+    if (file) resend();
+    else patchEntry(sourceId, recordId, { status: 'failed', progress: 0, detail: BYTES_GONE_DETAIL });
+  });
 }
 
 /** Retry every upload the engine refused for lack of access, e.g. after the owner grant was added. */

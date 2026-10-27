@@ -638,6 +638,34 @@ export function sourceIndexingText(p: SourceProgress): string | null {
   return parts.join(' · ');
 }
 
+/**
+ * Why files failed on the model provider, in words the operator can act on. The
+ * reason follows "N files are not searchable: ".
+ */
+const MODEL_FAILURE_REASON: Record<string, string> = {
+  backend_model_access_denied: "the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
+  backend_model_not_found: 'the model provider does not know the configured model name. Fix the model settings, then retry.',
+  backend_model_quota_exceeded: "the model provider's rate limit or budget was reached. Retry later.",
+  backend_model_unavailable: 'the engine could not reach its model provider. Retry later.',
+  backend_model_failed: 'the model provider refused the request. Retry later.',
+};
+
+/**
+ * One sentence for a source whose files failed on the model provider, e.g.
+ * "2 files are not searchable: the model provider rejected the engine's API key, …".
+ * It comes straight from the records' index states, so it clears itself once the
+ * files are retried or removed. A file the engine cannot read is the file's own
+ * problem, told on its row, not here. Null when nothing failed that way.
+ */
+export function sourceFailureNotice(p: SourceProgress): string | null {
+  if (p.indexing.state !== 'ok') return null;
+  const failures = Object.entries(p.indexing.failures ?? {}).filter(([code, count]) => code in MODEL_FAILURE_REASON && count > 0);
+  if (!failures.length) return null;
+  const [code] = failures.sort((a, b) => b[1] - a[1])[0];
+  const total = failures.reduce((n, [, count]) => n + count, 0);
+  return `${plural(total, 'file')} ${total === 1 ? 'is' : 'are'} not searchable: ${MODEL_FAILURE_REASON[code]}`;
+}
+
 /** Roll-up across the engine's sources. Sources without a progress entry are ones the caller may not inspect. */
 export function summarizeEngineProgress(sourceIds: string[], progress: SourceProgress[]): ContextEngineProgressSummary {
   const byId = new Map(progress.map((p) => [p.sourceId, p]));
@@ -870,6 +898,15 @@ export function sharingMismatches(sources: ContextSourceConfig[], queryRoles: st
 /** Role handles as a readable list, for warnings. */
 export const roleList = nameList;
 
+/** What to tell people for the engine's stable index failure codes that name the fix. */
+const INDEX_FAILURE_DETAIL: Record<string, string> = {
+  backend_model_access_denied: "The engine's model provider rejected its API key, or the key may not use the configured model. Fix the model settings, then retry the file.",
+  backend_model_not_found: "The engine's model provider does not know the configured model name. Fix the model settings, then retry the file.",
+  backend_model_quota_exceeded: "The engine's model provider reached its rate limit or budget. Retry the file later.",
+  backend_model_unavailable: 'The engine could not reach its model provider. Retry the file later.',
+  backend_model_failed: 'The model provider refused the request for this file.',
+};
+
 /** Where an uploaded file stands once the engine has taken it, from its record status. */
 export function uploadStatusFromRecord(record: ContextRecordStatus): { status: UploadFileStatus; detail?: string } {
   if (record.state === 'quarantined') {
@@ -890,9 +927,10 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
     case 'reconcile_required':
       return { status: 'indexing', detail: 'The engine is repairing its index entry for this file.' };
     case 'failed':
-      return record.indexError === 'extraction_unsupported'
-        ? { status: 'unreadable', detail: "Stored, but the engine can't read this file type yet. Upload a text or Markdown export to make it searchable." }
-        : { status: 'failed', detail: `Indexing failed${record.indexError ? `: ${record.indexError}` : ''}.` };
+      if (record.indexError === 'extraction_unsupported') {
+        return { status: 'unreadable', detail: "Stored, but the engine can't read this file type yet. Upload a text or Markdown export to make it searchable." };
+      }
+      return { status: 'failed', detail: INDEX_FAILURE_DETAIL[record.indexError ?? ''] ?? `Indexing failed${record.indexError ? `: ${record.indexError}` : ''}.` };
     case 'not_indexed':
       return { status: 'stored', detail: 'The engine is running without its knowledge backend, so nothing is searchable yet.' };
     default:
@@ -932,9 +970,33 @@ export function engineMessage(err: unknown, fallback = 'The request failed.'): s
   return body.trim() || fallback;
 }
 
+/** The engine's stable error code from a failed request, e.g. "backend_model_access_denied"; null when the body carries none. */
+export function engineErrorCode(err: unknown): string | null {
+  if (!(err instanceof HttpError)) return null;
+  try {
+    const parsed = JSON.parse(err.message.replace(/^HTTP \d+:\s*/, '')) as { code?: unknown };
+    return typeof parsed.code === 'string' && parsed.code ? parsed.code : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The delivery's identity the idempotency key is hashed from: length-prefixed, so no two (record, version) pairs collide. */
 export function deliveryIdentity(recordId: string, version: string): string {
   return `${recordId.length}:${recordId}:${version}`;
+}
+
+/**
+ * Whether sending these bytes with these roles would change nothing on the
+ * engine: they are what the file's last delivery carried. The version number is
+ * only the engine's ordering number and says nothing about change; the hash does.
+ * A file remembered without a hash counts as changed, so it is sent once more.
+ */
+export function unchangedDelivery(previous: Pick<UploadEntry, 'contentHash' | 'audience'> | undefined, contentHash: string, audience: string[]): boolean {
+  if (!previous?.contentHash || previous.contentHash !== contentHash) return false;
+  const before = [...previous.audience].sort();
+  const after = [...audience].sort();
+  return before.length === after.length && before.every((tag, i) => tag === after[i]);
 }
 
 // ── First-run guidance ──────────────────────────────────────────────────────

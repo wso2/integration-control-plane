@@ -210,7 +210,16 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
 
         <Stack gap={1.75}>
           {selected?.kind === 'entity' ? (
-            <EntityPanel engineId={engine.id} orgHandle={orgHandle} name={selected.label} sources={engine.sources} onSelectEntity={selectEntityByName} onClose={() => select(null)} />
+            <EntityPanel
+              engineId={engine.id}
+              orgHandle={orgHandle}
+              name={selected.label}
+              // The node is one entity of this name; its kind picks that one on the engine.
+              kind={data.entities.find((e) => e.id === selected.key)?.kind}
+              sources={engine.sources}
+              onSelectEntity={selectEntityByName}
+              onClose={() => select(null)}
+            />
           ) : selected?.kind === 'record' ? (
             <RecordPanel
               label={selected.label}

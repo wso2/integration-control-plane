@@ -268,7 +268,18 @@ export interface SourceProgress {
   processing: { since?: string; total: number; queued: number; running: number; succeeded: number; failed: number; percent: number | null };
   records: { active: number; quarantined: number; deleted: number };
   /** Active record versions the knowledge backend has indexed, from the last background collection. */
-  indexing: { state: SourceIndexingState; expected: number | null; indexed: number | null; indexing: number | null; failed: number | null; missing: number | null; percent: number | null; collectedAt?: string };
+  indexing: {
+    state: SourceIndexingState;
+    expected: number | null;
+    indexed: number | null;
+    indexing: number | null;
+    failed: number | null;
+    missing: number | null;
+    percent: number | null;
+    collectedAt?: string;
+    /** The failed records counted by error code, the same codes a failed file's record carries. Empty when none failed. */
+    failures: Record<string, number>;
+  };
 }
 
 export interface ContextEngineProgress {
@@ -359,6 +370,8 @@ export interface UploadedFile {
   uploadedAt: string;
   /** The engine job that applied, or will apply, the latest delivery; followed after a reload until it finishes. */
   jobId?: string;
+  /** The hash of the bytes last sent, `sha256:<hex>`, so the same file dropped again is not sent again. */
+  contentHash?: string;
 }
 
 export interface UploadEntry extends UploadedFile {
@@ -369,6 +382,8 @@ export interface UploadEntry extends UploadedFile {
   detail?: string;
   /** The engine refused the caller; the owner grant would fix it. */
   forbidden?: boolean;
+  /** The engine is running the row's job again from the file it already has; nothing was uploaded. */
+  retrying?: boolean;
 }
 
 export interface IngestFileInput {
@@ -669,6 +684,8 @@ export interface ContextEntityView {
   /** Ids of `evidence` whose passage names the entity. */
   mentionedIn: string[];
   facts: ContextFact[];
+  /** Every kind this name has, when it was asked for without a kind and the name is more than one entity. */
+  kinds?: string[];
 }
 
 /**

@@ -33,6 +33,8 @@ interface EntityPanelProps {
   engineId: string;
   orgHandle: string;
   name: string;
+  /** The entity's kind, when the caller knows it: the same name can be more than one entity, one per kind. */
+  kind?: string;
   sources: ContextSource[];
   /** In provenance mode: the answer and the passages its query returned, to show this entity's part in it. */
   derivation?: { answer?: string; evidence: ContextEvidence[] };
@@ -48,9 +50,9 @@ interface EntityPanelProps {
  * read. In provenance mode it also says which answer sentences depend on it
  * and which of its passages the question did not retrieve.
  */
-export default function EntityPanel({ engineId, orgHandle, name, sources, derivation, onSelectEntity, onClose, onExplore }: EntityPanelProps): JSX.Element {
+export default function EntityPanel({ engineId, orgHandle, name, kind, sources, derivation, onSelectEntity, onClose, onExplore }: EntityPanelProps): JSX.Element {
   const navigate = useAppNavigate();
-  const entity = useContextEntity(engineId, name);
+  const entity = useContextEntity(engineId, name, kind);
   const view = entity.data;
   const byId = new Map(view?.evidence.map((e) => [e.id, e]) ?? []);
   const sourceName = new Map(sources.map((s) => [s.id, s.name]));
@@ -65,6 +67,8 @@ export default function EntityPanel({ engineId, orgHandle, name, sources, deriva
     .sort((a, b) => a - b);
   const inAnswer = derivation?.answer ? [...new Set(numbers.flatMap((n) => sentencesCiting(derivation.answer, n)))] : [];
   const notFound = entity.error instanceof HttpError && entity.error.status === 404;
+  // The kind the caller picked wins; otherwise the kind the engine opened.
+  const shownKind = kind ?? view?.entity.kind;
   const related = [...new Set(view?.facts.flatMap((f) => [f.subject, f.object]).filter((n) => n.toLowerCase() !== name.toLowerCase()) ?? [])];
 
   return (
@@ -76,7 +80,7 @@ export default function EntityPanel({ engineId, orgHandle, name, sources, deriva
             {name}
           </Typography>
           <Typography variant="caption" sx={mutedSx}>
-            Entity{view?.entity.kind ? ` · ${view.entity.kind}` : ''}
+            Entity{shownKind ? ` · ${shownKind}` : ''}
           </Typography>
         </Stack>
         <IconButton size="small" aria-label="Release the selection" onClick={onClose}>
