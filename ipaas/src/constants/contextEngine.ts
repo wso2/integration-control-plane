@@ -1,0 +1,817 @@
+/**
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import type {
+  ContextEngineStorage,
+  ContextSourceConfig,
+  FileVisibility,
+  LlmConfig,
+  LlmProvider,
+  McpClientId,
+  SourceCategory,
+  SourceConnector,
+  SourceFieldDef,
+  SourceFieldKind,
+  SourceProgressStatus,
+  StorageKind,
+  UploadFileStatus,
+} from '../types/contextEngine';
+import type { EmbeddingProvider } from '../types/ragIngestion';
+
+const RAG_LOGO_BASE = 'assets/images/rag/';
+const GENAI_LOGO_BASE = 'assets/images/genai/';
+
+/** Resolve a public logo path against the app base URL. */
+export const contextLogoUrl = (path: string): string => `${import.meta.env.BASE_URL}${path}`;
+
+// ── Step 1: the connector catalog ───────────────────────────────────────────
+
+const DB_LOGO_BASE = 'assets/images/databases/';
+
+export const SOURCE_CATEGORIES: { id: SourceCategory; label: string }[] = [
+  { id: 'documentation', label: 'Documentation' },
+  { id: 'cloud-storage', label: 'Cloud storage' },
+  { id: 'code', label: 'Code & tickets' },
+  { id: 'collaboration', label: 'Collaboration' },
+  { id: 'databases', label: 'Databases' },
+  { id: 'saas', label: 'SaaS apps' },
+  { id: 'web-files', label: 'Web & files' },
+];
+
+/** Required field. */
+const F = (key: string, label: string, kind: SourceFieldKind, extra: Partial<SourceFieldDef> = {}): SourceFieldDef => ({ key, label, kind, required: true, ...extra });
+/** Optional field. */
+const O = (key: string, label: string, kind: SourceFieldKind, extra: Partial<SourceFieldDef> = {}): SourceFieldDef => ({ key, label, kind, required: false, ...extra });
+/** Put a run of fields under one collapsible section heading; spread the result into a connector's `fields`. Pass `{ label, collapsed }` to start the section collapsed. */
+const G = (group: string | { label: string; collapsed?: boolean }, ...fields: SourceFieldDef[]): SourceFieldDef[] => {
+  const label = typeof group === 'string' ? group : group.label;
+  const collapsed = typeof group === 'string' ? false : !!group.collapsed;
+  return fields.map((f) => ({ ...f, group: label, ...(collapsed ? { groupCollapsed: true } : {}) }));
+};
+
+const MS_GRAPH_APP = [F('tenantId', 'Tenant ID', 'text'), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret')];
+
+/** Show a field only for the chosen auth flow (matches a connector's `authType` discriminator). */
+const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'authType', equals: flows });
+
+/**
+ * Optional RML mapping section, appended to connectors whose `isStructuredData` is
+ * set. A provided .rml.ttl is used to generate the context graph from the source's
+ * records; left empty, the engine generates the graph with the LLM. Its own collapsible section.
+ */
+export const RML_MAPPING = G(
+  { label: 'RML Mapping', collapsed: true },
+  O('rmlMapping', 'Mapping file', 'file', {
+    accept: '.rml.ttl,.ttl',
+    helper: 'Optional. Upload an .rml.ttl to control how your records are turned into a graph. Leave it empty and AI builds the graph for you.',
+  }),
+);
+
+const SQL_TABLES = (port: string) => [
+  F('host', 'Host', 'text'),
+  F('port', 'Port', 'text', { defaultValue: port }),
+  F('database', 'Database', 'text'),
+  F('tables', 'Tables', 'text', { placeholder: 'public.docs, public.faq', helper: 'Comma-separated, schema-qualified.' }),
+  F('user', 'User', 'text'),
+  F('password', 'Password', 'secret'),
+];
+
+/**
+ * Grouped form fields for a SQL database connector, mirroring the Ballerina
+ * `DatabaseSettings`: connect to a table, pick the columns to ingest, and stream
+ * changes with CDC. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
+ * MySQL has no schema layer and omits it.
+ */
+const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[] => [
+  ...G(
+    'Connection',
+    F('host', 'Host', 'text', { defaultValue: 'localhost' }),
+    F('port', 'Port', 'text', { defaultValue: port }),
+    F('database', 'Database', 'text'),
+    ...(schemaDefault !== undefined ? [O('schema', 'Schema', 'text', { defaultValue: schemaDefault })] : []),
+    F('username', 'Username', 'text'),
+    F('password', 'Password', 'secret'),
+  ),
+  ...G(
+    'Data to sync',
+    F('tableName', 'Table', 'text', { helper: 'Each row becomes one record.' }),
+    F('primaryKey', 'Primary Key', 'text', { helper: 'Column that uniquely identifies each row.' }),
+    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated columns to ingest. Empty ingests every column.' }),
+    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Column holding each row’s last-updated time (epoch ms). Recommended for clean re-syncs.' }),
+  ),
+  ...G(
+    { label: 'Sync options', collapsed: true },
+    F('cdcEnabled', 'Change Data Capture', 'select', {
+      defaultValue: 'true',
+      options: [
+        { value: 'true', label: 'Enabled' },
+        { value: 'false', label: 'Disabled' },
+      ],
+      helper: 'Keep syncing new inserts, updates and deletes after the first import.',
+    }),
+  ),
+];
+
+/**
+ * The connectors a context engine can read from. Order within a category is
+ * irrelevant; the catalog is searched, filtered and sorted by name at render time.
+ */
+export const SOURCE_CONNECTORS: SourceConnector[] = [
+  // Documentation
+  {
+    id: 'confluence',
+    name: 'Confluence',
+    description: 'Pages in an Atlassian Confluence space.',
+    category: 'documentation',
+    popular: true,
+    icon: 'book',
+    fields: [F('baseUrl', 'Base URL', 'url', { placeholder: 'https://your-org.atlassian.net/wiki' }), F('spaceKey', 'Space Key', 'text'), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
+    summaryKeys: ['baseUrl', 'spaceKey'],
+  },
+  {
+    id: 'notion',
+    name: 'Notion',
+    description: 'Pages and databases shared with an integration.',
+    category: 'documentation',
+    icon: 'file',
+    fields: [F('integrationToken', 'Integration Token', 'secret'), O('rootPageId', 'Root Page ID', 'text', { helper: 'Leave empty to read every page the integration can see.' })],
+    summaryKeys: ['rootPageId'],
+  },
+  { id: 'gitbook', name: 'GitBook', description: 'Published docs from a space.', category: 'documentation', icon: 'book', fields: [F('spaceId', 'Space ID', 'text'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['spaceId'] },
+  {
+    id: 'readme',
+    name: 'ReadMe',
+    description: 'Guides and API references in a project.',
+    category: 'documentation',
+    icon: 'book',
+    fields: [F('projectSubdomain', 'Project Subdomain', 'text'), F('apiKey', 'API Key', 'secret')],
+    summaryKeys: ['projectSubdomain'],
+  },
+  {
+    id: 'document360',
+    name: 'Document360',
+    description: 'Knowledge base articles in a project version.',
+    category: 'documentation',
+    icon: 'book',
+    fields: [F('projectVersionId', 'Project Version ID', 'text'), F('apiToken', 'API Token', 'secret')],
+    summaryKeys: ['projectVersionId'],
+  },
+  { id: 'helpjuice', name: 'Helpjuice', description: 'Knowledge base articles.', category: 'documentation', icon: 'book', fields: [F('accountUrl', 'Account URL', 'url'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['accountUrl'] },
+
+  // Cloud storage
+  {
+    id: 'gdrive',
+    name: 'Google Drive',
+    description: 'A Drive folder subtree, backfilled and kept in sync by the Changes API.',
+    category: 'cloud-storage',
+    popular: true,
+    logo: `${RAG_LOGO_BASE}googledrive.svg`,
+    icon: 'folder',
+    // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
+    // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
+    fields: [
+      ...G(
+        'Connection',
+        F('authType', 'Authentication', 'select', {
+          defaultValue: 'refresh_token',
+          options: [
+            { value: 'refresh_token', label: 'Refresh token' },
+            { value: 'bearer', label: 'Access token' },
+            { value: 'service_account', label: 'Service account' },
+          ],
+          helper: 'OAuth2 flow used to connect.',
+        }),
+        F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
+        F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
+        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+        F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
+        F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'Path to the service account private key in PEM form.' }),
+        O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional user to impersonate under domain-wide delegation.' }),
+      ),
+      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' })),
+    ],
+    summaryKeys: ['folderId'],
+  },
+  {
+    id: 'amazons3',
+    name: 'Amazon S3',
+    description: 'Objects in a bucket, optionally under a prefix.',
+    category: 'cloud-storage',
+    logo: `${RAG_LOGO_BASE}amazons3.svg`,
+    icon: 'cloud',
+    fields: [F('bucketName', 'Bucket Name', 'text'), O('prefix', 'Prefix', 'text', { placeholder: 'docs/' }), F('accessKeyId', 'Access Key ID', 'secret'), F('secretAccessKey', 'Secret Access Key', 'secret')],
+    summaryKeys: ['bucketName', 'prefix'],
+  },
+  {
+    id: 'sharepoint',
+    name: 'SharePoint',
+    description: 'Document libraries in a Microsoft 365 site.',
+    category: 'cloud-storage',
+    popular: true,
+    icon: 'building',
+    fields: [F('siteUrl', 'Site URL', 'url', { placeholder: 'https://contoso.sharepoint.com/sites/docs' }), ...MS_GRAPH_APP],
+    summaryKeys: ['siteUrl'],
+  },
+  { id: 'onedrive', name: 'OneDrive', description: "Files in a user's or shared drive.", category: 'cloud-storage', icon: 'cloud', fields: [F('driveId', 'Drive ID', 'text'), ...MS_GRAPH_APP], summaryKeys: ['driveId'] },
+  {
+    id: 'dropbox',
+    name: 'Dropbox',
+    description: 'Files in a shared folder.',
+    category: 'cloud-storage',
+    icon: 'box',
+    fields: [F('folderPath', 'Folder Path', 'text', { placeholder: '/Team/Docs' }), F('accessToken', 'Access Token', 'secret')],
+    summaryKeys: ['folderPath'],
+  },
+  { id: 'box', name: 'Box', description: 'Files in a folder tree.', category: 'cloud-storage', icon: 'box', fields: [F('folderId', 'Folder ID', 'text'), F('developerToken', 'Developer Token', 'secret')], summaryKeys: ['folderId'] },
+  {
+    id: 'azure-blob',
+    name: 'Azure Blob Storage',
+    description: 'Blobs in a storage container.',
+    category: 'cloud-storage',
+    icon: 'cloud',
+    fields: [F('accountName', 'Storage Account', 'text'), F('containerName', 'Container', 'text'), F('sasToken', 'SAS Token', 'secret')],
+    summaryKeys: ['accountName', 'containerName'],
+  },
+  {
+    id: 'gcs',
+    name: 'Google Cloud Storage',
+    description: 'Objects in a bucket.',
+    category: 'cloud-storage',
+    icon: 'cloud',
+    fields: [F('bucketName', 'Bucket Name', 'text'), O('prefix', 'Prefix', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')],
+    summaryKeys: ['bucketName', 'prefix'],
+  },
+
+  // Code & tickets
+  {
+    id: 'github',
+    name: 'GitHub',
+    description: 'Docs, markdown and code in a repository branch.',
+    category: 'code',
+    popular: true,
+    icon: 'github',
+    fields: [
+      F('repositoryUrl', 'Repository URL', 'url', { placeholder: 'https://github.com/org/repo' }),
+      F('branch', 'Branch', 'text', { defaultValue: 'main' }),
+      O('includePaths', 'Include Paths', 'text', { placeholder: 'docs/**, README.md', helper: 'Optional globs, comma separated.' }),
+      F('accessToken', 'Access Token', 'secret', { helper: 'A read-only token with repo scope.' }),
+    ],
+    summaryKeys: ['repositoryUrl', 'branch'],
+  },
+  {
+    id: 'gitlab',
+    name: 'GitLab',
+    description: 'A project repository and its wiki.',
+    category: 'code',
+    icon: 'code',
+    fields: [
+      F('baseUrl', 'Base URL', 'url', { defaultValue: 'https://gitlab.com' }),
+      F('projectPath', 'Project Path', 'text', { placeholder: 'group/project' }),
+      F('branch', 'Branch', 'text', { defaultValue: 'main' }),
+      F('accessToken', 'Access Token', 'secret'),
+    ],
+    summaryKeys: ['projectPath', 'branch'],
+  },
+  {
+    id: 'bitbucket',
+    name: 'Bitbucket',
+    description: 'Repositories in a workspace.',
+    category: 'code',
+    icon: 'code',
+    fields: [F('workspace', 'Workspace', 'text'), F('repositorySlug', 'Repository Slug', 'text'), F('branch', 'Branch', 'text', { defaultValue: 'main' }), F('appPassword', 'App Password', 'secret')],
+    summaryKeys: ['workspace', 'repositorySlug'],
+  },
+  {
+    id: 'azure-devops',
+    name: 'Azure DevOps',
+    description: 'Repositories and wiki pages in a project.',
+    category: 'code',
+    icon: 'code',
+    fields: [F('organizationUrl', 'Organization URL', 'url', { placeholder: 'https://dev.azure.com/org' }), F('project', 'Project', 'text'), F('personalAccessToken', 'Personal Access Token', 'secret')],
+    summaryKeys: ['organizationUrl', 'project'],
+  },
+  {
+    id: 'jira',
+    name: 'Jira',
+    description: 'Issues in a project.',
+    category: 'code',
+    icon: 'kanban',
+    fields: [F('baseUrl', 'Base URL', 'url', { placeholder: 'https://your-org.atlassian.net' }), F('projectKey', 'Project Key', 'text'), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
+    summaryKeys: ['baseUrl', 'projectKey'],
+  },
+  { id: 'linear', name: 'Linear', description: 'Issues and project documents.', category: 'code', icon: 'kanban', fields: [F('teamKey', 'Team Key', 'text'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['teamKey'] },
+  { id: 'asana', name: 'Asana', description: 'Tasks and project descriptions.', category: 'code', icon: 'kanban', fields: [F('projectId', 'Project ID', 'text'), F('accessToken', 'Access Token', 'secret')], summaryKeys: ['projectId'] },
+  { id: 'trello', name: 'Trello', description: 'Cards in a board.', category: 'code', icon: 'kanban', fields: [F('boardId', 'Board ID', 'text'), F('apiKey', 'API Key', 'secret'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['boardId'] },
+
+  // Collaboration
+  {
+    id: 'slack',
+    name: 'Slack',
+    description: 'Messages and files in selected channels.',
+    category: 'collaboration',
+    icon: 'hash',
+    fields: [F('channels', 'Channels', 'text', { placeholder: '#support, #platform' }), F('botToken', 'Bot Token', 'secret')],
+    summaryKeys: ['channels'],
+  },
+  { id: 'teams', name: 'Microsoft Teams', description: 'Channel conversations in a team.', category: 'collaboration', icon: 'chat', fields: [F('teamId', 'Team ID', 'text'), ...MS_GRAPH_APP], summaryKeys: ['teamId'] },
+  {
+    id: 'gmail',
+    name: 'Gmail',
+    description: 'Labelled mail threads from a mailbox.',
+    category: 'collaboration',
+    icon: 'mail',
+    fields: [F('label', 'Label', 'text', { placeholder: 'support' }), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret'), F('refreshToken', 'Refresh Token', 'secret')],
+    summaryKeys: ['label'],
+  },
+  {
+    id: 'outlook',
+    name: 'Outlook',
+    description: 'Mail folders from a Microsoft 365 mailbox.',
+    category: 'collaboration',
+    icon: 'mail',
+    fields: [F('mailbox', 'Mailbox', 'text', { placeholder: 'support@example.com' }), ...MS_GRAPH_APP],
+    summaryKeys: ['mailbox'],
+  },
+  {
+    id: 'zoom',
+    name: 'Zoom',
+    description: 'Meeting transcripts and recordings.',
+    category: 'collaboration',
+    icon: 'video',
+    fields: [F('accountId', 'Account ID', 'text'), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret')],
+    summaryKeys: ['accountId'],
+  },
+  { id: 'google-chat', name: 'Google Chat', description: 'Conversations in a space.', category: 'collaboration', icon: 'chat', fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')], summaryKeys: ['spaceId'] },
+
+  // Databases
+  {
+    id: 'postgresql',
+    name: 'PostgreSQL',
+    description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.',
+    category: 'databases',
+    logo: `${DB_LOGO_BASE}postgresql.svg`,
+    icon: 'database',
+    fields: [
+      ...DATABASE_FIELDS('5432', 'public'),
+      ...G(
+        { label: 'Sync options', collapsed: true },
+        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional logical replication slot name; a default is used when empty.' }),
+        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional publication name; a default is used when empty.' }),
+      ),
+    ],
+    summaryKeys: ['host', 'database'],
+    isStructuredData: true,
+  },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', logo: `${DB_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  {
+    id: 'mongodb',
+    name: 'MongoDB',
+    description: 'Documents in a collection.',
+    category: 'databases',
+    icon: 'database',
+    fields: [F('connectionString', 'Connection String', 'secret'), F('database', 'Database', 'text'), F('collection', 'Collection', 'text')],
+    summaryKeys: ['database', 'collection'],
+  },
+  {
+    id: 'snowflake',
+    name: 'Snowflake',
+    description: 'Rows from a table or view.',
+    category: 'databases',
+    icon: 'database',
+    fields: [F('account', 'Account', 'text'), F('warehouse', 'Warehouse', 'text'), F('database', 'Database', 'text'), F('schema', 'Schema', 'text'), F('table', 'Table', 'text'), F('user', 'User', 'text'), F('password', 'Password', 'secret')],
+    summaryKeys: ['database', 'table'],
+  },
+  {
+    id: 'bigquery',
+    name: 'BigQuery',
+    description: 'Rows from a table.',
+    category: 'databases',
+    icon: 'table',
+    fields: [F('projectId', 'Project ID', 'text'), F('dataset', 'Dataset', 'text'), F('table', 'Table', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')],
+    summaryKeys: ['dataset', 'table'],
+  },
+  { id: 'redshift', name: 'Amazon Redshift', description: 'Rows from selected tables.', category: 'databases', icon: 'database', fields: SQL_TABLES('5439'), summaryKeys: ['host', 'database'] },
+  {
+    id: 'elasticsearch',
+    name: 'Elasticsearch',
+    description: 'Documents from an index.',
+    category: 'databases',
+    icon: 'database',
+    fields: [F('endpoint', 'Endpoint', 'url'), F('indexName', 'Index', 'text'), F('apiKey', 'API Key', 'secret')],
+    summaryKeys: ['endpoint', 'indexName'],
+  },
+
+  // SaaS apps
+  {
+    id: 'zendesk',
+    name: 'Zendesk',
+    description: 'Tickets and help-center articles.',
+    category: 'saas',
+    icon: 'headset',
+    fields: [F('subdomain', 'Subdomain', 'text', { placeholder: 'your-org' }), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
+    summaryKeys: ['subdomain'],
+  },
+  {
+    id: 'salesforce',
+    name: 'Salesforce',
+    description: 'Records of an object, synced by SOQL backfill and Change Data Capture.',
+    category: 'saas',
+    icon: 'cloud',
+    // Mirrors the Ballerina `salesforce` connector's SalesforceSettings: an auth block
+    // (one of three OAuth2 flows, chosen by authType) plus the object, fields and sync options.
+    fields: [
+      ...G(
+        'Connection',
+        F('baseUrl', 'Instance URL', 'url', { placeholder: 'https://your-domain.my.salesforce.com', helper: 'Your My Domain URL; the OAuth token endpoint is derived from it.' }),
+        F('authType', 'Authentication', 'select', {
+          defaultValue: 'client_credentials',
+          options: [
+            { value: 'client_credentials', label: 'Client credentials' },
+            { value: 'refresh_token', label: 'Refresh token' },
+            { value: 'bearer', label: 'Access token' },
+          ],
+          helper: 'OAuth2 flow used to connect.',
+        }),
+        F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token') }),
+        F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token') }),
+        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+      ),
+      ...G(
+        'Data to sync',
+        F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'The SObject to sync. It must have Change Data Capture enabled.' }),
+        F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated business fields to ingest as content.' }),
+      ),
+      ...G({ label: 'Sync options', collapsed: true }, O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' })),
+    ],
+    summaryKeys: ['baseUrl', 'sobject'],
+    isStructuredData: true,
+  },
+  { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },
+  { id: 'intercom', name: 'Intercom', description: 'Help center articles and conversations.', category: 'saas', icon: 'headset', fields: [F('accessToken', 'Access Token', 'secret')], summaryKeys: [] },
+  {
+    id: 'servicenow',
+    name: 'ServiceNow',
+    description: 'Knowledge articles and incidents.',
+    category: 'saas',
+    icon: 'shield',
+    fields: [F('instanceUrl', 'Instance URL', 'url'), F('username', 'Username', 'text'), F('password', 'Password', 'secret')],
+    summaryKeys: ['instanceUrl'],
+  },
+  {
+    id: 'freshdesk',
+    name: 'Freshdesk',
+    description: 'Tickets and solution articles.',
+    category: 'saas',
+    icon: 'headset',
+    fields: [F('domain', 'Domain', 'text', { placeholder: 'your-org.freshdesk.com' }), F('apiKey', 'API Key', 'secret')],
+    summaryKeys: ['domain'],
+  },
+  {
+    id: 'shopify',
+    name: 'Shopify',
+    description: 'Products, policies and help pages.',
+    category: 'saas',
+    icon: 'cart',
+    fields: [F('storeDomain', 'Store Domain', 'text', { placeholder: 'your-store.myshopify.com' }), F('adminAccessToken', 'Admin Access Token', 'secret')],
+    summaryKeys: ['storeDomain'],
+  },
+  { id: 'stripe', name: 'Stripe', description: 'Products and their descriptions.', category: 'saas', icon: 'card', fields: [F('secretKey', 'Secret Key', 'secret')], summaryKeys: [] },
+
+  // Web & files
+  {
+    id: 'website',
+    name: 'Website',
+    description: 'Public pages crawled from a list of URLs.',
+    category: 'web-files',
+    icon: 'globe',
+    fields: [
+      F('urls', 'Page URLs', 'urls', { placeholder: 'https://docs.example.com/getting-started\nhttps://docs.example.com/faq', helper: 'One URL per line.' }),
+      O('maxDepth', 'Link Depth', 'text', { defaultValue: '1', helper: 'How many link hops to follow from each URL.' }),
+    ],
+    summaryKeys: ['urls'],
+  },
+  { id: 'sitemap', name: 'Sitemap', description: 'Every page listed in a sitemap.xml.', category: 'web-files', icon: 'globe', fields: [F('sitemapUrl', 'Sitemap URL', 'url', { placeholder: 'https://example.com/sitemap.xml' })], summaryKeys: ['sitemapUrl'] },
+  { id: 'rss', name: 'RSS Feed', description: 'Articles from a feed.', category: 'web-files', icon: 'rss', fields: [F('feedUrl', 'Feed URL', 'url')], summaryKeys: ['feedUrl'] },
+  { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', popular: true, icon: 'upload', fields: [], summaryKeys: [], single: true },
+];
+
+export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntries(SOURCE_CONNECTORS.map((c) => [c.id, c]));
+
+/**
+ * Connectors a source can be created from today. Every other connector is listed
+ * in the catalog as "Coming soon" and cannot be added yet. Flip an id in here as
+ * its backend lands — the catalog, quick-add row and forms pick it up with no
+ * other change.
+ */
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+
+/** Whether a source can be created from this connector yet. */
+export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
+
+export const POPULAR_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => c.popular);
+
+/** Live connectors offered as quick-add shortcuts, most useful first. */
+export const QUICK_ADD_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => isConnectorEnabled(c.id));
+
+/** Connectors rendered per catalog page; the next page loads as the list scrolls into view. */
+export const CATALOG_PAGE_SIZE = 24;
+
+/** Blank config for a connector; `name` defaults to the connector's display name, fields to their defaults, and visibility to everyone who can query. */
+export function blankSource(connectorId: string): ContextSourceConfig {
+  const connector = CONNECTOR_BY_ID[connectorId];
+  if (!connector) throw new Error(`Unknown source connector: ${connectorId}`);
+  return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [], stagedVisibility: EVERYONE_VISIBILITY };
+}
+
+// ── Step 3: LLM providers (embedding providers are shared with RAG) ─────────
+
+export interface LlmProviderInfo {
+  id: LlmProvider;
+  name: string;
+  /** Logo path under the public folder, resolved with {@link contextLogoUrl}. */
+  logo: string;
+  /** Selectable model ids. Empty means the provider takes a free-text deployment id (Azure). */
+  models: string[];
+}
+
+export const LLM_PROVIDERS: LlmProviderInfo[] = [
+  { id: 'openai', name: 'Open AI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'] },
+  { id: 'anthropic', name: 'Anthropic AI', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  { id: 'azure_openai', name: 'Azure Open AI', logo: `${GENAI_LOGO_BASE}azure-openai.svg`, models: [] },
+  { id: 'mistral', name: 'Mistral AI', logo: `${GENAI_LOGO_BASE}mistral.svg`, models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] },
+];
+
+export const LLM_AZURE_DEFAULT_API_VERSION = '2024-06-01';
+
+export function blankLlm(provider: LlmProvider): LlmConfig {
+  return { provider, model: '', apiKey: '', azureBaseUrl: '', azureApiVersion: provider === 'azure_openai' ? LLM_AZURE_DEFAULT_API_VERSION : '' };
+}
+
+// ── Engine limits and access model ──────────────────────────────────────────
+
+/**
+ * Each context engine runs as its own instance, and the console shows the one at its configured
+ * URL under this id. It is also the engine's root grant resource, so grants and permissions on the
+ * engine use it as is.
+ */
+export const CONTEXT_ENGINE_ID = 'engine';
+
+/** Shown for an engine set up from another browser, whose name this browser never saw. */
+export const DEFAULT_CONTEXT_ENGINE_NAME = 'Context engine';
+
+/** localStorage key of the running engine's name and description, which the engine itself does not hold. */
+export const CONTEXT_ENGINE_LOCAL_KEY = 'contextEngine:local';
+
+/** Limits for an engine's name and description, which the control plane provisions. */
+export const CONTEXT_ENGINE_NAME_MAX = 120;
+export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
+/** Shown under the description field: people browsing engines and AI agents connected over MCP both read it. */
+export const CONTEXT_ENGINE_DESCRIPTION_HINT = 'Tells people and AI agents what this engine contains, so they know when to search it.';
+
+/** Engine actions a querying role receives — read context, open evidence, see the trace. */
+export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
+
+/** What the creator of an engine gets on it: query it, upload files and manage its sources. The engine grants creators nothing by itself. */
+export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.read', 'ingest.write', 'source.manage'] as const;
+
+/** The creator's grant is keyed `owner-<principalId>`. */
+export const OWNER_GRANT_PREFIX = 'owner-';
+
+
+/** Grants created for an org role are keyed `role-<handle>` so they can be told apart from ad-hoc grants. */
+export const ROLE_GRANT_PREFIX = 'role-';
+
+export const CONTEXT_QUERY_DEFAULT_LIMIT = 10;
+export const CONTEXT_QUERY_MAX_LENGTH = 10000;
+
+/** Jobs stop being polled once they reach one of these. */
+export const CONTEXT_JOB_TERMINAL_STATES = new Set(['succeeded', 'failed']);
+
+// ── Exposure ────────────────────────────────────────────────────────────────
+
+export interface ContextMcpToolInfo {
+  name: string;
+  description: string;
+}
+
+/** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
+export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
+  { name: 'get_context', description: 'Returns the passages the caller may read that best answer a question, each with its source, version and link.' },
+  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage. Offered when the engine offers answers.' },
+];
+
+// ── Recommended models ──────────────────────────────────────────────────────
+
+/** One-click default pair: one provider, one key, good quality at low cost. */
+export const RECOMMENDED_MODELS: { embedding: { provider: EmbeddingProvider; model: string }; llm: { provider: LlmProvider; model: string } } = {
+  embedding: { provider: 'openai', model: 'text-embedding-3-small' },
+  llm: { provider: 'openai', model: 'gpt-4.1' },
+};
+
+// ── Source progress ─────────────────────────────────────────────────────────
+
+/** Chip text for a source's place in the pipeline. */
+export const SOURCE_PROGRESS_LABEL: Record<SourceProgressStatus, string> = {
+  waiting: 'Waiting for data',
+  reading: 'Reading',
+  processing: 'Processing',
+  indexing: 'Indexing',
+  processed: 'Processed',
+  attention: 'Processed with errors',
+};
+
+export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'info' | 'success' | 'warning'> = {
+  waiting: 'default',
+  reading: 'info',
+  processing: 'info',
+  indexing: 'info',
+  processed: 'success',
+  attention: 'warning',
+};
+
+/** Progress polling: quick while any source is moving, slow otherwise so a sync started elsewhere still shows up. */
+export const PROGRESS_POLL_ACTIVE_MS = 3000;
+export const PROGRESS_POLL_IDLE_MS = 15000;
+
+// ── MCP clients ─────────────────────────────────────────────────────────────
+
+export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
+  { id: 'claude-desktop', label: 'Claude Desktop', path: '~/Library/Application Support/Claude/claude_desktop_config.json' },
+  { id: 'cursor', label: 'Cursor', path: '.cursor/mcp.json' },
+  { id: 'vscode', label: 'VS Code', path: '.vscode/mcp.json' },
+  { id: 'generic', label: 'Generic', path: 'Any client that reads an mcpServers map' },
+];
+
+// ── Local persistence keys ──────────────────────────────────────────────────
+
+/** Session-storage key prefix for the create-wizard draft, suffixed by org handle. */
+export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
+/** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
+export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
+
+
+/** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
+export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';
+
+/** localStorage key of the questions asked from this browser, per engine, until the engine lists a caller's stored queries. */
+export const CONTEXT_ENGINE_QUESTIONS_KEY_PREFIX = 'contextEngine:questions:';
+
+/** How many asked questions are kept per engine. */
+export const ASKED_QUESTIONS_MAX = 20;
+
+/** localStorage key of the deletion job started from this browser, per engine, so a failed deletion can be told apart and retried. */
+export const CONTEXT_ENGINE_DELETION_KEY_PREFIX = 'contextEngine:deletion:';
+
+/** How often a list or page with an engine being deleted checks again. */
+export const DELETION_POLL_MS = 3000;
+
+/** localStorage key of a source's visibility rules as this browser last saved them, for the edit form and the upload rules check. */
+export const CONTEXT_ENGINE_RULES_KEY_PREFIX = 'contextEngine:rules:';
+
+/** The default for uploads: anyone who can query the engine can find the files. */
+export const EVERYONE_VISIBILITY: FileVisibility = { kind: 'everyone' };
+
+/** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
+export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];
+
+// ── File uploads ────────────────────────────────────────────────────────────
+
+/** The engine's upload limit and type allowlist (its `CONTEXT_ENGINE_UPLOAD_*` settings). */
+export const UPLOAD_MAX_BYTES = 25 * 1024 * 1024;
+
+/** Content type by file extension. Browsers leave `File.type` empty for Markdown, so the name decides. */
+export const UPLOAD_CONTENT_TYPES: Record<string, string> = {
+  txt: 'text/plain',
+  text: 'text/plain',
+  log: 'text/plain',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  html: 'text/html',
+  htm: 'text/html',
+  json: 'application/json',
+  csv: 'text/csv',
+  pdf: 'application/pdf',
+};
+
+export const UPLOAD_ACCEPT = Object.keys(UPLOAD_CONTENT_TYPES)
+  .map((ext) => `.${ext}`)
+  .join(',');
+
+/** Files in flight at once from one browser; the engine's worker indexes one at a time anyway. */
+export const UPLOAD_CONCURRENCY = 3;
+
+/** How often an uploaded file's job and record are checked while it is still moving. */
+export const UPLOAD_POLL_MS = 3000;
+
+export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
+  uploading: 'Uploading',
+  queued: 'Queued',
+  indexing: 'Indexing',
+  searchable: 'Searchable',
+  stored: 'Stored, not searchable',
+  unreadable: 'Not readable',
+  held: 'Held back',
+  failed: 'Failed',
+};
+
+export const UPLOAD_STATUS_TONE: Record<UploadFileStatus, 'default' | 'info' | 'success' | 'warning' | 'error'> = {
+  uploading: 'info',
+  queued: 'info',
+  indexing: 'info',
+  searchable: 'success',
+  stored: 'default',
+  unreadable: 'warning',
+  held: 'warning',
+  failed: 'error',
+};
+
+// ── Storage backends ────────────────────────────────────────────────────────
+
+export interface StorageBackendInfo {
+  kind: StorageKind;
+  title: string;
+  purpose: string;
+  /** The engine's embedded store. */
+  managedName: string;
+  managedDescription: string;
+  /** The alternative to the embedded store: an Infrastructure server, or an external database. */
+  alternativeLabel: string;
+  alternativeDescription: string;
+  /** Infrastructure list that can supply this store; null when Infrastructure offers none (the alternative is then external). */
+  infraSegment: 'vector-databases' | 'databases' | null;
+  /** Noun used in empty states and links, e.g. "vector database". */
+  infraNoun: string;
+  /** Engine provider ids sent in the configuration payload. */
+  managedProvider: string;
+  alternativeProvider: string;
+}
+
+export const STORAGE_BACKENDS: StorageBackendInfo[] = [
+  {
+    kind: 'vector',
+    title: 'Vector database',
+    purpose: 'Embeddings and similarity search over your sources.',
+    managedName: 'LanceDB',
+    managedDescription: 'Embedded vector index inside the engine. Good to start with; not shared or backed up.',
+    alternativeLabel: 'From Infrastructure · Vector Databases',
+    alternativeDescription: 'A managed PostgreSQL server with pgvector.',
+    infraSegment: 'vector-databases',
+    infraNoun: 'vector database',
+    managedProvider: 'lancedb',
+    alternativeProvider: 'pgvector',
+  },
+  {
+    kind: 'relational',
+    title: 'Relational database',
+    purpose: 'Source records, provenance ledger, grants and evidence.',
+    managedName: 'SQLite',
+    managedDescription: 'Embedded control-plane store for records, provenance and evidence.',
+    alternativeLabel: 'From Infrastructure · Databases',
+    alternativeDescription: 'A managed PostgreSQL server.',
+    infraSegment: 'databases',
+    infraNoun: 'database',
+    managedProvider: 'sqlite',
+    alternativeProvider: 'postgres',
+  },
+  {
+    kind: 'graph',
+    title: 'Graph database',
+    purpose: 'Entities and relationships the engine extracts.',
+    managedName: 'Kuzu',
+    managedDescription: 'Embedded graph index, isolated per engine. Recommended until a shared graph database is available.',
+    alternativeLabel: 'Connect Neo4j',
+    alternativeDescription: 'Bring your own Neo4j instance: Bolt URI, database, user and password.',
+    infraSegment: null,
+    infraNoun: 'graph database',
+    managedProvider: 'kuzu',
+    alternativeProvider: 'neo4j',
+  },
+];
+
+export const STORAGE_BACKEND_BY_KIND: Record<StorageKind, StorageBackendInfo> = Object.fromEntries(STORAGE_BACKENDS.map((b) => [b.kind, b])) as Record<StorageKind, StorageBackendInfo>;
+
+/** Every store on the engine's embedded default. */
+export function defaultStorage(): ContextEngineStorage {
+  return { vector: { mode: 'managed' }, relational: { mode: 'managed' }, graph: { mode: 'managed' } };
+}
+
+/** Default logical database name suggested for an Infrastructure server. */
+export const STORAGE_DEFAULT_DATABASE: Record<StorageKind, string> = { vector: 'context_vectors', relational: 'context_engine', graph: 'neo4j' };

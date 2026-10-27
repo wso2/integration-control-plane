@@ -76,9 +76,15 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
+      remark-parse:
+        specifier: ^11.0.0
+        version: 11.0.0
       swagger-ui-react:
         specifier: ^5.32.1
         version: 5.32.1(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+      unified:
+        specifier: ^11.0.5
+        version: 11.0.5
       yaml:
         specifier: ^2.9.0
         version: 2.9.0
@@ -89,6 +95,9 @@ importers:
       '@playwright/test':
         specifier: ^1.52.0
         version: 1.60.0
+      '@types/mdast':
+        specifier: 4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: 24.6.0
         version: 24.6.0

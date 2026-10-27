@@ -36,6 +36,7 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `INTEGRATION_BUILDER_*`                                                      | AI Integration Builder: copilot base URL, model, max tokens, connectors GraphQL URL                                      |
 | `AI_COPILOT_URL_SUFFIX`                                                      | Copilot path on the system APIs gateway                                                                                  |
 | `MOESIF_APP_URL`                                                             | API Insights. See below.                                                                                                 |
+| `CONTEXT_ENGINE_*`, `ENABLE_CONTEXT_ENGINE_FEATURE`                          | Context Engines. See below.                                                                                              |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
 
@@ -47,6 +48,14 @@ The org-level API Insights page embeds the Moesif dashboard, the same way the AP
 - The console fetches a Moesif viewer token from ipaas-service (`CHOREO_BASE_API_URL`) at `/analytics/id-token`. ipaas-service forwards the call to platform-api, which serves it only on an internal route.
 
 Moesif only answers an embed from origins it allowlists, so each console origin must be added on Moesif's side. Until then the page times out with Retry.
+
+## Context Engines
+
+Until ipaas-service provisions engines, the org-level Context Engines pages work with one running engine.
+
+- `ENABLE_CONTEXT_ENGINE_FEATURE` set to `true` shows the Context Engines entry. It also needs `CONTEXT_ENGINE_API_URL`.
+- `CONTEXT_ENGINE_API_URL` is the engine's base URL. The browser calls `<base>/v1/...` directly, so the engine must answer CORS for the console origin.
+- `CONTEXT_ENGINE_API_TOKEN` is for local development only: a bearer from the engine's static token file, sent instead of the platform token. Never set it in a shared deployment.
 
 ## Verification
 
