@@ -35,9 +35,13 @@ const schema = {
           type: 'object',
           required: ['sfSalesBaseUrl', 'greeting'],
           properties: {
-            sfSalesBaseUrl: { type: 'string' },
-            greeting: { type: 'string' },
-            support: { type: 'object', required: ['sfSupportBaseUrl'], properties: { sfSupportBaseUrl: { type: 'string' } } },
+            sfSalesBaseUrl: { type: 'string', description: '' },
+            greeting: { type: 'string', description: '' },
+            support: {
+              type: 'object',
+              required: ['sfSupportBaseUrl'],
+              properties: { sfSupportBaseUrl: { type: 'string', description: '' }, sfSupportRegion: { type: 'string', description: '' } },
+            },
           },
         },
       },
@@ -87,11 +91,26 @@ describe('ConfigForm with links', () => {
     const linked = Array.from(container.querySelectorAll('input')).filter((i) => i.value.startsWith('from '));
     expect(linked.map((i) => [i.getAttribute('aria-label'), i.value, i.disabled])).toEqual([
       ['sfSalesBaseUrl is supplied by salesforce-sales', 'from salesforce-sales', true],
-      ['support / sfSupportBaseUrl is supplied by salesforce-support', 'from salesforce-support', true],
+      ['sfSupportBaseUrl is supplied by salesforce-support', 'from salesforce-support', true],
     ]);
     const validated = handleValidationChange.mock.calls.map(([key]) => key);
     expect(validated).not.toContain('wso2.sfdemo.sfSalesBaseUrl');
     expect(validated).not.toContain('wso2.sfdemo.support.sfSupportBaseUrl');
-    expect(Array.from(container.querySelectorAll('input')).filter((i) => !i.disabled)).toHaveLength(1);
+    expect(Array.from(container.querySelectorAll('input')).filter((i) => !i.disabled)).toHaveLength(2);
+  });
+
+  it("lists a submodule's required configurables under Required", async () => {
+    await act(async () =>
+      root.render(<ConfigForm schema={schema} valueMap={new Map()} validationMap={new Map()} linkingMap={new Map()} setLinkingMap={vi.fn()} sensitiveMap={new Map()} setSensitiveMap={vi.fn()} handleValueChange={vi.fn()} handleValidationChange={vi.fn()} />),
+    );
+
+    const section = (title: string) =>
+      Array.from(container.querySelectorAll('h6'))
+        .find((h) => h.textContent === title)!
+        .closest('.MuiBox-root')!.textContent;
+    expect(section('Required')).toContain('wso2/sfdemo.support');
+    expect(section('Required')).toContain('sfSupportBaseUrl');
+    expect(section('Required')).not.toContain('sfSupportRegion');
+    expect(section('Optional')).toContain('sfSupportRegion');
   });
 });

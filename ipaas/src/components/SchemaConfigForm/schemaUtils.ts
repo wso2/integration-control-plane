@@ -76,10 +76,24 @@ export const extractUniqueMapKeySet = (valueMap: Map<string, BaseType>, jsonPath
   return uniqueKeySet;
 };
 
+/** A module's node in a Ballerina config schema: it has neither the description every configurable gets nor the name a record type gets. */
+const isModuleNode = (s: JSONSchema): boolean => s.type === 'object' && !!s.properties && s.description === undefined && s.name === undefined;
+
+/**
+ * Splits a package's schema into its root module's configurables and one schema per submodule
+ * (path `<org>.<package>.<module>`), so each module's required configurables count as required.
+ */
+const splitModules = (schema: JSONSchema, path: string): SchemaAtLevel[] => {
+  const entries = Object.entries(schema.properties ?? {});
+  const modules = entries.filter(([, s]) => isModuleNode(s));
+  if (modules.length === 0) return [{ schema, path }];
+  return [{ schema: { ...schema, properties: Object.fromEntries(entries.filter(([, s]) => !isModuleNode(s))) }, path }, ...modules.map(([name, s]) => ({ schema: s, path: `${path}.${name}` }))];
+};
+
 export const getSchemasAtLevel = (schema: JSONSchema, targetLevel: number, currentLevel = 1, currentPath = ''): SchemaAtLevel[] => {
   const schemas: SchemaAtLevel[] = [];
   if (currentLevel === targetLevel) {
-    schemas.push({ schema, path: currentPath });
+    schemas.push(...splitModules(schema, currentPath));
     return schemas;
   }
   if (currentLevel < targetLevel && schema.properties) {
