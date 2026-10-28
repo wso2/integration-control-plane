@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchOnPremKeySubscription, fetchOnPremKeys, generateOnPremKey, regenerateOnPremKey, renameOnPremKey, revokeOnPremKey } from '#api/onPremKeys';
+import { fetchOnPremKeySubscription, fetchOnPremKeys, generateOnPremKey, regenerateOnPremKey, renameOnPremKey, revokeOnPremKey } from '../../api/onPremKeys';
 import type { OnPremKey, OnPremKeySubscription } from '../../types/onPremKey';
 
 const ROOT_KEY = 'onPremKeys';

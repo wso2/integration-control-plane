@@ -16,6 +16,11 @@
  * under the License.
  */
 
+import type { Sample } from '../types/samples';
+
 export const PAGE_SIZE = 9;
+
+// Display names repeat across technologies (Hello World Service is both Ballerina and MI).
+export const sampleKey = (sample: Sample): string => `${sample.buildPack}:${sample.componentPath}`;
 
 export const DEFAULT_PREBUILT_INTEGRATIONS_URL = 'https://raw.githubusercontent.com/wso2/integration-samples/main/.metadata/prebuilt-integrations.json';

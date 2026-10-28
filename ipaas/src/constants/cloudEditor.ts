@@ -29,18 +29,13 @@ export const CLOUD_EDITOR_STEPS: CloudEditorStep[] = [
 
 /** Height of one wheel row in px. */
 export const CLOUD_EDITOR_WHEEL_ROW_HEIGHT = 40;
-/** Pod poll + keep-alive ping interval (ms). */
+/** Readiness poll + keep-alive ping interval (ms). */
 export const CLOUD_EDITOR_POLL_MS = 3_000;
-/**
- * Give up waiting for the pod after this (ms). Governs the pod-status wheel
- * only, so it is inert on cloud: that path has no cluster/release/namespace to
- * poll (see asInstance in api/cloud/cloudEditor.ts) and redirects as soon as the
- * BFF hands over a URL. The cloud budget is POLL_TIMEOUT_MS in that same file.
- */
-export const CLOUD_EDITOR_TIMEOUT_MS = 3 * 60 * 1000;
+/** Give up waiting for the editor to report ready after this (ms), once its address is known. */
+export const CLOUD_EDITOR_READY_TIMEOUT_MS = 3 * 60 * 1000;
 
 /**
- * Message of the error thrown when the cloud poll budget expires. Shared so
- * CloudEditorDeployment can branch on it without a bare literal across the #api seam.
+ * Message of the error thrown when the poll budget expires. Shared so
+ * CloudEditorDeployment can branch on it without repeating the literal.
  */
 export const CLOUD_EDITOR_TIMEOUT_MESSAGE = 'Timed out waiting for the Cloud Editor to become ready';

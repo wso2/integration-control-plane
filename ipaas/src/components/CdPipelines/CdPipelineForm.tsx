@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, FormControlLabel, PageContent, PageTitle, Stack, Switch } from '@wso2/oxygen-ui';
+import { Alert, Button, CircularProgress, PageContent, PageTitle, Stack } from '@wso2/oxygen-ui';
 import TextField from '../common/TextField';
-import { IS_CLOUD } from '../../features';
 import BusyFields from '../common/BusyFields';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
@@ -55,7 +54,6 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
   const [name, setName] = useState(existing ? existing.name : '');
   const [nameTouched, setNameTouched] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [isDefault, setIsDefault] = useState(existing ? Boolean(existing.is_default) : false);
   const [chain, setChain] = useState<EnvTemplate[]>(() =>
     existing
       ? flattenPromotionTree(existing.promotion_tree)
@@ -78,7 +76,7 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
   const handleSave = () => {
     setError('');
     setSubmitted(true);
-    const input: CreateDeploymentPipelineRequest = { name: name.trim(), is_default: isDefault, promotion_tree: buildPromotionTree(chain) };
+    const input: CreateDeploymentPipelineRequest = { name: name.trim(), promotion_tree: buildPromotionTree(chain) };
     const handlers = {
       onSuccess: () => navigate(backUrl),
       onError: (e: Error) => {
@@ -103,11 +101,7 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
         <BusyFields busy={saving}>
           {/* BusyFields is one child of the outer Stack, so its fields need their own gap. */}
           <Stack gap={3}>
-            <Stack direction="row" alignItems="center" gap={2}>
-              <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setNameTouched(true)} fullWidth required error={showNameError} helperText={showNameError ? nameError : ' '} sx={{ flex: 1, ...REQUIRED_SX }} />
-              {/* Hidden on cloud: the flag is accepted by the form but never persisted upstream. */}
-              {!IS_CLOUD && <FormControlLabel control={<Switch checked={isDefault} onChange={(e) => setIsDefault(e.target.checked)} />} label="Mark as default" sx={{ flexShrink: 0, whiteSpace: 'nowrap', mr: 0 }} />}
-            </Stack>
+            <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setNameTouched(true)} fullWidth required error={showNameError} helperText={showNameError ? nameError : ' '} sx={REQUIRED_SX} />
 
             <PromotionChainBuilder envTemplates={envTemplates} value={chain} onChange={setChain} disabled={saving} />
 

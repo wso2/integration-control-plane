@@ -20,7 +20,6 @@ import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@wso2/o
 import { GitHub } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { AuthStatus } from '../../types/import';
-import { IS_CLOUD } from '../../features';
 
 interface GitHubAuthAreaProps {
   authStatus: AuthStatus;
@@ -47,7 +46,7 @@ export default function GitHubAuthArea({ authStatus, isCheckingAuth, isAuthentic
     );
   }
   if (isAuthenticated) return null;
-  if (authStatus === 'authenticating' || (IS_CLOUD && authStatus === 'installing')) {
+  if (authStatus === 'authenticating' || authStatus === 'installing') {
     return (
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 3, minHeight: 40 }}>
         <CircularProgress size={16} />
@@ -69,9 +68,9 @@ export default function GitHubAuthArea({ authStatus, isCheckingAuth, isAuthentic
       </Stack>
     );
   }
-  // Cloud only: authorized, but the GitHub App is not installed on any account yet. The install
+  // Authorized, but the GitHub App is not installed on any account yet. The install
   // popup must open from this button's click — opening it from the token exchange gets popup-blocked.
-  if (IS_CLOUD && authStatus === 'needs-install') {
+  if (authStatus === 'needs-install') {
     return (
       <Box sx={{ mb: 3 }}>
         <Alert severity="info" sx={{ mb: 1.5 }}>

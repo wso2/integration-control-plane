@@ -25,7 +25,7 @@ describe('httpStatusOf', () => {
     expect(httpStatusOf(Object.assign(new Error('HTTP 500: masked'), { status: 404 }))).toBe(404);
   });
 
-  it('falls back to the message for wip GraphQL errors', () => {
+  it('falls back to the message for errors without a status', () => {
     expect(httpStatusOf(new Error('GraphQL request failed (HTTP 404): nope'))).toBe(404);
     expect(httpStatusOf(new Error('HTTP 503: unavailable'))).toBe(503);
   });
@@ -87,7 +87,7 @@ describe('isQuotaError', () => {
     expect(isQuotaError(Object.assign(new Error('You have reached the limit of 5 projects.'), { status: 402 }))).toBe(true);
   });
 
-  it('matches wip\'s HTTP-prefixed message form', () => {
+  it('matches the HTTP-prefixed message form', () => {
     expect(isQuotaError(new Error('HTTP 402: quota exceeded'))).toBe(true);
   });
 

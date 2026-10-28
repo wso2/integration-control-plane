@@ -32,9 +32,6 @@ export interface OrgEntry {
   handle: string;
   numericId: number;
   uuid?: string;
-}
-
-export interface RegisterUserResponse {
-  organizations?: Array<{ handle?: string; orgHandle?: string; name?: string; id?: number; orgId?: number }>;
-  idpId?: string;
+  /** Display name; absent when the source only knows the handle. */
+  name?: string;
 }

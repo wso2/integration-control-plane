@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createAuthzRole, deleteAuthzRole, fetchAuthzRoles, updateAuthzRole } from '#api/projectAuthz';
+import { createAuthzRole, deleteAuthzRole, fetchAuthzRoles, updateAuthzRole } from '../../api/projectAuthz';
 import type { AuthzRole, CreateAuthzRoleInput, UpdateAuthzRoleInput } from '../../types/projectAuthz';
 
 const ROOT_KEY = 'projectAuthz';

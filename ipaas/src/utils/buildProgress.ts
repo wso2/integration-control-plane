@@ -144,28 +144,15 @@ export function logsBehindBuild(status: string | undefined, conclusion: string |
 
 /**
  * Build-step name → what the build was doing, for a "Failed while …" label.
- * Two vocabularies land here: the OpenChoreo workflow task names the cloud BFF
- * passes through, and the step names WIP's logging API returns. An unmapped name
- * just yields a plain "Failed".
+ * The names are the OpenChoreo workflow tasks the BFF passes through. An
+ * unmapped name just yields a plain "Failed".
  */
 const BUILD_STEP_PHRASES: Record<string, string> = {
-  // OpenChoreo workflow tasks (cloud)
   'checkout-source': 'checking out the source',
   'build-image': 'building the image',
   'convert-component-descriptor': 'converting the component descriptor',
   'generate-workload-cr': 'generating the workload resource',
   'publish-build-artifacts': 'publishing build artifacts',
-  // WIP build steps
-  'Environment Setup': 'setting up the environment',
-  'Source Configuration File Validation': 'running validations',
-  'Build Preparation': 'preparing for build',
-  'Build Component': 'building source',
-  'Integration Project Build': 'building source',
-  'Main Sequence Validation': 'validating the main sequence',
-  'Unit Test Preparation': 'preparing unit tests',
-  'Unit Test': 'running unit tests',
-  'Push Image to Registry': 'pushing the image to the registry',
-  'Environment Cleanup': 'cleaning up the environment',
 };
 
 /** What the build was doing when it broke, or `undefined` if the step is unknown. */

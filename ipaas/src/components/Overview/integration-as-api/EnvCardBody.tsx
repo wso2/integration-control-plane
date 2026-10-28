@@ -22,7 +22,6 @@ import type { ReactNode } from 'react';
 import { useApiDefinition, useComponentDeployment, useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
-import { IS_CLOUD } from '../../../features';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
@@ -53,11 +52,10 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];
   const isGraphql = activeEndpoint?.type === 'GraphQL';
 
-  // The enforcing API Platform gateway URL for the selected endpoint (cloud-only; the hook throws in
-  // wip/icp). Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
+  // The enforcing API Platform gateway URL for the selected endpoint. Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
   // of the raw OpenChoreo external route.
-  const securityRef = IS_CLOUD && activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null;
-  const { data: apiSecurity } = useEndpointSecurity(securityRef, IS_CLOUD && !!activeEndpoint);
+  const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null;
+  const { data: apiSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint);
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
   const { data: swagger } = useApiDefinition(hasDeployment && !isGraphql ? activeEndpoint?.apimRevisionId : null);
@@ -100,9 +98,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
         </Box>
       )}
 
-      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && (
-        <EndpointUrlsPanel endpoints={envEndpoints} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} componentId={component.id} deploymentTrackId={versionId} externalUrlOverride={apiSecurity?.publicUrl || undefined} />
-      )}
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && <EndpointUrlsPanel endpoints={envEndpoints} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
 
       {hasDeployment &&
         deploymentStatusV2 !== 'IN_PROGRESS' &&
@@ -128,9 +124,9 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
 
       {/* Cloud-only in-console API consumption: consumer applications and the
           exposed API's security config. Keyed by the BFF's
-          component/environment/endpoint triple — in cloud the component name is
-          the component id and the endpoint name is the endpoint id. */}
-      {IS_CLOUD && showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (
+          component/environment/endpoint triple — the component name is the
+          component id and the endpoint name is the endpoint id. */}
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (
         <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={envEndpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id }))} />
       )}
 

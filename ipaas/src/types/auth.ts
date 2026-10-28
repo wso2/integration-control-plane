@@ -21,7 +21,6 @@ export interface User {
   username: string;
   displayName: string;
   isSuperAdmin: boolean;
-  isOidcUser: boolean;
   pictureUrl?: string;
   groups: { groupId: string; uuid?: string; groupName: string; groupDescription: string }[];
   groupCount: number;
@@ -95,13 +94,6 @@ export interface RoleGroupMapping {
   integrationUuid: string | null;
 }
 
-export interface UserPermissionsResponse {
-  userId: string;
-  scope: { orgUuid: string; projectUuid?: string; integrationUuid?: string; envUuid?: string };
-  permissions: { permissionId: number; permissionName: string; permissionDomain: string; description: string }[];
-  permissionNames: string[];
-}
-
 /** A pending org invitation. */
 export interface PendingInvitation {
   id: string;
@@ -119,10 +111,6 @@ export interface InviteUsersInput {
 
 export interface ChangePasswordInput {
   currentPassword: string;
-  newPassword: string;
-}
-
-export interface ForceChangePasswordInput {
   newPassword: string;
 }
 

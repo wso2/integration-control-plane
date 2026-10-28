@@ -17,16 +17,15 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createExternalCiToken, getExternalCiTokens, revokeExternalCiToken } from '#api/externalCi';
-import { IS_WIP } from '../../features';
+import { createExternalCiToken, getExternalCiTokens, revokeExternalCiToken } from '../../api/externalCi';
 import type { ExternalCiToken } from '../../types/externalCi';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 
 const ROOT = 'externalCi';
 
-/** External CI is a WIP-only devops surface (cloud/icp API stubs throw). */
+/** External CI is not served by the BFF yet; flip this when the feature is ported. */
 export function isExternalCiEnabled(): boolean {
-  return IS_WIP;
+  return false;
 }
 
 export function useExternalCiTokens(projectId: string, componentId: string | undefined) {

@@ -38,7 +38,7 @@ export default function Lifecycle(scope: ComponentScope): JSX.Element {
   const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
   // Derived rather than synced via an effect — an effect+render round trip here would delay
   // useComponentEndpoints and the four hooks gated on selectedApimId below from becoming enabled.
-  const [selectedTrackIdState, setSelectedTrackId] = useState('');
+  const [selectedTrackIdState] = useState('');
   const selectedTrackId = tracks.some((t) => t.id === selectedTrackIdState) ? selectedTrackIdState : (tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '');
 
   const { data: endpoints = [], isLoading: loadingEndpoints } = useComponentEndpoints(component?.id ?? '', selectedTrackId);
@@ -113,13 +113,6 @@ export default function Lifecycle(scope: ComponentScope): JSX.Element {
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
       <DeploymentTrackBar
-        tracks={tracks}
-        selectedId={selectedTrackId}
-        onChange={setSelectedTrackId}
-        orgHandler={scope.org}
-        projectHandler={scope.project}
-        componentHandler={scope.component}
-        versionView
         extra={
           <>
             {endpointsWithApim.length > 0 && (

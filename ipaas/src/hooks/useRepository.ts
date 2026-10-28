@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchComponentRepository, fetchCommitHistory, fetchGitHubUserRepos, fetchRepoBranches, fetchRepoMetadata, fetchChoreoSampleImages, updateBuildpackConfigs, obtainGithubToken, fetchRepoContents } from '#api/repository';
-import { fetchComponentNameAvailability } from '#api/components';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { fetchComponentRepository, fetchCommitHistory, fetchGitHubUserRepos, fetchRepoBranches, fetchRepoMetadata, fetchChoreoSampleImages, updateBuildpackConfigs, obtainGithubToken, fetchRepoContents } from '../api/repository';
+import { fetchComponentNameAvailability } from '../api/components';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
+import type { Repository } from '../types/repository';
 
 export function useComponentRepository(projectId: string, componentHandler: string) {
   return useQuery({
@@ -30,6 +31,23 @@ export function useComponentRepository(projectId: string, componentHandler: stri
   });
 }
 
+/**
+ * Repositories of several integrations, keyed by handler, sharing the cache with
+ * `useComponentRepository`. A value is `undefined` until its lookup settles and `null`
+ * when the integration has no repository.
+ */
+export function useComponentRepositories(projectId: string, componentHandlers: string[], enabled: boolean): Map<string, Repository | null | undefined> {
+  const results = useQueries({
+    queries: componentHandlers.map((handler) => ({
+      queryKey: ['componentRepository', projectId, handler],
+      queryFn: () => fetchComponentRepository(projectId, handler),
+      enabled: enabled && !!projectId && !!handler,
+      retry: false,
+    })),
+  });
+  return new Map(componentHandlers.map((handler, i) => [handler, results[i].data]));
+}
+
 export function useCommitHistory(componentId: string, branch: string) {
   return useQuery({
     queryKey: ['commitHistory', componentId, branch],
@@ -38,40 +56,40 @@ export function useCommitHistory(componentId: string, branch: string) {
   });
 }
 
-export function useGitHubUserRepos(enabled: boolean, secretRef = '') {
+export function useGitHubUserRepos(enabled: boolean) {
   return useQuery({
-    queryKey: ['githubUserRepos', secretRef],
-    queryFn: () => fetchGitHubUserRepos(secretRef),
+    queryKey: ['githubUserRepos'],
+    queryFn: () => fetchGitHubUserRepos(),
     enabled,
     staleTime: 2 * 60 * 1000,
     retry: false,
   });
 }
 
-export function useRepoBranches(repoOrg: string, repoName: string, isPublicRepo: boolean, secretRef = '') {
+export function useRepoBranches(repoOrg: string, repoName: string, isPublicRepo: boolean) {
   return useQuery({
-    queryKey: ['repoBranches', repoOrg, repoName, isPublicRepo, secretRef],
-    queryFn: () => fetchRepoBranches(repoOrg, repoName, isPublicRepo, secretRef),
+    queryKey: ['repoBranches', repoOrg, repoName, isPublicRepo],
+    queryFn: () => fetchRepoBranches(repoOrg, repoName, isPublicRepo),
     enabled: !!repoOrg && !!repoName,
     staleTime: 2 * 60 * 1000,
     retry: false,
   });
 }
 
-export function useRepoMetadata(org: string, repo: string, branch: string, subPath: string, enabled: boolean, isPublicRepo = false, secretRef = '') {
+export function useRepoMetadata(org: string, repo: string, branch: string, subPath: string, enabled: boolean, isPublicRepo = false) {
   return useQuery({
-    queryKey: ['repoMetadata', org, repo, branch, subPath, isPublicRepo, secretRef],
-    queryFn: () => fetchRepoMetadata(org, repo, branch, subPath, isPublicRepo, secretRef),
+    queryKey: ['repoMetadata', org, repo, branch, subPath, isPublicRepo],
+    queryFn: () => fetchRepoMetadata(org, repo, branch, subPath, isPublicRepo),
     enabled: enabled && !!org && !!repo && !!branch,
     staleTime: 60 * 1000,
     retry: false,
   });
 }
 
-export function useRepoContents(org: string, repo: string, branch: string, isPublicRepo = false, secretRef = '') {
+export function useRepoContents(org: string, repo: string, branch: string, isPublicRepo = false) {
   return useQuery({
-    queryKey: ['repoContents', org, repo, branch, isPublicRepo, secretRef],
-    queryFn: () => fetchRepoContents(org, repo, branch, isPublicRepo, secretRef),
+    queryKey: ['repoContents', org, repo, branch, isPublicRepo],
+    queryFn: () => fetchRepoContents(org, repo, branch, isPublicRepo),
     enabled: !!org && !!repo && !!branch,
     staleTime: 2 * 60 * 1000,
     retry: false,

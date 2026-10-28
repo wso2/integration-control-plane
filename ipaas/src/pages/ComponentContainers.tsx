@@ -23,14 +23,12 @@ import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import ContainerInfoCard from '../components/Containers/ContainerInfoCard';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
-import { PAID_SUBSCRIPTION_TYPE } from '../constants/subscription';
 import { useRelease } from '../hooks/useDevopsConfigs';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
-import { useSubscriptions } from '../hooks/useSubscription';
 import { isPrivateDpRelease } from '../utils/containers';
 import type { ComponentScope } from '../nav';
 
@@ -57,9 +55,8 @@ export default function ComponentContainers({ org, project, component }: Compone
   const releaseId = deployment?.releaseId ?? '';
   const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId);
 
-  const { data: subscriptions } = useSubscriptions(orgUuid ?? '');
-  const isSubscribed = (subscriptions?.list ?? []).some((s) => s.subscriptionType === PAID_SUBSCRIPTION_TYPE);
-  const isPaidOrPdpUser = isPrivateDpRelease(release) || isSubscribed;
+  // Paid subscriptions aren't served by cloud yet, so only a private data plane unlocks the paid fields.
+  const isPaidOrPdpUser = isPrivateDpRelease(release);
 
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   useEffect(() => setAlert(null), [trackId, envId]);
@@ -70,7 +67,7 @@ export default function ComponentContainers({ org, project, component }: Compone
 
   return (
     <Box>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} versionView extra={envSelect} />}
+      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
       <PageContent>
         <PageTitle>
           <PageTitle.Header>Containers</PageTitle.Header>

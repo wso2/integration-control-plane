@@ -41,8 +41,6 @@ import { toHandler } from '../utils/string';
 import { validateProjectName, validateProjectHandler, normalizeProjectError } from '../utils/projectValidation';
 import { isQuotaError } from '../utils/apiErrors';
 import { GitProvider as CredGitProvider } from '../types/credentials';
-import AddCredentialDialog from '../components/Settings/Credentials/AddCredentialDialog';
-import { gitProviderIcon } from '../constants/gitProviders';
 import { buildRepoUrl } from '../utils/gitProviderUrl';
 
 export default function CreateProject(scope: OrgScope): JSX.Element {
@@ -56,17 +54,8 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
 
   const {
     gitProvider,
-    credProvider,
-    selectedCredential,
-    isCredentialMode,
     isPublicRepo,
     providerSelected,
-    secretRef,
-    providerLabel,
-    allCredentials,
-    showCredModal,
-    setShowCredModal,
-    modalProvider,
     selectedOrg,
     setSelectedOrg,
     selectedRepo,
@@ -99,13 +88,9 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
     startGitHubAuth,
     startGitHubAppInstall,
     isCheckingAuth,
-    credentialAuthFailed,
     handleProviderSelect,
-    handleCredentialPicked,
-    handleCreateCredential,
-    handleCredentialAdded,
     resetSource,
-  } = useGitRepoSource(gitSectionOpen);
+  } = useGitRepoSource();
   const attachGit = providerSelected;
 
   const colSize = !isPublicRepo && showBranchAndSubPath ? 3 : 4;
@@ -170,9 +155,8 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
           gitOrganization: activeOrg,
           branch: selectedBranch,
           directoryPath: subPath === '/' ? '' : subPath.replace(/^\//, ''),
-          gitProvider: isPublicRepo ? 'public' : isCredentialMode ? (credProvider as string) : 'github',
+          gitProvider: isPublicRepo ? 'public' : 'github',
           isPublicRepo,
-          secretRef,
         });
       } else {
         project = await createProject.mutateAsync({
@@ -193,7 +177,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
     // Step 2: create workspace module components. The project already exists, so individual
     // component failures don't block navigation — the user can manage them from the project page.
     if (isWorkspace && workspaceModules.length > 0) {
-      const srcGitRepoUrl = buildRepoUrl(credProvider ?? CredGitProvider.GITHUB, activeOrg, activeRepo, selectedCredential?.serverUrl);
+      const srcGitRepoUrl = buildRepoUrl(CredGitProvider.GITHUB, activeOrg, activeRepo);
       await Promise.allSettled(
         workspaceModules.map((module) =>
           createComponent.mutateAsync({
@@ -207,7 +191,6 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
             repositoryBranch: selectedBranch,
             repositorySubPath: module.path,
             isPublicRepo,
-            ...(isCredentialMode ? { secretRef } : {}),
           }),
         ),
       );
@@ -225,35 +208,6 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
       return alt ? `This project id is already taken. Try "${alt}" instead.` : handlerTaken;
     }
     return undefined;
-  };
-
-  const renderCredentialAuthArea = () => {
-    if (!secretRef) return null;
-    if (credentialAuthFailed) {
-      return (
-        <Alert
-          severity="error"
-          sx={{ mb: 3 }}
-          action={
-            <Button color="inherit" size="small" onClick={resetSource}>
-              Retry
-            </Button>
-          }>
-          Could not access your {providerLabel} repositories. Re-authorize and try again.
-        </Alert>
-      );
-    }
-    if (isReposLoading) {
-      return (
-        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 3, minHeight: 40 }}>
-          <CircularProgress size={16} />
-          <Typography variant="body2" color="text.secondary">
-            Loading your {providerLabel} repositories…
-          </Typography>
-        </Stack>
-      );
-    }
-    return null;
   };
 
   const orgOptions = userRepos?.map((o) => o.orgName) ?? [];
@@ -304,10 +258,13 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
               }}
               fullWidth
               disabled={!isAuthenticated || isReposLoading}
-              error={credentialAuthFailed}
               slotProps={{
                 input: {
-                  startAdornment: <InputAdornment position="start">{isCredentialMode ? gitProviderIcon(credProvider!, 18) : <Building2 size={18} />}</InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Building2 size={18} />
+                    </InputAdornment>
+                  ),
                 },
               }}>
               {orgOptions.map((org) => (
@@ -330,13 +287,9 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      {isCredentialMode ? (
-                        gitProviderIcon(credProvider!, 16)
-                      ) : (
-                        <Box sx={{ color: 'text.primary', display: 'flex' }}>
-                          <GitHub size={16} />
-                        </Box>
-                      )}
+                      <Box sx={{ color: 'text.primary', display: 'flex' }}>
+                        <GitHub size={16} />
+                      </Box>
                     </InputAdornment>
                   ),
                 },
@@ -492,15 +445,11 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
                     startGitHubAuth(refetchRepos);
                   }}
                   onPublicSelect={() => handleProviderSelect('public')}
-                  credentials={allCredentials}
-                  onCredentialSelect={handleCredentialPicked}
-                  onCreateCredential={handleCreateCredential}
                 />
               </Box>
             ) : (
               <Box sx={{ mt: 4 }}>
                 {gitProvider === 'github' && <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />}
-                {isCredentialMode && renderCredentialAuthArea()}
                 {renderRepoPickers()}
               </Box>
             )}
@@ -546,10 +495,6 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
           {isCreating ? 'Creating…' : 'Create Project'}
         </Button>
       </Stack>
-
-      {showCredModal && modalProvider && (
-        <AddCredentialDialog initialProvider={modalProvider} lockProvider onClose={() => setShowCredModal(false)} onCancel={() => setShowCredModal(false)} onAdded={() => {}} onAddedCredential={handleCredentialAdded} onError={() => {}} />
-      )}
     </PageContent>
   );
 }

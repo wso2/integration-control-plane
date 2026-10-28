@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { DevopsConfigMap, DevopsConfigMount, DevopsSecret, ReleaseContainer } from '../types/devopsConfigs';
-import { buildConfigRows, mainContainer, mountKind, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath } from './devopsConfigs';
+import { buildConfigRows, mainContainer, mountKind, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from './devopsConfigs';
 
 const makeContainer = (overrides: Partial<ReleaseContainer>): ReleaseContainer => ({
   ID: 'c1',
@@ -160,6 +160,22 @@ describe('validateDisplayName', () => {
 
   it('accepts a valid display name', () => {
     expect(validateDisplayName('My Config')).toBe('');
+  });
+});
+
+describe('validateNewEnvGroupName', () => {
+  it('rejects the mi- prefix the MI configure drawer owns, in any case', () => {
+    expect(validateNewEnvGroupName('mi-env-vars')).toBe('Names starting with "mi-" are reserved for MI configuration.');
+    expect(validateNewEnvGroupName(' MI-secret-TOKEN')).toBe('Names starting with "mi-" are reserved for MI configuration.');
+  });
+
+  it('accepts other names, including ones that only contain mi-', () => {
+    expect(validateNewEnvGroupName('admin-settings')).toBe('');
+    expect(validateNewEnvGroupName('mini')).toBe('');
+  });
+
+  it('applies the display name rules first', () => {
+    expect(validateNewEnvGroupName('')).toBe('Display name is required.');
   });
 });
 

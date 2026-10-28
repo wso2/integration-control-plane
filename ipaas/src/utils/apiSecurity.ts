@@ -38,7 +38,7 @@ export function userFacingError(message: string, cause?: unknown): Error {
 /**
  * Turn a raw BFF failure into a message a user can act on.
  *
- * The cloud client throws `HTTP {status}: {body}` (see `api/cloud/_client.ts`),
+ * The cloud client throws `HTTP {status}: {body}` (see `api/_client.ts`),
  * and the body is usually a gateway string like `404 page not found` — useless
  * in a dialog. This maps the status to plain wording and falls back to the
  * caller's context sentence when the status carries nothing specific.

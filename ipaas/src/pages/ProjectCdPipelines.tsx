@@ -17,9 +17,8 @@
  */
 
 import { Alert, Box, Button, CircularProgress, IconButton, PageContent, PageTitle, Stack, Tooltip } from '@wso2/oxygen-ui';
-import { GitBranch, Plus, Repeat, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { GitBranch, Repeat, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
-import { IS_CLOUD } from '../features';
 import { useEnvTemplates, useProjectDeploymentPipelines } from '../hooks/useDeploymentPipelines';
 import { useProjectId } from '../hooks/useProjects';
 import type { DeploymentPipeline } from '../types/deploymentPipeline';
@@ -57,8 +56,8 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
         </PageTitle>
         {/* Cloud binds one pipeline per project, so adding a second is really a swap. */}
         {!!pipelines?.length && (
-          <Button variant="contained" startIcon={IS_CLOUD ? <Repeat size={18} /> : <Plus size={20} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-            {IS_CLOUD ? 'Change Pipeline' : 'Add Pipeline'}
+          <Button variant="contained" startIcon={<Repeat size={18} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+            Change Pipeline
           </Button>
         )}
       </Stack>
@@ -108,12 +107,11 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
                       Set as default
                     </Button>
                   )}
-                  <Tooltip title={pipeline.is_project_default ? 'The default pipeline cannot be removed' : 'Remove'}>
-                    <span>
+                  {!pipeline.is_project_default && (
+                    <Tooltip title="Remove">
                       <IconButton
                         size="small"
                         color="error"
-                        disabled={pipeline.is_project_default}
                         aria-label={`Remove ${pipeline.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -121,8 +119,8 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
                         }}>
                         <Trash2 size={16} />
                       </IconButton>
-                    </span>
-                  </Tooltip>
+                    </Tooltip>
+                  )}
                 </>
               }
             />

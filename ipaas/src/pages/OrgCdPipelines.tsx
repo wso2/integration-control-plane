@@ -25,6 +25,7 @@ import type { DeploymentPipeline } from '../types/deploymentPipeline';
 import { pinDefaultFirst } from '../utils/deploymentPipeline';
 import { cdPipelineEditorUrl, type OrgScope } from '../nav';
 import EmptyListing from '../components/EmptyListing';
+import SearchField from '../components/SearchField';
 import PipelineAccordionCard from '../components/CdPipelines/PipelineAccordionCard';
 import DeletePipelineDialog from '../components/CdPipelines/DeletePipelineDialog';
 
@@ -37,22 +38,29 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
   const { data: pipelines, isLoading, isError, refetch } = useOrgDeploymentPipelines();
   const { data: envTemplates } = useEnvTemplates(scope.org);
   const orderedPipelines = useMemo(() => (pipelines ? pinDefaultFirst(pipelines, (p) => !!p.is_default) : pipelines), [pipelines]);
+  const [search, setSearch] = useState('');
+  const filteredPipelines = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return s ? orderedPipelines?.filter((p) => p.name.toLowerCase().includes(s)) : orderedPipelines;
+  }, [orderedPipelines, search]);
   const [deleting, setDeleting] = useState<DeploymentPipeline | null>(null);
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   return (
     <PageContent>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <PageTitle>
-          <PageTitle.Header>Deployment Pipelines</PageTitle.Header>
-          <PageTitle.SubHeader>Promotion paths across environments, available to every project in this organization.</PageTitle.SubHeader>
-        </PageTitle>
-        {!!pipelines?.length && (
-          <Button variant="contained" startIcon={<Plus size={20} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+      <PageTitle>
+        <PageTitle.Header>Deployment Pipelines</PageTitle.Header>
+        <PageTitle.SubHeader>Promotion paths across environments, available to every project in this organization.</PageTitle.SubHeader>
+      </PageTitle>
+
+      {!!pipelines?.length && (
+        <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 5 }}>
+          <SearchField value={search} onChange={setSearch} placeholder="Search pipelines..." fullWidth />
+          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
             Create Pipeline
           </Button>
-        )}
-      </Stack>
+        </Stack>
+      )}
 
       {alert && (
         <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 2 }}>
@@ -76,9 +84,11 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
         </Alert>
       ) : !pipelines?.length ? (
         <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Create Pipeline" onAction={() => navigate(cdPipelineEditorUrl(scope))} />
+      ) : !filteredPipelines?.length ? (
+        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines found" description="Try adjusting your search" showAction={false} />
       ) : (
         <Stack gap={3}>
-          {orderedPipelines?.map((pipeline) => (
+          {filteredPipelines.map((pipeline) => (
             <PipelineAccordionCard
               key={pipeline.id}
               name={pipeline.name}
@@ -98,12 +108,11 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
                       <Pencil size={16} />
                     </IconButton>
                   </Tooltip>
-                  <Tooltip title={pipeline.is_default ? 'The default pipeline cannot be deleted' : 'Delete'}>
-                    <span>
+                  {!pipeline.is_default && (
+                    <Tooltip title="Delete">
                       <IconButton
                         size="small"
                         color="error"
-                        disabled={pipeline.is_default}
                         aria-label={`Delete ${pipeline.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -111,8 +120,8 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
                         }}>
                         <Trash2 size={16} />
                       </IconButton>
-                    </span>
-                  </Tooltip>
+                    </Tooltip>
+                  )}
                 </>
               }
             />

@@ -17,16 +17,15 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createVolume, createVolumeMount, deleteVolume, deleteVolumeMount, listStorageClasses, listVolumeMounts, listVolumes, updateVolumeMount } from '#api/storage';
-import { IS_WIP } from '../../features';
+import { createVolume, createVolumeMount, deleteVolume, deleteVolumeMount, listStorageClasses, listVolumeMounts, listVolumes, updateVolumeMount } from '../../api/storage';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import type { VolumeCreateData, VolumeMountCreateData, VolumeMountPath, VolumeMountUpdateData } from '../../types/storage';
 
 const ROOT = 'storage';
 
-/** Storage is a wip-only surface for now (cloud/icp API stubs throw). */
+/** Storage is not served by the BFF yet; flip this when the feature is ported. */
 export function isStorageEnabled(): boolean {
-  return IS_WIP;
+  return false;
 }
 
 export function useVolumes(projectId: string, environmentId: string) {

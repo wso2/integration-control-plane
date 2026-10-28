@@ -17,9 +17,9 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createByoiComponent, deployByoiImage, getByoiEndpointsYaml, getSampleRegistryId, updateByoiEndpointsYaml } from '#api/tailscale';
-import { createConfigMap, createSecret, getConfigMapDetails, getConfigMaps, getReleaseById, getSecrets, mountConfig, updateConfigMapData, updateSecret } from '#api/devopsConfigs';
-import { fetchComponents } from '#api/components';
+import { createByoiComponent, deployByoiImage, getByoiEndpointsYaml, getSampleRegistryId, updateByoiEndpointsYaml } from '../api/tailscale';
+import { createConfigMap, createSecret, getConfigMapDetails, getConfigMaps, getReleaseById, getSecrets, mountConfig, updateConfigMapData, updateSecret } from '../api/devopsConfigs';
+import { fetchComponents } from '../api/components';
 import type { Component } from '../types/component';
 import { OAUTH_CLIENT_SECRET, TAILSCALE_COMPONENT_SUBTYPE, TAILSCALE_COMPONENT_TYPE, TAILSCALE_IMAGE, TS_AUTH_KEY } from '../constants/tailscale';
 import type { TailscaleAuthMethod, TailscalePortMapping } from '../types/tailscale';
@@ -243,7 +243,7 @@ export function useSaveAndDeployTailscale(projectId: string) {
       qc.invalidateQueries({ queryKey: [ROOT, 'secrets', orgUuid, projectId, input.envId] });
       qc.invalidateQueries({ queryKey: [ROOT, 'configmaps', orgUuid, projectId, input.envId] });
       qc.invalidateQueries({ queryKey: [ROOT, 'byoiEndpoints', orgUuid, projectId, input.componentId, input.releaseId] });
-      // The secret/configmap writes go through #api/devopsConfigs — refresh the shared
+      // The secret/configmap writes go through api/devopsConfigs — refresh the shared
       // Configs & Secrets surface, which keys its queries under 'devopsConfigs'.
       qc.invalidateQueries({ queryKey: ['devopsConfigs'] });
     },

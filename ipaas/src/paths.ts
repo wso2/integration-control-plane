@@ -11,10 +11,6 @@ export function signupUrl(): string {
   return '/signup';
 }
 
-export function registerOrgUrl(): string {
-  return '/account-register';
-}
-
 export function projectsRedirectUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/projects/redirect`;
 }
@@ -37,10 +33,6 @@ export function termsOfUseUrl(): string {
 
 export function documentationUrl(): string {
   return 'https://wso2.com/integration-platform/docs/';
-}
-
-export function forceChangePasswordUrl(): string {
-  return '/change-password';
 }
 
 // ---------------------------------------------------------------------------
@@ -292,6 +284,12 @@ export function buildGitHubOAuthUrl(redirectUri: string, clientId: string, state
 export function buildGitHubAppInstallUrl(slug: string): string {
   return `https://github.com/apps/${slug}/installations/new`;
 }
+
+/** Moesif dashboard and the ipaas-service viewer-token endpoint. */
+export const MOESIF_ORIGINS = ['https://www.moesif.com', 'https://web-dev.moesif.com'] as const;
+// The isolated APIs section leaves out the LLM, MCP and A2A traffic cards.
+export const moesifInsightsUrl = (origin: string): string => `${origin}/wrap/basic/apis?embedded_ui=true&isolated_section=true#auth=post`;
+export const analyticsViewerTokenUrl = (base: string): string => `${base}/analytics/id-token`;
 
 // ---------------------------------------------------------------------------
 // Context Engines (org-level)

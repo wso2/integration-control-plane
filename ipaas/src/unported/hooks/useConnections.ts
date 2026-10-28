@@ -17,17 +17,16 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createChoreoConnection, createThirdPartyConnection, deleteConnection, getConnection, getConnectionServiceIdl, listConnectionCatalog, listConnections, refreshConnection } from '#api/connections';
-import { IS_WIP } from '../../features';
+import { createChoreoConnection, createThirdPartyConnection, deleteConnection, getConnection, getConnectionServiceIdl, listConnectionCatalog, listConnections, refreshConnection } from '../../api/connections';
 import { ConnectionScope } from '../../types/connections';
 import { useOrgs } from '../../hooks/useOrg';
 import type { ConnectionCatalogKind, DeleteConnectionParams } from '../../types/connections';
 
 const ROOT_KEY = 'connections';
 
-/** Connections is a wip-only surface for now (cloud/icp API stubs throw). */
+/** Connections is not served by the BFF yet; flip this when the feature is ported. */
 export function isConnectionsEnabled(): boolean {
-  return IS_WIP;
+  return false;
 }
 
 interface ConnectionsScope {

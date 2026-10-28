@@ -70,7 +70,7 @@ export default function ComponentApiInfo(scope: ComponentScope): JSX.Element {
   // Derived rather than synced via an effect — an effect+render round trip here would delay
   // useComponentEndpoints/useApimApi below from becoming enabled. Falls back to the latest
   // track/first endpoint whenever the current selection isn't valid for the current list.
-  const [selectedTrackIdState, setSelectedTrackId] = useState('');
+  const [selectedTrackIdState] = useState('');
   const selectedTrackId = tracks.some((t) => t.id === selectedTrackIdState) ? selectedTrackIdState : (tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '');
 
   const { data: endpoints = [] } = useComponentEndpoints(component?.id ?? '', selectedTrackId);
@@ -128,9 +128,7 @@ export default function ComponentApiInfo(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      {aggregatedTracks.length > 0 && (
-        <DeploymentTrackBar tracks={aggregatedTracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? ''} componentHandler={component.handler} versionView extra={endpointPicker} />
-      )}
+      {aggregatedTracks.length > 0 && <DeploymentTrackBar extra={endpointPicker} />}
 
       <PageContent>
         <Typography variant="h1" sx={{ mb: 3 }}>

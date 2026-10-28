@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { checkConfigGroupName, createConfigGroup, deleteConfigGroup, getConfigGroup, getConfigGroupUsage, listConfigGroups, updateConfigGroup } from '#api/configGroups';
+import { checkConfigGroupName, createConfigGroup, deleteConfigGroup, getConfigGroup, getConfigGroupUsage, listConfigGroups, updateConfigGroup } from '../../api/configGroups';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import type { CreateConfigGroupRequest, EditConfigGroupRequest } from '../../types/configGroups';
 

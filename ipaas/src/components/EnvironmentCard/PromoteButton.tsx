@@ -22,7 +22,6 @@ import type { ReactNode } from 'react';
 import { useComponentDeployment } from '../../hooks/useDeployments';
 import { usePromote } from '../../hooks/useDeployments';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
-import { IS_CLOUD } from '../../features';
 import Authorized from '../Authorized';
 import { Permissions } from '../../constants/permissions';
 
@@ -49,7 +48,7 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
   const sourceReleaseId = sourceDeployment?.releaseId;
   const alreadyPromoted = !deploymentsLoading && !!buildId && buildId === targetDeployment?.build?.buildId;
 
-  const missingPipeline = IS_CLOUD && !deploymentPipelineId;
+  const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted;
 
   const handlePromote = () => {

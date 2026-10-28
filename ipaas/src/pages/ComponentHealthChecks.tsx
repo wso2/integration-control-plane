@@ -81,7 +81,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
 
   return (
     <Box>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} versionView extra={envSelect} />}
+      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
       <PageContent>
         <PageTitle>
           <PageTitle.Header>Health Checks</PageTitle.Header>

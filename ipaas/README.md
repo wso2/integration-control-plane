@@ -1,214 +1,107 @@
-# Oxygen UI Test App
+# Integration Platform Console — developer guide
 
-This is a sample Vite + React + TypeScript application demonstrating the usage of WSO2 Oxygen UI components.
+![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white)
+![TanStack Query](https://img.shields.io/badge/TanStack_Query-5-FF4154?logo=reactquery&logoColor=white)
+![Playwright](https://img.shields.io/badge/Playwright-e2e-2EAD33?logo=playwright&logoColor=white)
 
-## Features
+The web console for the WSO2 Integration Platform on WSO2 Cloud. This guide covers how to build, test and change it. For a tour of the product and how the frontend is put together, start with the [repository README](../README.md).
 
-This test app showcases:
+> [!NOTE]
+> The console is a React single-page application. All of its data comes from `ipaas-service`, the platform's backend-for-frontend, and users sign in through Thunder, the WSO2 Cloud identity provider. [docs/architecture.md](docs/architecture.md) shows how the parts fit together.
 
-- Integration of `@wso2/oxygen-ui` components
-- Usage of `@wso2/oxygen-ui-icons-react` for icons
-- Theme customization with `OxygenUIThemeProvider`
-- MUI X Data Grid and Date Pickers integration
-- TypeScript configuration for Oxygen UI
+---
 
-## Getting Started
+## Prerequisites
 
-### Prerequisites
+| Tool                      | Version     | Needed for                      |
+| ------------------------- | ----------- | ------------------------------- |
+| Node.js                   | 20 or later | Building and testing            |
+| pnpm                      | 10          | Dependencies and scripts        |
+| Docker + local WSO2 Cloud | —           | Trying the console in a browser |
 
-- Node.js 24+
-- pnpm 10+
+## Getting started
 
-### Installation
-
-From the test app directory:
+**1. Install the dependencies**
 
 ```bash
+cd ipaas
 pnpm install
 ```
 
-### Configuration
-
-The application uses **runtime configuration** via `public/config.json`. This allows you to change backend API URLs **without rebuilding** the application.
-
-**Configure backend URLs:**
-
-Edit `public/config.json` (or `dist/config.json` after build):
-
-```json
-{
-  "VITE_GRAPHQL_URL": "https://localhost:9446/graphql",
-  "VITE_AUTH_BASE_URL": "https://localhost:9445/auth",
-  "VITE_OBSERVABILITY_URL": "https://localhost:9448/icp/observability"
-}
-```
-
-**For local development:**
-
-- Edit `public/config.json` with your backend URLs
-- Restart the dev server
-
-**For production/Docker deployments:**
-
-- Modify `dist/config.json` after building, or
-- Generate it dynamically from environment variables (see example below)
-
-**Docker deployment example:**
-
-```dockerfile
-# Build the app
-FROM node:20 AS builder
-WORKDIR /app
-COPY . .
-RUN pnpm install && pnpm build
-
-# Production image
-FROM nginx:alpine
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-# Override config.json at container startup
-COPY docker-entrypoint.sh /
-RUN chmod +x /docker-entrypoint.sh
-ENTRYPOINT ["/docker-entrypoint.sh"]
-```
+**2. Build the console**
 
 ```bash
-# docker-entrypoint.sh
-#!/bin/sh
-cat > /usr/share/nginx/html/config.json <<EOF
-{
-  "VITE_GRAPHQL_URL": "${GRAPHQL_URL}",
-  "VITE_AUTH_BASE_URL": "${AUTH_BASE_URL}",
-  "VITE_LOGS_URL": "${LOGS_URL}"
-}
-EOF
-nginx -g 'daemon off;'
+pnpm build          # production build in dist/
+pnpm build:check    # type-check, then build
 ```
 
-### Development
+**3. Try it in the local WSO2 Cloud stack**
 
-Run the development server:
+The console needs its backend, its identity provider and the rest of the platform around it. To see your changes in a browser, bring up the local WSO2 Cloud stack and deploy the console into it.
 
-```bash
-pnpm dev          # WIP on https://localhost:3000 (HTTPS)
-pnpm dev:cloud    # Cloud variant
-```
+> [!IMPORTANT]
+> Follow the **[local setup guide](https://docs.google.com/document/d/1El3uqR674ZDjLfbEP3VSQZgGxYjQMK0kfxQakc9Lh_s)** to bring up the stack and deploy your build. Do not test against a shared environment.
 
-### Build
-
-Create a production build:
-
-```bash
-pnpm build
-```
-
-Preview the production build:
-
-```bash
-pnpm preview
-```
+> [!TIP]
+> `public/config.json` already points at the local stack, so a local build needs no configuration. Other environments supply their own copy when they deploy the console; see [docs/runtime-config.md](docs/runtime-config.md).
 
 ## Testing
 
-### Unit tests (Vitest)
-
-Fast, isolated tests for pure utility functions. Runs in under 2 seconds — use these for PR checks.
-
 ```bash
-pnpm test:unit          # run once (CI / pre-push)
-pnpm test:unit:watch    # watch mode for local development
-pnpm test:unit:ui       # Vitest browser UI
+pnpm lint           # ESLint
+pnpm test:unit      # unit tests (Vitest); also run on every pull request
+pnpm test:e2e       # end-to-end tests (Playwright) against a deployed console
 ```
 
-Test files live alongside their source under `src/` and follow the `*.test.ts` / `*.test.tsx` naming convention. The current suite covers utility modules in `src/utils/` (time, deploy, string, cron, validation, and more). See `vitest.config.ts` for environment and alias configuration.
+- **Unit tests** sit next to the code they test, as `*.test.ts` or `*.test.tsx`.
+- **End-to-end tests** run in WSO2 Cloud's release validation for every release, and on your machine with credentials. [tests/e2e/README.md](tests/e2e/README.md) explains both.
 
-### E2E tests (Playwright)
-
-Smoke tests targeting the live staging environment. See [`tests/e2e/README.md`](tests/e2e/README.md) for full setup and usage.
-
-```bash
-pnpm test:e2e           # run smoke suite
-pnpm test:e2e:ui        # interactive Playwright UI
-pnpm test:e2e:report    # open last HTML report
-```
-
-## Project Structure
+## Project structure
 
 ```text
-src/
-  auth/          # AuthContext, OIDC token flow, STS exchange
-  config/        # routes.tsx — all app routes
-  layouts/       # AppLayout, PublicLayout, PolicyLayout
-  pages/         # One file per page/route
-  components/    # Shared and composite components
-  hooks/         # Custom React hooks
-  contexts/      # React context providers
-  api/           # API call modules
-  utils/         # Pure utility functions (each has a *.test.ts companion)
-  types/         # TypeScript interfaces and types
-  constants/     # App-wide constants
-public/
-  config.json    # Runtime config (API URLs, auth client ID — not baked into the bundle)
-tests/e2e/       # Playwright smoke suite
+ipaas/
+├── src/
+│   ├── api/         Calls to the backend, one file per domain
+│   ├── auth/        Sign-in and tokens (Thunder SDK)
+│   ├── hooks/       Data hooks over the API (TanStack Query)
+│   ├── pages/       One component per route
+│   ├── components/  Shared and feature components
+│   ├── layouts/     App shell and route guards
+│   ├── config/      Routes and runtime configuration
+│   ├── unported/    Features waiting for backend support (not routed)
+│   └── …            contexts, types, utils, constants, services
+├── public/          Static files, including config.json
+├── tests/e2e/       End-to-end tests
+├── docs/            Architecture and configuration
+├── Dockerfile       Console image (nginx)
+└── Dockerfile.e2e   End-to-end test image
 ```
 
-## Using Oxygen UI Components
+## 📚 Documentation
 
-### Basic Components
+| Document                                                               | What it covers                                                            |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [docs/architecture.md](docs/architecture.md)                           | Platform pieces, request flow, code layering                              |
+| [docs/runtime-config.md](docs/runtime-config.md)                       | `config.json` keys and how deployments set them                           |
+| [tests/e2e/README.md](tests/e2e/README.md)                             | End-to-end suite: setups, local runs, release validation                  |
+| [src/components/Overview/README.md](src/components/Overview/README.md) | The integration overview page and its types                               |
+| [src/contexts/README.md](src/contexts/README.md)                       | Shared React contexts                                                     |
+| [AGENTS.md](AGENTS.md)                                                 | Code rules and conventions: written for coding agents, useful to everyone |
 
-```tsx
-import { Button, TextField, Box, Stack } from '@wso2/oxygen-ui';
+## 🤝 Contributing
 
-function MyComponent() {
-  return (
-    <Box>
-      <Stack spacing={2}>
-        <TextField label="Name" />
-        <Button variant="contained">Submit</Button>
-      </Stack>
-    </Box>
-  );
-}
+Before opening a pull request, make sure these pass:
+
+```bash
+pnpm build:check
+pnpm lint
+pnpm test:unit
 ```
 
-### Icons
+> [!TIP]
+> The code rules — layering, page states and skeletons, styling, naming — are listed in [AGENTS.md](AGENTS.md). Reading them first saves review rounds.
 
-```tsx
-import { Settings, User, LogOut } from '@wso2/oxygen-ui-icons-react';
-
-function Toolbar() {
-  return (
-    <div>
-      <Settings size={20} />
-      <User size={20} />
-      <LogOut size={20} />
-    </div>
-  );
-}
-```
-
-### Theme Provider
-
-```tsx
-import { OxygenUIThemeProvider } from '@wso2/oxygen-ui';
-
-function App() {
-  return <OxygenUIThemeProvider>{/* Your app components */}</OxygenUIThemeProvider>;
-}
-```
-
-## Technologies Used
-
-- [React 19](https://react.dev/)
-- [TypeScript 5](https://www.typescriptlang.org/)
-- [Vite 7](https://vite.dev/)
-- [@wso2/oxygen-ui](https://www.npmjs.com/package/@wso2/oxygen-ui) - WSO2 Oxygen UI component library
-- [@wso2/oxygen-ui-icons-react](https://www.npmjs.com/package/@wso2/oxygen-ui-icons-react) - Icon library
-- [@wso2/oxygen-ui-charts-react](https://www.npmjs.com/package/@wso2/oxygen-ui-charts-react) - Charts library
-
-## Learn More
-
-- [Material-UI Documentation](https://mui.com/material-ui/)
-- [Vite Documentation](https://vite.dev/)
-- [React Documentation](https://react.dev/)
-- [React Router Documentation](https://reactrouter.com/)
+> [!CAUTION]
+> Never commit `.env.test`, `.env.local`, `.auth/` or real credentials in `public/config.json`.

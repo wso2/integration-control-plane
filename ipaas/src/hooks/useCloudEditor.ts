@@ -18,7 +18,7 @@
 
 import { useEffect } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { callCreateCodeServer, getCodeServer, getOrCreateSampleRegistry } from '#api/cloudEditor';
+import { callCreateCodeServer, getCodeServer, getOrCreateSampleRegistry } from '../api/cloudEditor';
 import { CLOUD_EDITOR_POLL_MS } from '../constants/cloudEditor';
 
 export function useGetOrCreateSampleRegistry() {

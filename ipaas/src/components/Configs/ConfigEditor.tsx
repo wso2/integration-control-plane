@@ -22,7 +22,7 @@ import { ArrowLeft, Trash2, Upload } from '@wso2/oxygen-ui-icons-react';
 import BusyFields from '../common/BusyFields';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useConfigMapDetails, useSaveConfig } from '../../hooks/useDevopsConfigs';
-import { parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath } from '../../utils/devopsConfigs';
+import { parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
 import type { ConfigKind, ConfigRow } from '../../types/devopsConfigs';
 
 /** The component/release/env target a config is created against. */
@@ -87,7 +87,9 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const [kind, setKind] = useState<ConfigKind>(existing?.kind ?? 'envVars');
   const [isSecret, setIsSecret] = useState(existing?.isSecret ?? false);
   const [name, setName] = useState(existing?.name ?? '');
-  const [rows, setRows] = useState<Array<{ key: string; value: string }>>(existing ? existing.keys.map((k) => ({ key: k, value: '' })) : []);
+  // A `stored` row is a secret already saved: its value is write-only, so it loads blank
+  // and stays as it is unless a new value is typed.
+  const [rows, setRows] = useState<Array<{ key: string; value: string; stored?: boolean }>>(existing ? existing.keys.map((k) => ({ key: k, value: '', stored: existing.isSecret })) : []);
   const [draftKey, setDraftKey] = useState('');
   const [draftValue, setDraftValue] = useState('');
   const [mountPath, setMountPath] = useState(existing?.mount.mount_path ?? '');
@@ -103,12 +105,12 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
     else setRows(Object.entries(details.data).map(([key, value]) => ({ key, value })));
   }, [details, existing?.kind]);
 
-  const nameErr = validateDisplayName(name);
+  // An edit keeps the group's stored name, so only a new env-var group is held to the reserved prefix.
+  const nameErr = !isEdit && kind === 'envVars' ? validateNewEnvGroupName(name) : validateDisplayName(name);
   const draftKeyErr = draftKey ? validateConfigKey(draftKey) : '';
   const pathErr = validateMountPath(mountPath);
-  // Secret values are write-only, so existing-secret rows load blank and must be
-  // re-entered — never persist a secret env var with an empty value.
-  const hasEmptySecretValue = isSecret && kind === 'envVars' && rows.some((r) => r.value === '');
+  // A new secret needs a value; a stored one left blank keeps its current value.
+  const hasEmptySecretValue = isSecret && kind === 'envVars' && rows.some((r) => !r.stored && r.value === '');
   const canSave = !save.isPending && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? rows.length > 0 : !pathErr && fileContent.trim().length > 0);
 
   const addRow = () => {
@@ -147,7 +149,10 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const handleSave = () => {
     setError('');
     if (!canSave) return;
-    const data = kind === 'envVars' ? Object.fromEntries(rows.map((r) => [r.key, r.value])) : { data: fileContent };
+    // Stored secrets left blank are kept as they are, not re-sent.
+    const kept = rows.filter((r) => r.stored && r.value === '');
+    const sent = rows.filter((r) => !(r.stored && r.value === ''));
+    const data = kind === 'envVars' ? Object.fromEntries(sent.map((r) => [r.key, r.value])) : { data: fileContent };
     save.mutate(
       {
         componentId: ctx.componentId,
@@ -158,6 +163,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
         kind,
         name: name.trim(),
         data,
+        keep: kind === 'envVars' && kept.length ? kept.map((r) => r.key) : undefined,
         mountPath: kind === 'fileMount' ? mountPath.trim() : undefined,
         existing: existing ? { configId, mountId: existing.mount.ID } : undefined,
       },
@@ -207,6 +213,11 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
                 }}
               />
             </Stack>
+            {rows.some((r) => r.stored) && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Secret values are hidden. Leave one blank to keep it, or type a new value to replace it.
+              </Typography>
+            )}
             {rows.length > 0 && (
               <Stack gap={1} sx={{ mb: 1 }}>
                 {rows.map((r, i) => (
@@ -216,8 +227,8 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
                       size="small"
                       type={isSecret ? 'password' : 'text'}
                       value={r.value}
-                      placeholder={isSecret ? 'Re-enter value' : ''}
-                      error={isSecret && r.value === ''}
+                      placeholder={r.stored ? '••••••••' : isSecret ? 'Enter a value' : ''}
+                      error={isSecret && !r.stored && r.value === ''}
                       onChange={(e) => setRows((prev) => prev.map((row, idx) => (idx === i ? { ...row, value: e.target.value } : row)))}
                       fullWidth
                       sx={{ flex: 1 }}

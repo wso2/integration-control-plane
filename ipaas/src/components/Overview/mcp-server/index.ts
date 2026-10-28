@@ -21,7 +21,6 @@ import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from './HeaderStatus';
 import EnvCardActions from './EnvCardActions';
 import EnvCardBody from './EnvCardBody';
-import OverviewHeaderActions from './OverviewHeaderActions';
 
 /**
  * MCP Server integration module — shared by BOTH MCP flavors:
@@ -41,7 +40,6 @@ const mcpServerModule: IntegrationModule = {
   HeaderStatus,
   EnvCardActions,
   EnvCardBody,
-  OverviewHeaderActions,
   // MCP has no in-editor source-editing surface — hide Open in Cloud / VS Code
   // (devant excludes it for `componentSubType === 'MCP'`).
   hideOpenInEditor: true,

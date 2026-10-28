@@ -36,6 +36,13 @@ export const HPA_CARD: ScalingMethodCard = {
   description: 'Your deployment will automatically scale based on the CPU and memory usage.',
 };
 
+/** Cloud's HPA always scales on CPU, and on memory too when a memory target is set. */
+export const CLOUD_HPA_CARD: ScalingMethodCard = {
+  value: ScalingMethod.HPA,
+  title: 'HPA',
+  description: 'Your deployment will automatically scale between a minimum and maximum number of replicas based on CPU and, optionally, memory usage.',
+};
+
 export const NO_AUTOSCALING_CARD: ScalingMethodCard = {
   value: ScalingMethod.None,
   title: 'No Autoscaling',
@@ -47,3 +54,10 @@ export const CLOUD_DP_MAX_REPLICAS = 5;
 
 export const CPU_THRESHOLD = { min: 10, max: 100, default: 50, step: 1 };
 export const MEMORY_THRESHOLD = { min: 20, max: 200, default: 50, step: 1 };
+
+/**
+ * Cloud's memory target, relative to the memory request (which is also the limit, so 100 is the
+ * ceiling). The runtimes hold most of their heap once warm, so a low target would pin a component
+ * at its maximum replicas; the default stays high.
+ */
+export const CLOUD_MEMORY_THRESHOLD = { min: 20, max: 100, default: 80, step: 1 };

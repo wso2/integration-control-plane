@@ -48,18 +48,16 @@ interface McpPlaygroundProps {
   onTokenRegenerate?: () => void;
   /** Endpoint chooser rendered in the sidebar. */
   endpointSwitcher?: McpSwitcher;
-  /** Network-visibility chooser rendered in the sidebar. */
-  visibilitySwitcher?: McpSwitcher;
   /** Where the connection controls go: a `sidebar` beside the panel (default) or a `bar` above it. */
   connectionLayout?: 'sidebar' | 'bar';
 }
 
 /**
- * In-house MCP playground: a connection sidebar (endpoint/visibility/URL/token) plus a
+ * In-house MCP playground: a connection sidebar (endpoint/URL/token) plus a
  * Tools tab (list → schema-driven form → run → result), a Ping tab, and a resizable
  * activity-history panel — all over the `useMcpConnection` session.
  */
-export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, endpointSwitcher, visibilitySwitcher, connectionLayout = 'sidebar' }: McpPlaygroundProps): JSX.Element {
+export default function McpPlayground({ url, token, headerName = 'test-key', isTokenFetching, onTokenRegenerate, endpointSwitcher, connectionLayout = 'sidebar' }: McpPlaygroundProps): JSX.Element {
   const conn = useMcpConnection({ url, token, headerName });
   const { status, listTools } = conn;
 
@@ -116,7 +114,6 @@ export default function McpPlayground({ url, token, headerName = 'test-key', isT
           status={conn.status}
           isTokenFetching={isTokenFetching}
           endpointSwitcher={endpointSwitcher}
-          visibilitySwitcher={visibilitySwitcher}
           onConnect={() => void conn.connect()}
           onDisconnect={() => void conn.disconnect()}
           onReconnect={() => void reconnect()}

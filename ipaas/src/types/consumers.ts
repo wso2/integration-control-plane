@@ -17,7 +17,7 @@
  */
 
 /**
- * API security & exposure domain. Cloud-only; `wip`/`icp` stub it. The spec calls
+ * API security & exposure domain. The spec calls
  * the credential a subscription token, but the BFF ships no `/subscriptions`
  * routes, so it is an endpoint api-key sent as `X-API-Key`.
  */

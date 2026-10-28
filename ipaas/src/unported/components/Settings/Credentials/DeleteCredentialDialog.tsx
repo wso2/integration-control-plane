@@ -18,7 +18,7 @@
 
 import { Typography } from '@wso2/oxygen-ui';
 import type { ReactNode } from 'react';
-import { useCredentialDeleteEligibility, useDeleteGitCredential } from '../../../../hooks/useCredentials';
+import { useCredentialDeleteEligibility, useDeleteGitCredential } from '../../../hooks/useCredentials';
 import ConfirmDeleteDialog from '../../../../components/ConfirmDeleteDialog';
 import DeletionEligibilityContent from '../../../../components/DeletionEligibilityContent';
 import type { GitCredential } from '../../../../types/credentials';

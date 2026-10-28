@@ -21,7 +21,6 @@ import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from './HeaderStatus';
 import EnvCardActions from './EnvCardActions';
 import EnvCardBody from './EnvCardBody';
-import OverviewHeaderActions from './OverviewHeaderActions';
 
 /**
  * AI Agent integration module.
@@ -40,7 +39,6 @@ const aiAgentModule: IntegrationModule = {
   HeaderStatus,
   EnvCardActions,
   EnvCardBody,
-  OverviewHeaderActions,
 };
 
 export default aiAgentModule;

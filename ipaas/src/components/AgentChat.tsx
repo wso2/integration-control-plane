@@ -19,16 +19,11 @@
 import { Alert, Avatar, Box, Button, CircularProgress, IconButton, InputBase, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, Copy, Send, Sparkles, User } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { IS_CLOUD } from '../features';
 import { useApiDefinition, useEnvEndpoints } from '../hooks/useDeployments';
-import { useApimApi, useGenerateTestKey } from '../hooks/useApim';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import { generateUUID } from '../utils/string';
 import type { AgentConnectionStatus, ChatMessage } from '../types/agentChat';
 import type { EndpointRef } from '../types/consumers';
-
-/** Header the APIM gateway reads the test key from. Cloud uses the api-key-auth header instead. */
-const APIM_TEST_KEY_HEADER = 'test-key';
 
 interface AgentChatProps {
   componentId: string;
@@ -36,7 +31,7 @@ interface AgentChatProps {
   /** The deployment's release id for the selected environment. */
   releaseId: string;
   /**
-   * Environment name. Cloud addresses endpoint security by the
+   * Environment name. Endpoint security is addressed by the
    * component/environment/endpoint triple, so chat cannot authenticate without it.
    */
   environmentName?: string;
@@ -58,77 +53,41 @@ function formatTime(ts: number): string {
 export default function AgentChat({ componentId, versionId, releaseId, environmentName, envCritical, waitForConfig = false, variant = 'card', onConnectionChange }: AgentChatProps): ReactNode {
   const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, releaseId);
 
-  // Candidate chat endpoint: the first reachable one. On the APIM products it must
-  // ALSO carry an APIM id, because the test key is minted per APIM API and a
-  // key-less endpoint could never authenticate (devant skips those too). Cloud has
-  // no APIM — credentials come from the API Platform gateway keyed by the
-  // component/environment/endpoint triple — so requiring an apimId there would
-  // reject every endpoint. (The `/chat` operation is confirmed below only as a
-  // hint; the endpoint is still used when its operations aren't discoverable.)
-  const candidate = useMemo(() => endpoints.find((e) => e.publicUrl && (IS_CLOUD || e.apimId)) ?? null, [endpoints]);
-  const apimId = candidate?.apimId ?? null;
+  // Candidate chat endpoint: the first reachable one. (The `/chat` operation is
+  // confirmed below only as a hint; the endpoint is still used when its operations
+  // aren't discoverable.)
+  const candidate = useMemo(() => endpoints.find((e) => e.publicUrl) ?? null, [endpoints]);
 
-  // Cloud: the enforcing gateway URL, active auth mode and a short-lived test key,
-  // from the same BFF routes the swagger console and the API security drawer use.
-  const accessRef: EndpointRef | null = useMemo(() => (IS_CLOUD && candidate && environmentName ? { componentName: componentId, environmentName, endpointName: candidate.id } : null), [componentId, environmentName, candidate]);
-  const access = useEndpointTestAccess(accessRef, IS_CLOUD && !!accessRef);
+  // The enforcing gateway URL, active auth mode and a short-lived test key, from the
+  // same BFF routes the swagger console and the API security drawer use.
+  const accessRef: EndpointRef | null = useMemo(() => (candidate && environmentName ? { componentName: componentId, environmentName, endpointName: candidate.id } : null), [componentId, environmentName, candidate]);
+  const access = useEndpointTestAccess(accessRef, !!accessRef);
 
-  const { data: apimApi } = useApimApi(IS_CLOUD ? null : apimId);
-  // Cloud carries the endpoint's base64 OpenAPI in `apimRevisionId`, so the
-  // operations come from the spec rather than from an APIM API record.
-  const { data: chatSpec } = useApiDefinition(IS_CLOUD ? candidate?.apimRevisionId : null);
-  const hasChatOperation = IS_CLOUD ? !!(chatSpec as { paths?: Record<string, unknown> } | null)?.paths?.['/chat'] : (apimApi?.operations?.some((op) => op.target === '/chat') ?? false);
+  // The endpoint's base64 OpenAPI arrives in `apimRevisionId`, so the operations come from the spec.
+  const { data: chatSpec } = useApiDefinition(candidate?.apimRevisionId);
+  const hasChatOperation = !!(chatSpec as { paths?: Record<string, unknown> } | null)?.paths?.['/chat'];
   // An agent publishes no OpenAPI spec, so a missing `/chat` is unknown rather than absent.
-  const operationsKnown = IS_CLOUD ? !!chatSpec : !!apimApi?.operations;
+  const operationsKnown = !!chatSpec;
 
-  // Cloud invokes the apip gateway and nothing else. The endpoint's own external
+  // Chat invokes the apip gateway and nothing else. The endpoint's own external
   // route is open (the policy engine is not in its path), so falling back to it
   // would hand the test key to a host that never validates it and would make an
   // unenforced call look like a secured one.
-  const chatUrl = IS_CLOUD ? access.gatewayUrl : (candidate?.publicUrl ?? '');
+  const chatUrl = access.gatewayUrl;
 
-  const generateKey = useGenerateTestKey();
-  const [apimKey, setApimKey] = useState<string | null>(null);
-  const [apimAuthError, setApimAuthError] = useState(false);
-  const fetchTestKey = useMemo(
-    () => async (): Promise<string | null> => {
-      if (!apimId) return null;
-      setApimAuthError(false);
-      try {
-        const result = await generateKey.mutateAsync({ apimId, keyType: envCritical ? 'Production' : 'Development' });
-        const key = result?.apikey ?? null;
-        setApimKey(key);
-        if (!key) setApimAuthError(true);
-        return key;
-      } catch {
-        setApimAuthError(true);
-        return null;
-      }
-    },
-    // generateKey is a stable mutation object; apimId/envCritical drive identity
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [apimId, envCritical],
-  );
-
-  useEffect(() => {
-    if (!IS_CLOUD && apimId) fetchTestKey();
-  }, [apimId, fetchTestKey]);
-
-  // The credential + how to present it, per product.
-  const apiKey = IS_CLOUD ? access.apiKey : apimKey;
-  const authHeader = IS_CLOUD ? access.authHeader : APIM_TEST_KEY_HEADER;
-  const authError = IS_CLOUD ? !!access.keyError : apimAuthError;
-  // Cloud: a `none`-mode endpoint is open and needs no credential at all.
-  const isAuthorized = IS_CLOUD ? access.isAuthorized : !!apimKey;
-  const refreshKey = IS_CLOUD ? access.mintKey : fetchTestKey;
+  const apiKey = access.apiKey;
+  const authHeader = access.authHeader;
+  const authError = !!access.keyError;
+  // A `none`-mode endpoint is open and needs no credential at all.
+  const isAuthorized = access.isAuthorized;
   // jwt-secured endpoints are not auto-minted — the test-key route would flip
   // enforcement to api-key auth, which must be a deliberate choice.
-  const needsManualKey = IS_CLOUD && access.mode === 'jwt' && !access.apiKey;
+  const needsManualKey = access.mode === 'jwt' && !access.apiKey;
 
   // Connection status, reported up to the host (Test page shows it as a chip). An
   // unreachable endpoint is terminal, so it reports `error` rather than spinning on
   // `connecting` forever.
-  const connectionStatus: AgentConnectionStatus = authError || (IS_CLOUD && access.isUnavailable) ? 'error' : isAuthorized && chatUrl ? 'connected' : 'connecting';
+  const connectionStatus: AgentConnectionStatus = authError || access.isUnavailable ? 'error' : isAuthorized && chatUrl ? 'connected' : 'connecting';
   useEffect(() => {
     onConnectionChange?.(connectionStatus);
   }, [connectionStatus, onConnectionChange]);
@@ -158,7 +117,7 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
 
   const send = async (message: string, allowKeyRefresh = true, keyOverride?: string | null): Promise<void> => {
     const key = keyOverride ?? apiKey;
-    // An open (cloud `none`-mode) endpoint is called without a credential.
+    // An open (`none`-mode) endpoint is called without a credential.
     if (!chatUrl || (!key && !isAuthorized)) return;
     setChatError(null);
     setIsSending(true);
@@ -169,15 +128,15 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
         body: JSON.stringify({ sessionId, message }),
       });
 
-      // Only re-mint where a key is what the endpoint expects. On a cloud `none` or
-      // `jwt` endpoint a 401 is not a stale key, and minting would silently switch
+      // Only re-mint where a key is what the endpoint expects. On a `none` or `jwt`
+      // endpoint a 401 is not a stale key, and minting would silently switch
       // enforcement to api-key auth — that stays an explicit user action.
-      const canRefreshKey = IS_CLOUD ? access.mode === 'api-key' : !!apimId;
+      const canRefreshKey = access.mode === 'api-key';
       if (response.status === 401 && allowKeyRefresh && canRefreshKey) {
         // Key likely expired — regenerate once and retry with the fresh key
         // passed directly; a setApiKey state update wouldn't reach this
         // closure in time. If we can't refresh, fall through to surface the 401.
-        const fresh = await refreshKey();
+        const fresh = await access.mintKey();
         if (fresh) {
           await send(message, false, fresh);
           return;
@@ -217,15 +176,13 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
     return <Alert severity="info">AI agent chat isn&apos;t available in production environments. Test your agent in a non-critical environment such as Development.</Alert>;
   }
 
-  // Cloud: a reachable endpoint exists, but it is not fronted by the API Platform
-  // gateway — the only URL chat may invoke — so name that cause instead of the
-  // generic "no endpoint", which would send the user looking in the wrong place.
-  const notExposed = IS_CLOUD && !!candidate && access.isUnavailable;
+  // A reachable endpoint exists, but it is not fronted by the API Platform gateway —
+  // the only URL chat may invoke — so name that cause instead of the generic
+  // "no endpoint", which would send the user looking in the wrong place.
+  const notExposed = !!candidate && access.isUnavailable;
   const noEndpoint = endpoints.length > 0 && !chatUrl && !notExposed;
   // Passes the gateway's own reason through rather than replacing it with a generic line.
-  const authNotice = IS_CLOUD
-    ? `Chat can’t authenticate with this agent: issuing a test key failed.${access.keyError ? ` ${access.keyError}` : ''}`
-    : 'Chat can’t authenticate with this agent: issuing a test key failed. Check that you have permission to generate API keys for it, then try again.';
+  const authNotice = `Chat can’t authenticate with this agent: issuing a test key failed.${access.keyError ? ` ${access.keyError}` : ''}`;
   const isPage = variant === 'page';
 
   return (
@@ -352,7 +309,7 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
           fullWidth
           multiline
           maxRows={4}
-          placeholder={(IS_CLOUD ? access.isMinting : generateKey.isPending) && !apiKey ? 'Authenticating…' : 'Message your agent…'}
+          placeholder={access.isMinting && !apiKey ? 'Authenticating…' : 'Message your agent…'}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {

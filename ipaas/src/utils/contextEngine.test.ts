@@ -466,6 +466,12 @@ describe('exposure snippets', () => {
     expect(buildQueryCurl('https://engine.example.com', 'q', 'answer')).toContain('https://engine.example.com/v1/answer');
   });
 
+  it('keeps a question from a link inside the curl body when pasted into a shell', () => {
+    const curl = buildQueryCurl('https://engine.example.com', "x' ; touch /tmp/pwned ; echo '");
+    const body = curl.slice(curl.indexOf("-d '"));
+    expect(body).toBe(`-d '${JSON.stringify({ question: "x' ; touch /tmp/pwned ; echo '", limit: 5 }, null, 2).replaceAll("'", "'\\''")}'`);
+  });
+
   it('builds an mcp client config keyed by the engine name', () => {
     const cfg = JSON.parse(buildMcpClientConfig('https://engine.example.com/', 'Support Knowledge!'));
     expect(Object.keys(cfg.mcpServers)).toEqual(['support-knowledge']);

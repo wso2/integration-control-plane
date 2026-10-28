@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, IconButton, MenuItem, Select as MuiSelect, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, Drawer, IconButton, MenuItem, Select as MuiSelect, Stack, Typography } from '@wso2/oxygen-ui';
 import TextField from '../common/TextField';
 import { ChevronDown, ChevronUp, Link, Trash2, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,175 +25,22 @@ import { useEnvEndpoints } from '../../hooks/useDeployments';
 import { useSchemaConfig, useCertificateGroups, useCertificateMappings, useConfigGroups } from '../../hooks/useConfiguration';
 import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
-import { useGenerateComponentEndpoints, useUpdateEndpoint } from '../../hooks/useComponents';
+import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
-import ManageDrawer from './ManageDrawer';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
-import { IS_CLOUD } from '../../features';
 import { toEndpointOptions } from '../../utils/endpoints';
-import { EndpointCard, VISIBILITY_OPTS } from '../EndpointCard';
+import { EndpointCard } from '../EndpointCard';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
+import MiConfigureDrawer from './MiConfigureDrawer';
+import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
+import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
 
 // ── Step indicator ────────────────────────────────────────────────────────────
 
 const SERVICE_STEPS = ['Configurations', 'Certificate Mount', 'Endpoints'];
 const AUTOMATION_STEPS = ['Configurations', 'Certificate Mount'];
-
-function StepIndicator({ step, steps }: { step: number; steps: string[] }) {
-  return (
-    <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1.25, borderBottom: '1px solid', borderColor: 'divider' }}>
-      {steps.map((label, idx) => {
-        const num = idx + 1;
-        const isActive = num === step;
-        const isDone = num < step;
-        return (
-          <Stack key={label} direction="row" alignItems="center" sx={{ flex: 1, minWidth: 0 }}>
-            <Stack direction="row" alignItems="center" gap={0.75} sx={{ minWidth: 0 }}>
-              <Box
-                sx={{
-                  width: 22,
-                  height: 22,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                  bgcolor: isActive ? 'primary.main' : isDone ? 'success.main' : 'action.disabledBackground',
-                  color: isActive || isDone ? 'primary.contrastText' : 'text.disabled',
-                  fontSize: '0.7rem',
-                  fontWeight: 600,
-                }}>
-                {num}
-              </Box>
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: isActive ? 600 : 400,
-                  color: isActive ? 'text.primary' : 'text.secondary',
-                  whiteSpace: 'nowrap',
-                }}>
-                {label}
-              </Typography>
-            </Stack>
-            {idx < steps.length - 1 && <Box sx={{ flex: 1, height: '1px', bgcolor: 'divider', mx: 0.75 }} />}
-          </Stack>
-        );
-      })}
-    </Stack>
-  );
-}
-
-// ── ManageEndpoint (inline edit view) ─────────────────────────────────────────
-
-interface ManageEndpointProps {
-  ep: EnvEndpoint;
-  componentId: string;
-  projectId: string;
-  versionId: string;
-  releaseId: string;
-  onBack: () => void;
-}
-
-function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, onBack }: ManageEndpointProps) {
-  const [visibilities, setVisibilities] = useState<string[]>(ep.networkVisibilities ?? [ep.visibility ?? 'Public']);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const updateEp = useUpdateEndpoint();
-
-  const handleToggle = (key: string) => {
-    setVisibilities((prev) => (prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]));
-  };
-
-  const handleSave = () => {
-    setSaveError(null);
-    updateEp.mutate(
-      { componentId, projectId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: visibilities },
-      {
-        onSuccess: onBack,
-        onError: (err) => setSaveError(err instanceof Error ? err.message : 'Failed to update endpoint'),
-      },
-    );
-  };
-
-  return (
-    <Box>
-      {/* Endpoint details (read-only) */}
-      <Box sx={{ mb: 2 }}>
-        {[
-          { label: 'Name', value: ep.displayName },
-          { label: 'Port', value: ep.port != null ? String(ep.port) : null },
-          { label: 'Status', value: ep.state ?? null },
-          { label: 'Type', value: ep.type ?? null },
-          { label: 'Context', value: ep.apiContext ?? null },
-          { label: 'Schema', value: ep.apiDefinitionPath ?? null },
-        ].map(({ label, value }) =>
-          value ? (
-            <Typography key={label} variant="body2" sx={{ mb: 0.5 }}>
-              <Box component="span" sx={{ fontWeight: 700 }}>
-                {label}
-              </Box>
-              : {value}
-            </Typography>
-          ) : null,
-        )}
-      </Box>
-
-      {/* Network visibility */}
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-        Network Visibility
-      </Typography>
-      <Stack gap={1} sx={{ mb: 2 }}>
-        {VISIBILITY_OPTS.map(({ key, label, Icon, description }) => {
-          const checked = visibilities.includes(key);
-          return (
-            <Box
-              key={key}
-              onClick={() => handleToggle(key)}
-              sx={{
-                display: 'flex',
-                alignItems: 'flex-start',
-                gap: 1.25,
-                p: 1.5,
-                border: '1px solid',
-                borderColor: checked ? 'primary.main' : 'divider',
-                borderRadius: 1,
-                cursor: 'pointer',
-                transition: 'border-color 0.15s',
-                '&:hover': { borderColor: 'primary.main' },
-              }}>
-              <Box sx={{ display: 'flex', color: 'primary.main', mt: 0.25, flexShrink: 0 }}>
-                <Icon size={18} />
-              </Box>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {label}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {description}
-                </Typography>
-              </Box>
-              <Checkbox checked={checked} size="small" sx={{ p: 0, flexShrink: 0, mt: 0.25 }} onClick={(e) => e.stopPropagation()} onChange={() => handleToggle(key)} />
-            </Box>
-          );
-        })}
-      </Stack>
-
-      {saveError && (
-        <Alert severity="error" sx={{ mb: 1 }}>
-          {saveError}
-        </Alert>
-      )}
-
-      <Stack direction="row" justifyContent="flex-end" gap={1}>
-        <Button onClick={onBack}>Cancel</Button>
-        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending || visibilities.length === 0} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
-          {updateEp.isPending ? 'Updating…' : 'Update'}
-        </Button>
-      </Stack>
-    </Box>
-  );
-}
 
 // ── Automation configure drawer ───────────────────────────────────────────────
 
@@ -721,7 +568,6 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
-          showLinking
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>
@@ -825,9 +671,34 @@ export interface ConfigureDrawerProps {
   hideEndpoints?: boolean;
   envTemplateId?: string;
   buildId?: string;
+  /**
+   * Configure & Deploy: the last step continues to the deploy (calls `onSaved`)
+   * even when nothing changed. The schema drawers always save, so only MI reads it.
+   */
+  continueWithoutChanges?: boolean;
 }
 
 export default function ConfigureDrawer(props: ConfigureDrawerProps) {
+  // MI has no configuration schema: it takes free-form env vars and secrets.
+  if (runtimeFromDisplayType(props.displayType ?? '') === 'mi') {
+    // envId, not envTemplateId: MI configs live on the environment's ReleaseBinding.
+    // Keyed by target so a new component/env remounts with fresh rows, never the previous target's.
+    return (
+      <MiConfigureDrawer
+        key={`${props.projectId}/${props.componentId}/${props.envId}`}
+        open={props.open}
+        onClose={props.onClose}
+        onSaved={props.onSaved}
+        projectId={props.projectId}
+        componentId={props.componentId}
+        envId={props.envId}
+        versionId={props.versionId}
+        releaseId={props.releaseId}
+        showEndpoints={!props.isAutomation && !props.hideEndpoints}
+        continueWithoutChanges={props.continueWithoutChanges}
+      />
+    );
+  }
   if (props.isAutomation) {
     return (
       <AutomationConfigureDrawer
@@ -1182,7 +1053,6 @@ function GenericServiceConfigureDrawer({
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
-          showLinking
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>
@@ -1280,11 +1150,7 @@ function GenericServiceConfigureDrawer({
         )}
       </Drawer>
 
-      {IS_CLOUD ? (
-        <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId} envName={envId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />
-      ) : (
-        <ManageDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} apimId={settingsEp?.apimId ?? null} />
-      )}
+      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId} envName={envId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />
     </>
   );
 }

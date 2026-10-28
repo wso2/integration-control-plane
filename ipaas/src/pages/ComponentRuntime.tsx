@@ -16,24 +16,19 @@
  * under the License.
  */
 
-import { Alert, Box, CircularProgress, MenuItem, PageContent, Select, Snackbar, Typography } from '@wso2/oxygen-ui';
+import { Box, Chip, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useState, type JSX } from 'react';
-import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import PodInsightsTable from '../components/Runtime/PodInsightsTable';
-import ReplicaRangeControl from '../components/Runtime/ReplicaRangeControl';
 import ResourceUsageCards from '../components/Runtime/ResourceUsageCards';
 import RuntimeOverview from '../components/Runtime/RuntimeOverview';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
-import { useLoadComponentPermissions } from '../hooks/usePermissionLoader';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { Permissions } from '../constants/permissions';
-import { IS_CLOUD } from '../features';
 import { useComponentPodMetrics, useComponentPods, useReleaseDetails, useRedeployRelease } from '../hooks/useRuntime';
-import { useHpa, useScalingState } from '../hooks/useScaling';
 import { DeploymentStatus } from '../types/deployment';
 import { calculateAggregateUsage, usageFromComponentLevelMetrics } from '../utils/podMetrics';
 import type { ComponentScope } from '../nav';
@@ -60,49 +55,30 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
   const releaseId = deployment?.releaseId ?? '';
   const status = deployment?.deploymentStatusV2 ?? DeploymentStatus.NotDeployed;
 
-  const { data: release } = useReleaseDetails(projectId, componentId, component, releaseId);
-  const clusterId = release?.environment?.environment_clusters?.[0]?.cluster_id ?? '';
+  const { data: release } = useReleaseDetails(projectId, component, releaseId);
   const namespace = release?.environment?.namespace ?? '';
   const isDeployed = status !== DeploymentStatus.NotDeployed && !!releaseId && release?.undeployed !== true;
 
-  // Cloud's runtime-details response is the authoritative source for these (OpenChoreo IDs,
-  // deployed image) — wip keeps using its existing component/deployment-derived values.
-  // Falling back to componentId/releaseId while `release` is still loading would flash a
-  // handler-shaped value that then flips to the real OpenChoreo UUID once it arrives —
-  // show nothing until the authoritative value is in, rather than a mismatched one first.
-  const displayComponentId = IS_CLOUD ? (release?.componentId ?? '') : componentId;
-  const displayReleaseId = IS_CLOUD ? (release?.ID ?? '') : releaseId;
-  const displayImageUrl = IS_CLOUD ? release?.image : (deployment?.imageUrl ?? undefined);
-
-  const pods = useComponentPods(projectId, component, clusterId, releaseId, namespace);
-  const metrics = useComponentPodMetrics(projectId, component, clusterId, releaseId, namespace);
+  const pods = useComponentPods(projectId, component, releaseId);
+  const metrics = useComponentPodMetrics(projectId, component, releaseId);
 
   // release.replicas is a one-shot fetch (invalidated once right when Redeploy is clicked,
   // before the rollout settles) and then never refreshed, so it goes stale — e.g. it can get
   // stuck at 2 after a redeploy's old pod terminates. The live, polled pod count self-corrects.
-  const replicaCount = IS_CLOUD ? (pods.data?.length ?? release?.replicas ?? 0) : (release?.replicas ?? 0);
-  // cloud has no pod-level metrics source and instead sends a pre-aggregated total; wip's
-  // backend only ever gives per-pod metrics, so it's summed against pod resource limits.
+  const replicaCount = pods.data?.length ?? release?.replicas ?? 0;
+  // There is no pod-level metrics source; the BFF sends a pre-aggregated total.
   const usage = useMemo(() => (metrics.data?.componentLevelMetrics ? usageFromComponentLevelMetrics(metrics.data.componentLevelMetrics) : calculateAggregateUsage(pods.data ?? [], metrics.data?.podLevelMetrics ?? [])), [pods.data, metrics.data]);
-  // cloud sends componentLevelMetrics only when it can resolve one (Observer reachable) —
+  // componentLevelMetrics is sent only when it can be resolved (Observer reachable) —
   // when it's absent but pods are actually running, "0 used" would misreport unknown as zero.
-  const usageUnavailable = IS_CLOUD && !metrics.data?.componentLevelMetrics && (pods.data?.length ?? 0) > 0;
+  const usageUnavailable = !metrics.data?.componentLevelMetrics && (pods.data?.length ?? 0) > 0;
 
-  // Min/max replicas above the pod table edit the same HPA the Scaling page owns.
-  const { data: hpa, isLoading: loadingHpa, isError: hpaError, refetch: refetchHpa } = useHpa(projectId, componentId, releaseId);
-  const { data: scalingState } = useScalingState(projectId, componentId, releaseId);
-  const scalingPath = useMemo(() => ({ componentId, releaseId }), [componentId, releaseId]);
-  const podScope = useMemo(() => ({ projectId, clusterId, namespace, releaseId, orgHandler: org, projectHandler: project, componentHandler: component }), [projectId, clusterId, namespace, releaseId, org, project, component]);
-  const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const podScope = useMemo(() => ({ projectId, releaseId, orgHandler: org, projectHandler: project, componentHandler: component }), [projectId, releaseId, org, project, component]);
 
-  // Landing straight on this page skips the Overview, which is where component-scoped
-  // permissions are normally loaded.
-  useLoadComponentPermissions(org, projectId, componentId);
   const { hasPermission } = useAccessControl();
   const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, componentId);
 
   const redeploy = useRedeployRelease();
-  const onRedeploy = () => redeploy.mutate({ projectId, componentId, componentName: component, releaseId });
+  const onRedeploy = () => redeploy.mutate({ projectId, componentName: component, releaseId });
 
   const isLoading = loadingProject || loadingComponent || loadingEnvironments;
 
@@ -132,24 +108,8 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
     );
   }
 
-  const envSelect = !IS_CLOUD && environments.length > 1 && (
-    <Select
-      size="small"
-      value={environments.some((e) => e.id === envId) ? envId : ''}
-      onChange={(e) => setEnvId(e.target.value as string)}
-      inputProps={{ 'aria-label': 'Environment' }}
-      sx={{ fontSize: '0.8125rem', '& .MuiSelect-select': { py: 0.5, px: 1.5 }, minWidth: 140 }}>
-      {environments.map((e) => (
-        <MenuItem key={e.id} value={e.id}>
-          {e.name}
-        </MenuItem>
-      ))}
-    </Select>
-  );
-
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} extra={envSelect} />}
       <PageContent>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Runtime
@@ -158,11 +118,12 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
           componentName={comp.displayName || comp.name || component}
           status={status}
           lastDeployedAt={release?.latest_deployment?.deployment_history?.CreatedAt ?? deployment?.build?.deployedAt}
-          lastDeployedMessage={release?.latest_deployment?.deployment_history?.change_message}
-          componentId={displayComponentId}
-          releaseId={displayReleaseId}
+          // The runtime response carries the OpenChoreo ids; until it arrives, show nothing
+          // rather than a handler-shaped value that then flips to the real id.
+          componentId={release?.componentId ?? ''}
+          releaseId={release?.ID ?? ''}
           namespace={namespace}
-          imageUrl={displayImageUrl}
+          imageUrl={release?.image}
           isDeployed={isDeployed}
           redeploying={redeploy.isPending}
           canRedeploy={!!releaseId}
@@ -173,7 +134,6 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
           <>
             <PodInsightsTable
               pods={pods.data}
-              metrics={metrics.data?.podLevelMetrics}
               isLoading={pods.isLoading}
               isError={pods.isError}
               isFetching={pods.isFetching || metrics.isFetching}
@@ -183,22 +143,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
               }}
               scope={podScope}
               canManage={canManage}
-              replicasControl={
-                <ReplicaRangeControl
-                  hpa={hpa ?? undefined}
-                  isLoading={loadingHpa}
-                  isError={hpaError}
-                  onRetry={() => refetchHpa()}
-                  replicas={replicaCount}
-                  orgUuid={orgUuid ?? ''}
-                  projectId={projectId}
-                  path={scalingPath}
-                  version={scalingState?.version ?? ''}
-                  canManage={canManage}
-                  onSaved={(message) => setAlert({ type: 'success', message })}
-                  onError={(message) => setAlert({ type: 'error', message })}
-                />
-              }
+              replicasControl={<Chip variant="outlined" label={`Replicas ${replicaCount}`} />}
             />
             <Box sx={{ mt: 4 }}>
               <ResourceUsageCards usage={usage} usageUnavailable={usageUnavailable} />
@@ -206,12 +151,6 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
           </>
         )}
       </PageContent>
-
-      <Snackbar open={!!alert} autoHideDuration={6000} onClose={() => setAlert(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert severity={alert?.type ?? 'success'} onClose={() => setAlert(null)} variant="filled">
-          {alert?.message}
-        </Alert>
-      </Snackbar>
     </Box>
   );
 }

@@ -19,7 +19,6 @@
 import { Alert, Box, CircularProgress, Link, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
 import { Info } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
-import DeploymentTrackBar from '../../components/DeploymentTrackBar';
 import WebhookSnippets from '../components/ExternalCI/WebhookSnippets';
 import CiTokensTable from '../components/ExternalCI/CiTokensTable';
 import ComingSoon from '../../pages/ComingSoon';
@@ -32,7 +31,7 @@ import { isByoiComponent } from '../../constants/integrations';
 import { EXTERNAL_CI_DOC_URL } from '../utils/externalCi';
 import type { ComponentScope } from '../../nav';
 
-export default function ComponentExternalCI({ org, project, component }: ComponentScope): JSX.Element {
+export default function ComponentExternalCI({ project, component }: ComponentScope): JSX.Element {
   const { projectId } = useProjectId(project);
   const { hasPermission } = useAccessControl();
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
@@ -52,7 +51,6 @@ export default function ComponentExternalCI({ org, project, component }: Compone
 
   return (
     <Box>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} versionView />}
       <PageContent>
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>

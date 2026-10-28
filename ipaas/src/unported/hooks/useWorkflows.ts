@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { cancelWorkflowInstance, createWorkflowConfig, fetchPastWorkflowInstances, fetchWorkflowConfigs, fetchWorkflowDefinitions, fetchWorkflowInstances, fetchWorkflowReviewData, reviewWorkflowInstance, updateWorkflowConfig } from '#api/workflows';
+import { cancelWorkflowInstance, createWorkflowConfig, fetchPastWorkflowInstances, fetchWorkflowConfigs, fetchWorkflowDefinitions, fetchWorkflowInstances, fetchWorkflowReviewData, reviewWorkflowInstance, updateWorkflowConfig } from '../../api/workflows';
 import type { OrgWorkflowConfig, ReviewerDecisionRequest, WorkflowConfigRequest, WorkflowDefinition, WorkflowInstanceResponse, WorkflowReviewData } from '../../types/workflow';
 
 const ROOT_KEY = 'workflows';

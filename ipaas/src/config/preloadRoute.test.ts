@@ -18,8 +18,7 @@
 
 import { describe, expect, it, vi } from 'vitest';
 
-// The real route tree pulls in `features`, which needs the build-time
-// `__PRODUCT__` define; a stub keeps this a unit test of the matching logic.
+// The real route tree pulls in every page; a stub keeps this a unit test of the matching logic.
 const Page = () => null;
 const preload = vi.fn(async () => ({ default: Page }));
 const Boundary = () => null;

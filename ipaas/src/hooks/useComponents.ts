@@ -33,7 +33,7 @@ import {
   createDeploymentTrack,
   deleteDeploymentTrack,
   checkDeploymentTrackDeletable,
-} from '#api/components';
+} from '../api/components';
 import { pollWhileDeleting } from '../utils/deletionPolling';
 import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput } from '../types/component';
 

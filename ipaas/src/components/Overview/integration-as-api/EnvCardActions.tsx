@@ -22,7 +22,6 @@ import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
-import { IS_CLOUD } from '../../../features';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import ServiceLogsDrawer from './ServiceLogsDrawer';
@@ -64,8 +63,8 @@ export default function EnvCardActions({
 
   const handleStop = () => {
     stopMutation.mutate(
-      // cloud: OpenChoreo's stop endpoint is per-environment; wip ignores it.
-      { orgHandler, componentId: component.id, releaseId, ...(IS_CLOUD ? { environment: env.id } : {}), type: 'service', clearCron: false },
+      // OpenChoreo's stop endpoint is per-environment.
+      { orgHandler, componentId: component.id, releaseId, environment: env.id, type: 'service', clearCron: false },
       {
         onSuccess: () => {
           requestPoll();

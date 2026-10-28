@@ -23,8 +23,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCreateComponent } from '../hooks/useComponents';
 import { isQuotaError } from '../utils/apiErrors';
 import { useChoreoSampleImages } from '../hooks/useRepository';
-import { generateAndSaveGitHubState, useAuth, validateAndClearGitHubState } from '#auth';
-import { IS_CLOUD } from '../features';
+import { generateAndSaveGitHubState, useAuth, validateAndClearGitHubState } from '../auth';
 import { providerComingSoonLabel } from '../constants/gitProviders';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
@@ -45,6 +44,7 @@ import { PROVIDER_ICON_SX, GITHUB_ICON_SX, SECTION_LABEL_SX } from '../constants
 import { resourceUrl, narrow, type ProjectScope } from '../nav';
 import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl } from '../paths';
 import type { Sample } from '../types/samples';
+import { sampleKey } from '../constants/samples';
 import { toHandler } from '../utils/string';
 import { buildCloudEditorUrl } from '../utils/cloudEditor';
 import { useProjectId } from '../hooks/useProjects';
@@ -104,7 +104,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
   const { data: sampleImages } = useChoreoSampleImages(orgUuid, projectId);
 
   const [selectedTab, setSelectedTab] = useState(0);
-  const [deployingSample, setDeployingSample] = useState<string | null>(null);
+  const [deployingSample, setDeployingSample] = useState<Sample | null>(null);
   const [isImportAuthenticating, setIsImportAuthenticating] = useState(false);
   const [pageError, setPageError] = useState<{ message: string; severity: 'error' | 'warning' } | null>(null);
 
@@ -129,11 +129,10 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
     if (creationBlocked) return;
     const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
     if (!githubAppClientId) {
-      // Cloud only: no GitHub App configured means private-repo authorization
-      // is impossible, so land the import page in public-URL mode instead of
-      // its default (private) mode with a dead Authorize button. Other
-      // variants keep the original navigation.
-      navigate(importUrl, IS_CLOUD ? { state: { mode: 'public' } } : undefined);
+      // No GitHub App configured means private-repo authorization is impossible,
+      // so land the import page in public-URL mode instead of its default
+      // (private) mode with a dead Authorize button.
+      navigate(importUrl, { state: { mode: 'public' } });
       return;
     }
     setIsImportAuthenticating(true);
@@ -181,7 +180,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const handleQuickDeploy = (sample: Sample) => {
     if (!projectId || creationBlocked) return;
-    setDeployingSample(sample.displayName);
+    setDeployingSample(sample);
     createComponent.mutate(
       {
         displayName: sample.displayName,
@@ -209,7 +208,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       <Box sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label="Integration"
-          subLabel={deployingSample || undefined}
+          subLabel={deployingSample?.displayName}
           isPending={createComponent.isPending}
           isSuccess={createComponent.isSuccess}
           error={createComponent.isError ? (createComponent.error?.message ?? 'Something went wrong. Please try again.') : null}
@@ -344,26 +343,26 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           <GitHub size={aiBuilderEnabled ? 23 : 24} />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.GITLAB_SELF_MANAGED) : 'Import from GitLab'} placement="top">
+                      <Tooltip title={providerComingSoonLabel(GitProvider.GITLAB_SELF_MANAGED)} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from GitLab" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.GITLAB_SELF_MANAGED } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton aria-label="Import from GitLab" disabled sx={PROVIDER_ICON_SX}>
                             <GitLabIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.BITBUCKET_CLOUD) : 'Import from Bitbucket'} placement="top">
+                      <Tooltip title={providerComingSoonLabel(GitProvider.BITBUCKET_CLOUD)} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Bitbucket" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.BITBUCKET_CLOUD } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton aria-label="Import from Bitbucket" disabled sx={PROVIDER_ICON_SX}>
                             <BitbucketIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.AZURE_DEVOPS) : 'Import from Azure'} placement="top">
+                      <Tooltip title={providerComingSoonLabel(GitProvider.AZURE_DEVOPS)} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Azure" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.AZURE_DEVOPS } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton aria-label="Import from Azure" disabled sx={PROVIDER_ICON_SX}>
                             <AzureDevOpsIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
@@ -457,7 +456,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {featuredSamples.map((sample) => (
-                        <SampleRowCard key={sample.displayName} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample === sample.displayName} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
+                        <SampleRowCard key={sampleKey(sample)} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
                       ))}
                     </Box>
                   )}

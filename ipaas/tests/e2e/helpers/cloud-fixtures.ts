@@ -180,7 +180,7 @@ export async function expectPageRendered(page: Page, url: string): Promise<void>
 /**
  * A reseeded token has to outlive the longest gap before the next reseed, with room to spare:
  * a token-mode session has no refresh token, so the SDK never renews it, and the first 401 after
- * it expires ends the session and redirects to sign-in (auth/cloud/session.ts). So installing a
+ * it expires ends the session and redirects to sign-in (auth/session.ts). So installing a
  * nearly-spent token does not merely lapse — it ends the run.
  */
 const RESEED_MIN_LIFETIME_MS = 6 * 60_000;

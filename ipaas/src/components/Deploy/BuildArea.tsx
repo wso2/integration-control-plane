@@ -340,6 +340,7 @@ export default function BuildArea({
         displayType={displayType}
         isAutomation={flags.isAutomation}
         envTemplateId={firstEnvTemplateId}
+        continueWithoutChanges
       />
 
       {/* Confirm deploy after configure */}

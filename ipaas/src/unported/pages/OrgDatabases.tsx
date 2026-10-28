@@ -21,7 +21,7 @@ import { Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { isPlatformServicesEnabled, useDatabaseServers, useServiceAvailability } from '../../hooks/usePlatformServices';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { DATABASE_KIND, type DbServerKind } from '../../constants/platformServices';

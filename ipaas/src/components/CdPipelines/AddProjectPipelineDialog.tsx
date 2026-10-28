@@ -20,12 +20,11 @@ import { Alert, Autocomplete, Button, CircularProgress, Dialog, DialogActions, D
 import TextField from '../common/TextField';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useOrgDeploymentPipelines, useUpdateProjectDeploymentPipelines } from '../../hooks/useDeploymentPipelines';
-import { IS_CLOUD } from '../../features';
 import type { DeploymentPipeline } from '../../types/deploymentPipeline';
 
 interface AddProjectPipelineDialogProps {
   projectId: string;
-  /** Pipelines already in the project — excluded from the picker and preserved on save. */
+  /** Pipelines already in the project, excluded from the picker. */
   currentPipelineIds: string[];
   onClose: () => void;
   onDone: () => void;
@@ -33,23 +32,18 @@ interface AddProjectPipelineDialogProps {
 }
 
 /**
- * Adds org pipelines to a project. The org pipelines not already in the project
- * are multi-selectable; saving PUTs the current ids plus the chosen ones (the
- * project pipeline set is a full replace).
- *
- * Cloud binds a project to exactly one pipeline, so there the picker is single-select
- * and the chosen pipeline replaces the current one rather than joining it.
+ * Sets a project's deployment pipeline. A project is bound to exactly one pipeline,
+ * so the chosen org pipeline replaces the current one.
  */
 export default function AddProjectPipelineDialog({ projectId, currentPipelineIds, onClose, onDone, onError }: AddProjectPipelineDialogProps): ReactNode {
   const { data: orgPipelines, isLoading, isError, refetch } = useOrgDeploymentPipelines();
   const update = useUpdateProjectDeploymentPipelines(projectId);
-  const [selected, setSelected] = useState<DeploymentPipeline[]>([]);
+  const [selected, setSelected] = useState<DeploymentPipeline | null>(null);
 
   const available = useMemo(() => (orgPipelines ?? []).filter((p) => !currentPipelineIds.includes(p.id)), [orgPipelines, currentPipelineIds]);
 
-  const chosen = selected.map((p) => p.id);
   const add = () =>
-    update.mutate(IS_CLOUD ? chosen : [...currentPipelineIds, ...chosen], {
+    update.mutate(selected ? [selected.id] : [], {
       onSuccess: () => {
         onClose();
         onDone();
@@ -62,9 +56,9 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{IS_CLOUD ? 'Set Deployment Pipeline' : 'Add Deployment Pipelines'}</DialogTitle>
+      <DialogTitle>Set Deployment Pipeline</DialogTitle>
       <DialogContent>
-        <DialogContentText sx={{ mb: 2 }}>{IS_CLOUD ? 'Select the deployment pipeline for your project.' : 'Select deployment pipelines to add to your project.'}</DialogContentText>
+        <DialogContentText sx={{ mb: 2 }}>Select the deployment pipeline for your project.</DialogContentText>
         {isLoading ? (
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ py: 2 }}>
             <CircularProgress size={18} />
@@ -88,14 +82,13 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
           </Typography>
         ) : (
           <Autocomplete
-            multiple={!IS_CLOUD}
             options={available}
-            value={IS_CLOUD ? (selected[0] ?? null) : selected}
-            onChange={(_, v) => setSelected(v === null ? [] : Array.isArray(v) ? v : [v])}
+            value={selected}
+            onChange={(_, v) => setSelected(v)}
             getOptionLabel={(p) => p.name}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             disabled={update.isPending}
-            renderInput={(params) => <TextField {...params} label={IS_CLOUD ? 'Pipeline' : 'Pipelines'} />}
+            renderInput={(params) => <TextField {...params} label="Pipeline" />}
           />
         )}
       </DialogContent>
@@ -103,7 +96,7 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
         <Button onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={add} disabled={selected.length === 0 || update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
+        <Button variant="contained" onClick={add} disabled={!selected || update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
           {update.isPending ? 'Adding…' : 'Add'}
         </Button>
       </DialogActions>

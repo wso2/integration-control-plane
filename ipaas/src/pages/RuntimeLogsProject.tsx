@@ -20,13 +20,11 @@ import { CircularProgress, MenuItem, PageContent, Select } from '@wso2/oxygen-ui
 import { ScrollText } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useOrgs } from '../hooks/useOrg';
-import { useProjectsByOrg } from '../hooks/useProjects';
+import { useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
-import { useEnvironments, useAllEnvironments, useCloudDataPlanes } from '../hooks/useEnvironments';
+import { useEnvironments, useAllEnvironments } from '../hooks/useEnvironments';
 import { useInfiniteLogs, useVisibleLogs, useResumeLiveOnAutoRefresh } from '../hooks/useLogs';
 import type { LogsRequest } from '../types/logs';
-import { choreologgingProjectLogsApiUrl } from '../config/runtimeConfig';
-import { IS_CLOUD } from '../features';
 import { AUTO_FETCH_INTERVAL, DEFAULT_DP_REGION, PAGE_SIZE } from '../utils/logs';
 import LogsPageLayout from '../components/Logs/LogsPageLayout';
 import LogsToolbar from '../components/Logs/LogsToolbar';
@@ -41,7 +39,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
   const { envFilter, levelFilter, sortDir, searchPhrase, autoFetch, startTime, endTime } = filters;
 
   const { data: orgs, isLoading: loadingOrgs } = useOrgs();
-  const { data: projects, isLoading: loadingProjects } = useProjectsByOrg(scope.org);
+  const { data: projects, isLoading: loadingProjects } = useProjects();
 
   const loadingProject = loadingOrgs || loadingProjects;
   const project = projects?.find((p) => p.id === scope.project || p.handler === scope.project);
@@ -55,8 +53,6 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
   const environments = orgUuid ? projectEnvs : globalEnvs;
   const loadingEnvironments = orgUuid ? loadingProjectEnvs : loadingGlobalEnvs;
 
-  const { data: cdps, isLoading: loadingCdps } = useCloudDataPlanes(orgUuid);
-
   const [integrationFilter, setIntegrationFilter] = useState('all');
 
   const componentIds = integrationFilter !== 'all' ? [integrationFilter] : allComponents.map((c) => c.id);
@@ -67,15 +63,9 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
   const envIdsKey = selectedEnvIds.join(',');
   const levelFilterKey = levelFilter.join(',');
 
-  const logsApiUrl = useMemo(() => {
-    // cloud: logs come from the wso2cloud observability proxy — the cloud
-    // fetchLogs resolves its own base URL and ignores this value, which only
-    // gates the query (stays disabled when the proxy URL is unconfigured).
-    if (IS_CLOUD) return window.API_CONFIG?.observabilityUrl || undefined;
-    if (!primaryEnv?.dpId || !cdps) return undefined;
-    const cdp = cdps.find((c) => c.id.toLowerCase() === primaryEnv.dpId!.toLowerCase());
-    return cdp ? choreologgingProjectLogsApiUrl(cdp.external_gateway_virtual_host) : undefined;
-  }, [primaryEnv?.dpId, cdps]);
+  // Logs come from the observability proxy, which fetchLogs resolves itself; the URL only
+  // gates the query, which stays disabled while the proxy is unconfigured.
+  const logsApiUrl = window.API_CONFIG?.observabilityUrl || undefined;
 
   const logsRequest = useMemo<LogsRequest | null>(() => {
     if (componentIds.length === 0 || !primaryEnv || !logsApiUrl) return null;
@@ -103,7 +93,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
   useResumeLiveOnAutoRefresh(autoFetch, backToLive);
   const live = liveStatus({ autoFetch, historyOpen, sort: sortDir });
 
-  if (loadingProject || loadingComponents || loadingEnvironments || loadingCdps) {
+  if (loadingProject || loadingComponents || loadingEnvironments) {
     return (
       <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />

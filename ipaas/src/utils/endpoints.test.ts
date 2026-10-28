@@ -46,7 +46,7 @@ describe('resolveEndpointInvokeUrl', () => {
 describe('trimEndpointName', () => {
   it('drops a redundant leading "Endpoint" word', () => {
     expect(trimEndpointName('Endpoint Covid Status')).toBe('Covid Status');
-    // The auto-generated shape the wip/GraphQL path relies on.
+    // The auto-generated endpoint name shape.
     expect(trimEndpointName('Endpoint 1')).toBe('1');
     expect(trimEndpointName('  Endpoint   Foo  ')).toBe('Foo');
   });

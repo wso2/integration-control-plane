@@ -21,3 +21,6 @@ export const FREE_COMPONENT_LIMIT = 5;
 
 /** Subscription record type that marks an org as being on a paid plan. */
 export const PAID_SUBSCRIPTION_TYPE = 'devant-subscription';
+
+/** The cloud billing product this console belongs to; the billing org is read for it. */
+export const BILLING_PRODUCT_CODE = 'integration-platform';

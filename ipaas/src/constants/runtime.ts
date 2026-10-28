@@ -18,9 +18,6 @@
 
 import type { PodConditionInfo } from '../types/runtime';
 
-/** Cloud pods carry no node name, so the data plane is named instead. */
-export const DATA_PLANE_LABEL = 'Choreo Cloud Data Plane';
-
 export const POD_ACTION_LABELS = {
   events: 'Pod conditions and events',
   logs: 'Real-time container logs',

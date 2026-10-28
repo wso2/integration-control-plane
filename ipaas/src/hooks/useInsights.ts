@@ -17,7 +17,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchComponentInsights, fetchInsightsEnvironments, fetchTopSlowestApisNamed } from '#api/insights';
+import { fetchComponentInsights, fetchInsightsEnvironments, fetchTopSlowestApisNamed } from '../api/insights';
 import { useCloudDataPlanes } from './useEnvironments';
 import { choreoInsightsQueryApiUrl } from '../config/runtimeConfig';
 import type { InsightsEnvironment, InsightsRange, SlowestApiRow } from '../types/insights';

@@ -59,8 +59,8 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   // Derived rather than synced via an effect — an effect+render round trip here would delay
   // useComponentDeployment/useRuntimeArguments/useTaskExecutions below from becoming enabled.
   const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  const [trackIdState, setTrackId] = useState('');
-  const trackId = tracks.some((t) => t.id === trackIdState) ? trackIdState : (tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '');
+  // An integration has one implicit deployment track.
+  const trackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
 
   const { data: environments = [] } = useEnvironments(org, projectId);
   const [envIdState, setEnvId] = useState('');
@@ -415,7 +415,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
       {tracks.length > 0 && (
         // Pin the track bar to the top of the scroll area so it stays visible as the page scrolls.
         <Box sx={{ position: 'sticky', top: 0, zIndex: (theme) => theme.zIndex.appBar }}>
-          <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} extra={envSelect} />
+          <DeploymentTrackBar extra={envSelect} />
         </Box>
       )}
       {/* Plain padded container (not PageContent) so the page uses the single outer scroller — the

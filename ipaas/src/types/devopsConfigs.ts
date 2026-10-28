@@ -169,6 +169,8 @@ export interface SecretWriteData {
   secret_type: string;
   config_type: string;
   data?: Record<string, string>;
+  /** Env-var secrets: stored keys that keep their current value (not re-sent in `data`). */
+  keep?: string[];
   env_file_content?: string;
   version?: number;
 }
@@ -219,6 +221,8 @@ export interface SaveConfigInput {
   name: string;
   /** Env vars: `{ KEY: value }`. File mount: `{ data: <file contents> }`. */
   data: Record<string, string>;
+  /** Editing env-var secrets: stored keys left unchanged (their values are write-only). */
+  keep?: string[];
   /** File mount only — absolute container path. */
   mountPath?: string;
   /** Editing an existing config: its id + mount id (skip create + mount, just update data). */

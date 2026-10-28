@@ -46,7 +46,7 @@ describe('project listing — RAG components', () => {
 
 describe('project listing — foreign runtimes', () => {
   it('keeps the displayType verdict when no buildpack is reported', () => {
-    // Only cloud sends buildpackType; absent must not exclude every wip component.
+    // A component without a buildpackType keeps the displayType verdict.
     expect(isSupportedIntegration('ballerinaService', null, undefined)).toBe(true);
     expect(isSupportedIntegration('ballerinaService', null, 'BI')).toBe(true);
     expect(isSupportedIntegration('miApiService', null, 'MI')).toBe(true);

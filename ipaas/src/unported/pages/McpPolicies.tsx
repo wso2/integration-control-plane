@@ -31,10 +31,9 @@ import type { CorsConfig, RateLimitConfig } from '../../types/policy';
 import { getApiBackendEndpoint } from '../utils/apim';
 import { parseJsonSafe } from '../utils/json';
 import { applyCors, applyRateLimit, corsFromApi, isRateLimitValid, rateLimitFromApi } from '../../utils/policy';
-import DeploymentTrackBar from '../../components/DeploymentTrackBar';
 import JsonView from '../components/JsonView';
 import SearchField from '../../components/SearchField';
-import SecurityDrawer from '../../components/SecurityDrawer';
+import SecurityDrawer from '../components/SecurityDrawer';
 import CorsSection from '../../components/Policies/CorsSection';
 import RateLimitingSection from '../../components/Policies/RateLimitingSection';
 import McpProxyCanvas from '../components/Policies/McpProxyCanvas';
@@ -56,7 +55,7 @@ export default function McpPolicies(scope: ComponentScope): JSX.Element {
   // rather than synced via an effect — an effect+render round trip here would delay
   // useComponentEndpoints below from becoming enabled.
   const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  const [selectedTrackIdState, setSelectedTrackId] = useState('');
+  const [selectedTrackIdState] = useState('');
   const selectedTrackId = tracks.some((t) => t.id === selectedTrackIdState) ? selectedTrackIdState : (tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '');
 
   const { data: endpoints = [], isLoading: loadingEndpoints } = useComponentEndpoints(component?.id ?? '', selectedTrackId);
@@ -155,8 +154,6 @@ export default function McpPolicies(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={scope.project} componentHandler={scope.component} versionView />}
-
       <PageContent sx={{ pt: 5 }}>
         <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(resourceUrl(scope, 'overview'))} sx={{ mb: 2, textTransform: 'none' }}>
           Back

@@ -17,9 +17,8 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings } from '#api/configuration';
+import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings } from '../api/configuration';
 import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput } from '../types/configuration';
-import { IS_CLOUD } from '../features';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -48,12 +47,12 @@ export function useCertificateMappings(projectId: string, componentId: string, e
   });
 }
 
-export function useSchemaConfig(projectId: string, componentId: string, envId: string, deploymentTrackId: string, commitHash?: string) {
+export function useSchemaConfig(projectId: string, componentId: string, envId: string, deploymentTrackId: string, commitHash?: string, enabled = true) {
   return useQuery({
     queryKey: ['schemaConfig', projectId, componentId, envId, deploymentTrackId, commitHash],
     queryFn: () => fetchSchemaConfig(projectId, componentId, envId, deploymentTrackId, commitHash),
-    // WIP's endpoint 400s without commitHash; cloud's ignores it, and waiting would hide the schema when a deploy fails before producing a commit.
-    enabled: !!projectId && !!componentId && !!envId && !!deploymentTrackId && (IS_CLOUD || !!commitHash),
+    // Don't wait for commitHash: a deploy that fails before producing a commit still has a schema to show.
+    enabled: enabled && !!projectId && !!componentId && !!envId && !!deploymentTrackId,
     retry: false,
   });
 }
