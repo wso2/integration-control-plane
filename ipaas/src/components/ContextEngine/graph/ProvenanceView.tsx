@@ -31,6 +31,7 @@ import {
   cosmosBuffers,
   derivationSummary,
   entityId,
+  entityConflicts,
   entityIndex,
   exploreModel,
   factEntityNames,
@@ -50,9 +51,10 @@ import EntityPanel, { EntityChip } from './EntityPanel';
 import { GRAPH_ENTITY_LIMIT } from './GraphExplorer';
 import { useGraphTheme } from './graphTheme';
 import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, nodeLabelSx, panelLabelSx, panelSx, sentenceSx } from './graphStyles';
-import type { ContextEngineDetail, ContextEvidence, ContextFact, ContextQueryResult, ContextQueryTrace } from '../../../types/contextEngine';
+import type { ContextEngineDetail, ContextEvidence, ContextFact, ContextQueryConflict, ContextQueryResult, ContextQueryTrace } from '../../../types/contextEngine';
 
 const NO_FACTS: ContextFact[] = [];
+const NO_CONFLICTS: ContextQueryConflict[] = [];
 /** Separates an entity's name from its kind in a selection key; a control character no name holds. */
 const KIND_SEPARATOR = '\u001f';
 
@@ -93,9 +95,10 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
 
   const data = result.data;
   const facts = data?.facts ?? NO_FACTS;
+  const conflicts = data?.conflicts ?? NO_CONFLICTS;
   const served = graph.data ?? null;
-  // The key entities, plus every entity the facts name, so each one the graph holds can be lit.
-  const keepNames = useMemo(() => factEntityNames(facts), [facts]);
+  // The key entities, plus every entity the facts and the conflicts name, so each one the graph holds can be lit.
+  const keepNames = useMemo(() => factEntityNames([...facts, ...conflicts.flatMap((c) => [c.first, c.second])]), [facts, conflicts]);
   const model = useMemo(() => (served ? exploreModel(served, { records: true, entities: true, detail: 'key', keepNames }) : null), [served, keepNames]);
   const buffers = useMemo(() => (model ? cosmosBuffers(model, palette) : null), [model, palette]);
   // An entity key is "e:" + name, with the kind after a separator when known, since the same name can be two entities.
@@ -106,8 +109,8 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
     }
     return selectedKey?.startsWith('p:') ? { evidenceId: selectedKey.slice(2) } : {};
   }, [selectedKey]);
-  const whole = useMemo(() => (model && served ? factSelection(model, served, facts) : null), [model, served, facts]);
-  const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, facts, focus) : null), [model, served, facts, focus]);
+  const whole = useMemo(() => (model && served ? factSelection(model, served, facts, {}, conflicts) : null), [model, served, facts, conflicts]);
+  const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, facts, focus, conflicts) : null), [model, served, facts, focus, conflicts]);
   // A chosen entity or passage narrows the lit part; one with no fact on the graph shows the whole answer's part.
   const lit = part && part.points.length ? part : whole;
   const pointColors = useMemo(() => (model && lit ? litPointColors(model, palette, lit, palette.lit) : null), [model, palette, lit]);
@@ -228,7 +231,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
               accent={colors.accent}
               height={GRAPH_HEIGHT}
               ariaLabel={`The part of the graph this answer used: ${litEntities} entit${litEntities === 1 ? 'y' : 'ies'} lit`}>
-              {facts.length === 0 && (
+              {facts.length === 0 && conflicts.length === 0 && (
                 <Box sx={canvasNoteSx}>
                   <Typography variant="body2" sx={{ ...mutedSx, textAlign: 'center', maxWidth: 380, bgcolor: 'background.paper', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
                     No graph relationships took part in this answer. It was written from the passages listed on the right.
@@ -276,6 +279,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             orgHandle={orgHandle}
             name={entityName}
             kind={focus.entityKind}
+            conflicts={served && exploreId ? entityConflicts(served, exploreId) : []}
             sources={engine.sources}
             derivation={{ answer: data.answerWithheld ? undefined : data.answer, evidence: data.evidence }}
             onSelectEntity={selectEntity}
@@ -360,9 +364,16 @@ function DerivationSteps({
       : { title: 'Answer', body: result.answerWithheld ? 'Hidden: a passage it was written from is out of your reach now.' : result.insufficientEvidence ? 'None: the passages did not answer the question.' : 'Passages only: no answer was written.' },
     {
       title: 'Entities',
-      body: result.facts.length
-        ? `${result.facts.length} fact${result.facts.length === 1 ? '' : 's'} from the graph stand on these passages, naming ${summary.entities} entit${summary.entities === 1 ? 'y' : 'ies'}. They are lit on the graph. They explain what the passages contain; the answer cites passages, not facts.`
-        : 'No graph facts came with this query, so its derivation runs through passages alone.',
+      body: [
+        result.facts.length
+          ? `${result.facts.length} fact${result.facts.length === 1 ? '' : 's'} from the graph stand on these passages, naming ${summary.entities} entit${summary.entities === 1 ? 'y' : 'ies'}. They are lit on the graph. They explain what the passages contain; the answer cites passages, not facts.`
+          : 'No graph facts came with this query, so its derivation runs through passages alone.',
+        result.conflicts.length
+          ? `The index flagged ${result.conflicts.length} conflict${result.conflicts.length === 1 ? '' : 's'} among the facts behind these passages. Each is drawn in red on the graph, and the model was told about them.`
+          : '',
+      ]
+        .filter(Boolean)
+        .join(' '),
     },
   ];
   // Passages from one document are told apart by their place in it; otherwise by document.

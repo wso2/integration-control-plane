@@ -23,10 +23,10 @@ import { useContextEntity } from '../../../hooks/useContextEngine';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
-import { sentencesCiting } from '../../../utils/contextGraph';
+import { sentencesCiting, type EntityConflict } from '../../../utils/contextGraph';
 import { EvidencePlace } from '../detail/EvidenceCard';
 import { mutedSx } from '../styles';
-import { panelSx, panelLabelSx, sentenceSx } from './graphStyles';
+import { panelSx, panelLabelSx, selectRowSx, sentenceSx } from './graphStyles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
 
 interface EntityPanelProps {
@@ -35,11 +35,17 @@ interface EntityPanelProps {
   name: string;
   /** The entity's kind, when the caller knows it: the same name can be more than one entity, one per kind. */
   kind?: string;
+  /** The colour the graph draws this entity's kind in, for the dot beside its name; the accent when it has none. */
+  kindColor?: string;
+  /** Conflicts the graph view holds in which this entity takes part, from the engine's contradiction check. */
+  conflicts?: EntityConflict[];
   sources: ContextSource[];
   /** In provenance mode: the answer and the passages its query returned, to show this entity's part in it. */
   derivation?: { answer?: string; evidence: ContextEvidence[] };
   /** Open another entity; its kind comes along when the fact that named it carries one. */
   onSelectEntity: (name: string, kind?: string) => void;
+  /** Select a conflict on the canvas, by its place in the graph's list; without it the conflicts are only read. */
+  onSelectConflict?: (index: number) => void;
   onClose: () => void;
   /** Provenance mode: leave the derivation and explore around this entity. */
   onExplore?: () => void;
@@ -51,7 +57,7 @@ interface EntityPanelProps {
  * read. In provenance mode it also says which answer sentences depend on it
  * and which of its passages the question did not retrieve.
  */
-export default function EntityPanel({ engineId, orgHandle, name, kind, sources, derivation, onSelectEntity, onClose, onExplore }: EntityPanelProps): JSX.Element {
+export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor, conflicts = [], sources, derivation, onSelectEntity, onSelectConflict, onClose, onExplore }: EntityPanelProps): JSX.Element {
   const navigate = useAppNavigate();
   const entity = useContextEntity(engineId, name, kind);
   const view = entity.data;
@@ -88,7 +94,7 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, sources, 
     <Box component="aside" aria-label={`Entity ${name}`} sx={panelSx(true)}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Stack direction="row" alignItems="baseline" flexWrap="wrap" columnGap={1} sx={{ minWidth: 0 }}>
-          <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, alignSelf: 'center' }} />
+          <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: kindColor ?? 'primary.main', flexShrink: 0, alignSelf: 'center' }} />
           <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>
             {name}
           </Typography>
@@ -201,6 +207,52 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, sources, 
                         <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
                           “{fact.text}”
                         </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          )}
+
+          {conflicts.length > 0 && (
+            <Box>
+              <Typography sx={panelLabelSx}>Conflicts</Typography>
+              <Stack component="ul" gap={0.75} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
+                {conflicts.map((c) => {
+                  const body = (
+                    <>
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        “{c.first}”
+                      </Box>{' '}
+                      <Box component="span" sx={mutedSx}>
+                        disagrees with
+                      </Box>{' '}
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        “{c.second}”
+                      </Box>
+                      {c.confidence !== null && (
+                        <Box component="span" sx={mutedSx}>
+                          {' '}
+                          · {Math.round(c.confidence * 100)}% sure
+                        </Box>
+                      )}
+                      {c.reason && (
+                        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                          {c.reason}
+                        </Typography>
+                      )}
+                    </>
+                  );
+                  return (
+                    <Box component="li" key={c.index} sx={{ fontSize: 13, lineHeight: 1.5 }}>
+                      {/* With a handler, the conflict can be selected on the canvas, where both of its sides light up. */}
+                      {onSelectConflict ? (
+                        <ButtonBase onClick={() => onSelectConflict(c.index)} sx={{ ...selectRowSx, '&:hover': { borderColor: 'error.main' } }} aria-label="Show this conflict on the graph">
+                          {body}
+                        </ButtonBase>
+                      ) : (
+                        body
                       )}
                     </Box>
                   );

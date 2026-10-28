@@ -21,13 +21,14 @@ import { ArrowRight, Search, Waypoints, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useContextGraph } from '../../../hooks/useContextEngine';
 import { useAskedQuestions } from '../../../hooks/contextQuestions';
-import { cosmosBuffers, exploreModel, KEY_DEGREE, labelled, litLinkColors, neighbourhood, relationTags, searchNodes, shortLabel, type ExploreDetail, type ExploreFilter, type LinkTag } from '../../../utils/contextGraph';
+import { conflictLink, conflictsOn, cosmosBuffers, entityConflicts, exploreModel, kindSlots, labelled, linkIndex, linkKey, linkSelection, litLinkColors, neighbourhood, relationLink, relationOf, relationTags, sameRelation, searchLabel, searchNodes, shortLabel, type ExploreFilter, type LinkTag, type Selection } from '../../../utils/contextGraph';
 import CosmosCanvas from './CosmosCanvas';
 import EntityPanel, { EntityChip } from './EntityPanel';
+import { ConflictPanel, RelationPanel, type ConflictView, type LinkEnd, type LinkRecord, type RelationView } from './LinkPanel';
 import { useGraphTheme } from './graphTheme';
 import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, nodeLabelSx, panelLabelSx, panelSx } from './graphStyles';
 import { mutedSx } from '../styles';
-import type { ContextEngineDetail } from '../../../types/contextEngine';
+import type { ContextEngineDetail, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
 
 /** Entities the overview asks the engine for; the most mentioned come first. */
 export const GRAPH_ENTITY_LIMIT = 200;
@@ -45,27 +46,34 @@ interface GraphExplorerProps {
 }
 
 /**
- * The Graph tab's explore view: the entities the engine's records name, the
- * records naming them and their relationships, drawn by the force simulation.
- * Search, kind and source filters narrow it; clicking a node lights its
- * neighbourhood and opens it in the inspector. Everything shown passed the
- * engine's access check for this reader.
+ * The Graph tab's explore view: every entity the engine's records name, the
+ * records naming them and their relationships, drawn by the force simulation
+ * with each document's entities grouped around it. Search, kind and source
+ * filters narrow it; clicking a node lights its neighbourhood and opens it in
+ * the inspector, and clicking the label on a line selects that relationship,
+ * or, on a "contradicts" label, the whole conflict. Everything shown passed
+ * the engine's access check for this reader.
  */
 export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain, onSelectKey }: GraphExplorerProps): JSX.Element {
   const { colors, palette } = useGraphTheme();
   const graph = useContextGraph(engine.id, GRAPH_ENTITY_LIMIT);
-  const [filter, setFilter] = useState<ExploreFilter>({ records: true, entities: true, detail: 'key' });
+  const [filter, setFilter] = useState<ExploreFilter>({ records: true, entities: true, detail: 'all' });
   const [selectedKey, setSelectedKey] = useState<string | null>(initialKey);
   const [hovered, setHovered] = useState<number | null>(null);
   const sourcesById = useMemo(() => new Map(engine.sources.map((s) => [s.id, s])), [engine.sources]);
   const data = graph.data ?? null;
   const model = useMemo(() => (data ? exploreModel(data, filter) : null), [data, filter]);
-  const buffers = useMemo(() => (model ? cosmosBuffers(model, palette) : null), [model, palette]);
-  const selectedIndex = selectedKey && model ? (model.index.get(selectedKey) ?? null) : null;
-  const selection = useMemo(() => (model && selectedIndex !== null ? neighbourhood(model, selectedIndex) : null), [model, selectedIndex]);
+  // The kinds with a colour of their own, from the whole graph served, so a kind keeps its colour whatever the filters show.
+  const slots = useMemo(() => (data ? kindSlots(data) : new Map<string, number>()), [data]);
+  const buffers = useMemo(() => (model ? cosmosBuffers(model, palette, { slots }) : null), [model, palette, slots]);
+  // The key names a link, when it is one the model draws, or else a node.
+  const selectedLink = selectedKey && model ? linkIndex(model, selectedKey) : undefined;
+  const selectedIndex = selectedKey && model && selectedLink === undefined ? (model.index.get(selectedKey) ?? null) : null;
+  const picked = useMemo(() => (model && data && selectedLink !== undefined ? linkSelection(model, data, selectedLink) : null), [model, data, selectedLink]);
+  const selection = useMemo<Selection | null>(() => picked ?? (model && selectedIndex !== null ? neighbourhood(model, selectedIndex) : null), [picked, model, selectedIndex]);
   const linkColors = useMemo(() => (model && selection ? litLinkColors(model, palette, selection, palette.lit) : null), [model, palette, selection]);
-  // The selected node's relationships, written on their links.
-  const linkTags = useMemo(() => (model && selection ? relationTags(model, selection) : NO_TAGS), [model, selection]);
+  // The selected link's label, or a selected node's relationships, written on their links.
+  const linkTags = useMemo(() => (picked ? picked.tags : model && selection ? relationTags(model, selection) : NO_TAGS), [picked, model, selection]);
   const answered = useAskedQuestions(engine.id).filter((q) => q.mode === 'answer' && q.outcome === 'answered');
   const [explain, setExplain] = useState('');
 
@@ -76,6 +84,13 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
 
   const select = (index: number | null) => {
     const key = index === null || !model ? null : model.nodes[index].key;
+    setSelectedKey(key);
+    onSelectKey(key);
+  };
+  // A relationship or a conflict line; a document line has no key and stays as it is.
+  const selectLink = (link: number) => {
+    const key = model ? linkKey(model, link) : undefined;
+    if (!key) return;
     setSelectedKey(key);
     onSelectKey(key);
   };
@@ -114,6 +129,33 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
   const counts = { records: data.records.length, entities: data.entities.length };
   const drawn = { entities: model.nodes.filter((n) => n.kind === 'entity').length, relations: model.links.filter((l) => l.kind === 'relates').length };
   const sourceIds = [...new Set(data.records.map((r) => r.sourceId))];
+  // The legend: the kinds with a colour, in slot order, and a neutral entry when a drawn entity has another kind or none.
+  const kindColor = (kind?: string): string | undefined => (kind !== undefined && slots.has(kind) ? colors.kinds[slots.get(kind) as number] : undefined);
+  const kindLegend = [...slots.entries()].sort((a, b) => a[1] - b[1]).map(([kind, slot]) => ({ kind, label: kind.charAt(0).toUpperCase() + kind.slice(1), color: colors.kinds[slot] ?? colors.entity }));
+  const otherEntities = model.nodes.some((n) => n.kind === 'entity' && kindColor(n.entityKind) === undefined);
+  const selectedEntity = selected?.kind === 'entity' ? data.entities.find((e) => e.id === selected.key) : undefined;
+  // The selected link, as the panels show it: its relationship from the graph served, or the conflicts on its line.
+  const pickedLink = selectedLink !== undefined ? model.links[selectedLink] : null;
+  const pickedRelation: ContextGraphRelation | undefined =
+    pickedLink?.kind === 'relates' && selectedLink !== undefined ? (relationOf(model, data, selectedLink) ?? { subjectId: model.nodes[pickedLink.source].key, relation: pickedLink.label ?? '', objectId: model.nodes[pickedLink.target].key, recordNodeIds: [] }) : undefined;
+  const end = (id: string): LinkEnd => {
+    const entity = data.entities.find((e) => e.id === id);
+    return entity ? { name: entity.name, ...(entity.kind ? { kind: entity.kind } : {}) } : { name: id };
+  };
+  const recordView = (id: string): LinkRecord => {
+    const record = data.records.find((r) => r.id === id);
+    return { id, label: record?.recordId ?? id, sourceName: record ? sourcesById.get(record.sourceId)?.name : undefined, drawn: model.index.has(id) };
+  };
+  const relationView = (relation: ContextGraphRelation): RelationView => ({ relation, subject: end(relation.subjectId), object: end(relation.objectId), records: relation.recordNodeIds.map(recordView), drawn: relationLink(model, relation) !== undefined });
+  const conflictView = ({ index, conflict }: { index: number; conflict: ContextGraphConflict }): ConflictView => ({ index, first: relationView(conflict.first), second: relationView(conflict.second), reason: conflict.reason, confidence: conflict.confidence });
+  const selectRelation = (relation: ContextGraphRelation) => {
+    const at = relationLink(model, relation);
+    if (at !== undefined) selectLink(at);
+  };
+  const selectConflict = (index: number) => {
+    const at = data.conflicts[index] ? conflictLink(model, data.conflicts[index]) : undefined;
+    if (at !== undefined) selectLink(at);
+  };
 
   return (
     <Box>
@@ -124,8 +166,19 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
             sx={{ width: 300 }}
             options={model.nodes.map((_, i) => i)}
             filterOptions={(_options, state) => searchNodes(model, state.inputValue, 10)}
-            getOptionLabel={(i) => model.nodes[i]?.label ?? ''}
+            // An entity is listed with its kind in brackets, so two of one name can be told apart.
+            getOptionLabel={(i) => (model.nodes[i] ? searchLabel(model.nodes[i]) : '')}
             groupBy={(i) => (model.nodes[i]?.kind === 'entity' ? 'Entities' : 'Documents')}
+            renderOption={(props, i) => {
+              const { key, ...rest } = props as typeof props & { key?: string };
+              const node = model.nodes[i];
+              return (
+                <li key={key ?? node.key} {...rest}>
+                  <Box aria-hidden sx={{ ...legendDotSx(node.kind === 'entity' ? (kindColor(node.entityKind) ?? colors.entity) : colors.record, node.kind === 'record'), mr: 1 }} />
+                  {searchLabel(node)}
+                </li>
+              );
+            }}
             onChange={(_e, i) => {
               if (i !== null && i !== undefined) select(i);
             }}
@@ -138,18 +191,6 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
             <KindToggle label="Documents" count={counts.records} on={filter.records} dot={legendDotSx(colors.record, true)} onClick={() => setFilter((f) => ({ ...f, records: !f.records }))} />
             <KindToggle label="Entities" count={drawn.entities} on={filter.entities} dot={legendDotSx(colors.entity)} onClick={() => setFilter((f) => ({ ...f, entities: !f.entities }))} />
           </Stack>
-          <TextField
-            select
-            size="small"
-            label="Detail"
-            value={filter.detail}
-            onChange={(e) => setFilter((f) => ({ ...f, detail: e.target.value as ExploreDetail }))}
-            sx={{ minWidth: 150 }}
-            helperText={null}
-            slotProps={{ htmlInput: { 'aria-label': 'Detail' } }}>
-            <MenuItem value="key">Key entities</MenuItem>
-            <MenuItem value="all">All entities</MenuItem>
-          </TextField>
           {sourceIds.length > 1 && (
             <TextField select size="small" label="Source" value={filter.sourceId ?? ''} onChange={(e) => setFilter((f) => ({ ...f, sourceId: e.target.value || undefined }))} sx={{ minWidth: 180 }}>
               <MenuItem value="">All sources</MenuItem>
@@ -164,7 +205,6 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
         <Typography variant="caption" sx={mutedSx}>
           Built while indexing · {drawn.entities} of {counts.entities}
           {data.truncated ? '+' : ''} entities · {drawn.relations} relationships
-          {filter.detail === 'key' && filter.entities ? ` · key entities are named more than once or linked ${KEY_DEGREE}+ ways` : ''}
         </Typography>
       </Stack>
 
@@ -187,6 +227,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
             );
           }}
           onSelect={select}
+          onSelectLink={selectLink}
           onHover={setHovered}
           accent={colors.accent}
           height={GRAPH_HEIGHT}
@@ -203,24 +244,60 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
               <Box sx={legendDotSx(colors.record, true)} />
               Document
             </Stack>
-            <Stack direction="row" alignItems="center" gap={0.75}>
-              <Box sx={legendDotSx(colors.entity)} />
-              Entity
-            </Stack>
-            <span>Drag to pan · scroll to zoom · click a node</span>
+            {kindLegend.map(({ kind, label, color }) => (
+              <Stack key={kind} direction="row" alignItems="center" gap={0.75}>
+                <Box sx={legendDotSx(color)} />
+                {label}
+              </Stack>
+            ))}
+            {(otherEntities || kindLegend.length === 0) && (
+              <Stack direction="row" alignItems="center" gap={0.75}>
+                <Box sx={legendDotSx(colors.entity)} />
+                {kindLegend.length ? 'Other entities' : 'Entity'}
+              </Stack>
+            )}
+            {data.conflicts.length > 0 && (
+              <Stack direction="row" alignItems="center" gap={0.75}>
+                <Box aria-hidden sx={{ width: 14, height: 3, borderRadius: 1, bgcolor: colors.conflict, flexShrink: 0 }} />
+                Conflict
+              </Stack>
+            )}
+            <span>Drag to pan · scroll to zoom · click a node or a label</span>
           </Box>
         </CosmosCanvas>
 
         <Stack gap={1.75}>
-          {selected?.kind === 'entity' ? (
+          {pickedLink?.kind === 'conflicts' && selectedLink !== undefined ? (
+            <ConflictPanel engineId={engine.id} orgHandle={orgHandle} conflicts={conflictsOn(model, data, selectedLink).map(conflictView)} onSelectEntity={selectEntityByName} onSelectRelation={selectRelation} onClose={() => select(null)} />
+          ) : pickedRelation ? (
+            <RelationPanel
+              engineId={engine.id}
+              orgHandle={orgHandle}
+              view={relationView(pickedRelation)}
+              conflicts={data.conflicts
+                .map((conflict, index) => ({ index, conflict }))
+                .filter(({ conflict }) => sameRelation(conflict.first, pickedRelation) || sameRelation(conflict.second, pickedRelation))
+                .map(conflictView)}
+              onSelectEntity={selectEntityByName}
+              onSelectRecord={(id) => {
+                const at = model.index.get(id);
+                if (at !== undefined) select(at);
+              }}
+              onSelectConflict={selectConflict}
+              onClose={() => select(null)}
+            />
+          ) : selected?.kind === 'entity' ? (
             <EntityPanel
               engineId={engine.id}
               orgHandle={orgHandle}
               name={selected.label}
               // The node is one entity of this name; its kind picks that one on the engine.
-              kind={data.entities.find((e) => e.id === selected.key)?.kind}
+              kind={selectedEntity?.kind}
+              kindColor={kindColor(selectedEntity?.kind)}
+              conflicts={entityConflicts(data, selected.key)}
               sources={engine.sources}
               onSelectEntity={selectEntityByName}
+              onSelectConflict={selectConflict}
               onClose={() => select(null)}
             />
           ) : selected?.kind === 'record' ? (
@@ -242,7 +319,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
                 Click a node
               </Typography>
               <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.55 }}>
-                Documents are the items your sources delivered. Entities are what the language model found in them while building the graph, and the lines between entities are the relationships it found. You see only what you may read.
+                Documents are the items your sources delivered. Entities are what the language model found in them while building the graph, and the lines between entities are the relationships it found. Click the label on a line to see that relationship; a red “contradicts” label is a conflict between two of them. You see only what you may read.
               </Typography>
               <Box component="dl" sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 2, rowGap: 0.5, m: 0, fontSize: 13 }}>
                 <Box component="dt" sx={mutedSx}>

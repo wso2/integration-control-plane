@@ -75,6 +75,7 @@ import type {
   ContextFact,
   ContextGraph,
   ContextGraphEntity,
+  ContextGraphRelation,
   ContextQueryMode,
   ContextQueryTrace,
 } from '../../types/contextEngine';
@@ -148,6 +149,7 @@ interface RawQueryResponse {
   answerWithheld?: boolean;
   evidence?: RawEvidence[];
   facts?: RawFact[];
+  conflicts?: { first: RawFact; second: RawFact; reason?: string; confidence?: number | null }[];
   insufficientEvidence?: boolean;
   traceId: string;
 }
@@ -169,11 +171,20 @@ interface RawQueryTrace {
   createdAt: string;
 }
 
+interface RawGraphRelation {
+  subject: string;
+  relation: string;
+  object: string;
+  records?: string[];
+  text?: string;
+}
+
 interface RawGraph {
   entities?: { id: string; name: string; kind?: string; mentions?: number }[];
   records?: { id: string; sourceId: string; recordId: string }[];
   mentions?: { entity: string; record: string; chunks?: number }[];
-  relations?: { subject: string; relation: string; object: string; records?: string[]; text?: string }[];
+  relations?: RawGraphRelation[];
+  conflicts?: { first: RawGraphRelation; second: RawGraphRelation; reason?: string; confidence?: number | null }[];
   truncated?: boolean;
 }
 
@@ -368,6 +379,7 @@ const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
   answerWithheld: raw.answerWithheld ?? false,
   evidence: (raw.evidence ?? []).map(toEvidence),
   facts: (raw.facts ?? []).map(toFact),
+  conflicts: (raw.conflicts ?? []).map((c) => ({ first: toFact(c.first), second: toFact(c.second), reason: c.reason ?? '', confidence: typeof c.confidence === 'number' ? c.confidence : null })),
   insufficientEvidence: raw.insufficientEvidence ?? raw.state === 'insufficient_evidence',
   traceId: raw.traceId,
 });
@@ -391,11 +403,15 @@ const toTrace = (raw: RawQueryTrace): ContextQueryTrace => ({
 
 const toGraphEntity = (raw: NonNullable<RawGraph['entities']>[number]): ContextGraphEntity => ({ id: raw.id, name: raw.name, ...(raw.kind ? { kind: raw.kind } : {}), mentions: raw.mentions ?? 0 });
 
+const toGraphRelation = (r: RawGraphRelation): ContextGraphRelation => ({ subjectId: r.subject, relation: r.relation, objectId: r.object, recordNodeIds: r.records ?? [], ...(r.text ? { text: r.text } : {}) });
+
 const toGraph = (raw: RawGraph): ContextGraph => ({
   entities: (raw.entities ?? []).map(toGraphEntity),
   records: (raw.records ?? []).map((r) => ({ id: r.id, sourceId: r.sourceId, recordId: r.recordId })),
   mentions: (raw.mentions ?? []).map((m) => ({ entityId: m.entity, recordNodeId: m.record, chunks: m.chunks ?? 1 })),
-  relations: (raw.relations ?? []).map((r) => ({ subjectId: r.subject, relation: r.relation, objectId: r.object, recordNodeIds: r.records ?? [], ...(r.text ? { text: r.text } : {}) })),
+  relations: (raw.relations ?? []).map(toGraphRelation),
+  // An engine without the contradiction check in its graph answers no conflicts at all.
+  conflicts: (raw.conflicts ?? []).map((c) => ({ first: toGraphRelation(c.first), second: toGraphRelation(c.second), reason: c.reason ?? '', confidence: typeof c.confidence === 'number' ? c.confidence : null })),
   truncated: raw.truncated ?? false,
 });
 

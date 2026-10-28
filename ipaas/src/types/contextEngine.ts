@@ -610,8 +610,18 @@ export interface ContextQueryResult {
   evidence: ContextEvidence[];
   /** Graph mode only: relationships that stand on `evidence`; empty in chunks mode. */
   facts: ContextFact[];
+  /** Graph mode only: pairs of facts the engine's contradiction check flagged among the passages, each side standing on `evidence`. */
+  conflicts: ContextQueryConflict[];
   insufficientEvidence: boolean;
   traceId: string;
+}
+
+/** Two facts of a query that cannot both be true, with the check's reason and its confidence from 0 to 1. */
+export interface ContextQueryConflict {
+  first: ContextFact;
+  second: ContextFact;
+  reason: string;
+  confidence: number | null;
 }
 
 /**
@@ -670,12 +680,26 @@ export interface ContextGraphRelation {
   text?: string;
 }
 
+/**
+ * Two relationships of the graph that the engine's contradiction check says cannot both be
+ * true, with the check's reason and its confidence from 0 to 1. Each side names only records
+ * the reader may read; the engine lists a conflict only when each side kept one.
+ */
+export interface ContextGraphConflict {
+  first: ContextGraphRelation;
+  second: ContextGraphRelation;
+  reason: string;
+  confidence: number | null;
+}
+
 /** The part of the engine's graph the reader may see. */
 export interface ContextGraph {
   entities: ContextGraphEntity[];
   records: ContextGraphRecord[];
   mentions: ContextGraphMention[];
   relations: ContextGraphRelation[];
+  /** Pairs of `relations` the contradiction check flagged. */
+  conflicts: ContextGraphConflict[];
   /** Less-mentioned entities were left out to keep within the limit. */
   truncated: boolean;
 }
