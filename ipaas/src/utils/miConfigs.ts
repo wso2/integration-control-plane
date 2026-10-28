@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { EnvGroup, MiConfig, MiConfigDraft, MiConfigSavePlan } from '../types/envGroups';
+import type { EnvGroup, MiConfig, MiConfigDraft, MiConfigEntry, MiConfigSavePlan } from '../types/envGroups';
 import { validateConfigKey } from './devopsConfigs';
 
 /**
@@ -47,6 +47,12 @@ export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, stri
     .sort();
   return { envVars, secrets };
 }
+
+/** The editor's rows as a draft, keys trimmed. */
+export const toMiConfigDraft = (envVars: MiConfigEntry[], secrets: MiConfigEntry[]): MiConfigDraft => ({
+  envVars: envVars.map(({ key, value }) => ({ key: key.trim(), value })),
+  secrets: secrets.map(({ key, value }) => ({ key: key.trim(), value })),
+});
 
 /** Number of variables plus secrets — the deploy card's "Configurables" count. */
 export const miConfigCount = (config: MiConfig): number => config.envVars.length + config.secrets.length;
@@ -126,5 +132,37 @@ export async function applyMiConfigSavePlan(plan: MiConfigSavePlan, writer: EnvG
       throw new Error(`${reason} Some changes were saved before this failed. Save again to apply the rest.`, { cause: err });
     }
     applied++;
+  }
+}
+
+/** The calls a promotion that carries MI configuration makes; `usePromoteMi` binds them to the BFF. */
+export interface MiPromoteSteps {
+  promote: () => Promise<void>;
+  /** The target's MI configuration, read once the promotion has created its ReleaseBinding. */
+  readTarget: () => Promise<MiConfig>;
+  writer: EnvGroupWriter;
+}
+
+/** The promotion went through, but the configuration was not all written to the target. */
+export class MiPromoteConfigError extends Error {}
+
+/**
+ * Promotes, then writes `draft` to the target environment. The env groups live on
+ * the target's ReleaseBinding, which the promotion creates, so the writes can only
+ * follow it: the integration starts in the target without its configuration and
+ * rolls out again once it is written.
+ *
+ * The plan is made against what the target holds after the promotion, so leftovers
+ * from an earlier deployment there are replaced. With `promoted`, a retry after a
+ * MiPromoteConfigError skips the promotion and writes the configuration again.
+ */
+export async function promoteWithMiConfig(draft: MiConfigDraft, steps: MiPromoteSteps, promoted = false): Promise<void> {
+  if (!promoted) await steps.promote();
+  try {
+    const plan = planMiConfigSave(await steps.readTarget(), draft);
+    if (!isEmptyMiConfigSavePlan(plan)) await applyMiConfigSavePlan(plan, steps.writer);
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : 'Failed to save the configurations.';
+    throw new MiPromoteConfigError(`The integration was promoted, but its configurations were not all saved: ${reason}`, { cause: err });
   }
 }

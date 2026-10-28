@@ -18,16 +18,22 @@
 
 import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { ArrowDown } from '@wso2/oxygen-ui-icons-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useComponentDeployment } from '../../hooks/useDeployments';
 import { usePromote } from '../../hooks/useDeployments';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
+import type { PromoteInput } from '../../types/deployment';
+import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
 import Authorized from '../Authorized';
 import { Permissions } from '../../constants/permissions';
+import MiPromoteDrawer from './MiPromoteDrawer';
 
 interface PromoteButtonProps {
   orgHandler: string;
+  projectId: string;
   componentId: string;
+  /** The integration's display type: an MI integration copies its configuration on a first promotion. */
+  displayType: string | undefined;
   versionId: string;
   deploymentPipelineId: string;
   sourceEnvId: string;
@@ -37,11 +43,12 @@ interface PromoteButtonProps {
   onPromoteSettled?: () => void;
 }
 
-export default function PromoteButton({ orgHandler, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled }: PromoteButtonProps) {
+export default function PromoteButton({ orgHandler, projectId, componentId, displayType, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
+  const [miPromoteOpen, setMiPromoteOpen] = useState(false);
 
   const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
@@ -50,22 +57,28 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
 
   const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted;
+  // MI configuration lives per environment; until the target has a deployment it has none,
+  // so the first promotion copies it from the source (MiPromoteDrawer).
+  const copiesMiConfig = runtimeFromDisplayType(displayType ?? '') === 'mi' && !targetDeployment?.releaseId;
+
+  const promoteInput = (releaseId: string): PromoteInput => ({
+    componentId,
+    apiVersionId: versionId,
+    sourceReleaseId: releaseId,
+    // The BFF validates this source→target hop against the pipeline's promotion paths.
+    sourceEnvironmentId: sourceEnvId,
+    targetEnvironmentId: targetEnvId,
+    deploymentPipelineId,
+  });
 
   const handlePromote = () => {
     if (!canPromote || !sourceReleaseId) return;
+    if (copiesMiConfig) {
+      setMiPromoteOpen(true);
+      return;
+    }
     onPromoteStarted?.();
-    promote.mutate(
-      {
-        componentId,
-        apiVersionId: versionId,
-        sourceReleaseId,
-        // The BFF validates this source→target hop against the pipeline's promotion paths.
-        sourceEnvironmentId: sourceEnvId,
-        targetEnvironmentId: targetEnvId,
-        deploymentPipelineId,
-      },
-      { onSettled: onPromoteSettled },
-    );
+    promote.mutate(promoteInput(sourceReleaseId), { onSettled: onPromoteSettled });
   };
 
   const tooltipTitle = !buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : '';
@@ -79,6 +92,9 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
           </Button>
         </span>
       </Tooltip>
+      {sourceReleaseId && (
+        <MiPromoteDrawer open={miPromoteOpen} onClose={() => setMiPromoteOpen(false)} projectId={projectId} componentId={componentId} input={promoteInput(sourceReleaseId)} onPromoteStarted={onPromoteStarted} onPromoteSettled={onPromoteSettled} />
+      )}
     </Authorized>
   );
 }

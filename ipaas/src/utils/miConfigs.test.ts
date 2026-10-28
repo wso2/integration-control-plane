@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { EnvGroup, MiConfig } from '../types/envGroups';
-import { applyMiConfigSavePlan, type EnvGroupWriter, isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, miConfigCount, miSecretGroup, planMiConfigSave, toMiConfig, validateMiConfigDraft } from './miConfigs';
+import { applyMiConfigSavePlan, type EnvGroupWriter, isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, miConfigCount, MiPromoteConfigError, miSecretGroup, planMiConfigSave, promoteWithMiConfig, toMiConfig, toMiConfigDraft, validateMiConfigDraft } from './miConfigs';
 
 const group = (name: string, sensitive: boolean, keys: string[]): EnvGroup => ({ name, sensitive, keys, data: {} });
 
@@ -43,6 +43,12 @@ describe('toMiConfig', () => {
     // Prefix matches but the name is not miSecretGroup(key): multiple keys, or a key that differs.
     const groups = [group('mi-secret-db', true, ['DB_USER', 'DB_PASS']), group('mi-secret-OTHER', true, ['TOKEN']), group(miSecretGroup('API_KEY'), true, ['API_KEY'])];
     expect(toMiConfig(groups, {}).secrets).toEqual(['API_KEY']);
+  });
+});
+
+describe('toMiConfigDraft', () => {
+  it('trims keys and keeps values as typed', () => {
+    expect(toMiConfigDraft([{ key: ' HOST ', value: ' a ' }], [{ key: 'TOKEN ', value: 's' }])).toEqual({ envVars: [{ key: 'HOST', value: ' a ' }], secrets: [{ key: 'TOKEN', value: 's' }] });
   });
 });
 
@@ -170,5 +176,76 @@ describe('applyMiConfigSavePlan', () => {
     const { calls, writer } = recorder(MI_ENV_VARS_GROUP);
     await expect(applyMiConfigSavePlan({ envVars: { A: '1' }, secretsToPut: [{ key: 'S', value: 'v' }], secretsToDelete: ['OLD'] }, writer)).rejects.toThrow('Cannot write mi-env-vars. Some changes were saved before this failed. Save again to apply the rest.');
     expect(calls).toEqual([`delete ${miSecretGroup('OLD')}`]);
+  });
+});
+
+describe('promoteWithMiConfig', () => {
+  const empty: MiConfig = { envVars: [], secrets: [] };
+  const draft = { envVars: [{ key: 'HOST', value: 'prod.example.com' }], secrets: [{ key: 'TOKEN', value: 'prod-token' }] };
+
+  // Records the promotion and each write in order; `failOn` makes the write to that group throw.
+  const steps = (target: MiConfig, failOn?: string) => {
+    const calls: string[] = [];
+    return {
+      calls,
+      steps: {
+        promote: async () => {
+          calls.push('promote');
+        },
+        readTarget: async () => {
+          calls.push('read target');
+          return target;
+        },
+        writer: {
+          put: async (name: string, _sensitive: boolean, data: Record<string, string>) => {
+            if (name === failOn) throw new Error(`Cannot write ${name}.`);
+            calls.push(`put ${name} ${JSON.stringify(data)}`);
+          },
+          remove: async (name: string) => {
+            calls.push(`delete ${name}`);
+          },
+        },
+      },
+    };
+  };
+
+  it('promotes, then writes the draft to the target', async () => {
+    const run = steps(empty);
+    await promoteWithMiConfig(draft, run.steps);
+    expect(run.calls).toEqual(['promote', 'read target', `put ${MI_ENV_VARS_GROUP} {"HOST":"prod.example.com"}`, `put ${miSecretGroup('TOKEN')} {"TOKEN":"prod-token"}`]);
+  });
+
+  it('only promotes when there is nothing to write', async () => {
+    const run = steps(empty);
+    await promoteWithMiConfig({ envVars: [], secrets: [] }, run.steps);
+    expect(run.calls).toEqual(['promote', 'read target']);
+  });
+
+  it('replaces what an earlier deployment left in the target', async () => {
+    const run = steps({ envVars: [{ key: 'OLD', value: 'x' }], secrets: ['STALE'] });
+    await promoteWithMiConfig(draft, run.steps);
+    expect(run.calls).toEqual(['promote', 'read target', `delete ${miSecretGroup('STALE')}`, `put ${MI_ENV_VARS_GROUP} {"HOST":"prod.example.com"}`, `put ${miSecretGroup('TOKEN')} {"TOKEN":"prod-token"}`]);
+  });
+
+  it('writes nothing when the promotion fails', async () => {
+    const run = steps(empty);
+    run.steps.promote = async () => {
+      throw new Error('Promotion not allowed.');
+    };
+    await expect(promoteWithMiConfig(draft, run.steps)).rejects.toThrow(/^Promotion not allowed\.$/);
+    expect(run.calls).toEqual([]);
+  });
+
+  it('says the integration was promoted when a write fails', async () => {
+    const run = steps(empty, miSecretGroup('TOKEN'));
+    const result = promoteWithMiConfig(draft, run.steps);
+    await expect(result).rejects.toBeInstanceOf(MiPromoteConfigError);
+    await expect(result).rejects.toThrow('The integration was promoted, but its configurations were not all saved: Cannot write mi-secret-TOKEN. Some changes were saved before this failed. Save again to apply the rest.');
+  });
+
+  it('skips the promotion on a retry', async () => {
+    const run = steps({ envVars: [{ key: 'HOST', value: 'prod.example.com' }], secrets: [] });
+    await promoteWithMiConfig(draft, run.steps, true);
+    expect(run.calls).toEqual(['read target', `put ${miSecretGroup('TOKEN')} {"TOKEN":"prod-token"}`]);
   });
 });
