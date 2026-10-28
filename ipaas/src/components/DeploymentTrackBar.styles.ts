@@ -38,39 +38,3 @@ export const barSx = {
   px: 8,
   minHeight: 48,
 } as const;
-
-export const trackLabelSx = {
-  fontSize: '0.8125rem',
-} as const;
-
-export const apiVersionChipSx = {
-  height: 20,
-  fontSize: '0.68rem',
-  fontWeight: 500,
-} as const;
-
-export const barCaptionSx = {
-  fontWeight: 500,
-  fontSize: '0.8125rem',
-} as const;
-
-export const tooltipAnchorSx = {
-  display: 'flex',
-  alignItems: 'center',
-  color: 'text.disabled',
-  cursor: 'help',
-} as const;
-
-export const menuActionsRowSx = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  px: 1.5,
-  py: 0.5,
-} as const;
-
-export const menuActionButtonSx = {
-  fontSize: '0.75rem',
-  textTransform: 'none',
-  px: 0.5,
-} as const;

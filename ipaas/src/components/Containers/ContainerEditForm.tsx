@@ -16,12 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Divider, FormControlLabel, Grid, Radio, RadioGroup, Slider, Stack, Switch, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Divider, FormControlLabel, Grid, Radio, RadioGroup, Slider, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState, type JSX } from 'react';
 import ResourceRangeSlider from '../common/ResourceRangeSlider';
-import StringArrayInput from '../common/StringArrayInput';
-import { IS_CLOUD } from '../../features';
 import { useUpdateContainer } from '../../hooks/useDevopsConfigs';
 import { CPU_MAX, CPU_MIN, CPU_STEP, MEMORY_MAX, MEMORY_MIN, MEMORY_STEP, MIN_GAP_CPU, MIN_GAP_MEMORY, containerToForm, formToWriteData } from '../../utils/containers';
 import { IMAGE_PULL_POLICY, type ImagePullPolicy, type ReleaseContainer } from '../../types/devopsConfigs';
@@ -71,20 +69,6 @@ export default function ContainerEditForm({ container, projectId, componentId, r
         <Alert severity="info" sx={{ mb: 2 }}>
           Resource requests and limits can only be configured with an upgraded subscription or private data plane.
         </Alert>
-      )}
-
-      {/* Toggling limits on/off isn't supported for cloud; */}
-      {isPaidOrPdpUser && !IS_CLOUD && (
-        <FormControlLabel
-          labelPlacement="start"
-          sx={{ ml: 0, mb: 2 }}
-          control={<Switch checked={form.limitsEnabled} onChange={(e) => set('limitsEnabled', e.target.checked)} />}
-          label={
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mr: 1 }}>
-              {form.limitsEnabled ? 'Limits Enabled' : 'Limits Disabled'}
-            </Typography>
-          }
-        />
       )}
 
       <Grid container spacing={4} sx={{ mb: 1 }}>
@@ -145,17 +129,6 @@ export default function ContainerEditForm({ container, projectId, componentId, r
           </RadioGroup>
         </Grid>
       </Grid>
-
-      {/* Command/Args editing isn't supported for cloud */}
-      {!IS_CLOUD && (
-        <>
-          <Divider sx={{ my: 3 }} />
-          <Stack gap={3}>
-            <StringArrayInput label="Command" value={form.command} onChange={(v) => set('command', v)} addLabel="Add Command" />
-            <StringArrayInput label="Arguments" value={form.args} onChange={(v) => set('args', v)} addLabel="Add Arguments" />
-          </Stack>
-        </>
-      )}
 
       <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
         <Button variant="outlined" onClick={onClose} disabled={update.isPending}>

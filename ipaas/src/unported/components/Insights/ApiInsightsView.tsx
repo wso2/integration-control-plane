@@ -58,8 +58,7 @@ function errorReasonRows(byCategory: ErrorCategoryRow[]): { label: string; count
 /**
  * Integration-level insights for an "Integration as API" component. Matches
  * the source design's api view: KPI row + Overview/Traffic/Latency/Errors
- * tabs. Every widget is backed by a real, apiId-scoped query (see
- * `fetchApiInsights` in `api/wip/insights.ts`) — these are the queries
+ * tabs. Every widget is backed by a real, apiId-scoped query — these are the queries
  * `choreo-apim-analytics-portal` uses (the actual "filter by integration"
  * Devant's own Insights page provides), ported onto the same
  * `analyticsqueryapi` endpoint the project view already uses.

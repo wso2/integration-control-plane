@@ -293,9 +293,7 @@ export default function ComponentDocuments(scope: ComponentScope): JSX.Element {
     return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
   }
 
-  const trackBar = aggregatedTracks.length > 0 && (
-    <DeploymentTrackBar tracks={aggregatedTracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? ''} componentHandler={component.handler} versionView extra={endpointPicker} />
-  );
+  const trackBar = aggregatedTracks.length > 0 && <DeploymentTrackBar extra={endpointPicker} />;
 
   // ── Create / Edit view ────────────────────────────────────────────────────
   if (view === 'create' || view === 'edit') {

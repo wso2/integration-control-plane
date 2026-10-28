@@ -61,16 +61,14 @@ export interface EnvironmentTemplate {
   clusterId?: string;
   choreoEnv?: string;
   critical: boolean;
-  dnsPrefix?: string;
 }
 
 /** POST body for creating an org environment. `isProd` mirrors the "critical" flag. */
 export interface CreateEnvironmentData {
   name: string;
   dataplaneId: string;
-  dnsPrefix: string;
   isProd: boolean;
-  /** Cloud only — OpenChoreo stores it as an annotation; the devops API has no such field. */
+  /** OpenChoreo stores it as an annotation. */
   description?: string;
 }
 

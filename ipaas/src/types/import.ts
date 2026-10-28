@@ -18,7 +18,6 @@
 
 import type { ReactNode } from 'react';
 import type { GitProvider, WorkspaceIntegrationType } from './project';
-import type { GitProvider as CredentialProvider } from './credentials';
 
 export type { GitProvider as SourceMode } from './project';
 export type { WorkspaceIntegrationType as IntegrationType } from './project';
@@ -29,8 +28,6 @@ export interface LocationState {
   authCode?: string;
   authenticated?: boolean;
   mode?: GitProvider;
-  /** Non-GitHub credential-based provider chosen on the Create page (Bitbucket/GitLab/Azure). */
-  provider?: CredentialProvider;
 }
 
 export interface IntegrationTypeOption {

@@ -16,7 +16,6 @@
  * under the License.
  */
 
-import { useCallback, useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   changeLifecycleState,
@@ -38,7 +37,7 @@ import {
   saveMarketplaceService,
   updateApimApi,
   updateApimDocument,
-} from '#api/apim';
+} from '../api/apim';
 import type { ApimApiInfo, DeploySettingsV2Payload, GeneratedTestKey, LifecycleHistory, LifecycleState, MarketplaceService } from '../types/apim';
 import type { ApiDocument } from '../types/marketplace';
 import type { EnvEndpoint } from '../types/component';
@@ -147,47 +146,6 @@ export function useGenerateTestKey() {
   return useMutation<GeneratedTestKey | null, Error, { apimId: string; keyType: 'Development' | 'Production' }>({
     mutationFn: ({ apimId, keyType }) => generateTestKey(apimId, keyType),
   });
-}
-
-/**
- * Mints a test key for an APIM API and keeps it in state, refreshing when the
- * endpoint/environment changes or `regenerate()` is called. `critical` picks the
- * key tier (Production vs Development).
- */
-export function useGeneratedTestKey({ apimId, critical, enabled = true }: { apimId: string | null; critical: boolean; enabled?: boolean }) {
-  const generateKey = useGenerateTestKey();
-  const [token, setToken] = useState('');
-  const [isFetching, setIsFetching] = useState(false);
-  const [nonce, setNonce] = useState(0);
-  const regenerate = useCallback(() => setNonce((n) => n + 1), []);
-
-  useEffect(() => {
-    if (!apimId || !enabled) {
-      setToken('');
-      setIsFetching(false);
-      return undefined;
-    }
-    let cancelled = false;
-    setIsFetching(true);
-    generateKey
-      .mutateAsync({ apimId, keyType: critical ? 'Production' : 'Development' })
-      .then((r) => {
-        if (!cancelled) setToken(r?.apikey ?? '');
-      })
-      .catch(() => {
-        if (!cancelled) setToken('');
-      })
-      .finally(() => {
-        if (!cancelled) setIsFetching(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-    // generateKey is a stable mutation; apimId/critical/enabled/nonce drive identity
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apimId, critical, enabled, nonce]);
-
-  return { token, isFetching, regenerate };
 }
 
 export function useApimSwagger(apimId: string | undefined | null) {

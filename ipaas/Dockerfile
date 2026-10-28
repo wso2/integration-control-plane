@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# Multi-stage build for the ipaas console (PRODUCT=cloud variant).
+# Multi-stage build for the ipaas console.
 # Stage 1: build the React/Vite app with pnpm.
 # Stage 2: serve the static bundle with nginx on port 3000.
 
@@ -27,7 +27,7 @@ COPY . .
 
 # Cache mount for vite/swc transform output so incremental builds are faster.
 RUN --mount=type=cache,target=/app/node_modules/.vite \
-    pnpm build:cloud
+    pnpm build
 
 # ==========================================
 # Stage 2: Serve with nginx

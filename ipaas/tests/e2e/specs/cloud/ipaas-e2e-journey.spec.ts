@@ -11,8 +11,7 @@
  */
 
 import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
-import { getAuthContext } from '../../helpers/auth-context.js';
-import { authStatePath } from '../../helpers/product.js';
+import { AUTH_STATE_PATH, getAuthContext } from '../../helpers/auth-context.js';
 import { expectPageRendered } from '../../helpers/cloud-fixtures.js';
 import { newConsoleContext } from '../../helpers/session-storage.js';
 import { BUILD_TIMEOUT_MS, waitForBuildToSettle } from '../../helpers/build.js';
@@ -26,6 +25,8 @@ import {
   AGENT_REPO_URL,
   AGENT_TYPE,
   AUTOMATION,
+  AUTOMATION_REPO_URL,
+  AUTOMATION_SUB_PATH,
   CLOUD_SECTIONS,
   CONSUMER,
   DEPLOY_TIMEOUT_MS,
@@ -36,6 +37,9 @@ import {
   EXECUTIONS_TARGET,
   EXECUTIONS_WATCH_MS,
   FOOTER_LINKS,
+  MI_DEPLOY_TIMEOUT_MS,
+  MI_SAMPLE_TECHNOLOGY,
+  MI_TECHNOLOGY,
   NO_CONSUMERS,
   NO_SCHEDULE,
   PROBE_TIMEOUT_MS,
@@ -44,7 +48,7 @@ import {
   REDEPLOY_SETTLE_MS,
   REMOVAL_TIMEOUT_MS,
   SAMPLE,
-  WIP_ONLY_SECTIONS,
+  UNPORTED_SECTIONS,
 } from '../../helpers/journey-fixtures.js';
 import { activeProject, listFixtureProjects, STALE_AGE_MS, staleProjects, setActiveProject } from '../../helpers/journey-project.js';
 import { enterOrgHome, enterProject, enterProjectOrSkip, openProjectSettings, projectSettingsButton, reseedHere } from '../../helpers/journey-session.js';
@@ -100,9 +104,9 @@ let context: BrowserContext;
 let page: Page;
 
 test.beforeAll(async ({ browser }, testInfo) => {
-  orgHandler = getAuthContext(testInfo.project.name).orgHandler;
+  orgHandler = getAuthContext().orgHandler;
   context = await newConsoleContext(browser, {
-    storageState: authStatePath(testInfo.project.name),
+    storageState: AUTH_STATE_PATH,
     baseURL: testInfo.project.use.baseURL,
   });
   page = await context.newPage();
@@ -373,10 +377,11 @@ test.describe('03 browse samples @smoke', () => {
     await expect(page.getByPlaceholder('Search samples…')).toBeVisible();
   });
 
-  test('TC_IP_SMPL_004 shows the Type and Tags filter sections, and hides Technology', async () => {
-    await expect(page.getByRole('button', { name: 'Type', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Tags', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Technology', exact: true })).not.toBeVisible();
+  test('TC_IP_SMPL_004 shows the Type, Technology and Tags filter sections', async () => {
+    for (const section of ['Type', 'Technology', 'Tags']) {
+      await expect(page.getByRole('button', { name: section, exact: true })).toBeVisible();
+    }
+    await expect(page.getByRole('checkbox', { name: MI_SAMPLE_TECHNOLOGY, exact: true }), 'the Technology filter offers no MI samples').toBeVisible();
   });
 
   test('TC_IP_SMPL_005 a search with no matches shows the empty-result message', async () => {
@@ -616,7 +621,12 @@ test.describe('04c test console @smoke', () => {
   });
 });
 
-// 04d — the automation sample: schedule it, then watch it run
+// 04d — an MI automation imported from a public repository: schedule it, then watch it run
+
+async function stopSchedule(page: Page): Promise<void> {
+  await envCard(page).getByRole('button', { name: 'Stop Schedule' }).click();
+  await expect(envCard(page).getByRole('button', { name: 'Schedule', exact: true }), 'the schedule is still live').toBeVisible({ timeout: 2 * 60_000 });
+}
 
 test.describe('04d schedule an automation @smoke', () => {
   test.describe.configure({ mode: 'serial' });
@@ -631,23 +641,70 @@ test.describe('04d schedule an automation @smoke', () => {
     if (alreadyDeployed) await openIntegration(page, AUTOMATION);
   });
 
-  test('TC_IP_AUTO_001 the Samples tab lists Scheduled Logger as an Automation', async () => {
-    test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
-    await reachCreateControl(page, samplesTab(page));
-    await samplesTab(page).click();
-    await expect(page.getByText(AUTOMATION, { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByText('Automation', { exact: true }).first(), `${AUTOMATION} is not offered as an Automation`).toBeVisible();
+  // Serial mode skips TC_IP_AUTO_007 once an earlier test fails, and a live one-minute schedule would keep firing on the shared org.
+  test.afterAll(async () => {
+    await dismissStrayDialog(page);
+    if (!(await page.getByRole('heading', { name: AUTOMATION }).isVisible().catch(() => false))) {
+      await enterProject(page, orgHandler);
+      await waitForIntegrationsToLoad(page);
+      if (!(await isPresent(page, AUTOMATION))) return;
+      await openIntegration(page, AUTOMATION);
+    } else {
+      // Already on the overview, but the failed watch may have outlived its token, so reload it with a fresh one.
+      await reseedHere(page);
+    }
+
+    const schedule = envCard(page).getByRole('button', { name: 'Schedule', exact: true });
+    const stop = envCard(page).getByRole('button', { name: 'Stop Schedule' });
+    // isVisible() does not wait, and the card renders after the reload.
+    const rendered = await schedule
+      .or(stop)
+      .first()
+      .waitFor({ state: 'visible', timeout: 60_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (!rendered) return;
+    if (await stop.isVisible()) await stopSchedule(page);
   });
 
-  test('TC_IP_AUTO_002 Deploy provisions the automation and lands on its overview', async () => {
+  test('TC_IP_AUTO_001 the import form resolves the repository and its MI sub path', async () => {
+    test.setTimeout(3 * 60_000);
+    test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
+    const importButton = page.getByRole('button', { name: 'Import from a Public Repository' });
+    await reachCreateControl(page, importButton);
+    await importButton.click();
+    await expect(page.getByRole('heading', { name: 'Import an Integration' })).toBeVisible({ timeout: 30_000 });
+
+    await page.getByRole('textbox', { name: 'Repository URL' }).fill(AUTOMATION_REPO_URL);
+    await expect(page.getByRole('combobox', { name: /^Branch/ }), 'the repository did not resolve into a branch — GitHub public API rate limit is the usual cause').toContainText('main', { timeout: 60_000 });
+
+    await page.getByRole('textbox', { name: 'Repository Sub Path' }).click();
+    const picker = page.getByRole('dialog').filter({ hasText: 'Repository Sub Path' });
+    // Prefix match: an expanded folder's name would also carry its children's.
+    await picker.getByRole('treeitem', { name: new RegExp(`^${AUTOMATION_SUB_PATH}`) }).click();
+    await picker.getByRole('button', { name: 'Continue', exact: true }).click();
+
+    await expect(page.getByRole('textbox', { name: 'Repository Sub Path' })).toHaveValue(`/${AUTOMATION_SUB_PATH}`);
+    await expect(page.getByRole('textbox', { name: 'Integration Name' })).toHaveValue(AUTOMATION);
+  });
+
+  test('TC_IP_AUTO_002 WSO2 Integrator: MI is selected and importing provisions the automation', async () => {
     test.setTimeout(4 * 60_000);
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
-    await cardFor(page, AUTOMATION, 'Deploy').click();
-    await expect(page.getByRole('heading', { name: AUTOMATION })).toBeVisible({ timeout: 2 * 60_000 });
+
+    await expect(page.getByText(MI_TECHNOLOGY, { exact: true })).toBeVisible({ timeout: 60_000 });
+    await page.getByRole('button', { name: /^Automation/ }).click();
+
+    // The cards expose no selected state, so an enabled submit (it needs a technology) is the closest check that detection picked one.
+    const submit = page.getByRole('button', { name: 'Import Integration' });
+    await expect(submit, 'Import Integration stayed disabled — technology detection did not select WSO2 Integrator: MI').toBeEnabled({ timeout: 60_000 });
+    await submit.click();
+
+    await expect(page.getByRole('heading', { name: AUTOMATION }), 'the import did not land on the automation overview').toBeVisible({ timeout: 2 * 60_000 });
   });
 
   test('TC_IP_AUTO_003 the build completed and the automation offers Schedule and Test', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(BUILD_TIMEOUT_MS + MI_DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await requireAutomationReady(page);
   });
 
@@ -692,8 +749,7 @@ test.describe('04d schedule an automation @smoke', () => {
   });
 
   test('TC_IP_AUTO_007 the schedule is stopped again', async () => {
-    await envCard(page).getByRole('button', { name: 'Stop Schedule' }).click();
-    await expect(envCard(page).getByRole('button', { name: 'Schedule', exact: true }), 'the schedule is still live').toBeVisible({ timeout: 2 * 60_000 });
+    await stopSchedule(page);
   });
 });
 
@@ -1001,13 +1057,13 @@ test.describe('07 page availability @smoke', () => {
     });
   }
 
-  test('TC_IP_SET_004 organization settings offers no WIP-only section', async () => {
+  test('TC_IP_SET_004 organization settings offers no unported section', async () => {
     await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
     // Positive assertion first: these absences would pass on a blank page.
     await expect(page.getByText('Package Registries', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     // Org Details was removed from cloud settings, so it must not come back either.
     await expect(page.getByText('Org Details', { exact: true })).not.toBeVisible();
-    for (const section of WIP_ONLY_SECTIONS) {
+    for (const section of UNPORTED_SECTIONS) {
       await expect(page.getByText(section, { exact: true })).not.toBeVisible();
     }
   });

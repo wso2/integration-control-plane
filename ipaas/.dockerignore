@@ -25,10 +25,9 @@ npm-debug.log*
 pnpm-debug.log*
 
 # Docs not needed at runtime
-AGENTS.md
-HOUSE_RULES.md
+**/AGENTS.md
 README.md
-RUNTIME_CONFIG.md
+docs/
 
 # The Dockerfiles themselves don't need to be in the build context's COPY
 .dockerignore

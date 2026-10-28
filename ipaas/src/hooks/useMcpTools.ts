@@ -74,7 +74,7 @@ export function useMcpTools({ baseUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER,
       const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl.replace(/\/+$/, '')}/mcp?transportType=streamable-http`), {
         requestInit: { headers: apiKey ? { [authHeader]: apiKey } : {} },
       });
-      const client = new Client({ name: 'wip', version: '1.0.0' }, { capabilities: {} });
+      const client = new Client({ name: 'ipaas-console', version: '1.0.0' }, { capabilities: {} });
       try {
         await client.connect(transport);
         if (!client.getServerCapabilities()?.tools) throw new Error('MCP server does not support the tools capability');

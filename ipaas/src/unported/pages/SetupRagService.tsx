@@ -19,9 +19,9 @@
 import { Alert, Box, Button, CircularProgress, LinearProgress, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
-import { isRagIngestionEnabled, useCreateRagService } from '../../hooks/useRagIngestion';
+import { isRagIngestionEnabled, useCreateRagService } from '../hooks/useRagIngestion';
 import { useProjects } from '../../hooks/useProjects';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { blankAutomation } from '../../constants/ragIngestion';

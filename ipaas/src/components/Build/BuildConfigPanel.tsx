@@ -34,7 +34,7 @@ interface BuildConfigPanelProps {
 }
 
 export default function BuildConfigPanel({ repository, componentId, versionId, onClose, onNotify }: BuildConfigPanelProps) {
-  const { organizationApp, nameApp, branch, gitProvider, buildpackConfig, isBuildConfigurationMigrated } = repository;
+  const { organizationApp, nameApp, branch, gitProvider, buildpackConfig } = repository;
   const url = repoUrl(repository);
 
   const versionConfig = buildpackConfig?.find((c) => c.versionId === versionId) ?? buildpackConfig?.[0];
@@ -149,14 +149,14 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
             />
           </Stack>
 
-          {isBuildConfigurationMigrated && (
+          {versionConfig?.pullLatestSubmodules !== undefined && (
             <>
               <Divider />
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Stack gap={0.25}>
                   <Typography variant="body2">Pull Latest Submodules</Typography>
                   <Typography variant="caption" color="text.secondary">
-                    Pull the latest version of all git submodules during the build
+                    Update git submodules to the latest commit of their tracked branch instead of the commit the repository pins
                   </Typography>
                 </Stack>
                 <FormControlLabel

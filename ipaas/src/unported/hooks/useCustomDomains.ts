@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createUrlMapping, deleteUrlMapping, fetchComponentUrlMappings, fetchCustomDomains, updateUrlMapping } from '#api/customDomains';
+import { createUrlMapping, deleteUrlMapping, fetchComponentUrlMappings, fetchCustomDomains, updateUrlMapping } from '../../api/customDomains';
 import { urlSettingsEnabled } from '../../constants/componentSettingsSections';
 import type { CreateUrlMappingInput, CustomDomain, CustomDomainType, CustomUrlMapping } from '../../types/customDomain';
 

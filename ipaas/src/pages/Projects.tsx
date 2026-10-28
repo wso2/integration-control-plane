@@ -23,7 +23,7 @@ import SearchField from '../components/SearchField';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useEffect, useState, type JSX } from 'react';
-import { useProjectsByOrg } from '../hooks/useProjects';
+import { useProjects } from '../hooks/useProjects';
 import { useRemovalNotice } from '../hooks/useRemovalNotice';
 import type { Project } from '../types/project';
 import EmptyListing from '../components/EmptyListing';
@@ -88,7 +88,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const [alert, setAlert] = useState<string | null>(null);
   const { hasOrgPermission } = useAccessControl();
   const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
-  const { data: projects, isLoading, refetch } = useProjectsByOrg(scope.org);
+  const { data: projects, isLoading, refetch } = useProjects();
 
   useEffect(() => {
     const state = location.state as { projectDeleted?: boolean } | null;

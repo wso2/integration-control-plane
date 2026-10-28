@@ -39,7 +39,7 @@ interface PipelineAccordionCardProps {
  */
 export default function PipelineAccordionCard({ name, isDefault, tree, envTemplates, actions }: PipelineAccordionCardProps): ReactNode {
   return (
-    <Accordion defaultExpanded={isDefault} disableGutters sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', '&:before': { display: 'none' } }}>
+    <Accordion defaultExpanded disableGutters sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', '&:before': { display: 'none' } }}>
       <AccordionSummary expandIcon={<ChevronDown size={18} />} sx={{ bgcolor: 'action.hover' }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ width: '100%', pr: 1 }}>
           <Stack direction="row" alignItems="center" gap={1}>

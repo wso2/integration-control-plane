@@ -25,9 +25,10 @@ function messageOf(error: unknown): string {
 /**
  * HTTP status behind a rejected API call, or `NaN` when there is none.
  *
- * Cloud rejects with `BffError`, which carries a typed `status` — read that in
- * preference to the message. Wip's GraphQL client throws a plain `Error` whose
- * message starts `HTTP {status}: …`, so the text is the only signal there.
+ * The BFF client rejects with a `BffError`, which carries a typed `status` — read
+ * that in preference to the message. Plain fetches (prebuilt catalog, RAG retrieval)
+ * throw an `Error` whose message holds `HTTP {status}`, and some callers pass a bare
+ * string, so the text is the only signal there.
  */
 export function httpStatusOf(error: unknown): number {
   if (typeof error === 'object' && error !== null && 'status' in error) {
@@ -44,7 +45,7 @@ export function isNotFoundError(error: unknown): boolean {
 
 /**
  * The API layer has no implementation for this call — the `ni()` stubs in
- * `src/api/cloud/` throw `[cloud] domain.fn: not implemented`.
+ * `src/api/` throw `[cloud] domain.fn: not implemented`.
  * A feature absent from the product is not a failure, so callers should treat it
  * as "unavailable here" rather than showing an error.
  */

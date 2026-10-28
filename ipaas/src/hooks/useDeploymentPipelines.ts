@@ -27,7 +27,7 @@ import {
   setDefaultProjectDeploymentPipeline,
   updateDeploymentPipeline,
   updateProjectDeploymentPipelines,
-} from '#api/deploymentPipelines';
+} from '../api/deploymentPipelines';
 import type { CreateDeploymentPipelineRequest, DeploymentPipeline, EnvTemplate, PipelineDeletionEligibility } from '../types/deploymentPipeline';
 import { useOrgUuid } from './useOrgUuid';
 import { useOrgs } from './useOrg';

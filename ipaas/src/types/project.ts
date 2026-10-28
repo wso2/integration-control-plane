@@ -76,7 +76,6 @@ export interface CreateMonoRepoProjectInput extends CreateProjectInput {
   directoryPath: string;
   gitProvider: string;
   isPublicRepo: boolean;
-  secretRef?: string;
 }
 
 /** Link a git repository to an EXISTING project (Devant `createProjectRepository`). */
@@ -92,7 +91,6 @@ export interface LinkProjectRepositoryInput {
   gitProvider: string;
   directoryPath: string;
   isPublicRepo: boolean;
-  secretRef: string;
 }
 
 export type GitProvider = 'github' | 'public';

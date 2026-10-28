@@ -19,11 +19,9 @@
 import { Box, IconButton, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Building2, Check, Copy, Download, Folder, Globe } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useFetchComponentEndpointSpec } from '../../../hooks/useComponents';
 import type { EnvEndpoint } from '../../../types/component';
 import { trimEndpointName } from '../../../utils/endpoints';
 import { decodeBase64Spec, specFileType } from '../../../utils/openApiSpec';
-import { IS_CLOUD } from '../../../features';
 
 function CopyButton({ url }: { url: string }) {
   const [copied, setCopied] = useState(false);
@@ -94,8 +92,6 @@ interface EndpointUrlsPanelProps {
   endpoints: EnvEndpoint[];
   selectedIdx: number;
   onSelect: (idx: number) => void;
-  componentId: string;
-  deploymentTrackId: string;
   /**
    * For an externally-exposed endpoint managed on the API Platform gateway, the enforcing gateway
    * invoke URL for the currently selected endpoint. When set, the "Public" row shows this (labelled
@@ -110,8 +106,7 @@ interface EndpointUrlsPanelProps {
  * invoke URLs (with copy), and the API-spec download. Shared by the env-card
  * bodies of integration-as-api and ai-agent
  */
-export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, componentId, deploymentTrackId, externalUrlOverride }: EndpointUrlsPanelProps) {
-  const fetchSpecMutation = useFetchComponentEndpointSpec();
+export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, externalUrlOverride }: EndpointUrlsPanelProps) {
   // Clamp a stale/out-of-bounds selection (e.g. the endpoint list shrank) to a
   // valid index so the panel stays visible and the selector stays consistent,
   // instead of silently rendering nothing.
@@ -135,14 +130,13 @@ export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, co
   // Fallback to invokeUrl if no visibility-specific URL
   const fallbackUrl = urlRows.length === 0 ? ep.invokeUrl || '' : '';
 
-  // Cloud's spec endpoint is a stub that always answers null; the real document already
-  // arrives with the endpoint list, base64 in the apimRevisionId slot (see cloud/deployments.ts).
-  const inlineSpec = IS_CLOUD ? decodeBase64Spec(ep.apimRevisionId) : null;
-  const canDownload = IS_CLOUD ? !!inlineSpec : !!ep.id;
+  // The spec arrives with the endpoint list, base64 in the apimRevisionId slot (see api/deployments.ts).
+  const inlineSpec = decodeBase64Spec(ep.apimRevisionId);
+  const canDownload = !!inlineSpec;
 
   const handleDownload = async () => {
     try {
-      const content = inlineSpec ?? (ep.id ? await fetchSpecMutation.mutateAsync({ componentId, versionId: deploymentTrackId, endpointId: ep.id }) : null);
+      const content = inlineSpec;
       if (!content) return;
       const { extension, mimeType } = specFileType(content);
       const blob = new Blob([content], { type: mimeType });

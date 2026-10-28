@@ -22,11 +22,9 @@ import type { JSX } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Alert, Box, Typography } from '@wso2/oxygen-ui';
 import PageLoader from '../components/PageLoader';
-import { useAuth, getAndClearRedirectUrl } from '#auth';
-import { useFetchProjectsByOrgId } from '../hooks/useOrg';
-import { fetchProjects as fetchProjectsApi } from '#api/projects';
-import { loginUrl, projectHomeUrl, projectsRedirectUrl, registerOrgUrl } from '../paths';
-import { IS_CLOUD } from '../features';
+import { useAuth, getAndClearRedirectUrl } from '../auth';
+import { fetchProjects as fetchProjectsApi } from '../api/projects';
+import { loginUrl, projectHomeUrl, projectsRedirectUrl } from '../paths';
 
 export default function OIDCCallback(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -34,7 +32,6 @@ export default function OIDCCallback(): JSX.Element {
   const { completeSignIn } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const handledRef = useRef(false);
-  const fetchProjects = useFetchProjectsByOrgId();
 
   useEffect(() => {
     if (handledRef.current) return;
@@ -55,14 +52,8 @@ export default function OIDCCallback(): JSX.Element {
       }
 
       try {
-        const { isNewUser, userId } = await completeSignIn(searchParams);
-
-        if (isNewUser) {
-          // First-time user — no org yet; send to org registration. Cloud never
-          // reports one: Thunder provisions the org at sign-up.
-          navigate(registerOrgUrl(), { replace: true });
-          return;
-        }
+        // Thunder provisions the org at sign-up, so a signed-in session always carries one.
+        const { userId, orgHandle } = await completeSignIn(searchParams);
 
         // Determine where to navigate post-login
         const savedUrl = getAndClearRedirectUrl();
@@ -82,39 +73,30 @@ export default function OIDCCallback(): JSX.Element {
           // User was trying to access a specific page — go back there
           window.location.href = savedUrl;
         } else {
-          const rawOrgHandle = localStorage.getItem('org_handle');
-          // 'default' is a placeholder — never treat it as a real org handle
-          const orgHandle = rawOrgHandle && rawOrgHandle !== 'default' ? rawOrgHandle : null;
-
           // Try to navigate to the last visited project (for existing users)
           let navigatedToLastProject = false;
           try {
-            if (orgHandle) {
-              // 1. Try the last-visited project stored by AppLayout
-              const lastProjectRaw = localStorage.getItem(`last_project:${userId}`);
-              if (lastProjectRaw) {
-                const { org, project } = JSON.parse(lastProjectRaw) as { org: string; project: string };
-                if (org === orgHandle && project) {
-                  // Mark ToS accepted — this user has already been through onboarding
-                  localStorage.setItem(`tos_accepted:${userId}:${orgHandle}`, 'true');
-                  navigate(projectHomeUrl(orgHandle, project), { replace: true });
-                  navigatedToLastProject = true;
-                }
+            // 1. Try the last-visited project stored by AppLayout
+            const lastProjectRaw = localStorage.getItem(`last_project:${userId}`);
+            if (lastProjectRaw) {
+              const { org, project } = JSON.parse(lastProjectRaw) as { org: string; project: string };
+              if (org === orgHandle && project) {
+                // Mark ToS accepted — this user has already been through onboarding
+                localStorage.setItem(`tos_accepted:${userId}:${orgHandle}`, 'true');
+                navigate(projectHomeUrl(orgHandle, project), { replace: true });
+                navigatedToLastProject = true;
               }
+            }
 
-              // 2. No stored last project — fetch from API and use the most recently updated one.
-              // In cloud the numericId concept doesn't exist (Thunder doesn't issue one); fall
-              // back to the JWT-scoped fetchProjects which ignores the orgId argument.
-              if (!navigatedToLastProject) {
-                const numericId = window.API_CONFIG.asgardeoOrgNumericId ?? parseInt(localStorage.getItem('org_numeric_id') ?? '0', 10);
-                const projects = IS_CLOUD ? (await fetchProjectsApi(0)).filter((p) => p.handler) : numericId > 0 ? (await fetchProjects(numericId)).filter((p) => p.handler) : [];
-                if (projects.length > 0) {
-                  const recent = projects.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
-                  // Mark ToS accepted — this user already has projects, they've been through onboarding
-                  localStorage.setItem(`tos_accepted:${userId}:${orgHandle}`, 'true');
-                  navigate(projectHomeUrl(orgHandle, recent.handler), { replace: true });
-                  navigatedToLastProject = true;
-                }
+            // 2. No stored last project — fetch from API and use the most recently updated one.
+            if (!navigatedToLastProject) {
+              const projects = (await fetchProjectsApi()).filter((p) => p.handler);
+              if (projects.length > 0) {
+                const recent = projects.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
+                // Mark ToS accepted — this user already has projects, they've been through onboarding
+                localStorage.setItem(`tos_accepted:${userId}:${orgHandle}`, 'true');
+                navigate(projectHomeUrl(orgHandle, recent.handler), { replace: true });
+                navigatedToLastProject = true;
               }
             }
           } catch {
@@ -123,8 +105,7 @@ export default function OIDCCallback(): JSX.Element {
 
           if (!navigatedToLastProject) {
             // Redirect to the projects/redirect route which shows the ToS welcome dialog.
-            // Cloud has an org handle here: its completeSignIn refuses a token without one.
-            navigate(orgHandle ? projectsRedirectUrl(orgHandle) : registerOrgUrl(), { replace: true });
+            navigate(projectsRedirectUrl(orgHandle), { replace: true });
           }
         }
       } catch (err) {

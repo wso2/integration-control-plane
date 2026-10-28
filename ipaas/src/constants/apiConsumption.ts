@@ -23,9 +23,6 @@ import type { SecurityMode } from '../types/consumers';
 /** Gateway default for the `api-key-auth` policy. */
 export const DEFAULT_API_KEY_HEADER = 'X-API-Key';
 
-/** The APIM products mint a test key instead, and read it from its own header. */
-export const APIM_TEST_KEY_HEADER = 'test-key';
-
 export const OAUTH_HEADER = 'Authorization';
 
 /** Stand-in shown wherever a consumer's credential is hidden. */

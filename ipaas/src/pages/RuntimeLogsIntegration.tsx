@@ -19,9 +19,8 @@
 import { Box, CircularProgress, PageContent } from '@wso2/oxygen-ui';
 import { ScrollText } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useMemo, type JSX } from 'react';
-import { IS_CLOUD } from '../features';
 import { useOrgs } from '../hooks/useOrg';
-import { useProjectsByOrg } from '../hooks/useProjects';
+import { useProjects } from '../hooks/useProjects';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useEnvironments, useAllEnvironments } from '../hooks/useEnvironments';
 import { useInfiniteComponentLogs, useInfiniteGatewayLogsByEnvironment, useVisibleLogs, useResumeLiveOnAutoRefresh } from '../hooks/useLogs';
@@ -47,7 +46,7 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
   const { envFilter, endpointFilter, levelFilter, sortDir, searchPhrase, autoFetch, startTime, endTime, sourceFilter, hideHealthChecks } = filters;
 
   const { data: orgs, isLoading: loadingOrgs } = useOrgs();
-  const { data: projects, isLoading: loadingProjects } = useProjectsByOrg(scope.org);
+  const { data: projects, isLoading: loadingProjects } = useProjects();
 
   const project = projects?.find((p) => p.id === scope.project || p.handler === scope.project);
   const projectId = project?.id ?? '';
@@ -62,21 +61,18 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
   const loadingEnvironments = orgUuid ? loadingProjectEnvs : loadingGlobalEnvs;
 
   const selectedEnvIds = envFilter.length > 0 ? envFilter : environments.map((e) => e.id);
-  const primaryEnv = environments.find((e) => selectedEnvIds.includes(e.id));
 
-  // Cloud reads every environment in one pass and narrows on the rows, so the environment selection never re-queries.
-  const envIdsKey = IS_CLOUD ? '' : selectedEnvIds.join(',');
+  // Every environment is read in one pass and narrowed on the rows, so the environment selection never re-queries.
   const levelFilterKey = levelFilter.join(',');
 
   const isGenericService = GENERIC_SERVICE_TYPES.has(component?.displayType ?? '');
   const logsApiUrl = isGenericService ? choreologgingComponentGatewayLogsApiUrl() : choreologgingComponentLogsApiUrl();
 
   const logsRequest = useMemo<ComponentLogsRequest | null>(() => {
-    // Cloud reads every environment, so it only waits for the list to exist; other products query the selected one.
-    if (!component || (IS_CLOUD ? environments.length === 0 : !primaryEnv)) return null;
+    // Every environment is read, so this only waits for the list to exist.
+    if (!component || environments.length === 0) return null;
     return {
       componentId: component.id,
-      environmentId: IS_CLOUD ? undefined : primaryEnv?.id,
       versionIdList: [],
       logLevels: levelFilter,
       startTime,
@@ -89,7 +85,7 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
       ...(isGenericService ? { logType: 'singleLine' } : {}),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [component?.id, isGenericService, envIdsKey, environments.length, levelFilterKey, startTime, endTime, searchPhrase, sortDir, project?.region]);
+  }, [component?.id, isGenericService, environments.length, levelFilterKey, startTime, endTime, searchPhrase, sortDir, project?.region]);
 
   const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage, backToLive: componentBackToLive } = useInfiniteComponentLogs(logsRequest, autoFetch ? AUTO_FETCH_INTERVAL : false, logsApiUrl);
 
@@ -103,7 +99,7 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
   const typedSearch = searchPhrase.trim();
   const gatewayPhrases = useMemo(() => (typedSearch ? [typedSearch] : gateway.searchPhrases), [typedSearch, gateway.searchPhrases]);
   const selectedEnvKey = selectedEnvIds.join(',');
-  const queriedEnvIds = useMemo(() => (IS_CLOUD ? selectedEnvKey.split(',').filter(Boolean) : environmentIds), [selectedEnvKey, environmentIds]);
+  const queriedEnvIds = useMemo(() => selectedEnvKey.split(',').filter(Boolean), [selectedEnvKey]);
 
   const {
     data: gatewayData,
@@ -123,7 +119,7 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
   const gatewayLoaded = useVisibleLogs(gatewayData);
   const loadedCount = useMemo(() => componentLoaded.length + tagGatewayEndpoints(gatewayLoaded, gateway.endpoints).length, [componentLoaded, gatewayLoaded, gateway.endpoints]);
 
-  const scopeFilter = useMemo(() => ({ environments: IS_CLOUD ? environments.filter((e) => envFilter.includes(e.id)) : [], endpoints: endpointFilter }), [environments, envFilter, endpointFilter]);
+  const scopeFilter = useMemo(() => ({ environments: environments.filter((e) => envFilter.includes(e.id)), endpoints: endpointFilter }), [environments, envFilter, endpointFilter]);
 
   const componentLogs = useMemo(() => filterLogsByScope(componentRows, scopeFilter), [componentRows, scopeFilter]);
   const gatewayLogs = useMemo(
@@ -134,8 +130,8 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
   // Merged for display only: a shared cursor would step past rows the other source had not fetched.
   const logs = useMemo(() => (gateway.available ? selectLogSources(componentLogs, gatewayLogs, sourceFilter, sortDir) : componentLogs), [gateway.available, componentLogs, gatewayLogs, sourceFilter, sortDir]);
 
-  // Cloud rows span environments, so one that cannot be placed gets no name rather than the selected environment's.
-  const envNameOf = (row: LogRow): string | undefined => findEnvironment(environments, row.environment)?.name ?? (IS_CLOUD ? undefined : primaryEnv?.name);
+  // Rows span environments, so one that cannot be placed gets no name.
+  const envNameOf = (row: LogRow): string | undefined => findEnvironment(environments, row.environment)?.name;
   const endpointNameOf = (row: LogRow): string | undefined => (gateway.endpoints.length > 1 ? gateway.endpoints.find((e) => e.id === row.endpoint)?.displayName : undefined);
 
   const showsComponent = !gateway.available || sourceFilter !== 'gateway';

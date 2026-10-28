@@ -110,7 +110,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
 
   return (
     <>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} extra={envSelect} />}
+      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
       <PageContent>
         {/* The heading stays put through every state — loading, not-deployed, editor — so the
             page never reads as just a floating notice. Only the action is state-dependent. */}

@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAccessToken } from '#auth';
+import { getAccessToken } from '../auth';
 import { usePrebuiltIntegrations } from './usePrebuiltIntegrations';
 import { runAiIntegrationPipeline, clearChatHistory } from '../services/aiIntegrationBuilder';
 import type { AiIntegrationBuilderResponse, ConversationTurn, PipelineStage, StepEvent } from '../types/aiBuilder';

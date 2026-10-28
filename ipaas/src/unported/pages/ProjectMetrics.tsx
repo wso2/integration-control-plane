@@ -24,7 +24,7 @@ import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProjectId } from '../../hooks/useProjects';
 import { useComponents } from '../../hooks/useComponents';
-import { useEnvironments, useCloudDataPlanes } from '../../hooks/useEnvironments';
+import { useEnvironments } from '../../hooks/useEnvironments';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useProjectMetricsModel, rangeToIso } from '../hooks/useObservabilityMetrics';
 import { useInfiniteLogs, useVisibleLogs } from '../../hooks/useLogs';
@@ -32,8 +32,6 @@ import MetricsHeader from '../components/Observability/MetricsHeader';
 import ProjectMetricsDiagram from '../components/Observability/ProjectMetricsDiagram';
 import LogsPanel from '../../components/Logs/LogsPanel';
 import LogEntry from '../../components/Logs/LogEntry';
-import { choreologgingProjectLogsApiUrl } from '../../config/runtimeConfig';
-import { IS_CLOUD } from '../../features';
 import { DEFAULT_DP_REGION, PAGE_SIZE } from '../../utils/logs';
 import type { LogsRequest } from '../../types/logs';
 import type { MetricsRange } from '../../types/observability';
@@ -73,13 +71,7 @@ export default function ProjectMetrics(scope: ProjectScope): JSX.Element {
   };
 
   // ---------- Project runtime logs (same request the runtime-logs page builds) ----------
-  const { data: cdps } = useCloudDataPlanes(orgUuid);
-  const logsApiUrl = useMemo(() => {
-    if (IS_CLOUD) return window.API_CONFIG?.observabilityUrl || undefined;
-    if (!primaryEnv?.dpId || !cdps) return undefined;
-    const cdp = cdps.find((c) => c.id.toLowerCase() === primaryEnv.dpId!.toLowerCase());
-    return cdp ? choreologgingProjectLogsApiUrl(cdp.external_gateway_virtual_host) : undefined;
-  }, [primaryEnv?.dpId, cdps]);
+  const logsApiUrl = window.API_CONFIG?.observabilityUrl || undefined;
 
   const { from: logsFrom, to: logsTo } = useMemo(() => rangeToIso(range), [range]);
   const componentIdsKey = components.map((c) => c.id).join(',');

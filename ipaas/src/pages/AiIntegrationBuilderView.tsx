@@ -22,7 +22,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useAuth } from '#auth';
+import { useAuth } from '../auth';
 import { useChoreoSampleImages } from '../hooks/useRepository';
 import { useProjectId } from '../hooks/useProjects';
 import { useOrgUuid } from '../hooks/useOrgUuid';

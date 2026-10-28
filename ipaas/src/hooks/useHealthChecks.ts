@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createHealthCheck, deleteHealthCheck, getHealthChecks, updateHealthCheck } from '#api/healthChecks';
+import { createHealthCheck, deleteHealthCheck, getHealthChecks, updateHealthCheck } from '../api/healthChecks';
 import type { HealthCheck, HealthCheckWriteData } from '../types/healthChecks';
 import { useOrgUuid } from './useOrgUuid';
 

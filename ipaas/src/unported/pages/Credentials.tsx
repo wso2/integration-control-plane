@@ -21,9 +21,9 @@ import { KeyRound, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import EmptyListing from '../../components/EmptyListing';
 import OrgSettingsTabs from '../../components/Settings/OrgSettingsTabs';
-import AddCredentialDialog from '../../components/Settings/Credentials/AddCredentialDialog';
+import AddCredentialDialog from '../components/Settings/Credentials/AddCredentialDialog';
 import DeleteCredentialDialog from '../components/Settings/Credentials/DeleteCredentialDialog';
-import { useGitCredentials } from '../../hooks/useCredentials';
+import { useGitCredentials } from '../hooks/useCredentials';
 import type { GitCredential } from '../../types/credentials';
 import type { OrgScope } from '../../nav';
 

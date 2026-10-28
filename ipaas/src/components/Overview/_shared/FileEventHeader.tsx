@@ -22,7 +22,6 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
-import { IS_CLOUD } from '../../../features';
 import type { CustomHeaderProps } from '../../../types/integration';
 import StatusDot from './StatusDot';
 import ConfigureButton from './ConfigureButton';
@@ -74,8 +73,8 @@ export default function FileEventHeader({
 
   const handleStop = () => {
     stopMutation.mutate(
-      // cloud: OpenChoreo's stop endpoint is per-environment; wip ignores it.
-      { orgHandler, componentId: component.id, releaseId, ...(IS_CLOUD ? { environment: env.id } : {}), type: 'service', clearCron: false },
+      // OpenChoreo's stop endpoint is per-environment.
+      { orgHandler, componentId: component.id, releaseId, environment: env.id, type: 'service', clearCron: false },
       {
         onSuccess: () => {
           requestPoll();

@@ -19,10 +19,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   fetchCurrentUser,
-  fetchOrgPermissions,
   fetchUsers,
   changePassword,
-  forceChangePassword,
   resetPassword,
   revokeUserTokens,
   unlockAccount,
@@ -50,19 +48,7 @@ import {
   removeRoleFromGroup,
   addUsersToGroup,
   removeUserFromGroup,
-} from '#api/auth';
-
-// ── Org permissions ──
-
-export function useOrgPermissions(orgHandler: string, userId: string, enabled = true) {
-  return useQuery({
-    queryKey: ['orgPermissions', orgHandler, userId],
-    queryFn: () => fetchOrgPermissions(orgHandler, userId),
-    enabled: enabled && !!orgHandler && !!userId,
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  });
-}
+} from '../api/auth';
 
 // ── Users ──
 
@@ -77,12 +63,6 @@ export function useCurrentUser(orgHandler: string, userId: string) {
 export function useChangePassword() {
   return useMutation({
     mutationFn: changePassword,
-  });
-}
-
-export function useForceChangePassword() {
-  return useMutation({
-    mutationFn: forceChangePassword,
   });
 }
 

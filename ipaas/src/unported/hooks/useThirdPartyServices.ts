@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addConnectionConfig, createGenaiService, deleteGenaiService, getGenaiService, listThirdPartyServices, setGenaiServiceStatus } from '#api/genaiServices';
+import { addConnectionConfig, createGenaiService, deleteGenaiService, getGenaiService, listThirdPartyServices, setGenaiServiceStatus } from '../../api/genaiServices';
 import { buildCreateThirdPartyRequest } from '../utils/thirdPartyServices';
 import { endpointsToConfigRequest } from '../utils/genaiServices';
 import { useOrgUuid } from '../../hooks/useOrgUuid';

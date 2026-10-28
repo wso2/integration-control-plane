@@ -19,7 +19,6 @@
 import { Box, CircularProgress, Typography } from '@wso2/oxygen-ui';
 import { useEffect, type JSX } from 'react';
 import { GITHUB_AUTH } from '../constants/github';
-import { IS_CLOUD } from '../features';
 import { buildEditorCallbackUrl, editorCallbackUri, editorStateOrgId } from '../utils/vscodeCallback';
 
 export default function GitHubOAuthCallback(): JSX.Element {
@@ -48,13 +47,13 @@ export default function GitHubOAuthCallback(): JSX.Element {
     }
 
     const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
-    // Cloud only: installationId/setupAction are present when GitHub redirects
-    // here after a GitHub App installation (App "Setup URL" pointed at /ghapp).
-    // Other variants post the original { authCode, state } shape untouched.
+    // installationId/setupAction are present when GitHub redirects here after a
+    // GitHub App installation (App "Setup URL" pointed at /ghapp).
     channel.postMessage({
       authCode: code ?? null,
       state: state ?? null,
-      ...(IS_CLOUD ? { installationId: params.get('installation_id'), setupAction: params.get('setup_action') } : {}),
+      installationId: params.get('installation_id'),
+      setupAction: params.get('setup_action'),
     });
     channel.close();
     window.close();

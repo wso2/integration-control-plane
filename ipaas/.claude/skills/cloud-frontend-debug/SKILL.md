@@ -8,7 +8,7 @@ description: Debug unexpected frontend behavior and inefficiency on the Cloud pr
 ## Scope — when this applies
 
 Use this skill only for:
-- The **Cloud** product path (not WIP/ICP).
+- The **ipaas console** (the cloud product; there is no other build).
 - **Frontend-caused** unexpected behavior or inefficiency — not backend bugs, not infra/deploy issues, not "this feature doesn't work as designed."
 
 Typical symptoms a developer will describe (their words, not the real cause):

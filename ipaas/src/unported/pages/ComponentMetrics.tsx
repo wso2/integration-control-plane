@@ -47,7 +47,7 @@ const COLOR = { total: '#569CD6', success: '#2E9E5B', failed: '#EF4444', mean: '
  * Integration-level Metrics page — port of Devant's ObservabilityOverview2:
  * request/latency histograms (API-like integrations only) + cpu/memory/network/disk
  * usage graphs for the selected environment's active release, with the runtime
- * logs panel underneath. Data from `choreoobsapi/0.3.0` (see api/wip/observability.ts).
+ * logs panel underneath. Data from `choreoobsapi/0.3.0`.
  */
 export default function ComponentMetrics(scope: ComponentScope): JSX.Element {
   const { projectId, project } = useProjectId(scope.project);

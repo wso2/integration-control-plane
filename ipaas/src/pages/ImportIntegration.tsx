@@ -21,7 +21,7 @@ import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../constants/
 import TextField from '../components/common/TextField';
 import { ArrowLeft, GitBranch, RefreshCw, GitHub } from '@wso2/oxygen-ui-icons-react';
 import { MENU_SEARCH_THRESHOLD } from '../components/MenuSearchField';
-import { useState, useEffect, useMemo, useRef, type JSX } from 'react';
+import { useState, useEffect, useRef, type JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import BusyFields from '../components/common/BusyFields';
@@ -41,13 +41,7 @@ import type { IntegrationType, SourceMode, LocationState } from '../types/import
 import { SAMPLE_REPO_URL } from '../constants/github';
 import { external } from '../paths';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems, selectMenuHeader } from '../components/Import/gitHubSelectActions';
-import { GitProvider, type GitCredential } from '../types/credentials';
-import AddCredentialDialog from '../components/Settings/Credentials/AddCredentialDialog';
-import { IS_CLOUD } from '../features';
-import { gitProviderIcon, GIT_PROVIDER_LABEL } from '../constants/gitProviders';
-import { credentialsForProvider } from '../utils/gitCredentials';
-import { useGitCredentials } from '../hooks/useCredentials';
-import CredentialSelectCard from '../components/Import/CredentialSelectCard';
+import { GitProvider } from '../types/credentials';
 import { buildRepoUrl } from '../utils/gitProviderUrl';
 import { URL_DEBOUNCE_MS } from '../constants/project';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
@@ -69,32 +63,6 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
   const [sourceMode] = useState<SourceMode>(locationState?.mode ?? 'github');
   const isPublicRepo = sourceMode === 'public';
-
-  // Non-GitHub credential-based provider (Bitbucket/GitLab/Azure) chosen on the
-  // Create page. Captured once so it survives location-state clears. In this
-  // mode the GitHub OAuth flow is replaced by a stored-credential picker, and
-  // the selected credential's id is threaded as `secretRef` into every repo call.
-  const [credProvider] = useState<GitProvider | null>(locationState?.provider ?? null);
-  const isCredentialMode = !!credProvider && credProvider !== GitProvider.GITHUB;
-  const [selectedCredential, setSelectedCredential] = useState<GitCredential | null>(null);
-  const credentialId = selectedCredential?.id ?? '';
-  const [showCredentialModal, setShowCredentialModal] = useState(false);
-
-  // Existing credentials for the chosen provider drive the picker card: if the user already
-  // has some, they select from the dropdown; if none exist, the authorize modal opens directly.
-  const { data: allCredentials = [], isLoading: isCredsLoading } = useGitCredentials(isCredentialMode);
-  const providerCredentials = useMemo(() => credentialsForProvider(allCredentials, credProvider ?? ''), [allCredentials, credProvider]);
-  const hasCredentials = providerCredentials.length > 0;
-  const autoOpenedModalRef = useRef(false);
-
-  // No credentials yet → open the authorize modal once (the "prompt to add" path).
-  useEffect(() => {
-    if (!isCredentialMode || isCredsLoading || autoOpenedModalRef.current) return;
-    if (!hasCredentials && !selectedCredential) {
-      autoOpenedModalRef.current = true;
-      setShowCredentialModal(true);
-    }
-  }, [isCredentialMode, isCredsLoading, hasCredentials, selectedCredential]);
 
   const { authStatus, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth(preAuthenticated ? 'done' : pendingAuthCode ? 'authenticating' : 'idle');
   const [selectedOrg, setSelectedOrg] = useState('');
@@ -134,11 +102,8 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     exchangeAuthCode(pendingAuthCode);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // secretRef scopes every repo call to the chosen credential's provider account; '' keeps the GitHub OAuth path.
-  const secretRef = isCredentialMode ? credentialId : '';
-
-  const reposEnabled = !isPublicRepo && (isCredentialMode ? !!credentialId : authStatus === 'done' || preAuthenticated);
-  const { data: userRepos, isLoading: isReposLoading, isError: isReposError, isSuccess: isReposSuccess, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled, secretRef);
+  const reposEnabled = !isPublicRepo && (authStatus === 'done' || preAuthenticated);
+  const { data: userRepos, isLoading: isReposLoading, isSuccess: isReposSuccess, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled);
 
   // Authorization is proven by a successful repo query, not by a non-empty list —
   // an authorized account with no repositories is still authenticated.
@@ -146,14 +111,14 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const hasRepos = (userRepos?.length ?? 0) > 0;
   const isCheckingAuth = !isPublicRepo && reposEnabled && isReposLoading;
 
-  const { data: branches, isLoading: isBranchesLoading, refetch: refetchBranches } = useRepoBranches(activeOrg, activeRepo, isPublicRepo, secretRef);
+  const { data: branches, isLoading: isBranchesLoading, refetch: refetchBranches } = useRepoBranches(activeOrg, activeRepo, isPublicRepo);
 
   const showBranchAndSubPath = !!(activeOrg && activeRepo);
   const pathReady = !!(activeOrg && activeRepo && selectedBranch);
 
-  const { data: repoContents = [], isLoading: isContentsLoading, isError: isContentsError, refetch: refetchContents } = useRepoContents(activeOrg, activeRepo, selectedBranch, isPublicRepo, secretRef);
+  const { data: repoContents = [], isLoading: isContentsLoading, isError: isContentsError, refetch: refetchContents } = useRepoContents(activeOrg, activeRepo, selectedBranch, isPublicRepo);
 
-  const { data: repoMetadata, isFetching: isValidating, refetch: refetchMetadata } = useRepoMetadata(activeOrg, activeRepo, selectedBranch, subPath, pathReady, isPublicRepo, secretRef);
+  const { data: repoMetadata, isFetching: isValidating, refetch: refetchMetadata } = useRepoMetadata(activeOrg, activeRepo, selectedBranch, subPath, pathReady, isPublicRepo);
 
   const handleRevalidate = () => {
     setDetectedMode(null);
@@ -349,16 +314,12 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         projectId,
         displayType: resolveDisplayType(),
         componentSubType: resolveComponentSubType(),
-        srcGitRepoUrl: buildRepoUrl(isCredentialMode && selectedCredential ? (selectedCredential.type as GitProvider) : (credProvider ?? GitProvider.GITHUB), activeOrg, activeRepo, selectedCredential?.serverUrl),
+        srcGitRepoUrl: buildRepoUrl(GitProvider.GITHUB, activeOrg, activeRepo),
         repositoryBranch: selectedBranch,
         repositorySubPath: subPath || '/',
         isPublicRepo,
-        // Non-GitHub providers build through the stored credential (secretRef).
-        ...(isCredentialMode ? { secretRef: credentialId } : {}),
-        // Private repos in the cloud variant build through the GitHub App
-        // installation that grants access; other variants keep their original
-        // payload untouched.
-        ...(isPublicRepo ? { enableAutoDeploy: true } : !isCredentialMode && IS_CLOUD ? { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId } : {}),
+        // Private repos build through the GitHub App installation that grants access.
+        ...(isPublicRepo ? { enableAutoDeploy: true } : { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId }),
       },
       {
         onSuccess: (component) => navigate(resourceUrl(narrow(scope, component.handler), 'overview')),
@@ -371,40 +332,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
   // Render helpers
 
-  const providerLabel = credProvider ? (GIT_PROVIDER_LABEL[credProvider] ?? 'Git provider') : 'Git provider';
-
-  // Credential-mode auth is driven entirely by the (non-closable) authorize
-  // modal. The only thing shown inline is a failure notice: if repos can't be
-  // loaded with the just-authorized credential, offer a re-authorize retry.
-  const credentialAuthFailed = isCredentialMode && !!credentialId && isReposError;
-  const renderCredentialArea = () => {
-    if (!credentialAuthFailed) return null;
-    return (
-      <Box sx={{ mb: 4, width: '50%' }}>
-        <Alert
-          severity="error"
-          action={
-            <Button
-              color="inherit"
-              size="small"
-              onClick={() => {
-                setSelectedCredential(null);
-                setSelectedOrg('');
-                setSelectedRepo('');
-                setSelectedBranch('');
-                setShowCredentialModal(true);
-              }}>
-              Retry
-            </Button>
-          }>
-          Could not access your {providerLabel} repositories. Re-authorize and try again.
-        </Alert>
-      </Box>
-    );
-  };
-
   const renderGitHubArea = () => {
-    if (isCredentialMode) return renderCredentialArea();
     if (isCheckingAuth) {
       return (
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 4, minHeight: 50 }}>
@@ -436,11 +364,11 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         </Box>
       );
     }
-    // Cloud only: authorized, but the GitHub App is not installed on any
+    // Authorized, but the GitHub App is not installed on any
     // account yet. The install popup must open from this button's click —
     // opening it straight from the token exchange gets popup-blocked (no
     // user gesture).
-    if (IS_CLOUD && authStatus === 'needs-install') {
+    if (authStatus === 'needs-install') {
       return (
         <Box sx={{ mb: 4 }}>
           <Alert severity="info" sx={{ mb: 1.5 }}>
@@ -559,17 +487,19 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                 }}
                 fullWidth
                 disabled={!isAuthenticated || isReposLoading}
-                error={authStatus === 'failed' || credentialAuthFailed}
+                error={authStatus === 'failed'}
                 slotProps={{
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Box sx={{ color: 'text.primary', display: 'flex' }}>{isCredentialMode ? gitProviderIcon(credProvider!, 16) : <GitHub size={16} />}</Box>
+                        <Box sx={{ color: 'text.primary', display: 'flex' }}>
+                          <GitHub size={16} />
+                        </Box>
                       </InputAdornment>
                     ),
                   },
                 }}>
-                {!isCredentialMode && organizationActionItems(!!githubInstallUrl, isAuthenticated ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
+                {organizationActionItems(!!githubInstallUrl, isAuthenticated ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
                 {orgOptions.map((org) => (
                   <MenuItem key={org} value={org}>
                     {org}
@@ -605,7 +535,9 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   input: {
                     startAdornment: (
                       <InputAdornment position="start">
-                        <Box sx={{ color: 'text.primary', display: 'flex' }}>{isCredentialMode ? gitProviderIcon(credProvider!, 16) : <GitHub size={16} />}</Box>
+                        <Box sx={{ color: 'text.primary', display: 'flex' }}>
+                          <GitHub size={16} />
+                        </Box>
                       </InputAdornment>
                     ),
                   },
@@ -614,7 +546,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   { key: 'repo-search', value: repoSearch, onChange: setRepoSearch, placeholder: 'Search repositories', show: reposForOrg.length > MENU_SEARCH_THRESHOLD },
                   isAuthenticated ? { label: 'Refresh repositories', onClick: () => refetchRepos(), loading: isReposLoading } : undefined,
                 )}
-                {!isCredentialMode && repositoryActionItems(!!githubInstallUrl)}
+                {repositoryActionItems(!!githubInstallUrl)}
                 {reposForOrg
                   .filter((repo) => repo.toLowerCase().includes(repoSearch.trim().toLowerCase()))
                   .map((repo) => (
@@ -710,7 +642,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
   // Early returns
 
-  if (!isPublicRepo && (authStatus === 'authenticating' || (IS_CLOUD && authStatus === 'installing'))) {
+  if (!isPublicRepo && (authStatus === 'authenticating' || authStatus === 'installing')) {
     return (
       <PageContent sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 3 }}>
@@ -772,54 +704,10 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         Import an Integration
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 4 }}>
-        {isPublicRepo ? 'Bring an existing integration from a public GitHub repository into this project.' : `Bring an existing integration from your ${isCredentialMode ? providerLabel : 'GitHub'} repository into this project.`}
+        {isPublicRepo ? 'Bring an existing integration from a public GitHub repository into this project.' : 'Bring an existing integration from your GitHub repository into this project.'}
       </Typography>
 
-      {/* Credential picker card — only while there are credentials to pick and none is
-          selected yet. No credentials → the authorize modal drives it; once authorized
-          the card gives way to the org/repo pickers below. */}
-      {isCredentialMode && credProvider && hasCredentials && !selectedCredential && (
-        <Grid container spacing={3} sx={{ mb: 5 }}>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <CredentialSelectCard
-              provider={credProvider}
-              credentials={providerCredentials}
-              selected={selectedCredential}
-              onSelect={(c) => {
-                setSelectedCredential(c);
-                setSelectedOrg('');
-                setSelectedRepo('');
-                setSelectedBranch('');
-              }}
-              onAddCredential={() => setShowCredentialModal(true)}
-            />
-          </Grid>
-        </Grid>
-      )}
       {!isPublicRepo && renderGitHubArea()}
-
-      {showCredentialModal && credProvider && (
-        <AddCredentialDialog
-          initialProvider={credProvider}
-          lockProvider
-          onClose={() => setShowCredentialModal(false)}
-          onCancel={() => {
-            setShowCredentialModal(false);
-            // Cancelling the initial "no credentials" prompt leaves nothing to work with —
-            // return to the Create page. Cancelling an "+ Add" from the picker just closes.
-            if (!hasCredentials && !selectedCredential) navigate(backUrl);
-          }}
-          onAdded={() => {}}
-          onAddedCredential={(c) => {
-            setSelectedCredential(c);
-            setSelectedOrg('');
-            setSelectedRepo('');
-            setSelectedBranch('');
-            refetchRepos();
-          }}
-          onError={() => {}}
-        />
-      )}
 
       <Box sx={{ '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
         <BusyFields busy={createComponent.isPending}>
@@ -875,7 +763,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
               Technology
             </Typography>
             <TechnologySelector selected={selectedTechnology} detectedMode={detectedMode} enabled={showBranchAndSubPath} onSelect={setSelectedTechnology} />
-            {IS_CLOUD && selectedTechnology === 'BI' && (
+            {selectedTechnology === 'BI' && (
               <>
                 {!ballerinaTokenStatus?.configured && (
                   <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2 }}>

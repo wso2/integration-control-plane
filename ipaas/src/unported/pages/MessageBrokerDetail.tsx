@@ -22,7 +22,7 @@ import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { isPlatformServicesEnabled, useDatabaseServer } from '../../hooks/usePlatformServices';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { MESSAGE_BROKER_KIND, BROKER_SERVICE_TYPES, serviceTypeLabel, type ServiceTypeOption } from '../../constants/platformServices';

@@ -40,9 +40,8 @@ import {
   supportsContextEngineProvisioning,
   updateContextModels,
   updateContextSource,
-} from '#api/contextEngine';
-import { IS_WIP } from '../features';
-import { getAccessToken } from '#auth';
+} from '../api/contextEngine';
+import { getAccessToken } from '../auth';
 import {
   CONTEXT_ENGINE_ASKED_KEY_PREFIX,
   CONTEXT_ENGINE_DELETION_KEY_PREFIX,
@@ -59,12 +58,12 @@ import type { ContextEngineForm, ContextQueryInput, ContextSourceConfig, CreateC
 
 const ROOT_KEY = 'contextEngines';
 
-/** Context Engines: wip build with the engine URL configured and the feature flag on. */
 /** Whether engines can be created, deleted and reconfigured here; that is the control plane's provisioning. */
 export const CONTEXT_ENGINE_PROVISIONING: boolean = supportsContextEngineProvisioning;
 
+/** Context Engines: the engine URL configured and the feature flag on. */
 export function isContextEngineEnabled(): boolean {
-  return IS_WIP && !!window.API_CONFIG?.enableContextEngineFeature && !!window.API_CONFIG?.contextEngineApiUrl;
+  return !!window.API_CONFIG?.enableContextEngineFeature && !!window.API_CONFIG?.contextEngineApiUrl;
 }
 
 /** The engines the caller can see; checked again every few seconds while one is being deleted. */

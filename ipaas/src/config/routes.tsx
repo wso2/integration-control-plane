@@ -17,9 +17,11 @@
  */
 
 import { type RouteProps, Navigate, Outlet } from 'react-router';
-import { cookiePolicyUrl, loginUrl, signupUrl, registerOrgUrl } from '../paths';
+import { cookiePolicyUrl, loginUrl, signupUrl } from '../paths';
 import { ScopeResolver, generateMatrixRoutes, withScope, type Matrix } from '../nav';
 import HiddenPageRedirect from '../components/HiddenPageRedirect';
+import UnknownRoute from '../components/UnknownRoute';
+import Logout from '../pages/Logout';
 import { createElement } from 'react';
 import { lazyPage } from './lazyPage';
 const PrebuiltIntegrationConfigProvider = lazyPage(() => import('../contexts/PrebuiltIntegrationConfigContext').then((m) => ({ default: m.PrebuiltIntegrationConfigProvider })));
@@ -28,7 +30,6 @@ const PrebuiltIntegrationConfigProvider = lazyPage(() => import('../contexts/Pre
 // shell (AppLayout) which must remain stable across route transitions.
 import PublicLayout from '../layouts/PublicLayout';
 import Login from '../pages/Login';
-import Signup from '../pages/Signup';
 import RouteErrorBoundary from '../components/RouteErrorBoundary';
 import AppLayout from '../layouts/AppLayout';
 
@@ -39,10 +40,8 @@ const OrgHomeRedirect = lazyPage(() => import('../components/OrgHomeRedirect'));
 
 const OIDCCallback = lazyPage(() => import('../pages/OIDCCallback'));
 const GitHubOAuthCallback = lazyPage(() => import('../pages/GitHubOAuthCallback'));
-const RegisterOrganization = lazyPage(() => import('../pages/RegisterOrganization'));
 const CookiePolicy = lazyPage(() => import('../pages/CookiePolicy'));
 const CloudEditorDeployment = lazyPage(() => import('../pages/CloudEditorDeployment'));
-const ForceChangePassword = lazyPage(() => import('../pages/ForceChangePassword'));
 const ProjectsRedirect = lazyPage(() => import('../pages/ProjectsRedirect'));
 const OrgHome = lazyPage(() => import('../pages/OrgHome'));
 const Projects = lazyPage(() => import('../pages/Projects'));
@@ -69,6 +68,7 @@ const ProjectOverview = lazyPage(() => import('../pages/ProjectOverview'));
 const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
 const ComponentContainers = lazyPage(() => import('../pages/ComponentContainers'));
 const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChecks'));
+const ComponentScaling = lazyPage(() => import('../pages/ComponentScaling'));
 const CdPipelineEditor = lazyPage(() => import('../pages/CdPipelineEditor'));
 const OrgSettings = lazyPage(() => import('../pages/OrgSettings'));
 const BrowseSamples = lazyPage(() => import('../pages/BrowseSamples'));
@@ -91,6 +91,7 @@ const EditEnvironment = lazyPage(() => import('../pages/EditEnvironment'));
 const RuntimeLogsOrg = lazyPage(() => import('../pages/RuntimeLogsOrg'));
 const RuntimeLogsProject = lazyPage(() => import('../pages/RuntimeLogsProject'));
 const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegration'));
+const ApiInsights = lazyPage(() => import('../pages/ApiInsights'));
 const ComingSoon = lazyPage(() => import('../pages/ComingSoon'));
 
 export interface AppRoute extends Omit<RouteProps, 'children'> {
@@ -113,7 +114,8 @@ const routes: AppRoute[] = [
     element: <PublicLayout />,
     children: [
       { path: loginUrl(), element: <Login /> },
-      { path: signupUrl(), element: <Signup /> },
+      // Thunder hosts sign-up on the same page as sign-in.
+      { path: signupUrl(), element: <Navigate to={loginUrl()} replace /> },
     ],
   },
   {
@@ -121,13 +123,11 @@ const routes: AppRoute[] = [
     children: [{ path: cookiePolicyUrl(), element: <CookiePolicy /> }],
   },
   { path: '/signin', element: <OIDCCallback /> },
+  { path: '/logout', element: <Logout /> },
   { path: '/ghapp', element: <GitHubOAuthCallback /> },
   {
     element: <ProtectedRoute />,
     children: [
-      { path: registerOrgUrl(), element: <RegisterOrganization /> },
-      // WIP local login can require a password change; remove with the WIP auth.
-      { path: '/change-password', element: <ForceChangePassword /> },
       { path: '/editor', element: <CloudEditorDeployment /> },
       {
         element: <ScopeResolver />,
@@ -138,6 +138,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler', element: <OrgHomeRedirect /> },
               { path: 'organizations/:orgHandler/deploy', element: createElement(withScope(OrgDeploy, ['organizations'])) },
               { path: 'organizations/:orgHandler/test', element: createElement(withScope(OrgTest, ['organizations'])) },
+              { path: 'organizations/:orgHandler/insights', element: createElement(withScope(ApiInsights, ['organizations'])) },
               { path: 'organizations/:orgHandler/metrics', element: <ComingSoon description="One view of throughput, latency and errors for every integration you run." /> },
               { path: 'organizations/:orgHandler/context-engines', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgContextEngines, ['organizations']))) },
               { path: 'organizations/:orgHandler/context-engines/new', element: createElement(RouteErrorBoundary, null, createElement(withScope(CreateContextEngine, ['organizations']))) },
@@ -230,6 +231,10 @@ const routes: AppRoute[] = [
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/admin/health-checks',
                 element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentHealthChecks, ['components']))),
               },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/admin/scaling',
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentScaling, ['components']))),
+              },
               // Unknown or retired pages (including the unported ones) go back to their level's home.
               { path: 'organizations/:orgHandler/*', element: <HiddenPageRedirect level="organizations" /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/*', element: <HiddenPageRedirect level="projects" /> },
@@ -240,6 +245,8 @@ const routes: AppRoute[] = [
       },
     ],
   },
+  // Anything no route above claims: sign in when signed out, otherwise a not-found page.
+  { path: '*', element: <UnknownRoute /> },
 ];
 
 export default routes;

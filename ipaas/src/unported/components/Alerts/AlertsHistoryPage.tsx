@@ -20,8 +20,6 @@ import { Autocomplete, Box, CircularProgress, MenuItem, Select, Table, TableBody
 import TextField from '../../../components/common/TextField';
 import { type JSX, useMemo, useState } from 'react';
 import type { CloudDataPlane, Environment } from '../../../types/environment';
-import { choreoAlertingApiUrl } from '../../../config/runtimeConfig';
-import { IS_CLOUD } from '../../../features';
 import { useGetAlertHistory } from '../../hooks/useAlerts';
 
 interface AlertsHistoryPageProps {
@@ -55,16 +53,12 @@ function formatCellValue(value: unknown, columnType: string): string {
   return String(value);
 }
 
-export default function AlertsHistoryPage({ componentId, environments, cloudDataPlanes }: AlertsHistoryPageProps): JSX.Element {
+export default function AlertsHistoryPage({ componentId, environments }: AlertsHistoryPageProps): JSX.Element {
   const [selectedEnvironment, setSelectedEnvironment] = useState<Environment | undefined>(environments[0]);
   const [timeRangeHours, setTimeRangeHours] = useState(1);
 
-  const alertingBaseUrl = useMemo(() => {
-    if (IS_CLOUD) return '';
-    if (!selectedEnvironment?.dpId || !cloudDataPlanes.length) return '';
-    const cdp = cloudDataPlanes.find((c) => c.id.toLowerCase() === selectedEnvironment.dpId!.toLowerCase());
-    return cdp ? choreoAlertingApiUrl(cdp.external_gateway_virtual_host) : '';
-  }, [selectedEnvironment, cloudDataPlanes]);
+  // Alerting is not served by the BFF yet.
+  const alertingBaseUrl = '';
 
   const { startTime, endTime } = useMemo(() => {
     const now = new Date();

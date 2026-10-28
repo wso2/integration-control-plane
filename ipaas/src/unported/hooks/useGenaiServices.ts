@@ -31,7 +31,7 @@ import {
   updateConnectionConfig,
   updateGenaiService,
   updateGenaiServiceIdl,
-} from '#api/genaiServices';
+} from '../../api/genaiServices';
 import { buildConnectionConfigPayload, buildCreateServiceRequest, buildUpdateServiceRequest } from '../utils/genaiServices';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import type { ConnectionConfigRequest, CreateGenAiServiceArgs, GenAiService, GenAiServiceEdit, GenAiServiceStatus } from '../../types/genaiServices';

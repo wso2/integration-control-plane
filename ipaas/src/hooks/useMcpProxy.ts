@@ -17,9 +17,9 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { generateMcpFeatures, createMcpApi } from '#api/mcpProxy';
-import { deleteApimApi } from '#api/apim';
-import { createMcpProxyComponent } from '#api/components';
+import { generateMcpFeatures, createMcpApi } from '../api/mcpProxy';
+import { deleteApimApi } from '../api/apim';
+import { createMcpProxyComponent } from '../api/components';
 import type { Component } from '../types/component';
 import type { McpProxyMetadata } from '../types/mcpProxy';
 

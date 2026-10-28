@@ -102,7 +102,7 @@ export function useMcpConnection({ url, token, headerName }: UseMcpConnectionPar
         const endpoint = new URL(url);
         if (!endpoint.searchParams.has('transportType')) endpoint.searchParams.set('transportType', 'streamable-http');
         const transport = new StreamableHTTPClientTransport(endpoint, { requestInit: { headers: { [headerName]: token } } });
-        client = new Client({ name: 'wip-mcp-playground', version: '1.0.0' }, { capabilities: {} });
+        client = new Client({ name: 'ipaas-console-mcp-playground', version: '1.0.0' }, { capabilities: {} });
         await client.connect(transport);
         if (isStale()) {
           await client.close().catch(() => undefined);

@@ -18,7 +18,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { fetchAutomationInsights } from '#api/insights';
+import { fetchAutomationInsights } from '../../api/insights';
 import { useInsightsQueryUrl } from '../../hooks/useInsights';
 import { executionOutcome, formatDuration } from '../utils/insightsFormat';
 import type { AutomationInsightsData, AutomationInsightsRaw, AutomationTrendPoint, ExecutionScatterPoint, HeatmapData, InsightsEnvironment, InsightsRange } from '../../types/insights';

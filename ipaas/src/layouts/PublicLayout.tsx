@@ -19,32 +19,28 @@
 import { Navigate, Outlet } from 'react-router';
 import { Box, ColorSchemeToggle, Layout, ParticleBackground, Stack } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { useAuth } from '#auth';
-import { orgHomeUrl, projectHomeUrl, registerOrgUrl } from '../paths';
+import { useAuth } from '../auth';
+import { orgHomeUrl, projectHomeUrl } from '../paths';
 
 export default function PublicLayout(): JSX.Element {
-  const { isAuthenticated, userId } = useAuth();
+  const { isAuthenticated, userId, orgHandle } = useAuth();
 
+  // A signed-in session always carries its org, so the public pages hand over to it.
   if (isAuthenticated) {
-    const storedOrg = localStorage.getItem('org_handle');
-    const org = storedOrg && storedOrg !== 'default' ? storedOrg : null;
-
-    // Restore the last visited project if it matches the stored org
-    if (org && userId) {
-      try {
-        const lastProjectRaw = localStorage.getItem(`last_project:${userId}`);
-        if (lastProjectRaw) {
-          const { org: lastOrg, project } = JSON.parse(lastProjectRaw) as { org: string; project: string };
-          if (lastOrg === org && project) {
-            return <Navigate to={projectHomeUrl(org, project)} replace />;
-          }
+    // Restore the last visited project if it belongs to the session's org
+    try {
+      const lastProjectRaw = localStorage.getItem(`last_project:${userId}`);
+      if (lastProjectRaw) {
+        const { org: lastOrg, project } = JSON.parse(lastProjectRaw) as { org: string; project: string };
+        if (lastOrg === orgHandle && project) {
+          return <Navigate to={projectHomeUrl(orgHandle, project)} replace />;
         }
-      } catch {
-        /* ignore malformed data */
       }
+    } catch {
+      /* ignore malformed data */
     }
 
-    return <Navigate to={org ? orgHomeUrl(org) : registerOrgUrl()} replace />;
+    return <Navigate to={orgHomeUrl(orgHandle)} replace />;
   }
 
   return (

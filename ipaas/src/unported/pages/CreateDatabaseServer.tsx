@@ -22,7 +22,7 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { isPlatformServicesEnabled, useCreateServer, useDatabaseServers, useServicePlans } from '../../hooks/usePlatformServices';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { CLOUD_PROVIDERS, DATABASE_KIND, FREE_TIER_DISABLED_PROVIDERS, regionLabel, SERVICE_NAME_ERROR, SERVICE_NAME_REGEX, type DbServerKind } from '../../constants/platformServices';

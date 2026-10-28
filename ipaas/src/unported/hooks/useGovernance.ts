@@ -41,7 +41,7 @@ import {
   fetchEndpointPolicyAdherence,
   fetchEndpointRulesetAdherence,
   fetchEndpointRuleAdherence,
-} from '#api/governance';
+} from '../../api/governance';
 import type { Ruleset, DocumentInfo, GovernancePolicyInfo } from '../../types/governance';
 
 const ROOT_KEY = 'governance';

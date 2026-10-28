@@ -21,7 +21,8 @@ export interface BuildpackConfig {
   buildContext: string;
   isUnitTestEnabled: boolean;
   languageVersion: string;
-  pullLatestSubmodules: boolean;
+  // Absent when the build does not check out submodules.
+  pullLatestSubmodules?: boolean;
   enableTrivyScan: boolean;
   keyValues?: Array<{ id?: string; key: string; value: string }>;
 }
@@ -35,7 +36,6 @@ export interface Repository {
   bitbucketServerUrl?: string;
   serverUrl?: string;
   projectApp?: string;
-  isBuildConfigurationMigrated?: boolean;
   buildpackConfig?: BuildpackConfig[];
 }
 

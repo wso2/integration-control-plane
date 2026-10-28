@@ -18,8 +18,8 @@
 
 import { Alert, Box, Button, CircularProgress, Link, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
-import { isRagIngestionEnabled, useRetrieveChunks } from '../../hooks/useRagIngestion';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { isRagIngestionEnabled, useRetrieveChunks } from '../hooks/useRagIngestion';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { DEFAULT_RETRIEVAL_QUERY } from '../../constants/ragIngestion';

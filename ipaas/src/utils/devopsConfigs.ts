@@ -54,6 +54,18 @@ export function validateDisplayName(name: string): string {
   return '';
 }
 
+// The MI configure drawer owns env-var groups named `mi-env-vars` and `mi-secret-<KEY>`
+// (miConfigs.ts) and would adopt, and may delete, a user's group with such a name.
+const MI_GROUP_PREFIX = 'mi-';
+
+/** `validateDisplayName` for a new env-var group, whose display name becomes its group name. */
+export function validateNewEnvGroupName(name: string): string {
+  const err = validateDisplayName(name);
+  if (err) return err;
+  if (name.trim().toLowerCase().startsWith(MI_GROUP_PREFIX)) return `Names starting with "${MI_GROUP_PREFIX}" are reserved for MI configuration.`;
+  return '';
+}
+
 /** Parse a `.env` file body into key/value rows, skipping comments and blanks. */
 export function parseDotEnv(text: string): Array<{ key: string; value: string }> {
   const rows: Array<{ key: string; value: string }> = [];

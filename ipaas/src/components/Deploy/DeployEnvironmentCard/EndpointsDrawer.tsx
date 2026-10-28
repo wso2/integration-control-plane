@@ -22,9 +22,7 @@ import { useState } from 'react';
 import type { EnvEndpoint } from '../../../types/component';
 import { EndpointCard } from '../../EndpointCard';
 import ApiSettingsDrawer from '../../Overview/integration-as-api/ApiSettingsDrawer';
-import { IS_CLOUD } from '../../../features';
 import { toEndpointOptions } from '../../../utils/endpoints';
-import ManageDrawer from '../../EnvironmentCard/ManageDrawer';
 
 interface EndpointsDrawerProps {
   open: boolean;
@@ -32,11 +30,8 @@ interface EndpointsDrawerProps {
   endpoints: EnvEndpoint[];
   isLoading?: boolean;
   envName: string;
-  // Context for deploy-settings-v2 redeploy and visibility editing
+  // Scope for the API settings drawer.
   componentId?: string;
-  versionId?: string;
-  releaseId?: string;
-  buildId?: string;
   environmentId?: string;
 }
 
@@ -53,7 +48,7 @@ const drawerSx = {
   },
 } as const;
 
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, versionId, releaseId, buildId, environmentId }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId }: EndpointsDrawerProps) {
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -99,24 +94,7 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
         </Box>
       </Drawer>
 
-      {IS_CLOUD ? (
-        <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId ?? ''} envName={environmentId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={selectedEndpoint?.id} />
-      ) : (
-        <ManageDrawer
-          open={manageDrawerOpen}
-          onClose={() => setManageDrawerOpen(false)}
-          apimId={selectedEndpoint?.apimId}
-          apimRevisionId={selectedEndpoint?.apimRevisionId}
-          endpointId={selectedEndpoint?.id}
-          endpointDisplayName={selectedEndpoint?.displayName}
-          networkVisibilities={selectedEndpoint?.networkVisibilities}
-          componentId={componentId}
-          versionId={versionId}
-          releaseId={releaseId}
-          buildId={buildId}
-          environmentId={environmentId}
-        />
-      )}
+      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId ?? ''} envName={environmentId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={selectedEndpoint?.id} />
     </>
   );
 }

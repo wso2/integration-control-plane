@@ -18,7 +18,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useRef } from 'react';
-import { fetchBuildLogs, fetchBuildRunLogs } from '#api/builds';
+import { fetchBuildLogs, fetchBuildRunLogs } from '../api/builds';
 import type { BuildRunLogs } from '../types/build';
 import { logsBehindBuild } from '../utils/buildProgress';
 

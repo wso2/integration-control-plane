@@ -20,13 +20,11 @@ import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo } from 'react';
 import type { ReactNode } from 'react';
-import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useQueryClient } from '@tanstack/react-query';
-import { useExecutionConfigs, useRuntimeArguments, useTriggerComponent } from '../../../hooks/useExecutions';
+import { useExecutionConfigs, useTriggerComponent } from '../../../hooks/useExecutions';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
-import { IS_CLOUD } from '../../../features';
 import { hasMissingRequiredConfigs } from './configStatus';
 import NextRunLabel from '../../NextRunLabel';
 import ScheduleButton from './ScheduleButton';
@@ -40,8 +38,6 @@ export default function EnvCardActions({
   projectId,
   versionId,
   orgHandler,
-  projectHandler,
-  componentHandler,
   releaseId,
   buildId,
   deploymentPipelineId,
@@ -53,7 +49,6 @@ export default function EnvCardActions({
   onTrigger,
 }: EnvCardActionsProps): ReactNode {
   const queryClient = useQueryClient();
-  const navigate = useAppNavigate();
 
   const { data: scheduleConfig } = useExecutionConfigs(component.id, releaseId, env.id);
   const { data: schemaConfig } = useSchemaConfig(projectId, component.id, envTemplateId, versionId, deployedCommitSha);
@@ -77,19 +72,9 @@ export default function EnvCardActions({
   const blockedReason = blockers.find(([blocked]) => blocked)?.[1] ?? '';
   const actionsDisabled = !!blockedReason;
 
-
-  // Cloud has no runtime-arguments endpoint, so the query stays disabled rather than always failing.
-  const { data: runtimeArgs, isLoading: runtimeArgsLoading } = useRuntimeArguments(component.id, versionId, deployedCommitSha ?? '', !IS_CLOUD);
-  const hasRuntimeArgs = (runtimeArgs?.length ?? 0) > 0;
   const triggerRun = useTriggerComponent();
 
-  const goToTestPage = () => navigate(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test`);
-
   const handleTest = () => {
-    if (hasRuntimeArgs) {
-      goToTestPage();
-      return;
-    }
     triggerRun.mutate(
       { orgHandler, projectId, componentId: component.id, releaseId, args: [] },
       {
@@ -125,7 +110,7 @@ export default function EnvCardActions({
       />
       <Tooltip title={blockedReason} placement="top">
         <span>
-          <Button variant="contained" size="small" startIcon={<Play size={14} />} disabled={actionsDisabled || triggerRun.isPending || runtimeArgsLoading} onClick={handleTest}>
+          <Button variant="contained" size="small" startIcon={<Play size={14} />} disabled={actionsDisabled || triggerRun.isPending} onClick={handleTest}>
             Test
           </Button>
         </span>

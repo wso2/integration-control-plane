@@ -22,21 +22,16 @@ import { useMemo, useState, type JSX, type ReactNode } from 'react';
 import * as styles from './PodInsightsTable.styles';
 import PodEventsDrawer from './PodEventsDrawer';
 import PodLogsDrawer from './PodLogsDrawer';
-import PodUsageCell from './PodUsageCell';
-import { DATA_PLANE_LABEL, POD_ACTION_LABELS } from '../../constants/runtime';
-import { IS_CLOUD } from '../../features';
-import { calculatePodUsage, formatBytes, formatVcpu, podLastActivity, podRestartCount } from '../../utils/podMetrics';
+import { POD_ACTION_LABELS } from '../../constants/runtime';
+import { podLastActivity, podRestartCount } from '../../utils/podMetrics';
 import { getPodStatus, podStatusPalette, runningPodCount } from '../../utils/pods';
 import { formatDistanceToNow } from '../../utils/time';
-import type { ClusterPod, PodMetrics, PodScope } from '../../types/runtime';
+import type { ClusterPod, PodScope } from '../../types/runtime';
 
-// OpenChoreo has no pod-level metrics source, so these columns would always read empty on cloud.
-const SHOW_POD_USAGE = !IS_CLOUD;
-const COLUMN_COUNT = SHOW_POD_USAGE ? 8 : 6;
+const COLUMN_COUNT = 6;
 
 interface PodInsightsTableProps {
   pods: ClusterPod[] | undefined;
-  metrics: PodMetrics[] | undefined;
   isLoading: boolean;
   isError: boolean;
   isFetching: boolean;
@@ -48,7 +43,7 @@ interface PodInsightsTableProps {
   canManage: boolean;
 }
 
-export default function PodInsightsTable({ pods, metrics, isLoading, isError, isFetching, onRefresh, scope, replicasControl, canManage }: PodInsightsTableProps): JSX.Element {
+export default function PodInsightsTable({ pods, isLoading, isError, isFetching, onRefresh, scope, replicasControl, canManage }: PodInsightsTableProps): JSX.Element {
   const rows = useMemo(() => pods ?? [], [pods]);
   const { running, total } = runningPodCount(rows);
   // The pod outlives its `open` flag so the drawer can finish sliding out before unmounting.
@@ -112,12 +107,6 @@ export default function PodInsightsTable({ pods, metrics, isLoading, isError, is
             <ListingTable.Head>
               <ListingTable.Row>
                 <ListingTable.Cell>Pod Details</ListingTable.Cell>
-                {SHOW_POD_USAGE && (
-                  <>
-                    <ListingTable.Cell>CPU Usage</ListingTable.Cell>
-                    <ListingTable.Cell>Memory Usage</ListingTable.Cell>
-                  </>
-                )}
                 <ListingTable.Cell>Status</ListingTable.Cell>
                 <ListingTable.Cell>Available</ListingTable.Cell>
                 <ListingTable.Cell>Restarts</ListingTable.Cell>
@@ -134,8 +123,6 @@ export default function PodInsightsTable({ pods, metrics, isLoading, isError, is
                 </ListingTable.Row>
               ) : (
                 rows.map((pod) => {
-                  const metric = metrics?.find((m) => m.metadata.name === pod.metadata.name);
-                  const usage = calculatePodUsage(pod, metric);
                   const statuses = pod.status.containerStatuses ?? [];
                   const { status, isRunning } = getPodStatus(pod);
                   const palette = podStatusPalette(status, isRunning);
@@ -148,22 +135,7 @@ export default function PodInsightsTable({ pods, metrics, isLoading, isError, is
                             {pod.metadata.name}
                           </Typography>
                         </Tooltip>
-                        {!IS_CLOUD && (
-                          <Typography variant="caption" color="text.secondary" sx={styles.dataPlane}>
-                            {DATA_PLANE_LABEL}
-                          </Typography>
-                        )}
                       </ListingTable.Cell>
-                      {SHOW_POD_USAGE && (
-                        <>
-                          <ListingTable.Cell>
-                            <PodUsageCell used={usage.cpu.used} limit={usage.cpu.limits} display={`${formatVcpu(usage.cpu.used)} / ${formatVcpu(usage.cpu.limits)} vCPU`} />
-                          </ListingTable.Cell>
-                          <ListingTable.Cell>
-                            <PodUsageCell used={usage.memory.used} limit={usage.memory.limits} display={`${formatBytes(usage.memory.used)} / ${formatBytes(usage.memory.limits)}`} />
-                          </ListingTable.Cell>
-                        </>
-                      )}
                       <ListingTable.Cell>
                         <Chip size="small" variant="outlined" color={palette.chip} icon={isRunning ? <Check size={13} /> : <Info size={13} />} label={status} sx={styles.statusChip(palette.text)} />
                       </ListingTable.Cell>

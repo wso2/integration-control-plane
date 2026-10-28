@@ -34,7 +34,7 @@ interface PodEventsDrawerProps {
 /** Conditions come from the pod the runtime page already holds, so only events are fetched. */
 export default function PodEventsDrawer({ open, onClose, onExited, pod, scope }: PodEventsDrawerProps): JSX.Element {
   const podName = pod?.metadata.name ?? '';
-  const { data: events, isLoading, isError } = usePodEvents(scope.projectId, scope.componentHandler, scope.releaseId, scope.clusterId, pod?.metadata.namespace ?? scope.namespace, podName, open);
+  const { data: events, isLoading, isError } = usePodEvents(scope.projectId, scope.componentHandler, scope.releaseId, podName, open);
 
   return (
     <PodDrawerShell open={open} onClose={onClose} onExited={onExited} title={`Pod Conditions and Events for ${podName}`}>

@@ -20,15 +20,12 @@ import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation } from 'react-router';
 import { Alert, Box, Button, Typography } from '@wso2/oxygen-ui';
 import { useCreateCodeServer, useEditorKeepAlive, useEditorReady, useGetOrCreateSampleRegistry } from '../hooks/useCloudEditor';
-import { useComponentPods } from '../hooks/useRuntime';
-import { CLOUD_EDITOR_POLL_MS, CLOUD_EDITOR_STEPS, CLOUD_EDITOR_TIMEOUT_MESSAGE, CLOUD_EDITOR_TIMEOUT_MS } from '../constants/cloudEditor';
-import { highestPodPhase } from '../utils/cloudEditor';
+import { CLOUD_EDITOR_READY_TIMEOUT_MS, CLOUD_EDITOR_STEPS, CLOUD_EDITOR_TIMEOUT_MESSAGE } from '../constants/cloudEditor';
 import DeploymentWheel from '../components/CloudEditor/DeploymentWheel';
 import type { ChoreoSampleImage, CloudEditorStepKey, CodeServerInstance, DeploymentParams } from '../types/cloudEditor';
 
 /**
  * Pull the server's own message out of a BFF failure ({"error":..,"message":..}).
- * Duck-typed rather than `instanceof BffError`: #api resolves per product.
  */
 function serverDetail(err: unknown): string | null {
   const body = (err as { body?: unknown } | null)?.body;
@@ -115,9 +112,7 @@ export default function CloudEditorDeployment(): JSX.Element {
           });
         } catch (err) {
           const timedOut = err instanceof Error && err.message === CLOUD_EDITOR_TIMEOUT_MESSAGE;
-          const message = timedOut
-            ? 'Your Cloud Editor is taking longer than expected to become ready. Please try again later or contact support.'
-            : 'Unable to start the Cloud Editor. Please try again or contact support if the problem persists.';
+          const message = timedOut ? 'Your Cloud Editor is taking longer than expected to become ready. Please try again later or contact support.' : 'Unable to start the Cloud Editor. Please try again or contact support if the problem persists.';
           throw new Error(serverDetail(err) ?? message, { cause: err });
         }
 
@@ -136,16 +131,13 @@ export default function CloudEditorDeployment(): JSX.Element {
         setInstance(resolved);
         setStepKey('scheduling');
 
-        // No cluster coordinates (e.g. cloud) → pod status can't be polled.
-        if (!resolved.clusterId || !resolved.releaseId || !resolved.namespace) {
-          // Readiness is the gate, not the URL: useEditorReady drives the redirect.
-          if (!resolved.ready) {
-            setStepKey('starting');
-            return;
-          }
-          setStepKey('opening');
-          redirect(resolved.url);
+        // Readiness is the gate, not the URL: useEditorReady drives the redirect.
+        if (!resolved.ready) {
+          setStepKey('starting');
+          return;
         }
+        setStepKey('opening');
+        redirect(resolved.url);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
       }
@@ -154,31 +146,9 @@ export default function CloudEditorDeployment(): JSX.Element {
     deploy();
   }, [params, createCodeServerMutation, getOrCreateRegistryMutation]);
 
-  // This page has no component handler/name available (only params.componentId, a UUID) —
-  // harmless since cloud's clusterId/namespace are already absent here (see the redirect
-  // above), so the query stays disabled on cloud regardless of componentName.
-  const podsQuery = useComponentPods(params.projectId, '', instance?.clusterId ?? '', instance?.releaseId ?? '', instance?.namespace ?? '', CLOUD_EDITOR_POLL_MS);
-  const pods = useMemo(() => podsQuery.data ?? [], [podsQuery.data]);
-  const isAnyPodRunning = pods.some((p) => p.status?.phase === 'Running');
-  const isPolling = !!instance?.clusterId && !isAnyPodRunning;
-
-  // Advance the wheel as the pod's conditions progress.
-  useEffect(() => {
-    if (!instance?.clusterId) return;
-    setStepKey(isAnyPodRunning ? 'opening' : highestPodPhase(pods));
-  }, [instance, isAnyPodRunning, pods]);
-
-  // Redirect once the pod is running.
-  useEffect(() => {
-    if (instance && isAnyPodRunning) redirect(instance.url);
-  }, [instance, isAnyPodRunning]);
-
-  // Cloud: the address is known but the workload may still be starting.
-  const awaitingReady = !!instance && !instance.ready && !instance.clusterId;
-  const readyQuery = useEditorReady(
-    { userId: params.userId, projectId: params.projectId, componentId: params.componentId },
-    awaitingReady,
-  );
+  // The address is known but the workload may still be starting.
+  const awaitingReady = !!instance && !instance.ready;
+  const readyQuery = useEditorReady({ userId: params.userId, projectId: params.projectId, componentId: params.componentId }, awaitingReady);
 
   useEffect(() => {
     if (!awaitingReady) return;
@@ -189,17 +159,23 @@ export default function CloudEditorDeployment(): JSX.Element {
     redirect(current.url);
   }, [awaitingReady, readyQuery.data]);
 
-  // Keep the scale-to-zero timer off the editor for the whole wait.
-  useEditorKeepAlive(instance?.url, isPolling || awaitingReady);
+  // Polling carries on through failed lookups (a blip during a pod restart is normal), so only
+  // the timeout ends the wait; it reports a lookup that was still failing at that point.
+  const readyLookupFailingRef = useRef(false);
+  readyLookupFailingRef.current = readyQuery.isError;
 
-  // Give up if the pod never becomes ready.
+  // Keep the scale-to-zero timer off the editor for the whole wait.
+  useEditorKeepAlive(instance?.url, awaitingReady);
+
+  // Give up if the editor never reports ready.
   useEffect(() => {
-    if (!isPolling) return undefined;
+    if (!awaitingReady) return undefined;
     const id = window.setTimeout(() => {
-      if (!hasRedirected.current) setError('Your Cloud Editor setup is taking longer than usual. Please close this window and try again later.');
-    }, CLOUD_EDITOR_TIMEOUT_MS);
+      if (hasRedirected.current) return;
+      setError(readyLookupFailingRef.current ? 'Could not check whether your Cloud Editor is ready. Please close this window and try again.' : 'Your Cloud Editor setup is taking longer than usual. Please close this window and try again later.');
+    }, CLOUD_EDITOR_READY_TIMEOUT_MS);
     return () => clearTimeout(id);
-  }, [isPolling]);
+  }, [awaitingReady]);
 
   const activeIndex = CLOUD_EDITOR_STEPS.findIndex((s) => s.key === stepKey);
 

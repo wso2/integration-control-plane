@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { getOrgUuidFromToken } from '#auth';
+import { getOrgUuidFromToken } from '../auth';
 
 /**
  * Returns the current org UUID derived from the active access token, or null
  * if no org-scoped token is present. Components should use this instead of
- * reading the token through #auth directly.
+ * reading the token through auth directly.
  */
 export function useOrgUuid(): string | null {
   return getOrgUuidFromToken();

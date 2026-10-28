@@ -40,8 +40,6 @@ import { external } from '../paths';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems } from '../components/Import/gitHubSelectActions';
 import { toHandler } from '../utils/string';
 import { validateProjectName, validateProjectHandler, normalizeProjectError } from '../utils/projectValidation';
-import AddCredentialDialog from '../components/Settings/Credentials/AddCredentialDialog';
-import { gitProviderIcon } from '../constants/gitProviders';
 import { buildRepoUrl } from '../utils/gitProviderUrl';
 import { GitProvider as CredGitProvider } from '../types/credentials';
 import { useGitRepoSource } from '../hooks/useGitRepoSource';
@@ -57,17 +55,8 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
 
   const {
     gitProvider,
-    credProvider,
-    selectedCredential,
-    isCredentialMode,
     isPublicRepo,
     providerSelected,
-    secretRef,
-    providerLabel,
-    allCredentials,
-    showCredModal,
-    setShowCredModal,
-    modalProvider,
     selectedOrg,
     setSelectedOrg,
     selectedRepo,
@@ -103,13 +92,8 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
     openGitHubManage,
     githubInstallUrl,
     isCheckingAuth,
-    credentialAuthFailed,
     handleProviderSelect,
-    handleCredentialPicked,
-    handleCreateCredential,
-    handleCredentialAdded,
-    resetSource,
-  } = useGitRepoSource(true);
+  } = useGitRepoSource();
 
   // Hold the repo pickers at md:3 so Organization/Repository keep their width when branch/subpath appear.
   const colSize = isPublicRepo ? 4 : 3;
@@ -158,9 +142,8 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
         gitOrganization: activeOrg,
         branch: selectedBranch,
         directoryPath: subPath === '/' ? '' : subPath.replace(/^\//, ''),
-        gitProvider: isPublicRepo ? 'public' : isCredentialMode ? (credProvider as string) : 'github',
+        gitProvider: isPublicRepo ? 'public' : 'github',
         isPublicRepo,
-        secretRef,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
@@ -172,7 +155,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
     // Step 2: create workspace module components. The project already exists, so individual
     // component failures don't block navigation — the user can manage them from the project page.
     if (workspaceModules.length > 0) {
-      const srcGitRepoUrl = buildRepoUrl(credProvider ?? CredGitProvider.GITHUB, activeOrg, activeRepo, selectedCredential?.serverUrl);
+      const srcGitRepoUrl = buildRepoUrl(CredGitProvider.GITHUB, activeOrg, activeRepo);
       await Promise.allSettled(
         workspaceModules.map((module) =>
           createComponent.mutateAsync({
@@ -186,7 +169,6 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             repositoryBranch: selectedBranch,
             repositorySubPath: module.path,
             isPublicRepo,
-            ...(isCredentialMode ? { secretRef } : {}),
           }),
         ),
       );
@@ -259,13 +241,16 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
               }}
               fullWidth
               disabled={!isAuthenticated || isReposLoading}
-              error={credentialAuthFailed}
               slotProps={{
                 input: {
-                  startAdornment: <InputAdornment position="start">{isCredentialMode ? gitProviderIcon(credProvider!, 18) : <Building2 size={18} />}</InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Building2 size={18} />
+                    </InputAdornment>
+                  ),
                 },
               }}>
-              {!isCredentialMode && organizationActionItems(!!githubInstallUrl)}
+              {organizationActionItems(!!githubInstallUrl)}
               {orgOptions.map((org) => (
                 <MenuItem key={org} value={org}>
                   {org}
@@ -297,18 +282,14 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      {isCredentialMode ? (
-                        gitProviderIcon(credProvider!, 16)
-                      ) : (
-                        <Box sx={{ color: 'text.primary', display: 'flex' }}>
-                          <GitHub size={16} />
-                        </Box>
-                      )}
+                      <Box sx={{ color: 'text.primary', display: 'flex' }}>
+                        <GitHub size={16} />
+                      </Box>
                     </InputAdornment>
                   ),
                 },
               }}>
-              {!isCredentialMode && repositoryActionItems(!!githubInstallUrl)}
+              {repositoryActionItems(!!githubInstallUrl)}
               {reposForOrg.map((repo) => (
                 <MenuItem key={repo} value={repo}>
                   {repo}
@@ -405,26 +386,11 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 startGitHubAuth(refetchRepos);
               }}
               onPublicSelect={() => handleProviderSelect('public')}
-              credentials={allCredentials}
-              onCredentialSelect={handleCredentialPicked}
-              onCreateCredential={handleCreateCredential}
             />
           </Box>
         ) : (
           <Box sx={{ mb: 1 }}>
             {gitProvider === 'github' && <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />}
-            {credentialAuthFailed && (
-              <Alert
-                severity="error"
-                sx={{ mb: 3 }}
-                action={
-                  <Button color="inherit" size="small" onClick={resetSource}>
-                    Retry
-                  </Button>
-                }>
-                Could not access your {providerLabel} repositories. Re-authorize and try again.
-              </Alert>
-            )}
             {renderRepoPickers()}
             {pathReady && !isContentsLoading && !isContentsError && !isWorkspace && (
               <Alert severity="info" sx={{ mb: 3 }}>
@@ -510,10 +476,6 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           </Button>
         )}
       </Stack>
-
-      {showCredModal && modalProvider && (
-        <AddCredentialDialog initialProvider={modalProvider} lockProvider onClose={() => setShowCredModal(false)} onCancel={() => setShowCredModal(false)} onAdded={() => {}} onAddedCredential={handleCredentialAdded} onError={() => {}} />
-      )}
     </PageContent>
   );
 }

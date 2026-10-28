@@ -18,8 +18,8 @@
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Query } from '@tanstack/react-query';
-import { fetchApimSwagger } from '#api/apim';
-import { fetchComponentByHandler } from '#api/components';
+import { fetchApimSwagger } from '../api/apim';
+import { fetchComponentByHandler } from '../api/components';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { TYPE_TO_KIND } from '../constants/insights';
 import {
@@ -35,7 +35,7 @@ import {
   stopDeployment,
   redeployDeployment,
   deployPrebuiltImage,
-} from '#api/deployments';
+} from '../api/deployments';
 import type { ComponentDeployment, BuildRun, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, RecentDeployment } from '../types/deployment';
 import type { DeployComponentInput } from '../types/build';
 import type { ComponentDetail } from '../types/component';

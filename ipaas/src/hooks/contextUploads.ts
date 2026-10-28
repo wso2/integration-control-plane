@@ -33,7 +33,7 @@
  */
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent, updateContextSource } from '#api/contextEngine';
+import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent, updateContextSource } from '../api/contextEngine';
 import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
 import { engineMessage, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';

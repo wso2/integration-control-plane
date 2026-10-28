@@ -18,69 +18,32 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { UUID_RE } from '../utils/string';
-import { fetchProjects, fetchProject, fetchProjectContributors, fetchProjectComponentLabels, fetchProjectHandlerAvailability, createProject, createMonoRepoProject, linkProjectRepository, updateProject, deleteProject } from '#api/projects';
+import { fetchProjects, fetchProject, fetchProjectContributors, fetchProjectComponentLabels, fetchProjectHandlerAvailability, createProject, createMonoRepoProject, linkProjectRepository, updateProject, deleteProject } from '../api/projects';
 import type { Project, CreateProjectInput, CreateMonoRepoProjectInput, LinkProjectRepositoryInput, UpdateProjectInput } from '../types/project';
-import { useOrgs } from './useOrg';
 import { pollWhileDeleting } from '../utils/deletionPolling';
-import { IS_CLOUD } from '../features';
 
-function orgId(): number {
-  return window.API_CONFIG?.asgardeoOrgNumericId ?? 0;
-}
-
-// In cloud, Thunder does not issue an asgardeoOrgNumericId, so the legacy
-// numeric-ID gate (id > 0) blocks every project query indefinitely. The org
-// scope is carried by the JWT, so the cloud variant's fetchProjects family
-// ignores the numericId argument — we just need to let the queries fire.
-const isOrgScopeReady = (id: number): boolean => IS_CLOUD || id > 0;
-
-/**
- * Whether the queries in this file are actually enabled yet (WIP only — cloud is always ready).
- * Right after fresh onboarding, `asgardeoOrgNumericId` isn't recovered immediately (see
- * AppLayout.tsx's ID-recovery effect), so `orgId()` reads 0 for a beat. A caller that treats
- * "not loading" as "definitely doesn't exist" during that gap — instead of "we haven't been able
- * to check yet" — can flash a false not-found state. Use this to extend a loading condition
- * through that window instead.
- */
-export function useIsOrgScopeReady(): boolean {
-  return isOrgScopeReady(orgId());
-}
-
-const projectsQuery = (id: number) => ({
-  queryKey: ['projects', id],
-  queryFn: () => fetchProjects(id),
-  enabled: isOrgScopeReady(id),
+const projectsQuery = {
+  queryKey: ['projects'],
+  queryFn: fetchProjects,
   refetchInterval: pollWhileDeleting,
-});
+};
 
 export function useProjects() {
-  return useQuery(projectsQuery(orgId()));
+  return useQuery(projectsQuery);
 }
 
 /**
  * Projects for pickers and navigation targets; `useProjects` keeps the finalizing ones that scope resolution and name-uniqueness checks need.
  */
 export function useActiveProjects() {
-  return useQuery({ ...projectsQuery(orgId()), select: (list: Project[]) => list.filter((p) => !p.deleting) });
-}
-
-export function useProjectsByOrg(orgHandle: string) {
-  const { data: orgs } = useOrgs();
-  const numericId = orgs?.find((o) => o.handle === orgHandle)?.numericId ?? 0;
-  return useQuery({
-    queryKey: ['projects', numericId],
-    queryFn: () => fetchProjects(numericId),
-    enabled: isOrgScopeReady(numericId),
-    refetchInterval: pollWhileDeleting,
-  });
+  return useQuery({ ...projectsQuery, select: (list: Project[]) => list.filter((p) => !p.deleting) });
 }
 
 export function useProject(projectId: string) {
-  const id = orgId();
   return useQuery({
-    queryKey: ['project', projectId, id],
-    queryFn: () => fetchProject(id, projectId),
-    enabled: !!projectId && isOrgScopeReady(id),
+    queryKey: ['project', projectId],
+    queryFn: () => fetchProject(projectId),
+    enabled: !!projectId,
   });
 }
 
@@ -91,31 +54,28 @@ export function useProjectByHandler(handler: string) {
 }
 
 export function useProjectContributors(projectId: string) {
-  const id = orgId();
   return useQuery({
-    queryKey: ['projectContributors', projectId, id],
-    queryFn: () => fetchProjectContributors(id, projectId),
-    enabled: !!projectId && isOrgScopeReady(id),
+    queryKey: ['projectContributors', projectId],
+    queryFn: () => fetchProjectContributors(projectId),
+    enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
   });
 }
 
 export function useProjectComponentLabels(projectId: string) {
-  const id = orgId();
   return useQuery({
-    queryKey: ['projectComponentLabels', projectId, id],
-    queryFn: () => fetchProjectComponentLabels(id, projectId),
-    enabled: !!projectId && isOrgScopeReady(id),
+    queryKey: ['projectComponentLabels', projectId],
+    queryFn: () => fetchProjectComponentLabels(projectId),
+    enabled: !!projectId,
     staleTime: 5 * 60 * 1000,
   });
 }
 
 export function useProjectHandlerAvailability(candidate: string, enabled: boolean) {
-  const id = orgId();
   return useQuery({
-    queryKey: ['projectHandlerAvailability', id, candidate],
-    queryFn: () => fetchProjectHandlerAvailability(id, candidate),
-    enabled: enabled && isOrgScopeReady(id) && !!candidate && candidate.length >= 2,
+    queryKey: ['projectHandlerAvailability', candidate],
+    queryFn: () => fetchProjectHandlerAvailability(candidate),
+    enabled: enabled && !!candidate && candidate.length >= 2,
     staleTime: 0,
     retry: false,
   });

@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createEgressPolicy, deleteEgressPolicy, fetchEgressPolicy, updateEgressPolicy } from '#api/egressControl';
+import { createEgressPolicy, deleteEgressPolicy, fetchEgressPolicy, updateEgressPolicy } from '../../api/egressControl';
 import type { EgressPolicy, EgressPolicyRequest } from '../../types/egressPolicy';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 

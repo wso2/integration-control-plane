@@ -17,42 +17,25 @@
  */
 
 interface RuntimeConfig {
-  VITE_GRAPHQL_URL?: string;
   VITE_AUTH_BASE_URL?: string;
   VITE_OBSERVABILITY_URL?: string;
-  VITE_ALERTING_URL?: string;
   SYSTEM_APIS_BASE_URL?: string;
   BILLING_API_BASE_URL?: string;
   BILLING_CONSOLE_URL?: string;
   CHOREO_SAAS_OFFER_URL?: string;
   ENABLE_BILLING_FEATURE?: string | boolean;
   ASGARDEO_CLIENT_ID?: string;
-  ASGARDEO_AUTHORIZE_ENDPOINT?: string;
-  ASGARDEO_TOKEN_ENDPOINT?: string;
   ASGARDEO_SIGN_IN_REDIRECT_URL?: string;
   ASGARDEO_SCOPE?: string;
   ASGARDEO_RESOURCE?: string;
-  STS_TOKEN_ENDPOINT?: string;
-  STS_CLIENT_ID?: string;
-  STS_SCOPE?: string;
   CHOREO_BASE_API_URL?: string;
-  APIM_BASE_URL?: string;
-  INSIGHTS_BASE_URL?: string;
-  ASGARDEO_ORG_NUMERIC_ID?: string;
   SYS_API_PREFIX?: string;
   GITHUB_APP_CLIENT_ID?: string;
   GITHUB_APP_AUTH_REDIRECTION_URL?: string;
   GITHUB_APP_SLUG?: string;
-  SUBSCRIPTIONS_API_URL?: string;
   SAMPLES_URL?: string;
   PREBUILT_INTEGRATIONS_URL?: string;
-  ASGARDEO_SIGNUP_URL?: string;
   AI_COPILOT_URL_SUFFIX?: string;
-  AI_COPILOT_DATACOLLECTOR_BASE_URL?: string;
-  PLATFORM_SERVICES_API_BASE_URL?: string;
-  ENABLE_PLATFORM_SERVICES_FEATURE?: string | boolean;
-  /** Comma-separated list of "REGION::https://domain" entries, e.g. "US::https://console.us.devant.dev,EU::https://console.eu.devant.dev". When set, a region selector is shown on login/signup. */
-  AVAILABLE_LOGIN_REGIONS?: string;
   /** Comma-separated exact origins an editor's https callback may use, e.g. "https://a.example.dev,https://b.example.dev". Empty allows none. */
   EDITOR_CALLBACK_ORIGINS?: string;
   /** Comma-separated parent domains whose https subdomains may be editor callbacks, e.g. "cloud.wso2.com". Editors get a subdomain each, so they cannot be listed individually. */
@@ -60,45 +43,33 @@ interface RuntimeConfig {
   CHOREO_URL_MANAGER_URL?: string;
   ENABLE_CUSTOM_URL_MAPPINGS_FEATURE?: string | boolean;
   RAG_INGESTION_IMAGE?: string;
-  ENABLE_RAG_INGESTION_FEATURE?: string | boolean;
-  RAG_INGESTION_BACKEND?: string;
   INTEGRATION_BUILDER_COPILOT_BASE_URL?: string;
   INTEGRATION_BUILDER_LLM_MODEL?: string;
   INTEGRATION_BUILDER_MAX_TOKENS?: string;
   INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL?: string;
-  /** Devant Context Engine REST base (the app calls `<base>/v1/...`). Unset disables the feature. */
+  MOESIF_APP_URL?: string;
+  /** Context Engine REST base (the app calls `<base>/v1/...`). Unset disables the feature. */
   CONTEXT_ENGINE_API_URL?: string;
-  /** Local-development only: a static engine token when the engine cannot verify platform tokens yet. */
+  /** Local-development only: a static engine token when the engine cannot verify platform tokens. */
   CONTEXT_ENGINE_API_TOKEN?: string;
   ENABLE_CONTEXT_ENGINE_FEATURE?: string | boolean;
 }
 
 export interface ApiConfig {
-  graphqlUrl: string;
   authBaseUrl: string;
   observabilityUrl: string;
-  alertingUrl: string;
   asgardeoClientId: string;
-  asgardeoAuthorizeEndpoint: string;
-  asgardeoTokenEndpoint: string;
   asgardeoSignInRedirectUrl: string;
   asgardeoScope: string;
   asgardeoResource?: string;
-  stsTokenEndpoint: string;
-  stsClientId: string;
-  stsScope: string;
   choreoBaseApiUrl: string;
   choreoOrgApiUrl: string;
-  apimBaseUrl: string;
-  insightsBaseUrl: string;
-  asgardeoOrgNumericId?: number;
   systemApisBaseUrl?: string;
   sysApiPrefix: string;
   githubAppClientId?: string;
   githubAppAuthRedirectUrl?: string;
   /** GitHub App slug — powers https://github.com/apps/{slug}/installations/new when the App is authorized but not yet installed on any account. */
   githubAppSlug?: string;
-  subscriptionsApiUrl: string;
   billingApiBaseUrl: string;
   /** External billing console base — the Upgrade button links to `${billingConsoleUrl}/cloud/devant/upgrade`. */
   billingConsoleUrl?: string;
@@ -108,11 +79,7 @@ export interface ApiConfig {
   enableBillingFeature?: boolean;
   samplesUrl?: string;
   prebuiltIntegrationsUrl?: string;
-  asgardeoSignupUrl: string;
   aiCopilotUrlSuffix: string;
-  aiCopilotDatacollectorBaseUrl: string;
-  /** Comma-separated "REGION::https://domain" entries. Present only when multi-region is configured. */
-  availableLoginRegions?: string;
   /**
    * Exact origins an editor may have its GitHub OAuth result forwarded to over
    * https. Browser-based editors cannot use a custom URI scheme, so they need
@@ -137,18 +104,8 @@ export interface ApiConfig {
   urlManagerUrl?: string;
   /** Feature flag mirroring Devant's ENABLE_CUSTOM_URL_MAPPINGS_FEATURE. */
   enableCustomUrlMappings?: boolean;
-  /** Platform-services (managed databases) base URL. When unset, the admin Databases page stays disabled. */
-  platformServicesApiBaseUrl?: string;
-  /** Gates the admin Databases feature (mirrors Devant's ENABLE_PLATFORM_SERVICES_FEATURE). */
-  enablePlatformServicesFeature?: boolean;
   /** Container image deployed by the RAG Ingestion wizard. Falls back to {@link RAG_INGESTION_DEFAULT_IMAGE} when unset. */
   ragIngestionImage?: string;
-  /** Gates the RAG Ingestion (Scheduled Ingestion) feature. */
-  enableRagIngestionFeature?: boolean;
-  /** RAG backend base URL — powers the Retrieval query endpoint. When unset, Retrieval's query action is disabled. */
-  ragBackendUrl?: string;
-  /** Internal Marketplace API base — derived from choreoBaseApiUrl. Used to read/write service descriptions (Overview). */
-  internalMarketplaceUrl: string;
   /** AI Integration Builder copilot base URL. */
   integrationBuilderCopilotBaseUrl: string;
   /** AI Integration Builder LLM model name. */
@@ -157,7 +114,9 @@ export interface ApiConfig {
   integrationBuilderMaxTokens: number;
   /** AI Integration Builder central GraphQL URL for connectors. */
   integrationBuilderCentralGraphqlUrl: string;
-  /** Devant Context Engine REST base. Empty when the engine is not configured for this deployment. */
+  /** Trusted Moesif embed origin; empty disables API Insights. */
+  moesifAppUrl?: string;
+  /** Context Engine REST base. Empty when the engine is not configured for this deployment. */
   contextEngineApiUrl: string;
   /** Dev-only static bearer token for the engine; unset sends the platform token. */
   contextEngineApiToken?: string;
@@ -180,42 +139,27 @@ function parsePositiveInt(value: unknown, fallback: number): number {
 
 // Default configuration (used as fallback if config.json fails to load)
 const DEFAULT_CONFIG: ApiConfig = {
-  graphqlUrl: 'https://apis.preview-dv.choreo.dev/projects/1.0.0/graphql',
   authBaseUrl: 'https://localhost:9445/auth',
   observabilityUrl: 'https://localhost:9448/icp/observability',
-  alertingUrl: 'https://localhost:9448/icp/alerting',
   asgardeoClientId: '',
-  asgardeoAuthorizeEndpoint: 'https://dev.api.asgardeo.io/t/a/oauth2/authorize',
-  asgardeoTokenEndpoint: 'https://dev.api.asgardeo.io/t/a/oauth2/token',
   asgardeoSignInRedirectUrl: `${window.location.origin}/signin`,
   asgardeoScope: 'openid profile email groups',
-  stsTokenEndpoint: '',
-  stsClientId: '',
-  stsScope: '',
   choreoBaseApiUrl: 'https://apis.preview-dv.choreo.dev',
   choreoOrgApiUrl: 'https://apis.preview-dv.choreo.dev/orgs/1.0.0',
-  apimBaseUrl: 'https://sts.preview-dv.choreo.dev',
-  insightsBaseUrl: 'https://choreocontrolplane.preview-dv.choreo.dev',
   systemApisBaseUrl: '',
   sysApiPrefix: '783c6c4d-8b9b-4190-b70a-e717ab1ee739-systemapis',
   githubAppClientId: '',
   githubAppAuthRedirectUrl: `${window.location.origin}/ghapp`,
   githubAppSlug: '',
-  subscriptionsApiUrl: import.meta.env.DEV ? '/subscriptions-proxy' : 'https://subscriptions.dv.wso2.com',
   billingApiBaseUrl: '',
-  asgardeoSignupUrl: 'https://dev.asgardeo.io/signup',
   aiCopilotUrlSuffix: '',
-  aiCopilotDatacollectorBaseUrl: '',
-  availableLoginRegions: undefined,
   editorCallbackOrigins: [],
   editorCallbackDomains: [],
   integrationBuilderCopilotBaseUrl: 'https://apis.preview-dv.devant.dev/copilot',
   integrationBuilderLlmModel: 'claude-sonnet-4-6',
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
-  internalMarketplaceUrl: 'https://apis.preview-dv.choreo.dev/marketplace/0.1.0',
-  // Dev server proxies this path to a locally running engine (see vite.config.ts).
-  contextEngineApiUrl: import.meta.env.DEV ? '/context-engine-proxy' : '',
+  contextEngineApiUrl: '',
 };
 
 /**
@@ -235,48 +179,28 @@ export async function loadConfig(): Promise<void> {
     const systemApisBase = trim(config.SYSTEM_APIS_BASE_URL || DEFAULT_CONFIG.systemApisBaseUrl || '');
 
     window.API_CONFIG = {
-      graphqlUrl: config.VITE_GRAPHQL_URL || DEFAULT_CONFIG.graphqlUrl,
       authBaseUrl: trim(config.VITE_AUTH_BASE_URL || DEFAULT_CONFIG.authBaseUrl),
       observabilityUrl: trim(config.VITE_OBSERVABILITY_URL || DEFAULT_CONFIG.observabilityUrl),
-      alertingUrl: config.VITE_ALERTING_URL ? trim(config.VITE_ALERTING_URL) : systemApisBase ? `${systemApisBase}/systemapis/choreo-alerting-api/v1.0` : DEFAULT_CONFIG.alertingUrl,
       asgardeoClientId: config.ASGARDEO_CLIENT_ID || DEFAULT_CONFIG.asgardeoClientId,
-      asgardeoAuthorizeEndpoint: config.ASGARDEO_AUTHORIZE_ENDPOINT || DEFAULT_CONFIG.asgardeoAuthorizeEndpoint,
-      asgardeoTokenEndpoint: config.ASGARDEO_TOKEN_ENDPOINT || DEFAULT_CONFIG.asgardeoTokenEndpoint,
       asgardeoSignInRedirectUrl: config.ASGARDEO_SIGN_IN_REDIRECT_URL || DEFAULT_CONFIG.asgardeoSignInRedirectUrl,
       asgardeoScope: config.ASGARDEO_SCOPE || DEFAULT_CONFIG.asgardeoScope,
       asgardeoResource: config.ASGARDEO_RESOURCE?.trim() || undefined,
-      stsTokenEndpoint: config.STS_TOKEN_ENDPOINT || DEFAULT_CONFIG.stsTokenEndpoint,
-      stsClientId: config.STS_CLIENT_ID || DEFAULT_CONFIG.stsClientId,
-      stsScope: config.STS_SCOPE || '',
       choreoBaseApiUrl: choreoBase,
       choreoOrgApiUrl: `${choreoBase}/orgs/1.0.0`,
-      apimBaseUrl: trim(config.APIM_BASE_URL || DEFAULT_CONFIG.apimBaseUrl),
-      insightsBaseUrl: trim(config.INSIGHTS_BASE_URL || DEFAULT_CONFIG.insightsBaseUrl),
       systemApisBaseUrl: systemApisBase || DEFAULT_CONFIG.systemApisBaseUrl,
-      asgardeoOrgNumericId: (() => {
-        if (config.ASGARDEO_ORG_NUMERIC_ID) return parseInt(config.ASGARDEO_ORG_NUMERIC_ID, 10);
-        const stored = localStorage.getItem('org_numeric_id');
-        return stored ? parseInt(stored, 10) : undefined;
-      })(),
       sysApiPrefix: config.SYS_API_PREFIX || DEFAULT_CONFIG.sysApiPrefix,
       githubAppClientId: config.GITHUB_APP_CLIENT_ID || DEFAULT_CONFIG.githubAppClientId,
       githubAppAuthRedirectUrl: config.GITHUB_APP_AUTH_REDIRECTION_URL || DEFAULT_CONFIG.githubAppAuthRedirectUrl,
       githubAppSlug: config.GITHUB_APP_SLUG || DEFAULT_CONFIG.githubAppSlug,
-      subscriptionsApiUrl: config.SUBSCRIPTIONS_API_URL || DEFAULT_CONFIG.subscriptionsApiUrl,
       billingApiBaseUrl: trim(config.BILLING_API_BASE_URL || DEFAULT_CONFIG.billingApiBaseUrl),
       samplesUrl: config.SAMPLES_URL || undefined,
       prebuiltIntegrationsUrl: config.PREBUILT_INTEGRATIONS_URL || undefined,
-      asgardeoSignupUrl: config.ASGARDEO_SIGNUP_URL || DEFAULT_CONFIG.asgardeoSignupUrl,
       aiCopilotUrlSuffix: config.AI_COPILOT_URL_SUFFIX || DEFAULT_CONFIG.aiCopilotUrlSuffix,
-      aiCopilotDatacollectorBaseUrl: trim(config.AI_COPILOT_DATACOLLECTOR_BASE_URL || DEFAULT_CONFIG.aiCopilotDatacollectorBaseUrl),
       urlManagerUrl: config.CHOREO_URL_MANAGER_URL ? trim(config.CHOREO_URL_MANAGER_URL) : undefined,
       enableCustomUrlMappings: config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === 'true' || config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === true,
       billingConsoleUrl: config.BILLING_CONSOLE_URL ? trim(config.BILLING_CONSOLE_URL) : undefined,
       choreoSaasOfferUrl: config.CHOREO_SAAS_OFFER_URL || undefined,
       enableBillingFeature: config.ENABLE_BILLING_FEATURE === 'true' || config.ENABLE_BILLING_FEATURE === true,
-      platformServicesApiBaseUrl: config.PLATFORM_SERVICES_API_BASE_URL ? trim(config.PLATFORM_SERVICES_API_BASE_URL) : undefined,
-      enablePlatformServicesFeature: config.ENABLE_PLATFORM_SERVICES_FEATURE === 'true' || config.ENABLE_PLATFORM_SERVICES_FEATURE === true,
-      availableLoginRegions: config.AVAILABLE_LOGIN_REGIONS || undefined,
       editorCallbackOrigins: (config.EDITOR_CALLBACK_ORIGINS || '')
         .split(',')
         .map((origin) => origin.trim().toLowerCase())
@@ -286,13 +210,11 @@ export async function loadConfig(): Promise<void> {
         .map((domain) => domain.trim().toLowerCase())
         .filter(Boolean),
       ragIngestionImage: config.RAG_INGESTION_IMAGE ? trim(config.RAG_INGESTION_IMAGE) : undefined,
-      enableRagIngestionFeature: config.ENABLE_RAG_INGESTION_FEATURE === 'true' || config.ENABLE_RAG_INGESTION_FEATURE === true,
-      ragBackendUrl: config.RAG_INGESTION_BACKEND ? trim(config.RAG_INGESTION_BACKEND) : undefined,
       integrationBuilderCopilotBaseUrl: config.INTEGRATION_BUILDER_COPILOT_BASE_URL ? trim(config.INTEGRATION_BUILDER_COPILOT_BASE_URL) : 'https://apis.preview-dv.devant.dev/copilot',
       integrationBuilderLlmModel: config.INTEGRATION_BUILDER_LLM_MODEL || 'claude-sonnet-4-6',
       integrationBuilderMaxTokens: parsePositiveInt(config.INTEGRATION_BUILDER_MAX_TOKENS, DEFAULT_CONFIG.integrationBuilderMaxTokens),
       integrationBuilderCentralGraphqlUrl: config.INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL || 'https://api.dev-central.ballerina.io/2.0/graphql',
-      internalMarketplaceUrl: `${choreoBase}/marketplace/0.1.0`,
+      moesifAppUrl: config.MOESIF_APP_URL?.trim() || undefined,
       contextEngineApiUrl: config.CONTEXT_ENGINE_API_URL ? trim(config.CONTEXT_ENGINE_API_URL) : DEFAULT_CONFIG.contextEngineApiUrl,
       contextEngineApiToken: config.CONTEXT_ENGINE_API_TOKEN?.trim() || undefined,
       enableContextEngineFeature: config.ENABLE_CONTEXT_ENGINE_FEATURE === 'true' || config.ENABLE_CONTEXT_ENGINE_FEATURE === true,
@@ -306,27 +228,10 @@ export async function loadConfig(): Promise<void> {
 }
 
 // URL helpers — only for values that require computation (path concatenation or runtime parameters).
-// Simple field reads (e.g. window.API_CONFIG.apimBaseUrl) are done directly at call sites.
+// Simple field reads (e.g. window.API_CONFIG.choreoBaseApiUrl) are done directly at call sites.
 
-export const loginApiUrl = (): string => `${window.API_CONFIG.authBaseUrl}/login`;
-export const refreshTokenApiUrl = (): string => `${window.API_CONFIG.authBaseUrl}/refresh-token`;
-export const revokeTokenApiUrl = (): string => `${window.API_CONFIG.authBaseUrl}/revoke-token`;
-
-export const choreoAlertingApiUrl = (gatewayHost: string): string => {
-  const { alertingUrl, sysApiPrefix } = window.API_CONFIG;
-  if (alertingUrl) return alertingUrl;
-  return `https://${sysApiPrefix}.${gatewayHost}/systemapis/choreo-alerting-api/v1.0`;
-};
-
-export const choreologgingProjectLogsApiUrl = (gatewayHost: string): string => {
-  const { sysApiPrefix } = window.API_CONFIG;
-  return `https://${sysApiPrefix}.${gatewayHost}/systemapis/choreologgingapi/0.2.0/logs/project/application?live=true`;
-};
-
-// Insights (Usage Insights / APIM traffic) query endpoint — served by the same
-// per-org systemapis gateway as alerting/logging, not `insightsBaseUrl` (that
-// default is a stale host that 404s; devant's own captured traffic — see
-// devant-insights-01.har — hits `<sysApiPrefix>.<gatewayHost>/systemapis/analyticsqueryapi/0.1.0/query`).
+// Insights (Usage Insights / APIM traffic) query endpoint — served by the per-org
+// systemapis gateway, like logging (`<sysApiPrefix>.<gatewayHost>/systemapis/analyticsqueryapi/0.1.0/query`).
 export const choreoInsightsQueryApiUrl = (gatewayHost: string): string => {
   const { sysApiPrefix } = window.API_CONFIG;
   return `https://${sysApiPrefix}.${gatewayHost}/systemapis/analyticsqueryapi/0.1.0/query`;
@@ -357,18 +262,4 @@ export const getDevPortalBaseUrl = (): string | null => {
   } catch {
     return null;
   }
-};
-
-// Path template for an API's page on the (third-party) Developer Portal.
-const DEV_PORTAL_API_VIEW_PATH = 'views/default/api';
-
-/**
- * Full Developer Portal URL for a published API. The Dev Portal is a separate
- * (third-party) portal, so its URL shape lives here, not inlined in components.
- * Returns null when the base can't be derived.
- */
-export const getDevPortalApiUrl = (orgHandler: string, apiName: string, apiVersion: string): string | null => {
-  const base = getDevPortalBaseUrl();
-  if (!base) return null;
-  return `${base}/${orgHandler}/${DEV_PORTAL_API_VIEW_PATH}/${encodeURIComponent(apiName)}-${encodeURIComponent(apiVersion)}`;
 };

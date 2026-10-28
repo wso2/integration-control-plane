@@ -38,7 +38,7 @@ export default function PipelineEnvNode({ name, region, critical, onRemove, disa
         <Typography variant="body1" sx={{ fontWeight: 600, flex: 1, wordBreak: 'break-word' }}>
           {name}
         </Typography>
-        {critical && <Chip label="Critical" size="small" color="warning" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
+        {critical && <Chip label="Critical" size="small" color="error" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />}
         {onRemove && (
           <Tooltip title="Remove">
             <IconButton size="small" color="error" disabled={disabled} onClick={onRemove} aria-label={`Remove ${name}`} sx={{ p: 0.25 }}>

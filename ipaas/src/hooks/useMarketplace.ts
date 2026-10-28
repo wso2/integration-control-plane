@@ -17,7 +17,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchThrottlingPolicies, fetchApiDocuments, fetchRuleAdherence } from '#api/marketplace';
+import { fetchThrottlingPolicies, fetchApiDocuments, fetchRuleAdherence } from '../api/marketplace';
 
 export function useThrottlingPolicies() {
   return useQuery({

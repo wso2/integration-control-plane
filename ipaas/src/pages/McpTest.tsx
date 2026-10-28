@@ -20,9 +20,6 @@ import { Alert, Box, MenuItem, PageContent, PageTitle, Select, Stack } from '@ws
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import ComingSoon from './ComingSoon';
 import McpPlayground from '../components/McpPlayground/McpPlayground';
-import DeploymentTrackBar from '../components/DeploymentTrackBar';
-import { IS_CLOUD } from '../features';
-import { useGeneratedTestKey } from '../hooks/useApim';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment, useEnvEndpoints } from '../hooks/useDeployments';
@@ -30,39 +27,27 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import type { ComponentScope } from '../nav';
-import type { EnvEndpoint } from '../types/component';
 import type { EndpointRef } from '../types/consumers';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
 import { PILL_SELECT_SX } from '../constants/styles';
-const TEST_KEY_HEADER = 'test-key';
-
-/** Network-visibility URL resolvers (mirrors the endpoint URLs panel). */
-const VISIBILITY_OPTIONS: { value: string; label: string; getUrl: (ep: EnvEndpoint) => string }[] = [
-  { value: 'public', label: 'Public', getUrl: (ep) => ep.publicUrl || ep.defaultPublicUrl || ep.invokeUrl || '' },
-  { value: 'organization', label: 'Organization', getUrl: (ep) => ep.organizationUrl || ep.defaultOrganizationUrl || '' },
-  { value: 'project', label: 'Project', getUrl: (ep) => ep.projectUrl || '' },
-];
 
 /**
- * MCP Server "Test" page: resolves the deployed MCP endpoint + a freshly minted
- * `test-key` for the selected environment/track, then hands them to the in-house
+ * MCP Server "Test" page: resolves the deployed MCP endpoint's gateway URL + a test
+ * credential for the selected environment, then hands them to the in-house
  * {@link McpPlayground} (the interactive connect / list-tools / invoke / ping surface).
  */
 export default function McpTest(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
-  const { projectId, project } = useProjectId(scope.project);
+  const { projectId } = useProjectId(scope.project);
   const { data: component } = useComponentByHandler(projectId, scope.component);
   const isMcp = component?.componentSubType === 'MCP';
 
   const { data: environments = [] } = useEnvironments(scope.org, projectId);
 
   const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  const [selectedTrackId, setSelectedTrackId] = useState('');
-  useEffect(() => {
-    if (!tracks.length) return;
-    setSelectedTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [component?.id, tracks]);
+  // An integration has one implicit deployment track.
+  const selectedTrackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
 
   const [selectedEnvId, setSelectedEnvId] = useState('');
   useEffect(() => {
@@ -75,42 +60,28 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   const releaseId = deployment?.releaseId ?? '';
   const { data: endpoints = [] } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
 
-  // Cloud has no APIM, so requiring an apimId there would reject every endpoint.
-  const testableEndpoints = useMemo(() => endpoints.filter((e) => e.publicUrl && (IS_CLOUD || e.apimId)), [endpoints]);
+  const testableEndpoints = useMemo(() => endpoints.filter((e) => e.publicUrl), [endpoints]);
   const [selectedEndpointId, setSelectedEndpointId] = useState('');
-  const [selectedVisibility, setSelectedVisibility] = useState('');
 
   const activeEndpointId = testableEndpoints.some((e) => e.id === selectedEndpointId) ? selectedEndpointId : (testableEndpoints[0]?.id ?? '');
   const activeEndpoint = testableEndpoints.find((e) => e.id === activeEndpointId) ?? null;
 
-  const visibilityOptions = useMemo(() => (activeEndpoint ? VISIBILITY_OPTIONS.filter((v) => v.getUrl(activeEndpoint) && (!activeEndpoint.networkVisibilities?.length || activeEndpoint.networkVisibilities.includes(v.label))) : []), [activeEndpoint]);
-  const activeVisibility = visibilityOptions.some((v) => v.value === selectedVisibility) ? selectedVisibility : (visibilityOptions[0]?.value ?? '');
-
-  const apimId = activeEndpoint?.apimId ?? null;
   // Only a live deployment can answer MCP calls; every other state explains itself.
   const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
 
-  const accessRef: EndpointRef | null = useMemo(
-    () => (IS_CLOUD && component && selectedEnv && activeEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id } : null),
-    [component, selectedEnv, activeEndpoint],
-  );
-  const access = useEndpointTestAccess(accessRef, IS_CLOUD && !!accessRef && isActive);
+  const accessRef: EndpointRef | null = useMemo(() => (component && selectedEnv && activeEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id } : null), [component, selectedEnv, activeEndpoint]);
+  const access = useEndpointTestAccess(accessRef, !!accessRef && isActive);
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.
-  const baseUrl = IS_CLOUD ? access.gatewayUrl : (visibilityOptions.find((v) => v.value === activeVisibility)?.getUrl(activeEndpoint!) ?? '');
+  const baseUrl = access.gatewayUrl;
   const mcpUrl = baseUrl ? `${baseUrl}/mcp` : '';
 
   const endpointSwitcher = { options: testableEndpoints.map((e) => ({ label: e.displayName, value: e.id })), value: activeEndpointId, onChange: setSelectedEndpointId };
-  const visibilitySwitcher = { options: visibilityOptions.map((v) => ({ label: v.label, value: v.value })), value: activeVisibility, onChange: setSelectedVisibility };
 
-  const apim = useGeneratedTestKey({ apimId, critical: !!selectedEnv?.critical });
-  const token = IS_CLOUD ? access.apiKey : apim.token;
-  const tokenFetching = IS_CLOUD ? access.isMinting : apim.isFetching;
-  const regenerate = IS_CLOUD ? () => void access.mintKey() : apim.regenerate;
-  const headerName = IS_CLOUD ? access.authHeader : TEST_KEY_HEADER;
+  const regenerate = () => void access.mintKey();
   // Not offered for an open endpoint: the test-key route switches enforcement to api-key, so
   // minting would secure an endpoint whose api-key scheme the user turned off.
-  const canMint = !IS_CLOUD || access.mode === 'api-key';
+  const canMint = access.mode === 'api-key';
 
   // Non-MCP components keep this route's previous Coming Soon behaviour.
   if (component && !isMcp) {
@@ -129,8 +100,6 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? scope.project} componentHandler={scope.component} />}
-
       <PageContent sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
           <PageTitle>
@@ -142,23 +111,15 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
           <NotDeployedAlert status={deployment?.deploymentStatusV2} />
         ) : !mcpUrl ? (
           // Deployed, but with no enforcing URL to call — a different state from "not deployed".
-          <Alert severity="info">{IS_CLOUD && access.isUnavailable ? 'This MCP server isn’t exposed as an API on the gateway yet, so it cannot be tested from here.' : 'No testable endpoint URL is available for this MCP server yet.'}</Alert>
+          <Alert severity="info">{access.isUnavailable ? 'This MCP server isn’t exposed as an API on the gateway yet, so it cannot be tested from here.' : 'No testable endpoint URL is available for this MCP server yet.'}</Alert>
         ) : (
           <>
-            {IS_CLOUD && access.keyError && (
+            {access.keyError && (
               <Alert severity="warning" sx={{ mb: 1.5 }}>
                 {access.keyError}
               </Alert>
             )}
-            <McpPlayground
-              url={mcpUrl}
-              token={token || null}
-              headerName={headerName}
-              isTokenFetching={tokenFetching}
-              onTokenRegenerate={canMint ? regenerate : undefined}
-              endpointSwitcher={endpointSwitcher}
-              visibilitySwitcher={IS_CLOUD ? undefined : visibilitySwitcher}
-            />
+            <McpPlayground url={mcpUrl} token={access.apiKey || null} headerName={access.authHeader} isTokenFetching={access.isMinting} onTokenRegenerate={canMint ? regenerate : undefined} endpointSwitcher={endpointSwitcher} />
           </>
         )}
       </PageContent>

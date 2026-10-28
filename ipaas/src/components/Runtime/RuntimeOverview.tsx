@@ -20,7 +20,6 @@ import { Alert, Box, Button, Chip, CircularProgress, Grid, Stack, Typography } f
 import { RotateCw } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import CopyField from './CopyField';
-import { IS_CLOUD } from '../../features';
 import { formatDistanceToNow } from '../../utils/time';
 import type { PaletteColor } from '../../config/statusColors';
 
@@ -49,7 +48,6 @@ interface RuntimeOverviewProps {
   componentName: string;
   status: string;
   lastDeployedAt?: string;
-  lastDeployedMessage?: string;
   componentId: string;
   releaseId: string;
   namespace?: string;
@@ -60,7 +58,7 @@ interface RuntimeOverviewProps {
   onRedeploy: () => void;
 }
 
-export default function RuntimeOverview({ componentName, status, lastDeployedAt, lastDeployedMessage, componentId, releaseId, namespace, imageUrl, isDeployed, redeploying, canRedeploy, onRedeploy }: RuntimeOverviewProps): JSX.Element {
+export default function RuntimeOverview({ componentName, status, lastDeployedAt, componentId, releaseId, namespace, imageUrl, isDeployed, redeploying, canRedeploy, onRedeploy }: RuntimeOverviewProps): JSX.Element {
   const meta = statusMeta(status);
   return (
     <Grid container spacing={4}>
@@ -74,11 +72,6 @@ export default function RuntimeOverview({ componentName, status, lastDeployedAt,
         <Typography variant="body2" color="text.secondary">
           Last deployed {lastDeployedAt ? formatDistanceToNow(lastDeployedAt) : '—'}
         </Typography>
-        {!IS_CLOUD && lastDeployedMessage && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-            {lastDeployedMessage}
-          </Typography>
-        )}
         <Box sx={{ mt: 3 }}>
           {isDeployed ? (
             <Button variant="outlined" startIcon={redeploying ? <CircularProgress size={16} color="inherit" /> : <RotateCw size={18} />} disabled={redeploying || !canRedeploy} onClick={onRedeploy}>

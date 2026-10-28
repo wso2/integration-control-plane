@@ -16,11 +16,11 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, MenuItem, PageContent, PageTitle, Select, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAccessControl } from '../../contexts/AccessControlContext';
 import DeploymentTrackBar from '../../components/DeploymentTrackBar';
-import ScaleMethodCard from '../components/Scaling/ScaleMethodCard';
+import ScaleMethodCard from '../../components/Scaling/ScaleMethodCard';
 import ScaleToZeroConfig from '../components/Scaling/ScaleToZeroConfig';
 import HpaConfig from '../components/Scaling/HpaConfig';
 import ReplicasTable from '../components/Scaling/ReplicasTable';
@@ -28,7 +28,7 @@ import ComingSoon from '../../pages/ComingSoon';
 import { Permissions } from '../../constants/permissions';
 import { GENERIC_SERVICE_TYPES } from '../../constants/integrations';
 import { CLOUD_DP_MAX_REPLICAS, HPA_CARD, SCALE_TO_ZERO_CARD } from '../../constants/scaling';
-import { isScalingEnabled, useHpa, useHttpScaler, useScalingState, useSetScalingMethod } from '../../hooks/useScaling';
+import { isScalingEnabled, useHpa, useHttpScaler, useScalingState, useSetScalingMethod } from '../hooks/useScaling';
 import { useComponentByHandler } from '../../hooks/useComponents';
 import { useComponentDeployment } from '../../hooks/useDeployments';
 import { useRelease } from '../../hooks/useDevopsConfigs';
@@ -38,7 +38,6 @@ import { useProjectId } from '../../hooks/useProjects';
 import { mainContainer } from '../../utils/devopsConfigs';
 import { ScalingMethod, type ScalingPath } from '../../types/scaling';
 import type { ComponentScope } from '../../nav';
-import { IS_CLOUD } from '../../features';
 
 export default function ComponentScaling({ org, project, component }: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid();
@@ -108,27 +107,14 @@ export default function ComponentScaling({ org, project, component }: ComponentS
     );
   };
 
-  const envSelect = !IS_CLOUD && environments.length > 1 && (
-    <Select
-      size="small"
-      value={environments.some((e) => e.id === envId) ? envId : ''}
-      onChange={(e) => setEnvId(e.target.value as string)}
-      inputProps={{ 'aria-label': 'Environment' }}
-      sx={{ fontSize: '0.8125rem', '& .MuiSelect-select': { py: 0.5, px: 1.5 }, minWidth: 140 }}>
-      {environments.map((e) => (
-        <MenuItem key={e.id} value={e.id}>
-          {e.name}
-        </MenuItem>
-      ))}
-    </Select>
-  );
+  const envSelect = null;
 
   const onSaved = (message: string) => setAlert({ type: 'success', message });
   const onError = (message: string) => setAlert({ type: 'error', message });
 
   return (
     <Box>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={trackId} onChange={setTrackId} orgHandler={org} projectHandler={project} componentHandler={component} versionView extra={envSelect} />}
+      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
       <PageContent>
         {isLoading || (loadingState && releaseId) ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>

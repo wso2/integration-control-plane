@@ -19,10 +19,8 @@
 import { Alert, Box, Button, CircularProgress, Divider, Stack, Typography } from '@wso2/oxygen-ui';
 import { MCP } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { IS_CLOUD } from '../../../features';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
-import { useGenerateTestKey } from '../../../hooks/useApim';
 import { useMcpTools } from '../../../hooks/useMcpTools';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
@@ -36,9 +34,8 @@ import McpToolTile from './McpToolTile';
  *
  * Discovers the deployed endpoint, obtains a test credential for it, then lists
  * tools over the MCP SDK (`useMcpTools`) — mirroring devant's MCP overview, which
- * replaces the swagger/operations view with a tools list. Cloud takes the
- * credential and the enforcing gateway URL from the API Platform
- * (`useEndpointTestAccess`); the APIM products mint against the endpoint's apimId.
+ * replaces the swagger/operations view with a tools list. The credential and the
+ * enforcing gateway URL come from the API Platform (`useEndpointTestAccess`).
  * Shared by both MCP flavors (server-from-source and proxy) via the registry.
  */
 export default function EnvCardBody({ component, env, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {
@@ -48,62 +45,38 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
   const isDeploymentReady = hasDeployment && isDeploymentHealthy(deploymentStatusV2);
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
 
-  // Default to the MCP-capable endpoint (tools are listed at `${baseUrl}/mcp`). On the
-  // APIM products it must also carry an apimId, since the test key is minted per APIM
-  // API; cloud has no APIM, so requiring one there would reject every endpoint. The
+  // Default to the MCP-capable endpoint (tools are listed at `${baseUrl}/mcp`). The
   // user can still switch endpoints in the panel.
   const mcpIdx = useMemo(() => {
-    const i = endpoints.findIndex((e) => e.publicUrl && (IS_CLOUD || e.apimId));
+    const i = endpoints.findIndex((e) => e.publicUrl);
     return i >= 0 ? i : 0;
   }, [endpoints]);
   const [selectedEpIdx, setSelectedEpIdx] = useState<number | null>(null);
   const activeIdx = selectedEpIdx ?? mcpIdx;
   const activeEndpoint = endpoints[activeIdx] ?? endpoints[0];
-  const apimId = activeEndpoint?.apimId ?? null;
 
-  // Cloud: enforcing gateway URL + a short-lived api-key from the API Platform.
-  const accessRef: EndpointRef | null = useMemo(() => (IS_CLOUD && activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null), [component.id, env.id, activeEndpoint]);
-  const access = useEndpointTestAccess(accessRef, IS_CLOUD && !!accessRef && isDeploymentReady);
+  // Enforcing gateway URL + a short-lived api-key from the API Platform.
+  const accessRef: EndpointRef | null = useMemo(() => (activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null), [component.id, env.id, activeEndpoint]);
+  const access = useEndpointTestAccess(accessRef, !!accessRef && isDeploymentReady);
 
-  // Cloud lists tools through the apip gateway and nothing else. The raw external
+  // Tools are listed through the apip gateway and nothing else. The raw external
   // route is open (no policy engine in its path), so falling back to it would hand
   // the test key to a host that never validates it.
-  const baseUrl = IS_CLOUD ? access.gatewayUrl : (activeEndpoint?.publicUrl ?? '');
+  const baseUrl = access.gatewayUrl;
 
-  // APIM products: mint the test key against the endpoint's APIM API.
-  const generateKey = useGenerateTestKey();
-  const [apimKey, setApimKey] = useState<string | null>(null);
-  useEffect(() => {
-    if (IS_CLOUD || !apimId || !isDeploymentReady) return undefined;
-    let cancelled = false;
-    generateKey
-      .mutateAsync({ apimId, keyType: env.critical ? 'Production' : 'Development' })
-      .then((r) => {
-        if (!cancelled) setApimKey(r?.apikey ?? null);
-      })
-      .catch(() => {
-        /* surfaced via the tools error below */
-      });
-    return () => {
-      cancelled = true;
-    };
-    // generateKey is a stable mutation; apimId/env/readiness drive identity
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apimId, env.critical, isDeploymentReady]);
-
-  const apiKey = IS_CLOUD ? access.apiKey : apimKey;
-  // Wait for the credential before connecting — except on a cloud `none`-mode
-  // endpoint, which is open and needs none.
-  const isAuthorized = IS_CLOUD ? access.isAuthorized : !!apimKey;
-  const keyError = IS_CLOUD ? access.keyError : null;
+  const apiKey = access.apiKey;
+  // Wait for the credential before connecting — except on a `none`-mode endpoint,
+  // which is open and needs none.
+  const isAuthorized = access.isAuthorized;
+  const keyError = access.keyError;
   // jwt-secured endpoints are not auto-minted — the test-key route would flip
   // enforcement to api-key auth, which must be a deliberate choice.
-  const needsManualKey = IS_CLOUD && access.mode === 'jwt' && !access.apiKey;
+  const needsManualKey = access.mode === 'jwt' && !access.apiKey;
 
   const { tools, isLoading, error, isForbidden, isUnauthorized, refetch } = useMcpTools({
     baseUrl,
     apiKey,
-    authHeader: IS_CLOUD ? access.authHeader : undefined,
+    authHeader: access.authHeader,
     enabled: isDeploymentReady && !!baseUrl && isAuthorized,
   });
 
@@ -135,13 +108,13 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
     <>
       <Divider sx={{ my: 2 }} />
 
-      {showEndpointPanel && <EndpointUrlsPanel endpoints={endpoints} selectedIdx={activeIdx} onSelect={setSelectedEpIdx} componentId={component.id} deploymentTrackId={versionId} externalUrlOverride={access.gatewayUrl || undefined} />}
+      {showEndpointPanel && <EndpointUrlsPanel endpoints={endpoints} selectedIdx={activeIdx} onSelect={setSelectedEpIdx} externalUrlOverride={access.gatewayUrl || undefined} />}
 
       {!isDeploymentReady ? (
         <Alert severity="info" sx={{ mt: 1.5 }}>
           Deploy to view MCP tools.
         </Alert>
-      ) : IS_CLOUD && access.isUnavailable ? (
+      ) : access.isUnavailable ? (
         // Terminal: with no gateway URL the tools call is never attempted, so this
         // must not fall through to the authorization spinner and hang there.
         <Alert severity="warning" sx={{ mt: 1.5 }}>
