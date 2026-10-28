@@ -21,6 +21,8 @@ import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack
 import { Eye, EyeOff, Link2, Link2Off, Lock, Pencil, Unlock } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
 import { type LinkingInfo, isNumberType, typeDisplayName } from '../schemaUtils';
+import { LinkedElement } from '../LinkedElement';
+import { useLinkedFrom } from '../linkedFrom';
 
 interface ConfigGroup {
   groupUuid: string;
@@ -49,7 +51,12 @@ interface BaseElementProps {
   setSensitiveMap?: Dispatch<SetStateAction<Map<string, boolean>>>;
 }
 
-export function BaseElement({
+export function BaseElement(props: BaseElementProps) {
+  const resource = useLinkedFrom(props.jsonPath);
+  return resource ? <LinkedElement title={props.title} resource={resource} /> : <EditableElement {...props} />;
+}
+
+function EditableElement({
   type,
   title,
   jsonPath,

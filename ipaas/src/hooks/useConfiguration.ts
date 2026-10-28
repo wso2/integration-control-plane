@@ -17,8 +17,20 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings } from '../api/configuration';
-import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput } from '../types/configuration';
+import {
+  fetchCertificateGroups,
+  fetchConfigGroups,
+  fetchCertificateMappings,
+  fetchSchemaConfig,
+  fetchConfigMgt,
+  saveSchemaConfig,
+  postConfigMgt,
+  postCertificateMappings,
+  fetchResourceLinks,
+  fetchResourceLinkOptions,
+  createResourceLink,
+} from '../api/configuration';
+import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, CreateResourceLinkInput } from '../types/configuration';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -97,6 +109,36 @@ export function usePostCertificateMappings() {
     mutationFn: (data: CertMapping) => postCertificateMappings(data),
     onSuccess: (_, vars) => {
       qc.invalidateQueries({ queryKey: ['certMappings', vars.projectId, vars.componentId, vars.envTemplateId, vars.deploymentTrackId] });
+    },
+  });
+}
+
+export function useResourceLinks(projectId: string, componentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['resourceLinks', projectId, componentId],
+    queryFn: () => fetchResourceLinks(projectId, componentId),
+    enabled: enabled && !!projectId && !!componentId,
+    retry: false,
+  });
+}
+
+export function useResourceLinkOptions(projectId: string, componentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['resourceLinkOptions', projectId, componentId],
+    queryFn: () => fetchResourceLinkOptions(projectId, componentId),
+    enabled: enabled && !!projectId && !!componentId,
+    retry: false,
+  });
+}
+
+export function useCreateResourceLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateResourceLinkInput) => createResourceLink(input),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['resourceLinks', vars.projectId, vars.componentId] });
+      // Linking rolls the integration out in every environment.
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
     },
   });
 }

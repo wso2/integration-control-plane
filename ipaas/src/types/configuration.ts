@@ -129,3 +129,23 @@ export interface PostConfigMgtInput {
   commitHash: string;
   configs: ConfigMgtSaveItem[];
 }
+
+/** A resource linked to an integration: `configurables` maps each config key it supplies to the resource key whose value it receives. */
+export interface ResourceLink {
+  resourceType: string;
+  configurables: Record<string, string>;
+}
+
+/** A resource the integration could link, with the connections (config key prefixes) named after its keys, best match first. */
+export interface ResourceLinkOption {
+  resourceType: string;
+  displayName: string;
+  connections: string[];
+}
+
+export interface CreateResourceLinkInput {
+  projectId: string;
+  componentId: string;
+  resourceType: string;
+  connection: string;
+}
