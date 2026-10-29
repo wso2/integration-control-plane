@@ -743,6 +743,18 @@ export function formatBytes(n: number): string {
   return `${one(n / (1024 * 1024))} MB`;
 }
 
+/** A version newer than the record's: now in epoch milliseconds, or one past the record's when that is ahead. */
+export function nextRecordVersion(current: string | undefined, now = Date.now()): string {
+  const n = Number(current);
+  return String(Number.isFinite(n) && n >= now ? n + 1 : now);
+}
+
+/** Why a file chosen again for a record is not that record's file; null when its name and size match. */
+export function reselectedFileProblem(record: Pick<UploadedFile, 'name' | 'size'>, file: { name: string; size: number }): string | null {
+  if (file.name === record.name && file.size === record.size) return null;
+  return `That is not ${record.name} (${formatBytes(record.size)}). Choose the same file that was uploaded.`;
+}
+
 /** What to say about a chosen file before it is sent. */
 export function checkStagedFile(meta: Pick<StagedFileMeta, 'name' | 'size' | 'contentType'>, existingNames: string[]): StagedFileCheck {
   const replaces = existingNames.includes(meta.name);

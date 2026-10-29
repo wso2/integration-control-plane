@@ -75,7 +75,7 @@ import type {
   UpdateContextSourceInput,
   UpdateContextModelsInput,
   PutContextGrantInput,
-  RecordEventInput,
+  RecordDeleteInput,
   SourceIndexingState,
   SourceProgress,
   SourceReadingState,
@@ -271,7 +271,6 @@ interface RawRecordStatus {
   recordId: string;
   state: string;
   currentVersion: string;
-  sourceAclVersion: string;
   quarantineReason?: string;
   indexState: string;
   indexError?: string;
@@ -662,8 +661,8 @@ async function findContextDelivery(engineId: string, sourceId: string, key: stri
 
 /**
  * Upload one file as a record of the source. The record id is the file name, so
- * uploading the same name again is a new version. The version doubles as the
- * ACL version, both epoch milliseconds, so they only grow.
+ * uploading the same name again is a new version; versions are epoch milliseconds.
+ * A new audience for a record is an upload of its content at a newer version.
  */
 export async function ingestContextFile(input: IngestFileInput): Promise<ContextJobHandle> {
   const key = await deliveryKey(input.sourceId, 'upsert', input.recordId, input.version);
@@ -678,7 +677,6 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
     contentHash: `sha256:${await sha256Hex(bytes)}`,
     sourceObservedAt: new Date(Number(input.version)).toISOString(),
     audience: input.audience,
-    sourceAclVersion: input.version,
     idempotencyKey: key,
   };
   const form = new FormData();
@@ -696,18 +694,17 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
   }
 }
 
-/** Remove a record, or change who can see it, with an event-only delivery. */
-export async function sendContextRecordEvent(input: RecordEventInput): Promise<ContextJobHandle> {
-  const key = await deliveryKey(input.sourceId, input.operation, input.recordId, input.version);
+/** Remove a record with an event-only delivery, at a version newer than the record's. */
+export async function deleteContextRecord(input: RecordDeleteInput): Promise<ContextJobHandle> {
+  const key = await deliveryKey(input.sourceId, 'delete', input.recordId, input.version);
   const event = {
     schemaVersion: '1',
     sourceId: input.sourceId,
     sourceRecordId: input.recordId,
     sourceVersion: input.version,
-    operation: input.operation,
+    operation: 'delete',
     sourceObservedAt: new Date(Number(input.version)).toISOString(),
     audience: input.audience,
-    sourceAclVersion: input.version,
     idempotencyKey: key,
   };
   const form = new FormData();
@@ -719,7 +716,7 @@ export async function sendContextRecordEvent(input: RecordEventInput): Promise<C
 /** A record's lifecycle and index state. Needs delivery or manage rights on the source. */
 export async function getContextRecordStatus(engineId: string, sourceId: string, recordId: string): Promise<ContextRecordStatus> {
   const raw = await contextEngineClient.get<RawRecordStatus>(engineId, `${sourcePath(sourceId)}/records/${encodeURIComponent(recordId)}`);
-  return { recordId: raw.recordId, state: raw.state, currentVersion: raw.currentVersion, sourceAclVersion: raw.sourceAclVersion, quarantineReason: raw.quarantineReason, indexState: raw.indexState, indexError: raw.indexError, updatedAt: raw.updatedAt };
+  return { recordId: raw.recordId, state: raw.state, currentVersion: raw.currentVersion, quarantineReason: raw.quarantineReason, indexState: raw.indexState, indexError: raw.indexError, updatedAt: raw.updatedAt };
 }
 
 // ── Query ───────────────────────────────────────────────────────────────────

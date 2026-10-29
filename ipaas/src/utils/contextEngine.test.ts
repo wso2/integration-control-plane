@@ -26,6 +26,8 @@ import {
   deliveryIdentity,
   engineMessage,
   formatBytes,
+  nextRecordVersion,
+  reselectedFileProblem,
   describeUploadAudience,
   endsSentence,
   splitSentences,
@@ -796,7 +798,7 @@ describe('source progress', () => {
 
 describe('file uploads', () => {
   const MB = 1024 * 1024;
-  const record = (o: Partial<ContextRecordStatus>): ContextRecordStatus => ({ recordId: 'r', state: 'active', currentVersion: '1', sourceAclVersion: '1', indexState: 'pending', updatedAt: 'x', ...o });
+  const record = (o: Partial<ContextRecordStatus>): ContextRecordStatus => ({ recordId: 'r', state: 'active', currentVersion: '1', indexState: 'pending', updatedAt: 'x', ...o });
 
   it('decides the content type by extension before the browser type', () => {
     expect(contentTypeForFile('notes.md', '')).toBe('text/markdown');
@@ -812,6 +814,20 @@ describe('file uploads', () => {
     expect(formatBytes(3277)).toBe('3.2 KB');
     expect(formatBytes(25 * MB)).toBe('25 MB');
     expect(formatBytes(4.8 * MB)).toBe('4.8 MB');
+  });
+
+  it('picks a version newer than the record, even when the record is ahead of the clock', () => {
+    expect(nextRecordVersion('1000', 5000)).toBe('5000');
+    expect(nextRecordVersion('5000', 5000)).toBe('5001');
+    expect(nextRecordVersion('9000', 5000)).toBe('9001');
+    expect(nextRecordVersion(undefined, 5000)).toBe('5000');
+  });
+
+  it('accepts a file chosen again only when its name and size match the record', () => {
+    const record = { name: 'oncall.txt', size: 1100 };
+    expect(reselectedFileProblem(record, { name: 'oncall.txt', size: 1100 })).toBeNull();
+    expect(reselectedFileProblem(record, { name: 'oncall.txt', size: 1200 })).toBe('That is not oncall.txt (1.1 KB). Choose the same file that was uploaded.');
+    expect(reselectedFileProblem(record, { name: 'other.txt', size: 1100 })).not.toBeNull();
   });
 
   it('checks a chosen file and explains the outcome', () => {

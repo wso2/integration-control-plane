@@ -337,7 +337,6 @@ export interface ContextRecordStatus {
   recordId: string;
   state: 'active' | 'quarantined' | 'deleted' | string;
   currentVersion: string;
-  sourceAclVersion: string;
   quarantineReason?: string;
   indexState: ContextIndexState | string;
   indexError?: string;
@@ -393,12 +392,11 @@ export interface IngestFileInput {
   signal?: AbortSignal;
 }
 
-export interface RecordEventInput {
+export interface RecordDeleteInput {
   engineId: string;
   sourceId: string;
   recordId: string;
-  operation: 'delete' | 'acl_changed';
-  /** Audience tags; a delete ignores them, a visibility change replaces them. */
+  /** The record's audience tags: the engine requires at least one and ignores them on a delete. */
   audience: string[];
   version: string;
 }
