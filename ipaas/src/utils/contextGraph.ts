@@ -184,10 +184,10 @@ export function exploreModel(graph: ContextGraph, filter: ExploreFilter, recordL
     const target = m.index.get(relation.objectId);
     if (source !== undefined && target !== undefined) addLink(m, { source, target, kind: 'relates', label: relation.relation, ...(relation.text ? { text: relation.text } : {}) }, seen);
   }
-  // A conflict is drawn between the two ends that differ, as the check drew it, when both of its relationships are shown.
-  const shown = (r: ContextGraphRelation) => !filter.sourceId || r.recordNodeIds.some((id) => kept.has(id));
+  // A conflict is drawn between the two ends that differ, as the check drew it, when both of its
+  // relationships are drawn: their records pass the source filter and every entity of theirs is on the canvas.
   for (const conflict of graph.conflicts ?? []) {
-    if (!shown(conflict.first) || !shown(conflict.second)) continue;
+    if (relationLink(m, conflict.first) === undefined || relationLink(m, conflict.second) === undefined) continue;
     const [a, b] = conflictEnds(conflict);
     const source = m.index.get(a);
     const target = m.index.get(b);

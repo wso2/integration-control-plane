@@ -508,6 +508,19 @@ describe('facts on the graph', () => {
     expect(factSelection(m, withConflict, [], { evidenceId: 'e1' }, [{ ...sides, reason: '', confidence: null }]).tags.map((t) => t.text)).toEqual(['fails over to']);
   });
 
+  it('draws no conflict line while a relationship behind it is not drawn', () => {
+    // "gateway 7 fails over to kandy" and "vault fails over to kandy" disagree: the ends that differ are gateway 7 and vault.
+    const second = { subjectId: 'ent_v', relation: 'fails over to', objectId: 'ent_k', recordNodeIds: ['rec_ops'] };
+    const withConflict: ContextGraph = { ...GRAPH, relations: [...GRAPH.relations, second], conflicts: [{ first: GRAPH.relations[0], second, reason: '', confidence: null }] };
+    expect(exploreModel(withConflict, { records: true, entities: true, detail: 'all' }).links.some((l) => l.kind === 'conflicts')).toBe(true);
+    // Key entities only: kandy, mentioned once with two relationships, is dropped. Both ends of the conflict are
+    // drawn, but neither relationship is, so no red line is drawn between gateway 7 and vault.
+    const key = exploreModel(withConflict, { records: true, entities: true, detail: 'key', keepNames: new Set(['vault']) });
+    expect([key.index.has('ent_g'), key.index.has('ent_v'), key.index.has('ent_k')]).toEqual([true, true, false]);
+    expect(key.links.some((l) => l.kind === 'conflicts')).toBe(false);
+    expect(conflictLink(key, withConflict.conflicts[0])).toBeUndefined();
+  });
+
   it('tells two entities of one name apart by their kind', () => {
     // "gateway 7" is a system and also a building: two entities, two ids.
     const twins: ContextGraph = {
