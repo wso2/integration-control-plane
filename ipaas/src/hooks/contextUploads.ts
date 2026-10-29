@@ -37,7 +37,7 @@ import { getContextJob, getContextRecordStatus, hashContent, ingestContextFile, 
 import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
 import { engineMessage, isUploadActive, unchangedDelivery, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
-import type { AudienceRule, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
+import type { AudienceRule, ContextJob, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
 
 export interface FileToUpload {
   content: Blob;
@@ -245,9 +245,9 @@ function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
  * Run a failed row's job again on the engine, as the same job, from the bytes
  * the engine still has. True when the engine took it, or when the job turned out
  * to be running or done already, and the row now follows it; true as well when
- * the retry failed for another reason and the row says so. False only when the
- * engine cannot run that job again because its bytes are gone, so the caller
- * sends the file itself if it still has it.
+ * the retry failed for another reason, or the job could not be looked up, and
+ * the row says so. False only when the engine cannot run that job again because
+ * its bytes are gone, so the caller sends the file itself if it still has it.
  */
 async function retryOnEngine(engineId: string, sourceId: string, recordId: string, jobId: string): Promise<boolean> {
   patchEntry(sourceId, recordId, { status: 'queued', progress: 100, detail: undefined, forbidden: false, jobId, retrying: true });
@@ -255,8 +255,17 @@ async function retryOnEngine(engineId: string, sourceId: string, recordId: strin
     await retryContextJob(jobId);
   } catch (err) {
     if (err instanceof HttpError && err.status === 409) {
-      const job = await getContextJob(jobId).catch(() => null);
-      if (job && job.state !== 'failed') {
+      // The engine refused to run the job again. Its state says why: one still running or done is
+      // followed; a failed one has lost its bytes. When the state cannot be read, nothing is known,
+      // so the row stays failed with its job and nothing is sent again.
+      let job: ContextJob;
+      try {
+        job = await getContextJob(jobId);
+      } catch (lookupErr) {
+        patchEntry(sourceId, recordId, { status: 'failed', progress: 0, retrying: false, detail: engineMessage(lookupErr, 'The retry was refused, and the job could not be looked up. Try again.') });
+        return true;
+      }
+      if (job.state !== 'failed') {
         await watchJob(engineId, sourceId, recordId, jobId);
         return true;
       }
