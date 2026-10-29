@@ -140,6 +140,8 @@ export function sourceFieldError(def: SourceFieldDef, value: string | undefined)
   const v = (value ?? '').trim();
   if (!v) return def.required ? `${def.label} is required.` : '';
   if (def.kind === 'url' && !isHttpUrl(v)) return 'Enter a full http(s) URL.';
+  if (def.valueType === 'integer' && !/^\d+$/.test(v)) return 'Enter a whole number.';
+  if (def.valueType === 'number' && !Number.isFinite(Number(v))) return 'Enter a number.';
   if (def.kind === 'urls') {
     const bad = splitUrls(v).find((u) => !isHttpUrl(u));
     if (bad) return `Not a valid URL: ${bad}`;
@@ -1278,19 +1280,53 @@ export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEn
 }
 
 /**
- * `POST …/integrations`: every field the connector shows, secrets included. The BFF names the
- * integration and its source with a DNS label. With visibility rules, the integration labels every
- * record with each rule's group; without, the BFF lets every console user see them.
+ * `POST …/integrations`: every field the connector shows, secrets included, typed and placed as the
+ * integration's settings say. The BFF names the integration and its source with a DNS label. With
+ * visibility rules, the integration labels every record with each rule's group; without, the BFF
+ * lets every console user see them.
  */
-export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, string>; source?: { audience: string[]; audienceMapping: Record<string, string> } } {
+export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> } } {
   const audienceMapping = audienceMappingFromRules(source.audience);
   const audience = Object.keys(audienceMapping);
   return {
     name: engineHandleFrom(source.name),
     type,
-    settings: Object.fromEntries(Object.entries({ ...sourceSettings(source), ...sourceSecrets(source) }).filter(([, v]) => v !== '')),
+    settings: integrationSettings(source),
     ...(audience.length ? { source: { audience, audienceMapping } } : {}),
   };
+}
+
+/** The integration's settings from the fields that apply; blank fields and files are left out. */
+function integrationSettings(source: ContextSourceConfig): Record<string, unknown> {
+  const connector = connectorFor(source.type);
+  const settings: Record<string, unknown> = {};
+  if (!connector) return settings;
+  for (const f of visibleFields(connector, source.values)) {
+    const raw = (source.values[f.key] ?? '').trim();
+    if (raw === '' || f.kind === 'file') continue;
+    const path = (f.setting ?? f.key).split('.');
+    let table = settings;
+    for (const key of path.slice(0, -1)) table = (table[key] ??= {}) as Record<string, unknown>;
+    table[path[path.length - 1]] = settingValue(f, raw);
+  }
+  return settings;
+}
+
+function settingValue(def: SourceFieldDef, raw: string): unknown {
+  switch (def.valueType) {
+    case 'integer':
+    case 'number':
+      return Number(raw);
+    case 'boolean':
+      return raw === 'true';
+    case 'list':
+      return raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    default:
+      return def.kind === 'urls' ? splitUrls(raw).join('\n') : raw;
+  }
 }
 
 /** `RegisterSource` body for the engine's `POST /spaces/{id}/sources`. Credentials never travel here. */

@@ -82,6 +82,27 @@ export const RML_MAPPING = G(
   }),
 );
 
+/**
+ * Sign-in fields of the Google integrations, nested under their `auth` setting. Service accounts
+ * are not offered: the integrations read their key from a file that nothing mounts.
+ */
+const GOOGLE_AUTH = G(
+  'Connection',
+  F('authType', 'Authentication', 'select', {
+    defaultValue: 'refresh_token',
+    options: [
+      { value: 'refresh_token', label: 'Refresh token' },
+      { value: 'bearer', label: 'Access token' },
+    ],
+    helper: 'OAuth2 flow used to connect.',
+    setting: 'auth.type',
+  }),
+  F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token'), setting: 'auth.clientId' }),
+  F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.clientSecret' }),
+  F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.refreshToken' }),
+  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.', setting: 'auth.token' }),
+);
+
 const SQL_TABLES = (port: string) => [
   F('host', 'Host', 'text'),
   F('port', 'Port', 'text', { defaultValue: port }),
@@ -92,17 +113,17 @@ const SQL_TABLES = (port: string) => [
 ];
 
 /**
- * Grouped form fields for a SQL database connector, mirroring the Ballerina
- * `DatabaseSettings`: connect to a table, pick the columns to ingest, and stream
- * changes with CDC. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
+ * Grouped form fields for a SQL database connector, mirroring the database integrations'
+ * settings: the table, the columns to ingest and the poll for rows that Change Data Capture
+ * missed. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
  * MySQL has no schema layer and omits it.
  */
 const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[] => [
   ...G(
     'Connection',
     F('host', 'Host', 'text', { defaultValue: 'localhost' }),
-    F('port', 'Port', 'text', { defaultValue: port }),
-    F('database', 'Database', 'text'),
+    F('port', 'Port', 'text', { defaultValue: port, valueType: 'integer' }),
+    F('database', 'Database', 'text', { setting: 'databaseName' }),
     ...(schemaDefault !== undefined ? [O('schema', 'Schema', 'text', { defaultValue: schemaDefault })] : []),
     F('username', 'Username', 'text'),
     F('password', 'Password', 'secret'),
@@ -111,19 +132,12 @@ const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[]
     'Data to sync',
     F('tableName', 'Table', 'text', { helper: 'Each row becomes one record.' }),
     F('primaryKey', 'Primary Key', 'text', { helper: 'Column that uniquely identifies each row.' }),
-    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated columns to ingest. Empty ingests every column.' }),
-    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Column holding each row’s last-updated time (epoch ms). Recommended for clean re-syncs.' }),
+    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated columns to ingest. Empty ingests every column.', valueType: 'list' }),
+    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Column holding each row’s last-updated time. Recommended: without it, a row is versioned by when it is read.' }),
   ),
   ...G(
     { label: 'Sync options', collapsed: true },
-    F('cdcEnabled', 'Change Data Capture', 'select', {
-      defaultValue: 'true',
-      options: [
-        { value: 'true', label: 'Enabled' },
-        { value: 'false', label: 'Disabled' },
-      ],
-      helper: 'Keep syncing new inserts, updates and deletes after the first import.',
-    }),
+    O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for new rows the change listener missed.', valueType: 'number' }),
   ),
 ];
 
@@ -182,30 +196,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     popular: true,
     logo: `${RAG_LOGO_BASE}googledrive.svg`,
     icon: 'folder',
-    // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
-    // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
-    fields: [
-      ...G(
-        'Connection',
-        F('authType', 'Authentication', 'select', {
-          defaultValue: 'refresh_token',
-          options: [
-            { value: 'refresh_token', label: 'Refresh token' },
-            { value: 'bearer', label: 'Access token' },
-            { value: 'service_account', label: 'Service account' },
-          ],
-          helper: 'OAuth2 flow used to connect.',
-        }),
-        F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
-        F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
-        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
-        F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
-        F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'Path to the service account private key in PEM form.' }),
-        O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional user to impersonate under domain-wide delegation.' }),
-      ),
-      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' })),
-    ],
+    fields: [...GOOGLE_AUTH, ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' }))],
     summaryKeys: ['folderId'],
   },
   {
@@ -357,6 +348,30 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [F('accountId', 'Account ID', 'text'), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret')],
     summaryKeys: ['accountId'],
   },
+  {
+    id: 'gcalendar',
+    name: 'Google Calendar',
+    description: 'Events of a calendar, synced on a schedule.',
+    category: 'collaboration',
+    icon: 'calendar',
+    fields: [
+      ...GOOGLE_AUTH,
+      ...G(
+        'Data to sync',
+        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '`primary` for the signed-in account’s own calendar, or a calendar’s id.' }),
+        O('eventTypes', 'Event Types', 'text', { placeholder: 'default, outOfOffice', helper: 'Comma-separated, from birthday, default, focusTime, fromGmail, outOfOffice and workingLocation. Empty syncs meetings and out-of-office events.', valueType: 'list' }),
+        O('includePrivateEvents', 'Private Events', 'select', {
+          defaultValue: 'false',
+          options: [
+            { value: 'false', label: 'Leave out' },
+            { value: 'true', label: 'Include' },
+          ],
+          valueType: 'boolean',
+        }),
+      ),
+    ],
+    summaryKeys: ['calendarId'],
+  },
   { id: 'google-chat', name: 'Google Chat', description: 'Conversations in a space.', category: 'collaboration', icon: 'chat', fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')], summaryKeys: ['spaceId'] },
 
   // Databases
@@ -371,8 +386,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...DATABASE_FIELDS('5432', 'public'),
       ...G(
         { label: 'Sync options', collapsed: true },
-        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional logical replication slot name; a default is used when empty.' }),
-        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional publication name; a default is used when empty.' }),
+        O('slotName', 'Replication Slot', 'text', { helper: 'Logical replication slot to read through; one per source. Named after the source when empty.' }),
+        O('publicationName', 'Publication', 'text', { helper: 'Publication created for the table. Named after the source when empty.' }),
       ),
     ],
     summaryKeys: ['host', 'database'],
@@ -434,8 +449,6 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Records of an object, synced by SOQL backfill and Change Data Capture.',
     category: 'saas',
     icon: 'cloud',
-    // Mirrors the Ballerina `salesforce` connector's SalesforceSettings: an auth block
-    // (one of three OAuth2 flows, chosen by authType) plus the object, fields and sync options.
     fields: [
       ...G(
         'Connection',
@@ -448,18 +461,23 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
             { value: 'bearer', label: 'Access token' },
           ],
           helper: 'OAuth2 flow used to connect.',
+          setting: 'auth.type',
         }),
-        F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token') }),
-        F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token') }),
-        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+        F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token'), setting: 'auth.clientId' }),
+        F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token'), setting: 'auth.clientSecret' }),
+        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.refreshToken' }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.', setting: 'auth.token' }),
       ),
       ...G(
         'Data to sync',
         F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'The SObject to sync. It must have Change Data Capture enabled.' }),
-        F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated business fields to ingest as content.' }),
+        F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated fields to ingest as content.', valueType: 'list' }),
       ),
-      ...G({ label: 'Sync options', collapsed: true }, O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' })),
+      ...G(
+        { label: 'Sync options', collapsed: true },
+        O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' }),
+        O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for records the change listener missed.', valueType: 'number' }),
+      ),
     ],
     summaryKeys: ['baseUrl', 'sobject'],
     isStructuredData: true,
@@ -539,7 +557,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'docs_watch', 'gdrive', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'docs_watch', 'gdrive', 'gcalendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
 
 /**
  * Connectors the browser feeds itself, registered straight on the engine. Every other enabled
@@ -547,7 +565,7 @@ export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'do
  */
 export const ENGINE_NATIVE_CONNECTOR_IDS: ReadonlySet<string> = new Set(['upload']);
 
-export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive' };
+export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive', gcalendar: 'google_calendar' };
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);

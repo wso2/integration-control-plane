@@ -110,6 +110,7 @@ import {
   toConfigurationPayload,
   toCreateInput,
   toSourceRegistration,
+  toIntegrationRequest,
 } from './contextEngine';
 import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
 import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
@@ -245,23 +246,24 @@ describe('source validation', () => {
     expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
   });
 
-  it('shows and requires only the fields of the chosen Google Drive auth flow', () => {
-    const gd = SOURCE_CONNECTORS.find((c) => c.id === 'gdrive')!;
-    const clientEmail = gd.fields.find((f) => f.key === 'clientEmail')!;
-    const refreshToken = gd.fields.find((f) => f.key === 'refreshToken')!;
+  it('shows and requires only the fields of the chosen Google auth flow', () => {
+    for (const id of ['gdrive', 'gcalendar']) {
+      const google = SOURCE_CONNECTORS.find((c) => c.id === id)!;
+      const refreshToken = google.fields.find((f) => f.key === 'refreshToken')!;
+      const authType = google.fields.find((f) => f.key === 'authType')!;
 
-    // Default flow is refresh token: its credentials show, the service-account fields do not.
-    expect(blankSource('gdrive').values.authType).toBe('refresh_token');
-    expect(isFieldVisible(refreshToken, { authType: 'refresh_token' })).toBe(true);
-    expect(isFieldVisible(clientEmail, { authType: 'refresh_token' })).toBe(false);
-    expect(isFieldVisible(clientEmail, { authType: 'service_account' })).toBe(true);
-
+      // Refresh token is the default; service accounts are not offered, since their key file cannot be mounted.
+      expect(blankSource(id).values.authType).toBe('refresh_token');
+      expect(authType.options!.map((o) => o.value)).toEqual(['refresh_token', 'bearer']);
+      expect(isFieldVisible(refreshToken, { authType: 'refresh_token' })).toBe(true);
+      expect(isFieldVisible(refreshToken, { authType: 'bearer' })).toBe(false);
+    }
     // Refresh-token flow needs the client id, secret and refresh token besides the folder.
     expect(isSourceValid(withValues('gdrive', { folderId: 'f', clientId: 'c', clientSecret: 's' }))).toBe(false);
     expect(isSourceValid(withValues('gdrive', { folderId: 'f', clientId: 'c', clientSecret: 's', refreshToken: 'r' }))).toBe(true);
-    // Bearer flow needs only the access token; service account needs the email and key path (subject is optional).
+    // Bearer flow needs only the access token.
     expect(isSourceValid(withValues('gdrive', { folderId: 'f', authType: 'bearer', token: 't' }))).toBe(true);
-    expect(invalidSourceFields(withValues('gdrive', { folderId: 'f', authType: 'service_account' })).map((f) => f.key)).toEqual(['clientEmail', 'privateKeyPath']);
+    expect(isSourceValid(withValues('gcalendar', { authType: 'bearer', token: 't' }))).toBe(true);
   });
 
   it('offers an optional RML mapping on structured connectors', () => {
@@ -286,9 +288,9 @@ describe('source validation', () => {
     const keys = (id: string) => SOURCE_CONNECTORS.find((c) => c.id === id)!.fields.map((f) => f.key);
     // Only MySQL, PostgreSQL and SQL Server are supported, and they are enabled.
     for (const id of ['mysql', 'postgresql', 'mssql']) expect(isConnectorEnabled(id)).toBe(true);
-    // Core DatabaseSettings fields are present on each.
+    // Core settings of the database integrations are present on each.
     for (const id of ['mysql', 'postgresql', 'mssql']) {
-      expect(keys(id)).toEqual(expect.arrayContaining(['host', 'port', 'database', 'username', 'password', 'tableName', 'primaryKey', 'columns', 'updatedAtColumn', 'cdcEnabled']));
+      expect(keys(id)).toEqual(expect.arrayContaining(['host', 'port', 'database', 'username', 'password', 'tableName', 'primaryKey', 'columns', 'updatedAtColumn', 'pollInterval']));
     }
     // MySQL has no schema layer; PostgreSQL and SQL Server do.
     expect(keys('mysql')).not.toContain('schema');
@@ -296,10 +298,13 @@ describe('source validation', () => {
     expect(keys('mssql')).toContain('schema');
     // PostgreSQL exposes its CDC replication overrides.
     expect(keys('postgresql')).toEqual(expect.arrayContaining(['slotName', 'publicationName']));
-    // Per-dialect default ports and CDC on by default.
+    // Per-dialect default ports.
     expect(blankSource('mysql').values.port).toBe('3306');
     expect(blankSource('mssql').values.port).toBe('1433');
-    expect(blankSource('postgresql').values.cdcEnabled).toBe('true');
+    // Numeric fields refuse text.
+    const db = { host: 'h', database: 'd', username: 'u', password: 'p', tableName: 't', primaryKey: 'id' };
+    expect(invalidSourceFields(withValues('postgresql', { ...db, port: '54x' })).map((f) => f.key)).toEqual(['port']);
+    expect(invalidSourceFields(withValues('postgresql', { ...db, port: '5432', pollInterval: 'soon' })).map((f) => f.key)).toEqual(['pollInterval']);
   });
 
   it('needs at least one complete, unique visibility rule', () => {
@@ -443,6 +448,35 @@ describe('wire payloads', () => {
     expect(source.settings).toMatchObject({ authType: 'client_credentials', baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', apiVersion: '59.0' });
     expect(source.credentials).toEqual({ clientSecret: 's' });
     expect(source.credentials.refreshToken).toBeUndefined();
+  });
+
+  it('shapes an integration request as the integration settings type it', () => {
+    const pg = withValues('postgresql', { host: 'db', port: '5432', database: 'cetest', schema: 'kb', username: 'u', password: ' p ', tableName: 'articles', primaryKey: 'id', columns: 'title, body,, category', pollInterval: '60' });
+    expect(toIntegrationRequest(pg, 'postgresql').settings).toEqual({
+      host: 'db',
+      port: 5432,
+      databaseName: 'cetest',
+      schema: 'kb',
+      username: 'u',
+      password: 'p',
+      tableName: 'articles',
+      primaryKey: 'id',
+      columns: ['title', 'body', 'category'],
+      pollInterval: 60,
+    });
+
+    const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale', rmlMapping: '@prefix ex: <http://ex> .' });
+    // The auth flow nests under auth; the hidden refresh token and the mapping file are left out.
+    expect(toIntegrationRequest(sf, 'salesforce').settings).toEqual({
+      baseUrl: 'https://acme.my.salesforce.com',
+      auth: { type: 'client_credentials', clientId: 'c', clientSecret: 's' },
+      sobject: 'Account',
+      fields: ['Name', 'Industry'],
+      apiVersion: '59.0',
+    });
+
+    const calendar = withValues('gcalendar', { authType: 'bearer', token: 't', eventTypes: 'default' });
+    expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false });
   });
 
   it('summarizes sources for review', () => {
