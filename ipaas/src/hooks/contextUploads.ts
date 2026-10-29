@@ -300,9 +300,11 @@ function enqueue(engineId: string, sourceId: string, file: FileToUpload, audienc
       const contentHash = await hashContent(file.content);
       if (previous?.jobId && unchangedDelivery(previous, contentHash, audience)) {
         if (previous.status !== 'failed') {
-          // Already on the engine as it is: keep the row, with the version it has there.
+          // Already on the engine as it is: keep the row, with the version it has there. The sharing
+          // choice stays the new one: it names the same audience, in the words just chosen.
           pendingBytes.delete(key);
-          patchEntry(sourceId, recordId, { ...previous, progress: 100, detail: isUploadActive(previous) ? undefined : UNCHANGED_DETAIL });
+          const fresh = entriesOf(sourceId).find((e) => e.recordId === recordId);
+          patchEntry(sourceId, recordId, { ...previous, ...(fresh ? { visibility: fresh.visibility, label: fresh.label } : {}), progress: 100, detail: isUploadActive(previous) ? undefined : UNCHANGED_DETAIL });
           persist(sourceId);
           if (isUploadActive(previous)) await follow(engineId, sourceId, recordId);
           return;
