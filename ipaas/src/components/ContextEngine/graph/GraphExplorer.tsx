@@ -31,7 +31,7 @@ import { mutedSx } from '../styles';
 import type { ContextEngineDetail, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
 
 /** Entities the overview asks the engine for; the most mentioned come first. */
-export const GRAPH_ENTITY_LIMIT = 200;
+export const GRAPH_ENTITY_LIMIT = 1000;
 /** How many names a document's panel lists before folding the rest. */
 const NAMES_SHOWN = 40;
 const NO_TAGS: LinkTag[] = [];
