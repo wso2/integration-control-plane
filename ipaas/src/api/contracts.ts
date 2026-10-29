@@ -814,7 +814,7 @@ export interface ContextEngineApi {
   getContextQuery(queryId: string): Promise<ContextQueryResult>;
   getContextQueryTrace(queryId: string): Promise<ContextQueryTrace | null>;
   getContextGraph(engineId: string, limit: number): Promise<ContextGraph | null>;
-  getContextEntity(engineId: string, name: string, limit?: number): Promise<ContextEntityView>;
+  getContextEntity(engineId: string, name: string, limit?: number, kind?: string): Promise<ContextEntityView>;
   getContextEvidence(evidenceId: string): Promise<ContextEvidence>;
   getContextPermissions(resourceId: string): Promise<string[]>;
   listContextGrants(engineId: string): Promise<ContextGrant[]>;

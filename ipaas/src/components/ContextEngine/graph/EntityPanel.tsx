@@ -23,20 +23,29 @@ import { useContextEntity } from '../../../hooks/useContextEngine';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
-import { sentencesCiting } from '../../../utils/contextGraph';
+import { sentencesCiting, type EntityConflict } from '../../../utils/contextGraph';
 import { EvidencePlace } from '../detail/EvidenceCard';
 import { mutedSx } from '../styles';
-import { panelSx, panelLabelSx, sentenceSx } from './graphStyles';
+import { panelSx, panelLabelSx, selectRowSx, sentenceSx } from './graphStyles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
 
 interface EntityPanelProps {
   engineId: string;
   orgHandle: string;
   name: string;
+  /** The entity's kind, when the caller knows it: the same name can be more than one entity, one per kind. */
+  kind?: string;
+  /** The colour the graph draws this entity's kind in, for the dot beside its name; the accent when it has none. */
+  kindColor?: string;
+  /** Conflicts the graph view holds in which this entity takes part, from the engine's contradiction check. */
+  conflicts?: EntityConflict[];
   sources: ContextSource[];
   /** In provenance mode: the answer and the passages its query returned, to show this entity's part in it. */
   derivation?: { answer?: string; evidence: ContextEvidence[] };
-  onSelectEntity: (name: string) => void;
+  /** Open another entity; its kind comes along when the fact that named it carries one. */
+  onSelectEntity: (name: string, kind?: string) => void;
+  /** Select a conflict on the canvas, by its place in the graph's list; without it the conflicts are only read. */
+  onSelectConflict?: (index: number) => void;
   onClose: () => void;
   /** Provenance mode: leave the derivation and explore around this entity. */
   onExplore?: () => void;
@@ -48,9 +57,9 @@ interface EntityPanelProps {
  * read. In provenance mode it also says which answer sentences depend on it
  * and which of its passages the question did not retrieve.
  */
-export default function EntityPanel({ engineId, orgHandle, name, sources, derivation, onSelectEntity, onClose, onExplore }: EntityPanelProps): JSX.Element {
+export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor, conflicts = [], sources, derivation, onSelectEntity, onSelectConflict, onClose, onExplore }: EntityPanelProps): JSX.Element {
   const navigate = useAppNavigate();
-  const entity = useContextEntity(engineId, name);
+  const entity = useContextEntity(engineId, name, kind);
   const view = entity.data;
   const byId = new Map(view?.evidence.map((e) => [e.id, e]) ?? []);
   const sourceName = new Map(sources.map((s) => [s.id, s.name]));
@@ -65,18 +74,32 @@ export default function EntityPanel({ engineId, orgHandle, name, sources, deriva
     .sort((a, b) => a - b);
   const inAnswer = derivation?.answer ? [...new Set(numbers.flatMap((n) => sentencesCiting(derivation.answer, n)))] : [];
   const notFound = entity.error instanceof HttpError && entity.error.status === 404;
-  const related = [...new Set(view?.facts.flatMap((f) => [f.subject, f.object]).filter((n) => n.toLowerCase() !== name.toLowerCase()) ?? [])];
+  // The kind the caller picked wins; otherwise the kind the engine opened.
+  const shownKind = kind ?? view?.entity.kind;
+  // This entity's own name, by name and, when both sides know one, by kind: the same name can be another entity of another kind.
+  const mine = (other: string, otherKind?: string) => other.toLowerCase() === name.toLowerCase() && (!kind || !otherKind || otherKind === kind);
+  const related = [
+    ...new Map(
+      (view?.facts ?? [])
+        .flatMap((f): [string, string | undefined][] => [
+          [f.subject, f.subjectKind],
+          [f.object, f.objectKind],
+        ])
+        .filter(([other, otherKind]) => !mine(other, otherKind))
+        .map(([other, otherKind]) => [`${other.toLowerCase()}\u0000${otherKind ?? ''}`, { name: other, kind: otherKind }] as const),
+    ).values(),
+  ];
 
   return (
     <Box component="aside" aria-label={`Entity ${name}`} sx={panelSx(true)}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
         <Stack direction="row" alignItems="baseline" flexWrap="wrap" columnGap={1} sx={{ minWidth: 0 }}>
-          <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0, alignSelf: 'center' }} />
+          <Box aria-hidden sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: kindColor ?? 'primary.main', flexShrink: 0, alignSelf: 'center' }} />
           <Typography variant="subtitle1" component="h2" sx={{ fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }}>
             {name}
           </Typography>
           <Typography variant="caption" sx={mutedSx}>
-            Entity{view?.entity.kind ? ` · ${view.entity.kind}` : ''}
+            Entity{shownKind ? ` · ${shownKind}` : ''}
           </Typography>
         </Stack>
         <IconButton size="small" aria-label="Release the selection" onClick={onClose}>
@@ -171,18 +194,70 @@ export default function EntityPanel({ engineId, orgHandle, name, sources, deriva
               <Typography sx={panelLabelSx}>Relationships</Typography>
               <Stack component="ul" gap={0.5} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
                 {view.facts.map((fact) => {
-                  const other = fact.subject.toLowerCase() === name.toLowerCase() ? fact.object : fact.subject;
+                  const subjectMine = mine(fact.subject, fact.subjectKind);
+                  const objectMine = mine(fact.object, fact.objectKind);
                   return (
-                    <Box component="li" key={`${fact.subject}|${fact.relation}|${fact.object}`} sx={{ fontSize: 13, lineHeight: 1.5 }}>
-                      <span>{fact.subject.toLowerCase() === name.toLowerCase() ? name : <EntityChip name={other} onSelect={onSelectEntity} />}</span>{' '}
+                    <Box component="li" key={`${fact.subject}|${fact.subjectKind ?? ''}|${fact.relation}|${fact.object}|${fact.objectKind ?? ''}`} sx={{ fontSize: 13, lineHeight: 1.5 }}>
+                      <span>{subjectMine ? name : <EntityChip name={fact.subject} kind={fact.subjectKind} onSelect={onSelectEntity} />}</span>{' '}
                       <Box component="span" sx={mutedSx}>
                         {fact.relation}
                       </Box>{' '}
-                      <span>{fact.object.toLowerCase() === name.toLowerCase() ? name : <EntityChip name={other} onSelect={onSelectEntity} />}</span>
+                      <span>{objectMine ? name : <EntityChip name={fact.object} kind={fact.objectKind} onSelect={onSelectEntity} />}</span>
                       {fact.text && (
                         <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
                           “{fact.text}”
                         </Typography>
+                      )}
+                    </Box>
+                  );
+                })}
+              </Stack>
+            </Box>
+          )}
+
+          {conflicts.length > 0 && (
+            <Box>
+              <Typography sx={panelLabelSx}>Conflicts</Typography>
+              <Stack component="ul" gap={0.75} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
+                {conflicts.map((c) => {
+                  const body = (
+                    <>
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        “{c.first}”
+                      </Box>{' '}
+                      <Box component="span" sx={mutedSx}>
+                        disagrees with
+                      </Box>{' '}
+                      <Box component="span" sx={{ color: 'error.main' }}>
+                        “{c.second}”
+                      </Box>
+                      {c.confidence !== null && (
+                        <Box component="span" sx={mutedSx}>
+                          {' '}
+                          · {Math.round(c.confidence * 100)}% sure
+                        </Box>
+                      )}
+                      {c.reason && (
+                        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                          {c.reason}
+                        </Typography>
+                      )}
+                      {onSelectConflict && c.drawn === false && (
+                        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                          Not drawn with the current filters
+                        </Typography>
+                      )}
+                    </>
+                  );
+                  return (
+                    <Box component="li" key={c.index} sx={{ fontSize: 13, lineHeight: 1.5 }}>
+                      {/* With a handler, the conflict can be selected on the canvas, where both of its sides light up; not when its line is not drawn. */}
+                      {onSelectConflict ? (
+                        <ButtonBase onClick={() => onSelectConflict(c.index)} disabled={c.drawn === false} sx={{ ...selectRowSx, '&:hover': { borderColor: 'error.main' } }} aria-label="Show this conflict on the graph">
+                          {body}
+                        </ButtonBase>
+                      ) : (
+                        body
                       )}
                     </Box>
                   );
@@ -196,7 +271,7 @@ export default function EntityPanel({ engineId, orgHandle, name, sources, deriva
               <Typography sx={panelLabelSx}>Related entities</Typography>
               <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ mt: 0.75 }}>
                 {related.map((other) => (
-                  <EntityChip key={other} name={other} onSelect={onSelectEntity} />
+                  <EntityChip key={`${other.name}|${other.kind ?? ''}`} name={other.name} kind={other.kind} onSelect={onSelectEntity} />
                 ))}
               </Stack>
             </Box>
@@ -219,10 +294,10 @@ export default function EntityPanel({ engineId, orgHandle, name, sources, deriva
 }
 
 /** A clickable entity name, to move the selection along a relationship. */
-export function EntityChip({ name, onSelect, lit = false }: { name: string; onSelect: (name: string) => void; lit?: boolean }): JSX.Element {
+export function EntityChip({ name, kind, onSelect, lit = false }: { name: string; kind?: string; onSelect: (name: string, kind?: string) => void; lit?: boolean }): JSX.Element {
   return (
     <ButtonBase
-      onClick={() => onSelect(name)}
+      onClick={() => onSelect(name, kind)}
       sx={{
         display: 'inline-flex',
         alignItems: 'center',

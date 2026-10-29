@@ -25,6 +25,8 @@ import {
   contentTypeForFile,
   deliveryIdentity,
   engineMessage,
+  engineErrorCode,
+  sourceFailureNotice,
   formatBytes,
   describeUploadAudience,
   endsSentence,
@@ -47,6 +49,7 @@ import {
   stagedSummary,
   summarizeUploads,
   uploadSourceRules,
+  unchangedDelivery,
   uploadStatusFromRecord,
   visibilityError,
   visibilityTags,
@@ -696,10 +699,31 @@ const progress = (o: ProgressOverrides = {}): SourceProgress => ({
   reading: { state: 'idle', ...o.reading },
   processing: { total: 0, queued: 0, running: 0, succeeded: 0, failed: 0, percent: null, ...o.processing },
   records: { active: 0, quarantined: 0, deleted: 0, ...o.records },
-  indexing: { state: 'not_collected', expected: null, indexed: null, indexing: null, failed: null, missing: null, percent: null, ...o.indexing },
+  indexing: { state: 'not_collected', expected: null, indexed: null, indexing: null, failed: null, missing: null, percent: null, failures: {}, ...o.indexing },
 });
 
 describe('source progress', () => {
+  it('tells the operator what to fix when files failed on the model provider', () => {
+    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 3, indexed: 1, failed: 2, failures: { backend_model_access_denied: 2 } } }))).toBe(
+      "2 files are not searchable: the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
+    );
+    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { backend_model_unavailable: 1 } } }))).toMatch(/^1 file is not searchable: the engine could not reach its model provider/);
+    // Two codes need two fixes, so the notice counts every file and sends the reader to the rows instead of naming one fix.
+    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 4, indexed: 1, failed: 3, failures: { backend_model_access_denied: 2, backend_model_quota_exceeded: 1 } } }))).toBe(
+      "3 files are not searchable: the model provider failed on them for more than one reason. Each file's row says why.",
+    );
+    // A file the engine cannot read is the file's own problem, told on its row, not a notice.
+    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { extraction_unsupported: 1 } } }))).toBeNull();
+    expect(sourceFailureNotice(progress({ indexing: { state: 'unavailable', failures: { backend_model_access_denied: 2 } } }))).toBeNull();
+    expect(sourceFailureNotice(progress())).toBeNull();
+  });
+
+  it('reads the engine error code from a failed request', () => {
+    expect(engineErrorCode(new HttpError(503, 'HTTP 503: {"code":"backend_model_access_denied","message":"The model provider rejected the key"}'))).toBe('backend_model_access_denied');
+    expect(engineErrorCode(new HttpError(503, 'HTTP 503: Service Unavailable'))).toBeNull();
+    expect(engineErrorCode(new Error('offline'))).toBeNull();
+  });
+
   it('derives the pipeline status in priority order', () => {
     expect(sourceProgressStatus(progress())).toBe('waiting');
     expect(sourceProgressStatus(progress({ reading: { state: 'reading' }, processing: { total: 4, queued: 4, percent: 0 } }))).toBe('reading');
@@ -878,6 +902,12 @@ describe('file uploads', () => {
     expect(uploadStatusFromRecord(record({ indexState: 'pending' }))).toEqual({ status: 'indexing' });
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
+    // The engine's model failure codes say what to fix, so the file shows that instead of a code.
+    expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_model_access_denied' }))).toEqual({
+      status: 'failed',
+      detail: "The engine's model provider rejected its API key, or the key may not use the configured model. Fix the model settings, then retry the file.",
+    });
+    expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_model_unavailable' })).detail).toBe('The engine could not reach its model provider. Retry the file later.');
     expect(uploadStatusFromRecord(record({ indexState: 'not_indexed' })).status).toBe('stored');
     expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
       status: 'held',
@@ -885,6 +915,16 @@ describe('file uploads', () => {
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
     expect(summarizeUploads([])).toBe('No files yet');
+  });
+
+  it('tells an unchanged file from a changed one by its hash and roles, not its version', () => {
+    const sent = { contentHash: 'sha256:aa', audience: ['viewer', 'developer'] };
+    expect(unchangedDelivery(sent, 'sha256:aa', ['developer', 'viewer'])).toBe(true);
+    expect(unchangedDelivery(sent, 'sha256:bb', ['developer', 'viewer'])).toBe(false);
+    expect(unchangedDelivery(sent, 'sha256:aa', ['viewer'])).toBe(false);
+    // A file remembered before hashes were kept, or never sent, is sent once more.
+    expect(unchangedDelivery({ audience: ['viewer'] }, 'sha256:aa', ['viewer'])).toBe(false);
+    expect(unchangedDelivery(undefined, 'sha256:aa', ['viewer'])).toBe(false);
   });
 
   it('reads the engine message out of an HTTP error', () => {

@@ -75,6 +75,7 @@ import type {
   ContextFact,
   ContextGraph,
   ContextGraphEntity,
+  ContextGraphRelation,
   ContextQueryMode,
   ContextQueryTrace,
 } from '../../types/contextEngine';
@@ -137,6 +138,8 @@ interface RawFact {
   evidenceIds?: string[];
   linkedThrough?: string;
   text?: string;
+  subjectKind?: string;
+  objectKind?: string;
 }
 
 interface RawQueryResponse {
@@ -146,6 +149,7 @@ interface RawQueryResponse {
   answerWithheld?: boolean;
   evidence?: RawEvidence[];
   facts?: RawFact[];
+  conflicts?: { first: RawFact; second: RawFact; reason?: string; confidence?: number | null }[];
   insufficientEvidence?: boolean;
   traceId: string;
 }
@@ -167,11 +171,20 @@ interface RawQueryTrace {
   createdAt: string;
 }
 
+interface RawGraphRelation {
+  subject: string;
+  relation: string;
+  object: string;
+  records?: string[];
+  text?: string;
+}
+
 interface RawGraph {
   entities?: { id: string; name: string; kind?: string; mentions?: number }[];
   records?: { id: string; sourceId: string; recordId: string }[];
   mentions?: { entity: string; record: string; chunks?: number }[];
-  relations?: { subject: string; relation: string; object: string; records?: string[]; text?: string }[];
+  relations?: RawGraphRelation[];
+  conflicts?: { first: RawGraphRelation; second: RawGraphRelation; reason?: string; confidence?: number | null }[];
   truncated?: boolean;
 }
 
@@ -180,6 +193,7 @@ interface RawEntityView {
   evidence?: RawEvidence[];
   mentionedIn?: string[];
   facts?: RawFact[];
+  kinds?: string[];
 }
 
 interface RawPrincipal {
@@ -208,7 +222,7 @@ interface RawSourceProgress {
   reading: { state: string; runId?: string | null; startedAt?: string | null; completedAt?: string | null };
   processing: { since?: string | null; total: number; queued: number; running: number; succeeded: number; failed: number; percent?: number | null };
   records: { active: number; quarantined: number; deleted: number };
-  indexing: { state: string; expected?: number | null; indexed?: number | null; indexing?: number | null; failed?: number | null; missing?: number | null; percent?: number | null; collectedAt?: string | null };
+  indexing: { state: string; expected?: number | null; indexed?: number | null; indexing?: number | null; failed?: number | null; missing?: number | null; percent?: number | null; collectedAt?: string | null; failures?: Record<string, number> | null };
 }
 
 interface RawRecordStatus {
@@ -318,6 +332,7 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
     missing: raw.indexing?.missing ?? null,
     percent: raw.indexing?.percent ?? null,
     collectedAt: orUndefined(raw.indexing?.collectedAt),
+    failures: raw.indexing?.failures ?? {},
   },
 });
 
@@ -353,6 +368,8 @@ const toFact = (raw: RawFact): ContextFact => ({
   evidenceIds: raw.evidenceIds ?? [],
   ...(raw.linkedThrough ? { linkedThrough: raw.linkedThrough } : {}),
   ...(raw.text ? { text: raw.text } : {}),
+  ...(raw.subjectKind ? { subjectKind: raw.subjectKind } : {}),
+  ...(raw.objectKind ? { objectKind: raw.objectKind } : {}),
 });
 
 const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
@@ -362,6 +379,7 @@ const toQueryResult = (raw: RawQueryResponse): ContextQueryResult => ({
   answerWithheld: raw.answerWithheld ?? false,
   evidence: (raw.evidence ?? []).map(toEvidence),
   facts: (raw.facts ?? []).map(toFact),
+  conflicts: (raw.conflicts ?? []).map((c) => ({ first: toFact(c.first), second: toFact(c.second), reason: c.reason ?? '', confidence: typeof c.confidence === 'number' ? c.confidence : null })),
   insufficientEvidence: raw.insufficientEvidence ?? raw.state === 'insufficient_evidence',
   traceId: raw.traceId,
 });
@@ -385,11 +403,15 @@ const toTrace = (raw: RawQueryTrace): ContextQueryTrace => ({
 
 const toGraphEntity = (raw: NonNullable<RawGraph['entities']>[number]): ContextGraphEntity => ({ id: raw.id, name: raw.name, ...(raw.kind ? { kind: raw.kind } : {}), mentions: raw.mentions ?? 0 });
 
+const toGraphRelation = (r: RawGraphRelation): ContextGraphRelation => ({ subjectId: r.subject, relation: r.relation, objectId: r.object, recordNodeIds: r.records ?? [], ...(r.text ? { text: r.text } : {}) });
+
 const toGraph = (raw: RawGraph): ContextGraph => ({
   entities: (raw.entities ?? []).map(toGraphEntity),
   records: (raw.records ?? []).map((r) => ({ id: r.id, sourceId: r.sourceId, recordId: r.recordId })),
   mentions: (raw.mentions ?? []).map((m) => ({ entityId: m.entity, recordNodeId: m.record, chunks: m.chunks ?? 1 })),
-  relations: (raw.relations ?? []).map((r) => ({ subjectId: r.subject, relation: r.relation, objectId: r.object, recordNodeIds: r.records ?? [], ...(r.text ? { text: r.text } : {}) })),
+  relations: (raw.relations ?? []).map(toGraphRelation),
+  // An engine without the contradiction check in its graph answers no conflicts at all.
+  conflicts: (raw.conflicts ?? []).map((c) => ({ first: toGraphRelation(c.first), second: toGraphRelation(c.second), reason: c.reason ?? '', confidence: typeof c.confidence === 'number' ? c.confidence : null })),
   truncated: raw.truncated ?? false,
 });
 
@@ -541,6 +563,16 @@ export async function getContextJob(jobId: string): Promise<ContextJob> {
   return toJob(await contextEngineClient.get<RawJob>(`${V1}/jobs/${encodeURIComponent(jobId)}`));
 }
 
+/**
+ * Run a failed job again as the same job. The engine still has the file's bytes,
+ * so nothing is uploaded, and the job keeps its id. The engine answers 409 when
+ * the job is not failed any more, or when its bytes are already gone.
+ */
+export async function retryContextJob(jobId: string): Promise<ContextJobHandle> {
+  const raw = await contextEngineClient.post<RawJobAccepted>(`${V1}/jobs/${encodeURIComponent(jobId)}/retry`);
+  return { jobId: raw.jobId, statusUrl: raw.statusUrl };
+}
+
 // ── Progress ────────────────────────────────────────────────────────────────
 
 /**
@@ -605,6 +637,16 @@ async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
   const digest = await crypto.subtle.digest('SHA-256', bytes);
   return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+/** The hash a delivery carries and the engine checks the bytes against: `sha256:<hex>`. */
+async function hashBytes(bytes: ArrayBuffer): Promise<string> {
+  return `sha256:${await sha256Hex(bytes)}`;
+}
+
+/** A file's content hash, as its delivery carries it; kept per file so an unchanged file is not sent again. */
+export async function hashContent(content: Blob): Promise<string> {
+  return hashBytes(await content.arrayBuffer());
 }
 
 /** `<sourceId>:<operation>:<sha256>`: the connector host's scheme, which stays under the engine's key length limit. */
@@ -688,7 +730,7 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
     sourceVersion: input.version,
     operation: 'upsert',
     contentType: input.contentType,
-    contentHash: `sha256:${await sha256Hex(bytes)}`,
+    contentHash: await hashBytes(bytes),
     sourceObservedAt: new Date(Number(input.version)).toISOString(),
     audience: input.audience,
     sourceAclVersion: input.version,
@@ -785,15 +827,23 @@ export async function getContextGraph(engineId: string, limit: number): Promise<
   }
 }
 
-/** One entity, by its name as the graph returns it, with the passages that name it and its relationships. 404 when nothing the reader may read names it. */
-export async function getContextEntity(engineId: string, name: string, limit = 10): Promise<ContextEntityView> {
+/**
+ * One entity, by its name as the graph returns it, with the passages that name it
+ * and its relationships. An entity is its name and its kind, so `kind` picks one
+ * when the same name is, say, a building and an animal; without it the engine opens
+ * the kind named most and lists the others in `kinds`. 404 when nothing the reader
+ * may read names it.
+ */
+export async function getContextEntity(engineId: string, name: string, limit = 10, kind?: string): Promise<ContextEntityView> {
   requireThisEngine(engineId);
-  const raw = await contextEngineClient.get<RawEntityView>(`${V1}/graph/entity?name=${encodeURIComponent(name)}&limit=${encodeURIComponent(String(limit))}`);
+  const query = `name=${encodeURIComponent(name)}&limit=${encodeURIComponent(String(limit))}${kind ? `&kind=${encodeURIComponent(kind)}` : ''}`;
+  const raw = await contextEngineClient.get<RawEntityView>(`${V1}/graph/entity?${query}`);
   return {
     entity: toGraphEntity(raw.entity),
     evidence: (raw.evidence ?? []).map(toEvidence),
     mentionedIn: raw.mentionedIn ?? [],
     facts: (raw.facts ?? []).map(toFact),
+    ...(raw.kinds?.length ? { kinds: raw.kinds } : {}),
   };
 }
 

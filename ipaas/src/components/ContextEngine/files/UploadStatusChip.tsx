@@ -23,10 +23,11 @@ import { UPLOAD_STATUS_LABEL, UPLOAD_STATUS_TONE } from '../../../constants/cont
 import { isUploadActive } from '../../../utils/contextEngine';
 import type { UploadEntry } from '../../../types/contextEngine';
 
-/** Where one uploaded file stands, with the transfer percentage while it is being sent. */
-export default function UploadStatusChip({ entry }: { entry: Pick<UploadEntry, 'status' | 'progress'> }): JSX.Element {
+/** Where one uploaded file stands, with the transfer percentage while it is being sent. A row the engine is running again says "Retrying", not "Queued". */
+export default function UploadStatusChip({ entry }: { entry: Pick<UploadEntry, 'status' | 'progress' | 'retrying'> }): JSX.Element {
   const active = isUploadActive(entry);
-  const label = entry.status === 'uploading' ? `${UPLOAD_STATUS_LABEL.uploading} · ${entry.progress}%` : UPLOAD_STATUS_LABEL[entry.status];
+  const label =
+    entry.status === 'uploading' ? `${UPLOAD_STATUS_LABEL.uploading} · ${entry.progress}%` : entry.status === 'queued' && entry.retrying ? 'Retrying' : UPLOAD_STATUS_LABEL[entry.status];
   const icon = active ? <CircularProgress size={10} color="inherit" aria-hidden /> : entry.status === 'searchable' ? <Check size={12} /> : undefined;
   return <Chip size="small" variant="outlined" color={UPLOAD_STATUS_TONE[entry.status]} icon={icon} label={label} />;
 }

@@ -150,11 +150,15 @@ export function useContextGraph(engineId: string, limit: number, enabled = true)
   });
 }
 
-/** One entity's passages and relationships; a 404 means nothing the reader may read names it. */
-export function useContextEntity(engineId: string, name: string | null) {
+/**
+ * One entity's passages and relationships; a 404 means nothing the reader may read
+ * names it. `kind` picks one entity when the same name is more than one; without it
+ * the engine opens the kind named most.
+ */
+export function useContextEntity(engineId: string, name: string | null, kind?: string) {
   return useQuery({
-    queryKey: [ROOT_KEY, 'entity', engineId, name],
-    queryFn: () => getContextEntity(engineId, name as string, 10),
+    queryKey: [ROOT_KEY, 'entity', engineId, name, kind ?? null],
+    queryFn: () => getContextEntity(engineId, name as string, 10, kind),
     enabled: isContextEngineEnabled() && !!engineId && !!name,
     retry: false,
     staleTime: 60_000,

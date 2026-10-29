@@ -57,6 +57,8 @@ export const deleteContextEngine = (_engineId: string): Promise<ContextJobHandle
 export const updateContextModels = (_input: UpdateContextModelsInput): Promise<ContextEngineModels> => ni('updateContextModels');
 export const getContextEngineProgress = (_engineId: string): Promise<ContextEngineProgress> => ni('getContextEngineProgress');
 export const ingestContextFile = (_input: IngestFileInput): Promise<ContextJobHandle> => ni('ingestContextFile');
+export const hashContent = (_content: Blob): Promise<string> => ni('hashContent');
+export const retryContextJob = (_jobId: string): Promise<ContextJobHandle> => ni('retryContextJob');
 export const sendContextRecordEvent = (_input: RecordEventInput): Promise<ContextJobHandle> => ni('sendContextRecordEvent');
 export const getContextRecordStatus = (_sourceId: string, _recordId: string): Promise<ContextRecordStatus> => ni('getContextRecordStatus');
 export const addContextSource = (_engineId: string, _source: ContextSourceConfig): Promise<ContextSource> => ni('addContextSource');
@@ -66,7 +68,7 @@ export const queryContextEngine = (_input: ContextQueryInput): Promise<ContextQu
 export const getContextQuery = (_queryId: string): Promise<ContextQueryResult> => ni('getContextQuery');
 export const getContextQueryTrace = (_queryId: string): Promise<ContextQueryTrace | null> => ni('getContextQueryTrace');
 export const getContextGraph = (_engineId: string, _limit: number): Promise<ContextGraph | null> => ni('getContextGraph');
-export const getContextEntity = (_engineId: string, _name: string, _limit?: number): Promise<ContextEntityView> => ni('getContextEntity');
+export const getContextEntity = (_engineId: string, _name: string, _limit?: number, _kind?: string): Promise<ContextEntityView> => ni('getContextEntity');
 export const getContextEvidence = (_evidenceId: string): Promise<ContextEvidence> => ni('getContextEvidence');
 export const getContextPermissions = (_resourceId: string): Promise<string[]> => ni('getContextPermissions');
 export const listContextGrants = (_engineId: string): Promise<ContextGrant[]> => ni('listContextGrants');

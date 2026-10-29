@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, IconButton, Typography } from '@wso2/oxygen-ui';
+import { Box, ButtonBase, IconButton, Typography } from '@wso2/oxygen-ui';
 import { Maximize2, Minus, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import type { Graph as CosmosGraph, GraphConfig } from '@cosmos.gl/graph';
@@ -32,7 +32,26 @@ const FRAME_PADDING = 0.25;
 const FRAME_LINK_PX = 150;
 /** Which link counts as "nearer": this share of the way up the sorted distances. */
 const FRAME_LINK_RANK = 0.25;
+/**
+ * The layout's forces (see the config below), checked on screenshots of a
+ * made-up graph of 1 to 12 documents. The pull to a cluster's centre is
+ * `CLUSTER_FORCE` times the point's own strength times its distance, with no
+ * other factor, while the pull to the middle of the space is a tenth of
+ * `GRAVITY` times the distance; so a small cluster force is already a firm one,
+ * and ten times this value folds each group into a tight ball. Points push
+ * apart by `REPULSION` over their distance. The layout runs `DECAY` ticks, one
+ * per frame, and is all but still after a third of them.
+ */
+const CLUSTER_FORCE = 0.03;
+const REPULSION = 1.5;
+const GRAVITY = 0.02;
+const LINK_DISTANCE = 14;
+const LINK_SPRING = 0.7;
+const FRICTION = 0.8;
+const DECAY = 1200;
 const NO_TAGS: LinkTag[] = [];
+
+type Point = [number, number];
 
 interface CosmosCanvasProps {
   buffers: CosmosBuffers;
@@ -51,9 +70,10 @@ interface CosmosCanvasProps {
   /** Points that get a label over the canvas, drawn by `renderLabel` at the point's screen position, first the ones that matter most. */
   labels: number[];
   renderLabel: (index: number) => ReactNode;
-  /** Short texts drawn at the middle of a link, such as the relationship a fact names. */
+  /** Short texts drawn at the middle of a link, such as the relationship a fact names. With `onSelectLink`, each is a button that selects its link. */
   linkTags?: LinkTag[];
   onSelect: (index: number | null) => void;
+  onSelectLink?: (link: number) => void;
   onHover?: (index: number | null) => void;
   /** Accent for hover and focus rings, as a hex colour. */
   accent: string;
@@ -71,7 +91,7 @@ type Rect = [number, number, number, number];
  * graph is first drawn, so its WebGL code stays out of every other page. The
  * canvas draws points and links from flat buffers; labels and link tags are
  * ordinary DOM placed over the points it tracks, because the library draws
- * none and so they stay readable, selectable and reachable by keyboard. Their
+ * none and so they stay readable, clickable and reachable by keyboard. Their
  * positions are set straight on the elements once per frame, so React does
  * not render on every tick of the simulation. A browser without WebGL gets a
  * short note instead.
@@ -88,6 +108,7 @@ export default function CosmosCanvas({
   renderLabel,
   linkTags = NO_TAGS,
   onSelect,
+  onSelectLink,
   onHover,
   accent,
   height,
@@ -112,13 +133,15 @@ export default function CosmosCanvas({
   framePointsRef.current = frame;
   const fitToRef = useRef(fitTo);
   fitToRef.current = fitTo;
-  // A focus that arrives while the layout is still moving is framed once it settles.
-  const pendingFrameRef = useRef<number | null>(null);
+  // A framing that arrives while the layout is still moving is run once it settles.
+  const pendingFrameRef = useRef<(() => void) | null>(null);
   const lastFocusRef = useRef<number | null>(null);
+  // Whether the last selection was framed as a set, with no focused point, such as a link.
+  const lastFramedRef = useRef(false);
   const focusedRef = useRef(focused);
   focusedRef.current = focused;
-  const handlers = useRef({ onSelect, onHover });
-  handlers.current = { onSelect, onHover };
+  const handlers = useRef({ onSelect, onSelectLink, onHover });
+  handlers.current = { onSelect, onSelectLink, onHover };
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -191,10 +214,12 @@ export default function CosmosCanvas({
       // A tag sits at the middle of its link, or further along it, or a little beside it, whichever is free first.
       const links = linksRef.current;
       for (const { link, el, w, h } of measuredTags) {
-        const a = screen(links[link * 2]);
-        const b = screen(links[link * 2 + 1]);
+        const spaceA = tracked.get(links[link * 2]);
+        const spaceB = tracked.get(links[link * 2 + 1]);
         let shown = false;
-        if (a && b) {
+        if (spaceA && spaceB) {
+          const a = graph.spaceToScreenPosition(spaceA);
+          const b = graph.spaceToScreenPosition(spaceB);
           const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
           const nx = -(b[1] - a[1]) / len;
           const ny = (b[0] - a[0]) / len;
@@ -296,6 +321,35 @@ export default function CosmosCanvas({
     [stopFollowing],
   );
 
+  // Frame a set of points with no focused one among them, such as the two ends of a selected link:
+  // close enough that the nearer distances between them give a link room for its text, or enough
+  // to fit them all, and never beyond the cap. The fit takes its zoom from its padding alone, so the
+  // padding is worked out to give that zoom.
+  const frameSet = useCallback(
+    (points: number[]) => {
+      const graph = graphRef.current;
+      const host = hostRef.current;
+      if (!graph || !host || !points.length) return;
+      userMovedRef.current = true;
+      stopFollowing();
+      const all = graph.getPointPositions();
+      const at = points.map((i): Point => [all[i * 2], all[i * 2 + 1]]).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+      if (!at.length) return;
+      const xs = at.map((p) => p[0]);
+      const ys = at.map((p) => p[1]);
+      const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 1e-6);
+      const spanY = Math.max(Math.max(...ys) - Math.min(...ys), 1e-6);
+      const distances = at.flatMap((a, i) => at.slice(i + 1).map((b) => Math.hypot(b[0] - a[0], b[1] - a[1]))).sort((a, b) => a - b);
+      const typical = Math.max(distances[Math.floor((distances.length - 1) * FRAME_LINK_RANK)] ?? 1e-6, 1e-6);
+      const room = 1 - 2 * FRAME_PADDING;
+      const fitAllZoom = Math.min((host.clientWidth * room) / spanX, (host.clientHeight * room) / spanY);
+      const zoom = Math.min(FRAME_MAX_ZOOM, Math.max(FRAME_LINK_PX / typical, fitAllZoom));
+      const padding = Math.min(0.46, Math.max(0, (1 - zoom * Math.max(spanX / host.clientWidth, spanY / host.clientHeight)) / 2));
+      graph.fitViewByPointIndices(points, 600, padding, true);
+    },
+    [stopFollowing],
+  );
+
   useEffect(() => {
     const host = hostRef.current;
     if (!host) return;
@@ -325,13 +379,17 @@ export default function CosmosCanvas({
           fitViewPadding: 0.15,
           // Fading long links keeps a dense graph readable without hiding its structure.
           linkVisibilityMinTransparency: 0.15,
-          // Gentle forces and quick damping: the layout spreads out once and settles instead of swinging.
-          simulationRepulsion: 0.3,
-          simulationLinkDistance: 12,
-          simulationLinkSpring: 0.7,
-          simulationGravity: 0.3,
-          simulationFriction: 0.8,
-          simulationDecay: 2500,
+          // Each document and the entities it names are pulled gently to a centre of their own, spread
+          // over the space (see `clusterLayout`), so the canvas fills evenly instead of knotting in the
+          // middle. Points push apart firmly and are hardly pulled to the middle at all, so each group
+          // opens into a loose cloud; the friction settles it instead of letting it swing.
+          simulationCluster: CLUSTER_FORCE,
+          simulationRepulsion: REPULSION,
+          simulationGravity: GRAVITY,
+          simulationLinkDistance: LINK_DISTANCE,
+          simulationLinkSpring: LINK_SPRING,
+          simulationFriction: FRICTION,
+          simulationDecay: DECAY,
           simulationCollision: 1,
           simulationCollisionPadding: 1.5,
           onPointClick: (index) => handlers.current.onSelect(index),
@@ -340,19 +398,25 @@ export default function CosmosCanvas({
           onPointMouseOut: () => handlers.current.onHover?.(null),
           onSimulationTick: scheduleLabels,
           onZoom: scheduleLabels,
+          // A reader who zooms or drags takes over: the follow stops at its next tick, and a frame
+          // waiting for the simulation to end is dropped, so the camera stays where the reader put it.
           onZoomStart: (_event, userDriven) => {
-            if (userDriven) userMovedRef.current = true;
+            if (userDriven) {
+              userMovedRef.current = true;
+              pendingFrameRef.current = null;
+            }
           },
           onDragStart: () => {
             userMovedRef.current = true;
+            pendingFrameRef.current = null;
           },
           onTransition: scheduleLabels,
           onSimulationEnd: () => {
             stopFollowing();
-            if (pendingFrameRef.current !== null) {
-              frameFocus(pendingFrameRef.current);
-              pendingFrameRef.current = null;
-            } else if (!userMovedRef.current) fitAll(600);
+            const pending = pendingFrameRef.current;
+            pendingFrameRef.current = null;
+            if (pending) pending();
+            else if (!userMovedRef.current) fitAll(600);
             scheduleLabels();
           },
         };
@@ -374,7 +438,7 @@ export default function CosmosCanvas({
       setReady(false);
     };
     // The canvas is built once; data and selection change through the effects below.
-  }, [accent, scheduleLabels, stopFollowing, fitAll, frameFocus]);
+  }, [accent, scheduleLabels, stopFollowing, fitAll]);
 
   useEffect(() => {
     const graph = graphRef.current;
@@ -386,6 +450,11 @@ export default function CosmosCanvas({
     graph.setLinks(buffers.links);
     graph.setLinkColors(buffers.linkColors);
     graph.setLinkWidths(buffers.linkWidths);
+    graph.setLinkStrength(buffers.linkStrengths);
+    // Every document's group has a centre of its own; a point in no group is left to the other forces.
+    graph.setPointClusters(buffers.clusters);
+    graph.setClusterPositions(buffers.clusterPositions);
+    graph.setPointClusterStrength(buffers.clusterStrengths);
     graph.render(1);
     follow();
     scheduleLabels();
@@ -435,32 +504,42 @@ export default function CosmosCanvas({
     });
   }, [selection, focused, ready]);
 
+  // The camera follows the selection: a focused point is framed with its companions; a selection with
+  // no focused point, such as a link, is framed as a set; releasing either shows the whole graph again.
+  // The set's key changes only when it matters, so a node's changing neighbourhood does not refit.
+  const frameKey = focused === null && frame && frame.length ? frame.join(',') : '';
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph || !ready) return;
-    const was = lastFocusRef.current;
+    const had = lastFocusRef.current !== null || lastFramedRef.current;
     lastFocusRef.current = focused;
-    if (focused !== null) {
-      // Still settling: frame it when the simulation ends, so the camera lands on the final layout.
-      if (graph.isSimulationRunning && followRef.current !== null) pendingFrameRef.current = focused;
-      else frameFocus(focused);
-    } else if (was !== null) {
+    lastFramedRef.current = frameKey !== '';
+    // Still settling: frame when the simulation ends, so the camera lands on the final layout.
+    const once = (run: () => void) => {
+      if (graph.isSimulationRunning && followRef.current !== null) pendingFrameRef.current = run;
+      else run();
+    };
+    if (focused !== null) once(() => frameFocus(focused));
+    else if (frameKey) once(() => frameSet(framePointsRef.current ?? []));
+    else if (had) {
       pendingFrameRef.current = null;
       userMovedRef.current = true;
       stopFollowing();
       fitAll(600);
     }
-  }, [focused, ready, frameFocus, fitAll, stopFollowing]);
+  }, [focused, frameKey, ready, frameFocus, frameSet, fitAll, stopFollowing]);
 
   const zoom = (factor: number) => {
     const graph = graphRef.current;
     if (!graph) return;
     userMovedRef.current = true;
+    pendingFrameRef.current = null;
     stopFollowing();
     graph.setZoomLevel(graph.getZoomLevel() * factor, 250, true);
   };
   const fit = () => {
     userMovedRef.current = true;
+    pendingFrameRef.current = null;
     stopFollowing();
     fitAll(400);
   };
@@ -497,10 +576,21 @@ export default function CosmosCanvas({
             </Box>
           ))}
           {linkTags.map((tag) => (
-            <Box key={tag.link} ref={(el: HTMLDivElement | null) => placeTag(tag.link, el)} sx={floating}>
-              <Box sx={linkTagSx} title={tag.detail ?? tag.text}>
-                {tag.text}
-              </Box>
+            <Box key={tag.link} ref={(el: HTMLDivElement | null) => placeTag(tag.link, el)} sx={{ ...floating, '& > *': { pointerEvents: onSelectLink ? 'auto' : 'none' } }}>
+              {onSelectLink ? (
+                <ButtonBase
+                  onClick={() => handlers.current.onSelectLink?.(tag.link)}
+                  title={tag.detail ?? tag.text}
+                  aria-label={`${tag.text}: select this ${tag.tone === 'conflict' ? 'conflict' : 'relationship'}`}
+                  aria-pressed={!!tag.lit}
+                  sx={linkTagSx(tag.tone, tag.lit)}>
+                  {tag.text}
+                </ButtonBase>
+              ) : (
+                <Box sx={linkTagSx(tag.tone, tag.lit)} title={tag.detail ?? tag.text}>
+                  {tag.text}
+                </Box>
+              )}
             </Box>
           ))}
         </>

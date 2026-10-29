@@ -268,7 +268,18 @@ export interface SourceProgress {
   processing: { since?: string; total: number; queued: number; running: number; succeeded: number; failed: number; percent: number | null };
   records: { active: number; quarantined: number; deleted: number };
   /** Active record versions the knowledge backend has indexed, from the last background collection. */
-  indexing: { state: SourceIndexingState; expected: number | null; indexed: number | null; indexing: number | null; failed: number | null; missing: number | null; percent: number | null; collectedAt?: string };
+  indexing: {
+    state: SourceIndexingState;
+    expected: number | null;
+    indexed: number | null;
+    indexing: number | null;
+    failed: number | null;
+    missing: number | null;
+    percent: number | null;
+    collectedAt?: string;
+    /** The failed records counted by error code, the same codes a failed file's record carries. Empty when none failed. */
+    failures: Record<string, number>;
+  };
 }
 
 export interface ContextEngineProgress {
@@ -359,6 +370,8 @@ export interface UploadedFile {
   uploadedAt: string;
   /** The engine job that applied, or will apply, the latest delivery; followed after a reload until it finishes. */
   jobId?: string;
+  /** The hash of the bytes last sent, `sha256:<hex>`, so the same file dropped again is not sent again. */
+  contentHash?: string;
 }
 
 export interface UploadEntry extends UploadedFile {
@@ -369,6 +382,8 @@ export interface UploadEntry extends UploadedFile {
   detail?: string;
   /** The engine refused the caller; the owner grant would fix it. */
   forbidden?: boolean;
+  /** The engine is running the row's job again from the file it already has; nothing was uploaded. */
+  retrying?: boolean;
 }
 
 export interface IngestFileInput {
@@ -580,6 +595,9 @@ export interface ContextFact {
   linkedThrough?: string;
   /** The relationship as one sentence, written while indexing; absent when the engine has none. It keeps what the short relation can lose, such as a "not". */
   text?: string;
+  /** The kind of the subject and of the object, as the graph holds them: an entity is its name and its kind, so these pick the right one when a name is more than one entity. Absent when the engine gave none. */
+  subjectKind?: string;
+  objectKind?: string;
 }
 
 export interface ContextQueryResult {
@@ -592,8 +610,18 @@ export interface ContextQueryResult {
   evidence: ContextEvidence[];
   /** Graph mode only: relationships that stand on `evidence`; empty in chunks mode. */
   facts: ContextFact[];
+  /** Graph mode only: pairs of facts the engine's contradiction check flagged among the passages, each side standing on `evidence`. */
+  conflicts: ContextQueryConflict[];
   insufficientEvidence: boolean;
   traceId: string;
+}
+
+/** Two facts of a query that cannot both be true, with the check's reason and its confidence from 0 to 1. */
+export interface ContextQueryConflict {
+  first: ContextFact;
+  second: ContextFact;
+  reason: string;
+  confidence: number | null;
 }
 
 /**
@@ -652,12 +680,26 @@ export interface ContextGraphRelation {
   text?: string;
 }
 
+/**
+ * Two relationships of the graph that the engine's contradiction check says cannot both be
+ * true, with the check's reason and its confidence from 0 to 1. Each side names only records
+ * the reader may read; the engine lists a conflict only when each side kept one.
+ */
+export interface ContextGraphConflict {
+  first: ContextGraphRelation;
+  second: ContextGraphRelation;
+  reason: string;
+  confidence: number | null;
+}
+
 /** The part of the engine's graph the reader may see. */
 export interface ContextGraph {
   entities: ContextGraphEntity[];
   records: ContextGraphRecord[];
   mentions: ContextGraphMention[];
   relations: ContextGraphRelation[];
+  /** Pairs of `relations` the contradiction check flagged. */
+  conflicts: ContextGraphConflict[];
   /** Less-mentioned entities were left out to keep within the limit. */
   truncated: boolean;
 }
@@ -669,6 +711,8 @@ export interface ContextEntityView {
   /** Ids of `evidence` whose passage names the entity. */
   mentionedIn: string[];
   facts: ContextFact[];
+  /** Every kind this name has, when it was asked for without a kind and the name is more than one entity. */
+  kinds?: string[];
 }
 
 /**

@@ -21,21 +21,50 @@
 /** The canvas height: as tall as the window allows below the page's header, tabs and bar, within bounds, so the graph is in view without scrolling. */
 export const GRAPH_HEIGHT = 'clamp(380px, calc(100vh - 440px), 600px)';
 
-/** A short text on a link of the canvas: the relationship a fact names. */
-export const linkTagSx = {
-  fontSize: 10.5,
-  lineHeight: 1.2,
-  px: 0.75,
-  py: 0.2,
-  borderRadius: 1.25,
+/**
+ * A short text on a link of the canvas: the relationship a fact names, or
+ * "contradicts" on a conflict line, in the conflict colour. `lit` when it is
+ * part of the selection. The same style dresses the button it becomes when it
+ * can be clicked.
+ */
+export const linkTagSx = (tone?: 'conflict', lit = false) =>
+  ({
+    display: 'inline-block',
+    fontFamily: 'inherit',
+    fontSize: 10.5,
+    fontWeight: lit ? 600 : 400,
+    lineHeight: 1.2,
+    px: 0.75,
+    py: 0.2,
+    borderRadius: 1.25,
+    border: '1px solid',
+    borderColor: tone === 'conflict' ? 'error.main' : lit ? 'primary.main' : 'primary.light',
+    boxShadow: lit ? '0 0 0 1px currentColor' : 'none',
+    bgcolor: 'background.paper',
+    color: tone === 'conflict' ? 'error.main' : 'primary.main',
+    whiteSpace: 'nowrap',
+    maxWidth: 220,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    '&:hover': { borderColor: tone === 'conflict' ? 'error.main' : 'primary.main', boxShadow: '0 0 0 1px currentColor' },
+  }) as const;
+
+/** A row of a panel that selects something on the canvas when clicked, such as a conflict or one side of it. */
+export const selectRowSx = {
+  display: 'block',
+  width: '100%',
+  textAlign: 'left',
+  p: 1,
+  borderRadius: 1,
   border: '1px solid',
-  borderColor: 'primary.light',
+  borderColor: 'divider',
   bgcolor: 'background.paper',
-  color: 'primary.main',
-  whiteSpace: 'nowrap',
-  maxWidth: 220,
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
+  fontFamily: 'inherit',
+  fontSize: 13,
+  lineHeight: 1.5,
+  color: 'text.primary',
+  '&:hover': { borderColor: 'primary.main' },
+  '&.Mui-disabled': { opacity: 0.7 },
 } as const;
 
 /** A note across the middle of a canvas, over the dimmed graph. */
