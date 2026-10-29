@@ -398,11 +398,17 @@ export default function CosmosCanvas({
           onPointMouseOut: () => handlers.current.onHover?.(null),
           onSimulationTick: scheduleLabels,
           onZoom: scheduleLabels,
+          // A reader who zooms or drags takes over: the follow stops at its next tick, and a frame
+          // waiting for the simulation to end is dropped, so the camera stays where the reader put it.
           onZoomStart: (_event, userDriven) => {
-            if (userDriven) userMovedRef.current = true;
+            if (userDriven) {
+              userMovedRef.current = true;
+              pendingFrameRef.current = null;
+            }
           },
           onDragStart: () => {
             userMovedRef.current = true;
+            pendingFrameRef.current = null;
           },
           onTransition: scheduleLabels,
           onSimulationEnd: () => {
@@ -527,11 +533,13 @@ export default function CosmosCanvas({
     const graph = graphRef.current;
     if (!graph) return;
     userMovedRef.current = true;
+    pendingFrameRef.current = null;
     stopFollowing();
     graph.setZoomLevel(graph.getZoomLevel() * factor, 250, true);
   };
   const fit = () => {
     userMovedRef.current = true;
+    pendingFrameRef.current = null;
     stopFollowing();
     fitAll(400);
   };
