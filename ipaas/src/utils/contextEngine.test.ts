@@ -708,6 +708,10 @@ describe('source progress', () => {
       "2 files are not searchable: the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
     );
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { backend_model_unavailable: 1 } } }))).toMatch(/^1 file is not searchable: the engine could not reach its model provider/);
+    // Two codes need two fixes, so the notice counts every file and sends the reader to the rows instead of naming one fix.
+    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 4, indexed: 1, failed: 3, failures: { backend_model_access_denied: 2, backend_model_quota_exceeded: 1 } } }))).toBe(
+      "3 files are not searchable: the model provider failed on them for more than one reason. Each file's row says why.",
+    );
     // A file the engine cannot read is the file's own problem, told on its row, not a notice.
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { extraction_unsupported: 1 } } }))).toBeNull();
     expect(sourceFailureNotice(progress({ indexing: { state: 'unavailable', failures: { backend_model_access_denied: 2 } } }))).toBeNull();
