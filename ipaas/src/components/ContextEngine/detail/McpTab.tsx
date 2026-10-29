@@ -19,6 +19,7 @@
 import { Alert, Box, Button, ListingTable, Stack, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
+import { useCreateContextApiKey } from '../../../hooks/useContextEngine';
 import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
 import { buildMcpClientConfigs, mcpEndpointUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
@@ -32,6 +33,7 @@ interface McpTabProps {
 }
 
 const readableSx = { maxWidth: 900 } as const;
+const TEST_KEY_LIFETIME_MS = 60 * 60 * 1000;
 const toolsTableSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', mb: 3 } as const;
 
 /** Expose as MCP — endpoint, a config per client, an in-place test, and the tools agents get. */
@@ -41,12 +43,15 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   const configs = useMemo(() => buildMcpClientConfigs(base, engine.name), [base, engine.name]);
   const [client, setClient] = useState<McpClientId>('claude-desktop');
   const [testing, setTesting] = useState(false);
+  // The playground calls the public endpoint like any client would, with a short-lived key minted for it.
+  const testKey = useCreateContextApiKey(engine.id);
+  const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + TEST_KEY_LIFETIME_MS).toISOString() });
   const selected = configs.find((c) => c.id === client) ?? configs[0];
 
   return (
     <Box>
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="AI agents connect over the Model Context Protocol and call the engine's read tools with one of its API keys." />
+        <SurfaceHeader title="MCP server" description="AI agents connect over the Model Context Protocol and call the engine's read tools with one of its API keys, created on the API tab." />
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
           Server endpoint
@@ -70,7 +75,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
             {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
           </Button>
           <Typography variant="body2" sx={mutedSx}>
-            Lists the tools below and lets you call them with one of the engine's API keys — the same playground integrations already use.
+            Lists the tools below and lets you call them with a test key that expires in an hour — the same playground integrations already use.
           </Typography>
         </Stack>
       </Box>
@@ -78,7 +83,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
       {/* The playground takes the page's full width; the text around it keeps a readable measure. */}
       {testing && (
         <Box sx={playgroundFrameSx}>
-          <McpPlayground url={endpoint} token={null} headerName="X-API-Key" connectionLayout="bar" />
+          <McpPlayground url={endpoint} token={testKey.data?.apiKey ?? null} headerName="X-API-Key" isTokenFetching={testKey.isPending} onTokenRegenerate={mintTestKey} connectionLayout="bar" />
         </Box>
       )}
 

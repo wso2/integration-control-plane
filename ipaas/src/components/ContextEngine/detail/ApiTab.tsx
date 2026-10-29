@@ -20,6 +20,7 @@ import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl } from '../../../utils/contextEngine';
+import ApiKeysSection from './ApiKeysSection';
 import CodeViewer from '../../CodeViewer';
 import SurfaceHeader from './SurfaceHeader';
 import { endpointFieldSx, endpointRowSx, mutedSx } from '../styles';
@@ -63,6 +64,8 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
           A question nothing visible answers returns <code>state: "insufficient_evidence"</code>, with no answer.
         </Typography>
       </Stack>
+
+      <ApiKeysSection engineId={engine.id} />
 
       {question && (
         <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1 }}>
