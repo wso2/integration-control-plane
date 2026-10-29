@@ -40,6 +40,7 @@ import {
   litLinkColors,
   litPointColors,
   ordinal,
+  queryConflictLink,
   sentencesCiting,
   shortLabel,
   type FactFocus,
@@ -110,6 +111,8 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
     return selectedKey?.startsWith('p:') ? { evidenceId: selectedKey.slice(2) } : {};
   }, [selectedKey]);
   const whole = useMemo(() => (model && served ? factSelection(model, served, facts, {}, conflicts) : null), [model, served, facts, conflicts]);
+  // How many of the answer's conflicts have their red line on the graph shown; null when there is no graph to draw them on.
+  const drawnConflicts = useMemo(() => (model && served ? conflicts.filter((c) => queryConflictLink(model, served, c) !== undefined).length : null), [model, served, conflicts]);
   const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, facts, focus, conflicts) : null), [model, served, facts, focus, conflicts]);
   // A chosen entity or passage narrows the lit part; one with no fact on the graph shows the whole answer's part.
   const lit = part && part.points.length ? part : whole;
@@ -295,6 +298,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             canTrace={canTrace}
             permissionsKnown={!!permissions.data}
             modelName={trace.data?.models.answer?.model ?? engine.models.llm?.model}
+            drawnConflicts={drawnConflicts}
             sourceName={(id) => engine.sources.find((s) => s.id === id)?.name}
             onSelectPassage={selectPassage}
             onReadAnswer={data.answer && !data.answerWithheld ? () => select('answer') : undefined}
@@ -305,6 +309,14 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   );
 }
 
+/** Where an answer's conflicts can be seen: all drawn in red on the graph, some, none, or no graph to draw them on. */
+function conflictsDrawnText(total: number, drawn: number | null): string {
+  if (drawn === null) return 'They cannot be drawn, as this engine does not serve its graph yet.';
+  if (drawn === total) return total === 1 ? 'It is drawn in red on the graph.' : 'Each is drawn in red on the graph.';
+  if (drawn === 0) return total === 1 ? 'It is not drawn: the graph shown does not hold its entities.' : 'None is drawn: the graph shown does not hold their entities.';
+  return `${drawn} of them ${drawn === 1 ? 'is' : 'are'} drawn in red on the graph; the rest name entities it does not hold.`;
+}
+
 /** The right panel before anything is chosen: what the engine did, step by step, from what it recorded, and every passage the answer was written from. */
 function DerivationSteps({
   result,
@@ -312,6 +324,7 @@ function DerivationSteps({
   canTrace,
   permissionsKnown,
   modelName,
+  drawnConflicts,
   sourceName,
   onSelectPassage,
   onReadAnswer,
@@ -321,6 +334,8 @@ function DerivationSteps({
   canTrace: boolean;
   permissionsKnown: boolean;
   modelName?: string;
+  /** How many of the answer's conflicts are drawn on the graph; null when there is no graph to draw them on. */
+  drawnConflicts: number | null;
   sourceName: (sourceId: string) => string | undefined;
   onSelectPassage: (n: number) => void;
   onReadAnswer?: () => void;
@@ -369,7 +384,7 @@ function DerivationSteps({
           ? `${result.facts.length} fact${result.facts.length === 1 ? '' : 's'} from the graph stand on these passages, naming ${summary.entities} entit${summary.entities === 1 ? 'y' : 'ies'}. They are lit on the graph. They explain what the passages contain; the answer cites passages, not facts.`
           : 'No graph facts came with this query, so its derivation runs through passages alone.',
         result.conflicts.length
-          ? `The index flagged ${result.conflicts.length} conflict${result.conflicts.length === 1 ? '' : 's'} among the facts behind these passages. Each is drawn in red on the graph, and the model was told about them.`
+          ? `The index flagged ${result.conflicts.length} conflict${result.conflicts.length === 1 ? '' : 's'} among the facts behind these passages. ${conflictsDrawnText(result.conflicts.length, drawnConflicts)} The model was told about them.`
           : '',
       ]
         .filter(Boolean)

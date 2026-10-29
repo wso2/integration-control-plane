@@ -52,6 +52,7 @@ import {
   relationSentence,
   relationTags,
   ordinal,
+  queryConflictLink,
   sameRelation,
   searchLabel,
   searchNodes,
@@ -498,6 +499,8 @@ describe('facts on the graph', () => {
     expect(entityConflicts(withConflict, 'ent_g', narrowed)[0].drawn).toBe(false);
     // An answer's conflict lights both of its facts and the red line between the ends that differ.
     const sides = { first: { subject: 'gateway 7', relation: 'fails over to', object: 'kandy', evidenceIds: ['e1'] }, second: { subject: 'gateway 7', relation: 'fails over to', object: 'vault', evidenceIds: ['e2'] } };
+    expect(queryConflictLink(m, withConflict, { ...sides, reason: '', confidence: null })).toBe(at);
+    expect(queryConflictLink(narrowed, withConflict, { ...sides, reason: '', confidence: null })).toBeUndefined();
     const answered = factSelection(m, withConflict, [], {}, [{ ...sides, reason: 'Two different failover targets.', confidence: 0.9 }]);
     expect(answered.points.map((i) => m.nodes[i].key).sort()).toEqual(['ent_g', 'ent_gb', 'ent_k', 'ent_v'].filter((k) => k !== 'ent_gb'));
     expect(answered.tags.map((t) => t.text).sort()).toEqual(['contradicts', 'fails over to', 'fails over to']);

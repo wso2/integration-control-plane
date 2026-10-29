@@ -782,6 +782,29 @@ export interface FactSelection extends Selection {
 }
 
 /**
+ * The conflict line an answer's conflict stands on: between the two ends that
+ * differ, as the check drew it. Undefined when the graph shown does not hold
+ * both of those entities, or draws no line between them.
+ */
+export function queryConflictLink(m: GraphModel, graph: ContextGraph, conflict: ContextQueryConflict): number | undefined {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const subjectsDiffer = !same(conflict.first.subject, conflict.second.subject) || conflict.first.subjectKind !== conflict.second.subjectKind;
+  const ends: [string, string | undefined][] = subjectsDiffer
+    ? [
+        [conflict.first.subject, conflict.first.subjectKind],
+        [conflict.second.subject, conflict.second.subjectKind],
+      ]
+    : [
+        [conflict.first.object, conflict.first.objectKind],
+        [conflict.second.object, conflict.second.objectKind],
+      ];
+  const [a, b] = ends.map(([name, kind]) => entityIndex(m, graph, name, kind));
+  if (a === undefined || b === undefined || a === b) return undefined;
+  const at = m.links.findIndex((link) => link.kind === 'conflicts' && ((link.source === a && link.target === b) || (link.source === b && link.target === a)));
+  return at < 0 ? undefined : at;
+}
+
+/**
  * The part of the graph an answer's facts used: the entities they name and the
  * relationships between them, with the relationship text for each lit link. A
  * fact's link is the `relates` link between its two entities with the same
@@ -824,25 +847,12 @@ export function factSelection(m: GraphModel, graph: ContextGraph, facts: Context
     }
   }
   // A conflict's own line, between the two ends that differ, lights up when both of its sides are in the part shown.
-  const conflictLinks = m.links.map((link, i) => ({ link, i })).filter(({ link }) => link.kind === 'conflicts');
   for (const conflict of conflicts) {
     if (!inFocus(conflict.first) || !inFocus(conflict.second)) continue;
-    const subjectsDiffer = !same(conflict.first.subject, conflict.second.subject) || conflict.first.subjectKind !== conflict.second.subjectKind;
-    const ends: [string, string | undefined][] = subjectsDiffer
-      ? [
-          [conflict.first.subject, conflict.first.subjectKind],
-          [conflict.second.subject, conflict.second.subjectKind],
-        ]
-      : [
-          [conflict.first.object, conflict.first.objectKind],
-          [conflict.second.object, conflict.second.objectKind],
-        ];
-    const [a, b] = ends.map(([name, kind]) => entityIndex(m, graph, name, kind));
-    if (a === undefined || b === undefined || a === b) continue;
-    const match = conflictLinks.find(({ link }) => (link.source === a && link.target === b) || (link.source === b && link.target === a));
-    if (match && !links.has(match.i)) {
-      links.add(match.i);
-      tags.push({ link: match.i, text: 'contradicts', ...(conflict.reason ? { detail: conflict.reason } : {}), tone: 'conflict' });
+    const match = queryConflictLink(m, graph, conflict);
+    if (match !== undefined && !links.has(match)) {
+      links.add(match);
+      tags.push({ link: match, text: 'contradicts', ...(conflict.reason ? { detail: conflict.reason } : {}), tone: 'conflict' });
     }
   }
   if (!focus.entity && !focus.evidenceId) {
