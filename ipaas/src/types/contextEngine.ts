@@ -30,7 +30,8 @@ import type { EmbeddingConfig } from './ragIngestion';
 
 // ── Engine ──────────────────────────────────────────────────────────────────
 
-export type ContextEngineState = 'provisioning' | 'ready' | 'failed' | 'deleting';
+/** `ready` is the BFF's `running`; `unknown` is an engine whose state the BFF could not read. */
+export type ContextEngineState = 'provisioning' | 'starting' | 'ready' | 'failed' | 'deleting' | 'unknown';
 
 /** Tabs on the engine detail page; the active one is a URL segment. */
 export type ContextEngineTabKey = 'overview' | 'playground' | 'graph' | 'api' | 'mcp' | 'access';
@@ -48,12 +49,19 @@ export interface ContextEngineSummary {
 
 /** A context engine as shown in the listing. */
 export interface ContextEngine {
+  /** The engine's key in this console, built from its environment and handle (see `contextEngineKey`). */
   id: string;
+  /** The engine's name at the BFF: unique within its environment. */
+  handle: string;
+  environment: string;
+  /** Display name. */
   name: string;
   description: string;
   state: ContextEngineState;
+  statusReason?: string;
   createdAt: string;
-  summary?: ContextEngineSummary;
+  /** The gateway URL integrations call; set only while the engine runs. */
+  publicApiUrl?: string;
 }
 
 /** Which surfaces the engine is published on. */
@@ -477,6 +485,8 @@ export interface ContextEngineDraft {
 export interface CreateContextEngineInput {
   name: string;
   description: string;
+  /** The environment the engine is created in. */
+  environment: string;
   sources: ContextSourceConfig[];
   roles: string[];
   embedding: EmbeddingConfig;
@@ -486,12 +496,43 @@ export interface CreateContextEngineInput {
   storage: ContextEngineStorage;
 }
 
-export interface CreateContextEngineResult {
-  id: string;
+/** What is set up on an engine once it runs: the creator's grant, the sources and the query roles. */
+export interface ContextEngineSetupInput {
+  sources: ContextSourceConfig[];
+  roles: string[];
+}
+
+export interface ContextEngineSetupResult {
   /** Engine ids of the registered sources, by the name the wizard gave them. */
   sources: Record<string, string>;
-  /** Steps the engine could not complete because it does not expose that route yet. */
+  /** Steps the engine refused; what succeeded is kept. */
   warnings: string[];
+}
+
+/** A source run by an integration the BFF deploys next to the engine. Settings never come back. */
+export interface ContextIntegration {
+  name: string;
+  type: string;
+  shape: 'automation' | 'service' | string;
+  sourceId?: string;
+  status: string;
+  statusReason?: string;
+  lastRun?: { status: string; startedAt?: string; completedAt?: string };
+}
+
+/** A key for the engine's public API, masked; the full key is shown once, when it is created. */
+export interface ContextApiKey {
+  name: string;
+  displayName?: string;
+  maskedKey: string;
+  status: string;
+  expiresAt?: string;
+}
+
+export interface CreatedContextApiKey {
+  keyId: string;
+  apiKey: string;
+  expiresAt?: string;
 }
 
 // ── Jobs ────────────────────────────────────────────────────────────────────
@@ -700,6 +741,7 @@ export interface ContextGrant {
 
 /** A change to a registered source; every field is optional, but one must be set. */
 export interface UpdateContextSourceInput {
+  engineId: string;
   sourceId: string;
   name?: string;
   /** Replaces all of the source's visibility rules. */

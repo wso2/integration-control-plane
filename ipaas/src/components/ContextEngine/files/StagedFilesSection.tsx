@@ -77,7 +77,7 @@ export function StagedFilesSection({ draft, onChange, onRunningEngine = false }:
  * Who can see the staged files. Without files it only explains the choice each
  * upload makes; the source itself needs no rules typed in.
  */
-export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }: StagedProps & { orgHandle: string; queryRoles?: string[] }): JSX.Element {
+export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles, engineId }: StagedProps & { orgHandle: string; queryRoles?: string[]; engineId?: string }): JSX.Element {
   const staged = draft.staged ?? [];
   if (staged.length === 0) {
     return (
@@ -98,6 +98,7 @@ export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }
       hint="Applies to the files you add here; later uploads to this source choose again."
       orgHandle={orgHandle}
       queryRoles={queryRoles}
+      engineId={engineId}
       value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}
       onChange={(stagedVisibility) => onChange({ ...draft, stagedVisibility })}
     />

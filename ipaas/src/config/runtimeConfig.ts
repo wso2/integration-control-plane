@@ -48,10 +48,6 @@ interface RuntimeConfig {
   INTEGRATION_BUILDER_MAX_TOKENS?: string;
   INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL?: string;
   MOESIF_APP_URL?: string;
-  /** Context Engine REST base (the app calls `<base>/v1/...`). Unset disables the feature. */
-  CONTEXT_ENGINE_API_URL?: string;
-  /** Local-development only: a static engine token when the engine cannot verify platform tokens. */
-  CONTEXT_ENGINE_API_TOKEN?: string;
   ENABLE_CONTEXT_ENGINE_FEATURE?: string | boolean;
 }
 
@@ -116,10 +112,6 @@ export interface ApiConfig {
   integrationBuilderCentralGraphqlUrl: string;
   /** Trusted Moesif embed origin; empty disables API Insights. */
   moesifAppUrl?: string;
-  /** Context Engine REST base. Empty when the engine is not configured for this deployment. */
-  contextEngineApiUrl: string;
-  /** Dev-only static bearer token for the engine; unset sends the platform token. */
-  contextEngineApiToken?: string;
   /** Gates the org-level Context Engines feature. */
   enableContextEngineFeature?: boolean;
 }
@@ -159,7 +151,6 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderLlmModel: 'claude-sonnet-4-6',
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
-  contextEngineApiUrl: '',
 };
 
 /**
@@ -215,8 +206,6 @@ export async function loadConfig(): Promise<void> {
       integrationBuilderMaxTokens: parsePositiveInt(config.INTEGRATION_BUILDER_MAX_TOKENS, DEFAULT_CONFIG.integrationBuilderMaxTokens),
       integrationBuilderCentralGraphqlUrl: config.INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL || 'https://api.dev-central.ballerina.io/2.0/graphql',
       moesifAppUrl: config.MOESIF_APP_URL?.trim() || undefined,
-      contextEngineApiUrl: config.CONTEXT_ENGINE_API_URL ? trim(config.CONTEXT_ENGINE_API_URL) : DEFAULT_CONFIG.contextEngineApiUrl,
-      contextEngineApiToken: config.CONTEXT_ENGINE_API_TOKEN?.trim() || undefined,
       enableContextEngineFeature: config.ENABLE_CONTEXT_ENGINE_FEATURE === 'true' || config.ENABLE_CONTEXT_ENGINE_FEATURE === true,
     };
 

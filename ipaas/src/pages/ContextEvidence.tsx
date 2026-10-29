@@ -21,9 +21,10 @@ import { ArrowLeft, Check, ChevronRight, Hash, Info, Link as LinkIcon, MessageSq
 import { useState, type JSX, type ReactNode } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions, useRouteEngineId } from '../hooks/useContextEngine';
 import { absoluteUrl, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
-import { contextEngineUrl, contextEvidenceUrl } from '../paths';
+import { contextEngineUrl, contextEnginesUrl, contextEvidenceUrl } from '../paths';
+import NotFound from '../components/NotFound';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../components/ContextEngine/styles';
@@ -77,14 +78,22 @@ function Row({ label, children }: { label: string; children: ReactNode }): JSX.E
  */
 export default function ContextEvidence(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
-  const { engineId = '', evidenceId = '' } = useParams();
+  const { evidenceId = '' } = useParams();
+  const engineId = useRouteEngineId();
   const engine = useContextEngine(engineId);
-  const evidence = useContextEvidence(evidenceId);
+  const evidence = useContextEvidence(engineId, evidenceId);
   const permissions = useContextPermissions(engineId);
   const [copied, setCopied] = useState(false);
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
+  }
+  if (!engineId) {
+    return (
+      <PageContent>
+        <NotFound message="This link does not name a context engine and its environment." backTo={contextEnginesUrl(scope.org)} />
+      </PageContent>
+    );
   }
 
   const engineName = engine.data?.name;
@@ -155,7 +164,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   // Someone who may open evidence but not ask: the engine's evidence.read without context.read.
   const readerOnly = !!permissions.data && !permissions.data.includes('context.read');
   const subject = l?.heading ?? ev.recordId;
-  const askAbout = () => navigate(`${contextEngineUrl(scope.org, engineId, 'playground')}?q=${encodeURIComponent(`What else do the sources say about “${subject}”?`)}`);
+  const askAbout = () => navigate(contextEngineUrl(scope.org, engineId, 'playground', { q: `What else do the sources say about “${subject}”?` }));
   const copyLink = () =>
     navigator.clipboard?.writeText(absoluteUrl(contextEvidenceUrl(scope.org, engineId, ev.id))).then(() => {
       setCopied(true);

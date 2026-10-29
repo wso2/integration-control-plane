@@ -77,10 +77,10 @@ interface ProvenanceViewProps {
  */
 export default function ProvenanceView({ engine, orgHandle, queryId, initialKey, onSelectKey, onBackToAnswer, onExit, onExploreEntity }: ProvenanceViewProps): JSX.Element {
   const { colors, palette } = useGraphTheme();
-  const result = useContextQueryResult(queryId);
+  const result = useContextQueryResult(engine.id, queryId);
   const permissions = useContextPermissions(engine.id);
   const canTrace = !!permissions.data?.includes('trace.read');
-  const trace = useContextQueryTrace(queryId, canTrace);
+  const trace = useContextQueryTrace(engine.id, queryId, canTrace);
   const graph = useContextGraph(engine.id, GRAPH_ENTITY_LIMIT);
   const asked = useAskedQuestions(engine.id).find((q) => q.queryId === queryId);
   const question = asked?.question ?? 'An earlier question';

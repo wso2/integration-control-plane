@@ -139,7 +139,7 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
   const key = entryKey(sourceId, recordId);
   clearTimer(key);
   try {
-    const record = await getContextRecordStatus(sourceId, recordId);
+    const record = await getContextRecordStatus(engineId, sourceId, recordId);
     const { status, detail } = uploadStatusFromRecord(record);
     patchEntry(sourceId, recordId, { status, detail, forbidden: false, version: record.currentVersion, progress: 100 });
     if (status === 'indexing')
@@ -174,7 +174,7 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
   const key = entryKey(sourceId, recordId);
   clearTimer(key);
   try {
-    const job = await getContextJob(jobId);
+    const job = await getContextJob(engineId, jobId);
     if (!CONTEXT_JOB_TERMINAL_STATES.has(job.state)) {
       patchEntry(sourceId, recordId, { status: 'queued', progress: 100 });
       timers.set(
@@ -217,7 +217,7 @@ const ruleChecks = new Map<string, Promise<void>>();
  * keeping the other saved rules. Someone without manage rights cannot update it,
  * and the file is sent anyway: the engine then holds it back and its row says why.
  */
-function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
+function ensureSourceRules(engineId: string, sourceId: string, tags: string[]): Promise<void> {
   const previous = ruleChecks.get(sourceId) ?? Promise.resolve();
   const next = previous.then(async () => {
     const saved = rememberedSourceRules(sourceId);
@@ -225,7 +225,7 @@ function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
     if (missing.length === 0) return;
     const rules = [...saved.filter((r) => !missing.includes(r.group)), ...uploadSourceRules(missing)];
     try {
-      await updateContextSource({ sourceId, audience: rules });
+      await updateContextSource({ engineId, sourceId, audience: rules });
       rememberSourceRules(sourceId, rules);
     } catch {
       // Uploading needs no manage rights; the file's row explains a hold-back.
@@ -248,7 +248,7 @@ function enqueue(engineId: string, sourceId: string, file: FileToUpload, audienc
     patchEntry(sourceId, recordId, { status: 'uploading', progress: 0, detail: undefined, forbidden: false });
     try {
       // A file still under its old label keeps the source's label rule; role tags must map to themselves.
-      if (entriesOf(sourceId).find((e) => e.recordId === recordId)?.visibility) await ensureSourceRules(sourceId, audience);
+      if (entriesOf(sourceId).find((e) => e.recordId === recordId)?.visibility) await ensureSourceRules(engineId, sourceId, audience);
       const handle = await ingestContextFile({ engineId, sourceId, recordId, content: file.content, contentType: file.contentType, audience, version, onProgress: (f) => patchEntry(sourceId, recordId, { progress: Math.round(f * 100) }) });
       patchEntry(sourceId, recordId, { status: 'queued', progress: 100, jobId: handle.jobId });
       persist(sourceId);
@@ -321,7 +321,7 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
 
 /** Share a file with other roles. A held-back file becomes visible once the source maps its new roles, which this checks first. */
 export async function changeUploadVisibility(engineId: string, sourceId: string, recordId: string, visibility: FileVisibility, audience: string[]): Promise<void> {
-  await ensureSourceRules(sourceId, audience);
+  await ensureSourceRules(engineId, sourceId, audience);
   const handle = await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'acl_changed', audience, version: String(Date.now()) });
   patchEntry(sourceId, recordId, { visibility, audience, label: undefined, status: 'queued', detail: undefined, jobId: handle.jobId });
   persist(sourceId);

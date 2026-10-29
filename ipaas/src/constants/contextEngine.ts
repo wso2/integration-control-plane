@@ -511,6 +511,24 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   { id: 'sitemap', name: 'Sitemap', description: 'Every page listed in a sitemap.xml.', category: 'web-files', icon: 'globe', fields: [F('sitemapUrl', 'Sitemap URL', 'url', { placeholder: 'https://example.com/sitemap.xml' })], summaryKeys: ['sitemapUrl'] },
   { id: 'rss', name: 'RSS Feed', description: 'Articles from a feed.', category: 'web-files', icon: 'rss', fields: [F('feedUrl', 'Feed URL', 'url')], summaryKeys: ['feedUrl'] },
   { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', popular: true, icon: 'upload', fields: [], summaryKeys: [], single: true },
+  {
+    id: 'docs_sync',
+    name: 'Docs Folder (scheduled)',
+    description: 'Markdown files from a folder, synced on a schedule.',
+    category: 'documentation',
+    icon: 'folder',
+    fields: [O('folder', 'Folder', 'text', { helper: 'Folder to read. Empty reads the default folder.' })],
+    summaryKeys: ['folder'],
+  },
+  {
+    id: 'docs_watch',
+    name: 'Docs Folder (watched)',
+    description: 'Markdown files from a folder, watched for changes.',
+    category: 'documentation',
+    icon: 'folder',
+    fields: [O('folder', 'Folder', 'text', { helper: 'Folder to read. Empty reads the default folder.' })],
+    summaryKeys: ['folder'],
+  },
 ];
 
 export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntries(SOURCE_CONNECTORS.map((c) => [c.id, c]));
@@ -521,7 +539,15 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'docs_watch', 'gdrive', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+
+/**
+ * Connectors the browser feeds itself, registered straight on the engine. Every other enabled
+ * connector runs as an integration the BFF deploys, of the type below (its id when not listed).
+ */
+export const ENGINE_NATIVE_CONNECTOR_IDS: ReadonlySet<string> = new Set(['upload']);
+
+export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive' };
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
@@ -567,20 +593,25 @@ export function blankLlm(provider: LlmProvider): LlmConfig {
 
 // ── Engine limits and access model ──────────────────────────────────────────
 
-/**
- * Each context engine runs as its own instance, and the console shows the one at its configured
- * URL under this id. It is also the engine's root grant resource, so grants and permissions on the
- * engine use it as is.
- */
+/** The engine's root grant resource: every engine uses this id for grants and permissions on itself. */
 export const CONTEXT_ENGINE_ID = 'engine';
 
-/** Shown for an engine set up from another browser, whose name this browser never saw. */
-export const DEFAULT_CONTEXT_ENGINE_NAME = 'Context engine';
+/** The BFF's limit for an engine's name, which becomes part of its address. */
+export const CONTEXT_ENGINE_HANDLE_MAX = 63;
 
-/** localStorage key of the running engine's name and description, which the engine itself does not hold. */
-export const CONTEXT_ENGINE_LOCAL_KEY = 'contextEngine:local';
+/** Fetch an engine's console key again this long before it expires. */
+export const CONSOLE_ACCESS_REFRESH_MARGIN_MS = 2 * 60 * 1000;
 
-/** Limits for an engine's name and description, which the control plane provisions. */
+/** How often an engine that is starting is checked again. */
+export const ENGINE_STATUS_POLL_MS = 4000;
+
+/** How many engines the listing reads a summary from at once. */
+export const SUMMARY_CONCURRENCY = 2;
+
+/** Model providers the engine cannot be configured with yet. */
+export const UNAVAILABLE_MODEL_PROVIDERS: ReadonlySet<string> = new Set(['azure_openai']);
+
+/** Limits for an engine's display name and description. */
 export const CONTEXT_ENGINE_NAME_MAX = 120;
 export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Shown under the description field: people browsing engines and AI agents connected over MCP both read it. */
@@ -676,9 +707,6 @@ export const CONTEXT_ENGINE_QUESTIONS_KEY_PREFIX = 'contextEngine:questions:';
 
 /** How many asked questions are kept per engine. */
 export const ASKED_QUESTIONS_MAX = 20;
-
-/** localStorage key of the deletion job started from this browser, per engine, so a failed deletion can be told apart and retried. */
-export const CONTEXT_ENGINE_DELETION_KEY_PREFIX = 'contextEngine:deletion:';
 
 /** How often a list or page with an engine being deleted checks again. */
 export const DELETION_POLL_MS = 3000;

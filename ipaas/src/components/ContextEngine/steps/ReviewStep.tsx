@@ -16,13 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Grid, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, Grid, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_HINT, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { engineDescriptionError, engineNameError, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
+import { engineDescriptionError, engineHandleFrom, engineNameError, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import { fieldStackSx, mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
@@ -41,6 +41,10 @@ interface ReviewStepProps {
   myGroups: string[];
   /** When the draft was last written to session storage, if at all. */
   draftSavedAt: string | null;
+  /** Environments the engine can be created in, and the one chosen. */
+  environments: { id: string; name: string }[];
+  environment: string;
+  onEnvironmentChange: (value: string) => void;
   onNameChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onEdit: (step: EditableStep) => void;
@@ -66,7 +70,7 @@ function SummaryCard({ title, editLabel, onEdit, children }: { title: string; ed
 }
 
 /** Step 4 — name the engine and confirm what will be created; every card jumps back to its step. */
-export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, onNameChange, onDescriptionChange, onEdit }: ReviewStepProps): JSX.Element {
+export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, environments, environment, onEnvironmentChange, onNameChange, onDescriptionChange, onEdit }: ReviewStepProps): JSX.Element {
   const nameError = engineNameError(form.name);
   // Query access and visibility are set in different steps; say where they disagree before anything is created.
   const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
@@ -99,7 +103,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           autoFocus
           value={form.name}
           error={!!nameError}
-          helperText={nameError || `${form.name.length}/${CONTEXT_ENGINE_NAME_MAX}`}
+          helperText={nameError || `${form.name.trim() ? `ID: ${engineHandleFrom(form.name)} · ` : ''}${form.name.length}/${CONTEXT_ENGINE_NAME_MAX}`}
           onChange={(e) => onNameChange(e.target.value)}
           sx={REQUIRED_FIELD_SX}
           inputProps={{ 'aria-label': 'Engine name' }}
@@ -115,6 +119,13 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           helperText={descriptionError || `${CONTEXT_ENGINE_DESCRIPTION_HINT} ${form.description.length}/${CONTEXT_ENGINE_DESCRIPTION_MAX}`}
           onChange={(e) => onDescriptionChange(e.target.value)}
         />
+        <TextField select label="Environment" required fullWidth size="small" value={environment} onChange={(e) => onEnvironmentChange(e.target.value)} helperText="The engine runs in this environment; its name must be unique there." sx={REQUIRED_FIELD_SX}>
+          {environments.map((env) => (
+            <MenuItem key={env.id} value={env.id}>
+              {env.name}
+            </MenuItem>
+          ))}
+        </TextField>
       </Stack>
 
       {(mismatch.seeNothing.length > 0 || mismatch.cannotQuery.length > 0 || mismatch.hiddenFromMe.length > 0) && (

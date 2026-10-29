@@ -17,39 +17,50 @@
  */
 
 /**
- * Context Engines — backed by the Context Engine REST API (`/v1`).
+ * Context Engines. The BFF lists, creates and deletes engines (`/context-engines`); each engine
+ * lives in one environment and is named within it, so the console keys it by both (see
+ * `contextEngineKey`). Everything inside an engine — sources, uploads, queries, grants, the graph —
+ * is the engine's own REST API (`/v1`), called through the org gateway with a console key from the
+ * BFF and the user's platform token (`_contextEngineAccess.ts`). Sources that run as integrations
+ * are added through the BFF, which deploys them next to the engine. Models come from the engine's
+ * environment, set at create, and are read back through `GET /v1/engine`.
  *
- * Each context engine runs as its own instance (the engine's ADR 0019), and this
- * console is the UI for the one at the configured URL, shown under the id
- * `engine`, which is also the engine's grant resource. Until the control plane
- * provisions engines, creating one sets up that running engine: the wizard
- * registers its sources and grants, and its name and description stay in this
- * browser, since the engine holds no name. Models, stores and served interfaces
- * come from the engine's environment through `GET /v1/engine`, read-only;
- * deleting an engine and changing its models are provisioning, refused here.
- * Sources live at `/v1/sources` and progress at `/v1/progress`. Answer mode
- * answers 404 when the engine is deployed without answers. Integrators use the
- * public routes, `/v1/context`, `/v1/answer` and `/v1/mcp`.
- *
- * Reads that hit a missing route degrade to an empty section so the detail page
- * still renders.
+ * Reads that hit a missing route degrade to an empty section so the detail page still renders.
  */
 
-import { authenticatedFetch, getAccessToken } from '../auth';
-import { CONTEXT_ENGINE_ID, CONTEXT_ENGINE_LOCAL_KEY, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS, DEFAULT_CONTEXT_ENGINE_NAME } from '../constants/contextEngine';
-import { audienceMappingFromRules, deliveryIdentity, engineMessage, ownerGrantId, roleGrantId, rolesFromGrants, summarizeEngineProgress, toSourceRegistration } from '../utils/contextEngine';
+import { CONTEXT_ENGINE_ID, CONTEXT_OWNER_ACTIONS, CONTEXT_QUERY_ACTIONS } from '../constants/contextEngine';
+import {
+  audienceMappingFromRules,
+  contextEngineKey,
+  deliveryIdentity,
+  engineMessage,
+  integrationTypeFor,
+  ownerGrantId,
+  roleGrantId,
+  rolesFromGrants,
+  summarizeEngineProgress,
+  toBffCreateRequest,
+  toIntegrationRequest,
+  toSourceRegistration,
+} from '../utils/contextEngine';
 import { HttpError } from '../types/http';
+import { bff, items, q, seg, type ListResponse } from './_client';
+import { asHttpError, enginePath, engineRequest, engineUpload, forgetConsoleAccess } from './_contextEngineAccess';
 import type {
+  ContextApiKey,
   ContextEngine,
   ContextEngineDetail,
   ContextEngineExposure,
   ContextEngineModels,
   ContextModelSummary,
   ContextEngineProgress,
+  ContextEngineSetupInput,
+  ContextEngineSetupResult,
   ContextEngineState,
   ContextEngineSummary,
   ContextEvidence,
   ContextGrant,
+  ContextIntegration,
   ContextJob,
   ContextJobHandle,
   ContextPrincipal,
@@ -58,7 +69,7 @@ import type {
   ContextRecordStatus,
   ContextSource,
   CreateContextEngineInput,
-  CreateContextEngineResult,
+  CreatedContextApiKey,
   IngestFileInput,
   ContextSourceConfig,
   UpdateContextSourceInput,
@@ -78,43 +89,28 @@ import type {
   ContextQueryTrace,
 } from '../types/contextEngine';
 
-// Phase-1 bridge: the console talks to the one engine at CONTEXT_ENGINE_API_URL, sending the
-// static dev token when one is configured and the platform token otherwise.
-const engineBaseUrl = (): string => {
-  const base = window.API_CONFIG?.contextEngineApiUrl;
-  if (!base) throw new Error('Context Engine API URL is not configured');
-  return base;
+const contextEngineClient = {
+  get: <T>(engineId: string, path: string) => engineRequest<T>(engineId, 'GET', path),
+  post: <T>(engineId: string, path: string, body?: unknown) => engineRequest<T>(engineId, 'POST', path, body),
+  put: <T>(engineId: string, path: string, body?: unknown) => engineRequest<T>(engineId, 'PUT', path, body),
+  patch: <T>(engineId: string, path: string, body?: unknown) => engineRequest<T>(engineId, 'PATCH', path, body),
+  delete: <T>(engineId: string, path: string) => engineRequest<T>(engineId, 'DELETE', path),
 };
 
-/** A static engine token from runtime config, for local development; the platform token is used otherwise. */
-const staticEngineToken = (): string | undefined => window.API_CONFIG?.contextEngineApiToken || undefined;
-
-async function engineRequest<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const url = `${engineBaseUrl()}${path}`;
-  const headers: Record<string, string> = body !== undefined ? { 'Content-Type': 'application/json' } : {};
-  const init: RequestInit = { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) };
-  const fixed = staticEngineToken();
-  const res = fixed ? await fetch(url, { ...init, headers: { ...headers, Authorization: `Bearer ${fixed}` } }) : await authenticatedFetch(url, init);
-  const text = await res.text().catch(() => '');
-  if (!res.ok) throw new HttpError(res.status, `HTTP ${res.status}: ${text || res.statusText}`);
-  return text ? (JSON.parse(text) as T) : (undefined as T);
+/** A BFF call whose failure surfaces as an `HttpError`, like an engine call's. */
+async function viaBff<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (err) {
+    throw asHttpError(err);
+  }
 }
 
-const contextEngineClient = {
-  get: <T>(path: string) => engineRequest<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => engineRequest<T>('POST', path, body),
-  put: <T>(path: string, body?: unknown) => engineRequest<T>('PUT', path, body),
-  patch: <T>(path: string, body?: unknown) => engineRequest<T>('PATCH', path, body),
-  delete: <T>(path: string) => engineRequest<T>('DELETE', path),
-};
-
 const V1 = '/v1';
-const grantsPath = (resourceId: string): string => `${V1}/resources/${encodeURIComponent(resourceId)}/grants`;
+/** Grants on the engine itself; every engine uses the same root resource. */
+const grantsPath = (): string => `${V1}/resources/${encodeURIComponent(CONTEXT_ENGINE_ID)}/grants`;
 
-/** Engines are provisioned by the control plane; here, creating one sets up the running engine. */
-export const supportsContextEngineProvisioning = false;
-
-const provisioningRefused = (what: string): Error => new Error(`${what} is provisioning, which the control plane owns; this console shows the engine it is configured for.`);
+const provisioningRefused = (what: string): Error => new Error(`${what} is not supported yet: an engine keeps the models it was created with.`);
 
 // ── Raw wire shapes — private to this file ──────────────────────────────────
 
@@ -218,13 +214,44 @@ interface RawPrincipal {
   groups?: string[];
 }
 
+/** An engine as the BFF lists it. The URLs are set only while it runs. */
+interface BffEngine {
+  name: string;
+  displayName?: string;
+  description?: string;
+  environment: string;
+  status: string;
+  statusReason?: string;
+  createdAt?: string;
+  consoleApiUrl?: string;
+  publicApiUrl?: string;
+}
+
+interface BffIntegration {
+  name: string;
+  type: string;
+  shape: string;
+  sourceId?: string;
+  status: string;
+  statusReason?: string;
+  lastRun?: { status: string; startedAt?: string; completedAt?: string };
+}
+
+interface BffApiKey {
+  name: string;
+  displayName?: string;
+  maskedApiKey: string;
+  status: string;
+  expiresAt?: string;
+}
+
 /** `GET /v1/engine`: what the engine's environment configured, never keys. */
 interface RawModelSummary {
   provider: string;
   model: string;
 }
 
-interface RawEngine {
+interface RawEngineConfig {
   description?: string | null;
   models?: { embedding?: RawModelSummary | null; llm?: RawModelSummary | null; answer?: RawModelSummary | null } | null;
   storage?: Partial<Record<StorageKind, { provider?: string } | null>> | null;
@@ -257,37 +284,18 @@ interface RawEngineProgress {
 
 // ── Mappers ─────────────────────────────────────────────────────────────────
 
-/** The engine's name and description as the wizard set it up, kept in this browser: the engine holds no name. */
-interface LocalEngineRecord {
-  name: string;
-  description: string;
-  createdAt: string;
-}
+const ENGINE_STATES: Record<string, ContextEngineState> = { provisioning: 'provisioning', starting: 'starting', running: 'ready', failed: 'failed', deleting: 'deleting' };
 
-function readLocalEngine(): LocalEngineRecord | null {
-  try {
-    const raw = localStorage.getItem(CONTEXT_ENGINE_LOCAL_KEY);
-    return raw ? (JSON.parse(raw) as LocalEngineRecord) : null;
-  } catch {
-    return null;
-  }
-}
-
-function writeLocalEngine(record: LocalEngineRecord): void {
-  try {
-    localStorage.setItem(CONTEXT_ENGINE_LOCAL_KEY, JSON.stringify(record));
-  } catch {
-    // Storage may be unavailable (private mode); the engine then shows under the default name.
-  }
-}
-
-/** The one engine: its name and description from this browser's setup, else the engine's own description. */
-const toEngine = (raw: RawEngine | null, local: LocalEngineRecord | null): ContextEngine => ({
-  id: CONTEXT_ENGINE_ID,
-  name: local?.name || DEFAULT_CONTEXT_ENGINE_NAME,
-  description: local?.description || raw?.description || '',
-  state: 'ready' as ContextEngineState,
-  createdAt: local?.createdAt ?? '',
+const toEngine = (raw: BffEngine): ContextEngine => ({
+  id: contextEngineKey(raw.environment, raw.name),
+  handle: raw.name,
+  environment: raw.environment,
+  name: raw.displayName || raw.name,
+  description: raw.description ?? '',
+  state: ENGINE_STATES[raw.status] ?? 'unknown',
+  ...(raw.statusReason ? { statusReason: raw.statusReason } : {}),
+  createdAt: raw.createdAt ?? '',
+  ...(raw.publicApiUrl ? { publicApiUrl: raw.publicApiUrl.replace(/\/+$/, '') } : {}),
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -310,7 +318,7 @@ const toEvidence = (raw: RawEvidence): ContextEvidence => ({
 const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary | null => (raw ? { provider: raw.provider, model: raw.model } : null);
 
 /** The environment's models; they change only by redeploying the engine, so nothing here is editable. */
-const toModels = (raw: RawEngine | null): ContextEngineModels => ({
+const toModels = (raw: RawEngineConfig | null): ContextEngineModels => ({
   embedding: toModel(raw?.models?.embedding),
   llm: toModel(raw?.models?.llm),
   answer: toModel(raw?.models?.answer),
@@ -351,7 +359,7 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
 });
 
 /** Which public surfaces the deployment serves, as the engine reports them; unknown counts as off. */
-const toExposure = (raw: RawEngine | null): ContextEngineExposure => ({ api: raw?.interfaces?.publicApi ?? false, mcp: raw?.interfaces?.mcp ?? false, answers: raw?.interfaces?.answers ?? false });
+const toExposure = (raw: RawEngineConfig | null): ContextEngineExposure => ({ api: raw?.interfaces?.publicApi ?? false, mcp: raw?.interfaces?.mcp ?? false, answers: raw?.interfaces?.answers ?? false });
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
@@ -364,7 +372,7 @@ const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = 
 };
 
 /** Per-store placement as the engine reports it; null until it reports any. */
-const toStorage = (raw: RawEngine | null): Record<StorageKind, StorageSummary> | null => {
+const toStorage = (raw: RawEngineConfig | null): Record<StorageKind, StorageSummary> | null => {
   const st = raw?.storage;
   if (!st) return null;
   const one = (kind: StorageKind): StorageSummary => {
@@ -441,42 +449,35 @@ async function optional<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
 
 // ── Engines ─────────────────────────────────────────────────────────────────
 
-/** Only the engine this console is configured for exists here; any other id is not found. */
-function requireThisEngine(engineId: string): void {
-  if (engineId !== CONTEXT_ENGINE_ID) throw new HttpError(404, `HTTP 404: no context engine "${engineId}"`);
-}
-
-/**
- * The engine counts as created once this browser set it up. Deleting only forgets it here and
- * leaves the engine's data in place, so the engine's own data cannot decide this.
- */
-const isSetUp = (local: LocalEngineRecord | null): boolean => !!local;
-
 /** The engine's configuration, sources and grants, each degrading to empty when the caller may not read it. */
-async function fetchEngineFacets(): Promise<{ engine: RawEngine | null; sources: RawSource[]; grants: RawGrant[] }> {
+async function fetchEngineFacets(engineId: string): Promise<{ engine: RawEngineConfig | null; sources: RawSource[]; grants: RawGrant[] }> {
   const [engine, sources, grants] = await Promise.all([
-    optional(() => contextEngineClient.get<RawEngine>(`${V1}/engine`), null as RawEngine | null),
-    optional(() => contextEngineClient.get<RawSource[]>(`${V1}/sources`), [] as RawSource[]),
-    optional(() => contextEngineClient.get<RawGrant[]>(grantsPath(CONTEXT_ENGINE_ID)), [] as RawGrant[]),
+    optional(() => contextEngineClient.get<RawEngineConfig>(engineId, `${V1}/engine`), null as RawEngineConfig | null),
+    optional(() => contextEngineClient.get<RawSource[]>(engineId, `${V1}/sources`), [] as RawSource[]),
+    optional(() => contextEngineClient.get<RawGrant[]>(engineId, grantsPath()), [] as RawGrant[]),
   ]);
   return { engine, sources: sources ?? [], grants: grants ?? [] };
 }
 
 /** Listing-only progress: any failure just leaves the progress line out, it never fails the listing. */
-async function fetchProgressQuietly(): Promise<RawEngineProgress | null> {
+async function fetchProgressQuietly(engineId: string): Promise<RawEngineProgress | null> {
   try {
-    return await contextEngineClient.get<RawEngineProgress>(`${V1}/progress`);
+    return await contextEngineClient.get<RawEngineProgress>(engineId, `${V1}/progress`);
   } catch {
     return null;
   }
 }
 
-/** The one engine this console shows, once it is set up, with an at-a-glance summary. */
-export async function listContextEngines(): Promise<ContextEngine[]> {
-  const local = readLocalEngine();
-  const [facets, progress] = await Promise.all([fetchEngineFacets(), fetchProgressQuietly()]);
-  if (!isSetUp(local)) return [];
-  const summary: ContextEngineSummary = {
+/** The engines in one environment, from the BFF alone; their summaries are read per engine. */
+export async function listContextEngines(environment: string): Promise<ContextEngine[]> {
+  const raw = await viaBff(() => bff.get<ListResponse<BffEngine>>(`/context-engines${q({ environment })}`));
+  return items(raw).map(toEngine);
+}
+
+/** At-a-glance facts for a running engine's listing row, read from the engine itself. */
+export async function getContextEngineSummary(engineId: string): Promise<ContextEngineSummary> {
+  const [facets, progress] = await Promise.all([fetchEngineFacets(engineId), fetchProgressQuietly(engineId)]);
+  return {
     sourceCount: facets.sources.length,
     sourceTypes: facets.sources.map((s) => s.type),
     roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
@@ -488,38 +489,49 @@ export async function listContextEngines(): Promise<ContextEngine[]> {
         )
       : null,
   };
-  return [{ ...toEngine(facets.engine, local), summary }];
 }
 
-/** The engine with its sources, models, query roles and exposure. */
+/** The engine with its sources, models, query roles and exposure. Until it runs, only what the BFF knows. */
 export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
-  requireThisEngine(engineId);
-  const local = readLocalEngine();
-  const { engine, sources, grants } = await fetchEngineFacets();
-  if (!isSetUp(local)) throw new HttpError(404, 'HTTP 404: the context engine is not set up yet');
+  const engine = toEngine(await viaBff(() => bff.get<BffEngine>(enginePath(engineId))));
+  if (engine.state !== 'ready') {
+    return { ...engine, sources: [], models: toModels(null), queryRoles: [], exposure: toExposure(null), storage: null };
+  }
+  const { engine: config, sources, grants } = await fetchEngineFacets(engineId);
   return {
-    ...toEngine(engine, local),
+    ...engine,
+    description: engine.description || config?.description || '',
     sources: sources.map(toSource),
-    models: toModels(engine),
+    models: toModels(config),
     queryRoles: rolesFromGrants(grants.map(toGrant)),
-    exposure: toExposure(engine),
-    storage: toStorage(engine),
+    exposure: toExposure(config),
+    storage: toStorage(config),
   };
 }
 
+/** Ask the BFF for a new engine. It starts provisioning; {@link setUpContextEngine} runs once it is ready. */
+export async function createContextEngine(input: CreateContextEngineInput): Promise<ContextEngine> {
+  return toEngine(await viaBff(() => bff.post<BffEngine>('/context-engines', toBffCreateRequest(input))));
+}
+
+/** Register a source: on the engine for one the browser feeds, through the BFF for one an integration runs. */
+async function registerSource(engineId: string, source: ContextSourceConfig): Promise<ContextSource> {
+  const type = integrationTypeFor(source.type);
+  if (type === null) return toSource(await contextEngineClient.post<RawSource>(engineId, `${V1}/sources`, toSourceRegistration(source)));
+  const request = toIntegrationRequest(source, type);
+  const raw = await viaBff(() => bff.post<BffIntegration>(`${enginePath(engineId)}/integrations`, request));
+  if (!raw.sourceId) throw new Error('The integration was added, but its source is not registered yet.');
+  return { id: raw.sourceId, name: request.name, type: raw.type, state: 'ready' };
+}
+
 /**
- * Set up the running engine: grant its creator query and upload access,
- * register the sources with their visibility rules, grant the chosen roles, and
- * keep the name and description in this browser. The models, answers and storage
- * come from the engine's environment, so the wizard's choices for them are not sent.
- * One instance is one engine for now, so a second setup is refused. Setting it up again
- * after deleting it adds to whatever the running engine still holds.
+ * Set up a running engine: grant its creator query and upload access, register the sources with
+ * their visibility rules, and grant the chosen roles. A step the engine refuses is reported rather
+ * than undone: what succeeded is already usable.
  */
-export async function createContextEngine(input: CreateContextEngineInput): Promise<CreateContextEngineResult> {
-  if (isSetUp(readLocalEngine())) throw new HttpError(409, "HTTP 409: this console's context engine is already set up");
+export async function setUpContextEngine(engineId: string, input: ContextEngineSetupInput): Promise<ContextEngineSetupResult> {
   const warnings: string[] = [];
   const sources: Record<string, string> = {};
-  // A step the engine refuses is reported rather than undone: what succeeded is already usable.
   const attempt = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
     try {
       await fn();
@@ -528,46 +540,59 @@ export async function createContextEngine(input: CreateContextEngineInput): Prom
     }
   };
   await attempt('Give you query and upload access', async () => {
-    const me = await getContextPrincipal();
-    await contextEngineClient.put(`${grantsPath(CONTEXT_ENGINE_ID)}/${encodeURIComponent(ownerGrantId(me.id))}`, { principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
+    const me = await getContextPrincipal(engineId);
+    await contextEngineClient.put(engineId, `${grantsPath()}/${encodeURIComponent(ownerGrantId(me.id))}`, { principalId: me.id, actions: [...CONTEXT_OWNER_ACTIONS] });
   });
   for (const source of input.sources) {
     await attempt(`Register source “${source.name}”`, async () => {
-      const raw = await contextEngineClient.post<RawSource>(`${V1}/sources`, toSourceRegistration(source));
-      if (raw?.id) sources[source.name.trim()] = raw.id;
+      const created = await registerSource(engineId, source);
+      sources[source.name.trim()] = created.id;
     });
   }
   for (const role of input.roles) {
-    await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(`${grantsPath(CONTEXT_ENGINE_ID)}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
+    await attempt(`Grant query access to role “${role}”`, () => contextEngineClient.put(engineId, `${grantsPath()}/${encodeURIComponent(roleGrantId(role))}`, { group: role, actions: [...CONTEXT_QUERY_ACTIONS] }));
   }
-  writeLocalEngine({ name: input.name.trim(), description: input.description.trim(), createdAt: new Date().toISOString() });
-  return { id: CONTEXT_ENGINE_ID, sources, warnings };
+  return { sources, warnings };
 }
 
-/** Deleting an engine is deprovisioning its instance, which the control plane owns. */
-/**
- * Forget the engine in this console. Deleting its container will be the control plane's, through
- * the provisioning API; either way its data stays in the engine's databases until they are cleared.
- */
-export async function deleteContextEngine(engineId: string): Promise<ContextJobHandle | null> {
-  requireThisEngine(engineId);
-  try {
-    localStorage.removeItem(CONTEXT_ENGINE_LOCAL_KEY);
-  } catch {
-    throw new Error("Couldn't forget the engine: this browser's storage is unavailable.");
-  }
-  return null;
+/** Delete the engine, its integrations and its data. The BFF lists it as deleting until it is gone. */
+export async function deleteContextEngine(engineId: string): Promise<void> {
+  await viaBff(() => bff.delete(enginePath(engineId)));
+  forgetConsoleAccess(engineId);
 }
 
-/** The engine's models come from its environment; changing them is a redeploy. */
+/** The BFF cannot change an engine's models yet. */
 export async function updateContextModels(_input: UpdateContextModelsInput): Promise<ContextEngineModels> {
   throw provisioningRefused('Changing the models');
 }
 
+// ── Integrations and API keys (BFF) ─────────────────────────────────────────
+
+export async function listContextIntegrations(engineId: string): Promise<ContextIntegration[]> {
+  const raw = await viaBff(() => bff.get<ListResponse<BffIntegration>>(`${enginePath(engineId)}/integrations`));
+  return items(raw).map((i) => ({ name: i.name, type: i.type, shape: i.shape, sourceId: i.sourceId, status: i.status, statusReason: i.statusReason, lastRun: i.lastRun }));
+}
+
+export async function listContextApiKeys(engineId: string): Promise<ContextApiKey[]> {
+  const raw = await viaBff(() => bff.get<ListResponse<BffApiKey> | BffApiKey[]>(`${enginePath(engineId)}/api-keys`));
+  const list = Array.isArray(raw) ? raw : items(raw);
+  return list.map((k) => ({ name: k.name, displayName: k.displayName, maskedKey: k.maskedApiKey, status: k.status, expiresAt: k.expiresAt }));
+}
+
+/** A key for the engine's public API; the full key comes back only here. */
+export async function createContextApiKey(engineId: string, input: { displayName?: string; expiresAt?: string }): Promise<CreatedContextApiKey> {
+  const raw = await viaBff(() => bff.post<{ keyId: string; apiKey: string; expiresAt?: string }>(`${enginePath(engineId)}/api-keys`, input));
+  return { keyId: raw.keyId, apiKey: raw.apiKey, expiresAt: raw.expiresAt };
+}
+
+export async function revokeContextApiKey(engineId: string, keyName: string): Promise<void> {
+  await viaBff(() => bff.delete(`${enginePath(engineId)}/api-keys/${seg(keyName)}`));
+}
+
 // ── Jobs ────────────────────────────────────────────────────────────────────
 
-export async function getContextJob(jobId: string): Promise<ContextJob> {
-  return toJob(await contextEngineClient.get<RawJob>(`${V1}/jobs/${encodeURIComponent(jobId)}`));
+export async function getContextJob(engineId: string, jobId: string): Promise<ContextJob> {
+  return toJob(await contextEngineClient.get<RawJob>(engineId, `${V1}/jobs/${encodeURIComponent(jobId)}`));
 }
 
 // ── Progress ────────────────────────────────────────────────────────────────
@@ -578,9 +603,8 @@ export async function getContextJob(jobId: string): Promise<ContextJob> {
  * fewer entries than sources. An engine without the route reports `available: false`.
  */
 export async function getContextEngineProgress(engineId: string): Promise<ContextEngineProgress> {
-  requireThisEngine(engineId);
   try {
-    const raw = await contextEngineClient.get<RawEngineProgress>(`${V1}/progress`);
+    const raw = await contextEngineClient.get<RawEngineProgress>(engineId, `${V1}/progress`);
     return { available: true, sources: (raw?.sources ?? []).map(toSourceProgress) };
   } catch (err) {
     if (isMissingRoute(err)) return { available: false, sources: [] };
@@ -590,10 +614,9 @@ export async function getContextEngineProgress(engineId: string): Promise<Contex
 
 // ── Sources ─────────────────────────────────────────────────────────────────
 
-/** Register a source on a running engine with its visibility rules. Connection settings still wait for the configuration route. */
+/** Add a source to a running engine with its visibility rules; a connector's source is run by an integration. */
 export async function addContextSource(engineId: string, source: ContextSourceConfig): Promise<ContextSource> {
-  requireThisEngine(engineId);
-  return toSource(await contextEngineClient.post<RawSource>(`${V1}/sources`, toSourceRegistration(source)));
+  return registerSource(engineId, source);
 }
 
 /** Rename a source, replace its visibility rules, or pause and resume it. */
@@ -603,7 +626,7 @@ export async function updateContextSource(input: UpdateContextSourceInput): Prom
     ...(input.audience ? { audienceMapping: audienceMappingFromRules(input.audience) } : {}),
     ...(input.state ? { state: input.state } : {}),
   };
-  return toSource(await contextEngineClient.patch<RawSource>(`${V1}/sources/${encodeURIComponent(input.sourceId)}`, body));
+  return toSource(await contextEngineClient.patch<RawSource>(input.engineId, `${V1}/sources/${encodeURIComponent(input.sourceId)}`, body));
 }
 
 // ── File uploads ────────────────────────────────────────────────────────────
@@ -614,12 +637,6 @@ export async function updateContextSource(input: UpdateContextSourceInput): Prom
 // the content hash in the event, and a lookup by key after a lost reply.
 
 const sourcePath = (id: string): string => `${V1}/sources/${encodeURIComponent(id)}`;
-
-/** The bearer for requests the browser sends itself: the dev token when configured, else the platform token. */
-async function engineBearer(): Promise<string | null> {
-  const token = staticEngineToken() || (await getAccessToken());
-  return token ? `Bearer ${token}` : null;
-}
 
 async function sha256Hex(data: ArrayBuffer | string): Promise<string> {
   const bytes = typeof data === 'string' ? new TextEncoder().encode(data) : new Uint8Array(data);
@@ -632,50 +649,10 @@ async function deliveryKey(sourceId: string, operation: string, recordId: string
   return `${sourceId}:${operation}:${await sha256Hex(deliveryIdentity(recordId, version))}`;
 }
 
-/** One multipart POST with a given bearer. */
-function postMultipart(url: string, form: FormData, headers: Record<string, string>, bearer: string | null, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', url);
-    if (bearer) xhr.setRequestHeader('Authorization', bearer);
-    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
-    xhr.upload.onprogress = (e) => {
-      if (onProgress && e.lengthComputable) onProgress(e.loaded / e.total);
-    };
-    xhr.onload = () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText) as RawJobAccepted);
-        } catch {
-          reject(new Error('Expected a JSON response body.'));
-        }
-      } else {
-        reject(new HttpError(xhr.status, `HTTP ${xhr.status}: ${xhr.responseText || xhr.statusText}`));
-      }
-    };
-    xhr.onerror = () => reject(new Error('The upload could not reach the context engine.'));
-    xhr.onabort = () => reject(new DOMException('The upload was cancelled.', 'AbortError'));
-    if (signal) {
-      if (signal.aborted) {
-        // Before send(), abort() fires no abort event, so onabort would never settle the promise.
-        reject(new DOMException('The upload was cancelled.', 'AbortError'));
-        return;
-      }
-      signal.addEventListener('abort', () => xhr.abort(), { once: true });
-    }
-    xhr.send(form);
-  });
-}
-
-/** An XHR rather than fetch, because only XHR reports upload progress. Errors carry the engine's status. */
-async function sendMultipart(url: string, form: FormData, headers: Record<string, string>, onProgress?: (fraction: number) => void, signal?: AbortSignal): Promise<RawJobAccepted> {
-  return postMultipart(url, form, headers, await engineBearer(), onProgress, signal);
-}
-
 /** The job accepted under a delivery key, or null when the engine has none: the check after a lost reply. */
-async function findContextDelivery(sourceId: string, key: string): Promise<ContextJobHandle | null> {
+async function findContextDelivery(engineId: string, sourceId: string, key: string): Promise<ContextJobHandle | null> {
   try {
-    const raw = await contextEngineClient.get<RawJobAccepted>(`${sourcePath(sourceId)}/ingestions/${encodeURIComponent(key)}`);
+    const raw = await contextEngineClient.get<RawJobAccepted>(engineId, `${sourcePath(sourceId)}/ingestions/${encodeURIComponent(key)}`);
     return raw ? { jobId: raw.jobId, statusUrl: raw.statusUrl } : null;
   } catch (err) {
     if (err instanceof HttpError && err.status === 404) return null;
@@ -708,12 +685,12 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
   form.append('event', new Blob([JSON.stringify(event)], { type: 'application/json' }), 'event.json');
   form.append('content', new Blob([bytes], { type: input.contentType }), input.recordId);
   try {
-    const raw = await sendMultipart(`${window.API_CONFIG.contextEngineApiUrl}${sourcePath(input.sourceId)}/ingestions`, form, { 'Idempotency-Key': key }, input.onProgress, input.signal);
+    const raw = await engineUpload<RawJobAccepted>(input.engineId, `${sourcePath(input.sourceId)}/ingestions`, form, { 'Idempotency-Key': key }, input.onProgress, input.signal);
     return { jobId: raw.jobId, statusUrl: raw.statusUrl };
   } catch (err) {
     // The engine answered, or the user cancelled: nothing to look up.
     if (err instanceof HttpError || (err instanceof DOMException && err.name === 'AbortError')) throw err;
-    const found = await findContextDelivery(input.sourceId, key).catch(() => null);
+    const found = await findContextDelivery(input.engineId, input.sourceId, key).catch(() => null);
     if (found) return found;
     throw err;
   }
@@ -735,20 +712,20 @@ export async function sendContextRecordEvent(input: RecordEventInput): Promise<C
   };
   const form = new FormData();
   form.append('event', new Blob([JSON.stringify(event)], { type: 'application/json' }), 'event.json');
-  const raw = await sendMultipart(`${window.API_CONFIG.contextEngineApiUrl}${sourcePath(input.sourceId)}/ingestions`, form, { 'Idempotency-Key': key });
+  const raw = await engineUpload<RawJobAccepted>(input.engineId, `${sourcePath(input.sourceId)}/ingestions`, form, { 'Idempotency-Key': key });
   return { jobId: raw.jobId, statusUrl: raw.statusUrl };
 }
 
 /** A record's lifecycle and index state. Needs delivery or manage rights on the source. */
-export async function getContextRecordStatus(sourceId: string, recordId: string): Promise<ContextRecordStatus> {
-  const raw = await contextEngineClient.get<RawRecordStatus>(`${sourcePath(sourceId)}/records/${encodeURIComponent(recordId)}`);
+export async function getContextRecordStatus(engineId: string, sourceId: string, recordId: string): Promise<ContextRecordStatus> {
+  const raw = await contextEngineClient.get<RawRecordStatus>(engineId, `${sourcePath(sourceId)}/records/${encodeURIComponent(recordId)}`);
   return { recordId: raw.recordId, state: raw.state, currentVersion: raw.currentVersion, sourceAclVersion: raw.sourceAclVersion, quarantineReason: raw.quarantineReason, indexState: raw.indexState, indexError: raw.indexError, updatedAt: raw.updatedAt };
 }
 
 // ── Query ───────────────────────────────────────────────────────────────────
 
 export async function queryContextEngine(input: ContextQueryInput): Promise<ContextQueryResult> {
-  const raw = await contextEngineClient.post<RawQueryResponse>(`${V1}/queries`, { question: input.question, mode: input.mode, ...(input.limit ? { limit: input.limit } : {}) });
+  const raw = await contextEngineClient.post<RawQueryResponse>(input.engineId, `${V1}/queries`, { question: input.question, mode: input.mode, ...(input.limit ? { limit: input.limit } : {}) });
   return toQueryResult(raw);
 }
 
@@ -757,8 +734,8 @@ export async function queryContextEngine(input: ContextQueryInput): Promise<Cont
  * again: ones that moved out of reach drop out, and an answer whose passages
  * are not all still visible comes back withheld. Anyone else gets 404.
  */
-export async function getContextQuery(queryId: string): Promise<ContextQueryResult> {
-  return toQueryResult(await contextEngineClient.get<RawQueryResponse>(`${V1}/queries/${encodeURIComponent(queryId)}`));
+export async function getContextQuery(engineId: string, queryId: string): Promise<ContextQueryResult> {
+  return toQueryResult(await contextEngineClient.get<RawQueryResponse>(engineId, `${V1}/queries/${encodeURIComponent(queryId)}`));
 }
 
 /**
@@ -766,8 +743,8 @@ export async function getContextQuery(queryId: string): Promise<ContextQueryResu
  * query or evidence access who may read the record now, while it is still at
  * that version; every refusal is the same 404.
  */
-export async function getContextEvidence(evidenceId: string): Promise<ContextEvidence> {
-  return toEvidence(await contextEngineClient.get<RawEvidence>(`${V1}/evidence/${encodeURIComponent(evidenceId)}`));
+export async function getContextEvidence(engineId: string, evidenceId: string): Promise<ContextEvidence> {
+  return toEvidence(await contextEngineClient.get<RawEvidence>(engineId, `${V1}/evidence/${encodeURIComponent(evidenceId)}`));
 }
 
 /**
@@ -775,8 +752,8 @@ export async function getContextEvidence(evidenceId: string): Promise<ContextEvi
  * reader may not have it or the engine does not serve traces yet, so the
  * console simply leaves the trace out.
  */
-export async function getContextQueryTrace(queryId: string): Promise<ContextQueryTrace | null> {
-  const raw = await optional(() => contextEngineClient.get<RawQueryTrace>(`${V1}/queries/${encodeURIComponent(queryId)}/trace`), null as RawQueryTrace | null);
+export async function getContextQueryTrace(engineId: string, queryId: string): Promise<ContextQueryTrace | null> {
+  const raw = await optional(() => contextEngineClient.get<RawQueryTrace>(engineId, `${V1}/queries/${encodeURIComponent(queryId)}/trace`), null as RawQueryTrace | null);
   return raw ? toTrace(raw) : null;
 }
 
@@ -786,9 +763,8 @@ export async function getContextQueryTrace(queryId: string): Promise<ContextQuer
  * serve its graph yet.
  */
 export async function getContextGraph(engineId: string, limit: number): Promise<ContextGraph | null> {
-  requireThisEngine(engineId);
   try {
-    return toGraph(await contextEngineClient.get<RawGraph>(`${V1}/graph?limit=${encodeURIComponent(String(limit))}`));
+    return toGraph(await contextEngineClient.get<RawGraph>(engineId, `${V1}/graph?limit=${encodeURIComponent(String(limit))}`));
   } catch (err) {
     if (isMissingRoute(err)) return null;
     throw err;
@@ -797,8 +773,7 @@ export async function getContextGraph(engineId: string, limit: number): Promise<
 
 /** One entity, by its name as the graph returns it, with the passages that name it and its relationships. 404 when nothing the reader may read names it. */
 export async function getContextEntity(engineId: string, name: string, limit = 10): Promise<ContextEntityView> {
-  requireThisEngine(engineId);
-  const raw = await contextEngineClient.get<RawEntityView>(`${V1}/graph/entity?name=${encodeURIComponent(name)}&limit=${encodeURIComponent(String(limit))}`);
+  const raw = await contextEngineClient.get<RawEntityView>(engineId, `${V1}/graph/entity?name=${encodeURIComponent(name)}&limit=${encodeURIComponent(String(limit))}`);
   return {
     entity: toGraphEntity(raw.entity),
     evidence: (raw.evidence ?? []).map(toEvidence),
@@ -807,30 +782,30 @@ export async function getContextEntity(engineId: string, name: string, limit = 1
   };
 }
 
-/** The caller's effective engine actions on a resource they can see. */
-export async function getContextPermissions(resourceId: string): Promise<string[]> {
-  const raw = await contextEngineClient.get<{ resourceId: string; actions?: string[] }>(`${V1}/auth/permissions?resourceId=${encodeURIComponent(resourceId)}`);
+/** The caller's effective actions on the engine. */
+export async function getContextPermissions(engineId: string): Promise<string[]> {
+  const raw = await contextEngineClient.get<{ resourceId: string; actions?: string[] }>(engineId, `${V1}/auth/permissions?resourceId=${encodeURIComponent(CONTEXT_ENGINE_ID)}`);
   return raw?.actions ?? [];
 }
 
 // ── Access ──────────────────────────────────────────────────────────────────
 
 export async function listContextGrants(engineId: string): Promise<ContextGrant[]> {
-  const raw = await contextEngineClient.get<RawGrant[]>(grantsPath(engineId));
+  const raw = await contextEngineClient.get<RawGrant[]>(engineId, grantsPath());
   return (raw ?? []).map(toGrant);
 }
 
 export async function putContextGrant(input: PutContextGrantInput): Promise<ContextGrant> {
   const body = { actions: input.actions, ...(input.group ? { group: input.group } : {}), ...(input.principalId ? { principalId: input.principalId } : {}) };
-  return toGrant(await contextEngineClient.put<RawGrant>(`${grantsPath(input.engineId)}/${encodeURIComponent(input.grantId)}`, body));
+  return toGrant(await contextEngineClient.put<RawGrant>(input.engineId, `${grantsPath()}/${encodeURIComponent(input.grantId)}`, body));
 }
 
 export async function deleteContextGrant(engineId: string, grantId: string): Promise<void> {
-  await contextEngineClient.delete(`${grantsPath(engineId)}/${encodeURIComponent(grantId)}`);
+  await contextEngineClient.delete(engineId, `${grantsPath()}/${encodeURIComponent(grantId)}`);
 }
 
-/** The caller as the engine resolved it from the bearer credential. */
-export async function getContextPrincipal(): Promise<ContextPrincipal> {
-  const raw = await contextEngineClient.get<RawPrincipal>(`${V1}/auth/me`);
+/** The caller as the engine resolved it from the platform token. */
+export async function getContextPrincipal(engineId: string): Promise<ContextPrincipal> {
+  const raw = await contextEngineClient.get<RawPrincipal>(engineId, `${V1}/auth/me`);
   return { id: raw.id, kind: raw.kind, email: raw.email, groups: raw.groups ?? [] };
 }

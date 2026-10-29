@@ -18,12 +18,27 @@
 
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState, type JSX } from 'react';
+import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
-import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngineDraft, useContextEngines, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, useContextEngine, useContextEngineDraft, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { useAllEnvironments } from '../hooks/useEnvironments';
 import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
-import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
+import {
+  selectEnvironment,
+  checkStagedFile,
+  engineDescriptionError,
+  engineMessage,
+  engineNameError,
+  isFormDirty,
+  modelsStepBlocker,
+  sourcesStepBlocker,
+  storageStepBlocker,
+  toCreateInput,
+  visibilityTags,
+  withSourceVisibilityRules,
+} from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -33,10 +48,11 @@ import SourcesStep from '../components/ContextEngine/steps/SourcesStep';
 import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
 import StorageStep from '../components/ContextEngine/steps/StorageStep';
 import ReviewStep from '../components/ContextEngine/steps/ReviewStep';
-import SetupProgress, { type SetupUploadSource } from '../components/ContextEngine/files/SetupProgress';
+import SetupProgress, { type SetupPhase, type SetupUploadSource } from '../components/ContextEngine/files/SetupProgress';
 import { rememberSourceRules, startUploads } from '../hooks/contextUploads';
 import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
+import type { ContextSourceConfig } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
@@ -50,13 +66,17 @@ export interface CreateContextEngineLocationState {
   openFiles?: string;
 }
 
-interface SetupState {
+/** The engine the wizard created, and what it still has to hand over once the engine runs. */
+interface CreatedEngine {
   id: string;
   name: string;
+  sources: ContextSourceConfig[];
+  roles: string[];
+}
+
+interface SetupResult {
   warnings: string[];
   uploads: SetupUploadSource[];
-  sourceCount: number;
-  roleCount: number;
 }
 
 export default function CreateContextEngine(scope: OrgScope): JSX.Element {
@@ -68,18 +88,31 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const [form, dispatch] = useReducer(contextEngineFormReducer, undefined, () => draft.restore() ?? initialContextEngineForm);
   const [activeStep, setActiveStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  // Set once the engine exists and staged files are being handed to it; the steps give way to the setup card.
-  const [setup, setSetup] = useState<SetupState | null>(null);
+  const [created, setCreated] = useState<CreatedEngine | null>(null);
+  const [result, setResult] = useState<SetupResult | null>(null);
   const [showRestored, setShowRestored] = useState(restored);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const create = useCreateContextEngine();
-  const engines = useContextEngines();
+  const setUp = useSetUpContextEngine();
+  const live = useContextEngine(created?.id ?? '');
+  const setupStarted = useRef(false);
+  const [params] = useSearchParams();
+  const environments = useAllEnvironments();
+  const envList = useMemo(() => environments.data ?? [], [environments.data]);
+  const [chosenEnv, setChosenEnv] = useState<string | null>(null);
+  const environment = selectEnvironment(
+    envList.map((e) => e.id),
+    chosenEnv,
+    params.get('env'),
+  );
   const { data: orgRoles } = useRoles(scope.org);
   const roleNames = useMemo(() => Object.fromEntries((orgRoles ?? []).map((r) => [r.roleId, r.roleName])), [orgRoles]);
-  // The roles "everyone who can query" stands for when files are shared, and the creator's groups for the review's checks.
-  const { everyone, myGroups } = useUploadAudience(scope.org, form.roles);
-  const base = contextEnginesUrl(scope.org);
+  // The roles "everyone who can query" stands for when files are shared; the creator's groups are unknown until the engine runs.
+  const { everyone, myGroups } = useUploadAudience(scope.org, form.roles, null);
+  const base = contextEnginesUrl(scope.org, environment || undefined);
   const dirty = isFormDirty(form);
+  const engineState = live.data?.state;
+  const phase: SetupPhase = result ? 'done' : engineState === 'failed' ? 'failed' : engineState === 'ready' ? 'setting-up' : 'starting';
 
   // Mirror the form into session storage so leaving the wizard loses nothing but secrets.
   useEffect(() => {
@@ -88,12 +121,52 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     else clearDraft();
   }, [form, dirty, create.isSuccess, saveDraft, clearDraft]);
 
+  // Staged files live only in this page until the engine runs; warn before the tab closes on them.
+  useEffect(() => {
+    if (!created || result || phase === 'failed') return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [created, result, phase]);
+
+  // Once the new engine runs, hand it the creator's grant, the sources and the roles, then the staged files.
+  useEffect(() => {
+    if (!created || engineState !== 'ready' || setupStarted.current) return;
+    setupStarted.current = true;
+    setUp.mutate(
+      { engineId: created.id, input: { sources: created.sources, roles: created.roles } },
+      {
+        onSuccess: ({ sources, warnings }) => {
+          const uploads: SetupUploadSource[] = [];
+          for (const source of created.sources) {
+            const sourceId = sources[source.name.trim()];
+            if (!sourceId) continue;
+            rememberSourceRules(sourceId, source.audience ?? []);
+            const staged = source.staged ?? [];
+            if (source.type !== 'upload' || staged.length === 0) continue;
+            const files = staged.flatMap((m) => {
+              const content = getStagedFile(m.id);
+              return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
+            });
+            staged.forEach((m) => dropStagedFile(m.id));
+            if (files.length === 0) continue;
+            const visibility = source.stagedVisibility ?? EVERYONE_VISIBILITY;
+            startUploads(created.id, sourceId, files, visibility, visibilityTags(visibility, everyone));
+            uploads.push({ sourceId, name: source.name.trim() });
+          }
+          if (uploads.length === 0) {
+            navigate(contextEngineUrl(scope.org, created.id), { state: { warnings } satisfies CreateContextEngineLocationState });
+            return;
+          }
+          setResult({ warnings, uploads });
+        },
+        onError: (e) => setResult({ warnings: [`Set up the engine: ${engineMessage(e, 'the engine refused it')}`], uploads: [] }),
+      },
+    );
+  }, [created, engineState, setUp, everyone, navigate, scope.org]);
+
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
-  }
-  // Temporary: until the control plane provisions engines, this console sets up the one engine it runs against.
-  if (!CONTEXT_ENGINE_PROVISIONING && engines.data?.length && !setup && !create.isSuccess) {
-    return <ComingSoon title="Already set up" description="This console's context engine has already been created. Only one engine is supported for now." />;
   }
 
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
@@ -102,7 +175,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     // null, — 'Grant Access' step hidden
     modelsStepBlocker(form),
     storageStepBlocker(form.storage),
-    !form.name.trim() ? 'Enter a name for the engine' : engineNameError(form.name) || engineDescriptionError(form.description) || null,
+    !form.name.trim() ? 'Enter a name for the engine' : engineNameError(form.name) || engineDescriptionError(form.description) || (environment ? null : 'Choose an environment'),
   ];
   const stepValid = stepBlocker.map((b) => b === null);
   const canCreate = stepValid.every(Boolean);
@@ -118,36 +191,15 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     setError(null);
     // Each source's visibility becomes audience rules now that the query roles are known.
     const withRules = withSourceVisibilityRules(form.sources, everyone);
-    create.mutate(toCreateInput({ ...form, sources: withRules }), {
-      onSuccess: ({ id, sources, warnings }) => {
+    create.mutate(toCreateInput({ ...form, sources: withRules }, environment), {
+      onSuccess: (engine) => {
         draft.clear();
-        const uploads: SetupUploadSource[] = [];
-        for (const source of withRules) {
-          const sourceId = sources[source.name.trim()];
-          if (!sourceId) continue;
-          rememberSourceRules(sourceId, source.audience ?? []);
-          const staged = source.staged ?? [];
-          if (source.type !== 'upload' || staged.length === 0) continue;
-          const files = staged.flatMap((m) => {
-            const content = getStagedFile(m.id);
-            return content && !checkStagedFile(m, []).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
-          });
-          staged.forEach((m) => dropStagedFile(m.id));
-          if (files.length === 0) continue;
-          const visibility = source.stagedVisibility ?? EVERYONE_VISIBILITY;
-          startUploads(id, sourceId, files, visibility, visibilityTags(visibility, everyone));
-          uploads.push({ sourceId, name: source.name.trim() });
-        }
-        if (uploads.length === 0) {
-          navigate(contextEngineUrl(scope.org, id), { state: { warnings } satisfies CreateContextEngineLocationState });
-          return;
-        }
-        setSetup({ id, name: form.name.trim(), warnings, uploads, sourceCount: form.sources.length, roleCount: form.roles.length });
+        setCreated({ id: engine.id, name: engine.name, sources: withRules, roles: form.roles });
       },
       onError: (e) => {
-        if (e instanceof HttpError && e.status === 409) setError(CONTEXT_ENGINE_PROVISIONING ? 'A context engine with this name already exists.' : 'A context engine has already been created. Only one engine is supported for now.');
-        else if (e instanceof HttpError && e.status === 401) setError('The context engine rejected the credential. Check the engine token in runtime config.');
-        else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines. Ask an engine administrator for the engine.manage action.");
+        if (e instanceof HttpError && e.status === 409) setError(`Couldn't create the context engine: ${engineMessage(e, 'the name is taken in this environment')}`);
+        else if (e instanceof HttpError && e.status === 403) setError("You don't have permission to create context engines in this organization.");
+        else if (e instanceof HttpError && e.status === 402) setError(`Couldn't create the context engine: ${engineMessage(e, 'your plan has no room for another engine')}`);
         else if (e instanceof HttpError) setError(`Couldn't create the context engine: ${engineMessage(e)}`);
         else setError("Couldn't create the context engine. Please try again.");
       },
@@ -156,23 +208,25 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !setup ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !created ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
       <PageTitle>
         <PageTitle.Header>Create Context Engine</PageTitle.Header>
       </PageTitle>
 
-      {setup ? (
+      {created ? (
         <Box sx={{ mt: 3 }}>
           <SetupProgress
-            engineId={setup.id}
-            engineName={setup.name}
-            sourceCount={setup.sourceCount}
-            roleCount={setup.roleCount}
-            warnings={setup.warnings}
-            uploads={setup.uploads}
-            onOpen={() => navigate(contextEngineUrl(scope.org, setup.id), { state: { warnings: setup.warnings, openFiles: setup.uploads[0]?.sourceId } satisfies CreateContextEngineLocationState })}
+            engineId={created.id}
+            engineName={created.name}
+            phase={phase}
+            statusReason={live.data?.statusReason}
+            sourceCount={created.sources.length}
+            roleCount={created.roles.length}
+            warnings={result?.warnings ?? []}
+            uploads={result?.uploads ?? []}
+            onOpen={() => navigate(contextEngineUrl(scope.org, created.id), { state: { warnings: result?.warnings, openFiles: result?.uploads[0]?.sourceId } satisfies CreateContextEngineLocationState })}
           />
         </Box>
       ) : (
@@ -227,6 +281,9 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 everyone={everyone}
                 myGroups={myGroups}
                 draftSavedAt={draft.savedAt}
+                environments={envList}
+                environment={environment}
+                onEnvironmentChange={setChosenEnv}
                 onNameChange={(value) => dispatch({ type: 'name', value })}
                 onDescriptionChange={(value) => dispatch({ type: 'description', value })}
                 onEdit={setActiveStep}

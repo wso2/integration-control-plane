@@ -210,7 +210,7 @@ export default function EntityPanel({ engineId, orgHandle, name, sources, deriva
             Explore neighbours
           </Button>
         )}
-        <Button size="small" variant="text" startIcon={<MessageSquare size={15} />} onClick={() => navigate(`${contextEngineUrl(orgHandle, engineId, 'playground')}?q=${encodeURIComponent(`What do the sources say about ${name}?`)}`)}>
+        <Button size="small" variant="text" startIcon={<MessageSquare size={15} />} onClick={() => navigate(contextEngineUrl(orgHandle, engineId, 'playground', { q: `What do the sources say about ${name}?` }))}>
           Ask about this
         </Button>
       </Stack>

@@ -46,6 +46,7 @@ interface FilesDrawerProps {
 }
 
 function UploadRow({
+  engineId,
   entry,
   orgHandle,
   queryRoles,
@@ -56,6 +57,7 @@ function UploadRow({
   onChangeVisibility,
   onRemove,
 }: {
+  engineId: string;
   entry: UploadEntry;
   orgHandle: string;
   queryRoles: string[];
@@ -149,7 +151,7 @@ function UploadRow({
           )}
           {sharing !== null && (
             <Box sx={{ mt: 1.5 }}>
-              <FileVisibilityField id={`share-${entry.recordId}`} label={`Who can see ${entry.name}`} orgHandle={orgHandle} queryRoles={queryRoles} value={sharing} onChange={setSharing} />
+              <FileVisibilityField id={`share-${entry.recordId}`} label={`Who can see ${entry.name}`} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={sharing} onChange={setSharing} />
               <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.5 }}>
                 <Button size="small" variant="text" disabled={saving} onClick={() => setSharing(null)}>
                   Cancel
@@ -178,7 +180,7 @@ function UploadRow({
  */
 export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, open, onClose }: FilesDrawerProps): JSX.Element {
   const entries = useSourceUploads(engineId, source.id);
-  const { everyone, roleNames } = useUploadAudience(orgHandle, queryRoles);
+  const { everyone, roleNames } = useUploadAudience(orgHandle, queryRoles, engineId);
   const [staged, setStaged] = useState<StagedFileMeta[]>([]);
   const [visibility, setVisibility] = useState<FileVisibility>(EVERYONE_VISIBILITY);
   const [filter, setFilter] = useState('');
@@ -288,7 +290,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
               }}
             />
             <Box sx={{ mt: 2 }}>
-              <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
+              <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={visibility} onChange={setVisibility} />
             </Box>
             <Stack direction="row" justifyContent="flex-end" gap={1.5} sx={{ mt: 2 }}>
               <Button
@@ -339,6 +341,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 visible.map((entry) => (
                   <UploadRow
                     key={entry.recordId}
+                    engineId={engineId}
                     entry={entry}
                     orgHandle={orgHandle}
                     queryRoles={queryRoles}

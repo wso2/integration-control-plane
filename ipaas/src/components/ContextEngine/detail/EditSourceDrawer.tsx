@@ -117,7 +117,7 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
             <Alert severity="info" variant="outlined">
               The engine does not report a source&apos;s current visibility, so this starts from everyone who can query. Saving replaces who can see this content.
             </Alert>
-            <FileVisibilityField id="edit-source-visibility" label="Who can see this content" orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
+            <FileVisibilityField id="edit-source-visibility" label="Who can see this content" orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={visibility} onChange={setVisibility} />
           </>
         )}
 

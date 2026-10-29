@@ -31,7 +31,6 @@ import {
   splitSentences,
   askedQuestionMeta,
   citedNumbers,
-  deletionFailureText,
   evidencePlace,
   evidenceVersionLabel,
   isSameModel,
@@ -277,7 +276,7 @@ describe('source validation', () => {
     const base = { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name', clientId: 'c', clientSecret: 's' };
     expect(isSourceValid(withValues('salesforce', base))).toBe(true);
     const mapped = withValues('salesforce', { ...base, rmlMapping: '@prefix ex: <http://ex> .' });
-    const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] })).sources[0].settings;
+    const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] }, 'development')).sources[0].settings;
     expect(settings.rmlMapping).toBe('@prefix ex: <http://ex> .');
   });
 
@@ -375,10 +374,10 @@ describe('form completion', () => {
   });
 
   it('converts to a create input with trimmed name/description', () => {
-    const input = toCreateInput({ ...completeForm(), name: '  Ops  ', description: ' d ' });
+    const input = toCreateInput({ ...completeForm(), name: '  Ops  ', description: ' d ' }, 'development');
     expect(input.name).toBe('Ops');
     expect(input.description).toBe('d');
-    expect(() => toCreateInput({ ...completeForm(), llm: null })).toThrow();
+    expect(() => toCreateInput({ ...completeForm(), llm: null }, 'development')).toThrow();
   });
 });
 
@@ -427,7 +426,7 @@ describe('wire payloads', () => {
   });
 
   it('separates settings from credentials and adds azure fields only for azure', () => {
-    const payload = toConfigurationPayload(toCreateInput(completeForm()));
+    const payload = toConfigurationPayload(toCreateInput(completeForm(), 'development'));
     expect(payload.sources[0].settings).toEqual({ repositoryUrl: 'https://github.com/wso2/docs', branch: 'main', includePaths: '' });
     expect(payload.sources[0].credentials).toEqual({ accessToken: 'ghp_x' });
     expect(payload.llm).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6', apiKey: 'sk-ant' });
@@ -437,7 +436,7 @@ describe('wire payloads', () => {
   it('sends only the settings and credentials the chosen auth flow uses', () => {
     const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale' });
     const form = { ...completeForm(), sources: [sf] };
-    const source = toConfigurationPayload(toCreateInput(form)).sources[0];
+    const source = toConfigurationPayload(toCreateInput(form, 'development')).sources[0];
     // Client credentials is the default flow: the Connected App key is a setting, the hidden refresh token is dropped.
     expect(source.settings).toMatchObject({ authType: 'client_credentials', baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', apiVersion: '59.0' });
     expect(source.credentials).toEqual({ clientSecret: 's' });
@@ -462,7 +461,7 @@ describe('exposure snippets', () => {
     // The mode is in the URL and the engine is its address; neither is in the body.
     expect(curl).not.toContain('spaceId');
     expect(curl).not.toContain('"mode"');
-    expect(curl).toContain('Authorization: Bearer $TOKEN');
+    expect(curl).toContain('X-API-Key: $API_KEY');
     expect(buildQueryCurl('https://engine.example.com', 'q', 'answer')).toContain('https://engine.example.com/v1/answer');
   });
 
@@ -476,7 +475,7 @@ describe('exposure snippets', () => {
     const cfg = JSON.parse(buildMcpClientConfig('https://engine.example.com/', 'Support Knowledge!'));
     expect(Object.keys(cfg.mcpServers)).toEqual(['support-knowledge']);
     expect(cfg.mcpServers['support-knowledge'].url).toBe('https://engine.example.com/v1/mcp');
-    expect(cfg.mcpServers['support-knowledge'].headers).toEqual({ Authorization: 'Bearer <token>' });
+    expect(cfg.mcpServers['support-knowledge'].headers).toEqual({ 'X-API-Key': '<api key>' });
   });
 });
 
@@ -489,7 +488,7 @@ describe('shared api key', () => {
     expect(effectiveLlm(sameProvider)?.apiKey).toBe('sk-test');
     expect(modelsStepBlocker(sameProvider)).toBeNull();
     expect(modelsStepBlocker({ ...sameProvider, shareApiKey: false })).toBe('Complete the language model');
-    expect(toCreateInput(sameProvider).llm.apiKey).toBe('sk-test');
+    expect(toCreateInput(sameProvider, 'development').llm.apiKey).toBe('sk-test');
   });
 
   it('names the first missing piece of the models step', () => {
@@ -504,9 +503,9 @@ describe('shared api key', () => {
     expect(modelsStepBlocker({ ...form, answersEnabled: false })).toBeNull();
     const chosen = { ...form, answerLlm: { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' } };
     expect(modelsStepBlocker(chosen)).toBeNull();
-    expect(toCreateInput(chosen).answers).toEqual({ enabled: true, model: chosen.answerLlm });
-    expect(toCreateInput({ ...chosen, answersEnabled: false }).answers).toEqual({ enabled: false, model: null });
-    expect(toCreateInput(completeForm()).answers).toEqual({ enabled: true, model: null });
+    expect(toCreateInput(chosen, 'development').answers).toEqual({ enabled: true, model: chosen.answerLlm });
+    expect(toCreateInput({ ...chosen, answersEnabled: false }, 'development').answers).toEqual({ enabled: false, model: null });
+    expect(toCreateInput(completeForm(), 'development').answers).toEqual({ enabled: true, model: null });
   });
 });
 
@@ -555,7 +554,9 @@ describe('drafts', () => {
 
 function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDetail {
   return {
-    id: 'spc_1',
+    id: 'development/support-knowledge',
+    handle: 'support-knowledge',
+    environment: 'development',
     name: 'Support Knowledge',
     description: '',
     state: 'ready',
@@ -654,9 +655,9 @@ describe('storage', () => {
     expect(storageSelectionError('graph', { ...ext, password: '' })).toBe('Enter the database, user and password');
   });
 
-  it('the step blocker names the first incomplete store', () => {
+  it('the step blocker accepts only engine managed stores for now', () => {
     expect(storageStepBlocker(defaultStorage())).toBeNull();
-    expect(storageStepBlocker({ ...defaultStorage(), relational: { mode: 'infrastructure', serverId: '', serverName: '', database: '' } })).toBe('Choose a database server, or switch to Engine managed');
+    expect(storageStepBlocker({ ...defaultStorage(), relational: { mode: 'infrastructure', serverId: 's1', serverName: 'pg', database: 'context' } })).toBe('Only engine managed storage is available for now');
   });
 
   it('summarizes each mode in two lines', () => {
@@ -680,7 +681,7 @@ describe('storage', () => {
       password: 'pw',
       sslRequired: true,
     });
-    const payload = toConfigurationPayload(toCreateInput({ ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } } }));
+    const payload = toConfigurationPayload(toCreateInput({ ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } } }, 'development'));
     expect(payload.storage.vector).toEqual({ provider: 'lancedb' });
     expect(payload.storage.graph).toEqual({ provider: 'neo4j', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' });
   });
@@ -996,11 +997,6 @@ describe('provenance and evidence', () => {
     expect(askedQuestionMeta({ askedAt: now, outcome: 'answered', passages: 3 })).toBe('Just now · answered · 3 passages');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
-  });
-
-  it('explains a failed deletion', () => {
-    expect(deletionFailureText('residue_found')).toMatch(/still searchable/);
-    expect(deletionFailureText(undefined)).toMatch(/continues where the last attempt stopped/);
   });
 });
 

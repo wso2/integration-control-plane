@@ -51,7 +51,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
         Configure Storage
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        Where the engine keeps its data. Engine managed stores are embedded and need no setup. Pick a server from Infrastructure when you want shared, backed-up storage you already operate.
+        Where the engine keeps its data. Engine managed stores are embedded and need no setup. Servers from Infrastructure and external databases are not available yet.
       </Typography>
 
       <Box sx={storageGridSx}>
@@ -66,6 +66,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
             serversError={infrastructureAvailable && servers.isError}
             onRefresh={() => servers.refetch()}
             infrastructureAvailable={infrastructureAvailable}
+            alternativeUnavailable="Not available yet: engines keep their data in engine managed stores for now."
             listUrl={info.infraSegment === 'vector-databases' ? orgVectorDatabasesUrl(orgHandle) : info.infraSegment === 'databases' ? orgDatabasesUrl(orgHandle) : undefined}
             createUrl={info.infraSegment === 'vector-databases' ? newOrgVectorDatabaseUrl(orgHandle) : info.infraSegment === 'databases' ? newOrgDatabaseUrl(orgHandle) : undefined}
           />

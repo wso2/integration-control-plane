@@ -19,11 +19,11 @@
 import { Alert, Box, /* Button, */ Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { EyeOff, Info, KeyRound, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { CONTEXT_ENGINE_PROVISIONING, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
+import { CONTEXT_ENGINE_MODEL_UPDATES, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { EVERYONE_VISIBILITY, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
+import { checkStagedFile, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GetStartedChecklist from './GetStartedChecklist';
@@ -115,15 +115,15 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
   const permissions = useContextPermissions(engine.id);
-  // Models come from the engine's environment; changing them is provisioning, the control plane's.
-  const canEditModels = CONTEXT_ENGINE_PROVISIONING && !readOnly && !!permissions.data?.includes('engine.manage');
+  // Models are set when the engine is created; the BFF cannot change them yet.
+  const canEditModels = CONTEXT_ENGINE_MODEL_UPDATES && !readOnly && !!permissions.data?.includes('engine.manage');
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
   const openModels = () => {
     setModelsSession((n) => n + 1);
     setModelsOpen(true);
   };
-  const { everyone } = useUploadAudience(orgHandle, engine.queryRoles);
+  const { everyone } = useUploadAudience(orgHandle, engine.queryRoles, engine.id);
   const existingConfigs = engine.sources.map((s) => sourceAsConfig(s, rememberedSourceRules(s.id)));
 
   const submitNewSource = (picked: ContextSourceConfig) => {
@@ -144,9 +144,6 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
           const visibility = config.stagedVisibility ?? EVERYONE_VISIBILITY;
           startUploads(engine.id, created.id, files, visibility, visibilityTags(visibility, everyone));
           openFiles(created);
-        }
-        if ((connectorFor(config.type)?.fields.length ?? 0) > 0) {
-          setSourceNotice({ severity: 'warning', message: `“${created.name}” is registered, but its connection settings and credentials are not stored: the engine does not serve the configuration route yet.` });
         }
       },
       onError: (e) => {
@@ -327,7 +324,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
 
       {modelsSession > 0 && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={engine.models} open={modelsOpen} onClose={() => setModelsOpen(false)} />}
       {filesSource && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
-      <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} queryRoles={engine.queryRoles} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
+      <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} queryRoles={engine.queryRoles} engineId={engine.id} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
       {editSource && (
         <EditSourceDrawer
           key={editSource.id}

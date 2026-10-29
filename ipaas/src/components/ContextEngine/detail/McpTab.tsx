@@ -19,9 +19,8 @@
 import { Alert, Box, Button, ListingTable, Stack, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
-import { useContextEngineBearer } from '../../../hooks/useContextEngine';
 import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
-import { buildMcpClientConfigs, mcpEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
+import { buildMcpClientConfigs, mcpEndpointUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
 import McpPlayground from '../../McpPlayground/McpPlayground';
 import SurfaceHeader from './SurfaceHeader';
@@ -37,18 +36,17 @@ const toolsTableSx = { border: '1px solid', borderColor: 'divider', borderRadius
 
 /** Expose as MCP — endpoint, a config per client, an in-place test, and the tools agents get. */
 export default function McpTab({ engine }: McpTabProps): JSX.Element {
-  const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
+  const base = engine.publicApiUrl ?? '';
   const endpoint = mcpEndpointUrl(base);
   const configs = useMemo(() => buildMcpClientConfigs(base, engine.name), [base, engine.name]);
   const [client, setClient] = useState<McpClientId>('claude-desktop');
   const [testing, setTesting] = useState(false);
-  const bearer = useContextEngineBearer();
   const selected = configs.find((c) => c.id === client) ?? configs[0];
 
   return (
     <Box>
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="AI agents connect over the Model Context Protocol and call the engine's read tools with the user's identity." />
+        <SurfaceHeader title="MCP server" description="AI agents connect over the Model Context Protocol and call the engine's read tools with one of its API keys." />
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
           Server endpoint
@@ -72,7 +70,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
             {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
           </Button>
           <Typography variant="body2" sx={mutedSx}>
-            Lists the tools below and lets you call them with your own identity — the same playground integrations already use.
+            Lists the tools below and lets you call them with one of the engine's API keys — the same playground integrations already use.
           </Typography>
         </Stack>
       </Box>
@@ -80,7 +78,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
       {/* The playground takes the page's full width; the text around it keeps a readable measure. */}
       {testing && (
         <Box sx={playgroundFrameSx}>
-          <McpPlayground url={endpoint} token={bearer} headerName="Authorization" connectionLayout="bar" />
+          <McpPlayground url={endpoint} token={null} headerName="X-API-Key" connectionLayout="bar" />
         </Box>
       )}
 
@@ -116,7 +114,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
         </ListingTable.Container>
 
         <Alert severity="info" variant="outlined">
-          Every tool call and evidence read is authorized on the caller's own identity — an agent acting for a user sees exactly what that user may see, and no more.
+          Every tool call carries an API key, which the engine's gateway checks before the call reaches the engine.
         </Alert>
       </Box>
     </Box>
