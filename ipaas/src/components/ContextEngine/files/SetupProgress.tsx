@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, LinearProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, CircularProgress, LinearProgress, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, CircleAlert, FileText } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { retryUpload, useSourceUploads } from '../../../hooks/contextUploads';
@@ -167,9 +167,19 @@ export default function SetupProgress({ engineId, engineName, phase, statusReaso
               ? 'Open the engine to see why, or delete it and create it again.'
               : 'Keep this tab open until the uploads finish. Opening the engine now is fine; they carry on in its Files drawer.'}
         </Typography>
-        <Button variant={waiting ? 'outlined' : 'contained'} onClick={onOpen} sx={{ flexShrink: 0 }}>
-          Open engine
-        </Button>
+        {waiting ? (
+          <Tooltip title="Available once the engine is running">
+            <Box component="span" sx={{ flexShrink: 0 }}>
+              <Button variant="outlined" disabled>
+                Open engine
+              </Button>
+            </Box>
+          </Tooltip>
+        ) : (
+          <Button variant="contained" onClick={onOpen} sx={{ flexShrink: 0 }}>
+            Open engine
+          </Button>
+        )}
       </Stack>
     </Box>
   );
