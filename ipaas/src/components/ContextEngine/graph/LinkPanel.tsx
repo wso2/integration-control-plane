@@ -59,6 +59,8 @@ export interface ConflictView {
   second: RelationView;
   reason: string;
   confidence: number | null;
+  /** Its line is drawn on the canvas, so it can be selected. */
+  drawn: boolean;
 }
 
 const sentenceOf = (view: RelationView): string => `${view.subject.name} ${view.relation.relation} ${view.object.name}`;
@@ -78,7 +80,8 @@ interface RelationPanelProps {
 /**
  * One relationship, selected by clicking its label on the canvas: the two
  * entities it joins, the sentence it was taken from, the documents behind it,
- * and any conflict it is one side of. Each of those can be selected from here.
+ * and any conflict it is one side of. Each of those can be selected from here
+ * when it is drawn.
  */
 export function RelationPanel({ engineId, orgHandle, view, conflicts, onSelectEntity, onSelectRecord, onSelectConflict, onClose }: RelationPanelProps): JSX.Element {
   const navigate = useAppNavigate();
@@ -126,7 +129,7 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, onSelectEn
               const other = sameRelation(conflict.first.relation, view.relation) ? conflict.second : conflict.first;
               return (
                 <li key={conflict.index}>
-                  <ButtonBase onClick={() => onSelectConflict(conflict.index)} sx={{ ...selectRowSx, '&:hover': { borderColor: 'error.main' } }} aria-label={`Show the conflict with “${sentenceOf(other)}” on the graph`}>
+                  <ButtonBase onClick={() => onSelectConflict(conflict.index)} disabled={!conflict.drawn} sx={{ ...selectRowSx, '&:hover': { borderColor: 'error.main' } }} aria-label={`Show the conflict with “${sentenceOf(other)}” on the graph`}>
                     <Box component="span" sx={mutedSx}>
                       Disagrees with
                     </Box>{' '}
@@ -137,6 +140,11 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, onSelectEn
                     {conflict.reason && (
                       <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
                         {conflict.reason}
+                      </Typography>
+                    )}
+                    {!conflict.drawn && (
+                      <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                        Not drawn with the current filters
                       </Typography>
                     )}
                   </ButtonBase>

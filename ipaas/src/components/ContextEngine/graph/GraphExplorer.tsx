@@ -147,7 +147,14 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
     return { id, label: record?.recordId ?? id, sourceName: record ? sourcesById.get(record.sourceId)?.name : undefined, drawn: model.index.has(id) };
   };
   const relationView = (relation: ContextGraphRelation): RelationView => ({ relation, subject: end(relation.subjectId), object: end(relation.objectId), records: relation.recordNodeIds.map(recordView), drawn: relationLink(model, relation) !== undefined });
-  const conflictView = ({ index, conflict }: { index: number; conflict: ContextGraphConflict }): ConflictView => ({ index, first: relationView(conflict.first), second: relationView(conflict.second), reason: conflict.reason, confidence: conflict.confidence });
+  const conflictView = ({ index, conflict }: { index: number; conflict: ContextGraphConflict }): ConflictView => ({
+    index,
+    first: relationView(conflict.first),
+    second: relationView(conflict.second),
+    reason: conflict.reason,
+    confidence: conflict.confidence,
+    drawn: conflictLink(model, conflict) !== undefined,
+  });
   const selectRelation = (relation: ContextGraphRelation) => {
     const at = relationLink(model, relation);
     if (at !== undefined) selectLink(at);
@@ -294,7 +301,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
               // The node is one entity of this name; its kind picks that one on the engine.
               kind={selectedEntity?.kind}
               kindColor={kindColor(selectedEntity?.kind)}
-              conflicts={entityConflicts(data, selected.key)}
+              conflicts={entityConflicts(data, selected.key, model)}
               sources={engine.sources}
               onSelectEntity={selectEntityByName}
               onSelectConflict={selectConflict}

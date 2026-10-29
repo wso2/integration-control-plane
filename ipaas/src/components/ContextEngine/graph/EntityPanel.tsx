@@ -242,13 +242,18 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
                           {c.reason}
                         </Typography>
                       )}
+                      {onSelectConflict && c.drawn === false && (
+                        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                          Not drawn with the current filters
+                        </Typography>
+                      )}
                     </>
                   );
                   return (
                     <Box component="li" key={c.index} sx={{ fontSize: 13, lineHeight: 1.5 }}>
-                      {/* With a handler, the conflict can be selected on the canvas, where both of its sides light up. */}
+                      {/* With a handler, the conflict can be selected on the canvas, where both of its sides light up; not when its line is not drawn. */}
                       {onSelectConflict ? (
-                        <ButtonBase onClick={() => onSelectConflict(c.index)} sx={{ ...selectRowSx, '&:hover': { borderColor: 'error.main' } }} aria-label="Show this conflict on the graph">
+                        <ButtonBase onClick={() => onSelectConflict(c.index)} disabled={c.drawn === false} sx={{ ...selectRowSx, '&:hover': { borderColor: 'error.main' } }} aria-label="Show this conflict on the graph">
                           {body}
                         </ButtonBase>
                       ) : (

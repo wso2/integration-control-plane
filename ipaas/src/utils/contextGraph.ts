@@ -219,14 +219,16 @@ export interface EntityConflict {
   second: string;
   reason: string;
   confidence: number | null;
+  /** Its line is on the canvas shown, so it can be selected there. Unset when no canvas was given. */
+  drawn?: boolean;
 }
 
-/** The conflicts in which an entity takes part, on either side, as sentences built from the graph's entity names. */
-export function entityConflicts(graph: ContextGraph, entityId: string): EntityConflict[] {
+/** The conflicts in which an entity takes part, on either side, as sentences built from the graph's entity names. With a model, each says whether its line is drawn. */
+export function entityConflicts(graph: ContextGraph, entityId: string, m?: GraphModel): EntityConflict[] {
   return (graph.conflicts ?? [])
     .map((c, index) => ({ c, index }))
     .filter(({ c }) => [c.first.subjectId, c.first.objectId, c.second.subjectId, c.second.objectId].includes(entityId))
-    .map(({ c, index }) => ({ index, first: relationSentence(graph, c.first), second: relationSentence(graph, c.second), reason: c.reason, confidence: c.confidence }));
+    .map(({ c, index }) => ({ index, first: relationSentence(graph, c.first), second: relationSentence(graph, c.second), reason: c.reason, confidence: c.confidence, ...(m ? { drawn: conflictLink(m, c) !== undefined } : {}) }));
 }
 
 // ── Entity kinds ────────────────────────────────────────────────────────────

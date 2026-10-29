@@ -490,8 +490,12 @@ describe('facts on the graph', () => {
     expect(onGateway).toEqual([{ index: 0, first: 'gateway 7 fails over to kandy', second: 'gateway 7 fails over to vault', reason: 'Two different failover targets.', confidence: 0.9 }]);
     expect(entityConflicts(withConflict, 'ent_v')).toHaveLength(1);
     expect(entityConflicts(GRAPH, 'ent_g')).toEqual([]);
+    // Given the model, each conflict says whether its line is drawn, so a panel can grey out one that is not.
+    expect(entityConflicts(withConflict, 'ent_g', m)[0].drawn).toBe(true);
     // Narrowed to one source, a conflict needs both of its relationships shown.
-    expect(exploreModel(withConflict, { records: true, entities: true, detail: 'all', sourceId: 'src_a' }).links.some((l) => l.kind === 'conflicts')).toBe(false);
+    const narrowed = exploreModel(withConflict, { records: true, entities: true, detail: 'all', sourceId: 'src_a' });
+    expect(narrowed.links.some((l) => l.kind === 'conflicts')).toBe(false);
+    expect(entityConflicts(withConflict, 'ent_g', narrowed)[0].drawn).toBe(false);
     // An answer's conflict lights both of its facts and the red line between the ends that differ.
     const sides = { first: { subject: 'gateway 7', relation: 'fails over to', object: 'kandy', evidenceIds: ['e1'] }, second: { subject: 'gateway 7', relation: 'fails over to', object: 'vault', evidenceIds: ['e2'] } };
     const answered = factSelection(m, withConflict, [], {}, [{ ...sides, reason: 'Two different failover targets.', confidence: 0.9 }]);
