@@ -16,26 +16,37 @@
  * under the License.
  */
 
-import { Chip } from '@wso2/oxygen-ui';
+import { Chip, Tooltip } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import type { ContextEngineState } from '../../types/contextEngine';
 
-const COLOR: Record<ContextEngineState, 'success' | 'info' | 'error' | 'warning'> = {
+const COLOR: Record<ContextEngineState, 'success' | 'info' | 'error' | 'warning' | 'default'> = {
   ready: 'success',
   provisioning: 'info',
+  starting: 'info',
   failed: 'error',
   deleting: 'warning',
+  unknown: 'default',
 };
 
 const LABEL: Record<ContextEngineState, string> = {
-  ready: 'Ready',
+  ready: 'Running',
   provisioning: 'Provisioning',
+  starting: 'Starting',
   failed: 'Failed',
   deleting: 'Deleting',
+  unknown: 'Status unavailable',
 };
 
-/** Engine lifecycle state as a small outlined chip. Unknown states fall back to a neutral chip with the raw value. */
-export default function EngineStateChip({ state }: { state: ContextEngineState | string }): JSX.Element {
+/** Engine lifecycle state as a small outlined chip, with the BFF's reason, when it gives one, on hover. */
+export default function EngineStateChip({ state, reason }: { state: ContextEngineState | string; reason?: string }): JSX.Element {
   const known = state in COLOR ? (state as ContextEngineState) : null;
-  return <Chip size="small" variant="outlined" color={known ? COLOR[known] : 'default'} label={known ? LABEL[known] : state} />;
+  const chip = <Chip size="small" variant="outlined" color={known ? COLOR[known] : 'default'} label={known ? LABEL[known] : state} />;
+  return reason ? (
+    <Tooltip title={reason}>
+      <span>{chip}</span>
+    </Tooltip>
+  ) : (
+    chip
+  );
 }

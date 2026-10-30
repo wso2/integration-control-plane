@@ -39,6 +39,8 @@ export interface ProviderOption {
   logo: string;
   /** Selectable model ids; empty means a free-text deployment id (Azure). */
   models: string[];
+  /** Listed, but the engine cannot be configured with it yet. */
+  unavailable?: boolean;
 }
 
 interface ShareKeyOption {
@@ -81,9 +83,14 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
 
       <Box sx={modelTileGridSx}>
         {providers.map((p) => (
-          <SelectableCard key={p.id} title={p.name} logo={p.logo} selected={value?.provider === p.id} onSelect={() => onChange(blank(p.id))} />
+          <SelectableCard key={p.id} title={p.name} description={p.unavailable ? 'Not available yet' : undefined} logo={p.logo} selected={value?.provider === p.id} disabled={p.unavailable} onSelect={() => onChange(blank(p.id))} />
         ))}
       </Box>
+      {providerInfo?.unavailable && (
+        <Typography variant="caption" color="error">
+          {providerInfo.name} is not available yet. Choose another provider.
+        </Typography>
+      )}
 
       {value && (
         <Stack gap={2}>

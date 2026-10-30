@@ -296,22 +296,32 @@ export const analyticsViewerTokenUrl = (base: string): string => `${base}/analyt
 // ---------------------------------------------------------------------------
 
 import type { ContextEngineTabKey } from './types/contextEngine';
+import { parseContextEngineKey } from './utils/contextEngineKey';
 
-export function contextEnginesUrl(orgHandler: string): string {
-  return `/organizations/${orgHandler}/context-engines`;
+const withQuery = (path: string, params: Record<string, string | undefined>): string => {
+  const query = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1])).toString();
+  return query ? `${path}?${query}` : path;
+};
+
+/** The engines list, showing `environment` when given. */
+export function contextEnginesUrl(orgHandler: string, environment?: string): string {
+  return withQuery(`/organizations/${orgHandler}/context-engines`, { env: environment });
 }
 
-export function newContextEngineUrl(orgHandler: string): string {
-  return `/organizations/${orgHandler}/context-engines/new`;
+export function newContextEngineUrl(orgHandler: string, environment?: string): string {
+  return withQuery(`/organizations/${orgHandler}/context-engines/new`, { env: environment });
 }
 
-export function contextEngineUrl(orgHandler: string, engineId: string, tab: ContextEngineTabKey = 'overview'): string {
-  return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/${tab}`;
+/** An engine's page: its name in the path, its environment as `?env=`, and any extra query values. */
+export function contextEngineUrl(orgHandler: string, engineId: string, tab: ContextEngineTabKey = 'overview', params: Record<string, string | undefined> = {}): string {
+  const { environment, handle } = parseContextEngineKey(engineId);
+  return withQuery(`/organizations/${orgHandler}/context-engines/${encodeURIComponent(handle)}/${tab}`, { env: environment, ...params });
 }
 
 /** One cited passage: the page a citation link opens. */
 export function contextEvidenceUrl(orgHandler: string, engineId: string, evidenceId: string): string {
-  return `/organizations/${orgHandler}/context-engines/${encodeURIComponent(engineId)}/evidence/${encodeURIComponent(evidenceId)}`;
+  const { environment, handle } = parseContextEngineKey(engineId);
+  return withQuery(`/organizations/${orgHandler}/context-engines/${encodeURIComponent(handle)}/evidence/${encodeURIComponent(evidenceId)}`, { env: environment });
 }
 
 // ---------------------------------------------------------------------------

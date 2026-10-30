@@ -19,7 +19,8 @@
 import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router';
-import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
+import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl } from '../../../utils/contextEngine';
+import ApiKeysSection from './ApiKeysSection';
 import CodeViewer from '../../CodeViewer';
 import SurfaceHeader from './SurfaceHeader';
 import { endpointFieldSx, endpointRowSx, mutedSx } from '../styles';
@@ -34,7 +35,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
   const [params] = useSearchParams();
   // "Use in API" on the Playground lands here with the question in the URL.
   const question = params.get('q')?.trim() || undefined;
-  const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
+  const base = engine.publicApiUrl ?? '';
   const endpoints = [
     { label: 'Context', url: contextEndpointUrl(base), off: false },
     // Served only when the engine offers answers; otherwise it returns not-found.
@@ -56,14 +57,15 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
       <Stack gap={2} sx={{ mb: 3 }}>
         <Alert severity="info" variant="outlined">
-          Requests carry the caller's platform bearer token. The engine answers only for members of the roles granted on the Access tab, and returns only items whose groups map to one of the caller's roles. Everyone else receives not-found, never a hint that
-          the engine exists.
+          Requests carry one of this engine's API keys in the <code>X-API-Key</code> header. The engine's gateway checks the key; a request without a valid one never reaches the engine.
         </Alert>
         <Typography variant="body2" sx={mutedSx}>
           Send <code>{'{"question": "…"}'}</code>. <code>context</code> returns ranked passages, each with its source, item, version and link. <code>answer</code> returns an answer written from those passages, where each <code>[n]</code> cites the nth passage.
           A question nothing visible answers returns <code>state: "insufficient_evidence"</code>, with no answer.
         </Typography>
       </Stack>
+
+      <ApiKeysSection engineId={engine.id} />
 
       {question && (
         <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1 }}>

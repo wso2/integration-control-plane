@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, PageContent, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, PageContent, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
-import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useDeletionJob } from '../hooks/useContextEngine';
-import { deletionFailureText, engineMessage } from '../utils/contextEngine';
+import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
+import { engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -37,7 +37,7 @@ import ApiTab from '../components/ContextEngine/detail/ApiTab';
 import McpTab from '../components/ContextEngine/detail/McpTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
 import type { CreateContextEngineLocationState } from './CreateContextEngine';
-import type { ContextEngineTabKey } from '../types/contextEngine';
+import type { ContextEngineState, ContextEngineTabKey } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const TABS: { value: ContextEngineTabKey; label: string }[] = [
@@ -49,12 +49,45 @@ const TABS: { value: ContextEngineTabKey; label: string }[] = [
   // { value: 'access', label: 'Access' },
 ];
 
+/** Why an engine that is not running shows only its overview. */
+function EngineNotRunning({ state, reason }: { state: ContextEngineState; reason?: string }): JSX.Element {
+  if (state === 'failed') {
+    return (
+      <Alert severity="error" variant="outlined" sx={{ mb: 3 }}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          This engine failed to start
+        </Typography>
+        {reason ?? 'Delete it and create it again, or check its models and keys.'}
+      </Alert>
+    );
+  }
+  if (state === 'unknown') {
+    return (
+      <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          Status unavailable
+        </Typography>
+        {reason ?? "This engine's state could not be read. This page checks again shortly."}
+      </Alert>
+    );
+  }
+  return (
+    <Alert severity="info" variant="outlined" icon={<CircularProgress size={18} />} sx={{ mb: 3 }}>
+      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+        This engine is starting
+      </Typography>
+      {reason ? `${reason}. ` : ''}Its sources, playground and endpoints open once it is running. This usually takes about a minute.
+    </Alert>
+  );
+}
+
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
 const tabsSx = { borderBottom: '1px solid', borderColor: 'divider', mb: 3 } as const;
 
 export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
-  const { engineId = '', tab = 'overview' } = useParams();
+  const { tab = 'overview' } = useParams();
+  const engineId = useRouteEngineId();
   const { state } = useLocation() as { state: CreateContextEngineLocationState | null };
   const [warnings, setWarnings] = useState<string[]>(state?.warnings ?? []);
   const openFilesSourceId = state?.openFiles;
@@ -65,11 +98,10 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const deleting = engine?.state === 'deleting';
-  const deletion = useDeletionJob(engineId, deleting);
   // Once an engine seen deleting answers 404, it was deleted rather than never there.
   const seenDeleting = useRef(false);
   if (deleting) seenDeleting.current = true;
-  const base = contextEnginesUrl(scope.org);
+  const base = contextEnginesUrl(scope.org, engine?.environment);
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
@@ -95,7 +127,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
     );
   }
 
-  if (isError && error instanceof HttpError && error.status === 404) {
+  if (!engineId || (isError && error instanceof HttpError && error.status === 404)) {
     return (
       <PageContent>
         {back}
@@ -121,24 +153,15 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
     );
   }
 
-  // Deleting runs as a job on the engine: the page stays, read-only, until the engine is gone.
   const onDelete = () => {
     setDeleteError(null);
     remove.mutate(engine.id, {
-      // Without a deletion job the engine is gone from this console at once.
-      onSuccess: (handle) => (handle ? setConfirmDelete(false) : navigate(base)),
-      onError: (e) =>
-        setDeleteError(
-          e instanceof HttpError && e.status === 403
-            ? 'Deleting an engine needs the manage permission on it.'
-            : e instanceof HttpError && e.status === 405
-              ? 'This engine does not support deletion yet.'
-              : `Couldn't delete the context engine: ${engineMessage(e, 'please try again')}.`,
-        ),
+      onSuccess: () => navigate(base),
+      onError: (e) => setDeleteError(e instanceof HttpError && e.status === 403 ? "You don't have permission to delete context engines." : `Couldn't delete the context engine: ${engineMessage(e, 'please try again')}.`),
     });
   };
-  const deletionFailed = deleting && deletion.data?.state === 'failed';
-  const shownTab: ContextEngineTabKey = deleting ? 'overview' : activeTab;
+  const running = engine.state === 'ready';
+  const shownTab: ContextEngineTabKey = running ? activeTab : 'overview';
 
   return (
     <PageContent>
@@ -149,7 +172,8 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             <Typography variant="h5" sx={{ fontWeight: 600 }} noWrap>
               {engine.name}
             </Typography>
-            <EngineStateChip state={engine.state} />
+            <EngineStateChip state={engine.state} reason={engine.statusReason} />
+            <Chip size="small" variant="outlined" label={engine.environment} />
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
             {engine.description || 'No description'}
@@ -164,30 +188,15 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         )}
       </Stack>
 
-      {deleting &&
-        (deletionFailed ? (
-          <Alert
-            severity="error"
-            variant="outlined"
-            sx={{ mb: 3 }}
-            action={
-              <Button color="inherit" size="small" disabled={remove.isPending} onClick={onDelete}>
-                Retry
-              </Button>
-            }>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              Deleting this engine failed
-            </Typography>
-            {deletionFailureText(deletion.data?.error?.code)}
-          </Alert>
-        ) : (
-          <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
-            <Typography variant="body2" sx={{ fontWeight: 600 }}>
-              This engine is being deleted
-            </Typography>
-            Questions, uploads and changes are paused, and its API and MCP endpoints have stopped answering. It disappears from your list once the engine finishes.
-          </Alert>
-        ))}
+      {deleting && (
+        <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+          <Typography variant="body2" sx={{ fontWeight: 600 }}>
+            This engine is being deleted
+          </Typography>
+          Questions, uploads and changes are paused, and its API and MCP endpoints have stopped answering. It disappears from your list once it is gone.
+        </Alert>
+      )}
+      {!running && !deleting && <EngineNotRunning state={engine.state} reason={engine.statusReason} />}
 
       {warnings.length > 0 && (
         <Alert severity="warning" variant="outlined" onClose={() => setWarnings([])} sx={{ mb: 3 }}>
@@ -208,11 +217,11 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
       <Tabs value={shownTab} onChange={(_, v) => goTab(v as ContextEngineTabKey)} sx={tabsSx}>
         {TABS.map((t) => (
-          <Tab key={t.value} label={t.label} value={t.value} disabled={deleting && t.value !== 'overview'} />
+          <Tab key={t.value} label={t.label} value={t.value} disabled={!running && t.value !== 'overview'} />
         ))}
       </Tabs>
 
-      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={deleting} />}
+      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} />}
       {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'api' && <ApiTab engine={engine} />}
@@ -226,7 +235,6 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
           isPending={remove.isPending}
           error={deleteError}
           onConfirm={onDelete}
-          forgetOnly={!CONTEXT_ENGINE_PROVISIONING}
           onClose={() => {
             if (remove.isPending) return;
             setConfirmDelete(false);

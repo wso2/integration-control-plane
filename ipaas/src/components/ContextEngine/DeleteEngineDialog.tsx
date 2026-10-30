@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { Database, History, KeyRound, MessageSquare, Upload } from '@wso2/oxygen-ui-icons-react';
+import { Database, KeyRound, MessageSquare, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 
@@ -30,8 +30,6 @@ interface DeleteEngineDialogProps {
   error?: string | null;
   onConfirm: () => void;
   onClose: () => void;
-  /** Deleting only forgets the engine here; its data stays in the engine's databases until they are cleared. */
-  forgetOnly?: boolean;
 }
 
 function Item({ icon, children }: { icon: ReactNode; children: ReactNode }): JSX.Element {
@@ -50,20 +48,16 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
   return (
     <>
       <Typography variant="body2" color="text.secondary">
-        The engine deletes everything it holds for this engine. This can&apos;t be undone.
+        The engine, its storage and everything in it are deleted. This can&apos;t be undone.
       </Typography>
       <Stack component="ul" gap={1} sx={{ listStyle: 'none', p: 0, m: 0, mt: 1.75 }}>
         <Item icon={<Database size={16} />}>{sources}</Item>
         <Item icon={<Upload size={16} />}>Files uploaded to it</Item>
         <Item icon={<MessageSquare size={16} />}>Stored questions, answers and links to their passages</Item>
-        <Item icon={<KeyRound size={16} />}>Its models, keys and every access grant</Item>
-      </Stack>
-      <Stack direction="row" gap={1.25} alignItems="flex-start" sx={{ mt: 1.5, color: 'text.secondary' }}>
-        <History size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-        <Typography variant="body2">The job and access history stay as an audit trail.</Typography>
+        <Item icon={<KeyRound size={16} />}>Its models, API keys, integrations and every access grant</Item>
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>
-        Integrations and agents calling its API or MCP endpoint stop getting answers as soon as deletion starts.
+        Apps and agents calling its API or MCP endpoint stop getting answers as soon as deletion starts.
       </Typography>
     </>
   );
@@ -71,10 +65,9 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
 
 /**
  * Confirm deleting an engine: what the engine removes, what it keeps, and the
- * engine's name typed to confirm. Deletion runs as a job on the engine, so the
- * engine shows as deleting until the job finishes. Without provisioning, it only forgets the engine.
+ * engine's name typed to confirm. The engine shows as deleting until it is gone.
  */
-export default function DeleteEngineDialog({ name, sourceCount, isPending, error, onConfirm, onClose, forgetOnly = false }: DeleteEngineDialogProps): JSX.Element {
+export default function DeleteEngineDialog({ name, sourceCount, isPending, error, onConfirm, onClose }: DeleteEngineDialogProps): JSX.Element {
   const [typed, setTyped] = useState('');
   const matches = typed.trim() === name.trim();
   return (
@@ -89,14 +82,8 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
       isPending={isPending}
       confirmDisabled={!matches}
       confirmLabel="Delete engine"
-      pendingLabel={forgetOnly ? 'Deleting…' : 'Starting…'}>
-      {forgetOnly ? (
-        <Typography variant="body2" color="text.secondary">
-          This console stops showing the engine. Its data stays in the engine's databases until they are cleared, so creating an engine again picks up its sources and indexed content.
-        </Typography>
-      ) : (
-        <DeletesEverything sourceCount={sourceCount} />
-      )}
+      pendingLabel="Deleting…">
+      <DeletesEverything sourceCount={sourceCount} />
       <TextField
         fullWidth
         size="small"

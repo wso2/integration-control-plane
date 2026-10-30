@@ -19,10 +19,10 @@
 import { Alert, Box, Button, Drawer, IconButton, LinearProgress, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { FileText, RefreshCw, Search, Trash2, Upload, Users, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { changeUploadVisibility, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
+import { changeUploadVisibility, holdsUploadBytes, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
 import { useUploadAudience } from '../../../hooks/useContextEngine';
 import { EVERYONE_VISIBILITY, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
-import { checkStagedFile, contentTypeForFile, describeUploadAudience, engineMessage, formatBytes, isUploadActive, stagedSummary, summarizeUploads, visibilityError, visibilityTags } from '../../../utils/contextEngine';
+import { checkStagedFile, contentTypeForFile, describeUploadAudience, engineMessage, formatBytes, isUploadActive, reselectedFileProblem, stagedSummary, summarizeUploads, visibilityError, visibilityTags } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile, stageFiles } from '../../../utils/stagedFiles';
 import { formatDistanceToNow } from '../../../utils/time';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
@@ -46,38 +46,51 @@ interface FilesDrawerProps {
 }
 
 function UploadRow({
+  engineId,
   entry,
   orgHandle,
   queryRoles,
   roleNames,
   canRetry,
+  holdsBytes,
   onRetry,
   onReplace,
   onChangeVisibility,
   onRemove,
 }: {
+  engineId: string;
   entry: UploadEntry;
   orgHandle: string;
   queryRoles: string[];
   roleNames: Record<string, string>;
   canRetry: boolean;
+  /** This tab still holds the file's bytes; otherwise a visibility change needs the file chosen again. */
+  holdsBytes: boolean;
   onRetry: () => void;
   onReplace: () => void;
-  onChangeVisibility: (visibility: FileVisibility) => Promise<void>;
+  onChangeVisibility: (visibility: FileVisibility, chosen?: File) => Promise<void>;
   onRemove: () => void;
 }): JSX.Element {
   const [sharing, setSharing] = useState<FileVisibility | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<File | null>(null);
+  const chooseInput = useRef<HTMLInputElement>(null);
   const active = isUploadActive(entry);
+  const chosenProblem = chosen ? reselectedFileProblem(entry, chosen) : null;
+  const needsFile = !holdsBytes && (!chosen || !!chosenProblem);
+  const closeSharing = () => {
+    setSharing(null);
+    setChosen(null);
+  };
   const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
     setSaving(true);
     setError(null);
     try {
-      await onChangeVisibility(sharing);
-      setSharing(null);
+      await onChangeVisibility(sharing, holdsBytes ? undefined : (chosen ?? undefined));
+      closeSharing();
     } catch (e) {
       setError(engineMessage(e, "Couldn't change who can see it."));
     } finally {
@@ -149,12 +162,44 @@ function UploadRow({
           )}
           {sharing !== null && (
             <Box sx={{ mt: 1.5 }}>
-              <FileVisibilityField id={`share-${entry.recordId}`} label={`Who can see ${entry.name}`} orgHandle={orgHandle} queryRoles={queryRoles} value={sharing} onChange={setSharing} />
+              <FileVisibilityField id={`share-${entry.recordId}`} label={`Who can see ${entry.name}`} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={sharing} onChange={setSharing} />
+              {!holdsBytes && (
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }}>
+                    To change who can see this file, choose it again. The engine keeps who can see a file with its content, so the file is sent again as a new version.
+                  </Typography>
+                  <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.75, minWidth: 0 }}>
+                    <Button size="small" variant="outlined" startIcon={<Upload size={14} />} disabled={saving} onClick={() => chooseInput.current?.click()}>
+                      {chosen ? 'Choose another' : `Choose ${entry.name}`}
+                    </Button>
+                    {chosen && !chosenProblem && (
+                      <Typography variant="caption" sx={mutedSx} noWrap>
+                        {chosen.name} · {formatBytes(chosen.size)}
+                      </Typography>
+                    )}
+                  </Stack>
+                  {chosenProblem && (
+                    <Typography variant="caption" color="error" sx={{ display: 'block', mt: 0.5 }}>
+                      {chosenProblem}
+                    </Typography>
+                  )}
+                  <input
+                    ref={chooseInput}
+                    type="file"
+                    hidden
+                    aria-label={`Choose ${entry.name} again`}
+                    onChange={(e) => {
+                      setChosen(e.target.files?.[0] ?? null);
+                      e.target.value = '';
+                    }}
+                  />
+                </Box>
+              )}
               <Stack direction="row" gap={1} justifyContent="flex-end" sx={{ mt: 1.5 }}>
-                <Button size="small" variant="text" disabled={saving} onClick={() => setSharing(null)}>
+                <Button size="small" variant="text" disabled={saving} onClick={closeSharing}>
                   Cancel
                 </Button>
-                <Button size="small" variant="contained" disabled={saving || !!visibilityError(sharing)} onClick={() => void save()}>
+                <Button size="small" variant="contained" disabled={saving || needsFile || !!visibilityError(sharing)} onClick={() => void save()}>
                   {saving ? 'Saving…' : 'Save'}
                 </Button>
               </Stack>
@@ -178,7 +223,7 @@ function UploadRow({
  */
 export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, open, onClose }: FilesDrawerProps): JSX.Element {
   const entries = useSourceUploads(engineId, source.id);
-  const { everyone, roleNames } = useUploadAudience(orgHandle, queryRoles);
+  const { everyone, roleNames } = useUploadAudience(orgHandle, queryRoles, engineId);
   const [staged, setStaged] = useState<StagedFileMeta[]>([]);
   const [visibility, setVisibility] = useState<FileVisibility>(EVERYONE_VISIBILITY);
   const [filter, setFilter] = useState('');
@@ -288,7 +333,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
               }}
             />
             <Box sx={{ mt: 2 }}>
-              <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
+              <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={visibility} onChange={setVisibility} />
             </Box>
             <Stack direction="row" justifyContent="flex-end" gap={1.5} sx={{ mt: 2 }}>
               <Button
@@ -339,17 +384,19 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 visible.map((entry) => (
                   <UploadRow
                     key={entry.recordId}
+                    engineId={engineId}
                     entry={entry}
                     orgHandle={orgHandle}
                     queryRoles={queryRoles}
                     roleNames={roleNames}
                     canRetry={entry.status === 'failed' && !entry.jobId}
+                    holdsBytes={holdsUploadBytes(source.id, entry.recordId)}
                     onRetry={() => retryUpload(engineId, source.id, entry.recordId)}
                     onReplace={() => {
                       replaceTarget.current = entry;
                       replaceInput.current?.click();
                     }}
-                    onChangeVisibility={(next) => changeUploadVisibility(engineId, source.id, entry.recordId, next, visibilityTags(next, everyone))}
+                    onChangeVisibility={(next, chosen) => changeUploadVisibility(engineId, source.id, entry.recordId, next, visibilityTags(next, everyone), chosen)}
                     onRemove={() => setRemoving(entry)}
                   />
                 ))

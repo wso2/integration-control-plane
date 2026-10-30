@@ -99,7 +99,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const [params] = useSearchParams();
   const { markAsked } = useAskedFlag(engine.id);
   const [mode, setMode] = useState<ContextQueryMode>('context');
-  const principal = useContextPrincipal();
+  const principal = useContextPrincipal(engine.id);
   const groups = principal.data?.groups ?? [];
   const permissions = useContextPermissions(engine.id);
   const canQuery = !permissions.data || permissions.data.includes('context.read');
@@ -110,7 +110,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const [copied, setCopied] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const query = useQueryContextEngine();
-  const reopen = useReopenContextQuery();
+  const reopen = useReopenContextQuery(engine.id);
   // The question being reopened, kept here because the mutation's own pending state goes stale with its observer.
   const [openingId, setOpeningId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -174,9 +174,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     });
   };
 
-  const openInApi = (turn: Turn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}`);
+  const openInApi = (turn: Turn) => navigate(contextEngineUrl(orgHandle, engine.id, 'api', { q: turn.question }));
   // The Graph tab draws an answer's derivation from the stored query; a passage given here opens chosen.
-  const derivationHref = (queryId: string, ev?: ContextEvidence) => `${contextEngineUrl(orgHandle, engine.id, 'graph')}?query=${encodeURIComponent(queryId)}${ev ? `&node=${encodeURIComponent(`p:${ev.id}`)}` : ''}`;
+  const derivationHref = (queryId: string, ev?: ContextEvidence) => contextEngineUrl(orgHandle, engine.id, 'graph', { query: queryId, node: ev ? `p:${ev.id}` : undefined });
 
   // "Back to the answer" from the Graph tab lands here with `?open=` naming the question to reopen.
   const openRef = useRef<string | null>(null);

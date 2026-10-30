@@ -33,9 +33,9 @@
  */
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { getContextJob, getContextRecordStatus, ingestContextFile, sendContextRecordEvent, updateContextSource } from '../api/contextEngine';
+import { deleteContextRecord, getContextJob, getContextRecordStatus, ingestContextFile, updateContextSource } from '../api/contextEngine';
 import { CONTEXT_ENGINE_FILES_KEY_PREFIX, CONTEXT_ENGINE_RULES_KEY_PREFIX, CONTEXT_JOB_TERMINAL_STATES, UPLOAD_CONCURRENCY, UPLOAD_POLL_MS } from '../constants/contextEngine';
-import { engineMessage, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
+import { engineMessage, nextRecordVersion, reselectedFileProblem, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
 import type { AudienceRule, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
 
@@ -50,8 +50,8 @@ const EMPTY: UploadEntry[] = [];
 const entriesBySource = new Map<string, UploadEntry[]>();
 const loadedSources = new Set<string>();
 const listeners = new Set<() => void>();
-/** Bytes of uploads that have not succeeded yet, so a failed one can be retried. */
-const pendingBytes = new Map<string, FileToUpload>();
+/** Bytes of files this tab uploaded, in memory only: a retry or a visibility change sends them again. */
+const heldBytes = new Map<string, FileToUpload>();
 const timers = new Map<string, number>();
 const active = new Map<string, number>();
 const queues = new Map<string, (() => Promise<void>)[]>();
@@ -139,7 +139,7 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
   const key = entryKey(sourceId, recordId);
   clearTimer(key);
   try {
-    const record = await getContextRecordStatus(sourceId, recordId);
+    const record = await getContextRecordStatus(engineId, sourceId, recordId);
     const { status, detail } = uploadStatusFromRecord(record);
     patchEntry(sourceId, recordId, { status, detail, forbidden: false, version: record.currentVersion, progress: 100 });
     if (status === 'indexing')
@@ -174,7 +174,7 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
   const key = entryKey(sourceId, recordId);
   clearTimer(key);
   try {
-    const job = await getContextJob(jobId);
+    const job = await getContextJob(engineId, jobId);
     if (!CONTEXT_JOB_TERMINAL_STATES.has(job.state)) {
       patchEntry(sourceId, recordId, { status: 'queued', progress: 100 });
       timers.set(
@@ -187,7 +187,6 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
       patchEntry(sourceId, recordId, { status: 'failed', detail: job.error?.message ?? 'The engine could not apply this file.' });
       return;
     }
-    pendingBytes.delete(key);
     await watchRecord(engineId, sourceId, recordId, true);
   } catch (err) {
     patchEntry(sourceId, recordId, { status: 'failed', detail: engineMessage(err, "Couldn't follow the upload.") });
@@ -217,7 +216,7 @@ const ruleChecks = new Map<string, Promise<void>>();
  * keeping the other saved rules. Someone without manage rights cannot update it,
  * and the file is sent anyway: the engine then holds it back and its row says why.
  */
-function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
+function ensureSourceRules(engineId: string, sourceId: string, tags: string[]): Promise<void> {
   const previous = ruleChecks.get(sourceId) ?? Promise.resolve();
   const next = previous.then(async () => {
     const saved = rememberedSourceRules(sourceId);
@@ -225,7 +224,7 @@ function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
     if (missing.length === 0) return;
     const rules = [...saved.filter((r) => !missing.includes(r.group)), ...uploadSourceRules(missing)];
     try {
-      await updateContextSource({ sourceId, audience: rules });
+      await updateContextSource({ engineId, sourceId, audience: rules });
       rememberSourceRules(sourceId, rules);
     } catch {
       // Uploading needs no manage rights; the file's row explains a hold-back.
@@ -241,14 +240,14 @@ function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
 function enqueue(engineId: string, sourceId: string, file: FileToUpload, audience: string[], version: string): void {
   const recordId = file.name;
   const key = entryKey(sourceId, recordId);
-  pendingBytes.set(key, file);
+  heldBytes.set(key, file);
   const queue = queues.get(sourceId) ?? [];
   queues.set(sourceId, queue);
   queue.push(async () => {
     patchEntry(sourceId, recordId, { status: 'uploading', progress: 0, detail: undefined, forbidden: false });
     try {
       // A file still under its old label keeps the source's label rule; role tags must map to themselves.
-      if (entriesOf(sourceId).find((e) => e.recordId === recordId)?.visibility) await ensureSourceRules(sourceId, audience);
+      if (entriesOf(sourceId).find((e) => e.recordId === recordId)?.visibility) await ensureSourceRules(engineId, sourceId, audience);
       const handle = await ingestContextFile({ engineId, sourceId, recordId, content: file.content, contentType: file.contentType, audience, version, onProgress: (f) => patchEntry(sourceId, recordId, { progress: Math.round(f * 100) }) });
       patchEntry(sourceId, recordId, { status: 'queued', progress: 100, jobId: handle.jobId });
       persist(sourceId);
@@ -279,7 +278,7 @@ export function startUploads(engineId: string, sourceId: string, files: FileToUp
 
 /** Send a failed upload again, with a new version so the engine treats it as fresh. */
 export function retryUpload(engineId: string, sourceId: string, recordId: string): void {
-  const file = pendingBytes.get(entryKey(sourceId, recordId));
+  const file = heldBytes.get(entryKey(sourceId, recordId));
   const entry = entriesOf(sourceId).find((e) => e.recordId === recordId);
   if (!file || !entry) return;
   const version = String(Date.now());
@@ -291,7 +290,7 @@ export function retryUpload(engineId: string, sourceId: string, recordId: string
 export function retryForbidden(engineId: string, sourceId: string): void {
   entriesOf(sourceId)
     .filter((e) => e.forbidden && e.status === 'failed')
-    .forEach((e) => (pendingBytes.has(entryKey(sourceId, e.recordId)) ? retryUpload(engineId, sourceId, e.recordId) : void follow(engineId, sourceId, e.recordId)));
+    .forEach((e) => (heldBytes.has(entryKey(sourceId, e.recordId)) ? retryUpload(engineId, sourceId, e.recordId) : void follow(engineId, sourceId, e.recordId)));
 }
 
 /** Delete a record; it leaves search on the engine's next pass. */
@@ -300,7 +299,7 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
   if (entry && (entry.status === 'failed' || entry.status === 'uploading') && !entry.jobId) {
     // Never reached the engine: just forget it.
     clearTimer(entryKey(sourceId, recordId));
-    pendingBytes.delete(entryKey(sourceId, recordId));
+    heldBytes.delete(entryKey(sourceId, recordId));
     setEntries(
       sourceId,
       entriesOf(sourceId).filter((e) => e.recordId !== recordId),
@@ -308,10 +307,9 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
     persist(sourceId);
     return;
   }
-  await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'delete', audience: entry?.audience ?? [], version: String(Date.now()) });
+  await deleteContextRecord({ engineId, sourceId, recordId, audience: entry?.audience ?? [], version: nextRecordVersion(entry?.version) });
   clearTimer(entryKey(sourceId, recordId));
-  // A failed upload kept its bytes for a retry; nothing will retry a removed record.
-  pendingBytes.delete(entryKey(sourceId, recordId));
+  heldBytes.delete(entryKey(sourceId, recordId));
   setEntries(
     sourceId,
     entriesOf(sourceId).filter((e) => e.recordId !== recordId),
@@ -319,14 +317,34 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
   persist(sourceId);
 }
 
-/** Share a file with other roles. A held-back file becomes visible once the source maps its new roles, which this checks first. */
-export async function changeUploadVisibility(engineId: string, sourceId: string, recordId: string, visibility: FileVisibility, audience: string[]): Promise<void> {
-  await ensureSourceRules(sourceId, audience);
-  const handle = await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'acl_changed', audience, version: String(Date.now()) });
-  patchEntry(sourceId, recordId, { visibility, audience, label: undefined, status: 'queued', detail: undefined, jobId: handle.jobId });
+/** Whether this tab still holds a file's bytes, so its visibility can change without choosing it again. */
+export function holdsUploadBytes(sourceId: string, recordId: string): boolean {
+  return heldBytes.has(entryKey(sourceId, recordId));
+}
+
+/**
+ * Share a file with other roles. The engine versions a record's audience with its
+ * content, so the file is sent again at a newer version: the bytes this tab holds,
+ * or `chosen`, the same file picked again. A held-back file becomes visible once
+ * the source maps its new roles, which this checks first.
+ */
+export async function changeUploadVisibility(engineId: string, sourceId: string, recordId: string, visibility: FileVisibility, audience: string[], chosen?: File): Promise<void> {
+  const key = entryKey(sourceId, recordId);
+  const entry = entriesOf(sourceId).find((e) => e.recordId === recordId);
+  if (!entry) return;
+  const problem = chosen ? reselectedFileProblem(entry, chosen) : null;
+  if (problem) throw new Error(problem);
+  const file: FileToUpload | undefined = chosen ? { content: chosen, name: entry.name, size: chosen.size, contentType: entry.contentType } : heldBytes.get(key);
+  if (!file) throw new Error('To change who can see this file, choose it again.');
+  await ensureSourceRules(engineId, sourceId, audience);
+  const version = nextRecordVersion(entry.version);
+  const handle = await ingestContextFile({ engineId, sourceId, recordId, content: file.content, contentType: entry.contentType, audience, version });
+  heldBytes.set(key, file);
+  clearTimer(key);
+  patchEntry(sourceId, recordId, { visibility, audience, label: undefined, version, status: 'queued', detail: undefined, jobId: handle.jobId });
   persist(sourceId);
   timers.set(
-    entryKey(sourceId, recordId),
+    key,
     window.setTimeout(() => void watchJob(engineId, sourceId, recordId, handle.jobId), UPLOAD_POLL_MS),
   );
 }

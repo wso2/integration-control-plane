@@ -41,6 +41,9 @@ export default function GraphTab({ engine, orgHandle }: GraphTabProps): JSX.Elem
   const queryId = params.get('query');
   const node = params.get('node');
 
+  // The engine's environment lives in the query string too, so every view keeps it.
+  const view = (values: Record<string, string>) => new URLSearchParams({ env: engine.environment, ...values });
+
   const setNode = (key: string | null) => {
     const next = new URLSearchParams(params);
     if (key) next.set('node', key);
@@ -56,11 +59,11 @@ export default function GraphTab({ engine, orgHandle }: GraphTabProps): JSX.Elem
         queryId={queryId}
         initialKey={node}
         onSelectKey={setNode}
-        onBackToAnswer={() => navigate(`${contextEngineUrl(orgHandle, engine.id, 'playground')}?open=${encodeURIComponent(queryId)}`)}
-        onExit={() => setParams(new URLSearchParams())}
-        onExploreEntity={(id) => setParams(new URLSearchParams({ node: id }))}
+        onBackToAnswer={() => navigate(contextEngineUrl(orgHandle, engine.id, 'playground', { open: queryId }))}
+        onExit={() => setParams(view({}))}
+        onExploreEntity={(id) => setParams(view({ node: id }))}
       />
     );
   }
-  return <GraphExplorer engine={engine} orgHandle={orgHandle} initialKey={node} onSelectKey={setNode} onExplain={(id) => setParams(new URLSearchParams({ query: id }))} />;
+  return <GraphExplorer engine={engine} orgHandle={orgHandle} initialKey={node} onSelectKey={setNode} onExplain={(id) => setParams(view({ query: id }))} />;
 }

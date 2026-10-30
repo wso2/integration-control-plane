@@ -39,6 +39,8 @@ interface StorageBackendCardProps {
   onRefresh: () => void;
   /** Managed databases are switched off for this deployment; the Infrastructure option is then disabled. */
   infrastructureAvailable: boolean;
+  /** Why only the engine managed store can be chosen, when that is so. */
+  alternativeUnavailable?: string;
   /** Infrastructure list and create pages for this store, when Infrastructure offers it. */
   listUrl?: string;
   createUrl?: string;
@@ -89,7 +91,7 @@ function DatabaseField({ kind, value, onChange }: { kind: StorageBackendInfo['ki
 }
 
 /** One store's card: Engine managed, or an Infrastructure server (or an external database when Infrastructure has none). */
-export default function StorageBackendCard({ info, value, onChange, servers, serversLoading, serversError, onRefresh, infrastructureAvailable, listUrl, createUrl }: StorageBackendCardProps): JSX.Element {
+export default function StorageBackendCard({ info, value, onChange, servers, serversLoading, serversError, onRefresh, infrastructureAvailable, alternativeUnavailable, listUrl, createUrl }: StorageBackendCardProps): JSX.Element {
   const alternativeMode = info.infraSegment ? 'infrastructure' : 'external';
   const chooseMode = (mode: string) => {
     if (mode === 'managed') onChange({ mode: 'managed' });
@@ -258,14 +260,14 @@ export default function StorageBackendCard({ info, value, onChange, servers, ser
           <FormControlLabel
             value={alternativeMode}
             control={<Radio size="small" />}
-            disabled={alternativeMode === 'infrastructure' && !infrastructureAvailable}
+            disabled={!!alternativeUnavailable || (alternativeMode === 'infrastructure' && !infrastructureAvailable)}
             label={
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
                   {info.alternativeLabel}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
-                  {info.alternativeDescription}
+                  {alternativeUnavailable ?? info.alternativeDescription}
                 </Typography>
               </Box>
             }

@@ -21,8 +21,12 @@ import {
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
   CONTEXT_QUERY_ACTIONS,
+  CONTEXT_ENGINE_HANDLE_MAX,
+  ENGINE_NATIVE_CONNECTOR_IDS,
   EVERYONE_VISIBILITY,
+  INTEGRATION_TYPE_BY_CONNECTOR,
   OWNER_GRANT_PREFIX,
+  UNAVAILABLE_MODEL_PROVIDERS,
   defaultStorage,
   isConnectorEnabled,
   LLM_PROVIDERS,
@@ -109,7 +113,15 @@ export function splitUrls(value: string): string[] {
 
 /** The catalog entry behind a configured source, or undefined for an id the catalog no longer has. */
 export function connectorFor(type: string): SourceConnector | undefined {
-  return CONNECTOR_BY_ID[type];
+  return CONNECTOR_BY_ID[type] ?? CONNECTOR_BY_ID[CONNECTOR_BY_INTEGRATION_TYPE[type] ?? ''];
+}
+
+const CONNECTOR_BY_INTEGRATION_TYPE: Record<string, string> = Object.fromEntries(Object.entries(INTEGRATION_TYPE_BY_CONNECTOR).map(([connector, type]) => [type, connector]));
+
+/** The BFF integration type a connector runs as, or null for a source the browser feeds itself. */
+export function integrationTypeFor(connectorId: string): string | null {
+  if (ENGINE_NATIVE_CONNECTOR_IDS.has(connectorId)) return null;
+  return INTEGRATION_TYPE_BY_CONNECTOR[connectorId] ?? connectorId;
 }
 
 /** Whether a conditional field is currently shown, given the other values entered. Unconditional fields are always shown. */
@@ -128,6 +140,8 @@ export function sourceFieldError(def: SourceFieldDef, value: string | undefined)
   const v = (value ?? '').trim();
   if (!v) return def.required ? `${def.label} is required.` : '';
   if (def.kind === 'url' && !isHttpUrl(v)) return 'Enter a full http(s) URL.';
+  if (def.valueType === 'integer' && !/^\d+$/.test(v)) return 'Enter a whole number.';
+  if (def.valueType === 'number' && !Number.isFinite(Number(v))) return 'Enter a number.';
   if (def.kind === 'urls') {
     const bad = splitUrls(v).find((u) => !isHttpUrl(u));
     if (bad) return `Not a valid URL: ${bad}`;
@@ -250,6 +264,8 @@ export function effectiveLlm(form: Pick<ContextEngineForm, 'embedding' | 'llm' |
 
 /** Why the Models step cannot proceed, or null. */
 export function modelsStepBlocker(form: Pick<ContextEngineForm, 'embedding' | 'llm' | 'shareApiKey' | 'answersEnabled' | 'answerLlm'>): string | null {
+  const unavailable = [form.embedding, form.llm, form.answersEnabled ? form.answerLlm : null].some((m) => !!m && isModelProviderUnavailable(m.provider));
+  if (unavailable) return 'Azure OpenAI is not available yet; choose another provider';
   if (!form.embedding) return 'Choose an embedding model';
   if (!isEmbeddingValid(form.embedding)) return 'Complete the embedding model';
   if (!form.llm) return 'Choose a language model';
@@ -278,13 +294,18 @@ export function isFormComplete(form: ContextEngineForm): boolean {
   return isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null && isNameStepValid(form.name, form.description);
 }
 
+/** Providers the engine cannot be configured with yet: offered, but disabled, in the wizard. */
+export function isModelProviderUnavailable(provider: string): boolean {
+  return UNAVAILABLE_MODEL_PROVIDERS.has(provider);
+}
+
 /** The wizard form as a create request. Throws when a required section is missing — call after {@link isFormComplete}. */
-export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput {
+export function toCreateInput(form: ContextEngineForm, environment: string): CreateContextEngineInput {
   const llm = effectiveLlm(form);
   if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
   if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer model configuration is incomplete.');
   const answers = { enabled: form.answersEnabled, model: form.answersEnabled ? form.answerLlm : null };
-  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
+  return { name: form.name.trim(), description: form.description.trim(), environment, sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
 }
 
 /** Whether the wizard holds anything worth keeping. */
@@ -485,8 +506,9 @@ export function storageSelectionError(kind: StorageKind, sel: StorageSelection):
   }
 }
 
-/** Why Next is disabled on the Storage step, or null when every store is usable. */
+/** Why Next is disabled on the Storage step, or null when every store is usable. Only engine managed stores can be created for now. */
 export function storageStepBlocker(storage: ContextEngineStorage): string | null {
+  if (!isStorageAllManaged(storage)) return 'Only engine managed storage is available for now';
   for (const kind of STORAGE_KINDS) {
     const err = storageSelectionError(kind, storage[kind]);
     if (err) return err;
@@ -721,6 +743,18 @@ export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;
   if (n < 1024 * 1024) return `${one(n / 1024)} KB`;
   return `${one(n / (1024 * 1024))} MB`;
+}
+
+/** A version newer than the record's: now in epoch milliseconds, or one past the record's when that is ahead. */
+export function nextRecordVersion(current: string | undefined, now = Date.now()): string {
+  const n = Number(current);
+  return String(Number.isFinite(n) && n >= now ? n + 1 : now);
+}
+
+/** Why a file chosen again for a record is not that record's file; null when its name and size match. */
+export function reselectedFileProblem(record: Pick<UploadedFile, 'name' | 'size'>, file: { name: string; size: number }): string | null {
+  if (file.name === record.name && file.size === record.size) return null;
+  return `That is not ${record.name} (${formatBytes(record.size)}). Choose the same file that was uploaded.`;
 }
 
 /** What to say about a chosen file before it is sent. */
@@ -988,12 +1022,6 @@ export function suggestedQuestions(engine: Pick<ContextEngineDetail, 'sources'>)
   return out.slice(0, 4);
 }
 
-/** Why an engine's deletion job failed, in words, from its error code. */
-export function deletionFailureText(code: string | undefined): string {
-  const lead = code === 'residue_found' ? 'A removed item was still searchable, so the engine kept this engine and its data.' : 'The engine kept this engine and its data.';
-  return `${lead} Deleting again continues where the last attempt stopped.`;
-}
-
 // ── Editing models on a running engine ──────────────────────────────────────
 
 /** Whether a draft names the model already stored, ignoring its key, as the engine compares them. */
@@ -1185,7 +1213,121 @@ export function askedQuestionMeta(q: Pick<AskedQuestion, 'askedAt' | 'outcome' |
   return `${when} · ${what}`;
 }
 
+// ── Engine identity ─────────────────────────────────────────────────────────
+
+export { contextEngineKey, parseContextEngineKey } from './contextEngineKey';
+
+/** The environment a page shows: the one picked on it, else the one in its link, else the first; '' while none exist. */
+export function selectEnvironment(environmentIds: string[], picked: string | null, linked: string | null): string {
+  if (picked && environmentIds.includes(picked)) return picked;
+  if (linked && environmentIds.includes(linked)) return linked;
+  return environmentIds[0] ?? '';
+}
+
+/** The BFF's engine name derived from a display name: lowercase letters, digits and hyphens. */
+export function engineHandleFrom(displayName: string): string {
+  const slug = displayName
+    .normalize('NFKD')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, CONTEXT_ENGINE_HANDLE_MAX)
+    .replace(/-+$/, '');
+  return slug || 'engine';
+}
+
+/**
+ * Whether a 401 came from the gateway refusing the console key rather than from the engine. The
+ * engine answers every refusal with its `{code, message, traceId}` body; the gateway does not.
+ */
+export function isGatewayKeyRefusal(status: number, body: string): boolean {
+  if (status !== 401) return false;
+  try {
+    const parsed = JSON.parse(body) as { code?: unknown; traceId?: unknown } | null;
+    return !(parsed && typeof parsed.code === 'string' && typeof parsed.traceId === 'string');
+  } catch {
+    return true;
+  }
+}
+
 // ── Wire payloads ───────────────────────────────────────────────────────────
+
+export interface BffEngineModel {
+  provider: string;
+  model: string;
+  apiKey?: string;
+}
+
+export interface BffCreateEngineRequest {
+  name: string;
+  displayName: string;
+  description?: string;
+  environment: string;
+  models: { llm: BffEngineModel; embedding: BffEngineModel; answer?: BffEngineModel; answersEnabled: boolean };
+}
+
+/** `POST /context-engines`. A separate answer model reuses the language model's key when it has none of its own. */
+export function toBffCreateRequest(input: CreateContextEngineInput): BffCreateEngineRequest {
+  const model = (m: { provider: string; model: string; apiKey: string }): BffEngineModel => ({ provider: m.provider, model: m.model.trim(), ...(m.apiKey ? { apiKey: m.apiKey } : {}) });
+  const answer = input.answers.enabled && input.answers.model ? model(input.answers.model) : undefined;
+  return {
+    name: engineHandleFrom(input.name),
+    displayName: input.name.trim(),
+    ...(input.description.trim() ? { description: input.description.trim() } : {}),
+    environment: input.environment,
+    models: { llm: model(input.llm), embedding: model(input.embedding), ...(answer ? { answer } : {}), answersEnabled: input.answers.enabled },
+  };
+}
+
+/**
+ * `POST …/integrations`: every field the connector shows, secrets included, typed and placed as the
+ * integration's settings say. The BFF names the integration and its source with a DNS label. With
+ * visibility rules, the integration labels every record with each rule's group; without, the BFF
+ * lets every console user see them.
+ */
+export function toIntegrationRequest(source: ContextSourceConfig, type: string): { name: string; type: string; settings: Record<string, unknown>; source?: { audience: string[]; audienceMapping: Record<string, string> } } {
+  const audienceMapping = audienceMappingFromRules(source.audience);
+  const audience = Object.keys(audienceMapping);
+  return {
+    name: engineHandleFrom(source.name),
+    type,
+    settings: integrationSettings(source),
+    ...(audience.length ? { source: { audience, audienceMapping } } : {}),
+  };
+}
+
+/** The integration's settings from the fields that apply; blank fields and files are left out. */
+function integrationSettings(source: ContextSourceConfig): Record<string, unknown> {
+  const connector = connectorFor(source.type);
+  const settings: Record<string, unknown> = {};
+  if (!connector) return settings;
+  for (const f of visibleFields(connector, source.values)) {
+    const raw = (source.values[f.key] ?? '').trim();
+    if (raw === '' || f.kind === 'file') continue;
+    const path = (f.setting ?? f.key).split('.');
+    let table = settings;
+    for (const key of path.slice(0, -1)) table = (table[key] ??= {}) as Record<string, unknown>;
+    table[path[path.length - 1]] = settingValue(f, raw);
+  }
+  return settings;
+}
+
+function settingValue(def: SourceFieldDef, raw: string): unknown {
+  switch (def.valueType) {
+    case 'integer':
+    case 'number':
+      return Number(raw);
+    case 'boolean':
+      return raw === 'true';
+    case 'list':
+      return raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    default:
+      return def.kind === 'urls' ? splitUrls(raw).join('\n') : raw;
+  }
+}
 
 /** `RegisterSource` body for the engine's `POST /spaces/{id}/sources`. Credentials never travel here. */
 export function toSourceRegistration(source: ContextSourceConfig): { name: string; type: string; audienceMapping: Record<string, string> } {
@@ -1285,7 +1427,7 @@ const shellSingleQuoted = (text: string): string => text.replaceAll("'", "'\\''"
 export function buildQueryCurl(baseUrl: string, question = 'What is our rollback procedure?', route: 'context' | 'answer' = 'context'): string {
   const body = JSON.stringify({ question, limit: 5 }, null, 2);
   const url = route === 'answer' ? answerEndpointUrl(baseUrl) : contextEndpointUrl(baseUrl);
-  return `curl -X POST ${url} \\\n  -H "Authorization: Bearer $TOKEN" \\\n  -H "Content-Type: application/json" \\\n  -d '${shellSingleQuoted(body)}'`;
+  return `curl -X POST ${url} \\\n  -H "X-API-Key: $API_KEY" \\\n  -H "Content-Type: application/json" \\\n  -d '${shellSingleQuoted(body)}'`;
 }
 
 /** The shape of a `/v1/context` response, for the API tab; `/v1/answer` adds `answer`. */
@@ -1324,7 +1466,7 @@ export function buildMcpClientConfig(baseUrl: string, engineName: string): strin
       mcpServers: {
         [key || 'context-engine']: {
           url: mcpEndpointUrl(baseUrl),
-          headers: { Authorization: 'Bearer <token>' },
+          headers: { 'X-API-Key': '<api key>' },
         },
       },
     },
@@ -1342,7 +1484,7 @@ export function buildMcpClientConfigs(baseUrl: string, engineName: string): McpC
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '')
       .slice(0, 63) || 'context-engine';
-  const server = { url: mcpEndpointUrl(baseUrl), headers: { Authorization: 'Bearer <token>' } };
+  const server = { url: mcpEndpointUrl(baseUrl), headers: { 'X-API-Key': '<api key>' } };
   return MCP_CLIENTS.map((c) => ({
     ...c,
     json: JSON.stringify(c.id === 'vscode' ? { servers: { [key]: { type: 'http', ...server } } } : { mcpServers: { [key]: server } }, null, 2),
