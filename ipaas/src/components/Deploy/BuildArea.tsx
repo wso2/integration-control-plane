@@ -130,14 +130,18 @@ export default function BuildArea({
 
   const isLatest = selectedImage?.imageId === images[0]?.imageId;
   const isDeploying = deployTrack.isPending;
-  const canDeploy = !!selectedImage?.imageId && !!firstEnvId && !isDeploying && !isBuildPending;
+  // Image-only components (e.g. knowledge base data sources) have no builds, so there is
+  // no image to pick. Once deployed they can still be redeployed: an empty imageId makes
+  // the BFF cut a new release from the current workload, picking up component changes.
+  const redeployCurrent = !imagesLoading && images.length === 0 && !!firstEnvReleaseId;
+  const canDeploy = (!!selectedImage?.imageId || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending;
 
   const handleDeploy = () => {
     if (!canDeploy) return;
     deployTrack.mutate({
       componentId,
       id: versionId,
-      imageId: selectedImage!.imageId,
+      imageId: selectedImage?.imageId ?? '',
       environmentId: firstEnvId,
       deploymentPipelineId,
     });
@@ -237,11 +241,11 @@ export default function BuildArea({
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, color: 'text.secondary' }}>
                 <Rocket size={16} />
                 <Typography variant="body2" color="text.secondary">
-                  No images available yet.
+                  {redeployCurrent ? 'No build images for this component.' : 'No images available yet.'}
                 </Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary">
-                Trigger a build from the Build page first.
+                {redeployCurrent ? 'Deploy redeploys the current image with the latest component settings.' : 'Trigger a build from the Build page first.'}
               </Typography>
             </Box>
           ) : (
