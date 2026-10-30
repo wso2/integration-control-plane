@@ -124,6 +124,15 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
       </Alert>
     );
   }
+  // The engine serves its graph, but there is nothing in it: no record is indexed yet, or every record was
+  // deleted. The canvas is not mounted for it, since it has nothing to draw and no point to fit the camera to.
+  if (data.entities.length === 0 && data.records.length === 0) {
+    return (
+      <Alert severity="info">
+        The graph is empty. It fills as records are indexed: add a source or upload files, then come back.
+      </Alert>
+    );
+  }
 
   const selected = selectedIndex !== null ? model.nodes[selectedIndex] : null;
   const counts = { records: data.records.length, entities: data.entities.length };

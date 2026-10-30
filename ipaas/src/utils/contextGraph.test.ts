@@ -256,6 +256,17 @@ describe('cosmosBuffers', () => {
     expect(Array.from(cosmosBuffers(exploreModel(GRAPH, { records: true, entities: true, detail: 'all' }), PALETTE).shapes.slice(0, 4))).toEqual([1, 1, 1, 0]);
   });
 
+  it('draws nothing for an empty graph, such as one whose records were all deleted', () => {
+    const empty: ContextGraph = { entities: [], records: [], mentions: [], relations: [], conflicts: [], truncated: false };
+    const m = exploreModel(empty, { records: true, entities: true, detail: 'all' });
+    const b = cosmosBuffers(m, PALETTE, { slots: kindSlots(empty) });
+    expect(m.nodes).toHaveLength(0);
+    expect(b.positions).toHaveLength(0);
+    expect(b.links).toHaveLength(0);
+    expect(b.clusterPositions).toHaveLength(0);
+    expect(labelled(m, null, null, null)).toEqual([]);
+  });
+
   it('starts an unplaced graph the same way every time', () => {
     const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all' });
     expect(Array.from(cosmosBuffers(m, PALETTE).positions)).toEqual(Array.from(cosmosBuffers(m, PALETTE).positions));

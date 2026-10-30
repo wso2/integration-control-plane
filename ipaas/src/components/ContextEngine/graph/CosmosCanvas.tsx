@@ -122,10 +122,6 @@ export default function CosmosCanvas({
   const tagRefs = useRef(new Map<number, HTMLDivElement>());
   const linksRef = useRef(buffers.links);
   linksRef.current = buffers.links;
-  // cosmos.gl reads point positions from a GPU buffer it only creates once there are points, so
-  // fitting or framing an empty graph throws; the camera is left alone until something is drawn.
-  const hasPointsRef = useRef(buffers.positions.length > 0);
-  hasPointsRef.current = buffers.positions.length > 0;
   const followRef = useRef<number | null>(null);
   // Set once the reader zooms or drags: the camera then stops following the layout.
   const userMovedRef = useRef(false);
@@ -133,6 +129,9 @@ export default function CosmosCanvas({
   framePointsRef.current = frame;
   const fitToRef = useRef(fitTo);
   fitToRef.current = fitTo;
+  // How many points the graph holds right now. The library makes its position texture only once it has
+  // a point, and reading positions back before then throws, so the camera is never fitted to no points.
+  const pointCountRef = useRef(0);
   // A framing that arrives while the layout is still moving is run once it settles.
   const pendingFrameRef = useRef<(() => void) | null>(null);
   const lastFocusRef = useRef<number | null>(null);
@@ -252,7 +251,8 @@ export default function CosmosCanvas({
     const graph = graphRef.current;
     const host = hostRef.current;
     const to = fitToRef.current;
-    if (!graph || !hasPointsRef.current) return;
+    // With no points there is nothing to fit, and fitView would read positions the library never made.
+    if (!graph || !pointCountRef.current) return;
     if (!to || !to.length || !host) {
       graph.fitView(duration, 0.15, true);
       return;
@@ -291,7 +291,7 @@ export default function CosmosCanvas({
     (index: number) => {
       const graph = graphRef.current;
       const host = hostRef.current;
-      if (!graph || !host || !hasPointsRef.current) return;
+      if (!graph || !host) return;
       userMovedRef.current = true;
       stopFollowing();
       const points = framePointsRef.current && framePointsRef.current.length ? framePointsRef.current : [index];
@@ -443,6 +443,7 @@ export default function CosmosCanvas({
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph || !ready) return;
+    pointCountRef.current = buffers.positions.length / 2;
     graph.setPointPositions(buffers.positions, true);
     graph.setPointColors(buffers.colors);
     graph.setPointSizes(buffers.sizes);
@@ -456,7 +457,8 @@ export default function CosmosCanvas({
     graph.setClusterPositions(buffers.clusterPositions);
     graph.setPointClusterStrength(buffers.clusterStrengths);
     graph.render(1);
-    follow();
+    // An empty graph, such as one whose records were all deleted, has no layout to follow.
+    if (pointCountRef.current) follow();
     scheduleLabels();
   }, [buffers, ready, follow, scheduleLabels]);
 
