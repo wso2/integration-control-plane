@@ -188,6 +188,24 @@ export function orgCdPipelinesUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/admin/cd-pipelines`;
 }
 
+export function orgDatabasesUrl(scope: { org: string }): string {
+  return `/organizations/${scope.org}/platform-services`;
+}
+
+export function newDatabaseUrl(scope: { org: string }): string {
+  return `${orgDatabasesUrl(scope)}/new`;
+}
+
+/** A database's detail page, on one of its tabs. */
+export function databaseUrl(scope: { org: string }, serverId: string, tab = 'overview'): string {
+  return `${orgDatabasesUrl(scope)}/${encodeURIComponent(serverId)}/${tab}`;
+}
+
+/** A Temporal server's detail page, on one of its tabs. */
+export function temporalUrl(scope: { org: string }, serverId: string, tab = 'overview'): string {
+  return `${orgDatabasesUrl(scope)}/temporal/${encodeURIComponent(serverId)}/${tab}`;
+}
+
 /** The org Settings landing route — redirects to the first section the user can access. */
 export function orgSettingsUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/settings`;
@@ -275,6 +293,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
     { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
+    { key: 'platform-services', navId: 'org-platform-services', segment: 'platform-services' },
     { key: 'settings', navId: 'org-settings', segment: 'settings' },
   ],
   projects: [
@@ -379,10 +398,12 @@ function toOrgScope(scope: Scope): Scope {
 const CROSS_SCOPE_NAV_URL: Partial<Record<Level, Record<string, (scope: Scope) => string>>> = {
   projects: {
     'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
+    'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
   components: {
     'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
     'proj-cd-pipelines': (scope) => buildUrl(broaden(scope)!, 'admin/cd-pipelines'),
+    'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
 };
 
