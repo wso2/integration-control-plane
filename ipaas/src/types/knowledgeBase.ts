@@ -18,7 +18,8 @@
 
 /**
  * A RAG knowledge base: a vector store, an embedding model and a chunking
- * configuration, served by a KB Service deployed to the production environment.
+ * configuration, served by a KB Service deployed to `environment`, the one the
+ * BFF runs knowledge bases in.
  * `config` holds the settings exactly as the service reads them
  * (`VECTORDB_PROVIDER`, `COLLECTION_NAME`, …); secret values never leave the
  * BFF, so only their names are known.

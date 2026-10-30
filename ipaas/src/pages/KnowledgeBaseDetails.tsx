@@ -280,6 +280,7 @@ function ConfigurationTab({ kb }: { kb: KnowledgeBase }): JSX.Element {
           {update.error.message}
         </Alert>
       )}
+      <Alert severity="warning">Saving restarts the knowledge base service and every data source of this knowledge base, so they pick up the new settings.</Alert>
       <Stack gap={2.5} sx={{ maxWidth: 560 }}>
         <TextField label="Display Name" required fullWidth size="small" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
         <TextField label="Description" fullWidth size="small" multiline minRows={2} value={description} onChange={(e) => setDescription(e.target.value)} />

@@ -97,11 +97,19 @@ const REPO_METADATA_EMPTY: RepoMetadata = {
   isSubPathEmpty: true,
 };
 
+export function toRepository(repo: Partial<Repository> | null | undefined): Repository | null {
+  if (!repo?.organizationApp || !repo.nameApp) return null;
+  return repo as Repository;
+}
+
 // BFF ComponentRepository fields map 1:1 to Repository; projectName scopes
-// the lookup to the component within the caller's namespace.
+// the lookup to the component within the caller's namespace. Repo-less
+// components (knowledge base services, proxies) answer with an object that
+// lacks the org and repo name, which is no repository at all.
 export async function fetchComponentRepository(projectId: string, componentHandler: string): Promise<Repository | null> {
   try {
-    return (await bff.get<Repository | null>(`/components/${seg(componentHandler)}/repository${q({ projectName: projectId })}`)) ?? null;
+    const repo = await bff.get<Partial<Repository> | null>(`/components/${seg(componentHandler)}/repository${q({ projectName: projectId })}`);
+    return toRepository(repo);
   } catch {
     return null;
   }
