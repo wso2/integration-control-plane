@@ -29,6 +29,8 @@ import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationError
 const NUMERIC_TYPES = ['number', 'int', 'float', 'decimal', 'byte'];
 const REQUIRED_FIELD_ERROR = 'This field is required';
 const REQUIRED_MULTI_VALUE_ERROR = 'At least one value is required';
+export const POSITIONAL_GAP_ERROR = 'Enter a value: arguments are passed in order, and a later one has a value';
+export const AFTER_REPEATED_ERROR = 'Enter a value: an earlier argument takes a list, which would otherwise give its last value to this one';
 
 export const isNumericType = (type: string): boolean => NUMERIC_TYPES.includes(type);
 
@@ -60,12 +62,14 @@ function getFormInputType(arg: RuntimeArgument): FormInputType {
 }
 
 /**
- * A field is required when explicitly flagged, OR when it has no `prefix` — an
- * arg without a prefix is positional, so a value must always be supplied.
+ * A field is required when explicitly flagged, OR when it has no `prefix` and does not
+ * say otherwise — an arg without a prefix is positional, so a value must be supplied
+ * unless the schema marks it `required: false` (a parameter with a default, which the
+ * program fills in when trailing values are left out).
  */
 function isFieldRequired(arg: RuntimeArgument): boolean {
   if (arg.required === true) return true;
-  if (!arg.prefix) return true;
+  if (!arg.prefix) return arg.required !== false;
   return false;
 }
 
@@ -139,6 +143,35 @@ export function validateRequiredFields(formFields: FormField[], formData: Dynami
   return errors;
 }
 
+/**
+ * Positional arguments bind by position, so an empty one before a filled one would hand
+ * the later value to the wrong parameter. That holds for a nilable argument too: nil
+ * cannot be passed by position. Flags every such gap; `trailingValues` says values
+ * follow the declared arguments.
+ *
+ * A repeated argument takes every value except one for each positional parameter after
+ * it, filled or not (Ballerina's CliSpec). So it may be empty mid-list, leaving the values
+ * to the parameters after it; but once it has values, each parameter after it needs one,
+ * or the list's last value is bound to it instead.
+ */
+export function validatePositionalOrder(runtimeArguments: RuntimeArgument[], formData: DynamicFormData, trailingValues = false): DynamicFormValidationErrors {
+  const errors: DynamicFormValidationErrors = {};
+  const positional = runtimeArguments.filter((arg) => !arg.prefix);
+  const filled = positional.map((arg) => hasNonEmptyValue(formData[arg.name]));
+  let laterFilled = trailingValues;
+  for (let i = positional.length - 1; i >= 0; i -= 1) {
+    if (!filled[i] && laterFilled && !positional[i].repeat) errors[positional[i].name] = POSITIONAL_GAP_ERROR;
+    if (filled[i]) laterFilled = true;
+  }
+  const firstFilledRepeat = positional.findIndex((arg, i) => arg.repeat && filled[i]);
+  if (firstFilledRepeat >= 0) {
+    positional.slice(firstFilledRepeat + 1).forEach((arg, offset) => {
+      if (!arg.repeat && !filled[firstFilledRepeat + 1 + offset]) errors[arg.name] ??= AFTER_REPEATED_ERROR;
+    });
+  }
+  return errors;
+}
+
 export function hasAnyFormData(formData: DynamicFormData): boolean {
   return Object.keys(formData).length > 0 && Object.values(formData).some((value) => hasNonEmptyValue(value));
 }
@@ -160,7 +193,8 @@ function pushArgument(out: TriggerArgument[], arg: RuntimeArgument, stringValue:
  * Serialize the dynamic-form state into the run-pod `args` payload. A checked boolean
  * emits its prefix (flag) or, with no prefix, its literal value; an unchecked one emits
  * nothing. Repeated args emit one entry per non-empty value; everything else follows the
- * prefix/delimiter rules above. Empty values are skipped.
+ * prefix/delimiter rules above. Empty values are skipped, so the form must first pass
+ * validatePositionalOrder: then only trailing positional values can be empty.
  */
 export function buildExecutionArgumentsFromForm(runtimeArguments: RuntimeArgument[], formData: DynamicFormData): TriggerArgument[] {
   const structured: TriggerArgument[] = [];
@@ -177,7 +211,8 @@ export function buildExecutionArgumentsFromForm(runtimeArguments: RuntimeArgumen
     }
 
     if (!arg.repeat) {
-      if (value === undefined || value === null || value === '') return;
+      // Blank counts as empty, as it does for validation.
+      if (value === undefined || value === null || String(value).trim() === '') return;
       pushArgument(structured, arg, String(value));
       return;
     }

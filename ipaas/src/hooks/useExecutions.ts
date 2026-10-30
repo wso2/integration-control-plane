@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { fetchExecutionConfigs, fetchTaskExecutions, fetchRuntimeArguments, fetchExecutionArguments, fetchExecutionLogs, fetchTaskExecutionCount, updateJobConfigs, stopSchedule, triggerTask, triggerComponentRun } from '../api/executions';
 import type { StopScheduleInput, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
@@ -48,11 +48,11 @@ export function useTaskExecutions(releaseId: string, componentId = '', envId = '
  * `retry: false` so a 404 (no schema for this component) surfaces promptly to the
  * caller, which treats it the same as an empty schema.
  */
-export function useRuntimeArguments(componentId: string, deploymentTrackId: string, commitHash: string, enabled = true) {
+export function useRuntimeArguments(componentId: string, deploymentTrackId: string, commitHash: string | undefined, enabled = true) {
   return useQuery<RuntimeArgument[]>({
     queryKey: ['runtimeArguments', componentId, deploymentTrackId, commitHash],
-    queryFn: () => fetchRuntimeArguments(componentId, deploymentTrackId, commitHash),
-    enabled: enabled && !!componentId && !!deploymentTrackId && !!commitHash,
+    // Undeployed, there is no commit to read the arguments at, so there is nothing to fetch.
+    queryFn: enabled && componentId && deploymentTrackId && commitHash ? () => fetchRuntimeArguments(componentId, deploymentTrackId, commitHash) : skipToken,
     retry: false,
     staleTime: 5 * 60 * 1000,
   });

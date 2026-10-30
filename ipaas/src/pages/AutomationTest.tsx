@@ -38,7 +38,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useExecutionArguments, useRuntimeArguments, useTaskExecutionCount, useTaskExecutions, useTriggerComponent } from '../hooks/useExecutions';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
-import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validateRequiredFields } from '../utils/runtimeArguments';
+import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validatePositionalOrder, validateRequiredFields } from '../utils/runtimeArguments';
 import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
 import { isTerminalStatus } from '../utils/executionStatus';
 import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, TaskExecution } from '../types/executions';
@@ -208,7 +208,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
 
   const handleRun = async () => {
     setRunError(null);
-    const errors = validateRequiredFields(formFields, formData);
+    const errors = { ...validatePositionalOrder(runtimeArguments, formData), ...validateRequiredFields(formFields, formData) };
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       setShowErrors(true);
