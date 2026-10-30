@@ -222,7 +222,7 @@ function SelectedTypeArtifacts({ artifacts, artifactType, envId, componentId, qu
           const showTracing = ['Endpoint', 'InboundEndpoint', 'MessageProcessor', 'Sequence'].includes(artifactType);
 
           return (
-            <Card key={i} variant="outlined" sx={{ cursor: 'pointer', width: '100%', '&:hover': { boxShadow: 1 } }} onClick={() => onSelect(a)}>
+            <Card key={i} sx={{ cursor: 'pointer', width: '100%', '&:hover': { boxShadow: 1 } }} onClick={() => onSelect(a)}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', py: 1.5, '&:last-child': { pb: 1.5 } }}>
                 <Grid container spacing={2} sx={{ flex: 1 }}>
                   {columns.map((col, colIndex) => {

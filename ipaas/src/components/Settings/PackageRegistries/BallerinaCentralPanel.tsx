@@ -129,7 +129,7 @@ export default function BallerinaCentralPanel({ onBack }: { onBack: () => void }
         </Stack>
       ) : (
         <Stack gap={3} sx={{ maxWidth: 640 }}>
-          <Card variant="outlined" sx={{ p: 3, borderRadius: 2 }}>
+          <Card sx={{ p: 3, borderRadius: 2 }}>
             <Stack direction="row" alignItems="center" gap={1} sx={{ color: 'success.main', mb: 3 }}>
               <CheckCircle2 size={20} />
               <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'success.main' }}>

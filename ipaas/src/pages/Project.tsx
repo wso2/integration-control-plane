@@ -86,7 +86,7 @@ import Authorized from '../components/Authorized';
 import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
 import { UUID_RE } from '../utils/string';
 import { isExternalRepoIntegration } from '../utils/projectRepo';
-import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_MAX_NEWLINES, clampDescription, isAtNewlineLimit } from '../utils/description';
+import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_MAX_NEWLINES, toSingleLineDescription } from '../utils/description';
 
 const Markdown = lazy(() => import('../components/Markdown'));
 
@@ -699,7 +699,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const [excludedExpanded, setExcludedExpanded] = useState(true);
   const [primaryAction, setPrimaryAction] = useState<'cloud' | 'integrator'>('cloud');
   useEffect(() => {
-    setDescValue(project?.description?.trim() ?? '');
+    setDescValue(toSingleLineDescription(project?.description?.trim() ?? ''));
   }, [project?.description]);
 
   if (loadingProject) {
@@ -766,7 +766,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
 
   const commitDescEdit = () => {
     const trimmed = descValue.trim();
-    const original = project.description?.trim() ?? '';
+    // Older descriptions may hold line breaks; compare one-line forms so a no-op is not saved.
+    const original = toSingleLineDescription(project.description?.trim() ?? '');
     if (trimmed === original) {
       setDescEditing(false);
       return;
@@ -784,7 +785,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   };
 
   const cancelDescEdit = () => {
-    setDescValue(project.description?.trim() ?? '');
+    setDescValue(toSingleLineDescription(project.description?.trim() ?? ''));
     setDescEditing(false);
   };
 
@@ -792,7 +793,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
     // Vertically centers the empty state for a fresh user's first landing on the auto-provisioned
     // project — the header is hidden in this state too, so this is the only content on the page,
     // and centering it reads as a deliberate welcome screen rather than content stuck at the top.
-    <PageContent sx={justProvisionedDefaultProject ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' } : undefined}>
+    <PageContent fullWidth sx={justProvisionedDefaultProject ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' } : undefined}>
       {/* Hidden for a fresh user's still-empty auto-provisioned project — the name/description/
           repo-link controls have nothing to act on yet and only add noise to the empty state. */}
       {!justProvisionedDefaultProject && (
@@ -851,10 +852,9 @@ export default function Project(scope: ProjectScope): JSX.Element {
                     {descEditing && (
                       <InputBase
                         inputRef={descInputRef}
-                        multiline
                         autoFocus
                         value={descValue}
-                        onChange={(e) => setDescValue(clampDescription(e.target.value))}
+                        onChange={(e) => setDescValue(toSingleLineDescription(e.target.value))}
                         onBlur={commitDescEdit}
                         onKeyDown={(e) => {
                           if (e.key === 'Escape') {
@@ -862,7 +862,11 @@ export default function Project(scope: ProjectScope): JSX.Element {
                             cancelDescEdit();
                             return;
                           }
-                          if (e.key === 'Enter' && isAtNewlineLimit(descValue)) e.preventDefault();
+                          // onBlur commits, so blurring saves once.
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            descInputRef.current?.blur();
+                          }
                         }}
                         inputProps={{ maxLength: DESCRIPTION_MAX_LENGTH }}
                         sx={(theme) => ({
@@ -874,7 +878,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
                           alignItems: 'flex-start',
                           // The ghost text below is line-clamped, so the box cannot grow with the input.
                           overflow: 'hidden',
-                          '& textarea': { ...theme.typography.body2, padding: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', overflowY: 'auto !important' },
+                          '& input': { ...theme.typography.body2, padding: 0, border: 'none', outline: 'none', background: 'transparent' },
                         })}
                         disabled={updateProject.isPending}
                         autoComplete="off"

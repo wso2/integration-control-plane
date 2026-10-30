@@ -34,7 +34,7 @@ export default function ComingSoon({ title = HEADING, description = 'This featur
   const navigate = useAppNavigate();
 
   return (
-    <PageContent sx={pageSx}>
+    <PageContent fullWidth sx={pageSx}>
       <Stack alignItems="center" gap={3} sx={textStackSx}>
         {/* Illustration: the wait itself — a dotted ring drifting round a clock whose second
             hand sweeps. Sized tight to the art so the text sits close beneath it. */}

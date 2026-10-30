@@ -111,7 +111,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
   return (
     <>
       {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
-      <PageContent>
+      <PageContent fullWidth>
         {/* The heading stays put through every state — loading, not-deployed, editor — so the
             page never reads as just a floating notice. Only the action is state-dependent. */}
         <PageTitle>

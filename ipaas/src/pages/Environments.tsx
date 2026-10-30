@@ -151,7 +151,7 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
   const paginated = filtered.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
         <PageTitle.Header>Environments</PageTitle.Header>
         <PageTitle.SubHeader>Deployment targets for integrations, shared by every project in this organization.</PageTitle.SubHeader>

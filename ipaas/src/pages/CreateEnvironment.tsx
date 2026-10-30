@@ -81,7 +81,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const canSubmit = !!name.trim() && !create.isPending && !create.isSuccess;
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(listUrl)} sx={{ mb: 2 }}>
         Back to Environments
       </Button>

@@ -83,7 +83,7 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
             <Stack gap={2}>
               <Alert severity="success">{PANEL_COPY.saveSuccessMessage}</Alert>
 
-              <Card variant="outlined" sx={{ p: 2.5, borderRadius: 1 }}>
+              <Card sx={{ p: 2.5, borderRadius: 1 }}>
                 <Stack direction="row" alignItems="center" gap={1} sx={{ color: 'success.main', mb: 2 }}>
                   <CheckCircle2 size={18} />
                   <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'success.main' }}>

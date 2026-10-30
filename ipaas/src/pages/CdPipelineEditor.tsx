@@ -39,7 +39,7 @@ export default function CdPipelineEditor(): JSX.Element {
 
   if (loadingEnvs || (isEdit && loadingPipelines)) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>
@@ -49,7 +49,7 @@ export default function CdPipelineEditor(): JSX.Element {
 
   if (envError || !envTemplates) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Alert
           severity="error"
           action={
@@ -67,7 +67,7 @@ export default function CdPipelineEditor(): JSX.Element {
   // failure here rather than letting it fall through to "Pipeline not found".
   if (isEdit && pipelinesError) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Alert
           severity="error"
           action={

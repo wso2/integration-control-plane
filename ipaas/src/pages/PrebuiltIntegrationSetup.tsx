@@ -115,7 +115,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
   if (!integration) {
     if (!fromState && isPrebuiltLoading) {
       return (
-        <PageContent sx={{ pt: 5 }}>
+        <PageContent fullWidth sx={{ pt: 5 }}>
           <Skeleton variant="rounded" width={220} height={36} sx={{ mb: 3 }} />
           <Skeleton variant="rounded" height={72} sx={{ mb: 4 }} />
           <Skeleton variant="rounded" height={360} />
@@ -123,7 +123,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
       );
     }
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={handleBack} sx={{ mb: 3, pl: 0 }}>
           Select a different integration
         </Button>
@@ -133,7 +133,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
   }
 
   return (
-    <PageContent sx={{ pt: 5, pb: 6 }}>
+    <PageContent fullWidth sx={{ pt: 5, pb: 6 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={handleBack} sx={{ mb: 3, pl: 0 }}>
         Select a different integration
       </Button>

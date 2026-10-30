@@ -129,7 +129,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 1, textTransform: 'none' }}>
         Back
       </Button>

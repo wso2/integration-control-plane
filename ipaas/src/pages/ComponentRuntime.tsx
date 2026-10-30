@@ -84,7 +84,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   if (isLoading) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>
@@ -94,7 +94,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   if (!comp) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography color="error">Integration not found.</Typography>
       </PageContent>
     );
@@ -102,7 +102,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   if (environmentsError) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography color="error">Failed to load environments. Please try again.</Typography>
       </PageContent>
     );
@@ -110,7 +110,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <PageContent>
+      <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Runtime
         </Typography>

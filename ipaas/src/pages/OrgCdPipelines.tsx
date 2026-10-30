@@ -47,7 +47,7 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
         <PageTitle.Header>Deployment Pipelines</PageTitle.Header>
         <PageTitle.SubHeader>Promotion paths across environments, available to every project in this organization.</PageTitle.SubHeader>

@@ -163,7 +163,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   if (loadingComponent) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -189,7 +189,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
       {tracks.length > 0 && <DeploymentTrackBar extra={envSelector} />}
 
-      <PageContent>
+      <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Test Console
         </Typography>

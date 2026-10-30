@@ -48,7 +48,7 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
   const currentPipelineIds = useMemo(() => (pipelines ?? []).map((p) => p.id), [pipelines]);
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <PageTitle>
           <PageTitle.Header>Deployment Pipeline</PageTitle.Header>

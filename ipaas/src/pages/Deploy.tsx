@@ -58,7 +58,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
 
   if (isLoading) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -66,7 +66,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
 
   if (!component) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography color="error">Failed to load component information.</Typography>
       </PageContent>
     );
@@ -97,7 +97,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   }
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Typography variant="h1" sx={{ mb: 4 }}>
         Deploy
       </Typography>

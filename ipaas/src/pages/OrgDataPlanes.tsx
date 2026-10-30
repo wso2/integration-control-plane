@@ -89,7 +89,7 @@ export default function OrgDataPlanes(_scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2} sx={{ mb: 3 }}>
         <PageTitle>
           <PageTitle.Header>Data Planes</PageTitle.Header>

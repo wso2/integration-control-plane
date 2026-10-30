@@ -298,7 +298,7 @@ export default function DeployEnvironmentCard({
 
   return (
     <>
-      <Card variant="outlined">
+      <Card>
         <CardContent sx={{ pb: showPromote ? 1 : undefined }}>
           <DeployEnvironmentCardHeader
             envName={env.name}

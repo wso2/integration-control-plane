@@ -191,7 +191,6 @@ export default function BuildArea({
   return (
     <>
       <Card
-        variant="outlined"
         sx={{
           width: 320,
           flexShrink: 0,

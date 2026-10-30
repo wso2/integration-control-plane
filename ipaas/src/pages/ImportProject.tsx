@@ -358,7 +358,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   );
 
   return (
-    <PageContent sx={{ pt: 5, '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
+    <PageContent fullWidth sx={{ pt: 5, '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgHomeUrl)} sx={{ mb: 2 }}>
         Back to Home
       </Button>

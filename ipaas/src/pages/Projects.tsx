@@ -40,7 +40,7 @@ function ProjectCard({ project, onClick, onSettingsClick }: { project: Project; 
   const deleting = project.deleting === true;
   return (
     <Tooltip title={deleting ? 'This project is being deleted' : ''}>
-      <Card variant="outlined" aria-disabled={deleting || undefined} sx={deleting ? styles.cardDeleting : styles.card} onClick={deleting ? undefined : onClick}>
+      <Card aria-disabled={deleting || undefined} sx={deleting ? styles.cardDeleting : styles.card} onClick={deleting ? undefined : onClick}>
         <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
           <Avatar variant="rounded" sx={{ bgcolor: 'action.hover', color: 'text.secondary', width: 48, height: 48, borderRadius: 1 }}>
             {project.name[0].toUpperCase()}
@@ -205,7 +205,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
     );
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
         <PageTitle.Header>
           <Stack direction="row" alignItems="center" gap={1}>

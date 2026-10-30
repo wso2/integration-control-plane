@@ -50,7 +50,7 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 2 }}>
         Back to Environments
       </Button>
@@ -92,7 +92,7 @@ export default function EditEnvironment(): JSX.Element {
 
   if (isLoading)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>
@@ -100,14 +100,14 @@ export default function EditEnvironment(): JSX.Element {
     );
   if (isError)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography>Failed to load environments</Typography>
       </PageContent>
     );
   const env = environments?.find((e) => e.id === envId);
   if (!env)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography>Environment not found</Typography>
       </PageContent>
     );

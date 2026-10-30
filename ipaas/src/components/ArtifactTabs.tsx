@@ -373,7 +373,7 @@ export function ProxyApiReference({ envId, componentId, artifactType, artifact }
 
   return (
     <Stack gap={2}>
-      <Card variant="outlined" sx={{ '& .MuiCardContent-root:last-child': { pb: 1.5 } }}>
+      <Card sx={{ '& .MuiCardContent-root:last-child': { pb: 1.5 } }}>
         <CardContent>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
             {info.serviceName}

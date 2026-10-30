@@ -35,7 +35,7 @@ export default function ProjectSettings({ org, project }: ProjectScope): JSX.Ele
 
   if (!isOrgPermissionsLoaded || isLoading)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Loading />
       </PageContent>
     );

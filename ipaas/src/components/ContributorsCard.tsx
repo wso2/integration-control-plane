@@ -27,7 +27,7 @@ export default function ContributorsCard({ projectId }: { projectId: string }): 
   if (!contributors || contributors.length === 0) return null;
 
   return (
-    <Card variant="outlined">
+    <Card>
       <CardContent>
         <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
           <Users size={20} aria-hidden="true" />

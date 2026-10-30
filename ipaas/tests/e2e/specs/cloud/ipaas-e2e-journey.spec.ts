@@ -251,10 +251,10 @@ test.describe('01 fixture project @smoke', () => {
     // The pipeline starts a run every half hour and a run lasts nearly an hour, so runs never share one.
     const project = activeProject();
 
-    // first(): an org with no projects also offers it in the empty state; the form's submit shares the name but lives on the next page.
+    // first(): an org with no projects also offers it in the empty state, so first() picks one.
     await page.getByRole('button', { name: 'Create Project', exact: true }).first().click();
-    await page.getByRole('textbox', { name: 'Project Name' }).fill(project);
-    await page.getByRole('button', { name: 'Create Project', exact: true }).click();
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill(project);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     const landed = await page
       .getByRole('heading', { name: project })

@@ -89,7 +89,7 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 1, textTransform: 'none' }}>
         Back
       </Button>

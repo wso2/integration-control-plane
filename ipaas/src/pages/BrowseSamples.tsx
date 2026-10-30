@@ -116,7 +116,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (isSamplesLoading) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -124,7 +124,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (isSamplesError) {
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
           Back
         </Button>
@@ -135,7 +135,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (createComponent.isPending || createComponent.isSuccess || createComponent.isError) {
     return (
-      <PageContent sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label="Integration"
           subLabel={deployingSample?.displayName}
@@ -153,7 +153,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
   }
 
   return (
-    <PageContent sx={{ pt: 5 }}>
+    <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
         Back
       </Button>

@@ -168,7 +168,7 @@ export default function ProjectOverview({ org, project }: ProjectScope): JSX.Ele
   const { project: data, isLoading } = useProjectId(project);
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <ProjectSettingsTabs active="project-overview" />
       {isLoading ? (
         <Stack gap={3} sx={{ maxWidth: 640 }} aria-busy="true" aria-label="Loading project settings">

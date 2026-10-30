@@ -168,7 +168,7 @@ export function sidebarItems(scope: Scope, currentResource: Resource | null): Si
 }
 
 export function newProjectUrl(scope: { org: string }): string {
-  return `/organizations/${scope.org}/projects/new`;
+  return `/organizations/${scope.org}/new`;
 }
 
 export function importProjectUrl(scope: { org: string }): string {

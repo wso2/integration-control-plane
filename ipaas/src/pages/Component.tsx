@@ -145,7 +145,7 @@ export default function Component(scope: ComponentScope): JSX.Element {
         {/* Deployment track bar */}
 
         {/* <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}> */}
-        <PageContent>
+        <PageContent fullWidth>
           {/* Component header */}
           {!hasCustomOverview && (
             <HeaderShell

@@ -178,7 +178,7 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
 
   if (environments.length === 0) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <EmptyListing icon={<ScrollText size={48} />} title="No environments available" description="No deployment environments were found for this project. Deploy your integration first." />
       </PageContent>
     );

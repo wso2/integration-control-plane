@@ -47,6 +47,11 @@ export function toProjectHandler(name: string, maxLength: number): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/** `handler` with a `-xxxxx` suffix, trimmed so the result still fits in `maxLength`. */
+export function withRandomSuffix(handler: string, maxLength: number, suffix: string = Math.random().toString(36).slice(2, 7)): string {
+  return `${handler.substring(0, maxLength - suffix.length - 1).replace(/-+$/, '')}-${suffix}`;
+}
+
 export const generateUUID = (): string => crypto.randomUUID();
 
 /** Truncate to `max` characters, appending an ellipsis when it was longer. */

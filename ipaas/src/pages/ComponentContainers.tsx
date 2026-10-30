@@ -68,7 +68,7 @@ export default function ComponentContainers({ org, project, component }: Compone
   return (
     <Box>
       {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
-      <PageContent>
+      <PageContent fullWidth>
         <PageTitle>
           <PageTitle.Header>Containers</PageTitle.Header>
         </PageTitle>

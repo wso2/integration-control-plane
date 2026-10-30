@@ -164,7 +164,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
   };
 
   return (
-    <Card variant="outlined" sx={{ mb: 3 }}>
+    <Card sx={{ mb: 3 }}>
       <CardContent>
         <Stack direction="row" alignItems="center" gap={2} sx={{ mb: 1.5 }}>
           <Typography variant="h6">{env.name}</Typography>

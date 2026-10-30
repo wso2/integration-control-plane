@@ -69,7 +69,7 @@ export default function ByoiBuildArea({ componentId, versionId, orgHandler, orgU
 
   return (
     <>
-      <Card variant="outlined" sx={{ width: 320, flexShrink: 0, position: 'sticky', top: 24, alignSelf: 'flex-start', background: 'transparent' }}>
+      <Card sx={{ width: 320, flexShrink: 0, position: 'sticky', top: 24, alignSelf: 'flex-start', background: 'transparent' }}>
         <CardContent>
           <Typography variant="h4" component="h2" sx={{ mb: 2 }}>
             Set Up

@@ -644,7 +644,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
   if (!isPublicRepo && (authStatus === 'authenticating' || authStatus === 'installing')) {
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 3 }}>
           Back
         </Button>
@@ -679,7 +679,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                 ? 'MCP Server'
                 : 'Integration as API';
     return (
-      <PageContent sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label={integrationLabel}
           isPending={createComponent.isPending}
@@ -695,7 +695,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   // Main form
 
   return (
-    <PageContent sx={{ pt: 5 }}>
+    <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 3 }}>
         Back
       </Button>
