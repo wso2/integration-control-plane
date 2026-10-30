@@ -289,8 +289,8 @@ export interface ContextEngineProgress {
   sources: SourceProgress[];
 }
 
-/** One word for where a source is in the pipeline, derived from its progress. */
-export type SourceProgressStatus = 'waiting' | 'reading' | 'processing' | 'indexing' | 'processed' | 'attention';
+/** One word for where a source is in the pipeline, derived from its progress. `empty` is a source whose work is done but holds no record: every record was deleted, or the sync delivered nothing. */
+export type SourceProgressStatus = 'waiting' | 'reading' | 'processing' | 'indexing' | 'processed' | 'attention' | 'empty';
 
 /** Roll-up of every source's progress, for headers and the listing. */
 export interface ContextEngineProgressSummary {
@@ -302,7 +302,7 @@ export interface ContextEngineProgressSummary {
   active: number;
   /** Of the active sources, those whose connector is still reading, so their totals are not final. */
   reading: number;
-  /** Sources that have not received anything yet. */
+  /** Sources with nothing stored: nothing received yet, or every record removed. */
   waiting: number;
   /** Sources the caller cannot see progress for. */
   hidden: number;

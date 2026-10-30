@@ -574,7 +574,9 @@ export function formatProgressPercent(percent: number): string {
 /**
  * Where a source is in the pipeline. A connector that is still reading wins over
  * queued work, queued work wins over indexing, and a source that finished with
- * failed or quarantined items needs attention.
+ * failed or quarantined items needs attention. A source whose work is all done
+ * but holds no record is empty, not processed: "Processed" would say it holds
+ * content it does not, for example after every uploaded file was deleted.
  */
 export function sourceProgressStatus(p: SourceProgress): SourceProgressStatus {
   if (p.reading.state === 'reading') return 'reading';
@@ -582,6 +584,7 @@ export function sourceProgressStatus(p: SourceProgress): SourceProgressStatus {
   if (p.indexing.state === 'ok' && (p.indexing.indexing ?? 0) > 0) return 'indexing';
   if (p.reading.state === 'idle' && p.processing.total === 0 && p.records.active === 0) return 'waiting';
   if (p.processing.failed > 0 || p.records.quarantined > 0 || (p.indexing.state === 'ok' && (p.indexing.failed ?? 0) > 0)) return 'attention';
+  if (p.records.active === 0) return 'empty';
   return 'processed';
 }
 
@@ -601,7 +604,7 @@ export function isEngineProgressActive(progress: ContextEngineProgress | undefin
  */
 export function sourceProgressValue(p: SourceProgress): number | null {
   const status = sourceProgressStatus(p);
-  if (status === 'waiting') return 0;
+  if (status === 'waiting' || status === 'empty') return 0;
   if (status === 'reading') return null;
   if (status === 'indexing') return p.indexing.percent ?? 0;
   return p.processing.percent ?? 100;
@@ -609,7 +612,10 @@ export function sourceProgressValue(p: SourceProgress): number | null {
 
 /** Item counts under a source's bar, e.g. "540 of 1,200 items processed · 2 failed · 538 records stored" ("so far" while still reading). */
 export function sourceProgressDetail(p: SourceProgress): string {
-  if (sourceProgressStatus(p) === 'waiting') return 'No sync has started yet. Items appear here once the connector delivers them.';
+  const status = sourceProgressStatus(p);
+  if (status === 'waiting') return 'No sync has started yet. Items appear here once the connector delivers them.';
+  // The item counts would still show the deletes as processed work, which reads as if content were stored.
+  if (status === 'empty') return p.records.deleted > 0 ? 'All records were deleted. Nothing is stored.' : 'Nothing is stored. The latest sync delivered nothing.';
   const { total, succeeded, failed } = p.processing;
   const parts: string[] = [];
   if (total > 0) parts.push(`${(succeeded + failed).toLocaleString('en-US')} of ${plural(total, 'item')} processed${p.reading.state === 'reading' ? ' so far' : ''}`);
@@ -681,7 +687,7 @@ export function summarizeEngineProgress(sourceIds: string[], progress: SourcePro
     }
     const status = sourceProgressStatus(p);
     if (status === 'processed' || status === 'attention') sum.processed += 1;
-    else if (status === 'waiting') sum.waiting += 1;
+    else if (status === 'waiting' || status === 'empty') sum.waiting += 1;
     else sum.active += 1;
     if (status === 'reading') sum.reading += 1;
     delivered += p.processing.total;

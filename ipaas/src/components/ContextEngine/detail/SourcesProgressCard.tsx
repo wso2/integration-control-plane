@@ -87,7 +87,7 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
   const notice = sourceFailureNotice(progress);
   return (
     <Box sx={sourceProgressBodySx}>
-      {status !== 'waiting' && (
+      {status !== 'waiting' && status !== 'empty' && (
         <LinearProgress
           variant={value === null ? 'indeterminate' : 'determinate'}
           value={value ?? undefined}

@@ -636,6 +636,7 @@ export const SOURCE_PROGRESS_LABEL: Record<SourceProgressStatus, string> = {
   indexing: 'Indexing',
   processed: 'Processed',
   attention: 'Processed with errors',
+  empty: 'Nothing stored',
 };
 
 export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'info' | 'success' | 'warning'> = {
@@ -645,6 +646,7 @@ export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'inf
   indexing: 'info',
   processed: 'success',
   attention: 'warning',
+  empty: 'default',
 };
 
 /** Progress polling: quick while any source is moving, slow otherwise so a sync started elsewhere still shows up. */
