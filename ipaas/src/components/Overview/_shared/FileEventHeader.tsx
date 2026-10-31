@@ -18,14 +18,14 @@
 
 import { Button, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { GitCommit, RefreshCw, RotateCw, Square } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import type { CustomHeaderProps } from '../../../types/integration';
 import StatusDot from './StatusDot';
 import ConfigureButton from './ConfigureButton';
-import { hasMissingRequiredConfigs } from './configStatus';
+import { useMissingRequiredConfigs } from './configStatus';
 // Transitional: legacy ConfigureDrawer (defaults to the generic-service form
 // when `isAutomation` is absent) until its genericisation in phase 4.5.
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
@@ -69,7 +69,7 @@ export default function FileEventHeader({
   // Switch the Configure button to "Configure to Continue" when the schema has
   // required configs without values (devant: `hasAllRequiredConfigs`).
   const { data: schemaConfig } = useSchemaConfig(projectId, component.id, envTemplateId, versionId, deployedCommitSha);
-  const missingConfigs = useMemo(() => hasMissingRequiredConfigs(schemaConfig), [schemaConfig]);
+  const missingConfigs = useMissingRequiredConfigs(schemaConfig, projectId, component.id, envTemplateId);
 
   const handleStop = () => {
     stopMutation.mutate(

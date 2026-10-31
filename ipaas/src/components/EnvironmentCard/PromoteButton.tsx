@@ -16,9 +16,11 @@
  * under the License.
  */
 
-import { Button, Tooltip } from '@wso2/oxygen-ui';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowDown } from '@wso2/oxygen-ui-icons-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useResourceLinks } from '../../hooks/useConfiguration';
+import { promoteWithoutValues } from '../../utils/resourceLinks';
 import { useComponentDeployment } from '../../hooks/useDeployments';
 import { usePromote } from '../../hooks/useDeployments';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
@@ -27,6 +29,7 @@ import { Permissions } from '../../constants/permissions';
 
 interface PromoteButtonProps {
   orgHandler: string;
+  projectId: string;
   componentId: string;
   versionId: string;
   deploymentPipelineId: string;
@@ -37,21 +40,26 @@ interface PromoteButtonProps {
   onPromoteSettled?: () => void;
 }
 
-export default function PromoteButton({ orgHandler, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled }: PromoteButtonProps) {
+export default function PromoteButton({ orgHandler, projectId, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
+  const { data: links = [] } = useResourceLinks(projectId, componentId, true);
+  const [confirming, setConfirming] = useState(false);
+  const withoutValues = promoteWithoutValues(links, sourceEnvId, targetEnvId);
 
   const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
   const sourceReleaseId = sourceDeployment?.releaseId;
-  const alreadyPromoted = !deploymentsLoading && !!buildId && buildId === targetDeployment?.build?.buildId;
+  // The release, not the build: a ComponentType update gives the same build a new release.
+  const alreadyPromoted = !deploymentsLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
 
   const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted;
 
   const handlePromote = () => {
+    setConfirming(false);
     if (!canPromote || !sourceReleaseId) return;
     onPromoteStarted?.();
     promote.mutate(
@@ -74,11 +82,27 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
     <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
       <Tooltip title={tooltipTitle}>
         <span>
-          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || promote.isPending} onClick={handlePromote}>
+          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || promote.isPending} onClick={() => (withoutValues.length > 0 ? setConfirming(true) : handlePromote())}>
             {promote.isPending ? 'Promoting…' : 'Promote'}
           </Button>
         </span>
       </Tooltip>
+      <Dialog open={confirming} onClose={() => setConfirming(false)}>
+        <DialogTitle>Promote to {targetEnvId}?</DialogTitle>
+        <DialogContent>
+          {withoutValues.map((r) => (
+            <Typography key={r} variant="body2">
+              {r} has no values in {targetEnvId}. It won&apos;t start there until you add them on WSO2 Cloud.
+            </Typography>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirming(false)}>Cancel</Button>
+          <Button variant="contained" onClick={handlePromote}>
+            Promote
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Authorized>
   );
 }

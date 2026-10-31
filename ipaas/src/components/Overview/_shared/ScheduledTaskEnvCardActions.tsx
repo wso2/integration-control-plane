@@ -18,14 +18,13 @@
 
 import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
-import { useMemo } from 'react';
 import type { ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useExecutionConfigs, useTriggerComponent } from '../../../hooks/useExecutions';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
-import { hasMissingRequiredConfigs } from './configStatus';
+import { useMissingRequiredConfigs } from './configStatus';
 import NextRunLabel from '../../NextRunLabel';
 import ScheduleButton from './ScheduleButton';
 
@@ -52,7 +51,7 @@ export default function EnvCardActions({
 
   const { data: scheduleConfig } = useExecutionConfigs(component.id, releaseId, env.id);
   const { data: schemaConfig } = useSchemaConfig(projectId, component.id, envTemplateId, versionId, deployedCommitSha);
-  const missingConfigs = useMemo(() => hasMissingRequiredConfigs(schemaConfig), [schemaConfig]);
+  const missingConfigs = useMissingRequiredConfigs(schemaConfig, projectId, component.id, envTemplateId);
 
   // Automation's Run/Schedule are always disabled while a build is in progress.
   const buildDisabled = !!isBuildInProgress;

@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ResourceLink, ResourceLinkEnvironment } from '../types/configuration';
-import { type LinkRow, linkRows, linkedConfigurables } from './resourceLinks';
+import { type LinkRow, linkRows, linkedConfigurables, promoteWithoutValues } from './resourceLinks';
 
 const env = (name: string, inRelease: boolean, hasValues: boolean, configurables: Record<string, string> = {}, state: ResourceLinkEnvironment['state'] = inRelease ? 'linked' : 'next_release'): ResourceLinkEnvironment => ({
   name,
@@ -131,5 +131,12 @@ describe('linkRows', () => {
     const declaration: ResourceLink = { resourceType: 'salesforce-desk', linked: false, sourceDefined: true, environments: [env('development', true, true), env('production', false, false)] };
     expect(linkRows([declaration], 'development')).toMatchObject([{ notes: ['declared in workload.yaml'], unlinked: false, noValues: false, canUnlink: false }]);
     expect(linkRows([declaration], 'production')).toMatchObject([{ notes: ['declared in workload.yaml'], unlinked: false, noValues: true, canUnlink: false }]);
+  });
+});
+
+describe('promoteWithoutValues', () => {
+  it('names what the source release delivers and the target has no values for', () => {
+    expect(promoteWithoutValues([sales, support], 'development', 'production')).toEqual(['salesforce-sales']);
+    expect(promoteWithoutValues([sales, support], 'staging', 'production')).toEqual([]);
   });
 });

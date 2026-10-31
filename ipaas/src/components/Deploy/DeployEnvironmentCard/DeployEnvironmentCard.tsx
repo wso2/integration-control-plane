@@ -356,6 +356,7 @@ export default function DeployEnvironmentCard({
                 <span>
                   <PromoteButton
                     orgHandler={orgHandler}
+                    projectId={projectId}
                     componentId={componentId}
                     versionId={versionId}
                     deploymentPipelineId={deploymentPipelineId}
