@@ -139,10 +139,12 @@ const toDeploymentPipeline = (p: BffDeploymentPipeline): DeploymentPipeline => (
  * freshly created environment is actually deployable — an environment that sits
  * outside every promotion path can never be promoted into.
  *
- * The insertion point is the chain's terminal environment: the one promoted *to*
- * but never *from*. A pipeline with no paths, or a branching chain with several
- * terminals, is left untouched — there is no single correct place to insert and
- * guessing would rewrite a topology someone built deliberately.
+ * The insertion point is the chain's terminal environment: the one with nothing to
+ * promote *to*. A single-environment pipeline is stored as that environment with an
+ * empty target list (`development → []`), so it is the terminal and its path gets the
+ * new target. A pipeline with no paths, or a branching chain with several terminals,
+ * is left untouched — there is no single correct place to insert and guessing would
+ * rewrite a topology someone built deliberately.
  *
  * Returns whether the pipeline was updated.
  */
@@ -155,12 +157,14 @@ export const appendEnvironmentToDefaultPipeline = async (envSlug: string): Promi
   const targets = new Set(paths.flatMap((p) => p.targetEnvironments));
   if (sources.has(envSlug) || targets.has(envSlug)) return false; // already in the chain
 
-  const terminals = [...targets].filter((t) => !sources.has(t));
+  const promotesOnward = new Set(paths.filter((p) => p.targetEnvironments.length > 0).map((p) => p.sourceEnvironment));
+  const terminals = [...new Set([...sources, ...targets])].filter((e) => !promotesOnward.has(e));
   if (terminals.length !== 1) return false;
+  const [terminal] = terminals;
 
-  await bff.put<BffDeploymentPipeline>(`/deploymentpipelines/${seg(pipeline.name)}`, {
-    promotionPaths: [...paths, { sourceEnvironment: terminals[0], targetEnvironments: [envSlug] }],
-  });
+  // A terminal that is a source has only empty-target paths: fill them in rather than add a second path for it.
+  const promotionPaths = sources.has(terminal) ? paths.map((p) => (p.sourceEnvironment === terminal ? { ...p, targetEnvironments: [envSlug] } : p)) : [...paths, { sourceEnvironment: terminal, targetEnvironments: [envSlug] }];
+  await bff.put<BffDeploymentPipeline>(`/deploymentpipelines/${seg(pipeline.name)}`, { promotionPaths });
   return true;
 };
 
