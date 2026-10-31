@@ -29,7 +29,7 @@ vi.mock('../../hooks/useExecutions', () => ({
 vi.mock('../../contexts/UnsavedChangesContext', () => ({ useUnsavedChanges: () => () => {}, useLeaveGuard: () => (proceed: () => void) => proceed() }));
 
 const execution = { id: 'job-abc123', startTime: '', completionTime: '', runId: 'run-1', revisionId: 'rev-1', failedReason: '', status: 'Succeeded' };
-const drawer = <ExecutionDrawer open execution={execution} onClose={() => {}} orgHandler="acme" projectHandler="default" componentHandler="task" projectId="default" componentId="task" releaseId="task-1" />;
+const drawer = <ExecutionDrawer open execution={execution} onClose={() => {}} orgHandler="acme" projectHandler="default" componentHandler="task" projectId="default" componentId="task" environmentId="development" releaseId="task-1" />;
 let unmount = () => {};
 afterEach(() => unmount());
 

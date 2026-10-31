@@ -289,6 +289,6 @@ describe('scheduled tasks by release', () => {
     get.mockResolvedValue({ items: [] });
     await fetchTaskExecutions('hello-next-r1', 'hello', 'development', 'proj');
     await fetchTaskExecutions('', 'hello', 'development', 'proj');
-    expect(get.mock.calls.map(([url]) => (url as string).split('?')[0])).toEqual(['/releases/hello-next-r1/executions/history', '/components/hello/environments/development/executions/history']);
+    expect(get.mock.calls.map(([url]) => (url as string).split('?')[0])).toEqual(['/components/hello/environments/development/releases/hello-next-r1/executions/history', '/components/hello/environments/development/executions/history']);
   });
 });

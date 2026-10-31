@@ -90,12 +90,12 @@ export function useTailscaleConfigMapDetails(projectId: string, environmentId: s
 }
 
 /** The devops release (app-environment) — used for the proxy's namespace. */
-export function useTailscaleRelease(projectId: string, componentId: string | undefined, releaseId: string | undefined) {
+export function useTailscaleRelease(projectId: string, componentId: string | undefined, environmentId: string, releaseId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery({
-    queryKey: [ROOT, 'release', orgUuid, projectId, componentId, releaseId],
-    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, releaseId!),
-    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId,
+    queryKey: [ROOT, 'release', orgUuid, projectId, componentId, environmentId, releaseId],
+    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, environmentId, releaseId!),
+    enabled: !!orgUuid && !!projectId && !!componentId && !!environmentId && !!releaseId,
   });
 }
 
@@ -216,7 +216,7 @@ export function useSaveAndDeployTailscale(projectId: string) {
       // 4. Mount any newly-created Secret/ConfigMap onto the proxy's main container.
       if (newSecretId || newConfigMapId) {
         await runStep('Mounting the configuration onto the proxy', async () => {
-          const release = await getReleaseById(orgUuid, projectId, componentId, releaseId, DEFAULT_TRACK);
+          const release = await getReleaseById(orgUuid, projectId, componentId, envId, releaseId, DEFAULT_TRACK);
           const container = mainContainer(release.containers);
           if (!container) return;
           if (newSecretId) {

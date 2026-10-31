@@ -44,7 +44,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   // in-progress deployment has no reachable `/mcp` endpoint yet, and a degraded one
   // (crash-looping, or never rendered) never will.
   const isDeploymentReady = hasDeployment && isDeploymentHealthy(deploymentStatusV2);
-  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, env.id, releaseId);
 
   // Default to the MCP-capable endpoint (tools are listed at `${baseUrl}/mcp`). The
   // user can still switch endpoints in the panel.

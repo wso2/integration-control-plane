@@ -47,13 +47,13 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const orgUuid = useOrgUuid() ?? '';
 
   // Per-env endpoints for the current release.
-  const { data: envEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const { data: envEndpoints = [] } = useEnvEndpoints(component.id, versionId, env.id, releaseId);
 
   // Previous-env deployment + endpoints, for the swagger contract comparison.
   const { data: prevEnvDeployment } = useComponentDeployment(prevEnv ? orgHandler : '', prevEnv ? orgUuid : '', prevEnv ? component.id : '', prevEnv ? versionId : '', prevEnv ? prevEnv.id : '');
   const prevEnvReleaseId = prevEnvDeployment?.releaseId ?? '';
   const prevEnabled = !!prevEnv && !!prevEnvReleaseId;
-  const { data: prevEnvEndpoints = [] } = useEnvEndpoints(prevEnabled ? component.id : '', prevEnabled ? versionId : '', prevEnabled ? prevEnvReleaseId : '');
+  const { data: prevEnvEndpoints = [] } = useEnvEndpoints(prevEnabled ? component.id : '', prevEnabled ? versionId : '', prevEnv?.id ?? '', prevEnabled ? prevEnvReleaseId : '');
 
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];

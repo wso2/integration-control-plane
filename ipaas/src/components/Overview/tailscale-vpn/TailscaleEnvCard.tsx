@@ -86,8 +86,8 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
   const existingConfigMap = useMemo(() => configMaps.find((c) => c.name === configMapName), [configMaps, configMapName]);
   const { data: configMapDetails } = useTailscaleConfigMapDetails(projectId, env.id, existingConfigMap?.ID);
   const { data: byoi } = useByoiEndpointsYaml(projectId, component.id, releaseId);
-  const { data: release } = useTailscaleRelease(projectId, component.id, releaseId);
-  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const { data: release } = useTailscaleRelease(projectId, component.id, env.id, releaseId);
+  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, env.id, releaseId);
 
   const endpointsYaml = byoi?.endpointYaml?.data ? safeAtob(byoi.endpointYaml.data) : '';
   const configYaml = configMapDetails?.data?.['config.yaml'];

@@ -53,7 +53,7 @@ function formatTime(ts: number): string {
 }
 
 export default function AgentChat({ projectId, componentId, versionId, releaseId, environmentName, envCritical, waitForConfig = false, variant = 'card', onConnectionChange }: AgentChatProps): ReactNode {
-  const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, releaseId);
+  const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, environmentName ?? '', releaseId);
 
   // Candidate chat endpoint: the first reachable one. (The `/chat` operation is
   // confirmed below only as a hint; the endpoint is still used when its operations

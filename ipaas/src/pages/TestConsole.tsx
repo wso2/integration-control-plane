@@ -82,7 +82,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   const releaseId = deployment?.releaseId ?? '';
 
   // Endpoints for the selected env + track
-  const { data: allEndpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
+  const { data: allEndpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', selectedTrackId, selectedEnvId, releaseId);
   const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflowIntegration(component));
 
   // Selected endpoint — derived rather than synced via an effect, since useApimSwagger below

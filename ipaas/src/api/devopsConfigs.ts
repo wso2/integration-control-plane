@@ -186,15 +186,6 @@ const stageFile = (fileName: string, data: { data?: Record<string, string> }, se
   pendingFiles.set(fileName, { content: data.data?.data ?? '', sensitive });
 };
 
-// Cloud has no release resource and no lookup route, so the env is recovered by matching release_name.
-interface BffReleaseBinding {
-  environment_id?: string;
-  release_name?: string;
-}
-// The history is per track, so the release is looked up within the track it belongs to.
-const envForRelease = (componentId: string, releaseId: string, deploymentTrackId: string): Promise<string> =>
-  bff.get<ListResponse<BffReleaseBinding>>(`/components/${seg(componentId)}/release-mgt-deployments${q({ deploymentTrackId })}`).then((r) => items(r).find((d) => d.release_name === releaseId)?.environment_id ?? '');
-
 // PUT the combined file mount, draining any staged content for this fileName.
 const putFile = (componentId: string, env: string, fileName: string, mountPath: string, secretIdSet: boolean, deploymentTrackId?: string): Promise<unknown> => {
   const staged = pendingFiles.get(fileName);
@@ -226,14 +217,12 @@ const listEnvGroups = async (env: string, deploymentTrackId?: string): Promise<B
 
 // ── release (real container data, keyed by the resolved env) ───────────────────
 
-// Cloud has no release distinct from an app-environment binding, so releaseId
-// resolves to an env via envForRelease. `ID` is aliased to that env on purpose —
+// Cloud has no release distinct from an app-environment binding, so the release is
+// read as the env's. The container's `ID` is aliased to the env on purpose —
 // downstream consumers address the container by env, not a real container id.
 // Other fields come straight from the BFF's Containers endpoint (same shape as
 // ReleaseContainer), except `name` falls back to the env only if BFF omits it.
-export const getReleaseById = async (_orgUuid: string, _projectId: string, componentId: string, releaseId: string, deploymentTrackId = ''): Promise<ReleaseDetails> => {
-  const env = await envForRelease(componentId, releaseId, deploymentTrackId);
-  if (!env) return { ID: releaseId, containers: [] };
+export const getReleaseById = async (_orgUuid: string, _projectId: string, componentId: string, env: string, releaseId: string, deploymentTrackId = ''): Promise<ReleaseDetails> => {
   setComponentForEnv(env, componentId, deploymentTrackId);
   const list = await bff.get<ListResponse<ReleaseContainer>>(`${filesBase(componentId, env)}/containers${q({ deploymentTrackId })}`).catch(() => null);
   const real = items(list)[0];

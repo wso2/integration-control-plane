@@ -84,7 +84,7 @@ export default function RagIngestionConfigureDrawer({ open, onClose, component, 
 
   const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(orgHandler, orgUuid, component.id, versionId, env.id);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release, isLoading: loadingRelease } = useRelease(projectId, component.id, releaseId, versionId);
+  const { data: release, isLoading: loadingRelease } = useRelease(projectId, component.id, env.id, releaseId, versionId);
   const containerId = useMemo(() => mainContainer(release?.containers)?.ID ?? '', [release]);
 
   const ctx: EditorContext = { projectId, componentId: component.id, releaseId, containerId, envId: env.id, deploymentTrackId: versionId };

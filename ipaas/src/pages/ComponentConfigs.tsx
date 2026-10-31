@@ -55,7 +55,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
 
   const { data: deployment } = useComponentDeployment(org, orgUuid ?? '', comp?.id ?? '', trackId, envId);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release } = useRelease(projectId, comp?.id, releaseId, trackId);
+  const { data: release } = useRelease(projectId, comp?.id, envId, releaseId, trackId);
   const containerId = useMemo(() => mainContainer(release?.containers)?.ID ?? '', [release]);
 
   const { data: mounts = [], isLoading: loadingMounts } = useContainerConfigMounts(projectId, comp?.id, releaseId, containerId, trackId);

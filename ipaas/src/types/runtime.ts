@@ -145,6 +145,7 @@ export interface PodConditionInfo {
 /** Everything the pod drawers need to query one pod and link back to its Integration. */
 export interface PodScope {
   projectId: string;
+  environmentId: string;
   releaseId: string;
   orgHandler: string;
   projectHandler: string;

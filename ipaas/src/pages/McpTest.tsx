@@ -59,7 +59,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   const { data: deployment } = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', component?.id ?? '', selectedTrackId, selectedEnv?.id ?? '');
   const releaseId = deployment?.releaseId ?? '';
-  const { data: endpoints = [] } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
+  const { data: endpoints = [] } = useEnvEndpoints(component?.id ?? '', selectedTrackId, selectedEnv?.id ?? '', releaseId);
 
   const testableEndpoints = useMemo(() => endpoints.filter((e) => e.publicUrl), [endpoints]);
   const [selectedEndpointId, setSelectedEndpointId] = useState('');

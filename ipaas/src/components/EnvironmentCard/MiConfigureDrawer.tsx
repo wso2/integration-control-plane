@@ -75,7 +75,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const showEndpoints = endpointsEnabled && isDeployed;
   const lastStep = showEndpoints ? 2 : 1;
   const { data, isLoading, isError, refetch } = useMiConfig(projectId, componentId, envId, open && isDeployed);
-  const { data: endpoints = [] } = useEnvEndpoints(open && showEndpoints ? componentId : '', open && showEndpoints ? versionId : '', open && showEndpoints && releaseId ? releaseId : '');
+  const { data: endpoints = [] } = useEnvEndpoints(open && showEndpoints ? componentId : '', open && showEndpoints ? versionId : '', envId, open && showEndpoints && releaseId ? releaseId : '');
   const save = useSaveMiConfig(projectId, componentId, envId);
   const [step, setStep] = useState(1);
   const [envVars, setEnvVars] = useState<Row[]>([]);

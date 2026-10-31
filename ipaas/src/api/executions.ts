@@ -122,7 +122,7 @@ interface BffExecutionHistoryPage {
 // A release belongs to one deployment track, so reading by release lists that track's runs only.
 export const fetchTaskExecutions = async (releaseId: string, componentId = '', envId = '', _projectId = ''): Promise<TaskExecution[]> => {
   if (!componentId || !envId) return [];
-  const base = releaseId ? `/releases/${seg(releaseId)}/executions/history` : `/components/${seg(componentId)}/environments/${seg(envId)}/executions/history`;
+  const base = `/components/${seg(componentId)}/environments/${seg(envId)}${releaseId ? `/releases/${seg(releaseId)}` : ''}/executions/history`;
 
   const all: TaskExecution[] = [];
   let before: string | undefined;
@@ -304,12 +304,12 @@ export const stopSchedule = (input: StopScheduleInput): Promise<void> => bff.pos
 export const triggerTask = (_input: TriggerTaskInput): Promise<{ status: string; message: string; successCount: number; failedCount: number; details: string[] }> =>
   Promise.resolve({ status: 'skipped', message: 'Task triggering is not supported in this build.', successCount: 0, failedCount: 0, details: [] });
 
-// POST /components/{name}/releases/{releaseId}/executions — BFF resolves the env.
+// POST /components/{name}/environments/{env}/releases/{releaseId}/executions.
 // The BFF takes positional string args; map the name/value pairs to their values.
 // OpenChoreo does not return a run id from this endpoint, so runId is null.
 export const triggerComponentRun = (input: TriggerComponentInput): Promise<TriggerRunResult> =>
   bff
-    .post(`/components/${seg(input.componentId)}/releases/${seg(input.releaseId)}/executions`, {
+    .post(`/components/${seg(input.componentId)}/environments/${seg(input.environmentId)}/releases/${seg(input.releaseId)}/executions`, {
       args: (input.args ?? []).map((a) => a.argument_value),
     })
     .then(() => ({ runId: null }));

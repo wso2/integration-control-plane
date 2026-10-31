@@ -117,7 +117,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const scopeId = releaseId ? `${componentId}|${releaseId}|${environmentId}` : '';
 
   // The selected track's release, so the endpoint is the one deployed on that track.
-  const endpoints = useEnvEndpoints(componentId, trackId, releaseId);
+  const endpoints = useEnvEndpoints(componentId, trackId, environmentId, releaseId);
   const resolution = useMemo(() => resolveWorkflowEndpoint(endpoints.data ?? []), [endpoints.data]);
   const endpoint = resolution.status === 'ready' ? resolution.endpoint : null;
   const endpointName = endpoint?.id ?? '';

@@ -39,7 +39,7 @@ import { ENV_CARD_INSIGHTS_ENABLED } from '../../../constants/insights';
  * insights (the workflow body's definitions and figures).
  */
 export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2, children }: EnvCardBodyProps & { children?: ReactNode }): ReactNode {
-  const { data: allEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const { data: allEndpoints = [] } = useEnvEndpoints(component.id, versionId, env.id, releaseId);
   const envEndpoints = useUserVisibleEndpoints(allEndpoints, isWorkflowIntegration(component));
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];

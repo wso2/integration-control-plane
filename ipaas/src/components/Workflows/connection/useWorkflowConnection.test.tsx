@@ -53,7 +53,7 @@ const tokens = vi.hoisted(() => ({ next: ['user-token-1'] as string[] }));
 
 vi.mock('../../../auth', () => ({ getAccessToken: vi.fn(async () => tokens.next.shift() ?? 'user-token-last') }));
 vi.mock('../../../hooks/useDeployments', () => ({
-  useEnvEndpoints: (_componentId: string, _trackId: string | undefined, releaseId: string) => {
+  useEnvEndpoints: (_componentId: string, _trackId: string | undefined, _environmentId: string, releaseId: string) => {
     endpoints.releaseIds.push(releaseId);
     return releaseId ? { data: endpoints.list, isPending: false, isError: false, refetch: vi.fn() } : { data: undefined, isPending: true, isError: false, refetch: vi.fn() };
   },

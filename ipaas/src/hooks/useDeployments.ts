@@ -76,14 +76,13 @@ export function useComponentDeployments(orgHandler: string, orgUuid: string, com
   });
 }
 
-export function useEnvEndpoints(componentId: string, versionId: string | undefined, releaseId: string) {
+export function useEnvEndpoints(componentId: string, versionId: string | undefined, environmentId: string, releaseId: string) {
   return useQuery({
-    queryKey: ['envEndpoints', componentId, versionId, releaseId],
-    queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
-    // The cloud endpoint request is release-scoped and does not use versionId. Newly created
-    // OpenChoreo components currently carry an empty version, so requiring it here prevents the
-    // request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
-    enabled: !!componentId && !!releaseId,
+    queryKey: ['envEndpoints', componentId, versionId, environmentId, releaseId],
+    queryFn: () => fetchEnvEndpoints(componentId, versionId, environmentId, releaseId),
+    // Newly created OpenChoreo components currently carry an empty version, so requiring it here
+    // prevents the request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
+    enabled: !!componentId && !!environmentId && !!releaseId,
     staleTime: 30_000,
     retry: false,
     refetchInterval: (query) => {
@@ -239,7 +238,7 @@ export function useStopDeployment() {
 export function useRedeployDeployment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: { orgHandler: string; componentId: string; releaseId: string; type: string; releaseMgtReleaseId?: string; releaseMgtDeploymentId?: string }) => redeployDeployment(input),
+    mutationFn: (input: { orgHandler: string; componentId: string; environmentId: string; releaseId: string; type: string; releaseMgtReleaseId?: string; releaseMgtDeploymentId?: string }) => redeployDeployment(input),
     onSuccess: () => {
       trackEvent('component-deploy');
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });

@@ -79,7 +79,7 @@ export default function EnvCardActions({
 
   const handleTest = () => {
     triggerRun.mutate(
-      { orgHandler, projectId, componentId: component.id, releaseId, args: [] },
+      { orgHandler, projectId, componentId: component.id, environmentId: env.id, releaseId, args: [] },
       {
         onSuccess: () => {
           onNotify({ text: 'Execution triggered successfully', severity: 'success' });
