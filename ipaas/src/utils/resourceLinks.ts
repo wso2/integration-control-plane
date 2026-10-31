@@ -64,7 +64,7 @@ export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
     const notes: string[] = [];
     if (l.declared) notes.push('declared in workload.yaml');
     else if (!l.linked) notes.push("not linked · this environment's release still delivers it");
-    else if (!l.connection) notes.push('linked from WSO2 Cloud under its own key names');
+    else if (!l.connection) notes.push(e?.earlierNames ? 'linked from WSO2 Cloud · still delivered under its earlier names until the next release' : 'linked from WSO2 Cloud under its own key names');
     else if (ahead) notes.push(`through ${e.connection}`, `now goes through ${l.connection}; ${l.environments[0]?.name === env ? 'next build' : 'next release'}`);
     else notes.push(`through ${l.connection}`);
     if ((l.linked || l.declared) && e && !e.inRelease) notes.push('next release');

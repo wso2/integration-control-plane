@@ -74,6 +74,16 @@ describe('linkRows', () => {
     expect(linkRows([cloudLink], 'development')).toEqual([{ resourceType: 'orders-db', notes: ['linked from WSO2 Cloud under its own key names'], canUnlink: true }]);
   });
 
+  it('says where a link made on WSO2 Cloud is still delivered under its earlier names', () => {
+    const renamed: ResourceLink = {
+      resourceType: 'salesforce-pilot',
+      linked: true,
+      environments: [env('development', true, true), { ...env('production', true, true, { 'wso2.sfdemo.sfDeskBaseUrl': 'BASE_URL' }), earlierNames: true }],
+    };
+    expect(linkRows([renamed], 'development')[0].notes).toEqual(['linked from WSO2 Cloud under its own key names']);
+    expect(linkRows([renamed], 'production')[0].notes).toEqual(['linked from WSO2 Cloud · still delivered under its earlier names until the next release']);
+  });
+
   it("names the release's connection while the link is ahead of it, and when each environment gets the link's", () => {
     expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'now goes through wso2.sfdemo.sfCrm; next build'], canUnlink: true }]);
     expect(linkRows([ahead], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'now goes through wso2.sfdemo.sfCrm; next release']);

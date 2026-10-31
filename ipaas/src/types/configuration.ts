@@ -157,6 +157,8 @@ export interface ResourceLinkEnvironment {
   hasValues: boolean;
   connectionInBuild: boolean;
   connection?: string;
+  /** For a link without a connection: the release carries it under names or files other than the link's now. */
+  earlierNames?: boolean;
 }
 
 /**
