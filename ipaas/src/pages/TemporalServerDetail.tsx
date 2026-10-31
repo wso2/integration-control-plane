@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Trash2, Workflow } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -129,11 +129,15 @@ export default function TemporalServerDetail(scope: OrgScope): JSX.Element {
           <Workflow size={32} />
         </Box>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            {service.name}
-          </Typography>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <Typography variant="h5" sx={{ fontWeight: 600 }}>
+              {service.name}
+            </Typography>
+            {service.managed && <Chip label="Managed" size="small" variant="outlined" />}
+          </Stack>
           <Typography variant="body2" color="text.secondary">
             {service.runningVersion ? `Temporal ${service.runningVersion}` : 'Temporal'}
+            {service.managed && ' · Runs your workflow integrations. The integration platform created it.'}
           </Typography>
         </Box>
       </Stack>

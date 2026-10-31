@@ -29,7 +29,7 @@ import type { Environment } from './environment';
  * Any component whose pair does not resolve to a known type falls into
  * `'unsupported'`, which renders a fallback module.
  */
-export type IntegrationType = 'integration-as-api' | 'webhook' | 'automation' | 'file-integration' | 'event-integration' | 'ai-agent' | 'mcp-server' | 'mcp-proxy' | 'tailscale-vpn' | 'rag-ingestion' | 'unsupported';
+export type IntegrationType = 'integration-as-api' | 'webhook' | 'automation' | 'file-integration' | 'event-integration' | 'ai-agent' | 'mcp-server' | 'mcp-proxy' | 'tailscale-vpn' | 'rag-ingestion' | 'workflow' | 'unsupported';
 
 /** Underlying build runtime, when the integration type has more than one. */
 export type IntegrationRuntime = 'ballerina' | 'mi' | 'unknown';
