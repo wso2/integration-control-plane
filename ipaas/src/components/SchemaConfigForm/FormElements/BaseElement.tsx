@@ -22,6 +22,8 @@ import TextField from '../../common/TextField';
 import { Eye, EyeOff, Link2, Link2Off, Lock, Pencil, Unlock } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
 import { type LinkingInfo, isNumberType, typeDisplayName } from '../schemaUtils';
+import { LinkedElement } from '../LinkedElement';
+import { useLinkedFrom } from '../linkedFrom';
 
 interface ConfigGroup {
   groupUuid: string;
@@ -50,7 +52,12 @@ interface BaseElementProps {
   setSensitiveMap?: Dispatch<SetStateAction<Map<string, boolean>>>;
 }
 
-export function BaseElement({
+export function BaseElement(props: BaseElementProps) {
+  const source = useLinkedFrom(props.jsonPath);
+  return source ? <LinkedElement title={props.title} source={source} /> : <EditableElement {...props} />;
+}
+
+function EditableElement({
   type,
   title,
   jsonPath,

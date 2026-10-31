@@ -25,7 +25,20 @@
  */
 
 import { bff, q, seg } from './_client';
-import type { CertGroup, CertMapping, SchemaConfigData, ConfigMgtData, SchemaConfigItem, SaveSchemaConfigInput, ConfigMgtSaveItem } from '../types/configuration';
+import type {
+  CertGroup,
+  CertMapping,
+  SchemaConfigData,
+  ConfigMgtData,
+  SchemaConfigItem,
+  SaveSchemaConfigInput,
+  ConfigMgtSaveItem,
+  ResourceLink,
+  ResourceLinkOption,
+  ResourceLinkWrite,
+  CreateResourceLinkInput,
+  DeleteResourceLinkInput,
+} from '../types/configuration';
 
 export interface PostConfigMgtInput {
   orgHandler: string;
@@ -48,6 +61,15 @@ export const saveSchemaConfig = (input: SaveSchemaConfigInput): Promise<{ config
       ...(input.commitHash ? { commitHash: input.commitHash } : {}),
     })
     .then((r) => ({ configurations: r?.configurations ?? input.configurations }));
+
+export const fetchResourceLinks = (projectId: string, componentId: string): Promise<ResourceLink[]> => bff.get<ResourceLink[]>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`);
+
+export const fetchResourceLinkOptions = (projectId: string, componentId: string): Promise<ResourceLinkOption[]> => bff.get<ResourceLinkOption[]>(`/components/${seg(componentId)}/link-options${q({ projectName: projectId })}`);
+
+export const createResourceLink = ({ projectId, componentId, resourceType, connection }: CreateResourceLinkInput): Promise<ResourceLinkWrite> =>
+  bff.post<ResourceLinkWrite>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`, { resourceType, connection });
+
+export const deleteResourceLink = ({ projectId, componentId, resourceType }: DeleteResourceLinkInput): Promise<ResourceLinkWrite> => bff.delete<ResourceLinkWrite>(`/components/${seg(componentId)}/links/${seg(resourceType)}${q({ projectName: projectId })}`);
 
 // --- Choreo-v2 concepts not present on the OpenChoreo stack: safe defaults. ---
 export const fetchCertificateGroups = (_projectId: string, _componentId: string): Promise<CertGroup[]> => Promise.resolve([]);

@@ -16,9 +16,24 @@
  * under the License.
  */
 
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings } from '../api/configuration';
-import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput } from '../types/configuration';
+import {
+  fetchCertificateGroups,
+  fetchConfigGroups,
+  fetchCertificateMappings,
+  fetchSchemaConfig,
+  fetchConfigMgt,
+  saveSchemaConfig,
+  postConfigMgt,
+  postCertificateMappings,
+  fetchResourceLinks,
+  fetchResourceLinkOptions,
+  createResourceLink,
+  deleteResourceLink,
+} from '../api/configuration';
+import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, CreateResourceLinkInput, DeleteResourceLinkInput, ResourceLink } from '../types/configuration';
+import { linkedConfigurables } from '../utils/resourceLinks';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -99,4 +114,53 @@ export function usePostCertificateMappings() {
       qc.invalidateQueries({ queryKey: ['certMappings', vars.projectId, vars.componentId, vars.envTemplateId, vars.deploymentTrackId] });
     },
   });
+}
+
+export function useResourceLinks(projectId: string, componentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['resourceLinks', projectId, componentId],
+    queryFn: () => fetchResourceLinks(projectId, componentId),
+    enabled: enabled && !!projectId && !!componentId,
+    retry: false,
+  });
+}
+
+export function useResourceLinkOptions(projectId: string, componentId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['resourceLinkOptions', projectId, componentId],
+    queryFn: () => fetchResourceLinkOptions(projectId, componentId),
+    enabled: enabled && !!projectId && !!componentId,
+    retry: false,
+  });
+}
+
+export function useCreateResourceLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CreateResourceLinkInput) => createResourceLink(input),
+    onSuccess: (_, vars) => invalidateLinks(qc, vars.projectId, vars.componentId),
+  });
+}
+
+export function useDeleteResourceLink() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: DeleteResourceLinkInput) => deleteResourceLink(input),
+    onSuccess: (_, vars) => invalidateLinks(qc, vars.projectId, vars.componentId),
+  });
+}
+
+// A link change rolls the integration out in development.
+const invalidateLinks = (qc: ReturnType<typeof useQueryClient>, projectId: string, componentId: string) => {
+  qc.invalidateQueries({ queryKey: ['resourceLinks', projectId, componentId] });
+  qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+};
+
+const noLinks: ResourceLink[] = [];
+
+/** The links of an open Configure form, and the configurables they supply in its environment. */
+export function useFormLinks(projectId: string, componentId: string, env: string, open: boolean) {
+  const { data: links = noLinks } = useResourceLinks(projectId, componentId, open);
+  const linkedFrom = useMemo(() => linkedConfigurables(links, env), [links, env]);
+  return { links, linkedFrom };
 }

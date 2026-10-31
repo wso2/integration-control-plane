@@ -22,6 +22,8 @@ import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../types/schema';
 import { type LinkingInfo, type SchemaAtLevel, getSchemasAtLevel } from './schemaUtils';
 import { ConfigElement } from './FormElements/ConfigElement';
+import { LinkedFromContext } from './linkedFrom';
+import type { LinkedSource } from '../../utils/resourceLinks';
 
 interface ConfigGroup {
   groupUuid: string;
@@ -41,7 +43,11 @@ export interface ConfigFormProps {
   configGroups?: ConfigGroup[];
   handleValueChange: (jsonPath: string, value: BaseType, configMap?: Map<string, BaseType>) => void;
   handleValidationChange: (jsonPath: string, isValid: boolean, validationMap?: Map<string, boolean>) => void;
+  /** Config key → resource: configurables a link supplies, shown read-only. */
+  linkedFrom?: ReadonlyMap<string, LinkedSource>;
 }
+
+const noLinks: ReadonlyMap<string, LinkedSource> = new Map();
 
 function SectionAccordion({ title, defaultExpanded = false, children, contentSx, subAccordion = false }: { title: string; defaultExpanded?: boolean; children: React.ReactNode; contentSx?: object; subAccordion?: boolean }) {
   const [open, setOpen] = useState(defaultExpanded);
@@ -66,7 +72,7 @@ function SectionAccordion({ title, defaultExpanded = false, children, contentSx,
   );
 }
 
-export function ConfigForm({ schema, valueMap, handleValueChange, validationMap, handleValidationChange, linkingMap, setLinkingMap, sensitiveMap, setSensitiveMap, configGroups }: ConfigFormProps) {
+export function ConfigForm({ schema, valueMap, handleValueChange, validationMap, handleValidationChange, linkingMap, setLinkingMap, sensitiveMap, setSensitiveMap, configGroups, linkedFrom = noLinks }: ConfigFormProps) {
   const [isRequiredKeysInSchema, setIsRequiredKeysInSchema] = useState(false);
   const [isOptionalKeysInSchema, setIsOptionalKeysInSchema] = useState(false);
   const [schemasAtLevel, setSchemasAtLevel] = useState<SchemaAtLevel[]>([]);
@@ -152,7 +158,7 @@ export function ConfigForm({ schema, valueMap, handleValueChange, validationMap,
   };
 
   return (
-    <Box>
+    <LinkedFromContext.Provider value={linkedFrom}>
       {isRequiredKeysInSchema && (
         <SectionAccordion title="Required" defaultExpanded contentSx={{ px: 2, pt: 1.5, pb: 1 }}>
           {renderSection(true)}
@@ -164,6 +170,6 @@ export function ConfigForm({ schema, valueMap, handleValueChange, validationMap,
           {renderSection(false)}
         </SectionAccordion>
       )}
-    </Box>
+    </LinkedFromContext.Provider>
   );
 }

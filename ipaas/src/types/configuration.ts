@@ -129,3 +129,63 @@ export interface PostConfigMgtInput {
   commitHash: string;
   configs: ConfigMgtSaveItem[];
 }
+
+/**
+ * A resource linked to an integration, with what it delivers in each environment, in pipeline order. `connection` is
+ * the config key prefix its names follow, absent for a link made on WSO2 Cloud with names of its own. `linked` is
+ * false for a resource the integration's workload.yaml declares (`declared`), or that only an environment's release
+ * still delivers; there is nothing to unlink.
+ */
+export interface ResourceLink {
+  resourceType: string;
+  connection?: string;
+  linked: boolean;
+  declared?: boolean;
+  environments: ResourceLinkEnvironment[];
+}
+
+/**
+ * What a link delivers in one environment: whether that environment's release carries it, the configurables of
+ * that release's build it sets (config key → resource key), whether the resource has values there, and, for a link
+ * through a connection, whether the build has it and the connection the release's names follow: not the link's
+ * while the environment runs a build from before a Change link, or an older build after a rollback.
+ */
+export interface ResourceLinkEnvironment {
+  name: string;
+  inRelease: boolean;
+  configurables: Record<string, string>;
+  hasValues: boolean;
+  connectionInBuild: boolean;
+  connection?: string;
+}
+
+/**
+ * What linking, changing or unlinking did to the integration's current build: `updated` (development gets it now),
+ * `next_deploy`, `unchanged` or `next_build` (the next build applies it); and where the resource has no values yet.
+ */
+export interface ResourceLinkWrite {
+  resourceType: string;
+  connection?: string;
+  workload: 'updated' | 'next_deploy' | 'unchanged' | 'next_build';
+  environmentsWithoutValues: string[];
+}
+
+/** A resource the integration could link, with the connections (config key prefixes) named after its keys, best match first. */
+export interface ResourceLinkOption {
+  resourceType: string;
+  displayName: string;
+  connections: string[];
+}
+
+export interface CreateResourceLinkInput {
+  projectId: string;
+  componentId: string;
+  resourceType: string;
+  connection: string;
+}
+
+export interface DeleteResourceLinkInput {
+  projectId: string;
+  componentId: string;
+  resourceType: string;
+}
