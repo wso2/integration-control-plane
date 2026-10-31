@@ -43,7 +43,7 @@
  * workstream) rather than adding a query here.
  */
 
-import type { ComponentDeployment, BuildRun, ReleaseMgtDeployment, DeploymentTrackImage, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, ByoiImage } from '../types/deployment';
+import type { ComponentDeployment, BuildRun, ReleaseMgtDeployment, DeploymentTrackImage, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, ByoiImage, BuildStopped } from '../types/deployment';
 import type { EnvEndpoint } from '../types/component';
 import type { DeployComponentInput } from '../types/build';
 import { bff, items, q, seg, type ListResponse, type MessageResponse } from './_client';
@@ -126,6 +126,7 @@ interface BffWorkflowRun {
   componentName?: string;
   commit?: string;
   trigger?: 'initial' | 'manual' | 'automatic';
+  stopped?: BuildStopped;
 }
 
 // OpenChoreo workflow-run status -> the build vocabulary the build card expects
@@ -175,6 +176,7 @@ function toBuildRun(run: BffWorkflowRun & { name: string }): BuildRun {
     failureReason: 0,
     sourceCommitId: run.commit ?? '',
     buildRef: name, // == runId consumed by useBuildRunLogs
+    stopped: run.stopped,
   };
 }
 

@@ -27,8 +27,9 @@ import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings, useFormLinks } from '../../hooks/useConfiguration';
-import { LinkResourcePicker } from './LinkResourcePicker';
 import { LinkRows } from './LinkRows';
+import { LinkSuggestions } from './LinkSuggestions';
+import { StoppedBuild } from './StoppedBuild';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
@@ -1047,8 +1048,9 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
+        <StoppedBuild projectId={projectId} componentId={componentId} versionId={versionId} open={open} links={links} />
         <LinkRows projectId={projectId} componentId={componentId} env={schemaEnvId} links={links} />
-        <LinkResourcePicker projectId={projectId} componentId={componentId} open={open} linkedTypes={new Set(links.filter((l) => l.linked || l.declared).map((l) => l.resourceType))} />
+        <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} />
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}

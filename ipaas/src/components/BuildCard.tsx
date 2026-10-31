@@ -23,7 +23,7 @@ import { BUILD_STAGES } from '../constants/build';
 import { useDeploymentStatus } from '../hooks/useDeployments';
 import { useBuildLogs } from '../hooks/useBuilds';
 import { useStableStepperState } from '../hooks/useStableStepperState';
-import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isFailedConclusion } from '../utils/buildProgress';
+import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isFailedConclusion, stoppedBuildText } from '../utils/buildProgress';
 import { findCommitBySha } from '../utils/commits';
 import type { Commit } from '../types/repository';
 import BuildLogViewer from './BuildLogViewer';
@@ -136,7 +136,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
     statusLabel = 'Completed';
     statusDotColor = 'success.main';
   } else if (status === 'completed' && isFailedConclusion(conclusion)) {
-    statusLabel = failedLabel;
+    statusLabel = lastBuild.stopped ? `Failed: ${stoppedBuildText(lastBuild.stopped).why}` : failedLabel;
     statusDotColor = 'error.main';
   } else if (status === 'completed') {
     // Terminal, but neither success nor failure — cancelled, timed out, neutral.
@@ -223,6 +223,11 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
       <Collapse in={expanded} timeout={animateBody ? undefined : 0}>
         <Divider sx={{ mb: 2 }} />
 
+        {lastBuild.stopped && (
+          <Alert severity="error" sx={styles.alertSx}>
+            This build stopped before deploying: {stoppedBuildText(lastBuild.stopped).why}. Every environment keeps what it runs. {stoppedBuildText(lastBuild.stopped).next}
+          </Alert>
+        )}
         <Box sx={styles.stepperWrapSx(logsVisible)}>{renderStepper()}</Box>
 
         {logsVisible && (
