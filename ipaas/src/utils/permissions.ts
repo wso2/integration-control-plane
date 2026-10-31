@@ -19,10 +19,9 @@
 import { Scopes } from '../constants/permissions';
 
 /**
- * What the session may do: the access token's scopes. A token with none of ipaas-service's scopes
- * comes from a console that doesn't request them, and ipaas-service checks none then, so every
- * gated action stays available.
+ * What the session may do: the access token's scopes where ipaas-service enforces them, else every
+ * gated scope, as ipaas-service then refuses nothing for a missing scope.
  */
-export function sessionPermissions(scopes: string[]): string[] {
-  return scopes.some((scope) => scope.startsWith('ipaas:')) ? scopes : Object.values(Scopes);
+export function sessionPermissions(scopes: string[], enforced: boolean): string[] {
+  return enforced ? scopes : Object.values(Scopes);
 }

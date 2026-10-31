@@ -21,11 +21,11 @@ import { Scopes } from '../constants/permissions';
 import { sessionPermissions } from './permissions';
 
 describe('sessionPermissions', () => {
-  it('is the token scopes when they include ipaas-service scopes', () => {
-    expect(sessionPermissions(['openid', 'ipaas:project:read'])).toEqual(['openid', 'ipaas:project:read']);
+  it('is the token scopes when scopes are enforced', () => {
+    expect(sessionPermissions(['openid', 'cloud:organization:view'], true)).toEqual(['openid', 'cloud:organization:view']);
   });
 
-  it('is every gated scope when the token carries none of ipaas-service', () => {
-    expect(sessionPermissions(['openid', 'profile', 'cloud:organization:view'])).toEqual(Object.values(Scopes));
+  it('is every gated scope when they are not', () => {
+    expect(sessionPermissions(['openid', 'ipaas:project:read'], false)).toEqual(Object.values(Scopes));
   });
 });

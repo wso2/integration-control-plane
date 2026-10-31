@@ -498,7 +498,8 @@ describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
     await render();
 
     expect(auth?.scopes).toEqual([]);
-    expect(sessionPermissions(auth!.scopes)).toEqual(Object.values(Scopes));
+    expect(sessionPermissions(auth!.scopes, true)).toEqual([]);
+    expect(sessionPermissions(auth!.scopes, false)).toEqual(Object.values(Scopes));
   });
 
   it('never tries a silent sign-in: the session check joins the cloud console’s session', async () => {

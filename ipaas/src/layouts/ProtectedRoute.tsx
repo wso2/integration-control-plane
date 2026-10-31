@@ -33,7 +33,7 @@ export default function ProtectedRoute(): JSX.Element {
   useEffect(() => {
     // The org-scoped token is the authorization: its scopes gate actions, and the legacy
     // permissions, which nothing grants, stay open.
-    setOrgPermissions(isAuthenticated && userId ? [...Object.values(Permissions), ...sessionPermissions(scopes)] : []);
+    setOrgPermissions(isAuthenticated && userId ? [...Object.values(Permissions), ...sessionPermissions(scopes, window.API_CONFIG.scopesEnforced === true)] : []);
   }, [isAuthenticated, userId, scopes, setOrgPermissions]);
 
   if (!isAuthenticated) {
