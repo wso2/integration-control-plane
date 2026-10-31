@@ -19,6 +19,8 @@
 import { Alert, Box, Button, CircularProgress, Divider, DrawerPanel, MenuItem, Select, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useEndpointPolicies, useSetEndpointPolicies } from '../../../hooks/useConsumers';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import type { EndpointOption } from '../../../types/consumers';
 import type { CorsConfig, RateLimitConfig } from '../../../types/policy';
 import { configToPolicy, policyToConfig, toRateLimitOperations } from '../../../utils/endpointPolicy';
@@ -50,6 +52,7 @@ interface ApiSettingsDrawerProps {
 
 /** Cloud-only "API settings" drawer: CORS and rate limiting. Authentication lives in ApiSecurityDrawer. */
 export default function ApiSettingsDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSettingsDrawerProps): JSX.Element {
+  const canUpdate = useCan()(Scopes.ENDPOINT_UPDATE);
   const [cors, setCors] = useState<CorsConfig | null>(null);
   const [rateLimit, setRateLimit] = useState<RateLimitConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -185,9 +188,11 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
         <Button variant="outlined" color="inherit" onClick={handleCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={() => void handleApply()} disabled={!canApply}>
-          {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
-        </Button>
+        {canUpdate && (
+          <Button variant="contained" onClick={() => void handleApply()} disabled={!canApply}>
+            {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
+          </Button>
+        )}
       </DrawerPanel.Footer>
     </DrawerPanel>
   );

@@ -118,7 +118,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
                   deploymentTrackId={trackId}
                   orgHandler={org}
                   projectHandler={project}
-                  canManage={can(Scopes.INTEGRATION_UPDATE)}
+                  canReadLogs={can(Scopes.LOG_READ)}
                 />
               </>
             )}

@@ -83,6 +83,7 @@ import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } fr
 import { identifyIntegration } from '../utils/identifyIntegration';
 import IntegrationIcon from '../components/IntegrationIcon';
 import Authorized from '../components/Authorized';
+import { useCan } from '../hooks/useCan';
 import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
 import { UUID_RE } from '../utils/string';
 import { isExternalRepoIntegration } from '../utils/projectRepo';
@@ -632,6 +633,7 @@ function buildProjectRepoUrl(gitProvider?: string, gitOrganization?: string, rep
 
 export default function Project(scope: ProjectScope): JSX.Element {
   const navigate = useAppNavigate();
+  const canUpdate = useCan()(Scopes.PROJECT_UPDATE);
   const isUuid = UUID_RE.test(scope.project);
   const { data: projectById, isLoading: loadingById } = useProject(isUuid ? scope.project : '');
   const { data: projectByHandle, isLoading: loadingByHandle } = useProjectByHandler(isUuid ? '' : scope.project);
@@ -884,7 +886,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
                   <Box
                     sx={{ position: 'relative', flex: 1, cursor: 'text', mt: 0.25 }}
                     onClick={() => {
-                      if (!descEditing) {
+                      if (canUpdate && !descEditing) {
                         setDescEditing(true);
                         setTimeout(() => descInputRef.current?.focus(), 0);
                       }
@@ -904,8 +906,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
                         overflow: 'hidden',
                       }}
                       title={!descEditing && descValue ? descValue : undefined}>
-                      {descValue || '+ Add Description'}
-                      {descValue && (
+                      {descValue || (canUpdate && '+ Add Description')}
+                      {descValue && canUpdate && (
                         <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5 }}>
                           <Tooltip title="Edit description">
                             <IconButton

@@ -23,10 +23,11 @@ import type { BallerinaCentralTokenStatus } from '../types/packageRegistries';
 const ROOT_KEY = 'ballerinaCentralToken';
 
 /** Ballerina Central access token status for the org. */
-export function useBallerinaCentralToken(): UseQueryResult<BallerinaCentralTokenStatus> {
+export function useBallerinaCentralToken(enabled = true): UseQueryResult<BallerinaCentralTokenStatus> {
   return useQuery<BallerinaCentralTokenStatus>({
     queryKey: [ROOT_KEY],
     queryFn: fetchBallerinaCentralToken,
+    enabled,
   });
 }
 

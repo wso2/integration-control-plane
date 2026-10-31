@@ -36,6 +36,8 @@ import { getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';
 import type { IntegrationModule } from '../../../types/integration';
 import { withBase } from '../../../utils/basePath';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 
 const REST_API_TYPES = new Set(['restApi', 'byocRestApi', 'miRestApi', 'buildRestApi', 'miApiService', 'ballerinaService', 'byocService', 'byoiService', 'graphql', 'buildpackService']);
 
@@ -77,6 +79,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const [descValue, setDescValue] = useState(component.description?.trim() ?? '');
   const descInputRef = useRef<HTMLInputElement>(null);
   const updateDesc = useUpdateComponent();
+  const canEdit = useCan()(Scopes.INTEGRATION_UPDATE);
 
   // Only show a hover tooltip for the name/description when the 2-line clamp is actually
   // truncating them — a tooltip that fires on text that already fits is just a useless hover target.
@@ -231,7 +234,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
           <Stack direction="row" alignItems="center" gap={2}>
             <IntegrationIcon type={identifyIntegration(displayType, component.componentSubType ?? null).type} size={48} />
             <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Stack direction="row" alignItems="center" gap={0.5} sx={{ mb: 0.25, cursor: 'text', columnGap: nameEditing ? 1.5 : 0.5, '&:hover .pencil-btn': { opacity: 1 } }} onClick={() => !nameEditing && setNameEditing(true)}>
+              <Stack direction="row" alignItems="center" gap={0.5} sx={{ mb: 0.25, cursor: 'text', columnGap: nameEditing ? 1.5 : 0.5, '&:hover .pencil-btn': { opacity: 1 } }} onClick={() => canEdit && !nameEditing && setNameEditing(true)}>
                 {/* The Typography always stays in the DOM and determines the layout size.
                   The InputBase is absolutely overlaid on top when editing — zero layout shift. */}
                 <Box sx={{ position: 'relative', display: 'flex', flex: '0 1 auto', minWidth: nameEditing ? 200 : 0, maxWidth: '100%' }}>
@@ -289,6 +292,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                 {updateName.isPending ? (
                   <CircularProgress size={14} />
                 ) : (
+                  canEdit &&
                   !nameEditing && (
                     <Tooltip title="Edit name">
                       <IconButton
@@ -326,7 +330,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
             </Box>
           </Stack>
           <Stack direction="row" alignItems="flex-start" gap={1} sx={{ mt: '20px' }} onMouseEnter={() => setDescHovered(true)} onMouseLeave={() => setDescHovered(false)}>
-            <Box sx={{ position: 'relative', flex: 1, minWidth: 0, cursor: descEditing ? 'text' : descValue ? 'text' : 'pointer' }} onClick={() => !descEditing && setDescEditing(true)}>
+            <Box sx={{ position: 'relative', flex: 1, minWidth: 0, cursor: descEditing ? 'text' : descValue ? 'text' : 'pointer' }} onClick={() => canEdit && !descEditing && setDescEditing(true)}>
               {/* Ghost text determines height; pencil sits inline after last word */}
               <Typography
                 ref={descRef}
@@ -348,8 +352,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                   descValue || '\u200b'
                 ) : (
                   <>
-                    {descValue || '+ Add Description'}
-                    {descValue && (
+                    {descValue || (canEdit && '+ Add Description')}
+                    {descValue && canEdit && (
                       <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5 }}>
                         <Tooltip title="Edit description">
                           <IconButton
@@ -420,32 +424,36 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                 <Stack direction="row" alignItems="center" gap={0.5} flexWrap="wrap" sx={{ pb: 1, '&:hover .pencil-btn': { opacity: 1 } }}>
                   <Tag size={12} />
                   {labelList.length === 0 ? (
-                    <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} onClick={() => setLabelDialogOpen(true)}>
-                      Add labels
-                    </Typography>
+                    canEdit && (
+                      <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} onClick={() => setLabelDialogOpen(true)}>
+                        Add labels
+                      </Typography>
+                    )
                   ) : (
                     <>
                       {labelList.slice(0, 3).map((label) => (
                         <Chip key={label} label={label} size="small" variant="outlined" />
                       ))}
                       {labelList.length > 3 && (
-                        <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} onClick={() => setLabelDialogOpen(true)}>
+                        <Typography variant="body2" color={canEdit ? 'primary' : 'text.secondary'} sx={{ cursor: canEdit ? 'pointer' : 'default' }} onClick={() => canEdit && setLabelDialogOpen(true)}>
                           +{labelList.length - 3} more
                         </Typography>
                       )}
-                      <Tooltip title="Edit labels">
-                        <IconButton
-                          aria-label="Edit labels"
-                          className="pencil-btn"
-                          size="small"
-                          sx={{ p: 0.25, opacity: 0 }}
-                          onClick={(e) => {
-                            (e.currentTarget as HTMLElement).blur();
-                            setLabelDialogOpen(true);
-                          }}>
-                          <Pencil size={12} />
-                        </IconButton>
-                      </Tooltip>
+                      {canEdit && (
+                        <Tooltip title="Edit labels">
+                          <IconButton
+                            aria-label="Edit labels"
+                            className="pencil-btn"
+                            size="small"
+                            sx={{ p: 0.25, opacity: 0 }}
+                            onClick={(e) => {
+                              (e.currentTarget as HTMLElement).blur();
+                              setLabelDialogOpen(true);
+                            }}>
+                            <Pencil size={12} />
+                          </IconButton>
+                        </Tooltip>
+                      )}
                     </>
                   )}
                 </Stack>

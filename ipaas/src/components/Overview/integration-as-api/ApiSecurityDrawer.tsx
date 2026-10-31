@@ -20,6 +20,8 @@ import { Alert, Box, Button, Checkbox, CircularProgress, DrawerPanel, FormContro
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { API_KEY_SCHEME_DESCRIPTION, COMING_SOON_OAUTH, COMING_SOON_UPSTREAM_ATTRS, DEFAULT_API_KEY_HEADER, OAUTH_HEADER, OAUTH_SCHEME_DESCRIPTION } from '../../../constants/apiConsumption';
 import { useEndpointSecurity, useSetEndpointSecurity } from '../../../hooks/useConsumers';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import type { EndpointOption, SecurityConfig, SecurityMode } from '../../../types/consumers';
 import { endpointLoadNotice, friendlyApiError } from '../../../utils/apiSecurity';
 import { useEndpointDrawer } from './useEndpointDrawer';
@@ -47,6 +49,7 @@ interface ApiSecurityDrawerProps {
  * minus the Resources section, which has no cloud equivalent.
  */
 export default function ApiSecurityDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
+  const canUpdate = useCan()(Scopes.ENDPOINT_UPDATE);
   const [mode, setMode] = useState<SecurityMode>('none');
   const [apiKeyHeader, setApiKeyHeader] = useState(DEFAULT_API_KEY_HEADER);
   const [error, setError] = useState<string | null>(null);
@@ -196,9 +199,11 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
         <Button variant="outlined" color="inherit" onClick={handleCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={() => void handleApply()} disabled={saving || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
-          {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
-        </Button>
+        {canUpdate && (
+          <Button variant="contained" onClick={() => void handleApply()} disabled={saving || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
+            {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
+          </Button>
+        )}
       </DrawerPanel.Footer>
     </DrawerPanel>
   );
