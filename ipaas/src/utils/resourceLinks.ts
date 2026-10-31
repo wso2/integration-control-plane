@@ -18,9 +18,10 @@
 
 import type { ResourceLink } from '../types/configuration';
 
-/** Where a linked configurable's value comes from in one environment. */
+/** Where a linked configurable's value comes from in one environment: a link, or the integration's workload.yaml. */
 export interface LinkedSource {
   resource: string;
+  declared?: boolean;
   /** Set when the resource has no values in the environment yet. */
   noValuesIn?: string;
 }
@@ -31,7 +32,7 @@ export const linkedConfigurables = (links: ResourceLink[], env: string): Map<str
     links.flatMap((l) => {
       const e = l.environments.find((x) => x.name === env);
       if (!e?.inRelease) return [];
-      const source: LinkedSource = e.hasValues ? { resource: l.resourceType } : { resource: l.resourceType, noValuesIn: env };
+      const source: LinkedSource = { resource: l.resourceType, ...(l.declared && { declared: true }), ...(!e.hasValues && { noValuesIn: env }) };
       return Object.keys(e.configurables).map((key) => [key, source] as const);
     }),
   );
@@ -46,12 +47,15 @@ export interface LinkRow {
 export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
   links.flatMap((l) => {
     const e = l.environments.find((x) => x.name === env);
-    if (!l.linked && !e?.inRelease) return [];
+    if (!l.linked && !l.declared && !e?.inRelease) return [];
+    const ahead = l.linked && e?.inRelease && e.connection && e.connection !== l.connection;
     const notes: string[] = [];
-    if (!l.linked) notes.push("not linked · this environment's release still delivers it");
+    if (l.declared) notes.push('declared in workload.yaml');
+    else if (!l.linked) notes.push("not linked · this environment's release still delivers it");
     else if (!l.connection) notes.push('linked from WSO2 Cloud under its own key names');
+    else if (ahead) notes.push(`through ${e.connection}`, `now goes through ${l.connection}; ${l.environments[0]?.name === env ? 'next build' : 'next release'}`);
     else notes.push(`through ${l.connection}`);
-    if (l.linked && e && !e.inRelease) notes.push('next release');
+    if ((l.linked || l.declared) && e && !e.inRelease) notes.push('next release');
     if (e && !e.hasValues) notes.push(`no values in ${env}`);
     return [{ resourceType: l.resourceType, notes, canUnlink: l.linked }];
   });

@@ -131,21 +131,24 @@ export interface PostConfigMgtInput {
 }
 
 /**
- * A resource linked to an integration, with what it delivers in each environment. `connection` is the config key
- * prefix its names follow, absent for a link made on WSO2 Cloud with names of its own. `linked` is false for a
- * resource only an environment's release still delivers; there is nothing to unlink.
+ * A resource linked to an integration, with what it delivers in each environment, in pipeline order. `connection` is
+ * the config key prefix its names follow, absent for a link made on WSO2 Cloud with names of its own. `linked` is
+ * false for a resource the integration's workload.yaml declares (`declared`), or that only an environment's release
+ * still delivers; there is nothing to unlink.
  */
 export interface ResourceLink {
   resourceType: string;
   connection?: string;
   linked: boolean;
+  declared?: boolean;
   environments: ResourceLinkEnvironment[];
 }
 
 /**
  * What a link delivers in one environment: whether that environment's release carries it, the configurables of
  * that release's build it sets (config key → resource key), whether the resource has values there, and, for a link
- * through a connection, whether the build has it.
+ * through a connection, whether the build has it and the connection the release's names follow: not the link's
+ * while the environment runs a build from before a Change link, or an older build after a rollback.
  */
 export interface ResourceLinkEnvironment {
   name: string;
@@ -153,6 +156,7 @@ export interface ResourceLinkEnvironment {
   configurables: Record<string, string>;
   hasValues: boolean;
   connectionInBuild: boolean;
+  connection?: string;
 }
 
 /**

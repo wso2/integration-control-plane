@@ -24,22 +24,16 @@ import type { LinkedSource } from '../../utils/resourceLinks';
 const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 
 export function LinkedElement({ title, source }: { title: string; source: LinkedSource }) {
+  const from = source.declared ? `from workload.yaml (${source.resource})` : `from ${source.resource}`;
   return (
     <Box sx={{ mt: 1.5 }}>
       <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
         <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
           {title}
         </Typography>
-        <Chip icon={<Link2 size={12} />} label="linked" size="small" variant="outlined" color={source.noValuesIn ? 'warning' : 'info'} sx={chipSx} />
+        <Chip icon={<Link2 size={12} />} label={source.declared ? 'declared' : 'linked'} size="small" variant="outlined" color={source.noValuesIn ? 'warning' : 'info'} sx={chipSx} />
       </Stack>
-      <TextField
-        fullWidth
-        size="small"
-        disabled
-        value={source.noValuesIn ? `from ${source.resource} · no values in ${source.noValuesIn}` : `from ${source.resource}`}
-        color={source.noValuesIn ? 'warning' : undefined}
-        inputProps={{ 'aria-label': `${title} is supplied by ${source.resource}` }}
-      />
+      <TextField fullWidth size="small" disabled value={source.noValuesIn ? `${from} · no values in ${source.noValuesIn}` : from} color={source.noValuesIn ? 'warning' : undefined} inputProps={{ 'aria-label': `${title} is supplied by ${source.resource}` }} />
     </Box>
   );
 }

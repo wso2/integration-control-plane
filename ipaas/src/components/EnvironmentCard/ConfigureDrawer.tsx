@@ -1043,7 +1043,7 @@ function GenericServiceConfigureDrawer({
     return (
       <>
         <LinkRows projectId={projectId} componentId={componentId} env={schemaEnvId} links={links} />
-        <LinkResourcePicker projectId={projectId} componentId={componentId} open={open} linkedTypes={new Set(links.filter((l) => l.linked).map((l) => l.resourceType))} />
+        <LinkResourcePicker projectId={projectId} componentId={componentId} open={open} linkedTypes={new Set(links.filter((l) => l.linked || l.declared).map((l) => l.resourceType))} />
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}

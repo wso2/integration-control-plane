@@ -30,6 +30,22 @@ const sales: ResourceLink = {
 };
 const support: ResourceLink = { resourceType: 'support', linked: false, environments: [env('development', false, true), env('production', true, true, { 'wso2.sfdemo.supportUrl': 'URL' })] };
 const cloudLink: ResourceLink = { resourceType: 'orders-db', linked: true, environments: [env('development', true, true)] };
+// Linked through sfCrm, while development and production still run builds whose releases use sfSales.
+const ahead: ResourceLink = {
+  resourceType: 'salesforce-crm',
+  connection: 'wso2.sfdemo.sfCrm',
+  linked: true,
+  environments: [
+    { ...env('development', true, true, { 'wso2.sfdemo.sfSalesBaseUrl': 'BASE_URL' }), connection: 'wso2.sfdemo.sfSales' },
+    { ...env('production', true, true, { 'wso2.sfdemo.sfSalesBaseUrl': 'BASE_URL' }), connection: 'wso2.sfdemo.sfSales' },
+  ],
+};
+const declared: ResourceLink = {
+  resourceType: 'salesforce-desk',
+  linked: false,
+  declared: true,
+  environments: [env('development', true, true, { 'wso2.sfdemo.sfDeskBaseUrl': 'BASE_URL' }), env('production', false, false)],
+};
 
 describe('linkedConfigurables', () => {
   it("maps what each environment's release delivers, noting where the resource has no values", () => {
@@ -42,6 +58,10 @@ describe('linkedConfigurables', () => {
     );
     expect(linkedConfigurables([sales], 'staging')).toEqual(new Map());
   });
+
+  it('marks what workload.yaml supplies', () => {
+    expect(linkedConfigurables([declared], 'development')).toEqual(new Map([['wso2.sfdemo.sfDeskBaseUrl', { resource: 'salesforce-desk', declared: true }]]));
+  });
 });
 
 describe('linkRows', () => {
@@ -52,5 +72,15 @@ describe('linkRows', () => {
     ]);
     expect(linkRows([sales, support], 'staging')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'next release'], canUnlink: true }]);
     expect(linkRows([cloudLink], 'development')).toEqual([{ resourceType: 'orders-db', notes: ['linked from WSO2 Cloud under its own key names'], canUnlink: true }]);
+  });
+
+  it("names the release's connection while the link is ahead of it, and when each environment gets the link's", () => {
+    expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'now goes through wso2.sfdemo.sfCrm; next build'], canUnlink: true }]);
+    expect(linkRows([ahead], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'now goes through wso2.sfdemo.sfCrm; next release']);
+  });
+
+  it('lists a workload.yaml declaration, with nothing to unlink', () => {
+    expect(linkRows([declared], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml'], canUnlink: false }]);
+    expect(linkRows([declared], 'production')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml', 'next release', 'no values in production'], canUnlink: false }]);
   });
 });
