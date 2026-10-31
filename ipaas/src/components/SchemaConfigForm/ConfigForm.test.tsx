@@ -68,8 +68,8 @@ describe('ConfigForm with links', () => {
   it('shows the configurables a link supplies read-only and asks no value for them', async () => {
     const handleValidationChange = vi.fn();
     const linkedFrom = new Map([
-      ['wso2.sfdemo.sfSalesBaseUrl', 'salesforce-sales'],
-      ['wso2.sfdemo.support.sfSupportBaseUrl', 'salesforce-support'],
+      ['wso2.sfdemo.sfSalesBaseUrl', { resource: 'salesforce-sales' }],
+      ['wso2.sfdemo.support.sfSupportBaseUrl', { resource: 'salesforce-support', noValuesIn: 'production' }],
     ]);
     await act(async () =>
       root.render(
@@ -91,7 +91,7 @@ describe('ConfigForm with links', () => {
     const linked = Array.from(container.querySelectorAll('input')).filter((i) => i.value.startsWith('from '));
     expect(linked.map((i) => [i.getAttribute('aria-label'), i.value, i.disabled])).toEqual([
       ['sfSalesBaseUrl is supplied by salesforce-sales', 'from salesforce-sales', true],
-      ['sfSupportBaseUrl is supplied by salesforce-support', 'from salesforce-support', true],
+      ['sfSupportBaseUrl is supplied by salesforce-support', 'from salesforce-support · no values in production', true],
     ]);
     const validated = handleValidationChange.mock.calls.map(([key]) => key);
     expect(validated).not.toContain('wso2.sfdemo.sfSalesBaseUrl');

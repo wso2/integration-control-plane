@@ -52,8 +52,8 @@ interface BaseElementProps {
 }
 
 export function BaseElement(props: BaseElementProps) {
-  const resource = useLinkedFrom(props.jsonPath);
-  return resource ? <LinkedElement title={props.title} resource={resource} /> : <EditableElement {...props} />;
+  const source = useLinkedFrom(props.jsonPath);
+  return source ? <LinkedElement title={props.title} source={source} /> : <EditableElement {...props} />;
 }
 
 function EditableElement({

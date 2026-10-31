@@ -23,6 +23,7 @@ import type { BaseType, JSONSchema } from '../../types/schema';
 import { type LinkingInfo, type SchemaAtLevel, getSchemasAtLevel } from './schemaUtils';
 import { ConfigElement } from './FormElements/ConfigElement';
 import { LinkedFromContext } from './linkedFrom';
+import type { LinkedSource } from '../../utils/resourceLinks';
 
 interface ConfigGroup {
   groupUuid: string;
@@ -43,10 +44,10 @@ export interface ConfigFormProps {
   handleValueChange: (jsonPath: string, value: BaseType, configMap?: Map<string, BaseType>) => void;
   handleValidationChange: (jsonPath: string, isValid: boolean, validationMap?: Map<string, boolean>) => void;
   /** Config key → resource: configurables a link supplies, shown read-only. */
-  linkedFrom?: ReadonlyMap<string, string>;
+  linkedFrom?: ReadonlyMap<string, LinkedSource>;
 }
 
-const noLinks: ReadonlyMap<string, string> = new Map();
+const noLinks: ReadonlyMap<string, LinkedSource> = new Map();
 
 function SectionAccordion({ title, defaultExpanded = false, children, contentSx, subAccordion = false }: { title: string; defaultExpanded?: boolean; children: React.ReactNode; contentSx?: object; subAccordion?: boolean }) {
   const [open, setOpen] = useState(defaultExpanded);

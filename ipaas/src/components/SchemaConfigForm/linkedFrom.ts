@@ -17,8 +17,9 @@
  */
 
 import { createContext, useContext } from 'react';
+import type { LinkedSource } from '../../utils/resourceLinks';
 
 /** Config key → the resource whose link supplies the configurable. The form takes no value for these. */
-export const LinkedFromContext = createContext<ReadonlyMap<string, string>>(new Map());
+export const LinkedFromContext = createContext<ReadonlyMap<string, LinkedSource>>(new Map());
 
-export const useLinkedFrom = (jsonPath: string): string | undefined => useContext(LinkedFromContext).get(jsonPath);
+export const useLinkedFrom = (jsonPath: string): LinkedSource | undefined => useContext(LinkedFromContext).get(jsonPath);

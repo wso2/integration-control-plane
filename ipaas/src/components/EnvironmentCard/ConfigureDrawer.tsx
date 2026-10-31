@@ -25,8 +25,9 @@ import { useSchemaConfig, useCertificateGroups, useCertificateMappings, useConfi
 import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
-import { useSaveSchemaConfig, usePostCertificateMappings, useResourceLinks } from '../../hooks/useConfiguration';
+import { useSaveSchemaConfig, usePostCertificateMappings, useFormLinks } from '../../hooks/useConfiguration';
 import { LinkResourcePicker } from './LinkResourcePicker';
+import { LinkRows } from './LinkRows';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
@@ -768,8 +769,7 @@ function GenericServiceConfigureDrawer({
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, schemaEnvId, versionId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
   const { data: endpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
-  const { data: links = [] } = useResourceLinks(projectId, componentId, open);
-  const linkedFrom = useMemo(() => new Map(links.flatMap((l) => Object.keys(l.configurables).map((key) => [key, l.resourceType] as const))), [links]);
+  const { links, linkedFrom } = useFormLinks(projectId, componentId, schemaEnvId, open);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
   const generateEp = useGenerateComponentEndpoints();
@@ -1042,7 +1042,8 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
-        <LinkResourcePicker projectId={projectId} componentId={componentId} open={open} linkedTypes={new Set(links.map((l) => l.resourceType))} />
+        <LinkRows projectId={projectId} componentId={componentId} env={schemaEnvId} links={links} />
+        <LinkResourcePicker projectId={projectId} componentId={componentId} open={open} linkedTypes={new Set(links.filter((l) => l.linked).map((l) => l.resourceType))} />
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
