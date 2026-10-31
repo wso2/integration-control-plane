@@ -111,7 +111,8 @@ export interface DeployEnvironmentCardBodyProps {
   endpointCount?: number;
   configurablesCount?: number;
   scaleToZeroEnabled?: boolean;
-  onConfigClick: () => void;
+  /** Absent when the user's role can't change configuration here: the card hides the control. */
+  onConfigClick?: () => void;
   onJobConfigClick?: () => void;
   onHistoryClick?: () => void;
   onEndpointsClick?: () => void;

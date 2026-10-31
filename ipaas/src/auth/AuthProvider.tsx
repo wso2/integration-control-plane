@@ -114,6 +114,7 @@ function toSession(access: Record<string, unknown>, idClaims: Record<string, unk
     orgHandle,
     orgUuid,
     orgName,
+    scopes: (stringClaim(access, 'scope') ?? '').split(' ').filter(Boolean),
   };
 }
 
@@ -177,8 +178,10 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       );
       if (cancelled) return;
       if (!idClaims || Object.keys(idClaims).length === 0) return setStatus({ kind: 'signedOut', error: null });
-      const session = toSession(idClaims, idClaims);
-      if (!session) return endSession(MISSING_ORG);
+      const claimed = toSession(idClaims, idClaims);
+      if (!claimed) return endSession(MISSING_ORG);
+      // The gateway keeps the access token, so the browser has no scopes to gate on.
+      const session = { ...claimed, scopes: [] };
 
       connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), checkSession: gatewaySignedIn });
       local.set(ORG_HANDLE_KEY, session.orgHandle);
@@ -295,6 +298,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       displayName: user.displayName,
       pictureUrl: user.pictureUrl,
       orgHandle: status.kind === 'signedIn' ? status.session.orgHandle : '',
+      scopes: status.kind === 'signedIn' ? status.session.scopes : [],
       loginWithOIDC,
       completeSignIn,
       logout,

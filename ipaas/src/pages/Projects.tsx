@@ -31,7 +31,7 @@ import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { newProjectUrl, importProjectUrl, type OrgScope } from '../nav';
 import { projectHomeUrl } from '../paths';
 import { useAccessControl } from '../contexts/AccessControlContext';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import Authorized from '../components/Authorized';
 import * as styles from './Projects.styles';
 
@@ -87,7 +87,8 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const [alert, setAlert] = useState<string | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const { hasOrgPermission } = useAccessControl();
-  const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
+  const canCreateProject = hasOrgPermission(Scopes.PROJECT_CREATE);
+  const canDeleteProject = hasOrgPermission(Scopes.PROJECT_DELETE);
   const { data: projects, isLoading } = useProjects();
 
   useRemovalNotice(
@@ -119,7 +120,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
       <PageTitle>
         <PageTitle.Header>All projects</PageTitle.Header>
         <PageTitle.Actions>
-          <Authorized permissions={Permissions.PROJECT_MANAGE}>
+          <Authorized permissions={Scopes.PROJECT_CREATE}>
             <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>
               Import project
             </Button>
@@ -152,7 +153,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
           <Grid container spacing={2}>
             {paginated.map((p) => (
               <Grid key={p.id} size={{ xs: 12, sm: 6, md: 3 }}>
-                <ProjectCard org={scope.org} project={p} canDelete={canCreateProject} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onDelete={() => setDeletingProject(p)} />
+                <ProjectCard org={scope.org} project={p} canDelete={canDeleteProject} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onDelete={() => setDeletingProject(p)} />
               </Grid>
             ))}
           </Grid>

@@ -29,7 +29,7 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { useComponentPodMetrics, useComponentPods, useReleaseDetails, useRedeployRelease } from '../hooks/useRuntime';
 import { DeploymentStatus } from '../types/deployment';
 import { calculateAggregateUsage, usageFromComponentLevelMetrics } from '../utils/podMetrics';
@@ -73,7 +73,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
   const podScope = useMemo(() => ({ projectId, releaseId, orgHandler: org, projectHandler: project, componentHandler: component }), [projectId, releaseId, org, project, component]);
 
   const { hasPermission } = useAccessControl();
-  const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, componentId);
+  const canManage = hasPermission(Scopes.INTEGRATION_DEPLOY, projectId, componentId);
 
   const redeploy = useRedeployRelease();
   const onRedeploy = () => redeploy.mutate({ projectId, componentName: component, releaseId });

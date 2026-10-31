@@ -75,3 +75,13 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
   // The shape the client falls back to when the body carried no sentence.
   return !message || /^HTTP \d{3}:/.test(message) ? fallback : message;
 }
+
+/** ipaas-service refused the call because the user's role lacks a scope (`code: INSUFFICIENT_SCOPE`). */
+export function isPermissionError(error: unknown): boolean {
+  if (httpStatusOf(error) !== 403 || typeof error !== 'object' || error === null || !('body' in error)) return false;
+  try {
+    return (JSON.parse(String(error.body)) as { code?: unknown }).code === 'INSUFFICIENT_SCOPE';
+  } catch {
+    return false;
+  }
+}

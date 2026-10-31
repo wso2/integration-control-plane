@@ -39,6 +39,8 @@ export interface CloudSession {
   orgUuid: string;
   /** `ouName` */
   orgName?: string;
+  /** `scope`: what the user's role grants of the scopes the console asked for. A refresh keeps them. */
+  scopes: string[];
 }
 
 interface Connection {

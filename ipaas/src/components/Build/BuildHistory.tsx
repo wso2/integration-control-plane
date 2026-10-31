@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import { Alert, Button, Chip, CircularProgress, IconButton, ListingTable, Snackbar, Stack, TablePagination, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { GitCommit, Settings } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -54,6 +56,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
 
   const [searchParams, setSearchParams] = useSearchParams();
   const triggerBuild = useTriggerBuild();
+  const can = useCan();
 
   const handleAutoOpen = useCallback((build: BuildRun) => {
     setSelectedBuild(build);
@@ -136,6 +139,8 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
         <Typography variant="h1">Build</Typography>
 
         <Stack direction="row" alignItems="center" gap={1}>
+          {can(Scopes.INTEGRATION_BUILD) && (
+          <>
           <Tooltip title={hasInProgress ? 'A build is already in progress' : !latestCommit ? 'No commits available' : ''}>
             <span>
               <Button variant="outlined" size="small" onClick={handleSelectCommit} disabled={isBuilding || commitsLoading || commits.length === 0}>
@@ -156,10 +161,12 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
               </Button>
             </span>
           </Tooltip>
+          </>
+          )}
 
           <Tooltip title={isBuilding ? 'A build is already in progress' : 'Build configuration'}>
             <span>
-              <IconButton aria-label="Build configuration" size="small" onClick={handleOpenConfig} disabled={!repository || isBuilding}>
+              <IconButton aria-label="Build configuration" size="small" onClick={handleOpenConfig} disabled={!repository || isBuilding || !can(Scopes.INTEGRATION_UPDATE)}>
                 <Settings size={18} />
               </IconButton>
             </span>

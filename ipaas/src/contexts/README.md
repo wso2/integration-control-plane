@@ -11,7 +11,7 @@
 
 ### Purpose
 
-This context holds the **permissions of the signed-in user** and lets any component in the tree check them. The access token is scoped to one organization and carries no finer scope, so permissions are granted for the whole organization: `ProtectedRoute` grants every permission while a session is active and clears them when it ends.
+This context holds the **permissions of the signed-in user** and lets any component in the tree check them. The access token is scoped to one organization and carries no finer scope, so permissions are granted for the whole organization: `ProtectedRoute` grants the access token's scopes (every gated scope when the token carries none of ipaas-service's) and the legacy permissions while a session is active, and clears them when it ends. `Scopes` in `constants/permissions.ts` names what the console gates.
 
 State held:
 

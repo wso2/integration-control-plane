@@ -47,3 +47,22 @@ export const Permissions = {
 export const PROJECT_EDIT_PERMISSIONS = [Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT];
 export const ALL_ROLE_MODIFY_PERMISSIONS = [Permissions.USER_MANAGE_USERS, Permissions.USER_MANAGE_GROUPS, Permissions.USER_MANAGE_ROLES, Permissions.USER_UPDATE_GROUP_ROLES] as const;
 export const ALL_USER_MGT_PERMISSIONS = [Permissions.USER_MANAGE_USERS, Permissions.USER_UPDATE_USERS, Permissions.USER_MANAGE_GROUPS, Permissions.USER_MANAGE_ROLES, Permissions.USER_UPDATE_GROUP_ROLES, Permissions.USER_VIEW] as const;
+
+/**
+ * Scopes of `urn:wso2:cloud` that ipaas-service checks on the actions the console gates. Keep in step
+ * with ipaas-service's `middleware/authz`.
+ */
+export const Scopes = {
+  PROJECT_CREATE: 'ipaas:project:create',
+  PROJECT_UPDATE: 'ipaas:project:update',
+  PROJECT_DELETE: 'ipaas:project:delete',
+  INTEGRATION_CREATE: 'ipaas:integration:create',
+  INTEGRATION_UPDATE: 'ipaas:integration:update',
+  INTEGRATION_DELETE: 'ipaas:integration:delete',
+  INTEGRATION_BUILD: 'ipaas:integration:build',
+  INTEGRATION_DEPLOY: 'ipaas:integration:deploy',
+  PACKAGE_REGISTRY_MANAGE: 'ipaas:package-registry:manage',
+  CONFIG_MANAGE: 'cloud:resource-type:manage',
+  ENVIRONMENT_MANAGE: 'cloud:environment:manage',
+  DEPLOYMENT_PIPELINE_MANAGE: 'cloud:deployment-pipeline:manage',
+} as const;

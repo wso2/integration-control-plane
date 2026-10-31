@@ -24,7 +24,7 @@ import Authorized from '../components/Authorized';
 import EmptyListing from '../components/EmptyListing';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import ConfigEditor, { type EditorContext } from '../components/Configs/ConfigEditor';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
 import { useConfigMaps, useContainerConfigMounts, useDeleteConfig, useRelease, useSecrets } from '../hooks/useDevopsConfigs';
@@ -116,7 +116,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
           <PageTitle.Header>Configs &amp; secrets</PageTitle.Header>
           {!isLoading && comp && releaseId && containerId && view.kind === 'list' && (
             <PageTitle.Actions>
-              <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
+              <Authorized permissions={Scopes.CONFIG_MANAGE}>
                 <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setView({ kind: 'create' })}>
                   Create
                 </Button>
@@ -181,7 +181,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
                         <ListingTable.Cell>{r.kind === 'fileMount' ? 'File mount' : 'Environment variables'}</ListingTable.Cell>
                         <ListingTable.Cell>{r.kind === 'fileMount' ? r.mount.mount_path || '—' : r.keys.join(', ') || '—'}</ListingTable.Cell>
                         <ListingTable.Cell align="right">
-                          <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
+                          <Authorized permissions={Scopes.CONFIG_MANAGE}>
                             <Tooltip title="Edit">
                               <IconButton size="small" aria-label={`Edit ${r.name}`} onClick={() => setView({ kind: 'edit', row: r })}>
                                 <Pencil size={16} />

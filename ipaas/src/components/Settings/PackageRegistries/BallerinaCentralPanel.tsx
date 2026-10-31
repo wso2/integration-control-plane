@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CircularProgress, InputAdornment, Link, Skeleton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, ArrowUpRight, CheckCircle2, ChevronDown, Lock } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
@@ -35,6 +37,7 @@ export default function BallerinaCentralPanel({ onBack }: { onBack: () => void }
   const { data: tokenStatus, isLoading, isError, refetch } = useBallerinaCentralToken();
   const saveToken = useSaveBallerinaCentralToken();
   const removeToken = useRemoveBallerinaCentralToken();
+  const canManage = useCan()(Scopes.PACKAGE_REGISTRY_MANAGE);
   const [tokenInput, setTokenInput] = useState('');
   const [instructionsOpen, setInstructionsOpen] = useState(true);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -113,7 +116,7 @@ export default function BallerinaCentralPanel({ onBack }: { onBack: () => void }
               value={tokenInput}
               onChange={(e) => setTokenInput(e.target.value)}
               placeholder="Paste your token here"
-              disabled={saveToken.isPending}
+              disabled={saveToken.isPending || !canManage}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
@@ -126,7 +129,7 @@ export default function BallerinaCentralPanel({ onBack }: { onBack: () => void }
 
           {saveToken.isError && <Alert severity="error">{saveToken.error.message}</Alert>}
 
-          <Button variant="contained" disabled={!tokenInput.trim() || saveToken.isPending} onClick={handleSave} startIcon={saveToken.isPending ? <CircularProgress size={14} /> : undefined} sx={{ alignSelf: 'flex-start' }}>
+          <Button variant="contained" disabled={!tokenInput.trim() || saveToken.isPending || !canManage} onClick={handleSave} startIcon={saveToken.isPending ? <CircularProgress size={14} /> : undefined} sx={{ alignSelf: 'flex-start' }}>
             Save token
           </Button>
         </Stack>
@@ -166,7 +169,12 @@ export default function BallerinaCentralPanel({ onBack }: { onBack: () => void }
           {removeToken.isError && <Alert severity="error">{removeToken.error.message}</Alert>}
 
           <Stack direction="row" gap={1.5}>
-            <Button variant="outlined" color="error" disabled={removeToken.isPending} startIcon={removeToken.isPending ? <CircularProgress size={14} /> : undefined} onClick={() => removeToken.mutate(undefined, { onSuccess: () => setSaveSuccess(false) })}>
+            <Button
+              variant="outlined"
+              color="error"
+              disabled={removeToken.isPending || !canManage}
+              startIcon={removeToken.isPending ? <CircularProgress size={14} /> : undefined}
+              onClick={() => removeToken.mutate(undefined, { onSuccess: () => setSaveSuccess(false) })}>
               Remove token
             </Button>
           </Stack>

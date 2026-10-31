@@ -50,7 +50,7 @@ import { buildCloudEditorUrl } from '../utils/cloudEditor';
 import { useProjectId } from '../hooks/useProjects';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useOrgComponentLimits, useOrgSubscriptions } from '../hooks/useOrg';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
 import { useSamples } from '../hooks/useSamples';
 import { trackEvent } from '../services/tracking/tracking';
@@ -94,7 +94,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const isUpgraded = (subscriptions ?? []).some((sub) => sub.subscriptionType === 'devant-subscription' && sub.subscriptionStatus === 'active');
   const quotaReached = !isUpgraded && (orgLimits?.billableComponentCount ?? 0) >= FREE_COMPONENT_LIMIT;
-  const canManage = hasAnyPermission([Permissions.INTEGRATION_MANAGE], projectId);
+  const canManage = hasAnyPermission([Scopes.INTEGRATION_CREATE], projectId);
   const creationBlocked = !canManage || quotaReached;
   const blockedTooltip = !canManage ? 'You do not have permission to create integrations.' : 'You have exceeded the allocated integration quota. Upgrade your subscription.';
   const { features } = useFeaturePreview();

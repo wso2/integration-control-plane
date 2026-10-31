@@ -29,6 +29,7 @@ const SESSION: CloudSession = {
   user: { userId: 'u1', username: 'ada@example.com', displayName: 'Ada' },
   orgHandle: 'acme',
   orgUuid: 'org-uuid',
+  scopes: [],
 };
 
 let fetchMock: ReturnType<typeof vi.fn>;
