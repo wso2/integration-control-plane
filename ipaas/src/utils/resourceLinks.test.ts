@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ResourceLink } from '../types/configuration';
-import { linkRows, linkedConfigurables } from './resourceLinks';
+import { linkRows, linkedConfigurables, promoteWithoutValues } from './resourceLinks';
 
 const env = (name: string, inRelease: boolean, hasValues: boolean, configurables: Record<string, string> = {}) => ({ name, inRelease, hasValues, configurables, connectionInBuild: inRelease });
 
@@ -82,5 +82,12 @@ describe('linkRows', () => {
   it('lists a workload.yaml declaration, with nothing to unlink', () => {
     expect(linkRows([declared], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml'], canUnlink: false }]);
     expect(linkRows([declared], 'production')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml', 'next release', 'no values in production'], canUnlink: false }]);
+  });
+});
+
+describe('promoteWithoutValues', () => {
+  it('names what the source release delivers and the target has no values for', () => {
+    expect(promoteWithoutValues([sales, support], 'development', 'production')).toEqual(['salesforce-sales']);
+    expect(promoteWithoutValues([sales, support], 'staging', 'production')).toEqual([]);
   });
 });

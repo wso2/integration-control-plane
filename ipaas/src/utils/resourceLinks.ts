@@ -59,3 +59,7 @@ export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
     if (e && !e.hasValues) notes.push(`no values in ${env}`);
     return [{ resourceType: l.resourceType, notes, canUnlink: l.linked }];
   });
+
+/** The resources the source environment's release delivers that have no values in target: promoting starts it there without them. */
+export const promoteWithoutValues = (links: ResourceLink[], source: string, target: string): string[] =>
+  links.filter((l) => l.environments.some((e) => e.name === source && e.inRelease) && l.environments.some((e) => e.name === target && !e.hasValues)).map((l) => l.resourceType);
