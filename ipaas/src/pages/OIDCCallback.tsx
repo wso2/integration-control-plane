@@ -25,6 +25,7 @@ import PageLoader from '../components/PageLoader';
 import { useAuth, getAndClearRedirectUrl } from '../auth';
 import { fetchProjects as fetchProjectsApi } from '../api/projects';
 import { loginUrl, projectHomeUrl, projectsRedirectUrl } from '../paths';
+import { trackEvent } from '../services/tracking/tracking';
 import { stripBase, withBase } from '../utils/basePath';
 import { local } from '../utils/storage';
 
@@ -56,6 +57,7 @@ export default function OIDCCallback(): JSX.Element {
       try {
         // Thunder provisions the org at sign-up, so a signed-in session always carries one.
         const { userId, orgHandle } = await completeSignIn(searchParams);
+        trackEvent('login-clickbutton-success', undefined, true);
 
         // Determine where to navigate post-login
         const savedUrl = getAndClearRedirectUrl();
@@ -112,6 +114,7 @@ export default function OIDCCallback(): JSX.Element {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to complete authentication');
+        trackEvent('login-clickbutton-error');
       }
     };
 

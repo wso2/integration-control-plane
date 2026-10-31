@@ -27,12 +27,14 @@ import { loadConfig } from './config/runtimeConfig';
 import { AccessControlProvider } from './contexts/AccessControlContext';
 import { FeaturePreviewProvider } from './contexts/FeaturePreviewContext';
 import './index.css';
+import { initTracking } from './services/tracking/tracking';
 import { basePath } from './utils/basePath';
 
 const queryClient = new QueryClient();
 
 // Load runtime configuration before rendering the app
 loadConfig().then(() => {
+  initTracking();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <OxygenUIThemeProvider themes={[{ key: 'acrylicOrange', label: 'Acrylic Orange Theme', theme: AcrylicOrangeTheme }]} initialTheme="acrylicOrange">

@@ -32,6 +32,7 @@ import { useSamples } from '../hooks/useSamples';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
 import type { Sample } from '../types/samples';
 import { toHandler } from '../utils/string';
+import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
 
 export default function BrowseSamples(scope: ProjectScope): JSX.Element {
@@ -71,6 +72,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   const handleDeploy = (sample: Sample) => {
     if (!projectId) return;
+    trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
     setDeployingSample(sample);
     createComponent.mutate(
       {

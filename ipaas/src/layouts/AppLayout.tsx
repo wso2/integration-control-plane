@@ -103,6 +103,7 @@ import {
   type Scope,
 } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
+import { trackEvent } from '../services/tracking/tracking';
 import { componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
@@ -285,7 +286,7 @@ export default function AppLayout(): JSX.Element {
           <Header.Toggle collapsed={hideSidebarForEmptyProject || shell.sidebarCollapsed} onToggle={handleHeaderToggle} />
           <Header.Brand>
             <Header.BrandLogo>
-              <NavLink to={orgHomeUrl(scope.org)} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <NavLink to={orgHomeUrl(scope.org)} onClick={() => trackEvent('navbar-home')} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
                 <Logo />
               </NavLink>
             </Header.BrandLogo>
@@ -391,6 +392,7 @@ export default function AppLayout(): JSX.Element {
                       key={p.id}
                       selected={hasProject(scope) && (scope.project === p.handler || scope.project === p.id)}
                       onClick={() => {
+                        trackEvent('navbar-project-dropdown-existing');
                         setProjectMenuAnchor(null);
                         setProjectSearch('');
                         const newScope = narrow({ level: 'organizations', org: scope.org }, p.handler);
@@ -1040,7 +1042,7 @@ export default function AppLayout(): JSX.Element {
         )}
         {/* Matches the sidebar's surface rather than sitting as a white band under it. */}
         <Footer sx={{ backgroundColor: 'background.acrylic', backdropFilter: 'blur(3px)' }}>
-          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer">
+          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('navbar-documentation')}>
             Documentation
           </Footer.Link>
           <Footer.Link href="https://discord.com/invite/wso2" target="_blank" rel="noopener noreferrer">
@@ -1070,6 +1072,7 @@ export default function AppLayout(): JSX.Element {
             <Button
               variant="contained"
               onClick={async () => {
+                trackEvent('navbar-user-logout');
                 await logout();
                 navigate(loginUrl());
                 setConfirmDialogOpen(false);

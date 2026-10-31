@@ -34,6 +34,7 @@ import { projectHomeUrl } from '../paths';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
 import Authorized from '../components/Authorized';
+import { trackEvent } from '../services/tracking/tracking';
 import * as styles from './Projects.styles';
 
 function ProjectCard({ project, onClick, onSettingsClick }: { project: Project; onClick: () => void; onSettingsClick: () => void }) {
@@ -89,6 +90,8 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const { hasOrgPermission } = useAccessControl();
   const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
   const { data: projects, isLoading, refetch } = useProjects();
+
+  useEffect(() => trackEvent('visit-home'), []);
 
   useEffect(() => {
     const state = location.state as { projectDeleted?: boolean } | null;

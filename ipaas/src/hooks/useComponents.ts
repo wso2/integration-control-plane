@@ -34,6 +34,7 @@ import {
   deleteDeploymentTrack,
   checkDeploymentTrackDeletable,
 } from '../api/components';
+import { trackEvent } from '../services/tracking/tracking';
 import { pollWhileDeleting } from '../utils/deletionPolling';
 import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput } from '../types/component';
 
@@ -66,8 +67,14 @@ export function useComponentEndpoints(componentId: string, versionId: string) {
 export function useCreateComponent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateComponentInput) => createComponent(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['components'] }),
+    mutationFn: (input: CreateComponentInput) => {
+      trackEvent('component-create-start');
+      return createComponent(input);
+    },
+    onSuccess: () => {
+      trackEvent('component-create-end');
+      qc.invalidateQueries({ queryKey: ['components'] });
+    },
   });
 }
 
@@ -78,6 +85,7 @@ export function useDeleteComponent() {
     onSuccess: async (result, input) => {
       // The backend refuses some deletions without throwing, reporting `canDelete: false`.
       if (!result.canDelete) return;
+      trackEvent('component-delete');
       // Scoped per org+project — names repeat across orgs.
       const listKey = ['components', input.orgHandler, input.projectId];
       // An in-flight fetch would resolve after the mark below and overwrite it.

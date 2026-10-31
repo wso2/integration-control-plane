@@ -53,7 +53,11 @@ import { useOrgComponentLimits, useOrgSubscriptions } from '../hooks/useOrg';
 import { Permissions } from '../constants/permissions';
 import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
 import { useSamples } from '../hooks/useSamples';
+import { trackEvent } from '../services/tracking/tracking';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
+
+/** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
+const GET_STARTED_TABS = [{ label: 'Prebuilt Integrations' }, { label: 'Samples' }];
 
 export interface CreateIntegrationPanelsProps {
   scope: ProjectScope;
@@ -120,7 +124,9 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
     const url = buildCloudEditorUrl({ userId, orgUuid, orgHandle: scope.org, projectId, codeServerSample }, window.location.origin);
     if (!window.open(url, '_blank')) {
       setPageError({ message: 'Please allow popups for this site and try again.', severity: 'warning' });
+      return;
     }
+    trackEvent('open-cloud-editor-click', { org: scope.org, project: scope.project });
   };
 
   const importUrl = importComponentUrl(scope.org, scope.project);
@@ -147,6 +153,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       setPageError({ message: 'Please allow popups for this site and try again.', severity: 'warning' });
       return;
     }
+    trackEvent('component-create-import-github', { org: scope.org, project: scope.project, provider: GitProvider.GITHUB });
 
     const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
     channelRef.current = channel;
@@ -180,6 +187,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const handleQuickDeploy = (sample: Sample) => {
     if (!projectId || creationBlocked) return;
+    trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
     setDeployingSample(sample);
     createComponent.mutate(
       {
@@ -332,6 +340,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           aria-label="Import from a Public Repository"
                           onClick={(e) => {
                             e.stopPropagation();
+                            trackEvent('component-create-import-public-url', { org: scope.org, project: scope.project });
                             navigate(importUrl, { state: { mode: 'public' } });
                           }}
                           sx={PROVIDER_ICON_SX}>
@@ -391,7 +400,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             }}>
             <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
               <Box sx={{ mb: 2 }}>
-                <PillTabs value={selectedTab} onChange={setSelectedTab} tabs={[{ label: 'Prebuilt Integrations' }, { label: 'Samples' }]} />
+                <PillTabs
+                  value={selectedTab}
+                  onChange={(tab) => {
+                    trackEvent('components-new-get-started-tab', { org: scope.org, project: scope.project, tab: GET_STARTED_TABS[tab]?.label ?? String(tab) });
+                    setSelectedTab(tab);
+                  }}
+                  tabs={GET_STARTED_TABS}
+                />
               </Box>
 
               <Box sx={{ display: 'grid', flex: 1, minWidth: 0, '& > *': { gridArea: '1 / 1', zIndex: 1, minWidth: 0 } }}>
@@ -418,21 +434,30 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           disabledTooltip={blockedTooltip}
                           key={integration.displayName}
                           integration={integration}
-                          onClick={() =>
+                          onClick={() => {
+                            trackEvent('featured-prebuilt-integration-click', { org: scope.org, project: scope.project, integration: integration.displayName });
                             navigate(prebuiltIntegrationsUrl(scope.org, scope.project), {
                               state: {
                                 selectedApplications: integration.applications,
                                 selectedIntegration: integration,
                                 fromPath: `/organizations/${scope.org}/projects/${scope.project}/components/new`,
                               },
-                            })
-                          }
+                            });
+                          }}
                         />
                       ))}
                     </Box>
                   )}
                   <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(prebuiltIntegrationsUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
+                    <Button
+                      variant="text"
+                      color="primary"
+                      endIcon={<ArrowRight size={14} />}
+                      onClick={() => {
+                        trackEvent('prebuilt-integration-explore-click', { org: scope.org, project: scope.project });
+                        navigate(prebuiltIntegrationsUrl(scope.org, scope.project));
+                      }}
+                      sx={{ textTransform: 'none', pl: 0 }}>
                       Explore more prebuilt integrations
                     </Button>
                   </Box>
@@ -461,7 +486,15 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     </Box>
                   )}
                   <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(browseSamplesUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
+                    <Button
+                      variant="text"
+                      color="primary"
+                      endIcon={<ArrowRight size={14} />}
+                      onClick={() => {
+                        trackEvent('components-new-browse-more-samples', { org: scope.org, project: scope.project });
+                        navigate(browseSamplesUrl(scope.org, scope.project));
+                      }}
+                      sx={{ textTransform: 'none', pl: 0 }}>
                       Explore more samples
                     </Button>
                   </Box>

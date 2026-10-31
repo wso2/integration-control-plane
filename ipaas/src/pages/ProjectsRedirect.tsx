@@ -25,6 +25,7 @@ import { X } from '@wso2/oxygen-ui-icons-react';
 
 import { useAuth } from '../auth';
 import { loginUrl, orgHomeUrl, privacyPolicyUrl } from '../paths';
+import { trackEvent } from '../services/tracking/tracking';
 import { local } from '../utils/storage';
 
 export default function ProjectsRedirect(): JSX.Element {
@@ -47,6 +48,9 @@ export default function ProjectsRedirect(): JSX.Element {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAccept = () => {
+    // Thunder hosts sign-up, so the console's first sight of a new user is this one-time
+    // Terms of Use acceptance. Identify so the event lands on the user's Moesif profile.
+    trackEvent('signup-success', undefined, true);
     local.set(tosKey, 'true');
     setOpen(false);
     navigate(orgHomeUrl(orgHandler!), { replace: true, state: location.state });

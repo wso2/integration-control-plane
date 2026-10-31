@@ -20,6 +20,7 @@ import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/rea
 import type { Query } from '@tanstack/react-query';
 import { fetchApimSwagger } from '../api/apim';
 import { fetchComponentByHandler } from '../api/components';
+import { trackEvent } from '../services/tracking/tracking';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { TYPE_TO_KIND } from '../constants/insights';
 import {
@@ -162,6 +163,7 @@ export function useDeployDeploymentTrack() {
   return useMutation({
     mutationFn: (input: DeployDeploymentTrackInput) => deployDeploymentTrack(input),
     onSuccess: (_data, input) => {
+      trackEvent('component-deploy');
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId, input.id] });
       qc.invalidateQueries({ queryKey: ['executionConfigs', input.componentId] });
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
@@ -174,6 +176,7 @@ export function useTriggerBuild() {
   return useMutation({
     mutationFn: (input: DeployComponentInput) => triggerBuild(input),
     onSuccess: (_data, input) => {
+      trackEvent('component-build');
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId, input.versionId] });
     },
   });
@@ -184,6 +187,7 @@ export function usePromote() {
   return useMutation({
     mutationFn: (input: PromoteInput) => promote(input),
     onSuccess: (_data, input) => {
+      trackEvent('component-promote');
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId] });
     },
@@ -205,7 +209,10 @@ export function useRedeployDeployment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { orgHandler: string; componentId: string; releaseId: string; type: string; releaseMgtReleaseId?: string; releaseMgtDeploymentId?: string }) => redeployDeployment(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['componentDeployment'] }),
+    onSuccess: () => {
+      trackEvent('component-deploy');
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+    },
   });
 }
 

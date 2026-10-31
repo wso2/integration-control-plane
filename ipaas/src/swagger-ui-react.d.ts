@@ -28,6 +28,7 @@ declare module 'swagger-ui-react' {
     plugins?: unknown[];
     supportedSubmitMethods?: string[];
     requestInterceptor?: (request: { url: string; headers: Record<string, string> }) => unknown;
+    responseInterceptor?: (response: { status: number }) => unknown;
     [key: string]: unknown;
   }
 

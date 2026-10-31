@@ -36,6 +36,7 @@ import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import NotFound from '../components/NotFound';
 import { useProjectId } from '../hooks/useProjects';
 import type { EndpointRef } from '../types/consumers';
+import { trackEvent } from '../services/tracking/tracking';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
@@ -146,7 +147,10 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   const handleGetTestKey = async () => {
     if (!canGetTestKey) return;
     const key = await access.mintKey();
-    if (key) updateSecurityHeader(key);
+    if (key) {
+      updateSecurityHeader(key);
+      trackEvent('component-test-openapi-get-test-key');
+    }
   };
 
   // Swagger spec for the selected endpoint: its base64 OpenAPI arrives in `apimRevisionId`.
@@ -374,6 +378,10 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                         request.headers[testKeyHeaderRef.current] = securityHeaderRef.current;
                       }
                       return request;
+                    }}
+                    responseInterceptor={(response) => {
+                      trackEvent('component-test-execute', { status: response.status });
+                      return response;
                     }}
                   />
                 </Box>
