@@ -293,6 +293,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   const { data, isLoading, isError } = useSchemaConfig(projectId, componentId, envId, deploymentTrackId, commitHash);
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, envId, deploymentTrackId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
+  const { links, linkedFrom } = useFormLinks(projectId, componentId, envId, open);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
   const deployTrack = useDeployDeploymentTrack();
@@ -449,6 +450,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       setSaveError(null);
       const configurations: SchemaConfigItem[] = [];
       valueMap.forEach((value, key) => {
+        // A link supplies it; a value of the form's own would compete with the link's.
+        if (linkedFrom.has(key)) return;
         if (value !== '' && value !== undefined && value !== null) {
           const linking = linkingMap.get(key);
           const isSensitive = sensitiveMap.get(key) || false;
@@ -560,6 +563,9 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     }
     return (
       <>
+        <StoppedBuild projectId={projectId} componentId={componentId} versionId={deploymentTrackId} open={open} links={links} />
+        <LinkRows projectId={projectId} componentId={componentId} env={envId} links={links} />
+        <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} actions={['Link', 'Link through']} />
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -571,6 +577,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          linkedFrom={linkedFrom}
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>
@@ -584,7 +591,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   const renderCertificateMount = () => <CertificateMountStep projectId={projectId} componentId={componentId} envId={envId} deploymentTrackId={deploymentTrackId} open={open} linkedCerts={linkedCerts} onChange={setLinkedCerts} />;
 
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
-  const hasValidationErrors = Array.from(validationMap.values()).some((v) => !v);
+  // A field marked invalid before its link loaded is no longer the form's to fill.
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linkedFrom.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
   const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';

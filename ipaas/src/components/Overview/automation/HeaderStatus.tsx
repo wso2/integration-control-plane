@@ -17,7 +17,7 @@
  */
 
 import { CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import type { HeaderStatusProps } from '../../../types/integration';
@@ -26,7 +26,7 @@ import ConfigureButton from '../_shared/ConfigureButton';
 // stays until its genericisation in phase 4.5. Imported here, inside the type's
 // own folder — never from `_shared`.
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
-import { hasMissingRequiredConfigs } from '../_shared/configStatus';
+import { useMissingRequiredConfigs } from '../_shared/configStatus';
 
 /**
  * Automation's left-header slot: a Configure entry point.
@@ -52,7 +52,7 @@ export default function HeaderStatus({
 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
   const { data: schemaConfig } = useSchemaConfig(projectId, component.id, envTemplateId, versionId, deployedCommitSha);
-  const missingConfigs = useMemo(() => hasMissingRequiredConfigs(schemaConfig), [schemaConfig]);
+  const missingConfigs = useMissingRequiredConfigs(schemaConfig, projectId, component.id, envTemplateId);
 
   const deploying = deploymentStatusV2 === 'IN_PROGRESS';
   // A rollout over a workload this card has already seen running is a re-deploy (config change);

@@ -204,7 +204,7 @@ export default function Component(scope: ComponentScope): JSX.Element {
                 />
                 {index < environments.length - 1 && (
                   <Box sx={{ display: 'flex', justifyContent: 'center', mb: 3 }}>
-                    <PromoteButton orgHandler={scope.org} componentId={component.id} versionId={versionId} deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''} sourceEnvId={env.id} targetEnvId={environments[index + 1].id} />
+                    <PromoteButton orgHandler={scope.org} projectId={projectId} componentId={component.id} versionId={versionId} deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''} sourceEnvId={env.id} targetEnvId={environments[index + 1].id} />
                   </Box>
                 )}
               </Fragment>
