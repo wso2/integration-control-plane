@@ -1014,7 +1014,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
             <TechnologySelector selected={selectedTechnology} detectedMode={detectedMode} enabled={showBranchAndSubPath} onSelect={setSelectedTechnology} />
             {selectedTechnology === 'BI' && (
               <>
-                {!ballerinaTokenStatus?.configured && (
+                {ballerinaTokenStatus && !ballerinaTokenStatus.configured && (
                   <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2 }}>
                     <Typography variant="body2" color="text.secondary">
                       Depend on private packages?
