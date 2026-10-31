@@ -57,6 +57,7 @@ export default function DeployEnvironmentCardBody({
   endpointCount,
   configurablesCount,
   scaleToZeroEnabled,
+  missingConfigsReason,
   onConfigClick,
   onJobConfigClick,
   onHistoryClick,
@@ -136,6 +137,16 @@ export default function DeployEnvironmentCardBody({
           <Typography variant="caption" color="text.secondary" sx={{ pl: 1.5 }}>
             {nextRunLabel}
           </Typography>
+        )}
+        {missingConfigsReason && (
+          <Stack alignItems="flex-start" gap={0.75} sx={{ pl: 1.5 }}>
+            <Typography variant="caption" color="error.main">
+              {missingConfigsReason}
+            </Typography>
+            <Button size="small" variant="outlined" color="error" startIcon={<Settings size={14} />} onClick={onConfigClick}>
+              Configure to Continue
+            </Button>
+          </Stack>
         )}
       </Stack>
 

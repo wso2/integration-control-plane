@@ -50,3 +50,20 @@ export function useMissingRequiredConfigs(schemaConfig: SchemaConfigData | null 
   const { data: links } = useResourceLinks(projectId, componentId, !!schemaConfig?.jsonSchema);
   return useMemo(() => hasMissingRequiredConfigs(schemaConfig, links, env), [schemaConfig, links, env]);
 }
+
+/**
+ * Why env can't start until configured, for a card to say beside "Configure to Continue": the linked resources its
+ * release carries without values there, else the required configurables without one. Undefined when nothing is missing.
+ */
+export function missingConfigsReason(schemaConfig: SchemaConfigData | null | undefined, links: ResourceLink[] = [], env = ''): string | undefined {
+  if (!hasMissingRequiredConfigs(schemaConfig, links, env)) return undefined;
+  const withoutValues = links.filter((l) => l.environments.some((e) => e.name === env && e.inRelease && !e.hasValues)).map((l) => l.resourceType);
+  if (withoutValues.length === 0) return `Required configurables have no values in ${env}.`;
+  return `${withoutValues.join(', ')} ${withoutValues.length === 1 ? 'has' : 'have'} no values in ${env}. Add them on WSO2 Cloud; ${env} restarts with them by itself.`;
+}
+
+/** `missingConfigsReason` in env with the integration's links, read once the schema has configurables. */
+export function useMissingConfigsReason(schemaConfig: SchemaConfigData | null | undefined, projectId: string, componentId: string, env: string): string | undefined {
+  const { data: links } = useResourceLinks(projectId, componentId, !!schemaConfig?.jsonSchema);
+  return useMemo(() => missingConfigsReason(schemaConfig, links, env), [schemaConfig, links, env]);
+}
