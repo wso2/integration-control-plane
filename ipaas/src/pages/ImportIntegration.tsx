@@ -67,6 +67,8 @@ import { detectTechnology } from '../utils/technologyDetection';
 import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
 import { useWorkflowRuntime } from '../hooks/useWorkflowRuntime';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 
 // One Moesif event per selectable integration type. A type added later without an entry here still
 // reaches Moesif through the generic 'component-create-select-type', with `integrationType` set.
@@ -80,6 +82,7 @@ const INTEGRATION_TYPE_TRACK_EVENT: Partial<Record<IntegrationType, string>> = {
 };
 
 export default function ImportIntegration(scope: ProjectScope): JSX.Element {
+  const canCreate = useCan()(Scopes.INTEGRATION_CREATE);
   const navigate = useAppNavigate();
   const location = useLocation();
 
@@ -391,9 +394,9 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     return undefined;
   };
 
-  const canSubmit = Boolean(
-    activeOrg && activeRepo && selectedBranch && selectedTechnology && selectedIntegrationType && (!isAzureDevOps || selectedIntegrationType !== 'ai-agent') && displayName.trim() && handlerValid && projectId && (isPublicRepo || isAuthenticated),
-  );
+  const canSubmit =
+    canCreate &&
+    Boolean(activeOrg && activeRepo && selectedBranch && selectedTechnology && selectedIntegrationType && (!isAzureDevOps || selectedIntegrationType !== 'ai-agent') && displayName.trim() && handlerValid && projectId && (isPublicRepo || isAuthenticated));
 
   const handleSubmit = () => {
     // Fires on click, before the API call. 'component-create-end' fires only on success, so the gap

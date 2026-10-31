@@ -272,7 +272,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                   {standalone ? 'Create an integration on Cloud' : 'Create on Cloud'}
                 </Typography>
               </Stack>
-              <Card sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
+              <Card inert={creationBlocked} sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
                   <Box sx={{ flex: 1, minHeight: 260, overflow: 'hidden' }}>
                     <IDEMockup onOpenClick={handleOpenCloudEditor} />
@@ -293,7 +293,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                 {standalone ? 'Import your own integration' : 'Import your own'}
               </Typography>
             )}
-            <Card sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
+            <Card inert={creationBlocked} sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
               <CardContent
                 sx={{
                   display: 'flex',
