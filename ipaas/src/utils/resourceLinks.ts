@@ -37,16 +37,27 @@ export const linkedConfigurables = (links: ResourceLink[], env: string): Map<str
     }),
   );
 
-/** The latest link write of each resource: whether it left the resource linked, and until when development's release may take to reflect it. */
-export type LinkRollouts = Record<string, { linked: boolean; until: number }>;
+/**
+ * A write whose release is rolling out, and until when that may take: a link write of a resource in development
+ * (whether it left the resource linked), or a promote from source to target.
+ */
+export type Rollout = { until: number } & ({ resourceType: string; linked: boolean } | { source: string; target: string });
 
-/** Whether development's release has yet to reflect a link write it is rolling out. */
-export const rollingOut = (links: ResourceLink[] | undefined, rollouts: LinkRollouts | undefined, now = Date.now()): boolean => Object.entries(rollouts ?? {}).some(([type, r]) => now < r.until && !developmentReflects(links, type, r.linked));
+/** Whether a release has yet to reflect a write it is rolling out. */
+export const rollingOut = (links: ResourceLink[] | undefined, rollouts: Rollout[], now = Date.now()): boolean => rollouts.some((r) => now < r.until && !reflected(links, r));
+
+const reflected = (links: ResourceLink[] | undefined, r: Rollout) => ('target' in r ? !!links?.every((l) => sameDelivery(l, r.source, r.target)) : developmentReflects(links, r.resourceType, r.linked));
 
 const developmentReflects = (links: ResourceLink[] | undefined, type: string, linked: boolean) => {
   const l = links?.find((x) => x.resourceType === type);
   const e = l?.environments[0];
   return linked ? !!l?.linked && !!e?.inRelease && (!l.connection || e.connection === l.connection) : !e?.inRelease;
+};
+
+// Once target runs source's release, the link delivers the same there as in source.
+const sameDelivery = (l: ResourceLink, source: string, target: string) => {
+  const [s, t] = [source, target].map((name) => l.environments.find((e) => e.name === name));
+  return s?.inRelease === t?.inRelease && s?.connection === t?.connection && JSON.stringify(s?.configurables) === JSON.stringify(t?.configurables);
 };
 
 /**

@@ -34,7 +34,8 @@ import {
   deleteResourceLink,
 } from '../api/configuration';
 import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, CreateResourceLinkInput, DeleteResourceLinkInput, ResourceLink, ResourceLinkWrite } from '../types/configuration';
-import { linkedConfigurables, rollingOut, type LinkRollouts } from '../utils/resourceLinks';
+import { linkedConfigurables, rollingOut, type Rollout } from '../utils/resourceLinks';
+import type { PromoteInput } from '../types/deployment';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -124,7 +125,7 @@ export function useResourceLinks(projectId: string, componentId: string, enabled
     queryFn: () => fetchResourceLinks(projectId, componentId),
     enabled: enabled && !!projectId && !!componentId,
     retry: false,
-    refetchInterval: (query) => (rollingOut(query.state.data, linkRollouts(qc, projectId, componentId)) ? ROLLOUT_POLL_MS : false),
+    refetchInterval: (query) => (rollingOut(query.state.data, rollouts(qc, projectId, componentId)) ? ROLLOUT_POLL_MS : false),
   });
 }
 
@@ -184,19 +185,23 @@ const invalidateLinks = (qc: QueryClient, projectId: string, componentId: string
 const ROLLOUT_POLL_MS = 3000;
 const ROLLOUT_WINDOW_MS = 120_000;
 
-// The links report what each release carries, and OpenChoreo changes development's release after a write that updates the Workload.
-const linkRollouts = (qc: QueryClient, projectId: string, componentId: string): LinkRollouts =>
-  Object.fromEntries(
-    qc
-      .getMutationCache()
-      .findAll({ mutationKey: ['resourceLinkWrite'], status: 'success' })
-      .flatMap((m) => {
-        const vars = m.state.variables as DeleteResourceLinkInput;
-        const w = m.state.data as ResourceLinkWrite;
-        if (vars.projectId !== projectId || vars.componentId !== componentId) return [];
-        return [[w.resourceType, { linked: m.options.mutationKey?.[1] === 'link', until: w.workload === 'updated' ? m.state.submittedAt + ROLLOUT_WINDOW_MS : 0 }]];
-      }),
-  );
+// The links report what each release carries, and OpenChoreo changes a release after the write: development's after a
+// link write that updates the Workload, the target's after a promote.
+const rollouts = (qc: QueryClient, projectId: string, componentId: string): Rollout[] =>
+  qc
+    .getMutationCache()
+    .findAll({ status: 'success', predicate: (m) => m.options.mutationKey?.[0] === 'resourceLinkWrite' || m.options.mutationKey?.[0] === 'promote' })
+    .flatMap((m): Rollout[] => {
+      const until = m.state.submittedAt + ROLLOUT_WINDOW_MS;
+      if (m.options.mutationKey?.[0] === 'promote') {
+        const p = m.state.variables as PromoteInput;
+        return p.componentId === componentId ? [{ source: p.sourceEnvironmentId, target: p.targetEnvironmentId, until }] : [];
+      }
+      const vars = m.state.variables as DeleteResourceLinkInput;
+      const w = m.state.data as ResourceLinkWrite;
+      if (vars.projectId !== projectId || vars.componentId !== componentId || w.workload !== 'updated') return [];
+      return [{ resourceType: w.resourceType, linked: m.options.mutationKey?.[1] === 'link', until }];
+    });
 
 const noLinks: ResourceLink[] = [];
 
