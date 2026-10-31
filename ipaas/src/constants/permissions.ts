@@ -65,4 +65,7 @@ export const Scopes = {
   CONFIG_MANAGE: 'cloud:resource-type:manage',
   ENVIRONMENT_MANAGE: 'cloud:environment:manage',
   DEPLOYMENT_PIPELINE_MANAGE: 'cloud:deployment-pipeline:manage',
+  ENDPOINT_UPDATE: 'ipaas:endpoint:update',
+  ENDPOINT_API_KEY_MANAGE: 'ipaas:endpoint:api-key-manage',
+  APPLICATION_MANAGE: 'ipaas:application:manage',
 } as const;

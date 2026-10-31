@@ -20,6 +20,8 @@ import { Alert, Avatar, Box, Button, Chip, CircularProgress, Divider, IconButton
 import { Plus, ShieldCheck, Trash2, Users } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { DELETE_CONSUMER_WARNING, SECURITY_MODE_LABEL } from '../../../constants/apiConsumption';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import { useConsumers, useDeleteConsumer, useEndpointSecurity } from '../../../hooks/useConsumers';
 import type { Consumer, EndpointOption, EndpointRef } from '../../../types/consumers';
 import { consumerSummary } from '../../../utils/apiConsumption';
@@ -51,6 +53,8 @@ interface ConsumersPanelProps {
 
 /** Cloud-only "Consumers" subcard inside the API env card. */
 export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, deploymentTrackId, endpoints }: ConsumersPanelProps): JSX.Element {
+  const can = useCan();
+  const canManageConsumers = can(Scopes.APPLICATION_MANAGE) && can(Scopes.ENDPOINT_API_KEY_MANAGE);
   const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName, deploymentTrackId }), [componentName, envName, endpointName, deploymentTrackId]);
 
   const { data: consumers = [], isLoading, error } = useConsumers(projectName, endpointRef);
@@ -98,12 +102,16 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
           )}
         </Typography>
         <Stack direction="row" alignItems="center" gap={1.5}>
-          <Button variant="text" size="small" startIcon={<ShieldCheck size={14} />} onClick={() => setSecurityOpen(true)} sx={styles.textAction}>
-            Configure security
-          </Button>
-          <Button variant="contained" size="small" startIcon={count > 0 ? <Plus size={14} /> : undefined} onClick={() => setDialogTarget('new')}>
-            {count > 0 ? 'New consumer' : 'Consume API'}
-          </Button>
+          {can(Scopes.ENDPOINT_UPDATE) && (
+            <Button variant="text" size="small" startIcon={<ShieldCheck size={14} />} onClick={() => setSecurityOpen(true)} sx={styles.textAction}>
+              Configure security
+            </Button>
+          )}
+          {canManageConsumers && (
+            <Button variant="contained" size="small" startIcon={count > 0 ? <Plus size={14} /> : undefined} onClick={() => setDialogTarget('new')}>
+              {count > 0 ? 'New consumer' : 'Consume API'}
+            </Button>
+          )}
         </Stack>
       </Box>
 
@@ -136,14 +144,18 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
                     </Typography>
                   )}
                 </Box>
-                <Button variant="outlined" size="small" onClick={() => setDialogTarget(c)}>
-                  Manage
-                </Button>
-                <Tooltip title="Delete consumer">
-                  <IconButton size="small" aria-label={`Delete ${c.displayName}`} onClick={() => setPendingDelete(c)} sx={styles.consumerDeleteButton}>
-                    <Trash2 size={15} />
-                  </IconButton>
-                </Tooltip>
+                {canManageConsumers && (
+                  <>
+                    <Button variant="outlined" size="small" onClick={() => setDialogTarget(c)}>
+                      Manage
+                    </Button>
+                    <Tooltip title="Delete consumer">
+                      <IconButton size="small" aria-label={`Delete ${c.displayName}`} onClick={() => setPendingDelete(c)} sx={styles.consumerDeleteButton}>
+                        <Trash2 size={15} />
+                      </IconButton>
+                    </Tooltip>
+                  </>
+                )}
               </Box>
             );
           })}
