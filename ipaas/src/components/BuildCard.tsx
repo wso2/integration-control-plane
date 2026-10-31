@@ -27,6 +27,7 @@ import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion
 import { findCommitBySha } from '../utils/commits';
 import type { Commit } from '../types/repository';
 import BuildLogViewer from './BuildLogViewer';
+import { StoppedBuildAlert } from './Build/StoppedBuildAlert';
 import HorizontalStepper from './HorizontalStepper';
 import * as styles from './BuildCard.styles';
 
@@ -223,11 +224,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
       <Collapse in={expanded} timeout={animateBody ? undefined : 0}>
         <Divider sx={{ mb: 2 }} />
 
-        {lastBuild.stopped && (
-          <Alert severity="error" sx={styles.alertSx}>
-            This build stopped before deploying: {stoppedBuildText(lastBuild.stopped).why}. Every environment keeps what it runs. {stoppedBuildText(lastBuild.stopped).next}
-          </Alert>
-        )}
+        {lastBuild.stopped && <StoppedBuildAlert stopped={lastBuild.stopped} sx={styles.alertSx} />}
         <Box sx={styles.stepperWrapSx(logsVisible)}>{renderStepper()}</Box>
 
         {logsVisible && (

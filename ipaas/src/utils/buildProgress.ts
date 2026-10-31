@@ -17,6 +17,7 @@
  */
 
 import type { BuildRunLogs, BuildStep } from '../types/build';
+import type { ResourceLink } from '../types/configuration';
 import type { BuildStopped } from '../types/deployment';
 import type { Step, StepStatus } from '../types/stepper';
 import { BUILD_STAGES } from '../constants/build';
@@ -44,6 +45,21 @@ export const LINKS_UNREADABLE = 'links_unreadable';
 export function stoppedBuildText(stopped: BuildStopped): { why: string; next: string } {
   if (stopped.reason === LINKS_UNREADABLE) return { why: "the build couldn't read this integration's links", next: 'Build again.' };
   return { why: stopped.message, next: 'Change or unlink the link in the Configure form, then build again.' };
+}
+
+/**
+ * What the next build will do once every link a build stopped on is changed or unlinked, one line per link; undefined
+ * while one still stands as the build found it.
+ */
+export function stoppedLinksFixed(stopped: BuildStopped, links: ResourceLink[]): string[] | undefined {
+  if (stopped.links.length === 0) return undefined;
+  const lines: string[] = [];
+  for (const s of stopped.links) {
+    const now = links.find((l) => l.linked && l.resourceType === s.type);
+    if (now && (now.connection ?? '') === s.connection) return undefined;
+    lines.push(now ? `${s.type} now goes through ${now.connection}. Build again to use it.` : `${s.type} is unlinked. Build again.`);
+  }
+  return lines;
 }
 
 export function isFailedConclusion(conclusion?: string | null): boolean {

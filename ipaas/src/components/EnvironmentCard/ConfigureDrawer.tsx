@@ -1050,7 +1050,7 @@ function GenericServiceConfigureDrawer({
       <>
         <StoppedBuild projectId={projectId} componentId={componentId} versionId={versionId} open={open} links={links} />
         <LinkRows projectId={projectId} componentId={componentId} env={schemaEnvId} links={links} />
-        <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} />
+        <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} actions={['Link', 'Link through']} />
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
