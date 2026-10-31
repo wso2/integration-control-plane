@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { getRequiredPathsAtLevel } from '../../SchemaConfigForm/schemaUtils';
+import { requiredConfigKeys } from '../../../utils/configValues';
 import type { SchemaConfigData } from '../../../types/configuration';
 
 /**
@@ -28,14 +28,7 @@ import type { SchemaConfigData } from '../../../types/configuration';
  * Continue") and the disabling of Run/Schedule actions.
  */
 export function hasMissingRequiredConfigs(schemaConfig: SchemaConfigData | null | undefined): boolean {
-  if (!schemaConfig?.jsonSchema) return false;
-  try {
-    const schema = JSON.parse(atob(schemaConfig.jsonSchema));
-    const allRequired = getRequiredPathsAtLevel(schema).filter((p) => !p.includes('[*]') && !p.includes('.*'));
-    if (allRequired.length === 0) return false;
-    const filledKeys = new Set((schemaConfig.configurations ?? []).filter((c) => c.values?.[0]?.value).map((c) => c.key));
-    return allRequired.some((k) => !filledKeys.has(k));
-  } catch {
-    return false;
-  }
+  if (!schemaConfig) return false;
+  const filledKeys = new Set((schemaConfig.configurations ?? []).filter((c) => c.values?.[0]?.value).map((c) => c.key));
+  return requiredConfigKeys(schemaConfig.jsonSchema).some((k) => !filledKeys.has(k));
 }

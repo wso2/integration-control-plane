@@ -22,6 +22,8 @@ import type { HeaderStatusProps } from '../../../types/integration';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import StatusDot from '../_shared/StatusDot';
 import ConfigureButton from '../_shared/ConfigureButton';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
 import { hasMissingRequiredConfigs } from '../_shared/configStatus';
 
@@ -50,6 +52,7 @@ export default function HeaderStatus({
   buildId,
 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
+  const can = useCan();
 
   // Switch the Configure button to "Configure to Continue" when the schema has
   // required configs without values (tools can't be fetched until it's configured + deployed).
@@ -82,6 +85,7 @@ export default function HeaderStatus({
             releaseMgtReleaseId={releaseMgtReleaseId}
             releaseMgtDeploymentId={releaseMgtDeploymentId}
             envTemplateId={envTemplateId}
+            readOnly={!can(Scopes.CONFIG_MANAGE)}
             buildId={buildId}
           />
         </>

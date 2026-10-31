@@ -61,6 +61,7 @@ export default function FileEventHeader({
   deployAction,
 }: CustomHeaderProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
+  const can = useCan();
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
   const isActionPending = stopMutation.isPending || redeployMutation.isPending;
@@ -150,6 +151,7 @@ export default function FileEventHeader({
               releaseMgtReleaseId={releaseMgtReleaseId}
               releaseMgtDeploymentId={releaseMgtDeploymentId}
               envTemplateId={envTemplateId}
+              readOnly={!can(Scopes.CONFIG_MANAGE)}
               buildId={buildId}
               // File/event have no endpoints — match devant's ConfigurationWizard
               // (Configurations + Certificate Mount only, no Endpoints step).

@@ -22,6 +22,8 @@ import type { ReactNode } from 'react';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import type { HeaderStatusProps } from '../../../types/integration';
 import ConfigureButton from '../_shared/ConfigureButton';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 // Transitional: the legacy ConfigureDrawer (branches internally on `isAutomation`)
 // stays until its genericisation in phase 4.5. Imported here, inside the type's
 // own folder — never from `_shared`.
@@ -51,6 +53,7 @@ export default function HeaderStatus({
   requestPoll,
 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
+  const can = useCan();
   const { data: schemaConfig } = useSchemaConfig(projectId, component.id, envTemplateId, versionId, deployedCommitSha);
   const missingConfigs = useMemo(() => hasMissingRequiredConfigs(schemaConfig), [schemaConfig]);
 
@@ -96,6 +99,7 @@ export default function HeaderStatus({
         releaseMgtDeploymentId={releaseMgtDeploymentId}
         isAutomation
         envTemplateId={envTemplateId}
+        readOnly={!can(Scopes.CONFIG_MANAGE)}
         buildId={buildId}
       />
     </>

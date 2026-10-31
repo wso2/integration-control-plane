@@ -66,6 +66,7 @@ export const Scopes = {
   PACKAGE_REGISTRY_READ: 'ipaas:package-registry:read',
   PACKAGE_REGISTRY_MANAGE: 'ipaas:package-registry:manage',
   LOG_READ: 'ipaas:observability:log-read',
+  CONFIG_READ: 'ipaas:config:read',
   CONFIG_MANAGE: 'cloud:resource-type:manage',
   ENVIRONMENT_MANAGE: 'cloud:environment:manage',
   DEPLOYMENT_PIPELINE_MANAGE: 'cloud:deployment-pipeline:manage',

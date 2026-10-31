@@ -35,7 +35,7 @@ interface ConfigureButtonProps {
  */
 export default function ConfigureButton({ onClick, hasMissingConfigs, disabled }: ConfigureButtonProps) {
   const can = useCan();
-  if (!can(Scopes.CONFIG_MANAGE)) return null;
+  if (!can(Scopes.CONFIG_READ)) return null;
   return (
     <Button variant="outlined" size="small" color={hasMissingConfigs ? 'error' : 'primary'} startIcon={<SlidersHorizontal size={14} />} onClick={onClick} disabled={disabled} sx={{ mr: 1 }}>
       {hasMissingConfigs ? 'Configure to continue' : 'Configure'}
