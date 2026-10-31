@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, type StepperState } from './buildProgress';
+import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, stoppedBuildText, stoppedLinksFixed, type StepperState } from './buildProgress';
 import { BUILD_STAGES } from '../constants/build';
 import type { BuildRunLogs, BuildStage } from '../types/build';
 
@@ -259,5 +259,37 @@ describe('mergeForward', () => {
   it('unions newly reported failures in', () => {
     const merged = mergeForward(state({ failedStages: new Set([0]) }), state({ failedStages: new Set([2]) }));
     expect([...merged.failedStages].sort()).toEqual([0, 2]);
+  });
+});
+
+describe('stoppedBuildText', () => {
+  it("names the integration's links when the build couldn't read them, and asks for another build", () => {
+    expect(stoppedBuildText({ reason: 'links_unreadable', links: [], message: "the build could not read the component's links" })).toEqual({
+      why: "the build couldn't read this integration's links",
+      next: 'Build again.',
+    });
+  });
+
+  it('keeps the message of a stop the links caused', () => {
+    const message = "salesforce-sales is linked through acme.sfdemo.sfSales, which this build doesn't have";
+    expect(stoppedBuildText({ reason: 'connection_missing', links: [], message }).why).toBe(message);
+  });
+});
+
+describe('stoppedLinksFixed', () => {
+  const stopped = { reason: 'connection_missing', links: [{ type: 'salesforce-sales', connection: 'acme.sfdemo.sfSales' }], message: 'm' };
+  const link = (connection: string) => ({ resourceType: 'salesforce-sales', connection, linked: true, environments: [] });
+
+  it('is undefined while the link stands as the build found it', () => {
+    expect(stoppedLinksFixed(stopped, [link('acme.sfdemo.sfSales')])).toBeUndefined();
+  });
+
+  it('says what the next build does once the link is changed or unlinked', () => {
+    expect(stoppedLinksFixed(stopped, [link('acme.sfdemo.sfCrm')])).toEqual(['salesforce-sales now goes through acme.sfdemo.sfCrm. Build again to use it.']);
+    expect(stoppedLinksFixed(stopped, [])).toEqual(['salesforce-sales is unlinked. Build again.']);
+  });
+
+  it('is undefined for a stop that names no link', () => {
+    expect(stoppedLinksFixed({ ...stopped, links: [] }, [])).toBeUndefined();
   });
 });

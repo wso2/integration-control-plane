@@ -248,7 +248,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
                 </ListingTable.Cell>
 
                 <ListingTable.Cell>
-                  <BuildStatusLabel status={build.status} conclusion={build.conclusionV2 || build.conclusion} />
+                  <BuildStatusLabel status={build.status} conclusion={build.conclusionV2 || build.conclusion} stopped={build.stopped} />
                 </ListingTable.Cell>
 
                 <ListingTable.Cell>

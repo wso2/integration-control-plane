@@ -170,11 +170,19 @@ export interface ResourceLinkWrite {
   environmentsWithoutValues: string[];
 }
 
-/** A resource the integration could link, with the connections (config key prefixes) named after its keys, best match first. */
-export interface ResourceLinkOption {
+/**
+ * A resource a build calls for: registered from the preset variant of a Ballerina package it imports (`package`),
+ * with the build's connections (config key prefixes) named after its keys, best match first. `linked` is set when the
+ * integration links it already, with names of its own (no `linkedConnection`) or through a connection the build
+ * doesn't have: accepting changes that link.
+ */
+export interface ResourceLinkSuggestion {
   resourceType: string;
   displayName: string;
+  package: string;
   connections: string[];
+  linked: boolean;
+  linkedConnection?: string;
 }
 
 export interface CreateResourceLinkInput {
@@ -182,6 +190,8 @@ export interface CreateResourceLinkInput {
   componentId: string;
   resourceType: string;
   connection: string;
+  /** Set when the integration links the resource already: the write moves that link. */
+  changed?: boolean;
 }
 
 export interface DeleteResourceLinkInput {

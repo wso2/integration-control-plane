@@ -24,6 +24,7 @@ import type { BuildRun } from '../../types/deployment';
 import { BUILD_STAGES } from '../../constants/build';
 import { formatBuildDate, getStepStatus } from '../../utils/build';
 import BuildAccordionStepper from './BuildAccordionStepper';
+import { StoppedBuildAlert } from './StoppedBuildAlert';
 
 interface BuildDetailsProps {
   componentId: string;
@@ -93,6 +94,8 @@ export default function BuildDetails({ componentId, versionId, build, onLogsTogg
           )}
         </Stack>
       </Box>
+
+      {build.stopped && <StoppedBuildAlert stopped={build.stopped} sx={{ mt: 2 }} />}
 
       {/* Stage stepper */}
       {(() => {
