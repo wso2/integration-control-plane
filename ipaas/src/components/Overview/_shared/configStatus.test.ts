@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { hasMissingRequiredConfigs } from './configStatus';
+import { hasMissingRequiredConfigs, missingConfigsReason } from './configStatus';
 import type { ResourceLink, SchemaConfigData } from '../../../types/configuration';
 
 // Package wso2/sftask: two required configurables of connection sfSales, and an optional one.
@@ -68,5 +68,21 @@ describe('hasMissingRequiredConfigs', () => {
 
   it('ignores a link that supplies no configurable', () => {
     expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, [link({})], 'development')).toBe(true);
+  });
+});
+
+describe('missingConfigsReason', () => {
+  const noValues = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL', 'wso2.sftask.sfSalesAuthClientId': 'SALESFORCE_AUTH_CLIENT_ID' }, false);
+
+  it('names the linked resource without values', () => {
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [noValues], 'development')).toBe('salesforce-sales has no values in development. Add them on WSO2 Cloud; development restarts with them by itself.');
+  });
+
+  it('says required configurables have no values when no link is the cause', () => {
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [], 'development')).toBe('Required configurables have no values in development.');
+  });
+
+  it('is undefined when nothing is missing', () => {
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [sales], 'development')).toBeUndefined();
   });
 });

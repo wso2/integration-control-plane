@@ -32,6 +32,7 @@ import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDepl
 import { nextCronRunMs, formatTimeUntil, describeCron } from '../../../utils/cronUtils';
 import { deploymentPollInterval } from '../../../utils/deploymentStatus';
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
+import { useMissingConfigsReason } from '../../Overview/_shared/configStatus';
 import ScheduleDialog from '../../Overview/_shared/ScheduleDialog';
 import PromoteButton from '../../EnvironmentCard/PromoteButton';
 import DeployEnvironmentCardHeader from './DeployEnvironmentCardHeader';
@@ -207,7 +208,8 @@ export default function DeployEnvironmentCard({
   const envTemplateId = env.templateId ?? env.id;
   // Pre-warm cache so ConfigureDrawer opens instantly (result consumed there via shared query key).
   useGetConfigMgt(orgHandler, projectId, componentId, flags.isAutomation ? envTemplateId : env.id, versionId, componentName, configCommitHash, !!configCommitHash && !flags.isAutomation && !isMI);
-  useSchemaConfig(projectId, componentId, envTemplateId, versionId, configCommitHash, !isMI);
+  const { data: schemaConfig } = useSchemaConfig(projectId, componentId, envTemplateId, versionId, configCommitHash, !isMI);
+  const missingConfigsReason = useMissingConfigsReason(isMI ? null : schemaConfig, projectId, componentId, envTemplateId);
   // The full MI config, values included, though the count needs only keys: like the
   // Ballerina pre-warm above, it shares its query key with MiConfigureDrawer, which then opens instantly.
   const { data: miConfig } = useMiConfig(projectId, componentId, env.id, isMI && !!releaseId);
@@ -341,6 +343,7 @@ export default function DeployEnvironmentCard({
             envCritical={env.critical}
             endpointCount={endpoints.length}
             scaleToZeroEnabled={env.scaleToZeroEnabled}
+            missingConfigsReason={missingConfigsReason}
             onConfigClick={() => setConfigureOpen(true)}
             onJobConfigClick={flags.isAutomation ? () => setScheduleOpen(true) : undefined}
             onHistoryClick={() => setHistoryOpen(true)}
