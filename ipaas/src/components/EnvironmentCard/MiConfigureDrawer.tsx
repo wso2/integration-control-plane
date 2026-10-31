@@ -230,7 +230,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   const renderEndpoints = () => {
     if (managingEp) {
-      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} onBack={() => setManagingEp(null)} />;
+      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} environmentId={envId} onBack={() => setManagingEp(null)} />;
     }
     if (!endpoints.length) {
       return (

@@ -29,6 +29,7 @@ import ConsumersPanel from './ConsumersPanel';
 import ServiceInsights from './ServiceInsights';
 import SwaggerOperationsList, { type SwaggerDocument } from './SwaggerOperationsList';
 import GraphqlOperationsList from './GraphqlOperationsList';
+import { toEndpointOptions } from '../../../utils/endpoints';
 
 /**
  * Integration-as-API's content-only body: a deployment-in-progress spinner, the
@@ -127,7 +128,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
           component/environment/endpoint triple — the component name is the
           component id and the endpoint name is the endpoint id. */}
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (
-        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={envEndpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id }))} />
+        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={toEndpointOptions(envEndpoints)} />
       )}
 
       {showInsights && <ServiceInsights envName={env.name} envId={env.id} apimEnvId={env.apimEnvId} projectId={projectId} apiId={insightsApiId} />}

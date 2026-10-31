@@ -23,6 +23,7 @@ import { toEndpointOptions } from '../../utils/endpoints';
 interface EndpointConfigDrawerProps {
   open: boolean;
   onClose: () => void;
+  projectId: string;
   componentId: string;
   versionId: string;
   firstEnvReleaseId: string;

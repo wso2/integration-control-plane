@@ -78,11 +78,12 @@ interface ManageEndpointProps {
   projectId: string;
   versionId: string;
   releaseId: string;
+  environmentId: string;
   onBack: () => void;
 }
 
-export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, onBack }: ManageEndpointProps) {
-  const [visibilities, setVisibilities] = useState<string[]>(ep.networkVisibilities ?? [ep.visibility ?? 'Public']);
+export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, environmentId, onBack }: ManageEndpointProps) {
+  const [visibilities, setVisibilities] = useState<string[]>(() => Array.from(new Set([...(ep.displayProjectUrl === false ? [] : ['Project']), ...(ep.networkVisibilities ?? []).filter((value) => value !== 'Project')])));
   const [saveError, setSaveError] = useState<string | null>(null);
   const updateEp = useUpdateEndpoint();
 
@@ -93,7 +94,7 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
   const handleSave = () => {
     setSaveError(null);
     updateEp.mutate(
-      { componentId, projectId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: visibilities },
+      { componentId, projectId, environmentId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: visibilities },
       {
         onSuccess: onBack,
         onError: (err) => setSaveError(err instanceof Error ? err.message : 'Failed to update endpoint'),

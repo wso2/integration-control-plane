@@ -17,15 +17,15 @@
  */
 
 /**
- * Endpoint visibility: the OpenChoreo wire enum the BFF stores, and the labels the UI shows
+ * Endpoint visibility: the product-facing wire enum the BFF reconciles through APIP, and the labels the UI shows
  * (the `VISIBILITY_OPTS` keys in `components/EndpointCard`). Shared by `deployments.ts`, which
  * reads it, and `components.ts`, which writes it.
  */
 
 /** Wire value -> UI label. The inverse is derived, so the two cannot drift. */
 const VISIBILITY_LABEL: Record<string, string> = {
-  external: 'Public',
-  internal: 'Organization',
+  public: 'Public',
+  organization: 'Organization',
   project: 'Project',
 };
 

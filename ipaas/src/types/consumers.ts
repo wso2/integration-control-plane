@@ -34,6 +34,8 @@ export interface EndpointOption {
   /** Endpoint name — the BFF's `endpointName` path segment. */
   name: string;
   displayName: string;
+  networkVisibilities?: string[] | null;
+  visibilityStatus?: import('./component').EndpointVisibilityStatus | null;
 }
 
 /** A service endpoint exposed as a managed API on the API Platform gateway. */

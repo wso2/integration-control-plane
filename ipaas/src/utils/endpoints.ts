@@ -79,7 +79,7 @@ export function resolveEndpointInvokeUrl(endpoint: EnvEndpoint | undefined): str
 }
 
 /** Environment endpoints as the options the cloud API drawers select from. */
-export const toEndpointOptions = (endpoints: EnvEndpoint[]): EndpointOption[] => endpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id }));
+export const toEndpointOptions = (endpoints: EnvEndpoint[]): EndpointOption[] => endpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id, networkVisibilities: ep.networkVisibilities, visibilityStatus: ep.visibilityStatus }));
 
 export type VisibilityKey = 'public' | 'organization' | 'project';
 

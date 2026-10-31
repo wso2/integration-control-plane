@@ -72,6 +72,10 @@ export function useEnvEndpoints(componentId: string, versionId: string, releaseI
     enabled: !!componentId && !!versionId && !!releaseId,
     staleTime: 30_000,
     retry: false,
+    refetchInterval: (query) => {
+      const endpoints = query.state.data;
+      return endpoints?.some((endpoint) => ['ENABLING', 'DISABLING'].includes(endpoint.visibilityStatus?.public.status ?? '')) ? 2_000 : false;
+    },
   });
 }
 

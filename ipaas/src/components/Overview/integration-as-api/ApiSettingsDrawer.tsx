@@ -59,7 +59,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
   const setPolicies = useSetEndpointPolicies(endpointRef);
   const saving = setPolicies.isPending;
 
-  /** Routes come from the exposed API, not the endpoint's schema: without one there is only `/*`. */
+  /** Routes come from the APIP proxy generated from the released endpoint schema. */
   const operations = useMemo(() => toRateLimitOperations(policies?.operations), [policies?.operations]);
 
   // Seed the form once per (endpoint, open), so later edits survive a refetch.
@@ -79,7 +79,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
   }, [open, policies, syncKey]);
 
   const notice = endpointLoadNotice(loadError, {
-    notExposed: 'This endpoint isn’t exposed as an API yet. Set its visibility to Public and deploy, then come back to configure API settings.',
+    notExposed: 'This endpoint isn’t exposed as an API yet. Enable Public in Configure → Edit endpoint, then come back to configure API settings.',
     unavailable: 'API settings aren’t available in this environment.',
     readFailed: 'Could not read the current API settings.',
   });

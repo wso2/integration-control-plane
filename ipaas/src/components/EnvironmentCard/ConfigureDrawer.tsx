@@ -37,8 +37,6 @@ import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
 
-// ── Step indicator ────────────────────────────────────────────────────────────
-
 const SERVICE_STEPS = ['Configurations', 'Certificate Mount', 'Endpoints'];
 const AUTOMATION_STEPS = ['Configurations', 'Certificate Mount'];
 
@@ -1067,7 +1065,7 @@ function GenericServiceConfigureDrawer({
 
   const renderEndpoints = () => {
     if (managingEp) {
-      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} onBack={() => setManagingEp(null)} />;
+      return <ManageEndpoint ep={managingEp} componentId={componentId} projectId={projectId} versionId={versionId} releaseId={releaseId ?? ''} environmentId={envId} onBack={() => setManagingEp(null)} />;
     }
     if (!endpoints.length) {
       return (
