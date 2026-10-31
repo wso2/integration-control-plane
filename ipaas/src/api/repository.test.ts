@@ -27,7 +27,7 @@ vi.mock('./_client', async (importOriginal) => {
   return { ...actual, bff: { ...actual.bff, get, post, put } };
 });
 
-import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, markAzureDevOpsDefaultBranch, toRepository, updateBuildpackConfigs } from './repository';
+import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchComponentRepository, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, markAzureDevOpsDefaultBranch, toRepository, updateBuildpackConfigs } from './repository';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
 
 const baseInput: UpdateBuildpackConfigsInput = {
@@ -91,6 +91,16 @@ describe('toRepository', () => {
     expect(toRepository({})).toBeNull();
     expect(toRepository({ gitProvider: '', branch: '' })).toBeNull();
     expect(toRepository({ organizationApp: 'wso2', nameApp: '' })).toBeNull();
+  });
+});
+
+describe('fetchComponentRepository', () => {
+  beforeEach(() => get.mockReset());
+
+  it('asks without a project and drops a repo-less answer', async () => {
+    get.mockResolvedValue({ gitProvider: '', branch: '' });
+    expect(await fetchComponentRepository('shop', 'kb-svc')).toBeNull();
+    expect(get).toHaveBeenCalledWith('/components/kb-svc/repository');
   });
 });
 
