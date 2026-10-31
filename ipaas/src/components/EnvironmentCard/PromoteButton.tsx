@@ -45,9 +45,9 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
-  const { data: links = [] } = useResourceLinks(projectId, componentId, true);
-  const [confirming, setConfirming] = useState(false);
-  const withoutValues = promoteWithoutValues(links, sourceEnvId, targetEnvId);
+  const links = useResourceLinks(projectId, componentId, true);
+  const [checking, setChecking] = useState(false);
+  const [confirming, setConfirming] = useState<{ withoutValues: string[]; unchecked: boolean } | null>(null);
 
   const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
@@ -58,8 +58,18 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted;
 
+  // The target starts the release with the resources it carries: decide on a read made now, not on a cached or pending one.
+  const checkThenPromote = async () => {
+    setChecking(true);
+    const read = await links.refetch();
+    setChecking(false);
+    const withoutValues = read.isSuccess ? promoteWithoutValues(read.data, sourceEnvId, targetEnvId) : [];
+    if (!read.isSuccess || withoutValues.length > 0) setConfirming({ withoutValues, unchecked: !read.isSuccess });
+    else handlePromote();
+  };
+
   const handlePromote = () => {
-    setConfirming(false);
+    setConfirming(null);
     if (!canPromote || !sourceReleaseId) return;
     onPromoteStarted?.();
     promote.mutate(
@@ -82,22 +92,23 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
     <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
       <Tooltip title={tooltipTitle}>
         <span>
-          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || promote.isPending} onClick={() => (withoutValues.length > 0 ? setConfirming(true) : handlePromote())}>
-            {promote.isPending ? 'Promoting…' : 'Promote'}
+          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || checking || promote.isPending} onClick={checkThenPromote}>
+            {checking ? 'Checking…' : promote.isPending ? 'Promoting…' : 'Promote'}
           </Button>
         </span>
       </Tooltip>
-      <Dialog open={confirming} onClose={() => setConfirming(false)}>
+      <Dialog open={!!confirming} onClose={() => setConfirming(null)}>
         <DialogTitle>Promote to {targetEnvId}?</DialogTitle>
         <DialogContent>
-          {withoutValues.map((r) => (
+          {confirming?.unchecked && <Typography variant="body2">Couldn&apos;t check that the resources this release uses have values in {targetEnvId}. It won&apos;t start there if one has none.</Typography>}
+          {confirming?.withoutValues.map((r) => (
             <Typography key={r} variant="body2">
               {r} has no values in {targetEnvId}. It won&apos;t start there until you add them on WSO2 Cloud.
             </Typography>
           ))}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirming(false)}>Cancel</Button>
+          <Button onClick={() => setConfirming(null)}>Cancel</Button>
           <Button variant="contained" onClick={handlePromote}>
             Promote
           </Button>
