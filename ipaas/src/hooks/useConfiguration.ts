@@ -28,7 +28,7 @@ import {
   postConfigMgt,
   postCertificateMappings,
   fetchResourceLinks,
-  fetchResourceLinkOptions,
+  fetchResourceLinkSuggestions,
   createResourceLink,
   deleteResourceLink,
 } from '../api/configuration';
@@ -127,10 +127,10 @@ export function useResourceLinks(projectId: string, componentId: string, enabled
   });
 }
 
-export function useResourceLinkOptions(projectId: string, componentId: string, enabled: boolean) {
+export function useResourceLinkSuggestions(projectId: string, componentId: string, build: string | undefined, enabled: boolean) {
   return useQuery({
-    queryKey: ['resourceLinkOptions', projectId, componentId],
-    queryFn: () => fetchResourceLinkOptions(projectId, componentId),
+    queryKey: ['resourceLinkSuggestions', projectId, componentId, build],
+    queryFn: () => fetchResourceLinkSuggestions(projectId, componentId, build),
     enabled: enabled && !!projectId && !!componentId,
     retry: false,
   });
@@ -157,6 +157,7 @@ export function useDeleteResourceLink() {
 // A link change rolls the integration out in development.
 const invalidateLinks = (qc: QueryClient, projectId: string, componentId: string) => {
   qc.invalidateQueries({ queryKey: ['resourceLinks', projectId, componentId] });
+  qc.invalidateQueries({ queryKey: ['resourceLinkSuggestions', projectId, componentId] });
   qc.invalidateQueries({ queryKey: ['componentDeployment'] });
 };
 

@@ -17,6 +17,7 @@
  */
 
 import type { BuildRunLogs, BuildStep } from '../types/build';
+import type { BuildStopped } from '../types/deployment';
 import type { Step, StepStatus } from '../types/stepper';
 import { BUILD_STAGES } from '../constants/build';
 
@@ -34,6 +35,15 @@ export interface StepperState {
   failedStages: Set<number>;
   /** Stages observed finishing with none of their steps failing — never re-marked. */
   passedStages: Set<number>;
+}
+
+/** A stopped build's reason when the build couldn't read the integration's links: nothing the user's links caused. */
+export const LINKS_UNREADABLE = 'links_unreadable';
+
+/** Why a build stopped before deploying, and what to do next. */
+export function stoppedBuildText(stopped: BuildStopped): { why: string; next: string } {
+  if (stopped.reason === LINKS_UNREADABLE) return { why: "the build couldn't read this integration's links", next: 'Build again.' };
+  return { why: stopped.message, next: 'Change or unlink the link in the Configure form, then build again.' };
 }
 
 export function isFailedConclusion(conclusion?: string | null): boolean {

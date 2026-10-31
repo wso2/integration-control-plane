@@ -34,7 +34,7 @@ import type {
   SaveSchemaConfigInput,
   ConfigMgtSaveItem,
   ResourceLink,
-  ResourceLinkOption,
+  ResourceLinkSuggestion,
   ResourceLinkWrite,
   CreateResourceLinkInput,
   DeleteResourceLinkInput,
@@ -64,7 +64,9 @@ export const saveSchemaConfig = (input: SaveSchemaConfigInput): Promise<{ config
 
 export const fetchResourceLinks = (projectId: string, componentId: string): Promise<ResourceLink[]> => bff.get<ResourceLink[]>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`);
 
-export const fetchResourceLinkOptions = (projectId: string, componentId: string): Promise<ResourceLinkOption[]> => bff.get<ResourceLinkOption[]>(`/components/${seg(componentId)}/link-options${q({ projectName: projectId })}`);
+/** The resources build calls for (the latest build when absent). */
+export const fetchResourceLinkSuggestions = (projectId: string, componentId: string, build?: string): Promise<ResourceLinkSuggestion[]> =>
+  bff.get<ResourceLinkSuggestion[]>(`/components/${seg(componentId)}/link-suggestions${q({ projectName: projectId, build })}`);
 
 export const createResourceLink = ({ projectId, componentId, resourceType, connection }: CreateResourceLinkInput): Promise<ResourceLinkWrite> =>
   bff.post<ResourceLinkWrite>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`, { resourceType, connection });

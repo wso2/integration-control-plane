@@ -71,6 +71,15 @@ export interface BuildRun {
   failureReason: number;
   sourceCommitId: string;
   buildRef?: string;
+  /** Why the build stopped before it deployed, when it did. */
+  stopped?: BuildStopped;
+}
+
+/** A build that stopped before it wrote its Workload, so no environment runs it, and the links involved. */
+export interface BuildStopped {
+  reason: string;
+  links: { type: string; connection: string }[];
+  message: string;
 }
 
 export interface ReleaseMgtDeploymentComponentConfigs {

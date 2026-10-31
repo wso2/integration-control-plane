@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, type StepperState } from './buildProgress';
+import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isSkippedConclusion, logsBehindBuild, mergeForward, stepStatusAt, stoppedBuildText, type StepperState } from './buildProgress';
 import { BUILD_STAGES } from '../constants/build';
 import type { BuildRunLogs, BuildStage } from '../types/build';
 
@@ -259,5 +259,19 @@ describe('mergeForward', () => {
   it('unions newly reported failures in', () => {
     const merged = mergeForward(state({ failedStages: new Set([0]) }), state({ failedStages: new Set([2]) }));
     expect([...merged.failedStages].sort()).toEqual([0, 2]);
+  });
+});
+
+describe('stoppedBuildText', () => {
+  it("names the integration's links when the build couldn't read them, and asks for another build", () => {
+    expect(stoppedBuildText({ reason: 'links_unreadable', links: [], message: "the build could not read the component's links" })).toEqual({
+      why: "the build couldn't read this integration's links",
+      next: 'Build again.',
+    });
+  });
+
+  it('keeps the message of a stop the links caused', () => {
+    const message = "salesforce-sales is linked through acme.sfdemo.sfSales, which this build doesn't have";
+    expect(stoppedBuildText({ reason: 'connection_missing', links: [], message }).why).toBe(message);
   });
 });
