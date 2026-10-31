@@ -48,6 +48,7 @@ export default function HeaderStatus({
 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
   const can = useCan();
+  const configReadOnly = !can(Scopes.CONFIG_MANAGE);
 
   // Switch the Configure button to "Configure to Continue" when the schema has
   // required configs without values (devant: `hasAllRequiredConfigs`).
@@ -59,7 +60,7 @@ export default function HeaderStatus({
       <StatusDot status={deploymentStatusV2} />
       {hasDeployment && (
         <>
-          <ConfigureButton onClick={() => setConfigureOpen(true)} hasMissingConfigs={missingConfigs} />
+          <ConfigureButton onClick={() => setConfigureOpen(true)} hasMissingConfigs={missingConfigs} readOnly={configReadOnly} />
           <ConfigureDrawer
             onSaved={() => {
               requestPoll();
@@ -80,7 +81,7 @@ export default function HeaderStatus({
             releaseMgtReleaseId={releaseMgtReleaseId}
             releaseMgtDeploymentId={releaseMgtDeploymentId}
             envTemplateId={envTemplateId}
-            readOnly={!can(Scopes.CONFIG_MANAGE)}
+            readOnly={configReadOnly}
             buildId={buildId}
             hideEndpoints
           />

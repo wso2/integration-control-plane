@@ -54,6 +54,7 @@ export default function HeaderStatus({
 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
   const can = useCan();
+  const configReadOnly = !can(Scopes.CONFIG_MANAGE);
 
   const { data: schemaConfig } = useSchemaConfig(projectId, component.id, envTemplateId, versionId, deployedCommitSha);
   const missingConfigs = useMemo(() => hasMissingRequiredConfigs(schemaConfig), [schemaConfig]);
@@ -63,7 +64,7 @@ export default function HeaderStatus({
       <StatusDot status={deploymentStatusV2} />
       {hasDeployment && (
         <>
-          <ConfigureButton onClick={() => setConfigureOpen(true)} hasMissingConfigs={missingConfigs} />
+          <ConfigureButton onClick={() => setConfigureOpen(true)} hasMissingConfigs={missingConfigs} readOnly={configReadOnly} />
           <ConfigureDrawer
             onSaved={() => {
               requestPoll();
@@ -84,7 +85,7 @@ export default function HeaderStatus({
             releaseMgtReleaseId={releaseMgtReleaseId}
             releaseMgtDeploymentId={releaseMgtDeploymentId}
             envTemplateId={envTemplateId}
-            readOnly={!can(Scopes.CONFIG_MANAGE)}
+            readOnly={configReadOnly}
             buildId={buildId}
           />
         </>
