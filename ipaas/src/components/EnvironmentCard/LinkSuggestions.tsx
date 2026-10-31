@@ -20,7 +20,7 @@ import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from '@
 import { Link } from '@wso2/oxygen-ui-icons-react';
 import { useCreateResourceLink, useResourceLinkSuggestions } from '../../hooks/useConfiguration';
 import type { ResourceLink } from '../../types/configuration';
-import { linkSuggestionRows } from '../../utils/linkSuggestions';
+import { type LinkSuggestionAction, linkSuggestionRows } from '../../utils/linkSuggestions';
 import { LinkOutcome } from './LinkOutcome';
 
 interface LinkSuggestionsProps {
@@ -30,6 +30,10 @@ interface LinkSuggestionsProps {
   links: ResourceLink[];
   /** The build whose suggestions to offer; the latest when absent. */
   build?: string;
+  /** What the rows may offer to do. */
+  actions: LinkSuggestionAction[];
+  /** Hide the heading and help text, for rows inside another box. */
+  bare?: boolean;
 }
 
 const boxSx = { mb: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
@@ -37,24 +41,28 @@ const rowSx = { py: 0.75, borderTop: '1px solid', borderColor: 'divider' } as co
 const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 
 /** Resources a build's imports call for, one row per resource and connection. */
-export function LinkSuggestions({ projectId, componentId, open, links, build }: LinkSuggestionsProps) {
+export function LinkSuggestions({ projectId, componentId, open, links, build, actions, bare }: LinkSuggestionsProps) {
   const { data: suggestions = [] } = useResourceLinkSuggestions(projectId, componentId, build, open);
   const create = useCreateResourceLink();
 
-  const rows = linkSuggestionRows(suggestions, links);
+  const rows = linkSuggestionRows(suggestions, links, actions);
   const outcome = create.data && <LinkOutcome write={create.data} changed={!!create.variables.changed} />;
   if (rows.length === 0) return outcome || null;
 
   return (
     <>
       {outcome}
-      <Box sx={boxSx}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Suggested resources
-        </Typography>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-          Resources for the connectors this integration imports. Linking one supplies its connection&apos;s configurables: development gets them with its current build, other environments when you promote to them.
-        </Typography>
+      <Box sx={bare ? undefined : boxSx}>
+        {!bare && (
+          <>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Suggested resources
+            </Typography>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+              Resources for the connectors this integration imports. Linking one supplies its connection&apos;s configurables: development gets them with its current build, other environments when you promote to them.
+            </Typography>
+          </>
+        )}
         {rows.map((r) => {
           const pending = create.isPending && create.variables?.resourceType === r.resourceType && create.variables.connection === r.connection;
           return (

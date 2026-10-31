@@ -18,14 +18,15 @@
 
 import { describe, expect, it } from 'vitest';
 import type { ResourceLink } from '../types/configuration';
-import { linkSuggestionRows } from './linkSuggestions';
+import { type LinkSuggestionAction, linkSuggestionRows } from './linkSuggestions';
 
 const connections = ['wso2.sfdemo.sfSales', 'wso2.sfdemo.support.sfSupport'];
 const suggestions = [
   { resourceType: 'salesforce-sales', displayName: 'Salesforce (sales)', package: 'ballerinax/salesforce', connections, linked: false },
   { resourceType: 'salesforce-support', displayName: 'Salesforce (support)', package: 'ballerinax/salesforce', connections, linked: false },
 ];
-const rows = (s: typeof suggestions, links: ResourceLink[] = []) => linkSuggestionRows(s, links).map((r) => `${r.action} ${r.resourceType} → ${r.connection}`);
+const all = ['Link', 'Change link', 'Link through'] as const;
+const rows = (s: typeof suggestions, links: ResourceLink[] = [], actions: LinkSuggestionAction[] = [...all]) => linkSuggestionRows(s, links, actions).map((r) => `${r.action} ${r.resourceType} → ${r.connection}`);
 
 describe('linkSuggestionRows', () => {
   it('offers every resource of a variant through every connection', () => {
@@ -42,6 +43,22 @@ describe('linkSuggestionRows', () => {
       },
     ];
     expect(rows(suggestions.slice(1), links)).toEqual(['Link salesforce-support → wso2.sfdemo.support.sfSupport']);
+  });
+
+  it('leaves out a resource workload.yaml declares, and the connection its configurables are', () => {
+    const declared: ResourceLink = {
+      resourceType: 'salesforce-sales',
+      linked: false,
+      declared: true,
+      environments: [{ name: 'development', inRelease: true, hasValues: true, connectionInBuild: false, configurables: { 'wso2.sfdemo.sfSalesBaseUrl': 'SALESFORCE_BASE_URL' } }],
+    };
+    expect(rows(suggestions, [declared])).toEqual(['Link salesforce-support → wso2.sfdemo.support.sfSupport']);
+  });
+
+  it('offers only the actions asked for', () => {
+    const changed = { ...suggestions[0], linked: true, linkedConnection: 'wso2.sfdemo.sfCrm' } as (typeof suggestions)[0];
+    expect(rows([changed, suggestions[1]], [], ['Link', 'Link through'])).toEqual(['Link salesforce-support → wso2.sfdemo.sfSales', 'Link salesforce-support → wso2.sfdemo.support.sfSupport']);
+    expect(rows([changed, suggestions[1]], [], ['Change link'])).toEqual(['Change link salesforce-sales → wso2.sfdemo.sfSales', 'Change link salesforce-sales → wso2.sfdemo.support.sfSupport']);
   });
 
   it('changes a linked resource', () => {

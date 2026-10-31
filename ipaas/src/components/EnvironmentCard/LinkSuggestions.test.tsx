@@ -54,9 +54,15 @@ afterEach(() => {
 describe('LinkSuggestions', () => {
   it('offers to change a link the build can no longer take', async () => {
     create.current = { mutate: vi.fn(), isPending: false, isError: false };
-    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} build="sfdemo-2" />));
+    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} build="sfdemo-2" actions={['Change link']} />));
     expect(container.querySelector('button')?.textContent).toBe('Change link');
     expect(container.textContent).toContain('acme.sfdemo.sfSales → acme.sfdemo.sfCrm');
+  });
+
+  it('offers no change where it offers only new links', async () => {
+    create.current = { mutate: vi.fn(), isPending: false, isError: false };
+    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} actions={['Link', 'Link through']} />));
+    expect(container.querySelector('button')).toBeNull();
   });
 
   it('says in one line when the change reaches development', async () => {
@@ -67,7 +73,7 @@ describe('LinkSuggestions', () => {
       data: { resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfCrm', workload: 'next_build', environmentsWithoutValues: [] },
       variables,
     };
-    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} />));
+    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} actions={['Change link']} />));
     expect(container.textContent).toContain('salesforce-sales now goes through acme.sfdemo.sfCrm. Build again to use it.');
   });
 });

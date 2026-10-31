@@ -18,13 +18,17 @@
 
 import { Stack, Typography } from '@wso2/oxygen-ui';
 import { FailedIcon, InProgressIcon, QueuedIcon, SuccessIcon, WarningIcon } from '../StatusIcons';
+import type { BuildStopped } from '../../types/deployment';
+import { stoppedBuildText } from '../../utils/buildProgress';
 
 interface BuildStatusLabelProps {
   status: string;
   conclusion: string;
+  /** Why the build stopped before deploying, shown under "Failed". */
+  stopped?: BuildStopped;
 }
 
-export default function BuildStatusLabel({ status, conclusion }: BuildStatusLabelProps) {
+export default function BuildStatusLabel({ status, conclusion, stopped }: BuildStatusLabelProps) {
   if (status === 'queued') {
     return (
       <Stack direction="row" alignItems="center" gap={0.75}>
@@ -60,9 +64,16 @@ export default function BuildStatusLabel({ status, conclusion }: BuildStatusLabe
     }
     if (conclusion === 'failure' || conclusion === 'failed') {
       return (
-        <Stack direction="row" alignItems="center" gap={0.75}>
-          <FailedIcon size={16} />
-          <Typography variant="body2">Failed</Typography>
+        <Stack gap={0.25}>
+          <Stack direction="row" alignItems="center" gap={0.75}>
+            <FailedIcon size={16} />
+            <Typography variant="body2">Failed</Typography>
+          </Stack>
+          {stopped && (
+            <Typography variant="caption" color="text.secondary">
+              {stoppedBuildText(stopped).why}
+            </Typography>
+          )}
         </Stack>
       );
     }
