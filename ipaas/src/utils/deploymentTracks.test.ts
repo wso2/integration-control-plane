@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { trackBranchOptions } from './deploymentTracks';
+import { apiVersionError, hasVersionedApis, nextApiVersion, trackBranchOptions } from './deploymentTracks';
 import type { DeploymentTrack } from '../types/component';
 
 const TRACKS: DeploymentTrack[] = [
@@ -44,5 +44,55 @@ describe('trackBranchOptions', () => {
 
   it('still shows a branch the repository no longer has', () => {
     expect(summary('next-bbbbbb', 'gone')).toEqual(['gone', 'main:taken', 'next', 'feature']);
+  });
+});
+
+describe('nextApiVersion', () => {
+  it.each([
+    { versions: [], next: 'v1.0' },
+    { versions: ['', undefined], next: 'v1.0' },
+    { versions: ['v1.0'], next: 'v1.1' },
+    { versions: ['v1.0', 'v1.3', 'v2.1'], next: 'v2.2' },
+    // By number, not by text: v1.10 is after v1.9.
+    { versions: ['v1.9', 'v1.10'], next: 'v1.11' },
+    { versions: ['v10.0', 'v9.9'], next: 'v10.1' },
+    { versions: ['', 'v1.0', 'latest'], next: 'v1.1' },
+  ])('gives $next after $versions', ({ versions, next }) => {
+    expect(nextApiVersion(versions)).toBe(next);
+  });
+});
+
+describe('apiVersionError', () => {
+  const tracks: DeploymentTrack[] = [
+    { id: 'main-aaaaaa', branch: 'main', latest: true, apiVersion: 'v1.0' },
+    { id: 'next-bbbbbb', branch: 'next', apiVersion: 'v1.1' },
+    { id: 'old-cccccc', branch: 'old' },
+  ];
+
+  it.each(['1.0', 'v1', 'v1.0.0', 'V1.0', 'v1.x', ' v1.2', ''])('rejects %j', (value) => {
+    expect(apiVersionError(value, tracks)).toBe('API version must look like v1.0');
+  });
+
+  it('rejects a version another track uses', () => {
+    expect(apiVersionError('v1.1', tracks)).toBe('API version v1.1 is already used by another deployment track');
+    expect(apiVersionError('v1.1', tracks, 'old-cccccc')).toBe('API version v1.1 is already used by another deployment track');
+  });
+
+  it('accepts an unused version, and the edited track keeping its own', () => {
+    expect(apiVersionError('v1.2', tracks)).toBeNull();
+    expect(apiVersionError('v1.1', tracks, 'next-bbbbbb')).toBeNull();
+  });
+});
+
+describe('hasVersionedApis', () => {
+  it.each([
+    { displayType: 'ballerinaService', componentSubType: null, versioned: true },
+    { displayType: 'miApiService', componentSubType: null, versioned: true },
+    { displayType: 'ballerinaService', componentSubType: 'rag-service', versioned: false },
+    { displayType: 'ballerinaService', componentSubType: 'MCP', versioned: false },
+    { displayType: 'ballerinaService', componentSubType: 'aiAgent', versioned: false },
+    { displayType: 'scheduledTask', componentSubType: null, versioned: false },
+  ])('$displayType/$componentSubType → $versioned', ({ displayType, componentSubType, versioned }) => {
+    expect(hasVersionedApis({ displayType, componentSubType })).toBe(versioned);
   });
 });

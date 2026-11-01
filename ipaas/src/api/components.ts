@@ -229,7 +229,7 @@ export const fetchComponents = (_orgHandler: string, projectId: string): Promise
 export const fetchComponentByHandler = async (projectId: string, componentHandler: string): Promise<ComponentDetail> => {
   const detail = withFrontendDisplayType(await bff.get<ComponentDetail>(`/projects/${seg(projectId)}/components/${seg(componentHandler)}`));
   const deploymentTracks: DeploymentTrack[] = detail.deploymentTracks?.length ? detail.deploymentTracks : [{ id: detail.id, latest: true }];
-  const apiVersions: ApiVersion[] = deploymentTracks.map((t) => ({ id: t.id, apiVersion: '', branch: t.branch ?? '', latest: t.latest ?? false }));
+  const apiVersions: ApiVersion[] = deploymentTracks.map((t) => ({ id: t.id, apiVersion: t.apiVersion ?? '', branch: t.branch ?? '', latest: t.latest ?? false }));
   return { ...detail, deploymentTracks, apiVersions };
 };
 
@@ -292,12 +292,12 @@ export const createMcpProxyComponent = (_input: CreateMcpProxyComponentInput): P
 // Every track of the integration with its environments, which the component detail leaves out.
 export const fetchDeploymentTracks = (componentId: string): Promise<DeploymentTrack[]> => bff.get<ListResponse<DeploymentTrack>>(`/components/${seg(componentId)}/deployment-tracks`).then(items);
 
-// A track has no API version on cloud, so apiVersion is not sent.
 export const createDeploymentTrack = (input: CreateDeploymentTrackInput): Promise<DeploymentTrack> =>
   bff.post<DeploymentTrack>(`/components/${seg(input.componentId)}/deployment-tracks`, {
     branch: input.branch,
     description: input.description,
     enableAutoDeploy: input.enableAutoDeploy,
+    apiVersion: input.apiVersion,
   });
 
 export const updateDeploymentTrack = (input: UpdateDeploymentTrackInput): Promise<DeploymentTrack> =>
@@ -305,6 +305,7 @@ export const updateDeploymentTrack = (input: UpdateDeploymentTrackInput): Promis
     branch: input.branch,
     description: input.description,
     enableAutoDeploy: input.enableAutoDeploy,
+    apiVersion: input.apiVersion,
   });
 
 // The BFF refuses a delete it would answer canDelete: false for, with the same reason.

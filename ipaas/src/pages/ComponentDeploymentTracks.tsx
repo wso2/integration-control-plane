@@ -34,7 +34,7 @@ import type { ComponentScope } from '../nav';
 import type { DeploymentTrack } from '../types/component';
 import type { Environment } from '../types/environment';
 import type { Repository } from '../types/repository';
-import { trackBranchOptions } from '../utils/deploymentTracks';
+import { apiVersionError, hasVersionedApis, nextApiVersion, trackBranchOptions } from '../utils/deploymentTracks';
 
 type Notice = { type: 'success' | 'error'; message: string };
 
@@ -104,35 +104,63 @@ function BranchField({ repository, value, onChange, tracks, editingId, lockedRea
   );
 }
 
+const API_VERSION_HELP = "Unique to this track. It can't be changed later.";
+
+interface ApiVersionFieldProps {
+  value: string;
+  onChange: (version: string) => void;
+  /** Why the value can't be saved, when it can't. */
+  error: string | null;
+  /** The track already has a version, which never changes. */
+  locked: boolean;
+  /** A new track needs one; a track created before versions may stay without. */
+  required: boolean;
+}
+
+function ApiVersionField({ value, onChange, error, locked, required }: ApiVersionFieldProps): JSX.Element {
+  if (locked) return <TextField label="API Version" value={value} fullWidth disabled helperText="A track's API version can't be changed once set." />;
+  return <TextField label="API Version" value={value} onChange={(e) => onChange(e.target.value)} fullWidth required={required} error={!!error} helperText={error ?? API_VERSION_HELP} />;
+}
+
 interface TrackDialogProps {
   orgUuid: string;
   componentId: string;
   repository: Repository | null;
   tracks: DeploymentTrack[];
+  /** The integration's APIs are versioned per track, so the dialog asks for the version. */
+  versionedApis: boolean;
   /** The track to edit; absent creates one. */
   track?: DeploymentTrack;
   onClose: () => void;
   onDone: (msg: string) => void;
 }
 
-function TrackDialog({ orgUuid, componentId, repository, tracks, track, onClose, onDone }: TrackDialogProps): JSX.Element {
+function TrackDialog({ orgUuid, componentId, repository, tracks, versionedApis, track, onClose, onDone }: TrackDialogProps): JSX.Element {
   const create = useCreateDeploymentTrack();
   const update = useUpdateDeploymentTrack();
   const [branch, setBranch] = useState(track?.branch ?? '');
   const [description, setDescription] = useState(track?.description ?? '');
+  // A new track starts on the version the BFF would assign; a track without one starts empty,
+  // since saving a version fixes it for good.
+  const [apiVersion, setApiVersion] = useState(track ? (track.apiVersion ?? '') : nextApiVersion(tracks.map((t) => t.apiVersion)));
   const [error, setError] = useState('');
   const pending = create.isPending || update.isPending;
   // Typed in when the branches can't be listed, so checked here as well as in the list.
   const taken = tracks.some((t) => t.id !== track?.id && t.branch === branch.trim());
   // The default track builds the integration's own branch, which the BFF keeps it on.
   const lockedReason = track?.latest ? "The default track's branch can't be changed." : undefined;
+  const versionLocked = !!track?.apiVersion;
+  // Only a version this dialog can still set is sent: a new track's, or one an older track lacks.
+  // Editing such a track may leave it empty.
+  const sendsVersion = versionedApis && !versionLocked && (!track || apiVersion.trim() !== '');
+  const versionError = sendsVersion ? apiVersionError(apiVersion.trim(), tracks, track?.id) : null;
   const onError = (e: unknown) => setError(e instanceof Error ? e.message : `Failed to ${track ? 'update' : 'create'} the deployment track.`);
 
   const handleSave = () => {
     setError('');
-    const fields = { branch: lockedReason ? undefined : branch.trim(), description: description.trim() };
+    const fields = { branch: lockedReason ? undefined : branch.trim(), description: description.trim(), apiVersion: sendsVersion ? apiVersion.trim() : undefined };
     if (track) update.mutate({ componentId, deploymentTrackId: track.id, ...fields }, { onSuccess: () => onDone('Deployment track updated.'), onError });
-    else create.mutate({ orgUuid, componentId, branch: branch.trim(), description: fields.description }, { onSuccess: () => onDone('Deployment track created.'), onError });
+    else create.mutate({ orgUuid, componentId, ...fields, branch: branch.trim() }, { onSuccess: () => onDone('Deployment track created.'), onError });
   };
 
   return (
@@ -146,6 +174,7 @@ function TrackDialog({ orgUuid, componentId, repository, tracks, track, onClose,
         )}
         <Stack gap={2} sx={{ mt: 1 }}>
           <BranchField repository={repository} value={branch} onChange={setBranch} tracks={tracks} editingId={track?.id} lockedReason={lockedReason} />
+          {versionedApis && <ApiVersionField value={apiVersion} onChange={setApiVersion} error={versionError} locked={versionLocked} required={!track} />}
           <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
         </Stack>
       </DialogContent>
@@ -153,7 +182,7 @@ function TrackDialog({ orgUuid, componentId, repository, tracks, track, onClose,
         <Button onClick={onClose} disabled={pending}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={!branch.trim() || taken || pending} startIcon={pending ? <CircularProgress size={16} color="inherit" /> : track ? undefined : <Plus size={16} />}>
+        <Button variant="contained" onClick={handleSave} disabled={!branch.trim() || taken || !!versionError || pending} startIcon={pending ? <CircularProgress size={16} color="inherit" /> : track ? undefined : <Plus size={16} />}>
           {track ? (pending ? 'Saving…' : 'Save') : pending ? 'Creating…' : 'Create'}
         </Button>
       </DialogActions>
@@ -179,9 +208,10 @@ interface TracksBodyProps {
   componentId: string;
   tracks: DeploymentTrack[];
   deploymentTracksEnabled: boolean;
+  versionedApis: boolean;
 }
 
-function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEnabled }: TracksBodyProps): JSX.Element {
+function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEnabled, versionedApis }: TracksBodyProps): JSX.Element {
   const orgUuid = useOrgUuid();
   const { data: environments = [] } = useEnvironments(orgUuid ?? '', projectId);
   const { data: repository = null } = useComponentRepository(projectId, scope.component);
@@ -220,6 +250,7 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
             <ListingTable.Head>
               <ListingTable.Row>
                 <ListingTable.Cell>Branch</ListingTable.Cell>
+                {versionedApis && <ListingTable.Cell>API Version</ListingTable.Cell>}
                 <ListingTable.Cell>Description</ListingTable.Cell>
                 <ListingTable.Cell>Auto Deploy</ListingTable.Cell>
                 <ListingTable.Cell>Environments</ListingTable.Cell>
@@ -236,6 +267,7 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
                       {t.latest && <Chip label="Default" size="small" variant="outlined" color="primary" />}
                     </Stack>
                   </ListingTable.Cell>
+                  {versionedApis && <ListingTable.Cell>{t.apiVersion || '—'}</ListingTable.Cell>}
                   <ListingTable.Cell>{t.description || '—'}</ListingTable.Cell>
                   <ListingTable.Cell>{t.autoDeployEnabled ? 'On' : 'Off'}</ListingTable.Cell>
                   <ListingTable.Cell>
@@ -283,6 +315,7 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
           componentId={componentId}
           repository={repository}
           tracks={tracks}
+          versionedApis={versionedApis}
           track={dialog.track}
           onClose={() => setDialog(null)}
           onDone={(msg) => {
@@ -309,7 +342,7 @@ export default function ComponentDeploymentTracks(scope: ComponentScope): JSX.El
       ) : !comp ? (
         <Typography>Integration not found</Typography>
       ) : (
-        <TracksBody scope={scope} projectId={projectId} componentId={comp.id} tracks={comp.deploymentTracks ?? []} deploymentTracksEnabled={!!comp.deploymentTracksEnabled} />
+        <TracksBody scope={scope} projectId={projectId} componentId={comp.id} tracks={comp.deploymentTracks ?? []} deploymentTracksEnabled={!!comp.deploymentTracksEnabled} versionedApis={hasVersionedApis(comp)} />
       )}
     </PageContent>
   );

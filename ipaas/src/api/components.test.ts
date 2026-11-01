@@ -188,13 +188,38 @@ describe('deployment tracks', () => {
     expect(c.deploymentTracks).toEqual([{ id: 'uid-1', latest: true }]);
   });
 
-  it('creates a track from a branch, with no API version', async () => {
-    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', apiVersion: 'v1.0', branch: 'next', description: 'preview' });
-    expect(post).toHaveBeenCalledWith('/components/hello/deployment-tracks', { branch: 'next', description: 'preview', enableAutoDeploy: undefined });
+  it('creates a track from a branch with its API version', async () => {
+    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', apiVersion: 'v1.1', branch: 'next', description: 'preview' });
+    expect(post).toHaveBeenCalledWith('/components/hello/deployment-tracks', { branch: 'next', description: 'preview', enableAutoDeploy: undefined, apiVersion: 'v1.1' });
+  });
+
+  // JSON drops an undefined field, so the BFF assigns the version itself.
+  it('leaves the API version out when none is given', async () => {
+    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', branch: 'next' });
+    expect(JSON.parse(JSON.stringify(post.mock.calls[0][1]))).toEqual({ branch: 'next' });
   });
 
   it('updates a track in place', async () => {
     await updateDeploymentTrack({ componentId: 'hello', deploymentTrackId: 'next-bbbbbb', branch: 'release' });
     expect(put).toHaveBeenCalledWith('/components/hello/deployment-tracks/next-bbbbbb', expect.objectContaining({ branch: 'release' }));
+    expect(JSON.parse(JSON.stringify(put.mock.calls[0][1]))).not.toHaveProperty('apiVersion');
+  });
+
+  it('sets the API version of a track that has none', async () => {
+    await updateDeploymentTrack({ componentId: 'hello', deploymentTrackId: 'old-cccccc', apiVersion: 'v1.2' });
+    expect(put).toHaveBeenCalledWith('/components/hello/deployment-tracks/old-cccccc', expect.objectContaining({ apiVersion: 'v1.2' }));
+  });
+
+  it("lists each track's API version", async () => {
+    get.mockResolvedValue({
+      id: 'uid-1',
+      handler: 'hello',
+      deploymentTracks: [
+        { id: 'main-aaaaaa', branch: 'main', latest: true, apiVersion: 'v1.0' },
+        { id: 'old-cccccc', branch: 'old' },
+      ],
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.apiVersions?.map((v) => v.apiVersion)).toEqual(['v1.0', '']);
   });
 });

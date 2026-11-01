@@ -16,8 +16,9 @@
  * under the License.
  */
 
-import type { DeploymentTrack } from '../types/component';
+import type { Component, DeploymentTrack } from '../types/component';
 import type { RepoBranch } from '../types/repository';
+import { identifyIntegration } from './identifyIntegration';
 
 export interface TrackBranchOption extends RepoBranch {
   /** Another track already builds it; a branch can have one track. */
@@ -33,4 +34,44 @@ export function trackBranchOptions(branches: RepoBranch[], tracks: DeploymentTra
   const taken = new Set(tracks.filter((t) => t.id !== editingId && t.branch).map((t) => t.branch!));
   const listed = current && !branches.some((b) => b.name === current) ? [{ name: current, isDefault: false }, ...branches] : branches;
   return listed.map((b) => ({ ...b, inUse: taken.has(b.name) }));
+}
+
+/** A track's API version: `v` then major and minor numbers. The BFF holds the same rule. */
+const API_VERSION_PATTERN = /^v(\d+)\.(\d+)$/;
+
+export const API_VERSION_FORMAT_ERROR = 'API version must look like v1.0';
+
+/**
+ * The version a new track's API gets when none is given: the minor after the
+ * highest version among `versions`, by major then minor, or `v1.0` when there
+ * is none. The BFF assigns by the same rule, so the field shows what it would pick.
+ */
+export function nextApiVersion(versions: (string | undefined)[]): string {
+  let highest: [number, number] | null = null;
+  for (const v of versions) {
+    const m = v ? API_VERSION_PATTERN.exec(v) : null;
+    if (!m) continue;
+    const parsed: [number, number] = [Number(m[1]), Number(m[2])];
+    if (!highest || parsed[0] > highest[0] || (parsed[0] === highest[0] && parsed[1] > highest[1])) highest = parsed;
+  }
+  return highest ? `v${highest[0]}.${highest[1] + 1}` : 'v1.0';
+}
+
+/**
+ * Why `value` can't be a track's API version, with the BFF's wording, or `null`
+ * when it can. No two tracks of an integration share a version; `editingId` is the track being edited, if any.
+ */
+export function apiVersionError(value: string, tracks: DeploymentTrack[], editingId?: string): string | null {
+  if (!API_VERSION_PATTERN.test(value)) return API_VERSION_FORMAT_ERROR;
+  if (tracks.some((t) => t.id !== editingId && t.apiVersion === value)) return `API version ${value} is already used by another deployment track`;
+  return null;
+}
+
+/**
+ * Integrations whose tracks carry an API version: an integration as API built with
+ * Ballerina or MI.
+ */
+export function hasVersionedApis(component: Pick<Component, 'displayType' | 'componentSubType'>): boolean {
+  const { type, runtime } = identifyIntegration(component.displayType, component.componentSubType);
+  return type === 'integration-as-api' && (runtime === 'ballerina' || runtime === 'mi');
 }

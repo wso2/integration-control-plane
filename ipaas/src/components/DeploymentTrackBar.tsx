@@ -41,6 +41,11 @@ function TrackLabel({ track }: { track: DeploymentTrack }) {
       <GitBranch size={13} />
       <Typography variant="body2" sx={trackLabelSx}>
         {track.branch || track.id}
+        {track.apiVersion && (
+          <Typography component="span" variant="body2" color="text.secondary" sx={trackLabelSx}>
+            {` · ${track.apiVersion}`}
+          </Typography>
+        )}
       </Typography>
       {track.latest && <Chip label="Default" size="small" variant="outlined" color="primary" sx={defaultChipSx} />}
     </Stack>

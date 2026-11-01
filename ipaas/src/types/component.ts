@@ -52,6 +52,10 @@ export interface DeploymentTrack {
   branch?: string;
   /** Clone URL of the repository this track builds from. Cloud only. */
   url?: string;
+  /**
+   * The track's API version (`v1.0`), unique within its integration and fixed once set. Empty for an integration
+   * created before tracks, and for a track created before tracks had API versions.
+   */
   apiVersion?: string;
   description?: string;
   latest?: boolean;
@@ -72,7 +76,7 @@ export interface DeploymentTrackEnvironment {
 export interface CreateDeploymentTrackInput {
   orgUuid: string;
   componentId: string;
-  /** Devant only: cloud tracks carry no API version. */
+  /** Left out, the BFF gives the track the next minor version after the integration's highest. */
   apiVersion?: string;
   branch: string;
   description?: string;
@@ -88,6 +92,8 @@ export interface UpdateDeploymentTrackInput {
   /** An empty string removes the description. */
   description?: string;
   enableAutoDeploy?: boolean;
+  /** Accepted only for a track that has no API version yet: a set version can't change. */
+  apiVersion?: string;
 }
 
 /** Result of `deleteDeploymentTrack` (also used for proxy versions, which share the mutation). */
