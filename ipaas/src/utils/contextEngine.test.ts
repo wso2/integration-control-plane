@@ -948,12 +948,12 @@ describe('file uploads', () => {
     const pdf = { name: 'ref.pdf', size: 4.8 * MB, contentType: 'application/pdf' };
     const dup = { name: 'oncall.txt', size: 1100, contentType: 'text/plain' };
     expect(checkStagedFile(big, [])).toEqual({ problem: 'too-large', replaces: false });
-    expect(stagedFileNote(checkStagedFile(big, []), big.size)).toBe('41.2 MB is over the 25 MB limit. Split it or leave it out.');
+    expect(stagedFileNote(checkStagedFile(big, []))).toBe('This file is over the 25 MB limit.');
     expect(checkStagedFile(bin, [])).toEqual({ problem: 'unsupported', replaces: false });
-    expect(checkStagedFile(pdf, [])).toEqual({ warning: 'pdf', replaces: false });
+    expect(checkStagedFile(pdf, [])).toEqual({ replaces: false });
     expect(checkStagedFile(dup, ['oncall.txt'])).toEqual({ replaces: true });
-    expect(stagedFileNote(checkStagedFile(dup, ['oncall.txt']), dup.size)).toBe('Replaces the version already in the source');
-    expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size, pdfs: 1 });
+    expect(stagedFileNote(checkStagedFile(dup, ['oncall.txt']))).toBe('Replaces the version already in the source');
+    expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size });
   });
 
   it('turns a file visibility choice into role tags and identity rules', () => {
@@ -1036,7 +1036,7 @@ describe('file uploads', () => {
       detail: "The source has no rule for this file's roles yet, so nobody can see it.",
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
-    expect(summarizeUploads([])).toBe('No files yet');
+    expect(summarizeUploads([])).toBe('No files uploaded from this browser');
   });
 
   it('tells an unchanged file from a changed one by its hash and roles, not its version', () => {

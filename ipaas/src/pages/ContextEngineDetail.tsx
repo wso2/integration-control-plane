@@ -22,6 +22,7 @@ import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
+import { useLeaveGuardWhileSending } from '../hooks/contextUploads';
 import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useDeletionJob } from '../hooks/useContextEngine';
 import { deletionFailureText, engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
@@ -53,6 +54,7 @@ const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'cen
 const tabsSx = { borderBottom: '1px solid', borderColor: 'divider', mb: 3 } as const;
 
 export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
+  useLeaveGuardWhileSending();
   const navigate = useAppNavigate();
   const { engineId = '', tab = 'overview' } = useParams();
   const { state } = useLocation() as { state: CreateContextEngineLocationState | null };

@@ -352,12 +352,10 @@ export interface StagedFileMeta {
   contentType: string;
 }
 
-/** Why a chosen file cannot be uploaded, or what to warn about. */
+/** Why a chosen file cannot be uploaded. */
 export interface StagedFileCheck {
   /** Blocks the upload. */
   problem?: 'too-large' | 'unsupported';
-  /** Uploads, but is worth a warning. */
-  warning?: 'pdf';
   /** A file of this name is already in the source; uploading replaces it. */
   replaces: boolean;
 }

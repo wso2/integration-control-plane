@@ -18,7 +18,7 @@
 
 import { Box, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { EVERYONE_VISIBILITY } from '../../../constants/contextEngine';
+import { EVERYONE_VISIBILITY, UPLOAD_MAX_BYTES } from '../../../constants/contextEngine';
 import { formatBytes, stagedSummary } from '../../../utils/contextEngine';
 import { dropStagedFile, hasStagedFile, stageFiles } from '../../../utils/stagedFiles';
 import FileDropzone from './FileDropzone';
@@ -48,9 +48,9 @@ export function StagedFilesSection({ draft, onChange, onRunningEngine = false }:
         Files
       </Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, lineHeight: 1.5 }}>
-        {`Chosen now, uploaded ${when}. Text, Markdown, HTML or JSON up to 25 MB each; PDFs are stored until the engine can read them.`}
+        {`Chosen now, uploaded ${when}. Up to ${formatBytes(UPLOAD_MAX_BYTES)} each.`}
       </Typography>
-      <FileDropzone compact={staged.length > 0} hint="Text, Markdown, HTML or JSON, up to 25 MB each." onFiles={(files) => onChange({ ...draft, staged: stageFiles(staged, files) })} />
+      <FileDropzone compact={staged.length > 0} hint={`Up to ${formatBytes(UPLOAD_MAX_BYTES)} each.`} onFiles={(files) => onChange({ ...draft, staged: stageFiles(staged, files) })} />
       {staged.length > 0 && (
         <Box sx={{ mt: 1.5 }}>
           <StagedFileList
@@ -64,8 +64,8 @@ export function StagedFilesSection({ draft, onChange, onRunningEngine = false }:
           />
           <Typography variant="caption" color={missing.size ? 'warning.dark' : 'text.secondary'} sx={{ display: 'block', mt: 0.75 }}>
             {missing.size > 0
-              ? `${missing.size} of ${staged.length} file${staged.length === 1 ? '' : 's'} need adding again; the rest are staged in this browser.`
-              : `${sum.ready} file${sum.ready === 1 ? '' : 's'} · ${formatBytes(sum.bytes)} staged in this browser${sum.skipped ? ` · ${sum.skipped} skipped` : ''}. Nothing is sent until you ${onRunningEngine ? 'add the source' : 'create the engine'}.`}
+              ? `${missing.size} of ${staged.length} file${staged.length === 1 ? '' : 's'} need adding again. The rest are staged in this tab.`
+              : `${sum.ready} file${sum.ready === 1 ? '' : 's'} · ${formatBytes(sum.bytes)} staged in this tab${sum.skipped ? ` · ${sum.skipped} skipped` : ''}. Nothing is sent until you ${onRunningEngine ? 'add the source' : 'create the engine'}. Reloading the page clears them.`}
           </Typography>
         </Box>
       )}
@@ -79,6 +79,8 @@ export function StagedFilesSection({ draft, onChange, onRunningEngine = false }:
  */
 export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }: StagedProps & { orgHandle: string; queryRoles?: string[] }): JSX.Element {
   const staged = draft.staged ?? [];
+  // Skipped files will not upload, so the question counts only the ones that will.
+  const ready = stagedSummary(staged, []).ready;
   if (staged.length === 0) {
     return (
       <Box>
@@ -94,7 +96,7 @@ export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }
   return (
     <FileVisibilityField
       id="staged-visibility"
-      label={`Who can see ${staged.length === 1 ? 'this file' : `these ${staged.length} files`}`}
+      label={`Who can see ${ready === 1 ? 'this file' : ready === 0 ? 'these files' : `these ${ready} files`}`}
       hint="Applies to the files you add here; later uploads to this source choose again."
       orgHandle={orgHandle}
       queryRoles={queryRoles}

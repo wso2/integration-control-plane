@@ -134,7 +134,7 @@ export default function SetupProgress({ engineId, engineName, sourceCount, roleC
       </Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-          Keep this tab open until the uploads finish. Opening the engine now is fine; they carry on in its Files drawer.
+          Files are still being sent. Closing or reloading this tab stops them. You can open the engine while they finish.
         </Typography>
         <Button variant="contained" onClick={onOpen} sx={{ flexShrink: 0 }}>
           Open engine
