@@ -101,8 +101,11 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
         fullWidth
         size="small"
         autoFocus
-        label="Type the engine name to confirm"
-        placeholder={name}
+        label={
+          <>
+            Type <strong>{name}</strong> to confirm
+          </>
+        }
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         onKeyDown={(e) => {
