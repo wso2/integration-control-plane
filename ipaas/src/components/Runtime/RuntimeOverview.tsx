@@ -16,11 +16,11 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Grid, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, Grid, Stack, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { RotateCw } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import CopyField from './CopyField';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import type { PaletteColor } from '../../config/statusColors';
 
 // Normalize whatever casing/format the backend sends (e.g. "Active", "ACTIVE",
@@ -69,9 +69,13 @@ export default function RuntimeOverview({ componentName, status, lastDeployedAt,
           </Typography>
           <Chip size="small" variant="outlined" color={meta.color} label={meta.label} sx={{ height: 20, fontSize: '0.68rem', fontWeight: 500 }} />
         </Stack>
-        <Typography variant="body2" color="text.secondary">
-          Last deployed {lastDeployedAt ? formatDistanceToNow(lastDeployedAt) : '—'}
-        </Typography>
+        {lastDeployedAt ? (
+          <RelativeTime time={formatDistanceToNow(lastDeployedAt)} dateTime={lastDeployedAt} tooltip={formatDateTime(lastDeployedAt)} action="Last deployed" />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Last deployed —
+          </Typography>
+        )}
         <Box sx={{ mt: 3 }}>
           {isDeployed ? (
             <Button variant="outlined" startIcon={redeploying ? <CircularProgress size={16} color="inherit" /> : <RotateCw size={18} />} disabled={redeploying || !canRedeploy} onClick={onRedeploy}>

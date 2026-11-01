@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, MenuItem, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Button, CircularProgress, MenuItem, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Wrench } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
@@ -31,7 +30,6 @@ import { toHandler } from '../utils/string';
 import { newComponentUrl, resourceUrl, type ProjectScope } from '../nav';
 
 const ROW_GAP = 2;
-const REQUIRED_SX = { '& .MuiFormLabel-asterisk': { color: 'error.main' } };
 const RESERVE_HELPER_SX = { '& .MuiFormHelperText-root': { minHeight: '1rem', mt: 0.5 } };
 
 /**
@@ -146,8 +144,9 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
         <Stack gap={ROW_GAP} sx={{ maxWidth: 760 }}>
           {/* Identity — Integration Name + Integration Id, two columns */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
-            <TextField required size="small" label="Integration Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth sx={{ flex: 1, ...REQUIRED_SX, ...RESERVE_HELPER_SX }} helperText=" " />
+            <TextField labelPlacement="top" required size="small" label="Integration Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
             <TextField
+              labelPlacement="top"
               required
               size="small"
               label="Integration Id"
@@ -157,35 +156,36 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
                 setName(e.target.value);
               }}
               fullWidth
-              sx={{ flex: 1, ...REQUIRED_SX, ...RESERVE_HELPER_SX }}
+              sx={{ flex: 1, ...RESERVE_HELPER_SX }}
               error={(!!name && !nameLengthValid) || nameTaken}
               helperText={identifierHelper ?? ' '}
             />
           </Stack>
 
           {/* Description — own row */}
-          <TextField size="small" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} sx={RESERVE_HELPER_SX} helperText=" " />
+          <TextField labelPlacement="top" optional size="small" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} sx={RESERVE_HELPER_SX} helperText=" " />
 
           {/* Version (new MCP, editable) + Base Path (disabled) — one row */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
             <TextField
+              labelPlacement="top"
               required
               size="small"
               label="Version"
               value={version}
               onChange={(e) => setVersion(e.target.value)}
-              sx={{ flex: 1, ...REQUIRED_SX, ...RESERVE_HELPER_SX }}
+              sx={{ flex: 1, ...RESERVE_HELPER_SX }}
               error={!!version && !versionValid}
               helperText={version && !versionValid ? 'e.g. 1.0 or 1.0.0' : ' '}
             />
-            <TextField size="small" label="Base Path" value={basePath} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX, '& input': { fontFamily: 'monospace' } }} helperText=" " />
+            <TextField labelPlacement="top" size="small" label="Base Path" value={basePath} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX, '& input': { fontFamily: 'monospace' } }} helperText=" " />
           </Stack>
 
           {/* Source Integration as API (disabled) + its API version (selectable) — one row */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
-            <TextField size="small" label="Integration as API" value={loadingSource && !sourceName ? 'Loading…' : sourceName || '—'} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
+            <TextField labelPlacement="top" size="small" label="Integration as API" value={loadingSource && !sourceName ? 'Loading…' : sourceName || '—'} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
             {versions.length > 0 ? (
-              <TextField select size="small" label="Source API Version" value={selectedApiId} onChange={(e) => setSelectedApiId(e.target.value)} sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" ">
+              <TextField labelPlacement="top" select size="small" label="Source API Version" value={selectedApiId} onChange={(e) => setSelectedApiId(e.target.value)} sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" ">
                 {versions.map((v) => (
                   <MenuItem key={v.id} value={v.id}>
                     {v.apiVersion}
@@ -194,7 +194,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
                 ))}
               </TextField>
             ) : (
-              <TextField size="small" label="Source API Version" value={loadingApi || loadingSource ? 'Loading…' : sourceApiVersion || '—'} disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
+              <TextField labelPlacement="top" size="small" label="Source API Version" value={loadingApi || loadingSource ? 'Loading…' : sourceApiVersion || '—'} disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
             )}
           </Stack>
 

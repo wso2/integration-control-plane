@@ -139,7 +139,7 @@ export function AnyOfElement({
     <Box sx={{ mt: 1 }}>
       <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 1 }}>
         <Typography variant="body2" color="text.secondary">
-          {title}
+          {!isRequired && isRequiredAtRequiredLevel ? `${title} (Optional)` : title}
         </Typography>
         <Chip label="oneOf" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
       </Stack>

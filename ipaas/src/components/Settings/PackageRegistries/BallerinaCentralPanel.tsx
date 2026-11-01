@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CircularProgress, InputAdornment, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Accordion, AccordionDetails, AccordionSummary, Alert, Box, Button, Card, CircularProgress, InputAdornment, Link, Skeleton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, ArrowUpRight, CheckCircle2, ChevronDown, Lock } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { BALLERINA_CENTRAL_TOKEN_EXPIRY_WARNING_DAYS, BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS, BALLERINA_CENTRAL_TOKEN_PANEL_COPY } from '../../../constants/packageRegistries';

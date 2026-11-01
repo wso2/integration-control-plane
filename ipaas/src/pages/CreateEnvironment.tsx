@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, MenuItem, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, MenuItem, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -98,7 +97,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
 
       <BusyFields busy={create.isPending}>
         <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
-          <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+          <TextField labelPlacement="top" label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
           {loadingDataPlanes ? (
             <CircularProgress size={20} />
           ) : dataPlanesError ? (
@@ -112,7 +111,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
               Failed to load data planes.
             </Alert>
           ) : dataPlanes.length > 1 ? (
-            <TextField select label="Data Plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
+            <TextField labelPlacement="top" select label="Data Plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
               {dataPlanes.map((dp) => (
                 <MenuItem key={dp.id} value={dp.id}>
                   {dp.name}
@@ -120,7 +119,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
               ))}
             </TextField>
           ) : null}
-          <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
+          <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
           <Box>
             <FormControlLabel control={<Checkbox checked={critical} onChange={(_, v) => setCritical(v)} />} label={CRITICAL_ENVIRONMENT_LABEL} />
             <FormHelperText sx={{ mt: 0 }}>{CRITICAL_ENVIRONMENT_HELP}</FormHelperText>

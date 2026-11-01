@@ -16,9 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Divider, Drawer, IconButton, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, Divider, DrawerPanel, MenuItem, Select, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useEndpointPolicies, useSetEndpointPolicies } from '../../../hooks/useConsumers';
 import type { EndpointOption } from '../../../types/consumers';
@@ -103,90 +101,86 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={handleCancel} variant="temporary" sx={styles.rightDrawer}>
-      <Box sx={styles.drawerFrame}>
-        <Box sx={styles.drawerHeader}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            API Settings
-          </Typography>
-          <IconButton size="small" aria-label="close" onClick={handleCancel}>
-            <X size={16} />
-          </IconButton>
-        </Box>
+    <DrawerPanel open={open} onClose={handleCancel}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>API Settings</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-        <Box sx={styles.drawerBody}>
-          {!selectedEndpoint ? (
-            <Alert severity="info">No endpoint associated with this component.</Alert>
-          ) : (
-            <Stack gap={2.5}>
-              {error && <Alert severity="error">{error}</Alert>}
-              {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
+      <DrawerPanel.Body>
+        {!selectedEndpoint ? (
+          <Alert severity="info">No endpoint associated with this component.</Alert>
+        ) : (
+          <Stack gap={2.5}>
+            {error && <Alert severity="error">{error}</Alert>}
+            {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
 
-              <Stack direction="row" alignItems="center" gap={2}>
-                <Typography variant="body2" fontWeight={500}>
-                  Endpoints:
-                </Typography>
-                <Select size="small" value={selectedIdx} onChange={(e) => selectEndpoint(Number(e.target.value))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
-                  {endpoints.map((ep, i) => (
-                    <MenuItem key={ep.name} value={i}>
-                      {ep.displayName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </Stack>
-
-              {isLoading ? (
-                <Box sx={styles.centredRow}>
-                  <CircularProgress size={20} />
-                </Box>
-              ) : (
-                cors &&
-                rateLimit && (
-                  <>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
-                        CORS
-                      </Typography>
-                      <CorsSection value={cors} onChange={setCors} disabled={saving} />
-                    </Box>
-
-                    <Divider />
-
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
-                        Rate Limiting
-                      </Typography>
-                      <RateLimitingSection value={rateLimit} onChange={setRateLimit} disabled={saving} description="Limit how many requests the gateway accepts for this endpoint." apiLevelLabel="Whole endpoint" operations={operations} />
-                    </Box>
-
-                    <Divider />
-
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
-                        Resiliency
-                      </Typography>
-                      <Tooltip title={TIMEOUT_UNAVAILABLE}>
-                        <Box component="span" sx={styles.disabledTooltipTarget}>
-                          <TextField size="small" type="number" label="Endpoint timeout (ms)" value="" disabled sx={{ width: 220 }} helperText={TIMEOUT_UNAVAILABLE} />
-                        </Box>
-                      </Tooltip>
-                    </Box>
-                  </>
-                )
-              )}
+            <Stack direction="row" alignItems="center" gap={2}>
+              <Typography variant="body2" fontWeight={500}>
+                Endpoints:
+              </Typography>
+              <Select size="small" value={selectedIdx} onChange={(e) => selectEndpoint(Number(e.target.value))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
+                {endpoints.map((ep, i) => (
+                  <MenuItem key={ep.name} value={i}>
+                    {ep.displayName}
+                  </MenuItem>
+                ))}
+              </Select>
             </Stack>
-          )}
-        </Box>
 
-        <Box sx={styles.drawerFooter}>
-          <Button variant="outlined" onClick={handleCancel} disabled={saving}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={() => void handleApply()} disabled={!canApply}>
-            {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
-          </Button>
-        </Box>
-      </Box>
-    </Drawer>
+            {isLoading ? (
+              <Box sx={styles.centredRow}>
+                <CircularProgress size={20} />
+              </Box>
+            ) : (
+              cors &&
+              rateLimit && (
+                <>
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+                      CORS
+                    </Typography>
+                    <CorsSection value={cors} onChange={setCors} disabled={saving} />
+                  </Box>
+
+                  <Divider />
+
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+                      Rate Limiting
+                    </Typography>
+                    <RateLimitingSection value={rateLimit} onChange={setRateLimit} disabled={saving} description="Limit how many requests the gateway accepts for this endpoint." apiLevelLabel="Whole endpoint" operations={operations} />
+                  </Box>
+
+                  <Divider />
+
+                  <Box>
+                    <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+                      Resiliency
+                    </Typography>
+                    <Tooltip title={TIMEOUT_UNAVAILABLE}>
+                      <Box component="span" sx={styles.disabledTooltipTarget}>
+                        <TextField labelPlacement="top" size="small" type="number" label="Endpoint timeout (ms)" value="" disabled sx={{ width: 220 }} helperText={TIMEOUT_UNAVAILABLE} />
+                      </Box>
+                    </Tooltip>
+                  </Box>
+                </>
+              )
+            )}
+          </Stack>
+        )}
+      </DrawerPanel.Body>
+
+      <DrawerPanel.Footer>
+        <Button variant="outlined" onClick={handleCancel} disabled={saving}>
+          Cancel
+        </Button>
+        <Button variant="contained" onClick={() => void handleApply()} disabled={!canApply}>
+          {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
+        </Button>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

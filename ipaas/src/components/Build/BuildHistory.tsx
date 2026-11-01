@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, Chip, CircularProgress, IconButton, ListingTable, Snackbar, Stack, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Button, Chip, CircularProgress, IconButton, ListingTable, Snackbar, Stack, TablePagination, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { GitCommit, Settings } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -26,7 +26,7 @@ import type { BuildRun } from '../../types/deployment';
 import { BuildDrawerType } from '../../constants/build';
 import { useBuildAutoEffects } from '../../hooks/useBuildAutoEffects';
 import { findCommitBySha, latestCommitOf } from '../../utils/commits';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import BuildRightDrawer from './BuildRightDrawer';
 import BuildStatusLabel from './BuildStatusLabel';
 
@@ -252,9 +252,13 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
                 </ListingTable.Cell>
 
                 <ListingTable.Cell>
-                  <Typography variant="body2" color="text.secondary">
-                    {build.startedAt ? formatDistanceToNow(build.startedAt) : '—'}
-                  </Typography>
+                  {build.startedAt ? (
+                    <RelativeTime time={formatDistanceToNow(build.startedAt)} dateTime={build.startedAt} tooltip={formatDateTime(build.startedAt)} />
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      —
+                    </Typography>
+                  )}
                 </ListingTable.Cell>
 
                 <ListingTable.Cell align="right">

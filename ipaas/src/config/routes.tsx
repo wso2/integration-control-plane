@@ -20,6 +20,7 @@ import { type RouteProps, Navigate, Outlet } from 'react-router';
 import { cookiePolicyUrl, loginUrl, signupUrl } from '../paths';
 import { ScopeResolver, generateMatrixRoutes, withScope, type Matrix } from '../nav';
 import HiddenPageRedirect from '../components/HiddenPageRedirect';
+import LegacyNewProjectRedirect from '../components/LegacyNewProjectRedirect';
 import UnknownRoute from '../components/UnknownRoute';
 import Logout from '../pages/Logout';
 import { createElement } from 'react';
@@ -60,8 +61,6 @@ const ProjectCdPipelines = lazyPage(() => import('../pages/ProjectCdPipelines'))
 const OrgDataPlanes = lazyPage(() => import('../pages/OrgDataPlanes'));
 const OrgPackageRegistries = lazyPage(() => import('../pages/OrgPackageRegistries'));
 const ComponentRuntime = lazyPage(() => import('../pages/ComponentRuntime'));
-const ProjectSettings = lazyPage(() => import('../pages/ProjectSettings'));
-const ProjectOverview = lazyPage(() => import('../pages/ProjectOverview'));
 const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
 const ComponentContainers = lazyPage(() => import('../pages/ComponentContainers'));
 const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChecks'));
@@ -152,14 +151,13 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/metrics', element: <ComingSoon description="Throughput, latency and errors for every integration in the project." /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/admin/cd-pipelines', element: createElement(withScope(ProjectCdPipelines, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/devops/environments', element: createElement(withScope(Environments, ['projects'])) },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/settings', element: createElement(withScope(ProjectSettings, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(EditProject, ['projects'])) },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/settings/project-overview', element: createElement(withScope(ProjectOverview, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/redirect', element: <ProjectsRedirect /> },
               { path: 'organizations/:orgHandler/home', element: createElement(withScope(OrgHome, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/home', element: createElement(withScope(Project, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/overview', element: createElement(withScope(Component, ['components'])) },
               { path: 'organizations/:orgHandler/new', element: createElement(withScope(CreateProject, ['organizations'])) },
+              { path: 'organizations/:orgHandler/projects/new', element: createElement(withScope(LegacyNewProjectRedirect, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/import', element: createElement(withScope(ImportProject, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new', element: createElement(withScope(CreateIntegrationOptions, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/ai-builder', element: createElement(withScope(AiIntegrationBuilderView, ['projects'])) },

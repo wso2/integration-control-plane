@@ -16,10 +16,9 @@
  * under the License.
  */
 
-import { Box, Button, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, DrawerPanel, Typography } from '@wso2/oxygen-ui';
 import { useState, type ReactNode } from 'react';
-import { OPERATION_DRAWER_BODY_SX, OPERATION_DRAWER_HEADER_SX, OPERATION_TILE_LABEL_SX, VIEW_DETAILS_BUTTON_SX, operationBadgeSx, operationDrawerPaperSx, operationTileSx } from './styles';
+import { OPERATION_TILE_LABEL_SX, VIEW_DETAILS_BUTTON_SX, operationBadgeSx, operationTileSx } from './styles';
 
 /**
  * Colour configuration for an operation tile + its drawer header. Each consumer
@@ -73,15 +72,15 @@ export default function OperationTile({ badgeLabel, label, colors, drawerContent
         </Button>
       </Box>
 
-      <Drawer anchor="right" open={open} onClose={() => setOpen(false)} variant="temporary" sx={operationDrawerPaperSx(drawerWidth)}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={OPERATION_DRAWER_HEADER_SX}>
-          <Typography variant="h5">{drawerTitle}</Typography>
-          <IconButton size="small" onClick={() => setOpen(false)} aria-label="Close">
-            <X size={18} />
-          </IconButton>
-        </Stack>
-        <Box sx={OPERATION_DRAWER_BODY_SX}>{open && drawerContent}</Box>
-      </Drawer>
+      <DrawerPanel open={open} onClose={() => setOpen(false)} width={drawerWidth}>
+        <DrawerPanel.Header>
+          <DrawerPanel.Title>{drawerTitle}</DrawerPanel.Title>
+          <DrawerPanel.Actions>
+            <DrawerPanel.CloseButton />
+          </DrawerPanel.Actions>
+        </DrawerPanel.Header>
+        <DrawerPanel.Body>{open && drawerContent}</DrawerPanel.Body>
+      </DrawerPanel>
     </>
   );
 }

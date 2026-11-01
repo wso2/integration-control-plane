@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Avatar, Box, Button, Chip, CircularProgress, IconButton, InputBase, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Avatar, Box, Button, Chip, CircularProgress, IconButton, InputBase, Skeleton, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Tag, Cloud, GitCommitHorizontal, Copy, Check, Pencil, Globe, Lock } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentDetail } from '../../../types/component';
@@ -26,7 +26,7 @@ import type { Repository, Commit } from '../../../types/repository';
 import { useUpdateComponent } from '../../../hooks/useComponents';
 import { useChoreoSampleImages } from '../../../hooks/useRepository';
 import LabelDialog from '../../LabelDialog';
-import { formatDistanceToNow } from '../../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../../utils/time';
 import { getGitProviderIcon } from '../../../utils/build';
 import { buildRepoBrowseUrl } from '../../../utils/gitProviderUrl';
 import { DESCRIPTION_MAX_LENGTH, clampDescription, isAtNewlineLimit } from '../../../utils/description';
@@ -494,9 +494,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                       {latestCommit.message}
                     </Typography>
                     <Stack direction="row" alignItems="center" gap={1} flexWrap="nowrap">
-                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                        {formatDistanceToNow(latestCommit.author.date)}
-                      </Typography>
+                      <RelativeTime time={formatDistanceToNow(latestCommit.author.date)} dateTime={latestCommit.author.date} tooltip={formatDateTime(latestCommit.author.date)} hideIcon sx={{ whiteSpace: 'nowrap' }} />
                       <Avatar src={latestCommit.author.avatarUrl} alt={latestCommit.author.name ?? 'Commit author'} sx={{ width: 16, height: 16, fontSize: 10, flexShrink: 0 }}>
                         {latestCommit.author.name?.[0]?.toUpperCase()}
                       </Avatar>

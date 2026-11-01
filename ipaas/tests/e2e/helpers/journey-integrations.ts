@@ -63,7 +63,12 @@ export async function confirmRemoval(page: Page, placeholder: string, name: stri
   const confirm = dialog.getByRole('button', { name: 'Delete', exact: true });
   await expect(confirm, 'Delete stayed disabled after the name was typed').toBeEnabled({ timeout: 15_000 });
   await confirm.click();
-  await expect(dialog).not.toBeVisible({ timeout: 60_000 });
+
+  // A rejected delete keeps the dialog open with an alert, so it is raced against the dialog closing.
+  const rejected = dialog.getByRole('alert');
+  await Promise.race([dialog.waitFor({ state: 'hidden', timeout: 2 * 60_000 }).catch(() => {}), rejected.waitFor({ state: 'visible', timeout: 2 * 60_000 }).catch(() => {})]);
+  if (await rejected.isVisible()) throw new Error(`the console rejected the delete: ${(await rejected.textContent())?.trim()}`);
+  await expect(dialog, 'the delete neither completed nor reported an error').not.toBeVisible({ timeout: 30_000 });
 }
 
 /** The row greys out and stays counted until deletion lands, so its disappearance is the signal. */

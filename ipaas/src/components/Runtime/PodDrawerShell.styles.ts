@@ -16,43 +16,9 @@
  * under the License.
  */
 
-import { POD_DRAWER_TOP_OFFSET, POD_DRAWER_WIDTH } from '../../constants/runtime';
-
-export const drawer = (expanded: boolean) =>
-  ({
-    '& .MuiDrawer-paper': {
-      width: expanded ? '100%' : { xs: '100vw', sm: POD_DRAWER_WIDTH },
-      maxWidth: '100%',
-      position: 'fixed',
-      top: POD_DRAWER_TOP_OFFSET,
-      height: `calc(100% - ${POD_DRAWER_TOP_OFFSET}px)`,
-      display: 'flex',
-      flexDirection: 'column',
-    },
-  }) as const;
-
-export const header = {
-  px: 3,
-  py: 2,
-  borderBottom: '1px solid',
-  borderColor: 'divider',
-  flexShrink: 0,
-} as const;
-
-export const title = {
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-} as const;
-
-export const headerActions = { flexShrink: 0 } as const;
-
 export const body = {
-  flex: 1,
-  overflow: 'auto',
   px: 3,
   py: 2,
   display: 'flex',
   flexDirection: 'column',
-  minHeight: 0,
 } as const;

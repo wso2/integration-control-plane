@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Checkbox, Drawer, FormControlLabel, IconButton, MenuItem, Select, Stack, Tooltip, Typography, Button } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Box, Button, Checkbox, DrawerPanel, FormControlLabel, IconButton, MenuItem, Select, Stack, TextField, Tooltip } from '@wso2/oxygen-ui';
 import { Download, RefreshCw, X } from '@wso2/oxygen-ui-icons-react';
 import { useMemo } from 'react';
 import { useInfiniteComponentLogs, useVisibleLogs } from '../../../hooks/useLogs';
@@ -43,17 +42,6 @@ interface ServiceLogsDrawerProps {
   versionId: string;
   region?: string;
 }
-
-const drawerSx = {
-  '& .MuiDrawer-paper': {
-    width: 720,
-    position: 'fixed',
-    top: 64,
-    height: 'calc(100% - 64px)',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-} as const;
 
 export default function ServiceLogsDrawer({ open, onClose, componentId, environmentId, envName, versionId, region }: ServiceLogsDrawerProps) {
   const filters = useLogsFilters();
@@ -89,14 +77,13 @@ export default function ServiceLogsDrawer({ open, onClose, componentId, environm
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="h5">Runtime Logs</Typography>
-        <IconButton size="small" aria-label="close" onClick={handleClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={handleClose} width={720}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Runtime Logs</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
       {/* Filters */}
       <Box sx={{ px: 2, pt: 2, pb: 1, flexShrink: 0 }}>
@@ -180,8 +167,8 @@ export default function ServiceLogsDrawer({ open, onClose, componentId, environm
         {/* Custom date range */}
         {timePreset === 'custom' && (
           <Stack direction="row" gap={1.5} sx={{ mb: 1 }} flexWrap="wrap" alignItems="center">
-            <TextField type="datetime-local" size="small" label="Start" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
-            <TextField type="datetime-local" size="small" label="End" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
+            <TextField labelPlacement="top" type="datetime-local" size="small" label="Start" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
+            <TextField labelPlacement="top" type="datetime-local" size="small" label="End" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
             <Button variant="contained" size="small" onClick={() => refetch()}>
               Apply
             </Button>
@@ -190,7 +177,7 @@ export default function ServiceLogsDrawer({ open, onClose, componentId, environm
       </Box>
 
       {/* Log content */}
-      <Box sx={{ flex: 1, overflow: 'hidden', px: 2, pb: 2 }}>
+      <DrawerPanel.Body sx={{ overflow: 'hidden', pt: 0 }}>
         <LogsPanel
           items={logs}
           getKey={(l, i) => `${i}-${l.timestamp}-${l.logLine.slice(0, 50)}`}
@@ -203,7 +190,7 @@ export default function ServiceLogsDrawer({ open, onClose, componentId, environm
           onFetchNextPage={fetchNextPage}
           onClearFilters={clearFilters}
         />
-      </Box>
-    </Drawer>
+      </DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

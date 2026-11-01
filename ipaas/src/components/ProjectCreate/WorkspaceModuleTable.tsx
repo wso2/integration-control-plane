@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Card, CardContent, Divider, Grid, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Box, Card, CardContent, Divider, Grid, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { File, Folder, FolderOpen, Inbox, Plus, Trash2, Search } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, type JSX } from 'react';
 import type { RepoTreeNode } from '../../types/repository';

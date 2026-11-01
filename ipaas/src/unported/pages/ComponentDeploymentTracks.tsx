@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, ListingTable, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, ListingTable, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { GitBranch, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import Authorized from '../../components/Authorized';
@@ -57,9 +56,9 @@ function CreateTrackDialog({ orgUuid, componentId, onClose, onDone }: { orgUuid:
           </Alert>
         )}
         <Stack gap={2} sx={{ mt: 1 }}>
-          <TextField label="API Version" value={apiVersion} onChange={(e) => setApiVersion(e.target.value)} fullWidth required />
-          <TextField label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)} fullWidth required />
-          <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
+          <TextField labelPlacement="top" label="API Version" value={apiVersion} onChange={(e) => setApiVersion(e.target.value)} fullWidth required />
+          <TextField labelPlacement="top" label="Branch" value={branch} onChange={(e) => setBranch(e.target.value)} fullWidth required />
+          <TextField labelPlacement="top" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
         </Stack>
       </DialogContent>
       <DialogActions>

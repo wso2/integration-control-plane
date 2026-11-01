@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, PageContent, PageTitle, Skeleton, Stack } from '@wso2/oxygen-ui';
-import { Activity } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, PageContent, PageTitle, Skeleton, Stack } from '@wso2/oxygen-ui';
+import { Activity, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import EmptyListing from '../components/EmptyListing';
@@ -78,6 +78,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
   const envSelect = environments.length > 1 ? <EnvironmentSelect environments={environments} value={envId} onChange={setEnvId} deployment={{ orgHandler: org, orgUuid: orgUuid ?? '', componentId: comp?.id ?? '', versionId: trackId }} /> : null;
 
   const notify = (type: 'success' | 'error', message: string): void => setAlert({ type, message });
+  const showCreate = canManage && !resolving && !!comp && !!mainC && !creating && healthChecks.length === 0;
 
   return (
     <Box>
@@ -85,6 +86,13 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
       <PageContent fullWidth>
         <PageTitle>
           <PageTitle.Header>Health Checks</PageTitle.Header>
+          {showCreate && (
+            <PageTitle.Actions>
+              <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setCreating(true)}>
+                Create
+              </Button>
+            </PageTitle.Actions>
+          )}
         </PageTitle>
 
         {alert && (
@@ -128,9 +136,6 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
             icon={<Activity size={48} />}
             title="No Health Checks have been configured in this Environment."
             description="Configuring health checks will allow unhealthy replicas to self-heal and also ensures increased availability for your services."
-            showAction={canManage}
-            actionLabel="Create"
-            onAction={() => setCreating(true)}
           />
         ) : (
           healthChecks.map((hc) => {

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, IconButton, InputAdornment } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Box, IconButton, InputAdornment, TextField } from '@wso2/oxygen-ui';
 import { SendHorizontal } from '@wso2/oxygen-ui-icons-react';
 import { useContext } from 'react';
 import type { JSX, KeyboardEvent } from 'react';

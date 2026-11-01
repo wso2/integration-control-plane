@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Card, CardContent, Collapse, IconButton, InputAdornment, ListingTable, Skeleton, Stack, TablePagination, TableSortLabel, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Box, Card, CardContent, Collapse, IconButton, InputAdornment, ListingTable, Skeleton, Stack, TablePagination, TableSortLabel, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ExternalLink, Search } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useSortState } from '../../hooks/useSortState';

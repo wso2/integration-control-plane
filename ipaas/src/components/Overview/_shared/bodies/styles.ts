@@ -62,28 +62,10 @@ export const operationBadgeSx = (colors: OperationTileColors, minWidth: number) 
     flexShrink: 0,
   }) as const;
 
-/** Right drawer paper — width varies (default 720; MCP tools use a narrower drawer). */
-export const operationDrawerPaperSx = (width: number) =>
-  ({
-    '& .MuiDrawer-paper': {
-      width,
-      maxWidth: '100vw',
-      position: 'fixed',
-      top: 64,
-      height: 'calc(100% - 64px)',
-      borderLeft: '1px solid',
-      borderColor: 'divider',
-      display: 'flex',
-      flexDirection: 'column',
-    },
-  }) as const;
-
 export const OPERATION_TILE_LABEL_SX = { flex: 1, fontSize: '13px', fontWeight: 500, wordBreak: 'break-word', color: 'text.primary' } as const;
 export const OPERATION_HEADER_LABEL_SX = { fontFamily: 'monospace', fontWeight: 500, wordBreak: 'break-word', color: 'text.primary' } as const;
 export const OPERATION_DESCRIPTION_SX = { mt: 1, px: 0.5 } as const;
 export const VIEW_DETAILS_BUTTON_SX = { fontSize: '12px', flexShrink: 0, textTransform: 'none' } as const;
-export const OPERATION_DRAWER_HEADER_SX = { px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 } as const;
-export const OPERATION_DRAWER_BODY_SX = { flex: 1, overflowY: 'auto', px: 2, py: 2 } as const;
 
 // ── File / event runtime-log body ────────────────────────────────────────────
 

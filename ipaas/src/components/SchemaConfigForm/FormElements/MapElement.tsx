@@ -17,8 +17,7 @@
  */
 
 import React, { useEffect, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import { Box, Button, Chip, IconButton, Paper, Popover, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Box, Button, Chip, IconButton, Paper, Popover, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Edit2, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
 import { type LinkingInfo, extractAllMapKeySet, extractMapKey, extractUniqueMapKeySet, generateArrayJsonPath, isBaseType } from '../schemaUtils';
@@ -391,7 +390,7 @@ export const MapElement: React.FC<MapElementProps> = ({
                   onChange={(event) => handleKeyInputChange(event as React.ChangeEvent<HTMLInputElement>, key)}
                   onBlur={() => handleKeyInputBlur(key)}
                   error={duplicateKeys.has(key)}
-                  helperText={duplicateKeys.has(key) ? 'Key already exists' : ''}
+                  helperText={duplicateKeys.has(key) ? 'Key already exists' : ' '}
                 />
                 <IconButton size="small" color="error" onClick={() => handleDeleteKey(key)} aria-label="delete map entry">
                   <Trash2 size={14} />
@@ -514,7 +513,7 @@ export const MapElement: React.FC<MapElementProps> = ({
       <Box sx={{ mt: 1 }}>
         <Stack direction="row" alignItems="center" gap={0.75}>
           <Typography variant="body2" color="text.secondary">
-            {title}
+            {!isRequired && isRequiredAtRequiredLevel ? `${title} (Optional)` : title}
           </Typography>
           <Chip label="map" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
           <Box sx={{ flexGrow: 1 }} />

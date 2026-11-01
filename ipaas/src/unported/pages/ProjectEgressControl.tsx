@@ -18,7 +18,7 @@
 
 import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import ProjectSettingsTabs from '../../components/Settings/ProjectSettingsTabs';
+import ProjectSettingsTabs from '../components/Settings/ProjectSettingsTabs';
 import EgressPolicyEditor from '../components/Settings/Egress/EgressPolicyEditor';
 import { useProjectId } from '../../hooks/useProjects';
 import type { ProjectScope } from '../../nav';

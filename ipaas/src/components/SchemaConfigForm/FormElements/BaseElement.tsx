@@ -17,8 +17,7 @@
  */
 
 import { useEffect, useMemo, useState, type Dispatch, type MouseEvent, type SetStateAction } from 'react';
-import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack, Switch, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff, Link2, Link2Off, Lock, Pencil, Unlock } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
 import { type LinkingInfo, isNumberType, typeDisplayName } from '../schemaUtils';
@@ -70,6 +69,9 @@ export function BaseElement({
   setSensitiveMap,
 }: BaseElementProps) {
   const numberRegex = /^-?\d+(\.\d+)?$/;
+  // The Optional section already labels its fields, so only optional fields nested in the Required section get the suffix.
+  const isOptional = !isRequired && isRequiredAtRequiredLevel;
+  const labelText = isOptional ? `${title} (Optional)` : title;
   const [showContent, setShowContent] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const [error, setError] = useState('');
@@ -230,6 +232,7 @@ export function BaseElement({
             Link Configuration Group
           </Typography>
           <TextField
+            labelPlacement="top"
             select
             fullWidth
             size="small"
@@ -246,7 +249,7 @@ export function BaseElement({
               </MenuItem>
             ))}
           </TextField>
-          <TextField select fullWidth size="small" label="Config Key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
+          <TextField labelPlacement="top" select fullWidth size="small" label="Config Key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
             {(selectedGroup?.configurations || []).map((c) => (
               <MenuItem key={c.keyUuid} value={c.keyUuid}>
                 {c.key}
@@ -272,15 +275,9 @@ export function BaseElement({
         {!isSkipLabel && (
           <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              {title}
+              {labelText}
             </Typography>
-            {isRequired && (
-              <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-                *
-              </Typography>
-            )}
             <Chip label={typeDisplayName(type)} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
-            {!isRequired && isRequiredAtRequiredLevel && <Chip label="optional" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />}
           </Stack>
         )}
         <TextField
@@ -291,7 +288,7 @@ export function BaseElement({
           onChange={(e) => handleChange(e.target.value)}
           disabled={!!linked}
           error={isEdited && !linked && validationMap.get(jsonPath) === false}
-          helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : undefined}
+          helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
           inputProps={{ 'aria-required': Boolean(isRequired) }}
           InputProps={{ endAdornment: linkAdornment ? <InputAdornment position="end">{linkAdornment}</InputAdornment> : undefined }}>
           <MenuItem value="">
@@ -313,12 +310,7 @@ export function BaseElement({
         <Stack direction="row" alignItems="center" gap={1}>
           {!isSkipLabel && (
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              {title}
-            </Typography>
-          )}
-          {!isSkipLabel && isRequired && (
-            <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-              *
+              {labelText}
             </Typography>
           )}
           <Chip label="boolean" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
@@ -350,6 +342,7 @@ export function BaseElement({
               Updating the value removes the previous value permanently and cannot be restored.
             </Typography>
             <TextField
+              labelPlacement="top"
               fullWidth
               size="small"
               label={!isSkipLabel ? title : ''}
@@ -386,12 +379,7 @@ export function BaseElement({
               <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
                 {!isSkipLabel && (
                   <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                    {title}
-                  </Typography>
-                )}
-                {!isSkipLabel && isRequired && (
-                  <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-                    *
+                    {labelText}
                   </Typography>
                 )}
                 <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
@@ -402,14 +390,16 @@ export function BaseElement({
             </>
           ) : (
             <TextField
+              labelPlacement="top"
               fullWidth
               size="small"
               label={!isSkipLabel ? title : undefined}
+              optional={isOptional}
               type={showContent ? 'text' : 'password'}
               value={String(valueMap.get(jsonPath) ?? '')}
               onChange={(e) => handleChange(e.target.value)}
               error={isEdited && !linked && validationMap.get(jsonPath) === false}
-              helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : undefined}
+              helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
               inputProps={{ 'aria-required': Boolean(isRequired) }}
               InputProps={{
                 readOnly: !!linked,
@@ -436,12 +426,7 @@ export function BaseElement({
         <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
           {!isSkipLabel && (
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              {title}
-            </Typography>
-          )}
-          {!isSkipLabel && isRequired && (
-            <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-              *
+              {labelText}
             </Typography>
           )}
           <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
@@ -463,15 +448,9 @@ export function BaseElement({
       {!isSkipLabel && (
         <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-            {title}
+            {labelText}
           </Typography>
-          {isRequired && (
-            <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-              *
-            </Typography>
-          )}
           <Chip label={isSensitive ? 'secret' : typeDisplayName(type)} size="small" variant="outlined" color={isSensitive ? 'info' : 'default'} sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
-          {!isRequired && isRequiredAtRequiredLevel && <Chip label="optional" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />}
         </Stack>
       )}
       <TextField
@@ -482,7 +461,7 @@ export function BaseElement({
         onChange={(e) => handleChange(e.target.value)}
         placeholder="Enter a value"
         error={isEdited && !linked && validationMap.get(jsonPath) === false}
-        helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : undefined}
+        helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
         inputProps={{ 'aria-required': Boolean(isRequired) }}
         InputProps={{
           readOnly: !!linked,

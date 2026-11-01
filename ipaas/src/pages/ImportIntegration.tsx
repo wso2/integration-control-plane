@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, FormHelperText, FormLabel, Grid, IconButton, InputAdornment, Link, MenuItem, PageContent, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, FormHelperText, FormLabel, Grid, IconButton, InputAdornment, Link, MenuItem, PageContent, Skeleton, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../constants/import';
-import TextField from '../components/common/TextField';
 import { ArrowLeft, GitBranch, RefreshCw, GitHub } from '@wso2/oxygen-ui-icons-react';
 import { MENU_SEARCH_THRESHOLD } from '../components/MenuSearchField';
 import { useState, useEffect, useRef, type JSX } from 'react';
@@ -433,6 +432,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       {isPublicRepo ? (
         <Grid size={{ xs: 12, md: 3 }}>
           <TextField
+            labelPlacement="top"
             label="Repository URL"
             required
             value={repoUrl}
@@ -463,6 +463,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           <Grid size={{ xs: 12, md: 3 }}>
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <TextField
+                labelPlacement="top"
                 label="Organization"
                 select
                 required
@@ -512,6 +513,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           <Grid size={{ xs: 12, md: 3 }}>
             <Stack direction="row" alignItems="center" spacing={0.5}>
               <TextField
+                labelPlacement="top"
                 label="Repository"
                 select
                 required
@@ -564,6 +566,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         <Grid size={{ xs: 12, md: 3 }}>
           <Stack direction="row" alignItems="center" spacing={0.5}>
             <TextField
+              labelPlacement="top"
               label="Branch"
               select
               required
@@ -709,95 +712,95 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
       {!isPublicRepo && renderGitHubArea()}
 
-      <Box sx={{ '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
-        <BusyFields busy={createComponent.isPending}>
-          {/* Row 1 — source pickers (mode-aware) + Branch + Directory */}
-          {renderRepoPickers()}
+      <BusyFields busy={createComponent.isPending}>
+        {/* Row 1 — source pickers (mode-aware) + Branch + Directory */}
+        {renderRepoPickers()}
 
-          {/* Row 2 — Integration Name + auto-generated Integration Id */}
-          <Grid container columnSpacing={3} rowSpacing={1} sx={{ mt: 2, mb: 1 }}>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                label="Integration Name"
-                required
-                value={displayName}
-                onChange={(e) => {
-                  setDisplayName(e.target.value);
-                  displayNameAutoRef.current = false;
-                }}
-                fullWidth
-                error={!!displayName.trim() && !handlerValid}
-                helperText={displayName.trim() && !handlerValid ? 'Must be 3–64 chars' : undefined}
-              />
-            </Grid>
-
-            <Grid size={{ xs: 12, md: 3 }}>
-              <TextField
-                label="Integration Id"
-                value={effectiveHandler}
-                fullWidth
-                disabled
-                slotProps={{
-                  input: {
-                    endAdornment: isCheckingName ? (
-                      <InputAdornment position="end">
-                        <CircularProgress size={16} />
-                      </InputAdornment>
-                    ) : undefined,
-                  },
-                }}
-              />
-            </Grid>
+        {/* Row 2 — Integration Name + auto-generated Integration Id */}
+        <Grid container columnSpacing={3} rowSpacing={1} sx={{ mt: 2, mb: 1 }}>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              labelPlacement="top"
+              label="Integration Name"
+              required
+              value={displayName}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                displayNameAutoRef.current = false;
+              }}
+              fullWidth
+              error={!!displayName.trim() && !handlerValid}
+              helperText={displayName.trim() && !handlerValid ? 'Must be 3–64 chars' : undefined}
+            />
           </Grid>
 
-          {/* Row 3 — Description */}
-          <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} />
-            </Grid>
+          <Grid size={{ xs: 12, md: 3 }}>
+            <TextField
+              labelPlacement="top"
+              label="Integration Id"
+              value={effectiveHandler}
+              fullWidth
+              disabled
+              slotProps={{
+                input: {
+                  endAdornment: isCheckingName ? (
+                    <InputAdornment position="end">
+                      <CircularProgress size={16} />
+                    </InputAdornment>
+                  ) : undefined,
+                },
+              }}
+            />
           </Grid>
+        </Grid>
 
-          {/* Technology */}
-          <Box sx={{ mb: 3 }}>
-            <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
-              Technology
-            </Typography>
-            <TechnologySelector selected={selectedTechnology} detectedMode={detectedMode} enabled={showBranchAndSubPath} onSelect={setSelectedTechnology} />
-            {selectedTechnology === 'BI' && (
-              <>
-                {!ballerinaTokenStatus?.configured && (
-                  <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2 }}>
-                    <Typography variant="body2" color="text.secondary">
-                      Depend on private packages?
-                    </Typography>
-                    <Link component="button" type="button" variant="body2" underline="hover" onClick={() => setBallerinaDrawerOpen(true)} sx={{ fontWeight: 600 }}>
-                      Add a Ballerina Central token
-                    </Link>
-                  </Stack>
-                )}
-                <BallerinaCentralTokenDrawer open={ballerinaDrawerOpen} onClose={() => setBallerinaDrawerOpen(false)} tokenInput={ballerinaTokenInput} onTokenInputChange={setBallerinaTokenInput} />
-              </>
-            )}
-          </Box>
+        {/* Row 3 — Description */}
+        <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} />
+          </Grid>
+        </Grid>
 
-          {/* Integration Type */}
-          <Box sx={{ mb: 5 }}>
-            <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
-              Integration Type
-            </Typography>
-            <IntegrationTypeSelector selected={selectedIntegrationType} onSelect={setSelectedIntegrationType} />
-          </Box>
-        </BusyFields>
+        {/* Technology */}
+        <Box sx={{ mb: 3 }}>
+          <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
+            Technology
+          </Typography>
+          <TechnologySelector selected={selectedTechnology} detectedMode={detectedMode} enabled={showBranchAndSubPath} onSelect={setSelectedTechnology} />
+          {selectedTechnology === 'BI' && (
+            <>
+              {!ballerinaTokenStatus?.configured && (
+                <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Depend on private packages?
+                  </Typography>
+                  <Link component="button" type="button" variant="body2" underline="hover" onClick={() => setBallerinaDrawerOpen(true)} sx={{ fontWeight: 600 }}>
+                    Add a Ballerina Central token
+                  </Link>
+                </Stack>
+              )}
+              <BallerinaCentralTokenDrawer open={ballerinaDrawerOpen} onClose={() => setBallerinaDrawerOpen(false)} tokenInput={ballerinaTokenInput} onTokenInputChange={setBallerinaTokenInput} />
+            </>
+          )}
+        </Box>
 
-        <Stack direction="row" gap={2} sx={{ mt: 2 }}>
-          <Button variant="outlined" onClick={() => navigate(backUrl)} disabled={createComponent.isPending}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || createComponent.isPending}>
-            {createComponent.isPending ? <CircularProgress size={18} color="inherit" /> : 'Import Integration'}
-          </Button>
-        </Stack>
-      </Box>
+        {/* Integration Type */}
+        <Box sx={{ mb: 5 }}>
+          <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
+            Integration Type
+          </Typography>
+          <IntegrationTypeSelector selected={selectedIntegrationType} onSelect={setSelectedIntegrationType} />
+        </Box>
+      </BusyFields>
+
+      <Stack direction="row" gap={2} sx={{ mt: 2 }}>
+        <Button variant="outlined" onClick={() => navigate(backUrl)} disabled={createComponent.isPending}>
+          Cancel
+        </Button>
+        <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || createComponent.isPending}>
+          {createComponent.isPending ? <CircularProgress size={18} color="inherit" /> : 'Import Integration'}
+        </Button>
+      </Stack>
     </PageContent>
   );
 }

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { OxygenUIThemeProvider, AcrylicOrangeTheme } from '@wso2/oxygen-ui';
+import { OxygenUIThemeProvider, AcrylicOrangeTheme, GlobalStyles } from '@wso2/oxygen-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router';
 import { StrictMode } from 'react';
@@ -30,11 +30,15 @@ import './index.css';
 
 const queryClient = new QueryClient();
 
+// Forms mark optional fields with "(Optional)" instead; `required` stays on fields for assistive technology.
+const hideRequiredAsterisk = { '.MuiFormLabel-asterisk': { display: 'none' } } as const;
+
 // Load runtime configuration before rendering the app
 loadConfig().then(() => {
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
       <OxygenUIThemeProvider themes={[{ key: 'acrylicOrange', label: 'Acrylic Orange Theme', theme: AcrylicOrangeTheme }]} initialTheme="acrylicOrange">
+        <GlobalStyles styles={hideRequiredAsterisk} />
         <QueryClientProvider client={queryClient}>
           <BrowserRouter>
             <AuthProvider>

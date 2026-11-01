@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Grid, IconButton, InputAdornment, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Button, CircularProgress, Grid, IconButton, InputAdornment, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Edit } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -39,7 +38,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
   // Shown on blur, not per keystroke.
   const [nameErrorShown, setNameErrorShown] = useState<string | null>(null);
 
-  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
+  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createProject = useCreateProject();
   const navigate = useAppNavigate();
   const orgHomeUrl = resourceUrl(scope, 'overview');
@@ -99,7 +98,9 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
         <Grid container columnSpacing={3} rowSpacing={1}>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <TextField
+              labelPlacement="top"
               label="Name"
+              required
               placeholder="e.g. Customer Support Platform"
               value={displayName}
               onChange={(e) => {
@@ -115,7 +116,9 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <TextField
+              labelPlacement="top"
               label="Project ID"
+              required
               inputRef={handlerInputRef}
               value={effectiveHandler}
               onChange={(e) => onHandlerChange(e.target.value)}
@@ -126,7 +129,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
               fullWidth
               disabled={!handlerEdited}
               error={!!handlerError}
-              helperText={handlerError}
+              helperText={handlerError ?? (replacedHandler && `"${replacedHandler}" is taken, so "${effectiveHandler}" is used instead.`)}
               slotProps={{
                 input: {
                   endAdornment: isCheckingAvailability ? (
@@ -150,7 +153,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
             />
           </Grid>
           <Grid size={{ xs: 12, md: 8 }}>
-            <TextField label="Description (Optional)" placeholder="What is this project for?" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
+            <TextField labelPlacement="top" label="Description" optional placeholder="What is this project for?" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
           </Grid>
         </Grid>
       </BusyFields>

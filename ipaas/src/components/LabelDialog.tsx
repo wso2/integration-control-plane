@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Autocomplete, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from './common/TextField';
+import { Autocomplete, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { useEffect, useState } from 'react';
 import type { ComponentDetail } from '../types/component';
 import { useProjectComponentLabels } from '../hooks/useProjects';

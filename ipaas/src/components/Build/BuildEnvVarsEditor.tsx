@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Button, IconButton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo } from 'react';
 import { ENV_KEY_RE } from '../../constants/build';

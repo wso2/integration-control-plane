@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Link, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
-import { Plus, Trash2, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, DrawerPanel, IconButton, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import { useTriggerComponent } from '../../../hooks/useExecutions';
 
@@ -72,29 +71,16 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
 
   const previewJson = JSON.stringify(args);
 
-  const drawerSx = {
-    '& .MuiDrawer-paper': {
-      width: 440,
-      position: 'fixed',
-      top: 64,
-      height: 'calc(100% - 64px)',
-      borderLeft: '1px solid',
-      borderColor: 'divider',
-      display: 'flex',
-      flexDirection: 'column',
-    },
-  };
-
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="h5">Runtime Arguments</Typography>
-        <IconButton size="small" aria-label="close" onClick={handleClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={handleClose} width={440}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Runtime Arguments</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 2 }}>
+      <DrawerPanel.Body>
         <Alert severity="info" variant="outlined" sx={{ mb: 2 }}>
           <Typography variant="body2">
             To learn more about runtime arguments, see the{' '}
@@ -137,14 +123,14 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
             {runError}
           </Alert>
         )}
-      </Box>
+      </DrawerPanel.Body>
 
-      <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+      <DrawerPanel.Footer>
         <Button onClick={handleClose}>Cancel</Button>
         <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {trigger.isPending ? 'Executing…' : 'Execute'}
         </Button>
-      </Stack>
-    </Drawer>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

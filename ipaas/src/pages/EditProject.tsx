@@ -16,15 +16,15 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Grid, PageContent, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Button, CircularProgress, Grid, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import BusyFields from '../components/common/BusyFields';
-import NotFound from '../components/NotFound';
+import EditProjectSkeleton from '../components/EditProjectSkeleton';
+import PageNotFound from './PageNotFound';
 import { useProjectId, useUpdateProject } from '../hooks/useProjects';
-import { resourceUrl, broaden, type ProjectScope } from '../nav';
+import { resourceUrl, type ProjectScope } from '../nav';
 import type { Project } from '../types/project';
 import { validateProjectName } from '../utils/projectValidation';
 import { DESCRIPTION_MAX_LENGTH, toSingleLineDescription } from '../utils/description';
@@ -34,7 +34,7 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
   const updateProject = useUpdateProject();
   const projectHomeUrl = resourceUrl(scope, 'overview');
   // The overview edits the description on one line, so this form keeps the same shape.
-  const originalDescription = toSingleLineDescription(project.description?.trim() ?? '');
+  const originalDescription = toSingleLineDescription(project.description.trim());
   const [displayName, setDisplayName] = useState(project.name);
   const [description, setDescription] = useState(originalDescription);
   const [nameErrorShown, setNameErrorShown] = useState<string | null>(null);
@@ -66,7 +66,9 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
         <Grid container columnSpacing={3} rowSpacing={1}>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
             <TextField
+              labelPlacement="top"
               label="Name"
+              required
               placeholder="e.g. Customer Support Platform"
               value={displayName}
               onChange={(e) => {
@@ -81,11 +83,13 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
             />
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <TextField label="Project ID" value={project.handler} fullWidth disabled />
+            <TextField labelPlacement="top" label="Project ID" value={project.handler} fullWidth disabled />
           </Grid>
           <Grid size={{ xs: 12, md: 8 }}>
             <TextField
-              label="Description (Optional)"
+              labelPlacement="top"
+              label="Description"
+              optional
               placeholder="What is this project for?"
               value={description}
               onChange={(e) => setDescription(toSingleLineDescription(e.target.value))}
@@ -110,28 +114,24 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
 
 export default function EditProject(scope: ProjectScope): JSX.Element {
   const navigate = useAppNavigate();
-  const { project, isLoading } = useProjectId(scope.project);
+  const { project, isLoading, isError, refetch } = useProjectId(scope.project);
 
-  if (isLoading) {
+  if (isLoading) return <EditProjectSkeleton />;
+  if (isError)
     return (
-      <PageContent fullWidth sx={{ pt: 5 }} aria-busy="true" aria-label="Loading project">
-        <Skeleton variant="rounded" width={80} height={32} sx={{ mb: 2 }} />
-        <Skeleton variant="text" width={280} height={48} sx={{ mb: 4 }} />
-        <Grid container columnSpacing={3} rowSpacing={1}>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <Skeleton variant="rounded" height={56} />
-          </Grid>
-          <Grid size={{ xs: 12, sm: 6, md: 4 }}>
-            <Skeleton variant="rounded" height={56} />
-          </Grid>
-          <Grid size={{ xs: 12, md: 8 }}>
-            <Skeleton variant="rounded" height={56} />
-          </Grid>
-        </Grid>
+      <PageContent fullWidth sx={{ pt: 5 }}>
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              Retry
+            </Button>
+          }>
+          Could not load the project.
+        </Alert>
       </PageContent>
     );
-  }
-  if (!project) return <NotFound message="Project not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Projects" />;
+  if (!project) return <PageNotFound title="Project not found" actionTo={resourceUrl({ level: 'organizations', org: scope.org }, 'overview')} actionLabel="Back to Projects" />;
 
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>

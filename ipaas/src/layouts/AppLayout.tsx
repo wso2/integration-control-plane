@@ -41,8 +41,8 @@ import {
   Typography,
   UserMenu,
   useAppShell,
+  TextField,
 } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
@@ -983,13 +983,6 @@ export default function AppLayout(): JSX.Element {
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
                           </Sidebar.Item>
-                        </Sidebar.Item>
-
-                        <Sidebar.Item id="proj-settings">
-                          <Sidebar.ItemIcon>
-                            <Cog size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       </Sidebar.Category>,
                     ]}

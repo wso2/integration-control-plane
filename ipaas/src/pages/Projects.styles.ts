@@ -16,15 +16,6 @@
  * under the License.
  */
 
-export const card = {
-  cursor: 'pointer',
-  transition: 'border-color 0.15s',
-  '&:hover': {
-    boxShadow: 2,
-    borderColor: 'primary.main',
-  },
-} as const;
-
 /** A finalizing project is inert, so it gets no hover affordance at all. */
 export const cardDeleting = {
   opacity: 0.38,
@@ -38,4 +29,4 @@ export const projectActionSx = {
   px: 2.5,
 } as const;
 
-export const searchSx = { width: 400, maxWidth: '100%', mb: 3 } as const;
+export const searchSx = { mb: 3 } as const;

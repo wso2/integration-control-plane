@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { CircularProgress, IconButton, InputAdornment, Tooltip } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { CircularProgress, IconButton, InputAdornment, Tooltip, TextField } from '@wso2/oxygen-ui';
 import { Folder, Edit } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import type { RepoTreeNode } from '../../types/repository';
@@ -46,7 +45,9 @@ export default function DirectoryPickerField({ repo, value, onChange, statusIcon
   return (
     <>
       <TextField
+        labelPlacement="top"
         label="Repository Sub Path"
+        optional
         value={value}
         fullWidth
         disabled={disabled}

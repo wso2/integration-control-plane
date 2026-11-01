@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Box, Button, Card, CardContent, Chip, CircularProgress, Divider, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { Clock, Rocket, X } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, Card, CardContent, Chip, CircularProgress, Divider, DrawerPanel, Stack, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { Rocket } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import type { JSX } from 'react';
 import { useComponentDeployment, useByoiImageHistory } from '../../hooks/useDeployments';
 import { useDeployByoiImage } from '../../hooks/useRagIngestion';
 import type { ByoiImage } from '../../types/deployment';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 
 interface ByoiBuildAreaProps {
   componentId: string;
@@ -130,21 +130,21 @@ export default function ByoiBuildArea({ componentId, versionId, orgHandler, orgU
       </Card>
 
       {/* Full image-history drawer */}
-      <Drawer anchor="right" open={historyOpen} onClose={() => setHistoryOpen(false)} variant="temporary" sx={{ '& .MuiDrawer-paper': { width: 440, position: 'fixed', top: 64, height: 'calc(100% - 64px)', borderLeft: '1px solid', borderColor: 'divider' } }}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-          <Typography variant="h5">Image History</Typography>
-          <IconButton size="small" aria-label="close" onClick={() => setHistoryOpen(false)}>
-            <X size={16} />
-          </IconButton>
-        </Stack>
-        <Box sx={{ px: 3, py: 1, overflow: 'auto' }}>
+      <DrawerPanel open={historyOpen} onClose={() => setHistoryOpen(false)} width={440}>
+        <DrawerPanel.Header>
+          <DrawerPanel.Title>Image History</DrawerPanel.Title>
+          <DrawerPanel.Actions>
+            <DrawerPanel.CloseButton />
+          </DrawerPanel.Actions>
+        </DrawerPanel.Header>
+        <DrawerPanel.Body sx={{ py: 1 }}>
           <Stack divider={<Divider />}>
             {images?.map((image) => (
               <ImageHistoryItem key={image.id} image={image} />
             ))}
           </Stack>
-        </Box>
-      </Drawer>
+        </DrawerPanel.Body>
+      </DrawerPanel>
     </>
   );
 }
@@ -160,12 +160,7 @@ function ImageHistoryItem({ image }: { image: ByoiImage }): JSX.Element {
         {imageDetails}
       </Typography>
       <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Stack direction="row" alignItems="center" gap={0.5} sx={{ color: 'text.secondary' }}>
-          <Clock size={13} />
-          <Typography variant="body2" color="text.secondary">
-            {formatDistanceToNow(image.updatedAt)}
-          </Typography>
-        </Stack>
+        <RelativeTime time={formatDistanceToNow(image.updatedAt)} dateTime={image.updatedAt} tooltip={formatDateTime(image.updatedAt)} />
         <Chip label={isManual ? 'Manual' : 'External CI'} size="small" variant="outlined" color={isManual ? 'info' : 'secondary'} sx={{ height: 20, fontSize: '0.7rem' }} />
       </Stack>
     </Box>

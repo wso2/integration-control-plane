@@ -16,16 +16,8 @@
  * under the License.
  */
 
-import { Permissions } from './permissions';
-import { isSettingsSectionVisible, type SettingsSectionDef } from './orgSettingsSections';
+import { Permissions } from '../../constants/permissions';
+import type { SettingsSectionDef } from '../../constants/orgSettingsSections';
 
-/**
- * Project Settings sections, in display order. Only the Project section is backed by
- * the BFF so far; it is gated by project-management permissions.
- */
+/** Project Settings sections, kept for the unported pages that still show the project settings tabs. */
 export const PROJECT_SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [{ id: 'project-overview', label: 'Project', path: 'project-overview', permissions: [Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT] }];
-
-/** The first project section the user is allowed to see, or `null` if none. */
-export function firstAvailableProjectSettingsSection(hasAnyPermission: (perms: string[]) => boolean): SettingsSectionDef | null {
-  return PROJECT_SETTINGS_SECTIONS.find((s) => isSettingsSectionVisible(s, hasAnyPermission)) ?? null;
-}

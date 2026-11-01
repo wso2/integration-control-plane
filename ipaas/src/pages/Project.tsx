@@ -50,9 +50,10 @@ import {
   TablePagination,
   Tooltip,
   Typography,
+  TextField,
+  RelativeTime,
 } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX } from '../constants/styles';
-import TextField from '../components/common/TextField';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
 import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
@@ -73,7 +74,7 @@ import { useChoreoSampleImages, useComponentRepositories } from '../hooks/useRep
 import type { Component, ComponentDeletionError, ComponentSubscription, SubscriptionInfo } from '../types/component';
 import { useDeleteComponent } from '../hooks/useComponents';
 import NotFound from '../components/NotFound';
-import { formatDistanceToNow } from '../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { resourceUrl, broaden, newComponentUrl, editProjectUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
@@ -94,11 +95,25 @@ const FREE_COMPONENT_LIMIT = 5;
 
 const APIM_SUBSCRIBERS_ERROR_CODE = 'APIM_SUBSCRIBERS';
 
+// Zero padding and icon offset keep the button's icon flush with the title above it.
+const linkRepoButtonSx = { mt: 1, px: 0, minWidth: 0, textTransform: 'none', fontSize: '0.8125rem', '& .MuiButton-startIcon': { ml: 0 } } as const;
 const projectAvatarSx = { width: 58, height: 58, bgcolor: 'primary.main', color: 'primary.contrastText', flexShrink: 0 } as const;
-const integrationSearchSx = { width: 400, maxWidth: '100%' } as const;
-const rowDeleteSx = { opacity: 0, transition: 'opacity 0.15s' } as const;
-// Keyboard users reach the delete button through focus, so it shows on focus as well as hover.
-const integrationRowRevealSx = { '&:hover .row-delete, &:focus-within .row-delete': { opacity: 1 } } as const;
+const integrationSearchSx = { flex: 1 } as const;
+const descriptionSx = { maxWidth: 260 } as const;
+const INTEGRATIONS_HEADING_ID = 'project-integrations-heading';
+const overviewGridSx = { display: 'grid', columnGap: 4, rowGap: 2, gridTemplateColumns: { xs: '1fr', md: '3fr 1fr' } } as const;
+// The heading sits in its own grid row, so the side cards start level with the search row.
+const integrationsHeadingSx = { fontWeight: 600, gridColumn: { md: 1 } } as const;
+const mainColumnSx = { gridColumn: { md: 1 }, gridRow: { md: 2 } } as const;
+const sideColumnSx = { gridColumn: { md: 2 }, gridRow: { md: 2 }, mt: { xs: 2, md: 0 } } as const;
+// The time and the delete button share one grid cell, so swapping them does not shift the column.
+const lastUpdatedSwapSx = { display: 'grid', justifyItems: 'end', alignItems: 'center', '& > *': { gridArea: '1 / 1' } } as const;
+const rowDeleteSx = { opacity: 0, transition: 'opacity 0.15s', whiteSpace: 'nowrap' } as const;
+// Opacity rather than display, so the button stays reachable by keyboard focus and by tests.
+const integrationRowRevealSx = {
+  '&:hover .row-delete, &:focus-within .row-delete': { opacity: 1 },
+  '&:hover .row-swap:has(.row-delete) .row-time, &:focus-within .row-swap:has(.row-delete) .row-time': { opacity: 0 },
+} as const;
 
 /** Splits an integration's active API subscribers into internal (Choreo-managed test apps) vs external, deduped by application. */
 function splitSubscribers(data: SubscriptionInfo[]): { internal: ComponentSubscription[]; external: ComponentSubscription[] } {
@@ -347,10 +362,7 @@ function IntegrationsTable({
   const paginated = filteredIntegrations.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
   return (
-    <section>
-      <Typography variant="h6" component="h2" sx={{ fontWeight: 600, mb: 2 }}>
-        Integrations
-      </Typography>
+    <section aria-labelledby={INTEGRATIONS_HEADING_ID}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
         <TextField
           size="small"
@@ -438,8 +450,9 @@ function IntegrationsTable({
                 <ListingTable.Head>
                   <ListingTable.Row>
                     <ListingTable.Cell>Name</ListingTable.Cell>
+                    <ListingTable.Cell>Description</ListingTable.Cell>
                     <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                    <ListingTable.Cell>Last Updated</ListingTable.Cell>
+                    <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
                   </ListingTable.Row>
                 </ListingTable.Head>
                 <ListingTable.Body>
@@ -470,41 +483,46 @@ function IntegrationsTable({
                           </ListingTable.Cell>
                           <ListingTable.Cell>
                             {!init && (
+                              <Typography variant="body2" color="text.secondary" noWrap sx={descriptionSx}>
+                                {c.description.trim()}
+                              </Typography>
+                            )}
+                          </ListingTable.Cell>
+                          <ListingTable.Cell>
+                            {!init && (
                               <Typography variant="body2" noWrap>
                                 {getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)}
                               </Typography>
                             )}
                           </ListingTable.Cell>
-                          <ListingTable.Cell>
+                          <ListingTable.Cell align="right">
                             {deleting ? (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
                                 <CircularProgress size={14} color="inherit" />
                                 <Typography variant="body2" color="text.secondary" noWrap>
                                   Deleting
                                 </Typography>
                               </Box>
                             ) : (
-                              <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
-                                <Typography variant="body2" color="text.secondary">
-                                  {!init && formatDistanceToNow(c.lastBuildDate)}
-                                </Typography>
+                              <Box className="row-swap" sx={lastUpdatedSwapSx}>
+                                <Box className="row-time">{!init && <RelativeTime time={formatDistanceToNow(c.lastBuildDate)} dateTime={c.lastBuildDate} tooltip={formatDateTime(c.lastBuildDate)} />}</Box>
                                 <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
-                                  <Tooltip title="Delete">
-                                    <IconButton
-                                      className="row-delete"
-                                      size="small"
-                                      color="error"
-                                      aria-label={`Delete ${c.displayName}`}
-                                      sx={rowDeleteSx}
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleting(c);
-                                      }}>
-                                      <Trash2 size={16} />
-                                    </IconButton>
-                                  </Tooltip>
+                                  <Button
+                                    className="row-delete"
+                                    variant="outlined"
+                                    size="small"
+                                    color="error"
+                                    startIcon={<Trash2 size={14} />}
+                                    aria-label={`Delete ${c.displayName}`}
+                                    sx={rowDeleteSx}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleting(c);
+                                    }}>
+                                    Delete
+                                  </Button>
                                 </Authorized>
-                              </Stack>
+                              </Box>
                             )}
                           </ListingTable.Cell>
                         </ListingTable.Row>
@@ -542,8 +560,9 @@ function IntegrationsTable({
                   <ListingTable.Head>
                     <ListingTable.Row>
                       <ListingTable.Cell>Name</ListingTable.Cell>
+                      <ListingTable.Cell>Description</ListingTable.Cell>
                       <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                      <ListingTable.Cell>Last Updated</ListingTable.Cell>
+                      <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
                     </ListingTable.Row>
                   </ListingTable.Head>
                   <ListingTable.Body>
@@ -557,18 +576,19 @@ function IntegrationsTable({
                             </ListingTable.Cell>
                             <ListingTable.Cell>
                               {!init && (
-                                <Typography variant="body2" noWrap>
-                                  {getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)}
+                                <Typography variant="body2" color="text.secondary" noWrap sx={descriptionSx}>
+                                  {c.description.trim()}
                                 </Typography>
                               )}
                             </ListingTable.Cell>
                             <ListingTable.Cell>
                               {!init && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {formatDistanceToNow(c.lastBuildDate)}
+                                <Typography variant="body2" noWrap>
+                                  {getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)}
                                 </Typography>
                               )}
                             </ListingTable.Cell>
+                            <ListingTable.Cell align="right">{!init && <RelativeTime time={formatDistanceToNow(c.lastBuildDate)} dateTime={c.lastBuildDate} tooltip={formatDateTime(c.lastBuildDate)} />}</ListingTable.Cell>
                           </ListingTable.Row>
                         </Tooltip>
                       );
@@ -671,7 +691,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const [excludedExpanded, setExcludedExpanded] = useState(true);
   const [primaryAction, setPrimaryAction] = useState<'cloud' | 'integrator'>('cloud');
   useEffect(() => {
-    setDescValue(toSingleLineDescription(project?.description?.trim() ?? ''));
+    setDescValue(toSingleLineDescription(project?.description.trim() ?? ''));
   }, [project?.description]);
 
   if (loadingProject) {
@@ -739,7 +759,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const commitDescEdit = () => {
     const trimmed = descValue.trim();
     // Older descriptions may hold line breaks; compare one-line forms so a no-op is not saved.
-    const original = toSingleLineDescription(project.description?.trim() ?? '');
+    const original = toSingleLineDescription(project.description.trim());
     if (trimmed === original) {
       setDescEditing(false);
       return;
@@ -757,7 +777,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   };
 
   const cancelDescEdit = () => {
-    setDescValue(toSingleLineDescription(project.description?.trim() ?? ''));
+    setDescValue(toSingleLineDescription(project.description.trim()));
     setDescEditing(false);
   };
 
@@ -859,21 +879,20 @@ export default function Project(scope: ProjectScope): JSX.Element {
                   </Box>
                   {updateProject.isPending && <CircularProgress size={12} sx={{ mt: 0.25 }} />}
                 </Stack>
+                {projectRepoUrl ? (
+                  <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 2 }}>
+                    <GitHub size={14} />
+                    <Link href={projectRepoUrl} target="_blank" rel="noreferrer" data-testid="project-repo-link-link" underline="hover" sx={{ color: 'primary.main', fontSize: '0.8125rem' }}>
+                      {projectRepoUrl}
+                    </Link>
+                  </Stack>
+                ) : (
+                  <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => setLinkRepoOpen(true)} sx={linkRepoButtonSx}>
+                    Link a Repository
+                  </Button>
+                )}
               </div>
             </Stack>
-            {/* Outside the text column so its left edge lines up with the avatar's. */}
-            {projectRepoUrl ? (
-              <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 2 }}>
-                <GitHub size={14} />
-                <Link href={projectRepoUrl} target="_blank" rel="noreferrer" data-testid="project-repo-link-link" underline="hover" sx={{ color: 'primary.main', fontSize: '0.8125rem' }}>
-                  {projectRepoUrl}
-                </Link>
-              </Stack>
-            ) : (
-              <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => setLinkRepoOpen(true)} sx={{ mt: 2, pl: 0, alignSelf: 'flex-start', textTransform: 'none', fontSize: '0.8125rem' }}>
-                Link a Repository
-              </Button>
-            )}
           </Stack>
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
             <Authorized permissions={Permissions.PROJECT_MANAGE}>
@@ -951,13 +970,11 @@ export default function Project(scope: ProjectScope): JSX.Element {
       {isEmpty ? (
         <CreateIntegrationPanels scope={scope} />
       ) : (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 4,
-            gridTemplateColumns: { xs: '1fr', md: '3fr 1fr' },
-          }}>
-          <Box>
+        <Box sx={overviewGridSx}>
+          <Typography id={INTEGRATIONS_HEADING_ID} variant="h6" component="h2" sx={integrationsHeadingSx}>
+            Integrations
+          </Typography>
+          <Box sx={mainColumnSx}>
             <IntegrationsTable
               components={components}
               isLoading={loadingComponents}
@@ -984,7 +1001,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </Card>
             )}
           </Box>
-          <Box>
+          <Box sx={sideColumnSx}>
             <Stack gap={3}>
               <IntegrationTypesCard components={components} />
               <ArchitectureCard projectId={projectId} components={components} isLoading={loadingComponents} />

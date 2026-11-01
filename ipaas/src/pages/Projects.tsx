@@ -16,82 +16,80 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Card, CardContent, CircularProgress, Grid, IconButton, PageContent, PageTitle, Stack, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Clock, Folder, FolderInput, Plus, Settings } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, Grid, IconButton, ListingCard, PageContent, PageTitle, TablePagination, Tooltip } from '@wso2/oxygen-ui';
+import { Folder, FolderInput, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import SearchField from '../components/SearchField';
-import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useEffect, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useProjects } from '../hooks/useProjects';
+import { useComponents } from '../hooks/useComponents';
+import DeleteProjectDialog from '../components/DeleteProjectDialog';
 import { useRemovalNotice } from '../hooks/useRemovalNotice';
 import type { Project } from '../types/project';
 import EmptyListing from '../components/EmptyListing';
-import { formatDistanceToNow } from '../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import ExploreMore from '../components/ExploreMore';
-import { newProjectUrl, importProjectUrl, projectSettingsSectionUrl, type OrgScope } from '../nav';
+import { newProjectUrl, importProjectUrl, type OrgScope } from '../nav';
 import { projectHomeUrl } from '../paths';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
 import Authorized from '../components/Authorized';
 import * as styles from './Projects.styles';
 
-function ProjectCard({ project, onClick, onSettingsClick }: { project: Project; onClick: () => void; onSettingsClick: () => void }) {
+function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: string; project: Project; canDelete: boolean; onClick: () => void; onDelete: () => void }) {
   const deleting = project.deleting === true;
+  // The delete action shows on hover or focus, so its integration count is fetched then rather than for every card.
+  const [armed, setArmed] = useState(false);
+  const { data: components } = useComponents(org, armed && canDelete && !deleting ? project.id : '');
+  const hasComponents = !!components?.length;
   return (
     <Tooltip title={deleting ? 'This project is being deleted' : ''}>
-      <Card aria-disabled={deleting || undefined} sx={deleting ? styles.cardDeleting : styles.card} onClick={deleting ? undefined : onClick}>
-        <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
-          <Avatar variant="rounded" sx={{ bgcolor: 'action.hover', color: 'text.secondary', width: 48, height: 48, borderRadius: 1 }}>
-            {project.name[0].toUpperCase()}
-          </Avatar>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }}>
-            {project.name}
-          </Typography>
-        </CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2.5, pb: 2 }}>
-          {deleting ? (
-            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary' }}>
-              <CircularProgress size={12} color="inherit" />
-              Deleting
-            </Typography>
-          ) : (
-            <>
-              <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
-                <Clock size={14} />
-                {formatDistanceToNow(project.updatedAt)}
-              </Typography>
-              <IconButton
-                size="small"
-                aria-label={`Settings for ${project.name}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSettingsClick();
-                }}>
-                <Settings size={16} />
-              </IconButton>
-            </>
-          )}
-        </Stack>
-      </Card>
+      <ListingCard
+        title={project.name}
+        description={project.description.trim() || undefined}
+        updatedTime={deleting ? 'Deleting…' : formatDistanceToNow(project.updatedAt)}
+        updatedDateTime={deleting ? undefined : project.updatedAt}
+        updatedTooltip={deleting ? undefined : formatDateTime(project.updatedAt)}
+        onClick={deleting ? undefined : onClick}
+        aria-disabled={deleting || undefined}
+        sx={deleting ? styles.cardDeleting : undefined}
+        onMouseEnter={() => setArmed(true)}
+        onFocus={() => setArmed(true)}
+        actions={
+          deleting || !canDelete ? undefined : (
+            <Tooltip title={hasComponents ? 'To remove a project, you must delete all integrations in it.' : 'Delete'}>
+              {/* A disabled button fires no events, so the span carries the tooltip and stops the click opening the card. */}
+              <span onClick={(e) => e.stopPropagation()}>
+                <IconButton
+                  size="small"
+                  color="error"
+                  aria-label={`Delete ${project.name}`}
+                  disabled={!components || hasComponents}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}>
+                  <Trash2 size={16} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )
+        }
+      />
     </Tooltip>
   );
 }
 
 export default function Projects(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
-  const location = useLocation();
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [alert, setAlert] = useState<string | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const { hasOrgPermission } = useAccessControl();
   const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
   const { data: projects, isLoading } = useProjects();
-
-  useEffect(() => {
-    const state = location.state as { projectDeleted?: boolean } | null;
-    if (state?.projectDeleted) navigate(location.pathname, { replace: true, state: null });
-  }, [location, navigate]);
 
   useRemovalNotice(
     scope.org,
@@ -133,7 +131,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
         </PageTitle.Actions>
       </PageTitle>
 
-      <SearchField value={query} onChange={setQuery} placeholder="Search projects" sx={styles.searchSx} />
+      <SearchField value={query} onChange={setQuery} placeholder="Search projects" fullWidth sx={styles.searchSx} />
 
       {alert && (
         <Alert severity="success" onClose={() => setAlert(null)} sx={{ mb: 3 }}>
@@ -154,8 +152,8 @@ export default function Projects(scope: OrgScope): JSX.Element {
         <>
           <Grid container spacing={2}>
             {paginated.map((p) => (
-              <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                <ProjectCard project={p} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onSettingsClick={() => navigate(projectSettingsSectionUrl({ org: scope.org, project: p.handler }, 'project-overview'))} />
+              <Grid key={p.id} size={{ xs: 12, sm: 6, md: 3 }}>
+                <ProjectCard org={scope.org} project={p} canDelete={canCreateProject} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onDelete={() => setDeletingProject(p)} />
               </Grid>
             ))}
           </Grid>
@@ -176,6 +174,8 @@ export default function Projects(scope: OrgScope): JSX.Element {
           )}
         </>
       )}
+
+      {deletingProject && <DeleteProjectDialog project={deletingProject} onClose={() => setDeletingProject(null)} />}
 
       <ExploreMore />
     </PageContent>

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import BusyFields from '../common/BusyFields';
 import { CLOUD_COMING_SOON_PROVIDERS, providerComingSoonLabel } from '../../constants/gitProviders';
 import { ArrowLeft, GitBranch, GitHub, X } from '@wso2/oxygen-ui-icons-react';
@@ -211,6 +210,7 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
                 <>
                   {isPublic ? (
                     <TextField
+                      labelPlacement="top"
                       label="Repository URL"
                       required
                       value={repoUrl}
@@ -226,6 +226,7 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
                   ) : (
                     <Stack direction="row" gap={2}>
                       <TextField
+                        labelPlacement="top"
                         select
                         label="Organization"
                         required
@@ -247,6 +248,7 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
                         ))}
                       </TextField>
                       <TextField
+                        labelPlacement="top"
                         select
                         label="Repository"
                         required
@@ -270,6 +272,7 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
 
                   <Stack direction="row" gap={2}>
                     <TextField
+                      labelPlacement="top"
                       select
                       label="Branch"
                       required
@@ -294,7 +297,7 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
                         </MenuItem>
                       ))}
                     </TextField>
-                    <TextField label="Project Directory" value={directoryPath} onChange={(e) => setDirectoryPath(e.target.value || '/')} fullWidth size="small" helperText="Path within the repository" />
+                    <TextField labelPlacement="top" label="Project Directory" optional value={directoryPath} onChange={(e) => setDirectoryPath(e.target.value || '/')} fullWidth size="small" helperText="Path within the repository" />
                   </Stack>
                 </>
               )}

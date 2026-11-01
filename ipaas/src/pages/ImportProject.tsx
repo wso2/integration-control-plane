@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, IconButton, InputAdornment, MenuItem, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Grid, IconButton, InputAdornment, MenuItem, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../constants/import';
-import TextField from '../components/common/TextField';
 import { ArrowLeft, Building2, Check, CheckCircle2, Edit, GitHub, GitBranch } from '@wso2/oxygen-ui-icons-react';
 import GitLogoIcon from '../assets/icons/GitLogoIcon';
 import GitProviderCards from '../components/ProjectCreate/GitProviderCards';
@@ -106,7 +105,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   const orgBillableCount = isUpgraded ? 0 : (orgLimits?.billableComponentCount ?? 0);
   const quotaRemaining = isUpgraded ? undefined : Math.max(0, FREE_COMPONENT_LIMIT - orgBillableCount);
 
-  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
+  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createMonoRepoProject = useCreateMonoRepoProject();
   const createComponent = useCreateComponent();
   const orgHomeUrl = resourceUrl(scope, 'overview');
@@ -185,6 +184,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       const alt = availability?.alternateHandlerCandidate;
       return alt ? `This project id is already taken. Try "${alt}" instead.` : handlerTaken;
     }
+    if (replacedHandler) return `"${replacedHandler}" is taken, so "${effectiveHandler}" is used instead.`;
     return undefined;
   };
 
@@ -196,6 +196,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       {isPublicRepo ? (
         <Grid size={{ xs: 12, md: colSize }}>
           <TextField
+            labelPlacement="top"
             label="Repository URL"
             required
             value={repoUrl}
@@ -225,6 +226,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
         <>
           <Grid size={{ xs: 12, md: colSize }}>
             <TextField
+              labelPlacement="top"
               label="Organization"
               select
               required
@@ -260,6 +262,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           </Grid>
           <Grid size={{ xs: 12, md: colSize }}>
             <TextField
+              labelPlacement="top"
               label="Repository"
               select
               required
@@ -303,6 +306,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       {showBranchAndSubPath && (
         <Grid size={{ xs: 12, md: colSize }}>
           <TextField
+            labelPlacement="top"
             label="Branch"
             select
             required
@@ -358,16 +362,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   );
 
   return (
-    <PageContent fullWidth sx={{ pt: 5, '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
+    <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgHomeUrl)} sx={{ mb: 2 }}>
-        Back to Home
+        Back to projects
       </Button>
 
-      <Typography variant="h1" sx={{ mb: 1 }}>
+      <Typography variant="h1" sx={{ mb: 4 }}>
         Import a Project
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-        Choose a repository with your existing Ballerina workspace project.
       </Typography>
 
       {submitError && (
@@ -409,6 +410,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 2 }}>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
+                  labelPlacement="top"
                   label="Project Name"
                   required
                   value={displayName}
@@ -424,6 +426,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
+                  labelPlacement="top"
                   label="Project Id"
                   value={effectiveHandler}
                   onChange={(e) => onHandlerChange(e.target.value)}
@@ -456,7 +459,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
-                <TextField label="Description (Optional)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} slotProps={{ htmlInput: { 'aria-label': 'Description' } }} />
+                <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} slotProps={{ htmlInput: { 'aria-label': 'Description' } }} />
               </Grid>
             </Grid>
           </>

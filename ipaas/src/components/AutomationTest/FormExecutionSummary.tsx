@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Divider, Link, PageTitle, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Clock, GitCommit, History, Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Divider, Link, PageTitle, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { GitCommit, History, Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import { RUNTIME_ARGS_DOC_URL } from '../../constants/docs';
 
 interface FormExecutionSummaryProps {
@@ -38,8 +38,6 @@ interface FormExecutionSummaryProps {
  * Devant's FormExecutionSummary layout.
  */
 export default function FormExecutionSummary({ commitSha, buildDate, onNewTest, newTestDisabled, onExecutions, onRefresh, refreshDisabled }: FormExecutionSummaryProps): JSX.Element {
-  const age = buildDate ? formatDistanceToNow(buildDate) : '--';
-
   return (
     <Box sx={{ width: '100%' }}>
       <PageTitle>
@@ -82,12 +80,13 @@ export default function FormExecutionSummary({ commitSha, buildDate, onNewTest, 
             {commitSha ? commitSha.slice(0, 9) : '--'}
           </Typography>
         </Stack>
-        <Stack direction="row" alignItems="center" gap={0.5}>
-          <Clock size={14} />
+        {buildDate ? (
+          <RelativeTime time={formatDistanceToNow(buildDate)} dateTime={buildDate} tooltip={formatDateTime(buildDate)} />
+        ) : (
           <Typography variant="body2" color="text.secondary">
-            {age}
+            --
           </Typography>
-        </Stack>
+        )}
       </Stack>
 
       <Divider sx={{ mt: 2 }} />

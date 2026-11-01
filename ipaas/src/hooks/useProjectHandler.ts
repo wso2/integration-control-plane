@@ -28,6 +28,8 @@ export interface UseProjectHandlerReturn {
   isCheckingAvailability: boolean;
   availability: ProjectHandlerAvailability | undefined;
   availabilityError: boolean;
+  /** The user's own handle when it was taken and swapped for `handler`; null otherwise. */
+  replacedHandler: string | null;
   startEditing: () => void;
   stopEditing: () => void;
   onHandlerChange: (value: string) => void;
@@ -60,11 +62,11 @@ export function useProjectHandler(displayName: string): UseProjectHandlerReturn 
 
   const { data: availability, isFetching: isCheckingAvailability, isError: availabilityError } = useProjectHandlerAvailability(debouncedCandidate, debouncedCandidate.length >= 2);
 
-  // A taken handle becomes the BFF's suggestion, else gets a random suffix.
+  // A taken handle becomes the BFF's suggestion, else gets a random suffix; never while the user is typing.
   useEffect(() => {
-    if (!availability || availability.handlerUnique || debouncedCandidate !== effectiveHandler) return;
-    setReplacement({ base: requestedHandler, handler: availability.alternateHandlerCandidate || withRandomSuffix(effectiveHandler, PROJECT_HANDLER_MAX_LENGTH) });
-  }, [availability, debouncedCandidate, effectiveHandler, requestedHandler]);
+    if (handlerEdited || !availability || availability.handlerUnique || debouncedCandidate !== effectiveHandler) return;
+    setReplacement({ base: requestedHandler, handler: availability.alternateHandlerCandidate || withRandomSuffix(requestedHandler, PROJECT_HANDLER_MAX_LENGTH) });
+  }, [handlerEdited, availability, debouncedCandidate, effectiveHandler, requestedHandler]);
 
   const startEditing = () => {
     setHandlerEdited(true);
@@ -86,6 +88,7 @@ export function useProjectHandler(displayName: string): UseProjectHandlerReturn 
     isCheckingAvailability,
     availability,
     availabilityError,
+    replacedHandler: manualHandler && effectiveHandler !== requestedHandler ? requestedHandler : null,
     startEditing,
     stopEditing,
     onHandlerChange,

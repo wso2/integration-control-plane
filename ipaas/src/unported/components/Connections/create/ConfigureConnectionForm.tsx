@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Box as BoxIcon, Building2, ChevronDown, Globe, Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX, type ReactNode } from 'react';
 import { useEnvironments } from '../../../../hooks/useEnvironments';

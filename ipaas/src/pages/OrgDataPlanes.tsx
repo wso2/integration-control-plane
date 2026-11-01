@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Clock, Network, RefreshCw } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { Network, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import EmptyListing from '../components/EmptyListing';
 import PdpProgressDrawer from '../components/DataPlanes/PdpProgressDrawer';
@@ -46,14 +46,7 @@ function RegisteredTimeCell({ date }: { date?: string }): JSX.Element {
         {'—'}
       </Typography>
     );
-  return (
-    <Tooltip title={formatDateTime(date)}>
-      <Stack direction="row" alignItems="center" gap={0.5} sx={{ display: 'inline-flex' }}>
-        <Clock size={14} />
-        <Typography variant="body2">{formatDistanceToNow(date)}</Typography>
-      </Stack>
-    </Tooltip>
-  );
+  return <RelativeTime time={formatDistanceToNow(date)} dateTime={date} tooltip={formatDateTime(date)} />;
 }
 
 export default function OrgDataPlanes(_scope: OrgScope): JSX.Element {

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
@@ -174,7 +173,7 @@ export function CreateDatabaseServerView({ scope, kind }: { scope: OrgScope; kin
                   );
                 })}
               </Grid>
-              <TextField label="Service Name" required fullWidth value={serviceName} onChange={(e) => setServiceName(e.target.value)} error={!!nameError} helperText={nameError} sx={{ maxWidth: 480, ...REQUIRED_FIELD_SX }} />
+              <TextField labelPlacement="top" label="Service Name" required fullWidth value={serviceName} onChange={(e) => setServiceName(e.target.value)} error={!!nameError} helperText={nameError} sx={{ maxWidth: 480, ...REQUIRED_FIELD_SX }} />
             </>
           ) : (
             <>

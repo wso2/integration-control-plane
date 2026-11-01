@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, InputAdornment, PageContent, Pagination, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Box, Button, CircularProgress, InputAdornment, PageContent, Pagination, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Search } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';

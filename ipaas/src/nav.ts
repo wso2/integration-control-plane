@@ -20,7 +20,6 @@ import { createContext, createElement, useContext, type FC, type JSX } from 'rea
 import { Outlet, useParams, useLocation } from 'react-router';
 import { capitalize } from './utils/string';
 import { SETTINGS_SECTIONS, type SettingsSectionDef } from './constants/orgSettingsSections';
-import { PROJECT_SETTINGS_SECTIONS } from './constants/projectSettingsSections';
 import { COMPONENT_SETTINGS_SECTIONS } from './constants/componentSettingsSections';
 
 // ---------------------------------------------------------------------------
@@ -115,7 +114,7 @@ export function resourceUrl(scope: Scope, resource: Resource): string {
 // The Settings sections available at each level.
 function settingsSectionsForLevel(level: Level): readonly SettingsSectionDef[] {
   if (level === 'organizations') return SETTINGS_SECTIONS;
-  if (level === 'projects') return PROJECT_SETTINGS_SECTIONS;
+  if (level === 'projects') return [];
   return COMPONENT_SETTINGS_SECTIONS;
 }
 
@@ -201,11 +200,6 @@ export function orgSettingsSectionUrl(scope: { org: string }, sectionPath: strin
   return `/organizations/${scope.org}/settings/${sectionPath}`;
 }
 
-/** The project Settings landing route — redirects to the first section the user can access. */
-export function projectSettingsUrl(scope: { org: string; project: string }): string {
-  return `/organizations/${scope.org}/projects/${scope.project}/settings`;
-}
-
 /** A specific project Settings section. `sectionPath` is the suffix after `/settings/` (may include a sub-tab). */
 export function projectSettingsSectionUrl(scope: { org: string; project: string }, sectionPath: string): string {
   return `/organizations/${scope.org}/projects/${scope.project}/settings/${sectionPath}`;
@@ -288,7 +282,6 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'logs', navId: 'proj-logs', segment: 'observe/runtimelogs', parent: 'proj-observability' },
     { key: 'metrics', navId: 'proj-metrics', segment: 'observe/metrics', parent: 'proj-observability' },
     { key: 'cd-pipelines', navId: 'proj-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'proj-admin' },
-    { key: 'settings', navId: 'proj-settings', segment: 'settings' },
   ],
   components: [
     { key: 'overview', navId: 'overview', segment: 'overview' },

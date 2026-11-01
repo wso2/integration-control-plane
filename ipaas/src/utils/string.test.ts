@@ -101,7 +101,7 @@ describe('withRandomSuffix', () => {
   });
 
   it('generates a lowercase alphanumeric suffix by default', () => {
-    expect(withRandomSuffix('default', 25)).toMatch(/^default-[a-z0-9]{1,5}$/);
+    expect(withRandomSuffix('default', 25)).toMatch(/^default-[a-z0-9]{5}$/);
   });
 });
 

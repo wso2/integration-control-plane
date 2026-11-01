@@ -16,10 +16,9 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, TablePagination, Tooltip, Typography, TextField, RelativeTime } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX } from '../constants/styles';
 import SearchField from '../components/SearchField';
-import TextField from '../components/common/TextField';
 import { Layers, Plus, Trash2, AlertTriangle } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useLocation } from 'react-router';
@@ -30,7 +29,7 @@ import { useOrgs } from '../hooks/useOrg';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import type { EnvironmentTemplate } from '../types/environment';
 import EmptyListing from '../components/EmptyListing';
-import { formatDistanceToNow } from '../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { editEnvironmentUrl, newEnvironmentUrl, type OrgScope, type ProjectScope } from '../nav';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
@@ -218,9 +217,13 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
                           <Chip size="small" variant="outlined" color={t.critical ? 'error' : 'default'} label={t.critical ? 'Critical' : 'Non-Critical'} />
                         </ListingTable.Cell>
                         <ListingTable.Cell>
-                          <Typography variant="body2" color="text.secondary">
-                            {t.createdAt ? formatDistanceToNow(t.createdAt) : '—'}
-                          </Typography>
+                          {t.createdAt ? (
+                            <RelativeTime time={formatDistanceToNow(t.createdAt)} dateTime={t.createdAt} tooltip={formatDateTime(t.createdAt)} />
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              —
+                            </Typography>
+                          )}
                         </ListingTable.Cell>
                         {canManageEnv && (
                           <ListingTable.Cell>

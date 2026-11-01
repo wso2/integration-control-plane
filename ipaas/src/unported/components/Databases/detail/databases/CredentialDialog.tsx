@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Stack } from '@wso2/oxygen-ui';
-import TextField from '../../../../../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Stack, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useCreateDbCredential, useDbCredential, useUpdateDbCredential } from '../../../../hooks/usePlatformServices';
@@ -114,12 +113,13 @@ export default function CredentialDialog({ serverId, orgHandle, dbName, defaultU
               </Stack>
             )}
 
-            <TextField label="Credential Name" required fullWidth size="small" value={form.displayName} onChange={(e) => patch({ displayName: e.target.value })} error={!!nameError} helperText={nameError || ' '} sx={REQUIRED_FIELD_SX} />
+            <TextField labelPlacement="top" label="Credential Name" required fullWidth size="small" value={form.displayName} onChange={(e) => patch({ displayName: e.target.value })} error={!!nameError} helperText={nameError || ' '} sx={REQUIRED_FIELD_SX} />
 
             {!form.isSuperAdmin && (
               <>
-                <TextField label="Username" required fullWidth size="small" value={form.username} onChange={(e) => patch({ username: e.target.value })} sx={REQUIRED_FIELD_SX} />
+                <TextField labelPlacement="top" label="Username" required fullWidth size="small" value={form.username} onChange={(e) => patch({ username: e.target.value })} sx={REQUIRED_FIELD_SX} />
                 <TextField
+                  labelPlacement="top"
                   label="Password"
                   required
                   fullWidth
@@ -145,7 +145,7 @@ export default function CredentialDialog({ serverId, orgHandle, dbName, defaultU
                   value={form.privileges}
                   onChange={(_, value) => patch({ privileges: value })}
                   renderTags={(value, getTagProps) => value.map((option, index) => <Chip label={option} size="small" {...getTagProps({ index })} key={option} />)}
-                  renderInput={(params) => <TextField {...params} label="Privileges" required sx={REQUIRED_FIELD_SX} />}
+                  renderInput={(params) => <TextField labelPlacement="top" {...params} label="Privileges" required sx={REQUIRED_FIELD_SX} />}
                 />
               </>
             )}
@@ -164,7 +164,7 @@ export default function CredentialDialog({ serverId, orgHandle, dbName, defaultU
               onChange={(_, value) => patch({ environments: value })}
               getOptionLabel={(id) => envLabel(environments, id)}
               renderTags={(value, getTagProps) => value.map((option, index) => <Chip label={envLabel(environments, option)} size="small" {...getTagProps({ index })} key={option} />)}
-              renderInput={(params) => <TextField {...params} label="Environments" required sx={REQUIRED_FIELD_SX} />}
+              renderInput={(params) => <TextField labelPlacement="top" {...params} label="Environments" required sx={REQUIRED_FIELD_SX} />}
             />
           </Stack>
         )}

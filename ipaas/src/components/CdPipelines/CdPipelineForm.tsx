@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, PageContent, PageTitle, Stack } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Button, CircularProgress, PageContent, PageTitle, Stack, TextField } from '@wso2/oxygen-ui';
 import BusyFields from '../common/BusyFields';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
@@ -27,9 +26,6 @@ import type { CreateDeploymentPipelineRequest, DeploymentPipeline, EnvTemplate }
 import { buildPromotionTree, flattenPromotionTree, validatePipelineName } from '../../utils/deploymentPipeline';
 import { orgCdPipelinesUrl } from '../../nav';
 import PromotionChainBuilder from './PromotionChainBuilder';
-
-/** Red `*` on the required-field label. */
-const REQUIRED_SX = { '& .MuiFormLabel-asterisk': { color: 'error.main' } } as const;
 
 interface CdPipelineFormProps {
   orgHandler: string;
@@ -101,7 +97,7 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
         <BusyFields busy={saving}>
           {/* BusyFields is one child of the outer Stack, so its fields need their own gap. */}
           <Stack gap={3}>
-            <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setNameTouched(true)} fullWidth required error={showNameError} helperText={showNameError ? nameError : ' '} sx={REQUIRED_SX} />
+            <TextField labelPlacement="top" label="Name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setNameTouched(true)} fullWidth required error={showNameError} helperText={showNameError ? nameError : ' '} />
 
             <PromotionChainBuilder envTemplates={envTemplates} value={chain} onChange={setChain} disabled={saving} />
 

@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Avatar, Card, Chip, CircularProgress, Divider, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Avatar, Card, Chip, CircularProgress, Divider, IconButton, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { Check, Copy, Edit, GitBranch } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import type { JSX } from 'react';
 import type { DeploymentTrackImage } from '../../types/deployment';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 
 interface BuildImageCardProps {
   image: DeploymentTrackImage;
@@ -118,9 +118,7 @@ export default function BuildImageCard({ image, isLatest, variant = 'detail', is
       </Stack>
 
       {/* ── Time ago / started ── */}
-      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
-        {isPendingBuild ? `${buildState === 'queued' ? 'Queued' : 'Started'} ${formatDistanceToNow(image.builtAt)}` : formatDistanceToNow(image.builtAt)}
-      </Typography>
+      <RelativeTime time={formatDistanceToNow(image.builtAt)} dateTime={image.builtAt} tooltip={formatDateTime(image.builtAt)} action={isPendingBuild ? (buildState === 'queued' ? 'Queued' : 'Started') : undefined} size="small" sx={{ mb: 1.5 }} />
 
       <Divider sx={{ mb: 1.5 }} />
 

@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { CRITICAL_ENVIRONMENT_HELP, CRITICAL_ENVIRONMENT_LABEL } from '../constants/environment';
-import TextField from '../components/common/TextField';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -66,8 +65,8 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
       )}
 
       <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
-        <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-        <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
         <Box>
           <FormControlLabel control={<Checkbox checked={critical} onChange={(_, v) => setCritical(v)} />} label={CRITICAL_ENVIRONMENT_LABEL} />
           <FormHelperText sx={{ mt: 0 }}>{CRITICAL_ENVIRONMENT_HELP}</FormHelperText>

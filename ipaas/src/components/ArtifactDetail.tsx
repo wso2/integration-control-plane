@@ -27,9 +27,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Drawer,
+  DrawerPanel,
   Grid,
-  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -42,7 +41,7 @@ import {
   Tabs,
   Typography,
 } from '@wso2/oxygen-ui';
-import { ChevronRight, Maximize2, X } from '@wso2/oxygen-ui-icons-react';
+import { ChevronRight } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState } from 'react';
 import { useArtifactTypes, useArtifacts, ARTIFACT_QUERY_MAP } from '../hooks/useArtifacts';
 import type { Artifact } from '../types/artifact';
@@ -386,8 +385,8 @@ export function ArtifactTypeSelector({ envId, componentId, onSelectArtifact }: {
   );
 }
 
-const drawerSx = { '& .MuiDrawer-paper': { width: '60%', maxWidth: 700, minWidth: 400, position: 'fixed', top: 64, height: 'calc(100% - 64px)', borderLeft: '1px solid', borderColor: 'divider' } };
-const headerSx = { px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' };
+// A persistent panel has no backdrop, so it starts below the app header instead of covering it.
+const belowHeaderSx = { '& .MuiDrawer-paper': { top: 64, height: 'calc(100% - 64px)' } } as const;
 
 export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, componentHandler }: { selected: SelectedArtifact | null; onClose: () => void; orgHandler: string; projectHandler: string; componentHandler: string }) {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
@@ -440,21 +439,14 @@ export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, 
   };
 
   return (
-    <Drawer anchor="right" open onClose={onClose} variant="persistent" sx={drawerSx}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={headerSx}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {displayName}
-        </Typography>
-        <Stack direction="row" gap={0.5}>
-          <IconButton size="small" aria-label="maximize" disabled>
-            <Maximize2 size={16} />
-          </IconButton>
-          <IconButton size="small" aria-label="close" onClick={onClose}>
-            <X size={16} />
-          </IconButton>
-        </Stack>
-      </Stack>
-      <Box sx={{ px: 2 }}>
+    <DrawerPanel open onClose={onClose} variant="persistent" width="min(700px, max(400px, 60%))" sx={belowHeaderSx}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>{displayName}</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
+      <DrawerPanel.Body sx={{ pt: 0 }}>
         {tabs.length > 0 && (
           <>
             <Tabs value={validTabIndex} onChange={(_, v) => setActiveTabIndex(v)} sx={{ mb: 2 }}>
@@ -465,7 +457,7 @@ export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, 
             {renderActiveTab()}
           </>
         )}
-      </Box>
-    </Drawer>
+      </DrawerPanel.Body>
+    </DrawerPanel>
   );
 }
