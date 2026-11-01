@@ -48,7 +48,7 @@ import FileDropzone from './FileDropzone';
 import FileVisibilityField from './FileVisibilityField';
 import StagedFileList from './StagedFileList';
 import UploadStatusChip from './UploadStatusChip';
-import { checkAgainRowSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx, warningCaptionSx } from '../styles';
+import { checkAgainRowSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx, warningCaptionSx, wrapSx } from '../styles';
 import type { ContextSource, FileVisibility, StagedFileMeta, UploadEntry, UploadFileStatus } from '../../../types/contextEngine';
 
 interface FilesDrawerProps {
@@ -429,7 +429,11 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
         <ConfirmDeleteDialog
           title={
             <>
-              Remove <strong>{removing.name}</strong>?
+              Remove{' '}
+              <Box component="strong" sx={wrapSx}>
+                {removing.name}
+              </Box>
+              ?
             </>
           }
           onConfirm={() => void confirmRemove()}

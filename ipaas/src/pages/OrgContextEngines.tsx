@@ -29,7 +29,7 @@ import DeletionStatus from '../components/ContextEngine/DeletionStatus';
 import SearchField from '../components/SearchField';
 import ExposurePills from '../components/ContextEngine/ExposurePills';
 import SourceMark from '../components/ContextEngine/SourceMark';
-import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
+import { listMarksSx, listProgressTextSx, wrapSx } from '../components/ContextEngine/styles';
 import { engineMessage, progressListingLine } from '../utils/contextEngine';
 import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
 import type { ContextEngine } from '../types/contextEngine';
@@ -122,7 +122,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   const loadErrorMessage = error instanceof HttpError && error.status === 401 ? 'The context engine rejected the credential. Check the engine token in runtime config.' : 'Failed to load context engines. Is the engine running?';
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2} sx={{ mb: 3 }}>
         <PageTitle>
           <PageTitle.Header>Context Engines</PageTitle.Header>

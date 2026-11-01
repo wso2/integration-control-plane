@@ -49,6 +49,7 @@ import SetupProgress, { type SetupUploadSource } from '../components/ContextEngi
 import { rememberSourceRules, startUploads } from '../hooks/contextUploads';
 import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
+import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
@@ -167,7 +168,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !setup ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
