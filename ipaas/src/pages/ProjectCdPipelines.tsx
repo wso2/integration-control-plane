@@ -49,18 +49,18 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
 
   return (
     <PageContent fullWidth>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <PageTitle>
-          <PageTitle.Header>Deployment Pipeline</PageTitle.Header>
-          <PageTitle.SubHeader>The promotion path this project's integrations deploy along.</PageTitle.SubHeader>
-        </PageTitle>
+      <PageTitle>
+        <PageTitle.Header>Deployment Pipeline</PageTitle.Header>
+        <PageTitle.SubHeader>The promotion path this project's integrations deploy along.</PageTitle.SubHeader>
         {/* Cloud binds one pipeline per project, so adding a second is really a swap. */}
         {!!pipelines?.length && (
-          <Button variant="contained" startIcon={<Repeat size={18} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-            Change Pipeline
-          </Button>
+          <PageTitle.Actions>
+            <Button variant="contained" startIcon={<Repeat size={18} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+              Change Pipeline
+            </Button>
+          </PageTitle.Actions>
         )}
-      </Stack>
+      </PageTitle>
 
       {alert && (
         <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 2 }}>

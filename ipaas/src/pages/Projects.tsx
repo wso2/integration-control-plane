@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Card, CardContent, CircularProgress, Grid, IconButton, ListingTable, PageContent, PageTitle, Stack, TablePagination, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { CARD_TABLE_SX } from '../constants/styles';
-import { Clock, Folder, FolderInput, LayoutGrid, List, Plus, RefreshCw, Settings } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Avatar, Box, Button, Card, CardContent, CircularProgress, Grid, IconButton, PageContent, PageTitle, Stack, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Clock, Folder, FolderInput, Plus, Settings } from '@wso2/oxygen-ui-icons-react';
 import SearchField from '../components/SearchField';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -82,13 +81,12 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
   const location = useLocation();
   const [query, setQuery] = useState('');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [alert, setAlert] = useState<string | null>(null);
   const { hasOrgPermission } = useAccessControl();
   const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
-  const { data: projects, isLoading, refetch } = useProjects();
+  const { data: projects, isLoading } = useProjects();
 
   useEffect(() => {
     const state = location.state as { projectDeleted?: boolean } | null;
@@ -119,125 +117,23 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const safePage = Math.min(page, maxPage);
   const paginated = filtered.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
-  const projectsView =
-    view === 'list' ? (
-      <ListingTable.Container disablePaper>
-        <ListingTable variant="card" density="compact" sx={CARD_TABLE_SX}>
-          <ListingTable.Head>
-            <ListingTable.Row>
-              <ListingTable.Cell width={300}>Name</ListingTable.Cell>
-              <ListingTable.Cell>Description</ListingTable.Cell>
-              <ListingTable.Cell>Last Updated</ListingTable.Cell>
-              <ListingTable.Cell width={100}>Actions</ListingTable.Cell>
-            </ListingTable.Row>
-          </ListingTable.Head>
-          <ListingTable.Body>
-            {paginated.map((p) => {
-              const deleting = p.deleting === true;
-              return (
-                // followCursor because ListingTable.Row does not forward a ref for the tooltip to anchor to.
-                <Tooltip key={p.id} followCursor title={deleting ? 'This project is being deleted' : ''}>
-                  <ListingTable.Row
-                    variant="card"
-                    hover={!deleting}
-                    clickable={!deleting}
-                    aria-disabled={deleting || undefined}
-                    // The card variant tints its own background on hover; pin both states so a dying row stays inert.
-                    sx={deleting ? { opacity: 0.38, cursor: 'default', backgroundColor: 'background.acrylic', '&:hover': { backgroundColor: 'background.acrylic' } } : undefined}
-                    onClick={deleting ? undefined : () => navigate(projectHomeUrl(scope.org, p.handler))}>
-                    <ListingTable.Cell>
-                      <Stack direction="row" alignItems="center" gap={1.5}>
-                        <Avatar variant="rounded" sx={{ width: 32, height: 32, borderRadius: 1, fontSize: 14, bgcolor: 'action.hover', color: 'text.primary' }}>
-                          {p.name[0].toUpperCase()}
-                        </Avatar>
-                        <Typography variant="body2" fontWeight={600}>
-                          {p.name}
-                        </Typography>
-                      </Stack>
-                    </ListingTable.Cell>
-                    <ListingTable.Cell>
-                      <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 300 }}>
-                        {p.description || ''}
-                      </Typography>
-                    </ListingTable.Cell>
-                    <ListingTable.Cell>
-                      {!deleting && (
-                        <Typography variant="body2" color="text.secondary">
-                          {formatDistanceToNow(p.updatedAt)}
-                        </Typography>
-                      )}
-                    </ListingTable.Cell>
-                    <ListingTable.Cell>
-                      {deleting ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                          <CircularProgress size={12} color="inherit" />
-                          <Typography variant="caption" color="text.secondary" noWrap>
-                            Deleting
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <IconButton
-                          size="small"
-                          aria-label={`Settings for ${p.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(projectSettingsSectionUrl({ org: scope.org, project: p.handler }, 'project-overview'));
-                          }}>
-                          <Settings size={16} />
-                        </IconButton>
-                      )}
-                    </ListingTable.Cell>
-                  </ListingTable.Row>
-                </Tooltip>
-              );
-            })}
-          </ListingTable.Body>
-        </ListingTable>
-      </ListingTable.Container>
-    ) : (
-      <Grid container spacing={2}>
-        {paginated.map((p) => (
-          <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
-            <ProjectCard project={p} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onSettingsClick={() => navigate(projectSettingsSectionUrl({ org: scope.org, project: p.handler }, 'project-overview'))} />
-          </Grid>
-        ))}
-      </Grid>
-    );
-
   return (
     <PageContent fullWidth>
       <PageTitle>
-        <PageTitle.Header>
-          <Stack direction="row" alignItems="center" gap={1}>
-            All Projects
-            <IconButton size="small" aria-label="Refresh projects" onClick={() => refetch()}>
-              <RefreshCw size={18} />
-            </IconButton>
-          </Stack>
-        </PageTitle.Header>
+        <PageTitle.Header>All Projects</PageTitle.Header>
         <PageTitle.Actions>
-          <ToggleButtonGroup value={view} exclusive onChange={(_, v) => v && setView(v)} size="small">
-            <ToggleButton value="grid" aria-label="Grid view">
-              <LayoutGrid size={18} />
-            </ToggleButton>
-            <ToggleButton value="list" aria-label="List view">
-              <List size={18} />
-            </ToggleButton>
-          </ToggleButtonGroup>
+          <Authorized permissions={Permissions.PROJECT_MANAGE}>
+            <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>
+              Import Project
+            </Button>
+            <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={styles.projectActionSx}>
+              Create Project
+            </Button>
+          </Authorized>
         </PageTitle.Actions>
       </PageTitle>
 
-      <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 3, ml: 1 }}>
-        <SearchField value={query} onChange={setQuery} placeholder="Search projects" fullWidth />
-        <Authorized permissions={Permissions.PROJECT_MANAGE}>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={styles.projectActionSx}>
-            Create Project
-          </Button>
-          <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>
-            Import Project
-          </Button>
-        </Authorized>
-      </Stack>
+      <SearchField value={query} onChange={setQuery} placeholder="Search projects" sx={styles.searchSx} />
 
       {alert && (
         <Alert severity="success" onClose={() => setAlert(null)} sx={{ mb: 3 }}>
@@ -256,7 +152,13 @@ export default function Projects(scope: OrgScope): JSX.Element {
         />
       ) : (
         <>
-          {projectsView}
+          <Grid container spacing={2}>
+            {paginated.map((p) => (
+              <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
+                <ProjectCard project={p} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onSettingsClick={() => navigate(projectSettingsSectionUrl({ org: scope.org, project: p.handler }, 'project-overview'))} />
+              </Grid>
+            ))}
+          </Grid>
           {filtered.length > 10 && (
             <TablePagination
               component="div"

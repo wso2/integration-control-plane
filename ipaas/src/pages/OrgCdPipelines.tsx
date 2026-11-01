@@ -51,14 +51,18 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
       <PageTitle>
         <PageTitle.Header>Deployment Pipelines</PageTitle.Header>
         <PageTitle.SubHeader>Promotion paths across environments, available to every project in this organization.</PageTitle.SubHeader>
+        {!!pipelines?.length && (
+          <PageTitle.Actions>
+            <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+              Create Pipeline
+            </Button>
+          </PageTitle.Actions>
+        )}
       </PageTitle>
 
       {!!pipelines?.length && (
         <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 5 }}>
           <SearchField value={search} onChange={setSearch} placeholder="Search pipelines..." fullWidth />
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
-            Create Pipeline
-          </Button>
         </Stack>
       )}
 

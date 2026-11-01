@@ -26,12 +26,12 @@ export function samplesTab(page: Page): Locator {
   return page.getByRole('tab', { name: 'Samples', exact: true });
 }
 
-/** An empty project offers these inline; a populated one hides them behind Create an Integration. */
+/** An empty project offers these inline; a populated one hides them behind New Integration. */
 export async function reachCreateControl(page: Page, target: Locator): Promise<void> {
   if (await target.isVisible({ timeout: 15_000 }).catch(() => false)) return;
 
-  const createButton = page.getByRole('button', { name: 'Create an Integration', exact: true });
-  await expect(createButton, 'neither the inline control nor Create an Integration was available').toBeVisible({ timeout: 30_000 });
+  const createButton = page.getByRole('button', { name: 'New Integration', exact: true });
+  await expect(createButton, 'neither the inline control nor New Integration was available').toBeVisible({ timeout: 30_000 });
   await createButton.click();
   await expect(page.getByRole('heading', { name: 'How would you like to create your integration?' })).toBeVisible({ timeout: 30_000 });
   await expect(target, 'the create surface did not offer the expected control').toBeVisible({ timeout: 30_000 });

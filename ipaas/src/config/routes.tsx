@@ -48,6 +48,7 @@ const Projects = lazyPage(() => import('../pages/Projects'));
 const Project = lazyPage(() => import('../pages/Project'));
 const Component = lazyPage(() => import('../pages/Component'));
 const CreateProject = lazyPage(() => import('../pages/CreateProject'));
+const EditProject = lazyPage(() => import('../pages/EditProject'));
 const ImportProject = lazyPage(() => import('../pages/ImportProject'));
 const CreateIntegrationOptions = lazyPage(() => import('../pages/CreateIntegrationOptions'));
 const AiIntegrationBuilderView = lazyPage(() => import('../pages/AiIntegrationBuilderView'));
@@ -152,6 +153,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/admin/cd-pipelines', element: createElement(withScope(ProjectCdPipelines, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/devops/environments', element: createElement(withScope(Environments, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/settings', element: createElement(withScope(ProjectSettings, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(EditProject, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/settings/project-overview', element: createElement(withScope(ProjectOverview, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/redirect', element: <ProjectsRedirect /> },
               { path: 'organizations/:orgHandler/home', element: createElement(withScope(OrgHome, ['organizations'])) },

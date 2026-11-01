@@ -171,6 +171,10 @@ export function newProjectUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/new`;
 }
 
+export function editProjectUrl(scope: { org: string; project: string }): string {
+  return `/organizations/${scope.org}/projects/${scope.project}/edit`;
+}
+
 export function importProjectUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/projects/import`;
 }

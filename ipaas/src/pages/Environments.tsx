@@ -155,6 +155,15 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
       <PageTitle>
         <PageTitle.Header>Environments</PageTitle.Header>
         <PageTitle.SubHeader>Deployment targets for integrations, shared by every project in this organization.</PageTitle.SubHeader>
+        {!isLoading && !isError && !!templates?.length && (
+          <PageTitle.Actions>
+            <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
+              <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newEnvironmentUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+                Create Environment
+              </Button>
+            </Authorized>
+          </PageTitle.Actions>
+        )}
       </PageTitle>
 
       {isLoading ? (
@@ -177,11 +186,6 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
         <>
           <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 3 }}>
             <SearchField value={search} onChange={setSearch} placeholder="Search environments..." fullWidth />
-            <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
-              <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newEnvironmentUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
-                Create Environment
-              </Button>
-            </Authorized>
           </Stack>
           {alert && (
             <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 3 }}>

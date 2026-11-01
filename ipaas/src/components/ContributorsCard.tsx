@@ -34,7 +34,7 @@ export default function ContributorsCard({ projectId }: { projectId: string }): 
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             Contributors
           </Typography>
-          <Tooltip title="Users who have created integrations in this project">
+          <Tooltip title="Contributors to the source of the integrations deployed in this project">
             <Info size={14} aria-label="Contributors info" style={{ color: 'var(--oxygen-palette-text-secondary, #6b7280)', cursor: 'default' }} />
           </Tooltip>
         </Stack>

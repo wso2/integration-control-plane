@@ -434,7 +434,7 @@ test.describe('04 deploy a sample @smoke', () => {
     await enterProject(page, orgHandler);
     const table = page.getByRole('table').first();
     await expect(table).toBeVisible({ timeout: 30_000 });
-    for (const column of ['Name', 'Description', 'Type', 'Last Updated']) {
+    for (const column of ['Name', 'Type', 'Last Updated']) {
       await expect(table.getByRole('columnheader', { name: column, exact: true })).toBeVisible();
     }
     await expect(integrationRow(page, SAMPLE)).toHaveCount(1);
