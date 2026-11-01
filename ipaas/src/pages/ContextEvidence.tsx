@@ -16,13 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Check, ChevronRight, Hash, Info, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions } from '../hooks/useContextEngine';
-import { absoluteUrl, evidenceBackTarget, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
+import { absoluteUrl, evidenceBackTarget, evidencePart, evidencePlace, evidenceVersionLabel, partHint, passageLines, sourceTypeName } from '../utils/contextEngine';
 import { contextEngineUrl, contextEvidenceUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -153,6 +153,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
   const source = engine.data?.sources.find((s) => s.id === ev.sourceId);
   const place = evidencePlace(ev);
+  const part = evidencePart(ev);
   const lines = passageLines(ev);
   const l = ev.locator;
   // Someone who may open evidence but not ask: the engine's evidence.read without context.read.
@@ -164,7 +165,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     });
-  const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', l?.chunkIndex !== undefined ? `part ${l.chunkIndex + 1}` : '']
+  const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', !place.coarse && part !== undefined ? `part ${part}` : '']
     .filter(Boolean)
     .join(' · ');
 
@@ -177,7 +178,13 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             <Typography variant="h6" component="h1" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
               {ev.recordId}
             </Typography>
-            <Chip size="small" variant="outlined" label={primaryPlace(ev)} sx={l?.path ? { fontFamily: 'monospace' } : undefined} />
+            {place.coarse && part !== undefined ? (
+              <Tooltip title={partHint(part)}>
+                <Chip size="small" variant="outlined" label={primaryPlace(ev)} />
+              </Tooltip>
+            ) : (
+              <Chip size="small" variant="outlined" label={primaryPlace(ev)} sx={l?.path ? { fontFamily: 'monospace' } : undefined} />
+            )}
           </Stack>
           <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
             A passage from {engineName ?? 'this context engine'}, cited as evidence.
@@ -273,13 +280,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                   {l.characters.start}–{l.characters.end}
                 </Row>
               )}
-              {l?.chunkIndex !== undefined && <Row label="Part">{l.chunkIndex + 1} of the item</Row>}
-              <Row label="Version">{evidenceVersionLabel(ev.sourceVersion)}</Row>
-              {place.coarse && (
-                <Typography variant="caption" component="p" sx={{ ...mutedSx, mt: 1.25 }}>
-                  The engine can only place this file type by its part for now.
-                </Typography>
+              {part !== undefined && (
+                <Row label="Part">
+                  {part} of {ev.recordId}
+                </Row>
               )}
+              <Row label="Version">{evidenceVersionLabel(ev.sourceVersion)}</Row>
             </Box>
             <Box sx={{ ...summaryCardSx, height: 'auto' }}>
               <Stack direction="row" gap={1.25} alignItems="flex-start">

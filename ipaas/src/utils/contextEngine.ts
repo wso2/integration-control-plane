@@ -1355,12 +1355,26 @@ export function evidencePlace(evidence: Pick<ContextEvidence, 'locator' | 'locat
   return { path: l?.path, parts, coarse: !fine };
 }
 
+/** Which part of its item a passage came from, counted from 1, when the engine says. */
+export function evidencePart(evidence: Pick<ContextEvidence, 'locator' | 'location'>): number | undefined {
+  if (evidence.locator?.chunkIndex !== undefined) return evidence.locator.chunkIndex + 1;
+  const m = /^chunk:(\d+)$/.exec(evidence.location ?? '');
+  return m ? Number(m[1]) + 1 : undefined;
+}
+
+/** What a part is, for a passage the engine can place only by its part. */
+export const partHint = (part: number): string => `Files are split into parts for search. This passage is from part ${part}.`;
+
 /** A record version as people read it: uploads and most connectors version by epoch milliseconds. */
 export function evidenceVersionLabel(version: string): string {
   const n = Number(version);
   if (!Number.isFinite(n) || n < 1e12 || n > 1e14) return version;
   return new Date(n).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+/** The version a passage was taken from, as a label, and what that date means. */
+export const versionFromLabel = (version: string): string => `Version from ${evidenceVersionLabel(version)}`;
+export const VERSION_HINT = 'This passage comes from the copy of the file saved at this time. Changes made after it are not in this passage.';
 
 /** The passage split into its numbered source lines, or null when the lines cannot be lined up with the text. */
 export function passageLines(evidence: Pick<ContextEvidence, 'locator' | 'passage'>): { n: number; text: string }[] | null {

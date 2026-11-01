@@ -36,6 +36,7 @@ import {
   askedQuestionMeta,
   citedNumbers,
   deletionFailureText,
+  evidencePart,
   evidencePlace,
   evidenceVersionLabel,
   isSameModel,
@@ -1152,6 +1153,12 @@ describe('provenance and evidence', () => {
     // A PDF or office file is placed by its part only.
     expect(evidencePlace(ev({ chunkIndex: 2 }))).toEqual({ path: undefined, parts: ['Part 3'], coarse: true });
     expect(evidencePlace({ location: 'chunk:4', locator: undefined })).toEqual({ path: undefined, parts: ['Part 5'], coarse: true });
+  });
+
+  it('numbers the part a passage came from, from the locator or the location', () => {
+    expect(evidencePart(ev({ chunkIndex: 2 }))).toBe(3);
+    expect(evidencePart({ location: 'chunk:4', locator: undefined })).toBe(5);
+    expect(evidencePart({ location: 'page:4', locator: undefined })).toBeUndefined();
   });
 
   it('shows epoch versions as dates and leaves other versions alone', () => {
