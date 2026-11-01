@@ -70,7 +70,8 @@ function ConfigSkeleton(): JSX.Element {
 }
 
 export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Element {
-  const canCreate = useCan()(Scopes.INTEGRATION_CREATE);
+  const can = useCan();
+  const refusal = !can(Scopes.INTEGRATION_CREATE) ? "Your role doesn't allow creating integrations" : !can(Scopes.INTEGRATION_DEPLOY) ? "Your role doesn't allow deploying integrations" : '';
   const navigate = useAppNavigate();
   const location = useLocation();
   const { slug } = useParams<{ slug: string }>();
@@ -100,7 +101,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
 
   // Deploy button is enabled when: no schema (nothing to fill), or all required fields are filled.
   // While the schema is still loading we keep the button disabled.
-  const deployEnabled = canCreate && !isConfigSchemaLoading && (!hasSchema || requiredComplete);
+  const deployEnabled = !refusal && !isConfigSchemaLoading && (!hasSchema || requiredComplete);
 
   const handleDeploy = () => {
     if (!integration || !slug) return;
@@ -231,7 +232,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
           )}
 
           <Box sx={{ mt: 4, display: 'flex', justifyContent: 'flex-end' }}>
-            <Tooltip title={canCreate ? 'Please fill the required fields to deploy the integration' : "Your role doesn't allow creating integrations"} disableHoverListener={deployEnabled} placement="top" arrow>
+            <Tooltip title={refusal || 'Please fill the required fields to deploy the integration'} disableHoverListener={deployEnabled} placement="top" arrow>
               <span>
                 <Button variant="contained" endIcon={<ArrowRight size={16} />} onClick={handleDeploy} disabled={!deployEnabled}>
                   Deploy integration
