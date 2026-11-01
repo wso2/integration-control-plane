@@ -688,7 +688,7 @@ export interface ContextMcpToolInfo {
 /** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
   { name: 'get_context', description: 'Returns the passages the caller may read that best answer a question, each with its source, version and link.' },
-  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage. Offered when the engine offers answers.' },
+  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage.' },
 ];
 
 // ── Recommended models ──────────────────────────────────────────────────────
