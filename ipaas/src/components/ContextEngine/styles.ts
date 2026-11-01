@@ -578,12 +578,17 @@ export const answerMarkdownSx = {
   '& > :last-child, & > div > :last-child': { mb: 0 },
 } as const;
 
+/** A sentence's last word, its citation marks and its closing punctuation, kept on one line. */
+export const citationRunSx = { whiteSpace: 'nowrap' } as const;
+
 /** The sentence a pointed-at citation supports. */
 export const litSentenceSx = {
   bgcolor: 'rgba(255, 115, 0, 0.12)',
   boxShadow: (t: { palette: { primary: { main: string } } }) => `0 1px 0 ${t.palette.primary.main}`,
   borderRadius: '3px',
+  // The margin cancels the padding, so lighting a sentence never reflows the line it sits on.
   px: 0.25,
+  mx: -0.25,
 } as const;
 
 /** A passage in the evidence rail beside an answer. */

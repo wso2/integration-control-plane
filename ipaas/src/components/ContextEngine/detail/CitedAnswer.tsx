@@ -21,7 +21,7 @@ import { Children, cloneElement, createContext, isValidElement, useContext, type
 import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { CITE_PROPERTY, endsSentence, remarkCitations, splitSentences } from '../../../utils/contextEngine';
-import { answerMarkdownSx, citationMarkSx, litSentenceSx } from '../styles';
+import { answerMarkdownSx, citationMarkSx, citationRunSx, litSentenceSx } from '../styles';
 
 /** A citation someone is pointing at: its evidence number and, from the answer, the sentence it sits in. */
 export interface CitationFocus {
@@ -83,6 +83,46 @@ function citeOf(node: ReactNode): number | null {
   return citeNumber((node as ReactElement<ExtraProps>).props.node);
 }
 
+const CLOSING_PUNCTUATION = /^[.!?,;:]+["”')\]]*/;
+const CLOSING_PUNCTUATION_ONLY = /^[.!?,;:]+["”')\]]*\s*$/;
+
+/**
+ * Hold a run of marks on one line with the word before it and the punctuation after it,
+ * so a line never starts with a mark or with the full stop that follows the marks.
+ */
+function keepMarksTogether(nodes: ReactNode[]): ReactNode[] {
+  // Placing a mark can leave an empty piece of text beside it, which would split a run of marks.
+  const rest = nodes.filter((node) => node !== '');
+  const out: ReactNode[] = [];
+  while (rest.length) {
+    const node = rest.shift();
+    if (citeOf(node) === null) {
+      out.push(node);
+      continue;
+    }
+    const run: ReactNode[] = [node];
+    const before = out[out.length - 1];
+    const word = typeof before === 'string' ? /\S+$/.exec(before) : null;
+    if (word && typeof before === 'string') {
+      out[out.length - 1] = before.slice(0, word.index);
+      run.unshift(word[0]);
+    }
+    while (rest.length && citeOf(rest[0]) !== null) run.push(rest.shift());
+    const after = rest[0];
+    const closing = typeof after === 'string' ? CLOSING_PUNCTUATION.exec(after) : null;
+    if (closing && typeof after === 'string') {
+      run.push(closing[0]);
+      rest[0] = after.slice(closing[0].length);
+    }
+    out.push(
+      <Box key={`run-${out.length}`} component="span" sx={citationRunSx}>
+        {run}
+      </Box>,
+    );
+  }
+  return out;
+}
+
 interface Group {
   nodes: ReactNode[];
   cites: number[];
@@ -119,6 +159,11 @@ function Sentences({ id, children }: { id: string; children: ReactNode }): JSX.E
       appendMark(!current.hasText && groups.length ? groups[groups.length - 1] : current, child, n);
     } else if (typeof child === 'string') {
       splitSentences(child).forEach((piece) => {
+        // Punctuation that closes a sentence after its marks belongs to that sentence, not to the next.
+        if (!current.hasText && groups.length && CLOSING_PUNCTUATION_ONLY.test(piece)) {
+          groups[groups.length - 1].nodes.push(piece);
+          return;
+        }
         current.nodes.push(piece);
         if (piece.trim()) current.hasText = true;
         if (endsSentence(piece)) close();
@@ -136,7 +181,7 @@ function Sentences({ id, children }: { id: string; children: ReactNode }): JSX.E
         const lit = g.cites.some((n) => matches(active, n, sentence) || matches(pinned, n, sentence));
         return (
           <Box key={sentence} component="span" sx={lit ? litSentenceSx : undefined}>
-            {g.nodes.map((node, ni) => (citeOf(node) !== null ? cloneElement(node as ReactElement<{ sentence?: string }>, { key: ni, sentence }) : node))}
+            {keepMarksTogether(g.nodes.map((node, ni) => (citeOf(node) !== null ? cloneElement(node as ReactElement<{ sentence?: string }>, { key: ni, sentence }) : node)))}
           </Box>
         );
       })}

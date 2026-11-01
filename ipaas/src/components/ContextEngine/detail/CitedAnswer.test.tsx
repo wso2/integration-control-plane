@@ -54,8 +54,8 @@ describe('CitedAnswer', () => {
 
   it('keeps a mark with the sentence before it, ahead of the sentence end', () => {
     const html = render();
-    // "Rollbacks keep secrets [1][2]." : the marks come before the full stop, not after it.
-    expect(html).toMatch(/Rollbacks keep secrets<button[^>]*aria-label="Evidence 1"[\s\S]*?<\/button><button[^>]*aria-label="Evidence 2"[\s\S]*?<\/button>\./);
+    // "Rollbacks keep secrets [1][2]." : the marks come before the full stop, held on one line with the last word and the full stop.
+    expect(html).toMatch(/Rollbacks keep <span>secrets<button[^>]*aria-label="Evidence 1"[\s\S]*?<\/button><button[^>]*aria-label="Evidence 2"[\s\S]*?<\/button>\.<\/span>/);
   });
 
   it('reads citations only where the engine does', () => {
