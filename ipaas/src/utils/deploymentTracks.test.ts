@@ -88,11 +88,16 @@ describe('hasVersionedApis', () => {
   it.each([
     { displayType: 'ballerinaService', componentSubType: null, versioned: true },
     { displayType: 'miApiService', componentSubType: null, versioned: true },
-    { displayType: 'ballerinaService', componentSubType: 'rag-service', versioned: false },
-    { displayType: 'ballerinaService', componentSubType: 'MCP', versioned: false },
+    { displayType: 'ballerinaService', componentSubType: 'MCP', versioned: true },
     { displayType: 'ballerinaService', componentSubType: 'aiAgent', versioned: false },
     { displayType: 'scheduledTask', componentSubType: null, versioned: false },
-  ])('$displayType/$componentSubType → $versioned', ({ displayType, componentSubType, versioned }) => {
-    expect(hasVersionedApis({ displayType, componentSubType })).toBe(versioned);
+    { displayType: 'ballerinaEventHandler', componentSubType: null, versioned: false },
+  ])('$displayType/$componentSubType with tracks → $versioned', ({ displayType, componentSubType, versioned }) => {
+    expect(hasVersionedApis({ displayType, componentSubType, deploymentTracksEnabled: true })).toBe(versioned);
+  });
+
+  it('keeps an integration without tracks unversioned', () => {
+    expect(hasVersionedApis({ displayType: 'ballerinaService', componentSubType: null, deploymentTracksEnabled: false })).toBe(false);
+    expect(hasVersionedApis({ displayType: 'ballerinaService', componentSubType: 'MCP' })).toBe(false);
   });
 });

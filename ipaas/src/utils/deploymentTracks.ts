@@ -67,11 +67,15 @@ export function apiVersionError(value: string, tracks: DeploymentTrack[], editin
   return null;
 }
 
+/** Integration types that serve their endpoints as APIs on the API Platform gateway. AI agents are fronted by the AI gateway instead. */
+const GATEWAY_API_TYPES = new Set(['integration-as-api', 'mcp-server', 'webhook']);
+
 /**
- * Integrations whose tracks carry an API version: an integration as API built with
- * Ballerina or MI.
+ * Integrations whose tracks carry an API version: every integration with
+ * deployment tracks that serves APIs on the gateway. An integration without
+ * tracks keeps one unversioned API per endpoint.
  */
-export function hasVersionedApis(component: Pick<Component, 'displayType' | 'componentSubType'>): boolean {
-  const { type, runtime } = identifyIntegration(component.displayType, component.componentSubType);
-  return type === 'integration-as-api' && (runtime === 'ballerina' || runtime === 'mi');
+export function hasVersionedApis(component: Pick<Component, 'displayType' | 'componentSubType' | 'deploymentTracksEnabled'>): boolean {
+  if (!component.deploymentTracksEnabled) return false;
+  return GATEWAY_API_TYPES.has(identifyIntegration(component.displayType, component.componentSubType).type);
 }
