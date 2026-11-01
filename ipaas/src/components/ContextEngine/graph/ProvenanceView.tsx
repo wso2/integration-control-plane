@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Check, ExternalLink, FileText, History, Link as LinkIcon, MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAskedQuestions } from '../../../hooks/contextQuestions';
@@ -24,7 +24,7 @@ import { useContextGraph, useContextPermissions, useContextQueryResult, useConte
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
-import { absoluteUrl, evidencePlace, evidenceVersionLabel } from '../../../utils/contextEngine';
+import { absoluteUrl, evidencePlace, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import {
   answerSentences,
   citedPassages,
@@ -579,9 +579,11 @@ function PassagePanel({
       <Box sx={{ fontSize: 13, lineHeight: 1.5, bgcolor: 'action.hover', borderRadius: 1, p: 1.25, maxHeight: 220, overflowY: 'auto' }}>“{evidence.passage}”</Box>
       <Stack direction="row" alignItems="center" gap={0.75} sx={mutedSx}>
         <History size={13} aria-hidden />
-        <Typography variant="caption">
-          Version of {evidenceVersionLabel(evidence.sourceVersion)} · retrieved {ordinal(n)}
-        </Typography>
+        <Tooltip title={VERSION_HINT}>
+          <Typography variant="caption">
+            {versionFromLabel(evidence.sourceVersion)} · retrieved {ordinal(n)}
+          </Typography>
+        </Tooltip>
       </Stack>
       {result.answer && (
         <Box>

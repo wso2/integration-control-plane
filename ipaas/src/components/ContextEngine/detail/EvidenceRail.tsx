@@ -16,11 +16,11 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, Chip, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, ButtonBase, Chip, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, ChevronDown, ChevronRight, ExternalLink, History, Link as LinkIcon, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
-import { absoluteUrl, evidenceVersionLabel } from '../../../utils/contextEngine';
+import { absoluteUrl, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import { EvidencePlace } from './EvidenceCard';
 import { mutedSx, railCardSx, railNumberSx } from '../styles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
@@ -75,7 +75,9 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, on
         <Box sx={{ pl: 3.5 }}>
           <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
             <History size={13} aria-hidden />
-            <Typography variant="caption">Version of {evidenceVersionLabel(evidence.sourceVersion)}</Typography>
+            <Tooltip title={VERSION_HINT}>
+              <Typography variant="caption">{versionFromLabel(evidence.sourceVersion)}</Typography>
+            </Tooltip>
           </Stack>
           <Stack direction="row" gap={1} sx={{ mt: 1.25 }}>
             <Button size="small" variant="outlined" startIcon={<ExternalLink size={14} />} onClick={onOpen}>
