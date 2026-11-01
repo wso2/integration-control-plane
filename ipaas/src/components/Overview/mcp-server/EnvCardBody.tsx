@@ -21,6 +21,7 @@ import { MCP } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
+import ApiKeyAuthOffer from '../../ApiKeyAuthOffer';
 import { useMcpTools } from '../../../hooks/useMcpTools';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
@@ -72,9 +73,6 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   // which is open and needs none.
   const isAuthorized = access.isAuthorized;
   const keyError = access.keyError;
-  // jwt-secured endpoints are not auto-minted — the test-key route would flip
-  // enforcement to api-key auth, which must be a deliberate choice.
-  const needsManualKey = access.mode === 'jwt' && !access.apiKey;
 
   const { tools, isLoading, error, isForbidden, isUnauthorized, refetch } = useMcpTools({
     baseUrl,
@@ -129,17 +127,8 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
         <Alert severity="warning" sx={{ mt: 1.5 }}>
           {keyError}
         </Alert>
-      ) : needsManualKey ? (
-        <Alert
-          severity="info"
-          sx={{ mt: 1.5 }}
-          action={
-            <Button color="inherit" size="small" onClick={() => void access.mintKey()} disabled={access.isMinting}>
-              Use a test key
-            </Button>
-          }>
-          This MCP server is secured with OAuth. Listing its tools needs a test key, which switches the endpoint to API key authentication.
-        </Alert>
+      ) : access.needsApiKeyAuth ? (
+        <ApiKeyAuthOffer access={access} sx={{ mt: 1.5 }} />
       ) : (
         <>
           {(isLoading || !isAuthorized) && (

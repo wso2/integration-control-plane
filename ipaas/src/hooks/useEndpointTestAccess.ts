@@ -18,9 +18,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
-import { useCreateEndpointTestKey, useEndpointSecurity } from './useConsumers';
+import { useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
 import type { EndpointRef, SecurityMode } from '../types/consumers';
 import { friendlyApiError } from '../utils/apiSecurity';
+import { isApiKeyAuthRequired } from '../utils/apiErrors';
 
 export interface EndpointTestAccess {
   /**
@@ -44,6 +45,12 @@ export interface EndpointTestAccess {
   isMinting: boolean;
   /** Minting failed, as a message the user can act on. */
   keyError: string | null;
+  /** The endpoint uses another auth mode (jwt, or a refused test key says so), so it takes no test key until switched to API-key auth. */
+  needsApiKeyAuth: boolean;
+  /** The endpoint is being switched to API-key auth. */
+  isSwitching: boolean;
+  /** Switch the endpoint to API-key auth, then mint. Resolves to the plaintext, or `null` on failure. */
+  switchToApiKey: () => Promise<string | null>;
   /**
    * The endpoint cannot be reached through the gateway: its security config could
    * not be read (usually "not exposed as an API yet"), or it is exposed but
@@ -74,13 +81,14 @@ const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.component
  * the swagger test console.
  *
  * A key is minted automatically only when `api-key` is the active mode — that is
- * the auto-expose default, so it is policy-neutral. For a `jwt`-secured endpoint
- * the caller must call `mintKey()` explicitly, because the BFF's test-key route
- * switches the endpoint to api-key auth as a side effect.
+ * the auto-expose default. For another mode, ipaas-service refuses a test key
+ * (`needsApiKeyAuth`) until the caller switches the endpoint with `switchToApiKey()`,
+ * which changes how every caller of the API authenticates.
  */
 export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabled = true, gatewayUrlFallback = ''): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError } = useEndpointSecurity(ref, enabled);
   const createTestKey = useCreateEndpointTestKey(ref);
+  const enableApiKeyAuth = useEnableEndpointApiKeyAuth(ref);
 
   // The minted key and any failure are stored against the endpoint they belong
   // to, so a response that lands after the selection moved on is ignored by
@@ -88,6 +96,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
   const refKey = keyOf(ref);
   const [minted, setMinted] = useState<{ refKey: string; key: string | null } | null>(null);
   const [failure, setFailure] = useState<{ refKey: string; message: string } | null>(null);
+  const [apiKeyRequiredFor, setApiKeyRequiredFor] = useState<string | null>(null);
 
   const mode = security?.mode ?? null;
   const apiKey = minted?.refKey === refKey ? minted.key : null;
@@ -103,7 +112,8 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
         if (!key) setFailure({ refKey, message: MINT_FAILED });
         return key;
       } catch (err) {
-        setFailure({ refKey, message: friendlyApiError(err, MINT_FAILED) });
+        if (isApiKeyAuthRequired(err)) setApiKeyRequiredFor(refKey);
+        else setFailure({ refKey, message: friendlyApiError(err, MINT_FAILED) });
         return null;
       }
     },
@@ -112,8 +122,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
     [refKey],
   );
 
-  // Auto-mint for an api-key-secured endpoint. `jwt` is deliberately excluded:
-  // minting would silently flip the endpoint's enforcement to api-key auth.
+  // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
   const mintingFor = useRef<string | null>(null);
   useEffect(() => {
     if (!enabled || mode !== 'api-key') return;
@@ -139,6 +148,24 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
     void mintKey();
   }, [mode, refKey, mintKey]);
 
+  const switchToApiKey = useCallback(async (): Promise<string | null> => {
+    setFailure(null);
+    // This mints itself; the auto-mint must not mint a second key when the mode refetches as api-key.
+    mintingFor.current = refKey;
+    try {
+      await enableApiKeyAuth.mutateAsync();
+      setApiKeyRequiredFor(null);
+      return await mintKey();
+    } catch (err) {
+      setFailure({ refKey, message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
+      return null;
+    } finally {
+      mintingFor.current = null;
+    }
+    // enableApiKeyAuth is a stable mutation object; the endpoint identity drives it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refKey, mintKey]);
+
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
   // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
   // that authoritative gateway address without making a missing optional field look like an
@@ -154,6 +181,9 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
     isAuthorized: mode === 'none' || !!apiKey,
     isMinting: createTestKey.isPending,
     keyError,
+    needsApiKeyAuth: (mode === 'jwt' && !apiKey) || apiKeyRequiredFor === refKey,
+    isSwitching: enableApiKeyAuth.isPending,
+    switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never
     // reports unavailable — only a real answer does.
     isUnavailable: isSecurityError || (mode !== null && !gatewayUrl),

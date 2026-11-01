@@ -21,6 +21,7 @@ import { Check, Copy, Send, Sparkles, User } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useApiDefinition, useEnvEndpoints } from '../hooks/useDeployments';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
+import ApiKeyAuthOffer from './ApiKeyAuthOffer';
 import { generateUUID } from '../utils/string';
 import type { AgentConnectionStatus, ChatMessage } from '../types/agentChat';
 import type { EndpointRef } from '../types/consumers';
@@ -84,9 +85,6 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
   const authError = !!access.keyError;
   // A `none`-mode endpoint is open and needs no credential at all.
   const isAuthorized = access.isAuthorized;
-  // jwt-secured endpoints are not auto-minted — the test-key route would flip
-  // enforcement to api-key auth, which must be a deliberate choice.
-  const needsManualKey = access.mode === 'jwt' && !access.apiKey;
 
   // Connection status, reported up to the host (Test page shows it as a chip). An
   // unreachable endpoint is terminal, so it reports `error` rather than spinning on
@@ -199,17 +197,7 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
       {authError && <Alert severity="warning">{authNotice}</Alert>}
       {noEndpoint && <Alert severity="info">No chat endpoint found for this agent.</Alert>}
       {notExposed && <Alert severity="info">This agent can&apos;t be chat-tested right now &mdash; its endpoint hasn&apos;t registered on the API gateway. Redeploy the agent, or check that its endpoint is exposed as an API.</Alert>}
-      {needsManualKey && (
-        <Alert
-          severity="info"
-          action={
-            <Button color="inherit" size="small" onClick={() => void access.mintKey()} disabled={access.isMinting}>
-              Use a test key
-            </Button>
-          }>
-          This agent is secured with OAuth. Chatting here needs a test key, which switches the endpoint to API key authentication.
-        </Alert>
-      )}
+      <ApiKeyAuthOffer access={access} />
       {isPage && operationsKnown && !noEndpoint && !hasChatOperation && chatUrl && messages.length === 0 && (
         <Typography variant="caption" color="text.secondary">
           No <code>/chat</code> operation was detected on this agent — messages are sent to <code>{chatUrl}/chat</code>.

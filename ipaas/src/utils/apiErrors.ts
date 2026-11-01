@@ -78,10 +78,20 @@ export function apiErrorMessage(error: unknown, fallback: string): string {
 
 /** ipaas-service refused the call because the user's role lacks a scope (`code: INSUFFICIENT_SCOPE`). */
 export function isPermissionError(error: unknown): boolean {
-  if (httpStatusOf(error) !== 403 || typeof error !== 'object' || error === null || !('body' in error)) return false;
+  return httpStatusOf(error) === 403 && codeOf(error) === 'INSUFFICIENT_SCOPE';
+}
+
+/** A test key was refused because the endpoint doesn't use API-key auth (`code: API_KEY_AUTH_REQUIRED`). */
+export function isApiKeyAuthRequired(error: unknown): boolean {
+  return httpStatusOf(error) === 409 && codeOf(error) === 'API_KEY_AUTH_REQUIRED';
+}
+
+/** The `code` of an ipaas-service error body. */
+function codeOf(error: unknown): unknown {
+  if (typeof error !== 'object' || error === null || !('body' in error)) return undefined;
   try {
-    return (JSON.parse(String(error.body)) as { code?: unknown }).code === 'INSUFFICIENT_SCOPE';
+    return (JSON.parse(String(error.body)) as { code?: unknown }).code;
   } catch {
-    return false;
+    return undefined;
   }
 }

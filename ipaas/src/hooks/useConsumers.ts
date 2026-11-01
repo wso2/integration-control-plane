@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, regenerateConsumerToken, revokeConsumer, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
+import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, regenerateConsumerToken, revokeConsumer, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
 import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
 
 /** Endpoint refs are only usable once every segment is known, the track included: one read before its track resolves would read the default track's API. */
@@ -127,6 +127,15 @@ export function useSetEndpointSecurity(ref: EndpointRef | null | undefined) {
     onSuccess: (data) => {
       qc.setQueryData<SecurityConfig>(securityKey(ref), (prev) => ({ ...prev, ...data }));
     },
+  });
+}
+
+/** Switches the endpoint to API-key auth (`PUT …/security/api-key`). */
+export function useEnableEndpointApiKeyAuth(ref: EndpointRef | null | undefined) {
+  const qc = useQueryClient();
+  return useMutation<boolean, Error, void>({
+    mutationFn: () => setEndpointApiKeyAuth(ref!, true),
+    onSuccess: () => qc.invalidateQueries({ queryKey: securityKey(ref) }),
   });
 }
 

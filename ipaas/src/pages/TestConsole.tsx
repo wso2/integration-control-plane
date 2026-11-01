@@ -28,6 +28,7 @@ import { useApimSwagger } from '../hooks/useApim';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useEndpointPolicies } from '../hooks/useConsumers';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
+import ApiKeyAuthOffer from '../components/ApiKeyAuthOffer';
 import { useComponentDeployment, useEnvEndpoints } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
@@ -128,8 +129,8 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   const [keyCopied, setKeyCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
-  // Not offered for an open endpoint: the BFF's test-key route switches enforcement to api-key,
-  // so minting one would secure an endpoint the user deliberately left open.
+  // Not offered for an open endpoint, which needs no key. For jwt, ipaas-service refuses the key and
+  // ApiKeyAuthOffer offers the switch.
   const canGetTestKey = !!testKeyEndpointRef && (access.mode === 'api-key' || access.mode === 'jwt');
   const fetchingKey = access.isMinting;
   const unavailableNotice = endpointLoadNotice(access.securityError, {
@@ -341,6 +342,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                           {keyError}
                         </Typography>
                       )}
+                      <ApiKeyAuthOffer access={access} />
                     </Stack>
                   </Stack>
                 )}

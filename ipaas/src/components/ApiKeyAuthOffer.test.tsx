@@ -1,0 +1,80 @@
+/**
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import { act } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import ApiKeyAuthOffer from './ApiKeyAuthOffer';
+import { BffError } from '../api/_client';
+import { createEndpointTestKey, getEndpointSecurity, setEndpointApiKeyAuth } from '../api/consumers';
+import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
+import { button, flush, renderWithScopes } from '../test/renderWithScopes';
+import { DEVELOPER, VIEWER } from '../test/roles';
+import type { EndpointRef } from '../types/consumers';
+
+vi.mock('../api/consumers', () => ({ getEndpointSecurity: vi.fn(), createEndpointTestKey: vi.fn(), setEndpointApiKeyAuth: vi.fn() }));
+
+const ref: EndpointRef = { componentName: 'orders', environmentName: 'development', endpointName: 'http', deploymentTrackId: 'v1' };
+
+/** The Test page's part of the flow: the auto-minted key's refusal, the offer, and the key once minted. */
+function TestKey() {
+  const access = useEndpointTestAccess(ref);
+  return (
+    <>
+      <ApiKeyAuthOffer access={access} />
+      <output>{access.apiKey}</output>
+    </>
+  );
+}
+
+let unmount = () => {};
+afterEach(() => unmount());
+beforeEach(() => {
+  vi.resetAllMocks();
+  // The stored mode says api-key, but the endpoint has since been switched to OAuth.
+  vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'api-key', publicUrl: 'https://gw.example/orders' } as never);
+  vi.mocked(createEndpointTestKey).mockRejectedValue(new BffError(409, JSON.stringify({ code: 'API_KEY_AUTH_REQUIRED', message: 'the endpoint does not use API-key auth' })));
+  vi.mocked(setEndpointApiKeyAuth).mockResolvedValue(true);
+});
+
+async function refusedTestKey(scopes: string[]) {
+  const r = await renderWithScopes(<TestKey />, scopes);
+  unmount = r.unmount;
+  await flush();
+  return r.container;
+}
+
+describe('ApiKeyAuthOffer', () => {
+  it('explains a 409 and switches the endpoint to API key, then mints', async () => {
+    const c = await refusedTestKey(DEVELOPER);
+    expect(document.body.textContent).toContain("can't issue a test key");
+    expect(document.body.textContent).toContain('changes how every caller of this API authenticates');
+
+    vi.mocked(createEndpointTestKey).mockResolvedValue({ keyId: 'k', apiKey: 'test-key-1' });
+    await act(async () => button(c, 'Switch to API key')!.click());
+    await flush();
+    expect(setEndpointApiKeyAuth).toHaveBeenCalledWith(ref, true);
+    expect(c.querySelector('output')?.textContent).toBe('test-key-1');
+    expect(button(c, 'Switch to API key')).toBeUndefined();
+  });
+
+  it('only explains to a Viewer', async () => {
+    const c = await refusedTestKey(VIEWER);
+    expect(document.body.textContent).toContain("can't issue a test key");
+    expect(button(c, 'Switch to API key')).toBeUndefined();
+  });
+});
