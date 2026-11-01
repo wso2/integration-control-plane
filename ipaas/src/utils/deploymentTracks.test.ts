@@ -96,7 +96,7 @@ describe('hasVersionedApis', () => {
     expect(hasVersionedApis({ displayType, componentSubType, deploymentTracksEnabled: true })).toBe(versioned);
   });
 
-  it('keeps an integration without tracks unversioned', () => {
+  it('shows no versions for an integration that can have no tracks', () => {
     expect(hasVersionedApis({ displayType: 'ballerinaService', componentSubType: null, deploymentTracksEnabled: false })).toBe(false);
     expect(hasVersionedApis({ displayType: 'ballerinaService', componentSubType: 'MCP' })).toBe(false);
   });

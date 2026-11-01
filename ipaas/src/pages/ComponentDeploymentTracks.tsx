@@ -218,8 +218,6 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
   const [dialog, setDialog] = useState<{ track?: DeploymentTrack } | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
-  const onlyTrack = tracks.length <= 1;
-
   return (
     <>
       {notice && (
@@ -238,7 +236,7 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
         </Stack>
       ) : (
         <Alert severity="info" sx={{ mb: 2 }}>
-          This integration was created before deployment tracks, so it builds and deploys a single branch.
+          This integration builds and deploys a single branch, its default deployment track.
         </Alert>
       )}
 
@@ -277,19 +275,22 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
                     <ListingTable.Cell align="right">
                       <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
                         <Stack direction="row" justifyContent="flex-end" gap={0.5}>
-                          <Tooltip title="Edit">
-                            <IconButton size="small" aria-label={`Edit ${t.branch || 'deployment track'}`} onClick={() => setDialog({ track: t })}>
-                              <Pencil size={16} />
-                            </IconButton>
-                          </Tooltip>
+                          {/* The default track is the integration itself: its branch, API and description are the integration's. */}
+                          {!t.latest && (
+                            <Tooltip title="Edit">
+                              <IconButton size="small" aria-label={`Edit ${t.branch || 'deployment track'}`} onClick={() => setDialog({ track: t })}>
+                                <Pencil size={16} />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                           <TrackDeleteButton
                             orgHandler={scope.org}
                             projectId={projectId}
                             componentId={componentId}
                             trackId={t.id}
                             label={t.branch || 'deployment track'}
-                            disabled={onlyTrack}
-                            disabledTooltip="Cannot delete the last deployment track"
+                            disabled={!!t.latest}
+                            disabledTooltip="The default deployment track is deleted with the integration"
                             confirmTitle="Delete deployment track?"
                             confirmBody={
                               <>

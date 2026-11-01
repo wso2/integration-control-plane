@@ -71,9 +71,9 @@ export function apiVersionError(value: string, tracks: DeploymentTrack[], editin
 const GATEWAY_API_TYPES = new Set(['integration-as-api', 'mcp-server', 'webhook']);
 
 /**
- * Integrations whose tracks carry an API version: every integration with
- * deployment tracks that serves APIs on the gateway. An integration without
- * tracks keeps one unversioned API per endpoint.
+ * Integrations whose deployment tracks show and set an API version: every
+ * integration that can have tracks and serves APIs on the gateway. The default
+ * track's is always v1.0.
  */
 export function hasVersionedApis(component: Pick<Component, 'displayType' | 'componentSubType' | 'deploymentTracksEnabled'>): boolean {
   if (!component.deploymentTracksEnabled) return false;
