@@ -620,9 +620,9 @@ export interface LlmProviderInfo {
 }
 
 export const LLM_PROVIDERS: LlmProviderInfo[] = [
-  { id: 'openai', name: 'Open AI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'] },
-  { id: 'anthropic', name: 'Anthropic AI', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
-  { id: 'azure_openai', name: 'Azure Open AI', logo: `${GENAI_LOGO_BASE}azure-openai.svg`, models: [] },
+  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'] },
+  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  { id: 'azure_openai', name: 'Azure OpenAI', logo: `${GENAI_LOGO_BASE}azure-openai.svg`, models: [] },
   { id: 'mistral', name: 'Mistral AI', logo: `${GENAI_LOGO_BASE}mistral.svg`, models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] },
 ];
 
