@@ -16,6 +16,14 @@
  * under the License.
  */
 
+// ── Every screen ────────────────────────────────────────────────────────────
+
+/**
+ * Every Context Engine page and drawer passes this down, so a long path, URL, id or file name
+ * breaks inside its box instead of running past it. `break-word` changes no column or row sizing.
+ */
+export const wrapSx = { overflowWrap: 'break-word' } as const;
+
 // ── Wizard ──────────────────────────────────────────────────────────────────
 
 /** Step section heading — smaller than the page title. */
@@ -128,6 +136,7 @@ export const sourceDrawerSx = {
     maxWidth: '100%',
     display: 'flex',
     flexDirection: 'column',
+    ...wrapSx,
   },
 } as const;
 
@@ -329,7 +338,7 @@ export const uploadRowHeadSx = { display: 'flex', alignItems: 'center', gap: 1.5
 /** Lines the bar and captions up with the file name: the 18px icon plus the 12px gap. */
 export const uploadRowBodySx = { pl: '30px', mt: 0.75 } as const;
 
-export const filesDrawerSx = { '& .MuiDrawer-paper': { width: { xs: '100%', sm: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column' } } as const;
+export const filesDrawerSx = { '& .MuiDrawer-paper': { width: { xs: '100%', sm: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column', ...wrapSx } } as const;
 
 export const filesToolbarSx = { display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' } as const;
 

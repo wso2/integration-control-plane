@@ -26,7 +26,7 @@ import { absoluteUrl, evidenceBackTarget, evidencePart, evidencePlace, evidenceV
 import { contextEngineUrl, contextEvidenceUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
-import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../components/ContextEngine/styles';
+import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx, wrapSx } from '../components/ContextEngine/styles';
 import type { ContextEvidence as Evidence, ContextEvidenceLocationState } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
@@ -100,7 +100,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
   if (evidence.isLoading) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Box sx={centeredSx}>
           <CircularProgress />
@@ -113,7 +113,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   if (!ev) {
     const gone = evidence.error instanceof HttpError && evidence.error.status === 404;
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         {gone ? (
           <Box sx={{ ...summaryCardSx, height: 'auto', maxWidth: 620, p: 3.5 }}>
@@ -170,7 +170,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
     .join(' · ');
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       {back}
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} flexWrap="wrap">
         <Box sx={{ minWidth: 0 }}>
