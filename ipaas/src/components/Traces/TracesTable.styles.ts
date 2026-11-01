@@ -20,6 +20,15 @@ export const container = { mt: 2 } as const;
 
 export const row = { cursor: 'pointer' } as const;
 
+export const traceButton = {
+  p: 0,
+  minWidth: 0,
+  textAlign: 'left',
+  justifyContent: 'flex-start',
+  fontWeight: 'inherit',
+  typography: 'body2',
+} as const;
+
 export const traceId = { fontFamily: 'monospace', color: 'text.secondary' } as const;
 
 export const preview = { color: 'text.secondary', maxWidth: 420, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;

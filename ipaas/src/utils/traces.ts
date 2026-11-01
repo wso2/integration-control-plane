@@ -78,6 +78,19 @@ export interface SpanTreeRow {
 }
 
 /**
+ * Epoch milliseconds, keeping the sub-millisecond part. `Date.parse` truncates
+ * at three decimals, which collapses a whole trace that runs inside one
+ * millisecond onto a single instant and renders every bar full width.
+ */
+export function parseEpochMs(iso: string): number {
+  const base = Date.parse(iso);
+  if (Number.isNaN(base)) return Number.NaN;
+  const fraction = /\.(\d+)/.exec(iso);
+  if (!fraction || fraction[1].length <= 3) return base;
+  return base + Number(`0.${fraction[1].slice(3)}`);
+}
+
+/**
  * Orders spans depth-first and measures each against the trace's window, for
  * the waterfall. A span whose parent is missing becomes a root rather than
  * disappearing: the listing is capped and a parent may never have been
@@ -101,11 +114,13 @@ export function buildSpanTree(spans: SpanSummary[]): SpanTreeRow[] {
     }
   }
 
-  const startOf = (span: SpanSummary): number => Date.parse(span.startTime);
+  const startOf = (span: SpanSummary): number => parseEpochMs(span.startTime);
+  // durationNs is the authoritative length; the end timestamp only bounds the trace.
+  const lengthMs = (span: SpanSummary): number => span.durationNs / NANOS_PER_MS;
   const byStart = (a: SpanSummary, b: SpanSummary): number => startOf(a) - startOf(b) || a.spanId.localeCompare(b.spanId);
 
   const starts = spans.map(startOf).filter((t) => !Number.isNaN(t));
-  const ends = spans.map((span) => Date.parse(span.endTime)).filter((t) => !Number.isNaN(t));
+  const ends = spans.map((span) => startOf(span) + lengthMs(span)).filter((t) => !Number.isNaN(t));
   const traceStart = starts.length ? Math.min(...starts) : 0;
   const traceEnd = ends.length ? Math.max(...ends) : 0;
   const traceSpanMs = traceEnd - traceStart;
@@ -113,10 +128,9 @@ export function buildSpanTree(spans: SpanSummary[]): SpanTreeRow[] {
   const measure = (span: SpanSummary): { offset: number; width: number } => {
     if (traceSpanMs <= 0) return { offset: 0, width: 1 };
     const start = startOf(span);
-    const end = Date.parse(span.endTime);
-    if (Number.isNaN(start) || Number.isNaN(end)) return { offset: 0, width: 0 };
+    if (Number.isNaN(start)) return { offset: 0, width: 0 };
     const offset = (start - traceStart) / traceSpanMs;
-    const width = (end - start) / traceSpanMs;
+    const width = lengthMs(span) / traceSpanMs;
     return { offset: Math.min(Math.max(offset, 0), 1), width: Math.min(Math.max(width, 0), 1 - Math.min(offset, 1)) };
   };
 

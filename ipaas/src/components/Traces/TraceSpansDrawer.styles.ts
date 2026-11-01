@@ -45,7 +45,11 @@ export const spanRow = (selected: boolean) =>
     '&:hover': { bgcolor: selected ? 'action.selected' : 'action.hover' },
   }) as const;
 
-export const spanIndent = (depth: number) => ({ pl: depth * 1.5 }) as const;
+// Only the header indents. The track below it stays full width, or rows at
+// different depths would measure the same instant against different scales.
+export const spanIndent = (depth: number) => ({ pl: depth * 1.5, minWidth: 0 }) as const;
+
+export const partialNotice = { mb: 1 } as const;
 
 export const waterfallTrack = { position: 'relative', height: 4, bgcolor: 'action.hover', borderRadius: 2, mt: 0.5 } as const;
 

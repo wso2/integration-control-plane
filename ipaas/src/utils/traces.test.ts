@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildSpanTree, formatAttributeValue, formatDuration, formatTokens, previewValue, traceWindow } from './traces';
+import { buildSpanTree, formatAttributeValue, formatDuration, formatTokens, parseEpochMs, previewValue, traceWindow } from './traces';
 import type { SpanSummary } from '../types/traces';
 
 function span(spanId: string, parentSpanId: string | null, startMs: number, endMs: number): SpanSummary {
@@ -142,6 +142,65 @@ describe('buildSpanTree', () => {
     const rows = buildSpanTree([span('instant', null, 500, 500)]);
 
     expect(rows[0].width).toBe(1);
+  });
+
+  // A whole trace can run inside one millisecond; truncating to milliseconds
+  // would put every bar at full width.
+  it('scales a sub-millisecond trace proportionally', () => {
+    const root = {
+      spanId: 'root',
+      spanName: 'root',
+      parentSpanId: null,
+      startTime: '2025-11-07T06:23:24.035000000Z',
+      endTime: '2025-11-07T06:23:24.035800000Z',
+      durationNs: 800_000,
+    };
+    const child = {
+      spanId: 'child',
+      spanName: 'child',
+      parentSpanId: 'root',
+      startTime: '2025-11-07T06:23:24.035400000Z',
+      endTime: '2025-11-07T06:23:24.035500000Z',
+      durationNs: 100_000,
+    };
+
+    const rows = buildSpanTree([root, child]);
+
+    expect(rows[0].width).toBeCloseTo(1, 3);
+    expect(rows[1].offset).toBeCloseTo(0.5, 3);
+    expect(rows[1].width).toBeCloseTo(0.125, 3);
+  });
+
+  // durationNs is the span's own measurement; the end timestamp is coarser.
+  it('takes each bar length from durationNs', () => {
+    const rows = buildSpanTree([
+      { spanId: 'a', spanName: 'a', parentSpanId: null, startTime: '2026-01-01T00:00:00.000Z', endTime: '2026-01-01T00:00:00.100Z', durationNs: 100_000_000 },
+      { spanId: 'b', spanName: 'b', parentSpanId: 'a', startTime: '2026-01-01T00:00:00.050Z', endTime: '2026-01-01T00:00:00.100Z', durationNs: 25_000_000 },
+    ]);
+
+    expect(rows[1].width).toBeCloseTo(0.25, 5);
+  });
+});
+
+describe('parseEpochMs', () => {
+  it('keeps the part of the timestamp Date.parse truncates', () => {
+    const earlier = parseEpochMs('2025-11-07T06:23:24.035086494Z');
+    const later = parseEpochMs('2025-11-07T06:23:24.035886494Z');
+
+    // 800µs is 0.8ms. Epoch milliseconds are float64, so the resolution at a
+    // present-day timestamp is roughly a quarter of a microsecond — ample for a
+    // waterfall, but not exact.
+    expect(later - earlier).toBeCloseTo(0.8, 3);
+    expect(Date.parse('2025-11-07T06:23:24.035886494Z') - Date.parse('2025-11-07T06:23:24.035086494Z')).toBe(0);
+  });
+
+  it('handles a timestamp with no fraction, and one Date.parse already covers', () => {
+    expect(parseEpochMs('2025-11-07T06:23:24Z')).toBe(Date.parse('2025-11-07T06:23:24Z'));
+    expect(parseEpochMs('2025-11-07T06:23:24.035Z')).toBe(Date.parse('2025-11-07T06:23:24.035Z'));
+  });
+
+  it('reports an unparseable timestamp as NaN', () => {
+    expect(parseEpochMs('not a time')).toBeNaN();
   });
 });
 

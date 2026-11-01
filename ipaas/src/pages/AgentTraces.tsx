@@ -42,7 +42,7 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid();
   const { projectId, isLoading: loadingProject } = useProjectId(project);
   const { data: comp, isLoading: loadingComponent } = useComponentByHandler(projectId, component);
-  const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError } = useEnvironments(orgUuid ?? '', projectId);
+  const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError, refetch: refetchEnvironments } = useEnvironments(orgUuid ?? '', projectId);
 
   const [envId, setEnvId] = useState('');
   useEffect(() => {
@@ -53,6 +53,9 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
   // A fixed instant, or every render would shift "now" and the cursor would stop lining up.
   const [windowAnchor, setWindowAnchor] = useState(() => new Date());
   const [cursors, setCursors] = useState<string[]>([]);
+  // The route survives an integration or environment switch, so the cursor has
+  // to be dropped explicitly or it is sent against a listing it did not come from.
+  useEffect(() => setCursors([]), [comp?.id, envId]);
 
   const window = useMemo<TraceQuery>(
     () => ({
@@ -85,10 +88,7 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
     setWindowAnchor(new Date());
   };
 
-  const changeEnvironment = (nextEnvId: string) => {
-    setEnvId(nextEnvId);
-    setCursors([]);
-  };
+  const changeEnvironment = (nextEnvId: string) => setEnvId(nextEnvId);
 
   if (loadingProject || loadingComponent || loadingEnvironments) {
     return (
@@ -120,7 +120,7 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
         <Typography variant="h1" sx={{ mb: 3 }}>
           Traces
         </Typography>
-        <Alert severity="error" action={<Button onClick={() => refetch()}>Retry</Button>}>
+        <Alert severity="error" action={<Button onClick={() => refetchEnvironments()}>Retry</Button>}>
           Could not load environments.
         </Alert>
       </PageContent>
@@ -128,6 +128,7 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
   }
 
   const traces = data?.traces ?? [];
+  const onFirstPage = cursors.length === 0;
 
   return (
     <Box>
@@ -161,21 +162,27 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
           <Alert severity="error" action={<Button onClick={() => refetch()}>Retry</Button>}>
             Could not load traces for this agent.
           </Alert>
-        ) : traces.length === 0 ? (
-          <EmptyListing
-            icon={<Activity size={48} />}
-            title="No traces in this range"
-            description="Invoke the agent in this environment, or widen the time range. Traces appear once the agent has handled a request."
-          />
         ) : (
           <>
-            <TracesTable
-              traces={traces}
-              onSelect={(trace) => {
-                setSelectedTrace(trace);
-                setDrawerOpen(true);
-              }}
-            />
+            {traces.length === 0 ? (
+              <EmptyListing
+                icon={<Activity size={48} />}
+                title={onFirstPage ? 'No traces in this range' : 'No traces on this page'}
+                description={
+                  onFirstPage
+                    ? 'Invoke the agent in this environment, or widen the time range. Traces appear once the agent has handled a request.'
+                    : 'The search found none here. Continue with Next, or go back.'
+                }
+              />
+            ) : (
+              <TracesTable
+                traces={traces}
+                onSelect={(trace) => {
+                  setSelectedTrace(trace);
+                  setDrawerOpen(true);
+                }}
+              />
+            )}
 
             {data?.truncated ? (
               <Alert severity="info" sx={{ mt: 2 }}>
@@ -183,14 +190,20 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
               </Alert>
             ) : null}
 
-            <Stack direction="row" gap={1} sx={{ mt: 2, justifyContent: 'flex-end' }}>
-              <Button size="small" disabled={cursors.length === 0} onClick={() => setCursors((prev) => prev.slice(0, -1))}>
-                Previous
-              </Button>
-              <Button size="small" disabled={!data?.nextCursor} onClick={() => data?.nextCursor && setCursors((prev) => [...prev, data.nextCursor as string])}>
-                Next
-              </Button>
-            </Stack>
+            {/* Outside the listing: an empty page still has to be navigable, both
+                back to the previous one and on through a truncated search. */}
+            {!onFirstPage || data?.nextCursor ? (
+              <Stack direction="row" gap={1} sx={{ mt: 2, justifyContent: 'flex-end' }}>
+                <Button size="small" disabled={onFirstPage || isFetching} onClick={() => setCursors((prev) => prev.slice(0, -1))}>
+                  Previous
+                </Button>
+                {/* While a page loads, data still holds the previous one and its
+                    cursor; a second click would push that same cursor again. */}
+                <Button size="small" disabled={!data?.nextCursor || isFetching} onClick={() => data?.nextCursor && setCursors((prev) => [...prev, data.nextCursor as string])}>
+                  Next
+                </Button>
+              </Stack>
+            ) : null}
           </>
         )}
       </PageContent>

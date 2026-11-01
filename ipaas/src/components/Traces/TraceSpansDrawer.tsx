@@ -88,6 +88,11 @@ export default function TraceSpansDrawer({ open, onClose, trace, componentId, en
       ) : (
         <Box sx={styles.body}>
           <Box sx={styles.treePane}>
+            {data && data.totalCount > rows.length ? (
+              <Alert severity="warning" sx={styles.partialNotice}>
+                Showing {rows.length} of {data.totalCount} spans. The rest are not fetched, so some branches may appear detached.
+              </Alert>
+            ) : null}
             {rows.map(({ span, depth, offset, width }) => (
               <Box
                 key={span.spanId}
@@ -95,9 +100,9 @@ export default function TraceSpansDrawer({ open, onClose, trace, componentId, en
                 type="button"
                 aria-current={span.spanId === activeSpanId}
                 onClick={() => setSelectedSpanId(span.spanId)}
-                sx={{ ...styles.spanRow(span.spanId === activeSpanId), ...styles.spanIndent(depth) }}
+                sx={styles.spanRow(span.spanId === activeSpanId)}
               >
-                <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+                <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={styles.spanIndent(depth)}>
                   <Stack direction="row" alignItems="center" gap={0.5} minWidth={0}>
                     {span.error ? <CircleAlert size={13} color="var(--oxygen-palette-error-main)" /> : null}
                     <Typography variant="body2" noWrap>

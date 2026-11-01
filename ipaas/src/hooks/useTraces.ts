@@ -16,19 +16,29 @@
  * under the License.
  */
 
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { fetchSpanDetail, fetchTraceSpans, fetchTraces } from '../api/traces';
 import type { SpanDetail, SpanListResponse, TraceListResponse, TraceQuery } from '../types/traces';
 
-const traceQueryKey = (query: TraceQuery): unknown[] => [query.startTime, query.endTime, query.limit, query.sortOrder, query.cursor, query.include?.join(',')];
+/**
+ * Everything a trace listing is scoped to, as one key segment. The cursor is
+ * kept out of it so paging can be told apart from a change of integration,
+ * environment or window — only the former may keep the previous page on screen.
+ */
+function traceScopeId(componentId: string, envId: string, query: TraceQuery): string {
+  return JSON.stringify([componentId, envId, query.startTime, query.endTime, query.sortOrder ?? '', query.limit ?? 0, query.include?.join(',') ?? '']);
+}
 
 export function useTraces(componentId: string, envId: string, query: TraceQuery) {
+  const scopeId = traceScopeId(componentId, envId, query);
+
   return useQuery<TraceListResponse>({
-    queryKey: ['agentTraces', componentId, envId, ...traceQueryKey(query)],
+    queryKey: ['agentTraces', scopeId, query.cursor ?? ''],
     queryFn: () => fetchTraces(componentId, envId, query),
     enabled: !!componentId && !!envId && !!query.startTime && !!query.endTime,
-    // Keeps the current page on screen instead of collapsing to a skeleton on refresh.
-    placeholderData: keepPreviousData,
+    // Paging keeps the current page on screen rather than collapsing to a
+    // skeleton; any other change must not show one scope's traces under another.
+    placeholderData: (previous, previousQuery) => (previousQuery?.queryKey[1] === scopeId ? previous : undefined),
     retry: false,
   });
 }

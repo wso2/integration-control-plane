@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Chip, ListingTable, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Button, Chip, ListingTable, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { CircleAlert, CircleCheck } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import * as styles from './TracesTable.styles';
@@ -77,7 +77,19 @@ export default function TracesTable({ traces, onSelect }: TracesTableProps): JSX
           {traces.map((trace) => (
             <ListingTable.Row key={trace.traceId} hover sx={styles.row} onClick={() => onSelect(trace)}>
               <ListingTable.Cell>
-                <Typography variant="body2">{trace.rootSpanName}</Typography>
+                <Button
+                  variant="text"
+                  color="inherit"
+                  disableRipple
+                  sx={styles.traceButton}
+                  onClick={(event) => {
+                    // The row handles the click too; without this the drawer opens twice.
+                    event.stopPropagation();
+                    onSelect(trace);
+                  }}
+                >
+                  {trace.rootSpanName}
+                </Button>
                 <Stack direction="row" alignItems="center" gap={0.75} sx={styles.chips}>
                   <Typography variant="caption" sx={styles.traceId}>
                     {trace.traceId.slice(0, 16)}
