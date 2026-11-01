@@ -37,6 +37,8 @@ export interface ProviderOption {
   name: string;
   /** Full logo URL. */
   logo: string;
+  /** Full URL of the dark theme logo, when the logo is dark. */
+  logoDark?: string;
   /** Selectable model ids; empty means a free-text deployment id (Azure). */
   models: string[];
 }
@@ -81,7 +83,7 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
 
       <Box sx={modelTileGridSx}>
         {providers.map((p) => (
-          <SelectableCard key={p.id} title={p.name} logo={p.logo} selected={value?.provider === p.id} onSelect={() => onChange(blank(p.id))} />
+          <SelectableCard key={p.id} title={p.name} logo={p.logo} logoDark={p.logoDark} selected={value?.provider === p.id} onSelect={() => onChange(blank(p.id))} />
         ))}
       </Box>
 

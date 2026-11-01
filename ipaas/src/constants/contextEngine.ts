@@ -432,7 +432,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['host', 'database'],
     isStructuredData: true,
   },
-  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
   { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
   {
     id: 'mongodb',
@@ -615,15 +615,17 @@ export interface LlmProviderInfo {
   name: string;
   /** Logo path under the public folder, resolved with {@link contextLogoUrl}. */
   logo: string;
+  /** Light variant of a dark logo, for the dark theme. */
+  logoDark?: string;
   /** Selectable model ids. Empty means the provider takes a free-text deployment id (Azure). */
   models: string[];
 }
 
 export const LLM_PROVIDERS: LlmProviderInfo[] = [
-  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'] },
-  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, logoDark: `${GENAI_LOGO_BASE}openai-dark.svg`, models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'] },
+  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, logoDark: `${GENAI_LOGO_BASE}anthropic-dark.svg`, models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
   { id: 'azure_openai', name: 'Azure OpenAI', logo: `${GENAI_LOGO_BASE}azure-openai.svg`, models: [] },
-  { id: 'mistral', name: 'Mistral AI', logo: `${GENAI_LOGO_BASE}mistral.svg`, models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] },
+  { id: 'mistral', name: 'Mistral AI', logo: `${GENAI_LOGO_BASE}mistral.svg`, logoDark: `${GENAI_LOGO_BASE}mistral-dark.svg`, models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] },
 ];
 
 export const LLM_AZURE_DEFAULT_API_VERSION = '2024-06-01';
