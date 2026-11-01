@@ -115,26 +115,26 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const sourcesById = new Map(engine.sources.map((s) => [s.id, s]));
   const llmModel = engine.models.llm?.model;
 
-  const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !query.isPending;
+  const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !query.isPending && openingId === null;
   // const suggestions = suggestedQuestions(engine);
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
   const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
   const ask = (text = question, askMode = mode) => {
     const q = text.trim();
-    if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || query.isPending) return;
+    // A reopen in flight would replace the conversation and drop this question's turn.
+    if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || query.isPending || openingId !== null) return;
     setNotice(null);
-    query.mutate(
-      { engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT },
-      {
-        onSuccess: (result) => {
-          appendTurn(engine.id, { question: q, mode: askMode, result });
-          setQuestion('');
-          markAsked();
-          rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
-        },
-      },
-    );
+    // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
+    query
+      .mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT })
+      .then((result) => {
+        appendTurn(engine.id, { question: q, mode: askMode, result });
+        setQuestion('');
+        markAsked();
+        rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
+      })
+      .catch(() => undefined);
   };
 
   // Opening a recent question replaces the conversation with it and brings it into view; follow-ups then build on it.
@@ -344,9 +344,11 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             </ToggleButtonGroup>
             {turns.length > 0 && (
               <Tooltip title="Clear conversation">
-                <IconButton size="small" aria-label="Clear conversation" onClick={() => clearTurns(engine.id)}>
-                  <Eraser size={16} />
-                </IconButton>
+                <span>
+                  <IconButton size="small" aria-label="Clear conversation" disabled={openingId !== null} onClick={() => clearTurns(engine.id)}>
+                    <Eraser size={16} />
+                  </IconButton>
+                </span>
               </Tooltip>
             )}
           </Stack>
