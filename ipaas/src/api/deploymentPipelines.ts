@@ -140,9 +140,8 @@ const toDeploymentPipeline = (p: BffDeploymentPipeline): DeploymentPipeline => (
  * outside every promotion path can never be promoted into.
  *
  * The insertion point is the chain's terminal environment: the one with nothing to
- * promote *to*. A single-environment pipeline is stored as that environment with an
- * empty target list (`development → []`), so it is the terminal and its path gets the
- * new target. A pipeline with no paths, or a branching chain with several terminals,
+ * promote *to*. The terminal may have a path with an empty target list (a new org's
+ * `development → []`); that path gets the new target. A pipeline with no paths, or a branching chain with several terminals,
  * is left untouched — there is no single correct place to insert and guessing would
  * rewrite a topology someone built deliberately.
  *

@@ -59,10 +59,22 @@ describe('appendEnvironmentToDefaultPipeline', () => {
   });
 
   // The shape a new org starts with, and what the editor saves for one environment.
-  it('fills in the target of a single-environment pipeline', async () => {
+  it('fills in an empty last path when it is the only one', async () => {
     withDefault([{ sourceEnvironment: 'development', targetEnvironments: [] }]);
     expect(await appendEnvironmentToDefaultPipeline('staging')).toBe(true);
     expect(sentPaths()).toEqual([{ sourceEnvironment: 'development', targetEnvironments: ['staging'] }]);
+  });
+
+  it('fills in an empty last path at the end of a longer chain', async () => {
+    withDefault([
+      { sourceEnvironment: 'development', targetEnvironments: ['staging'] },
+      { sourceEnvironment: 'staging', targetEnvironments: [] },
+    ]);
+    expect(await appendEnvironmentToDefaultPipeline('production')).toBe(true);
+    expect(sentPaths()).toEqual([
+      { sourceEnvironment: 'development', targetEnvironments: ['staging'] },
+      { sourceEnvironment: 'staging', targetEnvironments: ['production'] },
+    ]);
   });
 
   it('appends after the end of a linear chain', async () => {
