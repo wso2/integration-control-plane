@@ -342,7 +342,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         )}
       </Drawer>
 
-      {showEndpoints && <ApiSettingsDrawer open={settingsEp !== null} onClose={() => setSettingsEp(null)} componentName={componentId} envName={envId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />}
+      {showEndpoints && <ApiSettingsDrawer open={settingsEp !== null} onClose={() => setSettingsEp(null)} componentName={componentId} envName={envId} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />}
     </>
   );
 }

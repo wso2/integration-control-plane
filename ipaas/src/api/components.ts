@@ -317,7 +317,7 @@ export const rotateComponentEnvironmentJwtSecret = (componentId: string, environ
 // APIP reconciles Public for this environment. Project access is implicit; its checkbox only
 // controls whether the console displays the internal project URL.
 export const updateEndpoint = (input: UpdateEndpointInput): Promise<object> =>
-  bff.put<object>(`/components/${seg(input.componentId)}/environments/${seg(input.environmentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ projectName: input.projectId })}`, {
+  bff.put<object>(`/components/${seg(input.componentId)}/environments/${seg(input.environmentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ projectName: input.projectId, deploymentTrackId: input.versionId })}`, {
     visibility: Array.from(new Set(['project', ...input.networkVisibilities.filter((value) => value !== 'Project').map(toVisibilityWire)])),
     displayProjectUrl: input.networkVisibilities.includes('Project'),
   });

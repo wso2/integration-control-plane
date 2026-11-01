@@ -70,8 +70,8 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   const isActive = deployment?.deploymentStatusV2 === 'ACTIVE';
 
   const accessRef: EndpointRef | null = useMemo(
-    () => (component && selectedEnv && activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id } : null),
-    [projectId, component, selectedEnv, activeEndpoint],
+    () => (component && selectedEnv && activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id, deploymentTrackId: selectedTrackId } : null),
+    [projectId, component, selectedEnv, activeEndpoint, selectedTrackId],
   );
   const access = useEndpointTestAccess(accessRef, !!accessRef && isActive);
 

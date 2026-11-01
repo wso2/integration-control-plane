@@ -34,6 +34,8 @@ interface EndpointsDrawerProps {
   projectId: string;
   componentId?: string;
   environmentId?: string;
+  /** The deployment track whose endpoints these are; its APIs are its own. */
+  versionId?: string;
 }
 
 const drawerSx = {
@@ -49,7 +51,7 @@ const drawerSx = {
   },
 } as const;
 
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId, versionId }: EndpointsDrawerProps) {
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -100,6 +102,7 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
         onClose={() => setManageDrawerOpen(false)}
         componentName={componentId ?? ''}
         envName={environmentId ?? ''}
+        deploymentTrackId={versionId}
         endpoints={toEndpointOptions(endpoints)}
         activeEndpointName={selectedEndpoint?.id}
       />
