@@ -417,7 +417,7 @@ export function summarizeSource(source: ContextSourceConfig): string {
     const staged = source.staged ?? [];
     if (staged.length === 0) return 'Upload files after the engine is created';
     const sum = stagedSummary(staged, []);
-    return `${plural(staged.length, 'file')} staged · ${formatBytes(sum.bytes)}${sum.pdfs ? ` · ${plural(sum.pdfs, 'PDF')} stored only` : ''}`;
+    return `${plural(staged.length, 'file')} staged · ${formatBytes(sum.bytes)}`;
   }
   const parts = connector.summaryKeys
     .map((key) => {
@@ -854,22 +854,19 @@ export function checkStagedFile(meta: Pick<StagedFileMeta, 'name' | 'size' | 'co
   const replaces = existingNames.includes(meta.name);
   if (!meta.contentType) return { problem: 'unsupported', replaces };
   if (meta.size > UPLOAD_MAX_BYTES) return { problem: 'too-large', replaces };
-  return meta.contentType === 'application/pdf' ? { warning: 'pdf', replaces } : { replaces };
+  return { replaces };
 }
 
 /** The row's caption for a check; '' when there is nothing to say. */
-export function stagedFileNote(check: StagedFileCheck, size: number): string {
-  if (check.problem === 'too-large') return `${formatBytes(size)} is over the ${formatBytes(UPLOAD_MAX_BYTES)} limit. Split it or leave it out.`;
+export function stagedFileNote(check: StagedFileCheck): string {
+  if (check.problem === 'too-large') return `This file is over the ${formatBytes(UPLOAD_MAX_BYTES)} limit.`;
   if (check.problem === 'unsupported') return 'Only text, Markdown, HTML, JSON or PDF files can be uploaded.';
-  const notes: string[] = [];
-  if (check.warning === 'pdf') notes.push('Stored, but not searchable until the engine can read PDFs');
-  if (check.replaces) notes.push('Replaces the version already in the source');
-  return notes.join(' · ');
+  return check.replaces ? 'Replaces the version already in the source' : '';
 }
 
 /** How many of the chosen files will upload, how many are skipped, and their size. */
-export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'contentType'>[], existingNames: string[]): { ready: number; skipped: number; bytes: number; pdfs: number } {
-  const sum = { ready: 0, skipped: 0, bytes: 0, pdfs: 0 };
+export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'contentType'>[], existingNames: string[]): { ready: number; skipped: number; bytes: number } {
+  const sum = { ready: 0, skipped: 0, bytes: 0 };
   for (const f of files) {
     const check = checkStagedFile(f, existingNames);
     if (check.problem) {
@@ -878,7 +875,6 @@ export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'con
     }
     sum.ready += 1;
     sum.bytes += f.size;
-    if (check.warning === 'pdf') sum.pdfs += 1;
   }
   return sum;
 }
@@ -1061,7 +1057,7 @@ export function uploadIsSlow(entry: Pick<UploadEntry, 'uploadedAt'>, now: number
 
 /** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */
 export function summarizeUploads(entries: Pick<UploadEntry, 'status'>[]): string {
-  if (entries.length === 0) return 'No files yet';
+  if (entries.length === 0) return 'No files uploaded from this browser';
   const count = (s: UploadFileStatus): number => entries.filter((e) => e.status === s).length;
   const parts = [plural(entries.length, 'file')];
   const moving = entries.filter(isUploadActive).length;

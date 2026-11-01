@@ -22,7 +22,7 @@ import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { changeUploadVisibility, checkUpload, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
 import { useContextEngineProgress, useUploadAudience } from '../../../hooks/useContextEngine';
 import { useNow } from '../../../hooks/useNow';
-import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
+import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED, UPLOAD_MAX_BYTES, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
 import {
   checkStagedFile,
   contentTypeForFile,
@@ -311,11 +311,10 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
           </Alert>
         )}
 
-        <FileDropzone
-          compact={entries.length > 0 || staged.length > 0}
-          hint="Text, Markdown, HTML or JSON, up to 25 MB each. PDFs are stored now and become searchable when the engine gains a PDF reader."
-          onFiles={(files) => setStaged((s) => stageFiles(s, files))}
-        />
+        <FileDropzone compact={entries.length > 0 || staged.length > 0} hint={`Up to ${formatBytes(UPLOAD_MAX_BYTES)} each.`} onFiles={(files) => setStaged((s) => stageFiles(s, files))} />
+        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: -1, lineHeight: 1.5 }}>
+          This list shows files uploaded from this browser. Files added from elsewhere are in the engine but not listed here.
+        </Typography>
 
         {staged.length > 0 && (
           <Box>
@@ -406,9 +405,6 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 ))
               )}
             </Box>
-            <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1, lineHeight: 1.5 }}>
-              This list is what this browser uploaded. Removing a file deletes it from search and the graph on the engine&apos;s next pass.
-            </Typography>
           </Box>
         )}
         <input
@@ -444,7 +440,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
           confirmLabel="Remove"
           pendingLabel="Removing…">
           <Typography variant="body2" color="text.secondary">
-            It leaves search and the graph on the engine&apos;s next pass. Its text can remain in storage until the engine compacts, which is planned for a later release.
+            Its content will no longer appear in search results or answers.
           </Typography>
           {removeError && (
             <Alert severity="error" variant="outlined" sx={{ mt: 1.5 }}>

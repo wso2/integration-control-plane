@@ -577,6 +577,30 @@ export function useSourceUploads(engineId: string, sourceId: string): UploadEntr
   return entries;
 }
 
+/** Whether any file, in any source, is still being sent from this tab. */
+function anySending(): boolean {
+  for (const list of entriesBySource.values()) if (list.some((e) => e.status === 'uploading')) return true;
+  return false;
+}
+
+/**
+ * Closing or reloading the tab stops a file still being sent, so the browser asks first.
+ * Browsers show their own wording in that prompt; a page cannot set it.
+ */
+export function useLeaveGuardWhileSending(): void {
+  const sending = useSyncExternalStore(subscribe, anySending, () => false);
+  useEffect(() => {
+    if (!sending) return undefined;
+    const ask = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      // Older Chrome and Edge show the prompt only when this is set.
+      event.returnValue = true;
+    };
+    window.addEventListener('beforeunload', ask);
+    return () => window.removeEventListener('beforeunload', ask);
+  }, [sending]);
+}
+
 // ── Rules ───────────────────────────────────────────────────────────────────
 // The engine keeps a source's rules but does not return them, so the rules this
 // browser last saved are kept for the edit form and the upload rules check.
