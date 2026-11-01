@@ -36,7 +36,7 @@ import type { ContextEngine } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
-const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } as const;
+const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' } as const;
 
 /** At most this many connector marks per row; the count covers the rest. */
 const MAX_MARKS = 4;
@@ -197,7 +197,8 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                         goDetail(e.id);
                       }
                     }}>
-                    <ListingTable.Cell sx={{ maxWidth: 360 }}>
+                    {/* The description never wraps, so this cap decides the column's width; narrower on laptops keeps Actions in view. */}
+                    <ListingTable.Cell sx={{ maxWidth: { xs: 280, lg: 360 } }}>
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
                         {e.name}
                       </Typography>
