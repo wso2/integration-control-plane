@@ -185,10 +185,14 @@ export const catalogSectionSx = {
   fontSize: 12,
 } as const;
 
+/** The logo of a light and dark pair defaults to 16 px wide; tiles let it keep its own proportions. */
+const tileLogoSx = { '& img': { width: 'auto' } } as const;
+
 export const catalogGridSx = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 1.5,
+  ...tileLogoSx,
 } as const;
 
 export const catalogSentinelSx = {
@@ -482,6 +486,7 @@ export const modelTileGridSx = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 1.25,
+  ...tileLogoSx,
 } as const;
 
 // ── Quick add ───────────────────────────────────────────────────────────────

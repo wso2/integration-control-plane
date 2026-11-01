@@ -41,8 +41,8 @@ interface ModelsStepProps {
   onAnswerLlmChange: (value: LlmConfig | null) => void;
 }
 
-const EMBEDDING_OPTIONS = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), models: p.models }));
-const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
+const EMBEDDING_OPTIONS = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), logoDark: p.logoDark && ragLogoUrl(p.logoDark), models: p.models }));
+const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
 
 /** Step 3 — embedding and language model side by side, with a one-click recommended pair, then whether and with what the engine answers. */
 export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled, answerLlm, onEmbeddingChange, onLlmChange, onShareApiKeyChange, onAnswersEnabledChange, onAnswerLlmChange }: ModelsStepProps): JSX.Element {

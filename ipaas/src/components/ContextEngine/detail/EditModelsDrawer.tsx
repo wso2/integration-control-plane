@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Drawer, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
 import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
@@ -41,12 +41,13 @@ interface ProviderInfo {
   id: string;
   name: string;
   logo: string;
+  logoDark?: string;
   models: string[];
 }
 
 /** Provider tiles with logos resolved against the app base, as the create wizard shows them. */
-const EMBEDDING_OPTIONS: ProviderInfo[] = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), models: p.models }));
-const LLM_OPTIONS: ProviderInfo[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
+const EMBEDDING_OPTIONS: ProviderInfo[] = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), logoDark: p.logoDark && ragLogoUrl(p.logoDark), models: p.models }));
+const LLM_OPTIONS: ProviderInfo[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
 
 const draftOf = (m: ContextModelSummary | null): ModelDraft | null =>
   m ? { provider: m.provider, model: m.model, baseUrl: m.baseUrl ?? '', apiVersion: m.apiVersion ?? '', dimensions: m.dimensions, keyMode: m.keyKind === 'reference' ? 'ref' : 'key', apiKey: '', apiKeyRef: '' } : null;
@@ -105,7 +106,7 @@ function ModelEditor({ kind, providers, draft, current, onChange }: { kind: 'emb
     <Stack gap={2}>
       <Box sx={modelTileGridSx}>
         {providers.map((p) => (
-          <SelectableCard key={p.id} title={p.name} logo={p.logo} selected={draft?.provider === p.id} onSelect={() => onChange(current?.provider === p.id ? draftOf(current)! : blankDraft(p.id, kind))} />
+          <SelectableCard key={p.id} title={p.name} logo={p.logo} logoDark={p.logoDark} selected={draft?.provider === p.id} onSelect={() => onChange(current?.provider === p.id ? draftOf(current)! : blankDraft(p.id, kind))} />
         ))}
       </Box>
       {draft && (
@@ -205,7 +206,7 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
             {locked ? (
               <Stack gap={1.75}>
                 <Stack direction="row" alignItems="center" gap={1.5} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                  {embeddingProvider && <Box component="img" src={embeddingProvider.logo} alt="" sx={{ width: 28, height: 28 }} />}
+                  {embeddingProvider && <ColorSchemeImage src={{ light: embeddingProvider.logo, dark: embeddingProvider.logoDark ?? embeddingProvider.logo }} alt="" width={28} height={28} />}
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {models.embedding ? (embeddingProvider?.name ?? models.embedding.provider) : 'Engine default'}

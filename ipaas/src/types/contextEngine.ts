@@ -210,6 +210,8 @@ export interface SourceConnector {
   popular?: boolean;
   /** Logo path under the public folder; `icon` is drawn when absent. */
   logo?: string;
+  /** Light variant of a dark logo, for the dark theme. */
+  logoDark?: string;
   icon: SourceIcon;
   fields: SourceFieldDef[];
   /** Field keys shown in the one-line summary, in order. */

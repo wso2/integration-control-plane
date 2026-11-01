@@ -67,14 +67,16 @@ export interface EmbeddingProviderInfo {
   name: string;
   /** Logo path under the public folder, resolved with {@link ragLogoUrl}. */
   logo: string;
+  /** Light variant of a dark logo, for the dark theme. */
+  logoDark?: string;
   /** Selectable model ids. Empty means the provider takes a free-text model id (Azure). */
   models: string[];
 }
 
 export const EMBEDDING_PROVIDERS: EmbeddingProviderInfo[] = [
-  { id: 'openai', name: 'Open AI', logo: `${RAG_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] },
+  { id: 'openai', name: 'Open AI', logo: `${RAG_LOGO_BASE}openai.svg`, logoDark: `${RAG_LOGO_BASE}openai-dark.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] },
   { id: 'azure_openai', name: 'Azure Open AI', logo: `${RAG_LOGO_BASE}azure-openai.svg`, models: [] },
-  { id: 'mistral', name: 'Mistral AI', logo: `${RAG_LOGO_BASE}mistral.svg`, models: ['mistral-embed'] },
+  { id: 'mistral', name: 'Mistral AI', logo: `${RAG_LOGO_BASE}mistral.svg`, logoDark: `${RAG_LOGO_BASE}mistral-dark.svg`, models: ['mistral-embed'] },
 ];
 
 export const AZURE_DEFAULT_API_VERSION = '2024-06-01';
