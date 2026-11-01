@@ -28,6 +28,8 @@ export interface UseProjectHandlerReturn {
   isCheckingAvailability: boolean;
   availability: ProjectHandlerAvailability | undefined;
   availabilityError: boolean;
+  /** Whether the availability check says the handle now shown is taken. */
+  handlerTaken: boolean;
   /** The user's own handle when it was taken and swapped for `handler`; null otherwise. */
   replacedHandler: string | null;
   startEditing: () => void;
@@ -85,9 +87,11 @@ export function useProjectHandler(displayName: string): UseProjectHandlerReturn 
   return {
     handler: effectiveHandler,
     handlerEdited,
-    isCheckingAvailability,
+    // Also true during the debounce, so submit waits for the handle actually shown to be checked.
+    isCheckingAvailability: isCheckingAvailability || (effectiveHandler.length >= 2 && debouncedCandidate !== effectiveHandler),
     availability,
     availabilityError,
+    handlerTaken: !!availability && !availability.handlerUnique && debouncedCandidate === effectiveHandler,
     replacedHandler: manualHandler && effectiveHandler !== requestedHandler ? requestedHandler : null,
     startEditing,
     stopEditing,

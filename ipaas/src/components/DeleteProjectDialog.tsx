@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, TextField } from '@wso2/oxygen-ui';
+import { Alert, DialogContentText, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useDeleteProject } from '../hooks/useProjects';
 import type { Project } from '../types/project';
+import ConfirmDeleteDialog from './ConfirmDeleteDialog';
 
 /** Confirms a project deletion by having the user type the project name. */
 export default function DeleteProjectDialog({ project, onClose }: { project: Project; onClose: () => void }): JSX.Element {
@@ -37,27 +38,23 @@ export default function DeleteProjectDialog({ project, onClose }: { project: Pro
     });
 
   return (
-    <Dialog open onClose={remove.isPending ? undefined : onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        Are you sure you want to remove the project &lsquo;<strong>{project.name}</strong>&rsquo;?
-      </DialogTitle>
-      <DialogContent>
-        {error && (
-          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
-            {error}
-          </Alert>
-        )}
-        <DialogContentText sx={{ mb: 2 }}>This action will be irreversible and all related details will be lost. Please type in the project name below to confirm.</DialogContentText>
-        <TextField value={confirmText} onChange={(e) => setConfirmText(e.target.value)} fullWidth placeholder="Enter project name to confirm" autoFocus slotProps={{ htmlInput: { 'aria-label': 'Project name' } }} />
-      </DialogContent>
-      <DialogActions>
-        <Button variant="outlined" onClick={onClose} disabled={remove.isPending}>
-          Cancel
-        </Button>
-        <Button variant="contained" color="error" onClick={handleDelete} disabled={confirmText.trim() !== project.name || remove.isPending} startIcon={remove.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-          {remove.isPending ? 'Deleting…' : 'Delete'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+    <ConfirmDeleteDialog
+      title={
+        <>
+          Are you sure you want to remove the project &lsquo;<strong>{project.name}</strong>&rsquo;?
+        </>
+      }
+      onConfirm={handleDelete}
+      onClose={onClose}
+      isPending={remove.isPending}
+      confirmDisabled={confirmText.trim() !== project.name}>
+      {error && (
+        <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+      <DialogContentText sx={{ mb: 2 }}>This action will be irreversible and all related details will be lost. Please type in the project name below to confirm.</DialogContentText>
+      <TextField value={confirmText} onChange={(e) => setConfirmText(e.target.value)} fullWidth placeholder="Enter project name to confirm" autoFocus slotProps={{ htmlInput: { 'aria-label': 'Project name' } }} />
+    </ConfirmDeleteDialog>
   );
 }

@@ -38,7 +38,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
   // Shown on blur, not per keystroke.
   const [nameErrorShown, setNameErrorShown] = useState<string | null>(null);
 
-  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
+  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, handlerTaken, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createProject = useCreateProject();
   const navigate = useAppNavigate();
   const orgHomeUrl = resourceUrl(scope, 'overview');
@@ -47,8 +47,6 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
   const handlerInputRef = useRef<HTMLInputElement>(null);
   // Shown once the edit is committed (Enter or blur).
   const handlerError = effectiveHandler && !handlerEdited ? validateProjectHandler(effectiveHandler) : null;
-  // Only gates submit: useProjectHandler swaps a taken handle for a free one.
-  const handlerTaken = !!availability && !availability.handlerUnique;
 
   // The input is disabled until editing starts, so it can only take focus afterwards.
   useEffect(() => {
@@ -128,8 +126,8 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
               }}
               fullWidth
               disabled={!handlerEdited}
-              error={!!handlerError}
-              helperText={handlerError ?? (replacedHandler && `"${replacedHandler}" is taken, so "${effectiveHandler}" is used instead.`)}
+              error={!!handlerError || (handlerTaken && !replacedHandler)}
+              helperText={handlerError ?? (replacedHandler ? `"${replacedHandler}" is taken, so "${effectiveHandler}" is used instead.` : handlerTaken ? 'This project ID is already taken. Edit it to choose another.' : undefined)}
               slotProps={{
                 input: {
                   endAdornment: isCheckingAvailability ? (

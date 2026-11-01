@@ -41,13 +41,13 @@ function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: stri
   const deleting = project.deleting === true;
   // The delete action shows on hover or focus, so its integration count is fetched then rather than for every card.
   const [armed, setArmed] = useState(false);
-  const { data: components } = useComponents(org, armed && canDelete && !deleting ? project.id : '');
+  const { data: components, isError: componentsError } = useComponents(org, armed && canDelete && !deleting ? project.id : '');
   const hasComponents = !!components?.length;
   return (
     <Tooltip title={deleting ? 'This project is being deleted' : ''}>
       <ListingCard
         title={project.name}
-        description={project.description.trim() || undefined}
+        description={project.description?.trim() || undefined}
         updatedTime={deleting ? 'Deleting…' : formatDistanceToNow(project.updatedAt)}
         updatedDateTime={deleting ? undefined : project.updatedAt}
         updatedTooltip={deleting ? undefined : formatDateTime(project.updatedAt)}
@@ -58,7 +58,7 @@ function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: stri
         onFocus={() => setArmed(true)}
         actions={
           deleting || !canDelete ? undefined : (
-            <Tooltip title={hasComponents ? 'To remove a project, you must delete all integrations in it.' : 'Delete'}>
+            <Tooltip title={componentsError ? 'Could not check this project for integrations. Try again later.' : hasComponents ? 'To remove a project, you must delete all integrations in it.' : 'Delete'}>
               {/* A disabled button fires no events, so the span carries the tooltip and stops the click opening the card. */}
               <span onClick={(e) => e.stopPropagation()}>
                 <IconButton

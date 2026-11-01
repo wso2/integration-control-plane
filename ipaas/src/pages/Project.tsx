@@ -110,10 +110,10 @@ const mainColumnSx = { gridColumn: { md: 1 }, gridRow: { md: 2 } } as const;
 const sideColumnSx = { gridColumn: { md: 2 }, gridRow: { md: 2 }, mt: { xs: 2, md: 0 } } as const;
 // The time and the delete button share one grid cell, so swapping them does not shift the column.
 const lastUpdatedSwapSx = { display: 'grid', justifyItems: 'end', alignItems: 'center', '& > *': { gridArea: '1 / 1' } } as const;
-const rowDeleteSx = { opacity: 0, transition: 'opacity 0.15s', whiteSpace: 'nowrap' } as const;
+const rowDeleteSx = { opacity: 0, pointerEvents: 'none', transition: 'opacity 0.15s', whiteSpace: 'nowrap' } as const;
 // Opacity rather than display, so the button stays reachable by keyboard focus and by tests.
 const integrationRowRevealSx = {
-  '&:hover .row-delete, &:focus-within .row-delete': { opacity: 1 },
+  '&:hover .row-delete, &:focus-within .row-delete': { opacity: 1, pointerEvents: 'auto' },
   '&:hover .row-swap:has(.row-delete) .row-time, &:focus-within .row-swap:has(.row-delete) .row-time': { opacity: 0 },
 } as const;
 
@@ -486,17 +486,11 @@ function IntegrationsTable({
                           <ListingTable.Cell>
                             {!init && (
                               <Typography variant="body2" color="text.secondary" noWrap sx={descriptionSx}>
-                                {c.description.trim()}
+                                {c.description?.trim()}
                               </Typography>
                             )}
                           </ListingTable.Cell>
-                          <ListingTable.Cell>
-                            {!init && (
-                              <Typography variant="body2" noWrap>
-                                {getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)}
-                              </Typography>
-                            )}
-                          </ListingTable.Cell>
+                          <ListingTable.Cell>{!init && <Chip variant="outlined" size="small" label={getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)} />}</ListingTable.Cell>
                           <ListingTable.Cell align="right">
                             {deleting ? (
                               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
@@ -579,17 +573,11 @@ function IntegrationsTable({
                             <ListingTable.Cell>
                               {!init && (
                                 <Typography variant="body2" color="text.secondary" noWrap sx={descriptionSx}>
-                                  {c.description.trim()}
+                                  {c.description?.trim()}
                                 </Typography>
                               )}
                             </ListingTable.Cell>
-                            <ListingTable.Cell>
-                              {!init && (
-                                <Typography variant="body2" noWrap>
-                                  {getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)}
-                                </Typography>
-                              )}
-                            </ListingTable.Cell>
+                            <ListingTable.Cell>{!init && <Chip variant="outlined" size="small" label={getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)} />}</ListingTable.Cell>
                             <ListingTable.Cell align="right">{!init && <RelativeTime time={formatDistanceToNow(c.lastBuildDate)} dateTime={c.lastBuildDate} tooltip={formatDateTime(c.lastBuildDate)} />}</ListingTable.Cell>
                           </ListingTable.Row>
                         </Tooltip>
@@ -693,7 +681,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const [excludedExpanded, setExcludedExpanded] = useState(true);
   const [primaryAction, setPrimaryAction] = useState<'cloud' | 'integrator'>('cloud');
   useEffect(() => {
-    setDescValue(toSingleLineDescription(project?.description.trim() ?? ''));
+    setDescValue(toSingleLineDescription(project?.description?.trim() ?? ''));
   }, [project?.description]);
 
   if (loadingProject) {
@@ -761,7 +749,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const commitDescEdit = () => {
     const trimmed = descValue.trim();
     // Older descriptions may hold line breaks; compare one-line forms so a no-op is not saved.
-    const original = toSingleLineDescription(project.description.trim());
+    const original = toSingleLineDescription(project.description?.trim() ?? '');
     if (trimmed === original) {
       setDescEditing(false);
       return;
@@ -779,7 +767,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   };
 
   const cancelDescEdit = () => {
-    setDescValue(toSingleLineDescription(project.description.trim()));
+    setDescValue(toSingleLineDescription(project.description?.trim() ?? ''));
     setDescEditing(false);
   };
 
@@ -897,7 +885,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
             </Stack>
           </Stack>
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
-            <Authorized permissions={Permissions.PROJECT_MANAGE}>
+            <Authorized permissions={[Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT]}>
               <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
                 Edit Project
               </Button>

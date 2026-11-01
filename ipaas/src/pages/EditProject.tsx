@@ -23,7 +23,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import BusyFields from '../components/common/BusyFields';
 import EditProjectSkeleton from '../components/EditProjectSkeleton';
 import PageNotFound from './PageNotFound';
-import { useProjectId, useUpdateProject } from '../hooks/useProjects';
+import { useProjectId, useProjects, useUpdateProject } from '../hooks/useProjects';
 import { resourceUrl, type ProjectScope } from '../nav';
 import type { Project } from '../types/project';
 import { validateProjectName } from '../utils/projectValidation';
@@ -32,22 +32,29 @@ import { DESCRIPTION_MAX_LENGTH, toSingleLineDescription } from '../utils/descri
 function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Project }): JSX.Element {
   const navigate = useAppNavigate();
   const updateProject = useUpdateProject();
+  const { data: allProjects = [] } = useProjects();
   const projectHomeUrl = resourceUrl(scope, 'overview');
   // The overview edits the description on one line, so this form keeps the same shape.
-  const originalDescription = toSingleLineDescription(project.description.trim());
+  const storedDescription = project.description?.trim() ?? '';
+  const originalDescription = toSingleLineDescription(storedDescription);
   const [displayName, setDisplayName] = useState(project.name);
   const [description, setDescription] = useState(originalDescription);
   const [nameErrorShown, setNameErrorShown] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  const nameError = validateProjectName(displayName);
-  const changed = displayName.trim() !== project.name || description.trim() !== originalDescription;
+  const trimmedName = displayName.trim().toLowerCase();
+  const nameTaken = allProjects.some((p) => p.id !== project.id && p.name.trim().toLowerCase() === trimmedName);
+  const nameError = validateProjectName(displayName) ?? (nameTaken ? 'A project with this name already exists.' : null);
+  const descriptionChanged = description.trim() !== originalDescription;
+  const changed = displayName.trim() !== project.name || descriptionChanged;
   const canSubmit = changed && !nameError && !updateProject.isPending;
 
   const handleSubmit = async () => {
     setSubmitError(null);
     try {
-      await updateProject.mutateAsync({ id: project.id, name: displayName.trim(), description: description.trim() || ' ', version: project.version });
+      // An untouched description is sent as stored, so a rename keeps any line breaks it has.
+      const nextDescription = descriptionChanged ? description.trim() : storedDescription;
+      await updateProject.mutateAsync({ id: project.id, name: displayName.trim(), description: nextDescription || ' ', version: project.version });
       navigate(projectHomeUrl);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to update the project. Please try again.');

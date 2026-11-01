@@ -80,6 +80,8 @@ export async function deleteIntegration(page: Page, name: string): Promise<void>
     const trash = page.getByRole('button', { name: `Delete ${name}` }).first();
     if (!(await trash.isVisible({ timeout: 5_000 }).catch(() => false))) break;
 
+    // The row's Delete takes clicks only while the row is hovered or focused.
+    await trash.locator('xpath=ancestor::tr[1]').hover();
     await trash.click();
     await confirmRemoval(page, 'Enter integration name to confirm', name);
     // This row must go before looking for the next; it greys out first and still counts.
