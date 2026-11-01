@@ -631,6 +631,13 @@ describe('first run', () => {
     expect(getStartedSteps(engineDetail(), false, { ...summary, active: 0, waiting: 1 })[0].state).toBe('done');
     expect(getStartedSteps(engineDetail(), false, { ...summary, processed: 0, active: 0, waiting: 2 })[0].state).toBe('current');
   });
+
+  it('talks about files, not a connector, when every source is an upload', () => {
+    const uploads = engineDetail({ sources: [{ id: 's1', name: 'File Upload', type: 'upload', state: 'ready' }] });
+    const summary = { sourceCount: 1, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
+    expect(getStartedSteps(uploads, false, summary)[0].description).toMatch(/Files become searchable as the engine indexes them, one at a time\.$/);
+    expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent' });
+  });
 });
 
 describe('playground modes', () => {

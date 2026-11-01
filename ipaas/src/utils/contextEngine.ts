@@ -1136,12 +1136,17 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
   };
   const n = engine.sources.length;
   const indexing = progress ? `${progressHeadline(progress)}. ` : '';
+  const uploadOnly = n > 0 && engine.sources.every((s) => s.type === 'upload');
   const defs: Omit<GetStartedStep, 'state'>[] = [
     uploadFirst && !done.index
       ? { id: 'index', title: 'Upload your first files', description: 'Files become searchable moments after they upload. Nothing else to set up.', action: 'Upload files' }
-      : { id: 'index', title: 'Index your sources', description: `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.` },
+      : {
+          id: 'index',
+          title: 'Index your sources',
+          description: uploadOnly ? `${indexing}Files become searchable as the engine indexes them, one at a time.` : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
+        },
     { id: 'ask', title: 'Ask it something', description: 'Try the Playground and check the cited passages.' },
-    { id: 'publish', title: 'Publish', description: 'Turn on the REST API or the MCP server for agents.' },
+    { id: 'publish', title: 'Connect an agent', description: 'Use the REST API or the MCP server to call this engine from your integrations.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
   ];
   let currentAssigned = false;
