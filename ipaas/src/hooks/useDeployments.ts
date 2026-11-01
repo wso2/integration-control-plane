@@ -69,7 +69,10 @@ export function useEnvEndpoints(componentId: string, versionId: string, releaseI
   return useQuery({
     queryKey: ['envEndpoints', componentId, versionId, releaseId],
     queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
-    enabled: !!componentId && !!versionId && !!releaseId,
+    // The cloud endpoint request is release-scoped and does not use versionId. Newly created
+    // OpenChoreo components currently carry an empty version, so requiring it here prevents the
+    // request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
+    enabled: !!componentId && !!releaseId,
     staleTime: 30_000,
     retry: false,
     refetchInterval: (query) => {
