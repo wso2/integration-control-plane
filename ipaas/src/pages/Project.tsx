@@ -55,7 +55,7 @@ import {
 } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX, SEARCH_STANDARD_WIDTH_SX } from '../constants/styles';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
-import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, SlidersHorizontal, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, SlidersHorizontal } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
 import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
@@ -72,6 +72,7 @@ import { useOrgs, useOrgComponentLimits, useOrgSubscriptions } from '../hooks/us
 import { useChoreoSampleImages, useComponentRepositories } from '../hooks/useRepository';
 import type { Component, ComponentDeletionError, ComponentSubscription, SubscriptionInfo } from '../types/component';
 import { useDeleteComponent } from '../hooks/useComponents';
+import DeleteIntegrationButton from '../components/DeleteIntegrationButton';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { newComponentUrl, editProjectUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
@@ -517,20 +518,7 @@ function IntegrationsTable({
                               <Box className="row-swap" sx={lastUpdatedSwapSx}>
                                 <Box className="row-time">{!init && <RelativeTime time={formatDistanceToNow(c.lastBuildDate)} dateTime={c.lastBuildDate} tooltip={formatDateTime(c.lastBuildDate)} />}</Box>
                                 <Authorized permissions={Scopes.INTEGRATION_DELETE}>
-                                  <Button
-                                    className="row-delete"
-                                    variant="outlined"
-                                    size="small"
-                                    color="error"
-                                    startIcon={<Trash2 size={14} />}
-                                    aria-label={`Delete ${c.displayName}`}
-                                    sx={rowDeleteSx}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setDeleting(c);
-                                    }}>
-                                    Delete
-                                  </Button>
+                                  <DeleteIntegrationButton component={c} onClick={() => setDeleting(c)} className="row-delete" sx={rowDeleteSx} />
                                 </Authorized>
                               </Box>
                             )}

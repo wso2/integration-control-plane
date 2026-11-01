@@ -23,3 +23,11 @@ export function useCan(): (scope: string) => boolean {
   const { hasAllPermissions } = useAccessControl();
   return (scope) => hasAllPermissions([scope]);
 }
+
+export const AGENT_REFUSAL = "Your role doesn't allow this for AI agents.";
+
+/** Why the role may not make an AI-agent write that agent-manager checks against `agentScope`; empty when it may. */
+export function useAgentRefusal(): (agentScope: string) => string {
+  const can = useCan();
+  return (agentScope) => (can(agentScope) ? '' : AGENT_REFUSAL);
+}

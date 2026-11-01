@@ -17,7 +17,7 @@
  */
 
 import { Scopes } from '../../constants/permissions';
-import { useCan } from '../../hooks/useCan';
+import { useAgentRefusal, useCan } from '../../hooks/useCan';
 import { Alert, Button, Chip, CircularProgress, IconButton, ListingTable, Snackbar, Stack, TablePagination, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { GitCommit, Settings } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -42,9 +42,11 @@ interface BuildHistoryProps {
   commits: Commit[];
   commitsLoading: boolean;
   repository: Repository | null;
+  /** An AI agent, whose build parameters agent-manager changes only for a role that may update agents. */
+  aiAgent: boolean;
 }
 
-export default function BuildHistory({ componentId, versionId, envId, branch, builds, buildsLoading, commits, commitsLoading, repository }: BuildHistoryProps) {
+export default function BuildHistory({ componentId, versionId, envId, branch, builds, buildsLoading, commits, commitsLoading, repository, aiAgent }: BuildHistoryProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerType, setDrawerType] = useState<BuildDrawerType | null>(null);
   const [selectedBuild, setSelectedBuild] = useState<BuildRun | null>(null);
@@ -57,6 +59,8 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
   const [searchParams, setSearchParams] = useSearchParams();
   const triggerBuild = useTriggerBuild();
   const can = useCan();
+  const agentRefusal = useAgentRefusal()(Scopes.AGENT_UPDATE);
+  const configRefusal = aiAgent ? agentRefusal : '';
 
   const handleAutoOpen = useCallback((build: BuildRun) => {
     setSelectedBuild(build);
@@ -164,9 +168,9 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
           </>
           )}
 
-          <Tooltip title={isBuilding ? 'A build is already in progress' : 'Build configuration'}>
+          <Tooltip title={configRefusal || (isBuilding ? 'A build is already in progress' : 'Build configuration')}>
             <span>
-              <IconButton aria-label="Build configuration" size="small" onClick={handleOpenConfig} disabled={!repository || isBuilding || !can(Scopes.INTEGRATION_UPDATE)}>
+              <IconButton aria-label="Build configuration" size="small" onClick={handleOpenConfig} disabled={!repository || isBuilding || !can(Scopes.INTEGRATION_UPDATE) || !!configRefusal}>
                 <Settings size={18} />
               </IconButton>
             </span>
