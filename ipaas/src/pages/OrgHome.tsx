@@ -29,6 +29,7 @@ import { projectHomeUrl } from '../paths';
 import { newComponentUrl } from '../nav';
 import { DEFAULT_PROJECT_HANDLER } from '../constants/project';
 import Projects from './Projects';
+import { local } from '../utils/storage';
 
 function OnboardingShell({ children }: { children: React.ReactNode }) {
   return (
@@ -59,12 +60,12 @@ export default function OrgHome(): JSX.Element {
 
   // Unscoped, a second org — or a second user on this browser — read as already-onboarded.
   const onboardedKey = `persona:${userId}:${orgHandler ?? ''}`;
-  const [step, setStep] = useState<'checking' | 'provisioning-error' | 'done'>(() => (localStorage.getItem(onboardedKey) ? 'done' : 'checking'));
+  const [step, setStep] = useState<'checking' | 'provisioning-error' | 'done'>(() => (local.get(onboardedKey) ? 'done' : 'checking'));
 
   // The route reuses this component across orgs, so a switch must re-check against the new key
   // rather than keep the previous org's 'done'.
   useEffect(() => {
-    setStep(localStorage.getItem(onboardedKey) ? 'done' : 'checking');
+    setStep(local.get(onboardedKey) ? 'done' : 'checking');
   }, [onboardedKey]);
 
   const [provisionError, setProvisionError] = useState<string | null>(null);
@@ -79,12 +80,12 @@ export default function OrgHome(): JSX.Element {
         const usable = projects.filter((p) => p.handler);
         if (usable.length > 0) {
           const recent = usable.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
-          localStorage.setItem(onboardedKey, 'developer');
+          local.set(onboardedKey, 'developer');
           navigate(projectHomeUrl(orgHandler!, recent.handler), { replace: true });
           return undefined;
         }
         return createProjectMutation.mutateAsync({ name: 'Default', handler: DEFAULT_PROJECT_HANDLER, description: '', orgHandler: orgHandler! }).then(() => {
-          localStorage.setItem(onboardedKey, 'developer');
+          local.set(onboardedKey, 'developer');
           // freshDefaultProject tells AppLayout it can hide the left nav immediately, without
           // waiting on the components/projects queries — we already know this project is empty
           // and the org has no other projects, since we just created it.

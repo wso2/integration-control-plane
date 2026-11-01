@@ -103,6 +103,7 @@ import {
   type Scope,
 } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
+import { trackEvent } from '../services/tracking/tracking';
 import { componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
@@ -112,6 +113,7 @@ import { useLoadedImage } from '../hooks/useLoadedImage';
 import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
+import { local } from '../utils/storage';
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
@@ -134,11 +136,11 @@ export default function AppLayout(): JSX.Element {
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
   // a fresh literal here re-triggers it (and its setState) on every render, which on a
   // sub-'md'-breakpoint viewport becomes an infinite render loop.
-  const appShellOptions = useMemo(() => ({ initialCollapsed: localStorage.getItem('sidebar:collapsed') !== 'false' }), []);
+  const appShellOptions = useMemo(() => ({ initialCollapsed: local.get('sidebar:collapsed') !== 'false' }), []);
   const { state: shell, actions } = useAppShell(appShellOptions);
 
   const handleToggleSidebar = () => {
-    localStorage.setItem('sidebar:collapsed', String(!shell.sidebarCollapsed));
+    local.set('sidebar:collapsed', String(!shell.sidebarCollapsed));
     actions.toggleSidebar();
   };
 
@@ -243,7 +245,7 @@ export default function AppLayout(): JSX.Element {
   // Persist last visited project so post-login can navigate back to it
   useEffect(() => {
     if (userId && hasProject(scope) && !orgAccessDenied) {
-      localStorage.setItem(`last_project:${userId}`, JSON.stringify({ org: scope.org, project: scope.project }));
+      local.set(`last_project:${userId}`, JSON.stringify({ org: scope.org, project: scope.project }));
     }
   }, [userId, scope, orgAccessDenied]);
 
@@ -284,7 +286,7 @@ export default function AppLayout(): JSX.Element {
           <Header.Toggle collapsed={hideSidebarForEmptyProject || shell.sidebarCollapsed} onToggle={handleHeaderToggle} />
           <Header.Brand>
             <Header.BrandLogo>
-              <NavLink to={orgHomeUrl(scope.org)} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <NavLink to={orgHomeUrl(scope.org)} onClick={() => trackEvent('navbar-home')} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
                 <Logo />
               </NavLink>
             </Header.BrandLogo>
@@ -390,6 +392,7 @@ export default function AppLayout(): JSX.Element {
                       key={p.id}
                       selected={hasProject(scope) && (scope.project === p.handler || scope.project === p.id)}
                       onClick={() => {
+                        trackEvent('navbar-project-dropdown-existing');
                         setProjectMenuAnchor(null);
                         setProjectSearch('');
                         const newScope = narrow({ level: 'organizations', org: scope.org }, p.handler);
@@ -1032,7 +1035,7 @@ export default function AppLayout(): JSX.Element {
         )}
         {/* Matches the sidebar's surface rather than sitting as a white band under it. */}
         <Footer sx={{ backgroundColor: 'background.acrylic', backdropFilter: 'blur(3px)' }}>
-          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer">
+          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('navbar-documentation')}>
             Documentation
           </Footer.Link>
           <Footer.Link href="https://discord.com/invite/wso2" target="_blank" rel="noopener noreferrer">
@@ -1062,6 +1065,7 @@ export default function AppLayout(): JSX.Element {
             <Button
               variant="contained"
               onClick={async () => {
+                trackEvent('navbar-user-logout');
                 await logout();
                 navigate(loginUrl());
                 setConfirmDialogOpen(false);

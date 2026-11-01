@@ -20,7 +20,7 @@ import { Alert, Box, Button, CircularProgress, Grid, IconButton, ListingCard, Pa
 import { Folder, FolderInput, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import SearchField from '../components/SearchField';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
 import DeleteProjectDialog from '../components/DeleteProjectDialog';
@@ -34,6 +34,7 @@ import { projectHomeUrl } from '../paths';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
 import Authorized from '../components/Authorized';
+import { trackEvent } from '../services/tracking/tracking';
 import * as styles from './Projects.styles';
 
 function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: string; project: Project; canDelete: boolean; onClick: () => void; onDelete: () => void }) {
@@ -90,6 +91,8 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const { hasOrgPermission } = useAccessControl();
   const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
   const { data: projects, isLoading } = useProjects();
+
+  useEffect(() => trackEvent('visit-home'), []);
 
   useRemovalNotice(
     scope.org,

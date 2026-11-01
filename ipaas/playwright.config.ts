@@ -18,7 +18,9 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
-const CLOUD_BASE_URL = process.env.E2E_CLOUD_BASE_URL ?? 'https://ipaas-console-development.gateway.dev.cloud.wso2.com';
+// Specs navigate with relative paths, so the trailing slash is load-bearing: without it
+// `new URL('login', base)` drops the console's base path and lands on the host root.
+const CLOUD_BASE_URL = `${(process.env.E2E_CLOUD_BASE_URL ?? 'https://ipaas-console-development.gateway.dev.cloud.wso2.com').replace(/\/+$/, '')}/`;
 
 // Thunder's Gate SPA intermittently stalls on its spinner; a fresh load clears it.
 const CLOUD_RETRIES = process.env.CI ? 2 : 1;

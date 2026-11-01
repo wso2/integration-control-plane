@@ -36,6 +36,8 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `INTEGRATION_BUILDER_*`                                                      | AI Integration Builder: copilot base URL, model, max tokens, connectors GraphQL URL                                      |
 | `AI_COPILOT_URL_SUFFIX`                                                      | Copilot path on the system APIs gateway                                                                                  |
 | `MOESIF_APP_URL`                                                             | API Insights. See below.                                                                                                 |
+| `TRACKING_ENV`                                                               | Analytics tier: `dev`, `stage`, `prod` or `off`. Picks the GTM container and CookiePro script. Defaults to `dev`.        |
+| `MOESIF_APP_API_KEY`                                                         | Moesif app key for product-usage events, set per deployment. Not API Insights. Unset disables Moesif tracking.           |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
 

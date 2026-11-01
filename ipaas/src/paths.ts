@@ -3,6 +3,8 @@
  * Navigation for the main matrix pages is handled by src/nav.ts.
  */
 
+import { withBase } from './utils/basePath';
+
 export function loginUrl(): string {
   return '/login';
 }
@@ -271,7 +273,7 @@ export const gitProviderBase = {
 // redirectUri falls back to window.location.origin + '/ghapp' when empty.
 export function buildGitHubOAuthUrl(redirectUri: string, clientId: string, state: string, scope = 'repo,read:user'): string {
   const params = new URLSearchParams({
-    redirect_uri: redirectUri || `${window.location.origin}/ghapp`,
+    redirect_uri: redirectUri || `${window.location.origin}${withBase('/ghapp')}`,
     client_id: clientId,
     scope,
     state,

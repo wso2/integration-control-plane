@@ -35,6 +35,7 @@ import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import { getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';
 import type { IntegrationModule } from '../../../types/integration';
+import { withBase } from '../../../utils/basePath';
 
 const REST_API_TYPES = new Set(['restApi', 'byocRestApi', 'miRestApi', 'buildRestApi', 'miApiService', 'ballerinaService', 'byocService', 'byoiService', 'graphql', 'buildpackService']);
 
@@ -208,7 +209,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
       codeServerSample: JSON.stringify(codeServerSample),
       sourceCommitHash: latestCommit?.sha ?? '',
     });
-    window.open(`${window.location.origin}/editor?${params}`, '_blank', 'noopener,noreferrer');
+    window.open(`${window.location.origin}${withBase('/editor')}?${params}`, '_blank', 'noopener,noreferrer');
   };
 
   // The header sits in a content column of variable width (next to the app sidebar), which can be

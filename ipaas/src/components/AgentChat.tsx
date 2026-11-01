@@ -26,6 +26,7 @@ import type { AgentConnectionStatus, ChatMessage } from '../types/agentChat';
 import type { EndpointRef } from '../types/consumers';
 
 interface AgentChatProps {
+  projectId: string;
   componentId: string;
   versionId: string;
   /** The deployment's release id for the selected environment. */
@@ -50,7 +51,7 @@ function formatTime(ts: number): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function AgentChat({ componentId, versionId, releaseId, environmentName, envCritical, waitForConfig = false, variant = 'card', onConnectionChange }: AgentChatProps): ReactNode {
+export default function AgentChat({ projectId, componentId, versionId, releaseId, environmentName, envCritical, waitForConfig = false, variant = 'card', onConnectionChange }: AgentChatProps): ReactNode {
   const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, releaseId);
 
   // Candidate chat endpoint: the first reachable one. (The `/chat` operation is
@@ -60,7 +61,7 @@ export default function AgentChat({ componentId, versionId, releaseId, environme
 
   // The enforcing gateway URL, active auth mode and a short-lived test key, from the
   // same BFF routes the swagger console and the API security drawer use.
-  const accessRef: EndpointRef | null = useMemo(() => (candidate && environmentName ? { componentName: componentId, environmentName, endpointName: candidate.id } : null), [componentId, environmentName, candidate]);
+  const accessRef: EndpointRef | null = useMemo(() => (candidate && environmentName ? { projectName: projectId, componentName: componentId, environmentName, endpointName: candidate.id } : null), [projectId, componentId, environmentName, candidate]);
   const access = useEndpointTestAccess(accessRef, !!accessRef);
 
   // The endpoint's base64 OpenAPI arrives in `apimRevisionId`, so the operations come from the spec.

@@ -22,7 +22,7 @@ export async function gotoOrgHome(page: Page, orgHandler: string): Promise<void>
   const landed = page.getByRole('heading', { name: 'All Projects' });
   if (await landed.isVisible({ timeout: 5_000 }).catch(() => false)) return;
 
-  await page.goto(`/organizations/${orgHandler}/home`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`organizations/${orgHandler}/home`, { waitUntil: 'domcontentloaded' });
   if (await landed.isVisible({ timeout: 30_000 }).catch(() => false)) return;
 
   // OrgHome sends a session it considers un-onboarded to the most recently updated project
@@ -31,10 +31,10 @@ export async function gotoOrgHome(page: Page, orgHandler: string): Promise<void>
   // The console's user id is the token's subject.
   const userId = tokenSubject(await readSessionToken(page));
   if (userId) {
-    await page.evaluate(({ org, user }) => localStorage.setItem(`persona:${user}:${org}`, 'developer'), { org: orgHandler, user: userId });
+    await page.evaluate(({ org, user }) => localStorage.setItem(`icp:persona:${user}:${org}`, 'developer'), { org: orgHandler, user: userId });
   }
 
-  await page.goto(`/organizations/${orgHandler}/home`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`organizations/${orgHandler}/home`, { waitUntil: 'domcontentloaded' });
   await expect(landed, `the org project list did not render for ${orgHandler}`).toBeVisible({ timeout: 60_000 });
 }
 

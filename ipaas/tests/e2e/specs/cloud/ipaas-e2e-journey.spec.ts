@@ -338,7 +338,7 @@ test.describe('03 browse samples @smoke', () => {
       test.skip(true, 'Could not determine project handler from the URL after entering the project');
       return;
     }
-    browseSamplesUrl = `/organizations/${orgHandler}/projects/${match[1]}/components/new/samples`;
+    browseSamplesUrl = `organizations/${orgHandler}/projects/${match[1]}/components/new/samples`;
 
     await page.goto(browseSamplesUrl, { waitUntil: 'domcontentloaded' });
     await Promise.race([
@@ -1043,19 +1043,19 @@ test.describe('07 page availability @smoke', () => {
   });
 
   test('TC_IP_SET_001 organization settings page exists', async () => {
-    await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
+    await expectPageRendered(page, `organizations/${orgHandler}/settings`);
   });
 
   const SECTION_IDS: Record<(typeof CLOUD_SECTIONS)[number], string> = { 'Package Registries': 'TC_IP_SET_003' };
   for (const section of CLOUD_SECTIONS) {
     test(`${SECTION_IDS[section]} organization settings offers "${section}"`, async () => {
-      await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
+      await expectPageRendered(page, `organizations/${orgHandler}/settings`);
       await expect(page.getByText(section, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     });
   }
 
   test('TC_IP_SET_004 organization settings offers no unported section', async () => {
-    await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
+    await expectPageRendered(page, `organizations/${orgHandler}/settings`);
     // Positive assertion first: these absences would pass on a blank page.
     await expect(page.getByText('Package Registries', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     // Org Details was removed from cloud settings, so it must not come back either.
@@ -1066,7 +1066,7 @@ test.describe('07 page availability @smoke', () => {
   });
 
   test('TC_IP_SET_005 package registries page exists', async () => {
-    await expectPageRendered(page, `/organizations/${orgHandler}/settings/package-registries`);
+    await expectPageRendered(page, `organizations/${orgHandler}/settings/package-registries`);
   });
 });
 

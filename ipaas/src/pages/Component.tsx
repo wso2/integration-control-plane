@@ -39,6 +39,7 @@ import type { SelectedArtifact } from '../components/artifact-config';
 import { resourceUrl, broaden, type ComponentScope } from '../nav';
 import BuildCard from '../components/BuildCard';
 import { latestCommitOf } from '../utils/commits';
+import { trackEvent } from '../services/tracking/tracking';
 import { UUID_RE } from '../utils/string';
 import { RAG_NO_SOURCE_SUBTYPES } from '../constants/ragIngestion';
 
@@ -98,6 +99,12 @@ export default function Component(scope: ComponentScope): JSX.Element {
   // Identity hook must run before any early return — rules of hooks. The
   // hook itself handles `undefined` component by returning `null`.
   const identity = useIntegrationIdentity(component);
+
+  // Keyed on the id so a background refetch (a new object for the same integration) doesn't re-fire.
+  const componentId = component?.id;
+  useEffect(() => {
+    if (componentId) trackEvent('component-overview');
+  }, [componentId]);
   // Resolve the type's Overview module once; shared by the header (HeaderShell)
   // and the env-card renderer (IntegrationRenderer) so neither re-resolves it.
   const overviewModule = useIntegrationModule(identity?.type ?? null);

@@ -81,3 +81,8 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
 export function getOrgUuidFromToken(): string | null {
   return connection ? connection.session.orgUuid : null;
 }
+
+/** The signed-in session, for code outside React (analytics). Null when signed out. */
+export function getSession(): CloudSession | null {
+  return connection ? connection.session : null;
+}

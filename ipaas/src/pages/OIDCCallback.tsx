@@ -25,6 +25,9 @@ import PageLoader from '../components/PageLoader';
 import { useAuth, getAndClearRedirectUrl } from '../auth';
 import { fetchProjects as fetchProjectsApi } from '../api/projects';
 import { loginUrl, projectHomeUrl, projectsRedirectUrl } from '../paths';
+import { trackEvent } from '../services/tracking/tracking';
+import { stripBase, withBase } from '../utils/basePath';
+import { local } from '../utils/storage';
 
 export default function OIDCCallback(): JSX.Element {
   const [searchParams] = useSearchParams();
@@ -54,13 +57,14 @@ export default function OIDCCallback(): JSX.Element {
       try {
         // Thunder provisions the org at sign-up, so a signed-in session always carries one.
         const { userId, orgHandle } = await completeSignIn(searchParams);
+        trackEvent('login-clickbutton-success', undefined, true);
 
         // Determine where to navigate post-login
         const savedUrl = getAndClearRedirectUrl();
         const savedPathname = savedUrl
           ? (() => {
               try {
-                return new URL(savedUrl).pathname;
+                return stripBase(new URL(savedUrl).pathname);
               } catch {
                 return '';
               }
@@ -77,12 +81,12 @@ export default function OIDCCallback(): JSX.Element {
           let navigatedToLastProject = false;
           try {
             // 1. Try the last-visited project stored by AppLayout
-            const lastProjectRaw = localStorage.getItem(`last_project:${userId}`);
+            const lastProjectRaw = local.get(`last_project:${userId}`);
             if (lastProjectRaw) {
               const { org, project } = JSON.parse(lastProjectRaw) as { org: string; project: string };
               if (org === orgHandle && project) {
                 // Mark ToS accepted — this user has already been through onboarding
-                localStorage.setItem(`tos_accepted:${userId}:${orgHandle}`, 'true');
+                local.set(`tos_accepted:${userId}:${orgHandle}`, 'true');
                 navigate(projectHomeUrl(orgHandle, project), { replace: true });
                 navigatedToLastProject = true;
               }
@@ -94,7 +98,7 @@ export default function OIDCCallback(): JSX.Element {
               if (projects.length > 0) {
                 const recent = projects.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())[0];
                 // Mark ToS accepted — this user already has projects, they've been through onboarding
-                localStorage.setItem(`tos_accepted:${userId}:${orgHandle}`, 'true');
+                local.set(`tos_accepted:${userId}:${orgHandle}`, 'true');
                 navigate(projectHomeUrl(orgHandle, recent.handler), { replace: true });
                 navigatedToLastProject = true;
               }
@@ -110,6 +114,7 @@ export default function OIDCCallback(): JSX.Element {
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to complete authentication');
+        trackEvent('login-clickbutton-error');
       }
     };
 
@@ -126,7 +131,7 @@ export default function OIDCCallback(): JSX.Element {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Please try logging in again.
           </Typography>
-          <a href={loginUrl()}>Return to Login</a>
+          <a href={withBase(loginUrl())}>Return to Login</a>
         </Box>
       </Box>
     );

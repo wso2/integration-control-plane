@@ -21,6 +21,7 @@ import { Outlet, useParams, useLocation } from 'react-router';
 import { capitalize } from './utils/string';
 import { SETTINGS_SECTIONS, type SettingsSectionDef } from './constants/orgSettingsSections';
 import { COMPONENT_SETTINGS_SECTIONS } from './constants/componentSettingsSections';
+import { local } from './utils/storage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -450,7 +451,7 @@ export function ScopeResolver(): JSX.Element {
   const { pathname } = useLocation();
   // When not inside an org route (e.g. /profile), fall back to the stored handle so the
   // nav shows the correct org rather than a synthetic 'default' that would produce bad URLs.
-  const stored = localStorage.getItem('org_handle');
+  const stored = local.get('org_handle');
   const validUrl = urlOrgHandler && urlOrgHandler !== 'default' ? urlOrgHandler : null;
   const orgHandler = validUrl ?? (stored && stored !== 'default' ? stored : '');
   const scope = resolveScope(orgHandler, projectHandler, componentHandler);

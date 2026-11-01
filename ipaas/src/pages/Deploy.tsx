@@ -140,6 +140,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
                   deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''}
                   flags={flags}
                   hideEndpoints={hideEndpoints}
+                  displayType={component.displayType}
                   env={env}
                   branch={branch}
                   componentName={component.name}

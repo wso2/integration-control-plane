@@ -29,6 +29,7 @@ import ConsumersPanel from './ConsumersPanel';
 import ServiceInsights from './ServiceInsights';
 import SwaggerOperationsList, { type SwaggerDocument } from './SwaggerOperationsList';
 import GraphqlOperationsList from './GraphqlOperationsList';
+import { toEndpointOptions } from '../../../utils/endpoints';
 
 /**
  * Integration-as-API's content-only body: a deployment-in-progress spinner, the
@@ -51,11 +52,16 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];
   const isGraphql = activeEndpoint?.type === 'GraphQL';
+  const publicExposure = activeEndpoint?.visibilityStatus?.public;
+  const organizationExposure = activeEndpoint?.visibilityStatus?.organization;
+  const gatewayExposureEnabled = publicExposure?.status === 'ENABLED' || organizationExposure?.status === 'ENABLED';
+  const gatewayExposureTransitioning = [publicExposure?.status, organizationExposure?.status].some((status) => status === 'ENABLING' || status === 'DISABLING');
+  const gatewayExposureFailure = [publicExposure, organizationExposure].find((state) => state?.status === 'FAILED' || state?.status === 'UNKNOWN' || state?.status === 'UNAVAILABLE');
 
   // The enforcing API Platform gateway URL for the selected endpoint. Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
   // of the raw OpenChoreo external route.
   const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null;
-  const { data: apiSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint);
+  const { data: apiSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint && gatewayExposureEnabled);
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
   const { data: swagger } = useApiDefinition(hasDeployment && !isGraphql ? activeEndpoint?.apimRevisionId : null);
@@ -126,8 +132,20 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
           exposed API's security config. Keyed by the BFF's
           component/environment/endpoint triple — the component name is the
           component id and the endpoint name is the endpoint id. */}
-      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (
-        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={envEndpoints.map((ep) => ({ name: ep.id, displayName: ep.displayName || ep.id }))} />
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && gatewayExposureEnabled && (
+        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={toEndpointOptions(envEndpoints)} />
+      )}
+
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !gatewayExposureEnabled && (
+        <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+          <Typography variant="body2" color={gatewayExposureFailure ? 'error.main' : 'text.secondary'}>
+            {gatewayExposureTransitioning
+              ? 'API exposure is being updated. Consumer and security settings will be available when the gateway deployment is ready.'
+              : gatewayExposureFailure
+                ? gatewayExposureFailure.reason || 'API exposure could not be completed. Retry the visibility update.'
+                : 'Expose this endpoint to Public or Organization visibility to configure consumers and API security.'}
+          </Typography>
+        </Box>
       )}
 
       {showInsights && <ServiceInsights envName={env.name} envId={env.id} apimEnvId={env.apimEnvId} projectId={projectId} apiId={insightsApiId} />}

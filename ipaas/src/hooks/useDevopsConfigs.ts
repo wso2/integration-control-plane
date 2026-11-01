@@ -92,13 +92,26 @@ export function useSaveConfig(projectId: string) {
   return useMutation({
     mutationFn: async (input: SaveConfigInput) => {
       if (!orgUuid) throw new Error('Organization is not available.');
-      const { componentId, releaseId, containerId, envId, isSecret, kind, name, data, mountPath, existing } = input;
+      const { componentId, releaseId, containerId, envId, isSecret, kind, name, data, keep, mountPath, existing } = input;
       const config_type = kind === 'envVars' ? 'VariableList' : 'File';
 
       // 1. Create or update the ConfigMap / Secret.
       const configId = await (async () => {
         if (isSecret) {
-          const body: SecretWriteData = { name, metadata: {}, environment_id: envId, organization_id: orgUuid, project_id: projectId, app_environment_id: releaseId, isBase64: false, save_type: 'Save', secret_type: 'Opaque', config_type, data };
+          const body: SecretWriteData = {
+            name,
+            metadata: {},
+            environment_id: envId,
+            organization_id: orgUuid,
+            project_id: projectId,
+            app_environment_id: releaseId,
+            isBase64: false,
+            save_type: 'Save',
+            secret_type: 'Opaque',
+            config_type,
+            data,
+            ...(keep?.length ? { keep } : {}),
+          };
           if (existing) {
             await updateSecret(orgUuid, projectId, existing.configId, body);
             return existing.configId;

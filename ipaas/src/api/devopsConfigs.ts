@@ -199,10 +199,12 @@ const putFile = (componentId: string, projectId: string, env: string, fileName: 
 
 // PUT a whole env-var group. The component is not on the create/update signatures
 // (they carry only the env via data.environment_id), so resolve it per env.
-const putEnvGroup = async (projectId: string, env: string, name: string, sensitive: boolean, data: Record<string, string>): Promise<void> => {
+// `keep` names stored secret keys that stay as they are; any other stored key
+// missing from `data` is removed.
+const putEnvGroup = async (projectId: string, env: string, name: string, sensitive: boolean, data: Record<string, string>, keep?: string[]): Promise<void> => {
   const componentId = await componentForEnv(env);
   if (!componentId) return;
-  await bff.put(`${filesBase(componentId, env)}/env-groups/${seg(name)}${q({ projectName: projectId })}`, { name, sensitive, data });
+  await bff.put(`${filesBase(componentId, env)}/env-groups/${seg(name)}${q({ projectName: projectId })}`, { name, sensitive, data, ...(keep?.length ? { keep } : {}) });
 };
 
 const listEnvGroups = async (projectId: string, env: string): Promise<BffEnvGroup[]> => {
@@ -278,9 +280,18 @@ export const createSecret = async (_orgUuid: string, _projectId: string, data: S
 };
 
 export const updateSecret = async (_orgUuid: string, _projectId: string, secretId: string, data: SecretWriteData): Promise<DevopsSecret> => {
-  if (isEnvVars(data.config_type)) await putEnvGroup(data.project_id, data.environment_id, secretId, true, data.data ?? {});
+  if (isEnvVars(data.config_type)) await putEnvGroup(data.project_id, data.environment_id, secretId, true, data.data ?? {}, data.keep);
   else stageFile(secretId, data, true);
-  return { ID: secretId, name: data.name, environment_id: data.environment_id, app_environment_id: data.app_environment_id ?? '', keys: Object.keys(data.data ?? {}), version: 1, config_type: data.config_type, secret_type: data.secret_type };
+  return {
+    ID: secretId,
+    name: data.name,
+    environment_id: data.environment_id,
+    app_environment_id: data.app_environment_id ?? '',
+    keys: [...Object.keys(data.data ?? {}), ...(data.keep ?? [])],
+    version: 1,
+    config_type: data.config_type,
+    secret_type: data.secret_type,
+  };
 };
 
 export const createConfigMap = async (_orgUuid: string, _projectId: string, data: ConfigMapWriteData): Promise<DevopsConfigMap> => {

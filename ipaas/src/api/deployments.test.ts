@@ -20,26 +20,30 @@ import { describe, expect, it } from 'vitest';
 
 import { toEnvEndpoint } from './deployments';
 
-// The two URLs OpenChoreo actually reports in a ReleaseBinding's status. There is no third,
-// project-scoped address: Project and Organization reach the same Service, gated by NetworkPolicy.
+// The two URLs OpenChoreo actually reports in a ReleaseBinding's status: Project reaches the
+// Service directly. Organization has no OpenChoreo-level address of its own — it goes through
+// the apip gateway's internal vhost, same as Public's external vhost, just reachable only from
+// inside the dataplane — so its URL comes from visibilityStatus.organization.url, not urls.*.
 const EXTERNAL = { host: 'gw.example', path: '/covid19-status-covid-commu-3e5', port: 443, scheme: 'https' };
 const INTERNAL = { host: 'covid-commu-3e5.dp-default-development.svc.cluster.local', path: '/', port: 8090, scheme: 'http' };
 const EXTERNAL_URL = 'https://gw.example/covid19-status-covid-commu-3e5';
 const INTERNAL_URL = 'http://covid-commu-3e5.dp-default-development.svc.cluster.local:8090';
+const ORGANIZATION_GATEWAY_URL = 'http://apip-internal.svc.cluster.local:8080/covid19-status-covid-commu-3e5';
 
 const bffEndpoint = (visibility: string[], urls: { external?: typeof EXTERNAL; internal?: typeof INTERNAL } = { external: EXTERNAL, internal: INTERNAL }) => ({
   name: 'covid-commu-3e5',
   type: 'HTTP',
   port: 8090,
   visibility,
+  displayProjectUrl: true,
   urls,
 });
 
 describe('toEnvEndpoint visibility URLs', () => {
   // The reported bug: the env card showed one row because projectUrl was never populated.
   it('gives a public+project endpoint both a public and a project URL', () => {
-    const ep = toEnvEndpoint(bffEndpoint(['external', 'project']), 'r1');
-    expect(ep.networkVisibilities).toEqual(['Public', 'Project']);
+    const ep = toEnvEndpoint(bffEndpoint(['public', 'project']), 'r1');
+    expect(ep.networkVisibilities).toEqual(['Project', 'Public']);
     expect(ep.publicUrl).toBe(EXTERNAL_URL);
     expect(ep.projectUrl).toBe(INTERNAL_URL);
     expect(ep.organizationUrl).toBe('');
@@ -52,28 +56,77 @@ describe('toEnvEndpoint visibility URLs', () => {
     expect(ep.publicUrl).toBe('');
   });
 
-  // Both scopes reach the same Service, so both rows carry the same URL — one row per visibility.
-  it('gives organization+project the same in-cluster URL on both fields', () => {
-    const ep = toEnvEndpoint(bffEndpoint(['internal', 'project'], { internal: INTERNAL }), 'r1');
-    expect(ep.organizationUrl).toBe(INTERNAL_URL);
+  // Organization and project reach the endpoint through entirely different front doors — the
+  // apip gateway's internal vhost vs. the raw Service — so they must not share a URL.
+  it('gives organization the apip gateway URL and project the in-cluster Service URL', () => {
+    const ep = toEnvEndpoint(
+      {
+        ...bffEndpoint(['organization', 'project'], { internal: INTERNAL }),
+        visibilityStatus: { public: { status: 'DISABLED' as const }, organization: { status: 'ENABLED' as const, url: ORGANIZATION_GATEWAY_URL } },
+      },
+      'r1',
+    );
+    expect(ep.organizationUrl).toBe(ORGANIZATION_GATEWAY_URL);
     expect(ep.projectUrl).toBe(INTERNAL_URL);
   });
 
-  it('leaves the project URL unset when project visibility is not declared', () => {
-    const ep = toEnvEndpoint(bffEndpoint(['internal'], { internal: INTERNAL }), 'r1');
-    expect(ep.organizationUrl).toBe(INTERNAL_URL);
-    expect(ep.projectUrl).toBe('');
+  it('adds implicit project visibility even if an older response omits it', () => {
+    const ep = toEnvEndpoint(
+      {
+        ...bffEndpoint(['organization'], { internal: INTERNAL }),
+        visibilityStatus: { public: { status: 'DISABLED' as const }, organization: { status: 'ENABLED' as const, url: ORGANIZATION_GATEWAY_URL } },
+      },
+      'r1',
+    );
+    expect(ep.organizationUrl).toBe(ORGANIZATION_GATEWAY_URL);
+    expect(ep.projectUrl).toBe(INTERNAL_URL);
+  });
+
+  it('shows Organization while its APIP deployment is enabling', () => {
+    const ep = toEnvEndpoint(
+      {
+        ...bffEndpoint(['project']),
+        visibilityStatus: { public: { status: 'DISABLED' as const }, organization: { status: 'ENABLING' as const } },
+      },
+      'r1',
+    );
+    expect(ep.networkVisibilities).toEqual(['Project', 'Organization']);
   });
 
   // An endpoint whose visibility has not reconciled yet must not render a blank card.
-  it('still exposes the internal URL as organization when no visibility is reported', () => {
+  it('treats an empty visibility list as project-only', () => {
     const ep = toEnvEndpoint(bffEndpoint([], { internal: INTERNAL }), 'r1');
-    expect(ep.organizationUrl).toBe(INTERNAL_URL);
+    expect(ep.organizationUrl).toBe('');
+    expect(ep.projectUrl).toBe(INTERNAL_URL);
+  });
+
+  it('hides only the project URL when its display preference is disabled', () => {
+    const ep = toEnvEndpoint({ ...bffEndpoint(['project', 'public']), displayProjectUrl: false }, 'r1');
+    expect(ep.networkVisibilities).toEqual(['Public']);
     expect(ep.projectUrl).toBe('');
+    expect(ep.publicUrl).toBe(EXTERNAL_URL);
+  });
+
+  it('hides the project URL when the display preference is omitted', () => {
+    const { displayProjectUrl: _omitted, ...endpoint } = bffEndpoint(['project', 'public']);
+    const ep = toEnvEndpoint(endpoint, 'r1');
+    expect(ep.networkVisibilities).toEqual(['Public']);
+    expect(ep.projectUrl).toBe('');
+  });
+
+  it('shows Public while its default APIP deployment is enabling', () => {
+    const ep = toEnvEndpoint(
+      {
+        ...bffEndpoint(['project']),
+        visibilityStatus: { public: { status: 'ENABLING' as const }, organization: { status: 'UNAVAILABLE' as const } },
+      },
+      'r1',
+    );
+    expect(ep.networkVisibilities).toEqual(['Project', 'Public']);
   });
 
   it('falls back to the internal URL for invokeUrl when there is no external one', () => {
     expect(toEnvEndpoint(bffEndpoint(['project'], { internal: INTERNAL }), 'r1').invokeUrl).toBe(INTERNAL_URL);
-    expect(toEnvEndpoint(bffEndpoint(['external', 'project']), 'r1').invokeUrl).toBe(EXTERNAL_URL);
+    expect(toEnvEndpoint(bffEndpoint(['public', 'project']), 'r1').invokeUrl).toBe(EXTERNAL_URL);
   });
 });

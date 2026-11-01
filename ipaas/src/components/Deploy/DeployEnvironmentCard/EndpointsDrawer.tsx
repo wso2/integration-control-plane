@@ -30,6 +30,7 @@ interface EndpointsDrawerProps {
   isLoading?: boolean;
   envName: string;
   // Scope for the API settings drawer.
+  projectId: string;
   componentId?: string;
   environmentId?: string;
 }
@@ -80,7 +81,14 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
         </DrawerPanel.Body>
       </DrawerPanel>
 
-      <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId ?? ''} envName={environmentId ?? ''} endpoints={toEndpointOptions(endpoints)} activeEndpointName={selectedEndpoint?.id} />
+      <ApiSettingsDrawer
+        open={manageDrawerOpen}
+        onClose={() => setManageDrawerOpen(false)}
+        componentName={componentId ?? ''}
+        envName={environmentId ?? ''}
+        endpoints={toEndpointOptions(endpoints)}
+        activeEndpointName={selectedEndpoint?.id}
+      />
     </>
   );
 }

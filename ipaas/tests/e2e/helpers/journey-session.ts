@@ -28,7 +28,7 @@ import { activeProject } from './journey-project.js';
 /** Parked on config.json first: reseeding writes through the page, so it needs the console's origin. */
 export async function refreshSession(page: Page): Promise<void> {
   if (!process.env.E2E_TOKEN_MODE) return;
-  await page.goto('/config.json', { waitUntil: 'domcontentloaded' });
+  await page.goto('config.json', { waitUntil: 'domcontentloaded' });
   await reseedSessionToken(page);
 }
 
@@ -36,7 +36,7 @@ export async function refreshSession(page: Page): Promise<void> {
 export async function reseedHere(page: Page): Promise<void> {
   if (!process.env.E2E_TOKEN_MODE) return;
   const here = page.url();
-  await page.goto('/config.json', { waitUntil: 'domcontentloaded' });
+  await page.goto('config.json', { waitUntil: 'domcontentloaded' });
   await reseedSessionToken(page);
   await page.goto(here, { waitUntil: 'domcontentloaded' });
 }
@@ -51,7 +51,7 @@ export function assertSignedIn(page: Page): void {
 
 export async function enterOrgHome(page: Page, orgHandler: string): Promise<void> {
   await refreshSession(page);
-  await page.goto(`/organizations/${orgHandler}/home`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`organizations/${orgHandler}/home`, { waitUntil: 'domcontentloaded' });
   assertSignedIn(page);
   await waitForApiConfig(page);
   await gotoOrgHome(page, orgHandler);

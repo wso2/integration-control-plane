@@ -25,7 +25,8 @@ import type { IntegrationIdentity, IntegrationRuntime } from '../types/integrati
  */
 const WEBHOOK_DISPLAY_TYPES = new Set(['webhook', 'ballerinaWebhook', 'miWebhook', 'byocWebhook', 'buildpackWebhook']);
 
-function runtimeFromDisplayType(displayType: string): IntegrationRuntime {
+/** The runtime a `displayType` implies. Every MI display type starts with `mi`. */
+export function runtimeFromDisplayType(displayType: string): IntegrationRuntime {
   if (displayType.startsWith('mi')) return 'mi';
   if (displayType.startsWith('ballerina')) return 'ballerina';
   return 'unknown';

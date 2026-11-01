@@ -21,6 +21,7 @@ import type { JSX } from 'react';
 import { Link } from 'react-router';
 import { orgHomeUrl } from '../paths';
 import { actionSx, artSx, fullScreenSx, pageSx, textStackSx } from './PageNotFound.styles';
+import { local } from '../utils/storage';
 
 interface PageNotFoundProps {
   title?: string;
@@ -34,7 +35,7 @@ interface PageNotFoundProps {
 
 /** The organization the session is scoped to, as recorded at sign-in. */
 function homeUrl(): string {
-  const org = localStorage.getItem('org_handle');
+  const org = local.get('org_handle');
   return org && org !== 'default' ? orgHomeUrl(org) : '/';
 }
 

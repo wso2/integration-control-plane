@@ -19,6 +19,7 @@
 import { useEffect, useState, type JSX } from 'react';
 import { Alert, Box } from '@wso2/oxygen-ui';
 import PageLoader from '../components/PageLoader';
+import { trackEvent } from '../services/tracking/tracking';
 import { useAuth } from '../auth';
 
 function friendlyError(err: unknown): string {
@@ -37,7 +38,11 @@ export default function Login(): JSX.Element {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loginWithOIDC().catch((err) => setError(friendlyError(err)));
+    trackEvent('visit-login-page');
+    loginWithOIDC().catch((err) => {
+      setError(friendlyError(err));
+      trackEvent('login-clickbutton-error');
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (error) {

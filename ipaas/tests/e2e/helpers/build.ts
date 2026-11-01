@@ -48,7 +48,7 @@ export async function waitForBuildToSettle(page: Page): Promise<string> {
 
 /** Reseeding writes through page.evaluate, so it only reaches the console's own storage. */
 async function reseedFromConsoleOrigin(page: Page, returnTo: string): Promise<void> {
-  await page.goto('/config.json', { waitUntil: 'domcontentloaded' });
+  await page.goto('config.json', { waitUntil: 'domcontentloaded' });
   await reseedSessionToken(page);
   await page.goto(returnTo, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });

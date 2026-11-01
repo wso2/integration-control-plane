@@ -88,6 +88,8 @@ import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
 import { UUID_RE } from '../utils/string';
 import { isExternalRepoIntegration } from '../utils/projectRepo';
 import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_MAX_NEWLINES, toSingleLineDescription } from '../utils/description';
+import { withBase } from '../utils/basePath';
+import { session } from '../utils/storage';
 
 const Markdown = lazy(() => import('../components/Markdown'));
 
@@ -660,11 +662,11 @@ export default function Project(scope: ProjectScope): JSX.Element {
   // sessionStorage cache covers repeat visits to any other empty project within the same tab
   // session, so only a genuinely first-ever visit to an empty non-onboarding project still waits.
   const emptyProjectCacheKey = projectId ? `project-overview-empty:${projectId}` : null;
-  const cachedIsEmpty = emptyProjectCacheKey ? sessionStorage.getItem(emptyProjectCacheKey) === 'true' : false;
+  const cachedIsEmpty = emptyProjectCacheKey ? session.get(emptyProjectCacheKey) === 'true' : false;
 
   useEffect(() => {
     if (!emptyProjectCacheKey || !isComponentsSuccess) return;
-    sessionStorage.setItem(emptyProjectCacheKey, String(components.length === 0));
+    session.set(emptyProjectCacheKey, String(components.length === 0));
   }, [emptyProjectCacheKey, isComponentsSuccess, components.length]);
 
   const { data: orgs = [] } = useOrgs();
@@ -719,7 +721,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
       componentId: openInCloudComponent.id,
       codeServerSample: JSON.stringify(codeServerSample),
     });
-    window.open(`${window.location.origin}/editor?${params}`, '_blank', 'noopener,noreferrer');
+    window.open(`${window.location.origin}${withBase('/editor')}?${params}`, '_blank', 'noopener,noreferrer');
     setSplitOpen(false);
     setOpenEditorWarning(null);
   };
