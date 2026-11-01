@@ -71,6 +71,8 @@ const checkQueue: (() => void)[] = [];
 let checksActive = 0;
 /** Status reads that failed to reach the engine in a row, per file, for the backoff. */
 const checkAttempts = new Map<string, number>();
+/** Bumped when a file is sent again, so a read started for the previous upload cannot touch the new one. */
+const generations = new Map<string, number>();
 let notifyTimer: number | undefined;
 
 const UNCHANGED_DETAIL = 'Unchanged, so it was not sent again.';
@@ -212,9 +214,11 @@ function follow(engineId: string, sourceId: string, recordId: string): Promise<v
  */
 async function watchRecord(engineId: string, sourceId: string, recordId: string, afterJob = false): Promise<void> {
   const key = entryKey(sourceId, recordId);
+  const generation = generations.get(key);
   clearTimer(key);
   try {
     const record = await queueCheck(() => getContextRecordStatus(sourceId, recordId));
+    if (generations.get(key) !== generation) return;
     const { status, detail } = uploadStatusFromRecord(record);
     checkAttempts.delete(key);
     patchEntry(sourceId, recordId, { status, detail, forbidden: false, check: undefined, version: record.currentVersion, progress: 100 });
@@ -224,6 +228,7 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
         window.setTimeout(() => void trackCheck(key, () => watchRecord(engineId, sourceId, recordId)), UPLOAD_POLL_MS),
       );
   } catch (err) {
+    if (generations.get(key) !== generation) return;
     if (err instanceof HttpError && err.status === 404) {
       const entry = entriesOf(sourceId).find((e) => e.recordId === recordId);
       if (!afterJob && entry?.jobId) {
@@ -252,9 +257,11 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
 /** Follow the engine's job for an upload, then the record it produced. */
 async function watchJob(engineId: string, sourceId: string, recordId: string, jobId: string): Promise<void> {
   const key = entryKey(sourceId, recordId);
+  const generation = generations.get(key);
   clearTimer(key);
   try {
     const job = await queueCheck(() => getContextJob(jobId));
+    if (generations.get(key) !== generation) return;
     checkAttempts.delete(key);
     if (!CONTEXT_JOB_TERMINAL_STATES.has(job.state)) {
       patchEntry(sourceId, recordId, { status: 'queued', progress: 100, running: job.state === 'running', check: undefined });
@@ -271,6 +278,7 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
     pendingBytes.delete(key);
     await watchRecord(engineId, sourceId, recordId, true);
   } catch (err) {
+    if (generations.get(key) !== generation) return;
     if (isTransientReadError(err)) {
       checkLater(sourceId, recordId, () => watchJob(engineId, sourceId, recordId, jobId));
       return;
@@ -374,6 +382,10 @@ async function retryOnEngine(engineId: string, sourceId: string, recordId: strin
 function enqueue(engineId: string, sourceId: string, file: FileToUpload, audience: string[], version: string, previous?: UploadEntry): void {
   const recordId = file.name;
   const key = entryKey(sourceId, recordId);
+  // A status check still pending for the file this one replaces must not touch it.
+  clearTimer(key);
+  checkAttempts.delete(key);
+  generations.set(key, (generations.get(key) ?? 0) + 1);
   pendingBytes.set(key, file);
   const queue = queues.get(sourceId) ?? [];
   queues.set(sourceId, queue);

@@ -35,7 +35,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('#api/contextEngine', () => api);
 
-import { refreshUploads, useSourceUploads } from './contextUploads';
+import { refreshUploads, startUploads, useSourceUploads } from './contextUploads';
 
 const INDEXED = { recordId: 'f0', state: 'active', indexState: 'indexed', currentVersion: '1' };
 let root: Root;
@@ -134,5 +134,36 @@ describe('useSourceUploads status reads', () => {
     expect(api.getContextRecordStatus).toHaveBeenCalledTimes(2);
     expect(seen).not.toContain('failed');
     expect(seen.at(-1)).toBe('searchable');
+  });
+
+  it('does not let a retry scheduled for the old file remove its replacement', async () => {
+    remember('s-replace', 1);
+    api.getContextRecordStatus.mockRejectedValueOnce(new HttpError(503, 'HTTP 503: unavailable')).mockRejectedValue(new HttpError(404, 'HTTP 404: not found'));
+    api.ingestContextFile.mockReturnValue(new Promise(() => undefined));
+    let latest: UploadEntry[] = [];
+    mount('s-replace', (e) => (latest = e));
+    await settle();
+    expect(latest[0]).toMatchObject({ check: 'retrying' });
+    act(() => startUploads('e1', 's-replace', [{ content: new Blob(['x']), name: 'f0', size: 1, contentType: 'text/plain' }], { kind: 'everyone' }, []));
+    await settle(30000);
+    expect(api.getContextRecordStatus).toHaveBeenCalledTimes(1);
+    expect(latest).toHaveLength(1);
+    expect(latest[0]).toMatchObject({ recordId: 'f0', status: 'uploading' });
+  });
+
+  it('ignores a status read that comes back after the file was sent again', async () => {
+    remember('s-late', 1);
+    let answer: (error: unknown) => void = () => undefined;
+    api.getContextRecordStatus.mockReturnValueOnce(new Promise((_resolve, reject) => (answer = reject)));
+    api.ingestContextFile.mockReturnValue(new Promise(() => undefined));
+    let latest: UploadEntry[] = [];
+    mount('s-late', (e) => (latest = e));
+    await settle();
+    act(() => startUploads('e1', 's-late', [{ content: new Blob(['x']), name: 'f0', size: 1, contentType: 'text/plain' }], { kind: 'everyone' }, []));
+    await settle();
+    answer(new HttpError(404, 'HTTP 404: not found'));
+    await settle();
+    expect(latest).toHaveLength(1);
+    expect(latest[0]).toMatchObject({ recordId: 'f0', status: 'uploading' });
   });
 });
