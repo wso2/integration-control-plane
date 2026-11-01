@@ -72,6 +72,7 @@ export const Scopes = {
   ENDPOINT_EXPOSE: 'ipaas:endpoint:expose',
   ENDPOINT_API_KEY_MANAGE: 'ipaas:endpoint:api-key-manage',
   APPLICATION_MANAGE: 'ipaas:application:manage',
+  EDITOR_USE: 'ipaas:editor:use',
   /** ipaas-service hands these AI-agent writes to agent-manager with the user's token, and agent-manager checks them. */
   AGENT_CREATE: 'amp:agent:create',
   AGENT_UPDATE: 'amp:agent:update',

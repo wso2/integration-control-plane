@@ -621,7 +621,9 @@ function buildProjectRepoUrl(gitProvider?: string, gitOrganization?: string, rep
 
 export default function Project(scope: ProjectScope): JSX.Element {
   const navigate = useAppNavigate();
-  const canUpdate = useCan()(Scopes.PROJECT_UPDATE);
+  const can = useCan();
+  const canUpdate = can(Scopes.PROJECT_UPDATE);
+  const canUseEditor = can(Scopes.EDITOR_USE);
   const isUuid = UUID_RE.test(scope.project);
   const { data: projectById, isLoading: loadingById } = useProject(isUuid ? scope.project : '');
   const { data: projectByHandle, isLoading: loadingByHandle } = useProjectByHandler(isUuid ? '' : scope.project);
@@ -708,7 +710,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   // The editor clones the project repo, so only an integration that builds from it can open.
   const openInCloudComponent = components.find((c) => isSupportedIntegration(c.displayType, c.componentSubType, c.buildpackType) && !isExternalRepo(c) && (!isRepoLinked || repoByHandler.get(c.handler) !== undefined)) ?? null;
   const projectRepoUrl = buildProjectRepoUrl(project.gitProvider, project.gitOrganization, project.repository, project.branch);
-  const showEditor = !!openInCloudComponent && !!projectRepoUrl;
+  const showEditor = !!openInCloudComponent && !!projectRepoUrl && (canUseEditor || openInIntegratorEnabled);
 
   const externalComponents = components.filter(isExternalRepo);
 
@@ -972,7 +974,11 @@ export default function Project(scope: ProjectScope): JSX.Element {
           <Stack direction={showEditor ? 'column' : 'row'} alignItems={showEditor ? 'flex-end' : 'center'} gap={showEditor ? 0.5 : 1.5} sx={{ flexShrink: 0 }}>
             {showEditor && (
               <Box sx={{ position: 'relative', flexShrink: 0 }}>
-                {openInIntegratorEnabled ? (
+                {!canUseEditor ? (
+                  <Button variant="outlined" size="small" startIcon={<IntegratorIcon width={16} height={16} />} onClick={handleOpenInIntegrator} sx={{ whiteSpace: 'nowrap' }}>
+                    Open in Integrator
+                  </Button>
+                ) : openInIntegratorEnabled ? (
                   <>
                     <ButtonGroup variant="outlined" size="small" ref={splitButtonRef}>
                       <Button

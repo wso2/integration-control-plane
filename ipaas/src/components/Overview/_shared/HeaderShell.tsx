@@ -79,7 +79,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const [descValue, setDescValue] = useState(component.description?.trim() ?? '');
   const descInputRef = useRef<HTMLInputElement>(null);
   const updateDesc = useUpdateComponent();
-  const canEdit = useCan()(Scopes.INTEGRATION_UPDATE);
+  const can = useCan();
+  const canEdit = can(Scopes.INTEGRATION_UPDATE);
 
   // Only show a hover tooltip for the name/description when the 2-line clamp is actually
   // truncating them — a tooltip that fires on text that already fits is just a useless hover target.
@@ -197,7 +198,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
 
   // Open-in-Cloud editor entry: only for components with a source repo and types
   // that don't opt out of it (e.g. MCP sets `hideOpenInEditor`).
-  const showOpenInEditor = hasSource && !module?.hideOpenInEditor;
+  const showOpenInEditor = hasSource && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
 
   const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;
   const ProviderIcon = getGitProviderIcon(repository?.gitProvider);
