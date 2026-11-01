@@ -21,7 +21,7 @@ import { ExternalLink, Rocket } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { Sample } from '../types/samples';
 import { Scopes } from '../constants/permissions';
-import { useAgentRefusal } from '../hooks/useCan';
+import { useAgentRefusal, useCan } from '../hooks/useCan';
 import { formatBuildPack, formatComponentType } from '../constants/integrations';
 
 const MAX_WORDS = 20;
@@ -34,7 +34,8 @@ function truncateWords(text: string): { display: string; isTruncated: boolean } 
 
 export default function SampleGridCard({ sample, onDeploy, isDeploying }: { sample: Sample; onDeploy: () => void; isDeploying: boolean }): JSX.Element {
   const agentRefusal = useAgentRefusal()(Scopes.AGENT_CREATE);
-  const refusal = sample.componentType === 'ai-agent' ? agentRefusal : '';
+  const canCreate = useCan()(Scopes.INTEGRATION_CREATE);
+  const refusal = !canCreate ? 'You do not have permission to create integrations.' : sample.componentType === 'ai-agent' ? agentRefusal : '';
   const sourceUrl = `${sample.repositoryUrl}tree/${sample.branch ?? 'main'}${sample.subDirectory ?? ''}${sample.componentPath}`;
   const { display: descriptionDisplay, isTruncated: isDescriptionTruncated } = truncateWords(sample.description);
 
