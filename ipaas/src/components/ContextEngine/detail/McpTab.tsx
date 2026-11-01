@@ -97,7 +97,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
               </ListingTable.Row>
             </ListingTable.Head>
             <ListingTable.Body>
-              {CONTEXT_MCP_TOOLS.map((t) => (
+              {CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers).map((t) => (
                 <ListingTable.Row key={t.name}>
                   <ListingTable.Cell>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
