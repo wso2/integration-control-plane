@@ -47,16 +47,16 @@ interface GitTreeEntry {
   type: string; // 'tree' | 'blob'
 }
 
-export interface AzureDevOpsOrganization {
+interface AzureDevOpsOrganization {
   organization: string;
 }
 
-export interface AzureDevOpsProject {
+interface AzureDevOpsProject {
   id: string;
   name: string;
 }
 
-export interface AzureDevOpsRepository {
+interface AzureDevOpsRepository {
   name: string;
   project: string;
   defaultBranch: string;
@@ -89,7 +89,7 @@ export async function fetchAzureDevOpsRepositories(organization: string, project
 
 export async function fetchAzureDevOpsBranches(organization: string, project: string, repo: string): Promise<RepoBranch[]> {
   const repository = (await fetchAzureDevOpsRepositories(organization, project)).find((item) => item.name === repo);
-  const defaultBranch = repository?.defaultBranch.replace(/^refs\/heads\//, '');
+  const defaultBranch = repository?.defaultBranch?.replace(/^refs\/heads\//, '');
   const branches = items(await bff.get<ListResponse<string>>(`/git/azuredevops/branches${q({ organization, project, repo })}`));
   return branches.map((name) => ({ name: name.replace(/^refs\/heads\//, ''), isDefault: name.replace(/^refs\/heads\//, '') === defaultBranch }));
 }
@@ -100,9 +100,14 @@ export async function fetchAzureDevOpsContents(organization: string, project: st
   return buildRepoTree(response?.items ?? []);
 }
 
-export async function fetchAzureDevOpsMetadata(organization: string, project: string, repo: string, branch: string, subPath: string): Promise<RepoMetadata> {
-  const tree = await fetchAzureDevOpsContents(organization, project, repo, branch);
-  return metadataFromTree(tree, subPath);
+export async function fetchAzureDevOpsMetadata(organization: string, project: string, repo: string, branch: string, subPath: string, cachedTree?: RepoTreeNode[]): Promise<RepoMetadata> {
+  try {
+    const tree = cachedTree ?? (await fetchAzureDevOpsContents(organization, project, repo, branch));
+    return metadataFromTree(tree, subPath);
+  } catch (err) {
+    if (isAzureDevOpsAuthRequired(err)) throw err;
+    return REPO_METADATA_DEFAULT;
+  }
 }
 
 // The shared branch/tree signatures identify a repo by owner+name only, so the

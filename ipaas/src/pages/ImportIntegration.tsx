@@ -40,6 +40,7 @@ import {
   useRepoContents,
   useRepoMetadata,
   useComponentNameAvailability,
+  isAzureDevOpsAuthRequired,
 } from '../hooks/useRepository';
 import type { DetectedMode } from '../types/repository';
 import DirectoryPickerField from '../components/DirectoryPicker';
@@ -60,7 +61,6 @@ import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav'
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
 import { useAzureDevOpsAuth } from '../hooks/useAzureDevOpsAuth';
 import AzureDevOpsIcon from '../assets/icons/AzureDevOpsIcon';
-import { isAzureDevOpsAuthRequired } from '../api/repository';
 import { toHandler, formatRepoNameToDisplayName } from '../utils/string';
 import { parseGitHubUrl } from '../utils/github';
 import { detectTechnology } from '../utils/technologyDetection';
@@ -136,8 +136,8 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const { data: userRepos, isLoading: isReposLoading, isSuccess: isReposSuccess, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled);
 
   const { data: adoOrganizations, isLoading: isAdoOrganizationsLoading, isError: isAdoOrganizationsError, error: adoOrganizationsError, refetch: refetchAdoOrganizations } = useAzureDevOpsOrganizations(isAzureDevOps);
-  const { data: adoProjects, isLoading: isAdoProjectsLoading, error: adoProjectsError, refetch: refetchAdoProjects } = useAzureDevOpsProjects(selectedOrg, isAzureDevOps);
-  const { data: adoRepositories, isLoading: isAdoRepositoriesLoading, error: adoRepositoriesError, refetch: refetchAdoRepositories } = useAzureDevOpsRepositories(selectedOrg, selectedAdoProject, isAzureDevOps);
+  const { data: adoProjects, isLoading: isAdoProjectsLoading, isError: isAdoProjectsError, error: adoProjectsError, refetch: refetchAdoProjects } = useAzureDevOpsProjects(selectedOrg, isAzureDevOps);
+  const { data: adoRepositories, isLoading: isAdoRepositoriesLoading, isError: isAdoRepositoriesError, error: adoRepositoriesError, refetch: refetchAdoRepositories } = useAzureDevOpsRepositories(selectedOrg, selectedAdoProject, isAzureDevOps);
 
   // Authorization is proven by a successful repo query, not by a non-empty list —
   // an authorized account with no repositories is still authenticated.
@@ -636,6 +636,8 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                     resetDownstreamState({ includeDisplayName: true, includeTechnology: true });
                   }}
                   disabled={!selectedOrg || isAdoProjectsLoading}
+                  error={isAdoProjectsError && !isAzureDevOpsAuthRequired(adoProjectsError)}
+                  helperText={isAdoProjectsError && !isAzureDevOpsAuthRequired(adoProjectsError) ? 'Could not load projects. Open the list and select Refresh projects to try again.' : undefined}
                   fullWidth>
                   {selectMenuHeader({ key: 'ado-project-search', value: '', onChange: () => {}, placeholder: '', show: false }, { label: 'Refresh projects', onClick: () => refetchAdoProjects(), loading: isAdoProjectsLoading })}
                   {adoProjectOptions.map((project) => (
@@ -653,6 +655,8 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   value={selectedRepo}
                   onChange={(e) => setSelectedRepo(e.target.value)}
                   disabled={!selectedAdoProject || isAdoRepositoriesLoading}
+                  error={isAdoRepositoriesError && !isAzureDevOpsAuthRequired(adoRepositoriesError)}
+                  helperText={isAdoRepositoriesError && !isAzureDevOpsAuthRequired(adoRepositoriesError) ? 'Could not load repositories. Open the list and select Refresh repositories to try again.' : undefined}
                   fullWidth
                   slotProps={{ select: { onClose: () => setRepoSearch('') } }}>
                   {selectMenuHeader(

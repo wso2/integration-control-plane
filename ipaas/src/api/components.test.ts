@@ -120,6 +120,7 @@ describe('createComponent component-type mapping', () => {
       repositoryUrl: 'https://dev.azure.com/acme/Payments/_git/order-sync',
     });
     expect(body.spec.workflow.parameters.repository.secretRef).toBe('');
+    expect(body.spec.workflow.parameters.repository.url).toBe('https://dev.azure.com/acme/Payments/_git/order-sync');
   });
 
   // The mi-* types carry the MI resource defaults; the shared types' defaults OOMKill the MI JVM.

@@ -36,30 +36,40 @@ export function useAzureDevOpsAuth(initialStatus: AuthStatus = 'idle'): UseAzure
     });
     if (selectAccount) params.set('prompt', 'select_account');
 
+    // Subscribe before opening the popup so even an immediately completed
+    // callback cannot post before this window is listening.
+    const channel = new BroadcastChannel(AZURE_DEVOPS_AUTH.BROADCAST_CHANNEL);
     const popup = window.open(`${AZURE_DEVOPS_AUTH.AUTHORIZE_URL}?${params}`, 'azure-devops-oauth', AZURE_DEVOPS_AUTH.POPUP_DIMENSIONS);
     if (!popup) {
+      channel.close();
       setErrorMessage('Please allow popups for this site and try again.');
       setAuthStatus('failed');
       return;
     }
 
-    const channel = new BroadcastChannel(AZURE_DEVOPS_AUTH.BROADCAST_CHANNEL);
     let completed = false;
+    let popupCloseTimer: ReturnType<typeof setTimeout> | undefined;
     const finish = () => {
       completed = true;
       clearInterval(poll);
+      clearTimeout(popupCloseTimer);
       channel.close();
     };
     const poll = setInterval(() => {
-      if (!completed && popup.closed) {
-        finish();
-        setErrorMessage('Azure DevOps connection was cancelled.');
-        setAuthStatus('idle');
+      if (!completed && popup.closed && !popupCloseTimer) {
+        // The callback posts its result and then closes. Give the queued
+        // BroadcastChannel message a chance to arrive before treating that
+        // close as a cancellation.
+        popupCloseTimer = setTimeout(() => {
+          if (completed) return;
+          finish();
+          setErrorMessage('Azure DevOps connection was cancelled.');
+          setAuthStatus('idle');
+        }, AZURE_DEVOPS_AUTH.CALLBACK_DELIVERY_GRACE_MS);
       }
     }, AZURE_DEVOPS_AUTH.POPUP_POLL_INTERVAL_MS);
 
     channel.onmessage = async (event) => {
-      finish();
       const {
         authCode,
         state: returnedState,
@@ -71,6 +81,10 @@ export function useAzureDevOpsAuth(initialStatus: AuthStatus = 'idle'): UseAzure
         error?: string | null;
         errorDescription?: string | null;
       };
+      // The channel is shared by tabs on this origin. A stale callback from a
+      // different attempt must not terminate or clear this attempt's state.
+      if (returnedState !== state) return;
+      finish();
       if (!returnedState || !validateAndClearAzureDevOpsState(returnedState)) {
         setErrorMessage('Azure DevOps authorization failed because the returned state was invalid.');
         setAuthStatus('failed');

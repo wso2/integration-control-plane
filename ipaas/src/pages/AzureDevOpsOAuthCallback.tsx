@@ -24,6 +24,9 @@ export default function AzureDevOpsOAuthCallback(): JSX.Element {
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100vh', gap: 2 }}>
       <CircularProgress size={32} />
       <Typography color="text.secondary">Completing Azure DevOps authentication…</Typography>
+      <Typography variant="body2" color="text.secondary">
+        If this window does not close automatically, return to the Integration import page.
+      </Typography>
     </Box>
   );
 }

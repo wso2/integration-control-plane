@@ -27,7 +27,8 @@ vi.mock('./_client', async (importOriginal) => {
   return { ...actual, bff: { ...actual.bff, get, post, put } };
 });
 
-import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, updateBuildpackConfigs } from './repository';
+import { BffError } from './_client';
+import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsMetadata, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, updateBuildpackConfigs } from './repository';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
 
 const baseInput: UpdateBuildpackConfigsInput = {
@@ -111,5 +112,22 @@ describe('Azure DevOps repository API', () => {
       { name: 'main', isDefault: true },
       { name: 'feature/demo', isDefault: false },
     ]);
+    expect(get.mock.calls[1][0]).toBe('/git/azuredevops/branches?organization=acme&project=Payments&repo=order-sync');
+  });
+
+  it('falls back to permissive metadata for non-auth tree failures', async () => {
+    get.mockRejectedValueOnce(new BffError(500, 'tree unavailable'));
+
+    await expect(fetchAzureDevOpsMetadata('acme', 'Payments', 'order-sync', 'main', '/')).resolves.toMatchObject({
+      isValidRepo: true,
+      isSubPathValid: true,
+    });
+  });
+
+  it('preserves Azure DevOps authentication failures from metadata loading', async () => {
+    const authError = new BffError(409, 'azuredevops-auth-required');
+    get.mockRejectedValueOnce(authError);
+
+    await expect(fetchAzureDevOpsMetadata('acme', 'Payments', 'order-sync', 'main', '/')).rejects.toBe(authError);
   });
 });

@@ -128,10 +128,11 @@ export function useAzureDevOpsContents(organization: string, project: string, re
 }
 
 export function useAzureDevOpsMetadata(organization: string, project: string, repo: string, branch: string, subPath: string, enabled: boolean) {
+  const contents = useAzureDevOpsContents(organization, project, repo, branch, enabled);
   return useQuery({
     queryKey: ['azureDevOpsMetadata', organization, project, repo, branch, subPath],
-    queryFn: () => fetchAzureDevOpsMetadata(organization, project, repo, branch, subPath),
-    enabled: enabled && !!organization && !!project && !!repo && !!branch,
+    queryFn: () => fetchAzureDevOpsMetadata(organization, project, repo, branch, subPath, contents.data),
+    enabled: enabled && !!organization && !!project && !!repo && !!branch && contents.isSuccess,
     staleTime: 60 * 1000,
     retry: false,
   });
@@ -208,6 +209,11 @@ export function useConnectAzureDevOps() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ authorizationCode, redirectUri }: { authorizationCode: string; redirectUri: string }) => connectAzureDevOps(authorizationCode, redirectUri),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['azureDevOpsOrganizations'] }),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        predicate: ({ queryKey }) => typeof queryKey[0] === 'string' && queryKey[0].startsWith('azureDevOps'),
+      }),
   });
 }
+
+export { isAzureDevOpsAuthRequired } from '../api/repository';
