@@ -16,12 +16,12 @@
  * under the License.
  */
 
+import { useCallback } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   connectAzureDevOps,
   fetchAzureDevOpsBranches,
   fetchAzureDevOpsContents,
-  fetchAzureDevOpsMetadata,
   fetchAzureDevOpsOrganizations,
   fetchAzureDevOpsProjects,
   fetchAzureDevOpsRepositories,
@@ -34,10 +34,12 @@ import {
   updateBuildpackConfigs,
   obtainGithubToken,
   fetchRepoContents,
+  markAzureDevOpsDefaultBranch,
+  metadataFromTree,
 } from '../api/repository';
 import { fetchComponentNameAvailability } from '../api/components';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
-import type { Repository } from '../types/repository';
+import type { Repository, RepoTreeNode } from '../types/repository';
 
 export function useComponentRepository(projectId: string, componentHandler: string) {
   return useQuery({
@@ -108,34 +110,36 @@ export function useAzureDevOpsRepositories(organization: string, project: string
 }
 
 export function useAzureDevOpsBranches(organization: string, project: string, repo: string, enabled: boolean) {
+  const { data: repositories } = useAzureDevOpsRepositories(organization, project, enabled);
+  const defaultBranchRef = repositories?.find((item) => item.name === repo)?.defaultBranch;
+  const select = useCallback((names: string[]) => markAzureDevOpsDefaultBranch(names, defaultBranchRef), [defaultBranchRef]);
   return useQuery({
     queryKey: ['azureDevOpsBranches', organization, project, repo],
     queryFn: () => fetchAzureDevOpsBranches(organization, project, repo),
+    select,
     enabled: enabled && !!organization && !!project && !!repo,
     staleTime: 2 * 60 * 1000,
     retry: false,
   });
 }
 
+const azureDevOpsContentsQuery = (organization: string, project: string, repo: string, branch: string, enabled: boolean) => ({
+  queryKey: ['azureDevOpsContents', organization, project, repo, branch],
+  queryFn: () => fetchAzureDevOpsContents(organization, project, repo, branch),
+  enabled: enabled && !!organization && !!project && !!repo && !!branch,
+  staleTime: 2 * 60 * 1000,
+  retry: false,
+});
+
 export function useAzureDevOpsContents(organization: string, project: string, repo: string, branch: string, enabled: boolean) {
-  return useQuery({
-    queryKey: ['azureDevOpsContents', organization, project, repo, branch],
-    queryFn: () => fetchAzureDevOpsContents(organization, project, repo, branch),
-    enabled: enabled && !!organization && !!project && !!repo && !!branch,
-    staleTime: 2 * 60 * 1000,
-    retry: false,
-  });
+  return useQuery(azureDevOpsContentsQuery(organization, project, repo, branch, enabled));
 }
 
+// Metadata is a view over the contents query rather than a cache of its own, so
+// refetching it (Revalidate) re-reads the tree and picks up new commits.
 export function useAzureDevOpsMetadata(organization: string, project: string, repo: string, branch: string, subPath: string, enabled: boolean) {
-  const contents = useAzureDevOpsContents(organization, project, repo, branch, enabled);
-  return useQuery({
-    queryKey: ['azureDevOpsMetadata', organization, project, repo, branch, subPath],
-    queryFn: () => fetchAzureDevOpsMetadata(organization, project, repo, branch, subPath, contents.data),
-    enabled: enabled && !!organization && !!project && !!repo && !!branch && contents.isSuccess,
-    staleTime: 60 * 1000,
-    retry: false,
-  });
+  const select = useCallback((tree: RepoTreeNode[]) => metadataFromTree(tree, subPath), [subPath]);
+  return useQuery({ ...azureDevOpsContentsQuery(organization, project, repo, branch, enabled), select });
 }
 
 export function useRepoBranches(repoOrg: string, repoName: string, isPublicRepo: boolean) {

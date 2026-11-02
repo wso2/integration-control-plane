@@ -55,7 +55,7 @@ import { SAMPLE_REPO_URL } from '../constants/github';
 import { external } from '../paths';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems, selectMenuHeader } from '../components/Import/gitHubSelectActions';
 import { GitProvider } from '../types/credentials';
-import { buildRepoUrl } from '../utils/gitProviderUrl';
+import { buildAzureDevOpsRepoUrl, buildRepoUrl } from '../utils/gitProviderUrl';
 import { URL_DEBOUNCE_MS } from '../constants/project';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
@@ -139,8 +139,10 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const { data: adoProjects, isLoading: isAdoProjectsLoading, isError: isAdoProjectsError, error: adoProjectsError, refetch: refetchAdoProjects } = useAzureDevOpsProjects(selectedOrg, isAzureDevOps);
   const { data: adoRepositories, isLoading: isAdoRepositoriesLoading, isError: isAdoRepositoriesError, error: adoRepositoriesError, refetch: refetchAdoRepositories } = useAzureDevOpsRepositories(selectedOrg, selectedAdoProject, isAzureDevOps);
 
-  // Authorization is proven by a successful repo query, not by a non-empty list —
-  // an authorized account with no repositories is still authenticated.
+  // GitHub authorization is proven by a successful repo query, not by a non-empty
+  // list — an authorized account with no repositories is still authenticated.
+  // Azure DevOps differs: git-app-service refuses to bind a connection that
+  // reaches no organization, so an empty list means nothing is connected.
   const isAuthenticated = !isPublicRepo && (isAzureDevOps ? (adoOrganizations?.length ?? 0) > 0 : isReposSuccess);
   const hasRepos = (userRepos?.length ?? 0) > 0;
   const isCheckingAuth = !isPublicRepo && (isAzureDevOps ? isAdoOrganizationsLoading : reposEnabled && isReposLoading);
@@ -403,7 +405,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         projectId,
         displayType: resolveDisplayType(),
         componentSubType: resolveComponentSubType(),
-        srcGitRepoUrl: isAzureDevOps ? buildRepoUrl(GitProvider.AZURE_DEVOPS, activeOrg, activeRepo, undefined, selectedAdoProject) : buildRepoUrl(GitProvider.GITHUB, activeOrg, activeRepo),
+        srcGitRepoUrl: isAzureDevOps ? buildAzureDevOpsRepoUrl(activeOrg, selectedAdoProject, activeRepo) : buildRepoUrl(GitProvider.GITHUB, activeOrg, activeRepo),
         repositoryBranch: selectedBranch,
         repositorySubPath: subPath || '/',
         isPublicRepo,

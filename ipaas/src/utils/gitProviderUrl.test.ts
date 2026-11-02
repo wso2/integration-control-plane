@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { buildRepoUrl, buildRepoBrowseUrl } from './gitProviderUrl';
+import { buildAzureDevOpsRepoUrl, buildRepoUrl, buildRepoBrowseUrl } from './gitProviderUrl';
 import { GitProvider } from '../types/credentials';
 import type { Repository } from '../types/repository';
 
@@ -40,7 +40,13 @@ describe('buildRepoUrl', () => {
     expect(buildRepoUrl(GitProvider.BITBUCKET_SERVER, 'acme', 'svc', 'https://bitbucket.acme.io/')).toBe('https://bitbucket.acme.io/acme/svc');
   });
   it('builds an Azure DevOps _git URL', () => {
-    expect(buildRepoUrl(GitProvider.AZURE_DEVOPS, 'acme org', 'svc repo', undefined, 'Payments & Billing')).toBe('https://dev.azure.com/acme%20org/Payments%20%26%20Billing/_git/svc%20repo');
+    expect(buildRepoUrl(GitProvider.AZURE_DEVOPS, 'acme', 'svc')).toBe('https://dev.azure.com/acme/_git/svc');
+  });
+});
+
+describe('buildAzureDevOpsRepoUrl', () => {
+  it('nests the repository under its project and encodes every segment', () => {
+    expect(buildAzureDevOpsRepoUrl('acme org', 'Payments & Billing', 'svc repo')).toBe('https://dev.azure.com/acme%20org/Payments%20%26%20Billing/_git/svc%20repo');
   });
 });
 
@@ -86,6 +92,10 @@ describe('buildRepoBrowseUrl', () => {
 
     it('adds the leading slash and drops a trailing one', () => {
       expect(azure('src/foo/')).toBe('https://dev.azure.com/acme/proj/_git/svc?path=%2Fsrc%2Ffoo&version=GBmain');
+    });
+
+    it('encodes a project name with spaces', () => {
+      expect(buildRepoBrowseUrl(repo({ gitProvider: 'azure_devops', projectApp: 'Payments Team', appSubPath: '' }))).toBe('https://dev.azure.com/acme/Payments%20Team/_git/svc?path=%2F&version=GBmain');
     });
   });
 });

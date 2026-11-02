@@ -27,6 +27,7 @@ import GitLogoIcon from '../assets/icons/GitLogoIcon';
 import type { BuildRunLogs } from '../types/build';
 import type { Repository } from '../types/repository';
 import { BUILD_STAGES } from '../constants/build';
+import { buildAzureDevOpsRepoUrl } from './gitProviderUrl';
 
 export function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
   return (
@@ -121,6 +122,8 @@ export function gitProviderLabel(provider: string): string {
       return 'Bitbucket';
     case 'bitbucket_server':
       return 'Bitbucket Server';
+    case 'azure_devops':
+      return 'Azure DevOps';
     default:
       return provider ?? '—';
   }
@@ -157,6 +160,8 @@ export function repoUrl(repository: Repository): string {
       return `https://bitbucket.org/${organizationApp}/${nameApp}`;
     case 'bitbucket_server':
       return base ? `${base}/projects/${projectApp ?? organizationApp}/repos/${nameApp}` : `${organizationApp}/${nameApp}`;
+    case 'azure_devops':
+      return projectApp ? buildAzureDevOpsRepoUrl(organizationApp, projectApp, nameApp) : '';
     default:
       return '';
   }

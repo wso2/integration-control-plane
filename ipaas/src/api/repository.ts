@@ -59,7 +59,8 @@ interface AzureDevOpsProject {
 interface AzureDevOpsRepository {
   name: string;
   project: string;
-  defaultBranch: string;
+  // Absent on a repository with no commits yet.
+  defaultBranch?: string;
   webUrl?: string;
 }
 
@@ -87,27 +88,23 @@ export async function fetchAzureDevOpsRepositories(organization: string, project
   return items(await bff.get<ListResponse<AzureDevOpsRepository>>(`/git/azuredevops/repos${q({ organization, project })}`));
 }
 
-export async function fetchAzureDevOpsBranches(organization: string, project: string, repo: string): Promise<RepoBranch[]> {
-  const repository = (await fetchAzureDevOpsRepositories(organization, project)).find((item) => item.name === repo);
-  const defaultBranch = repository?.defaultBranch?.replace(/^refs\/heads\//, '');
-  const branches = items(await bff.get<ListResponse<string>>(`/git/azuredevops/branches${q({ organization, project, repo })}`));
-  return branches.map((name) => ({ name: name.replace(/^refs\/heads\//, ''), isDefault: name.replace(/^refs\/heads\//, '') === defaultBranch }));
+const stripHeadsRef = (ref: string): string => ref.replace(/^refs\/heads\//, '');
+
+// Branch names only: which one is the default comes from the repository list
+// the picker already holds, so loading branches never refetches that list.
+export async function fetchAzureDevOpsBranches(organization: string, project: string, repo: string): Promise<string[]> {
+  return items(await bff.get<ListResponse<string>>(`/git/azuredevops/branches${q({ organization, project, repo })}`)).map(stripHeadsRef);
+}
+
+export function markAzureDevOpsDefaultBranch(names: string[], defaultBranchRef?: string): RepoBranch[] {
+  const defaultBranch = defaultBranchRef ? stripHeadsRef(defaultBranchRef) : undefined;
+  return names.map((name) => ({ name, isDefault: name === defaultBranch }));
 }
 
 export async function fetchAzureDevOpsContents(organization: string, project: string, repo: string, branch: string): Promise<RepoTreeNode[]> {
   const response = await bff.get<{ items: GitTreeEntry[]; truncated?: boolean }>(`/git/azuredevops/tree${q({ organization, project, repo, branch })}`);
   if (response?.truncated) console.warn(`[cloud] Azure DevOps tree for ${organization}/${project}/${repo}@${branch} is truncated`);
   return buildRepoTree(response?.items ?? []);
-}
-
-export async function fetchAzureDevOpsMetadata(organization: string, project: string, repo: string, branch: string, subPath: string, cachedTree?: RepoTreeNode[]): Promise<RepoMetadata> {
-  try {
-    const tree = cachedTree ?? (await fetchAzureDevOpsContents(organization, project, repo, branch));
-    return metadataFromTree(tree, subPath);
-  } catch (err) {
-    if (isAzureDevOpsAuthRequired(err)) throw err;
-    return REPO_METADATA_DEFAULT;
-  }
 }
 
 // The shared branch/tree signatures identify a repo by owner+name only, so the
@@ -276,7 +273,7 @@ export async function fetchRepoMetadata(org: string, repo: string, branch: strin
   }
 }
 
-function metadataFromTree(tree: RepoTreeNode[], subPath: string): RepoMetadata {
+export function metadataFromTree(tree: RepoTreeNode[], subPath: string): RepoMetadata {
   if (tree.length === 0) return REPO_METADATA_EMPTY;
   const blobs = collectBlobPaths(tree);
   const norm = subPath.replace(/^\/+/, '').replace(/\/+$/, '');

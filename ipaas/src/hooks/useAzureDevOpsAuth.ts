@@ -1,8 +1,22 @@
 /**
  * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { generateAndSaveAzureDevOpsState, validateAndClearAzureDevOpsState } from '../auth';
 import { AZURE_DEVOPS_AUTH } from '../constants/azureDevOps';
 import type { AuthStatus } from '../types/import';
@@ -18,10 +32,17 @@ export function useAzureDevOpsAuth(initialStatus: AuthStatus = 'idle'): UseAzure
   const [authStatus, setAuthStatus] = useState<AuthStatus>(initialStatus);
   const [errorMessage, setErrorMessage] = useState('');
   const connect = useConnectAzureDevOps();
+  // Tears down the in-flight attempt's channel and timers. Held so that
+  // unmounting, or starting another attempt, never leaves a poll running
+  // against a closed popup or a channel that can still deliver a code.
+  const disposeAttemptRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => () => disposeAttemptRef.current?.(), []);
 
   const startAzureDevOpsAuth = (onSuccess?: () => void, selectAccount = false): void => {
     const { azureDevOpsClientId, azureDevOpsRedirectUrl } = window.API_CONFIG;
     if (!azureDevOpsClientId) return;
+    disposeAttemptRef.current?.();
 
     setAuthStatus('authenticating');
     setErrorMessage('');
@@ -54,7 +75,9 @@ export function useAzureDevOpsAuth(initialStatus: AuthStatus = 'idle'): UseAzure
       clearInterval(poll);
       clearTimeout(popupCloseTimer);
       channel.close();
+      if (disposeAttemptRef.current === finish) disposeAttemptRef.current = null;
     };
+    disposeAttemptRef.current = finish;
     const poll = setInterval(() => {
       if (!completed && popup.closed && !popupCloseTimer) {
         // The callback posts its result and then closes. Give the queued

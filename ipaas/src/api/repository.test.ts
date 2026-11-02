@@ -27,8 +27,7 @@ vi.mock('./_client', async (importOriginal) => {
   return { ...actual, bff: { ...actual.bff, get, post, put } };
 });
 
-import { BffError } from './_client';
-import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsMetadata, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, updateBuildpackConfigs } from './repository';
+import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, markAzureDevOpsDefaultBranch, updateBuildpackConfigs } from './repository';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
 
 const baseInput: UpdateBuildpackConfigsInput = {
@@ -106,28 +105,20 @@ describe('Azure DevOps repository API', () => {
     expect(get.mock.calls.map((call) => call[0])).toEqual(['/git/azuredevops/organizations', '/git/azuredevops/projects?organization=acme%20org', '/git/azuredevops/repos?organization=acme%20org&project=Payments%20%26%20Billing']);
   });
 
-  it('normalizes refs/heads branch names and marks the repository default', async () => {
-    get.mockResolvedValueOnce({ items: [{ name: 'order-sync', defaultBranch: 'refs/heads/main' }] }).mockResolvedValueOnce({ items: ['refs/heads/main', 'feature/demo'] });
-    await expect(fetchAzureDevOpsBranches('acme', 'Payments', 'order-sync')).resolves.toEqual([
+  it('lists branch names without refetching the repository list', async () => {
+    get.mockResolvedValueOnce({ items: ['refs/heads/main', 'feature/demo'] });
+    await expect(fetchAzureDevOpsBranches('acme', 'Payments', 'order-sync')).resolves.toEqual(['main', 'feature/demo']);
+    expect(get.mock.calls.map((call) => call[0])).toEqual(['/git/azuredevops/branches?organization=acme&project=Payments&repo=order-sync']);
+  });
+
+  it('marks the default branch from the repository list ref', () => {
+    expect(markAzureDevOpsDefaultBranch(['main', 'feature/demo'], 'refs/heads/main')).toEqual([
       { name: 'main', isDefault: true },
       { name: 'feature/demo', isDefault: false },
     ]);
-    expect(get.mock.calls[1][0]).toBe('/git/azuredevops/branches?organization=acme&project=Payments&repo=order-sync');
   });
 
-  it('falls back to permissive metadata for non-auth tree failures', async () => {
-    get.mockRejectedValueOnce(new BffError(500, 'tree unavailable'));
-
-    await expect(fetchAzureDevOpsMetadata('acme', 'Payments', 'order-sync', 'main', '/')).resolves.toMatchObject({
-      isValidRepo: true,
-      isSubPathValid: true,
-    });
-  });
-
-  it('preserves Azure DevOps authentication failures from metadata loading', async () => {
-    const authError = new BffError(409, 'azuredevops-auth-required');
-    get.mockRejectedValueOnce(authError);
-
-    await expect(fetchAzureDevOpsMetadata('acme', 'Payments', 'order-sync', 'main', '/')).rejects.toBe(authError);
+  it('marks no default for a repository without one', () => {
+    expect(markAzureDevOpsDefaultBranch(['main'], undefined)).toEqual([{ name: 'main', isDefault: false }]);
   });
 });

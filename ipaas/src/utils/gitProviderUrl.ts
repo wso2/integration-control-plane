@@ -27,7 +27,7 @@ const trimSlashes = (s: string): string => s.replace(/^\/+|\/+$/g, '');
  * repo picker; `serverUrl` (GitLab self-managed) comes from the stored credential.
  * Mirrors Devant's per-provider builders.
  */
-export function buildRepoUrl(provider: GitProvider, org: string, repo: string, serverUrl?: string, project?: string): string {
+export function buildRepoUrl(provider: GitProvider, org: string, repo: string, serverUrl?: string): string {
   switch (provider) {
     case GitProvider.BITBUCKET_CLOUD:
       return `${gitProviderBase.bitbucket}/${org}/${repo}`;
@@ -36,11 +36,19 @@ export function buildRepoUrl(provider: GitProvider, org: string, repo: string, s
     case GitProvider.BITBUCKET_SERVER:
       return `${(serverUrl || gitProviderBase.bitbucket).replace(/\/$/, '')}/${org}/${repo}`;
     case GitProvider.AZURE_DEVOPS:
-      if (!project) throw new Error('Azure DevOps project is required');
-      return `${gitProviderBase.azure}/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}`;
+      return `${gitProviderBase.azure}/${org}/_git/${repo}`;
     default:
       return `${gitProviderBase.github}/${org}/${repo}`;
   }
+}
+
+/**
+ * Azure DevOps clone URL for the create-component payload. A repository lives
+ * under a project, which `buildRepoUrl` has no slot for. Names may hold spaces
+ * and other reserved characters, so each segment is encoded.
+ */
+export function buildAzureDevOpsRepoUrl(org: string, project: string, repo: string): string {
+  return `${gitProviderBase.azure}/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}`;
 }
 
 /**
@@ -71,7 +79,7 @@ export function buildRepoBrowseUrl(repo: Repository): string {
     case 'azure_devops': {
       // Azure resolves `path` against the repo root, so it always needs a leading slash.
       const azurePath = `/${subPath}`;
-      return `${gitProviderBase.azure}/${organizationApp}/${projectApp}/_git/${nameApp}?path=${encodeURIComponent(azurePath)}&version=GB${encodedBranch}`;
+      return `${buildAzureDevOpsRepoUrl(organizationApp, trimSlashes(projectApp || ''), nameApp)}?path=${encodeURIComponent(azurePath)}&version=GB${encodedBranch}`;
     }
     default:
       return `${gitProviderBase.github}/${organizationApp}/${nameApp}`;
