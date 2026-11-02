@@ -26,6 +26,7 @@ import { useAllEnvironments } from '../hooks/useEnvironments';
 import type { Environment } from '../types/environment';
 import { useUpdateEnvironment } from '../hooks/useEnvironments';
 import { resourceUrl } from '../nav';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 
 function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler: string }): JSX.Element {
   const navigate = useAppNavigate();
@@ -36,13 +37,17 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
   const mutation = useUpdateEnvironment();
   const backUrl = resourceUrl({ level: 'organizations', org: orgHandler }, 'environments');
   const isDirty = name !== env.name || description !== (env.description ?? '') || critical !== env.critical;
+  const allowLeave = useUnsavedChanges(isDirty);
 
   const save = () => {
     setError(null);
     mutation.mutate(
       { environmentId: env.id, name, description, critical },
       {
-        onSuccess: () => navigate(backUrl, { state: { updated: true, name } }),
+        onSuccess: () => {
+          allowLeave();
+          navigate(backUrl, { state: { updated: true, name } });
+        },
         onError: (err) => setError(err.message ?? 'Failed to update environment. Please try again.'),
       },
     );
@@ -51,7 +56,7 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
   return (
     <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 2 }}>
-        Back to Environments
+        Back to environments
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
@@ -74,7 +79,13 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
       </Stack>
 
       <Stack direction="row" gap={2}>
-        <Button variant="outlined" onClick={() => navigate(backUrl)}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(backUrl);
+          }}>
           Cancel
         </Button>
         <Button variant="contained" onClick={save} disabled={!name.trim() || !isDirty || mutation.isPending}>

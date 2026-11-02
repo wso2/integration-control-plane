@@ -27,6 +27,9 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import BusyFields from '../components/common/BusyFields';
 import { resourceUrl, type OrgScope } from '../nav';
 import { CRITICAL_ENVIRONMENT_HELP, CRITICAL_ENVIRONMENT_LABEL } from '../constants/environment';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+
+const DEFAULT_NAME = 'My-New-Environment';
 
 export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -35,7 +38,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const { data: dataPlanes = [], isLoading: loadingDataPlanes, isError: dataPlanesError, refetch: refetchDataPlanes } = useDataPlanes();
   const create = useAddEnvironment();
 
-  const [name, setName] = useState('My-New-Environment');
+  const [name, setName] = useState(DEFAULT_NAME);
   const [description, setDescription] = useState('');
   const [dataplaneId, setDataplaneId] = useState('');
   const [critical, setCritical] = useState(false);
@@ -46,6 +49,8 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   useEffect(() => {
     if (dataPlanes.length) setDataplaneId((prev) => (prev && dataPlanes.some((d) => d.id === prev) ? prev : dataPlanes[0].id));
   }, [dataPlanes]);
+
+  const allowLeave = useUnsavedChanges(name !== DEFAULT_NAME || description !== '' || critical || (dataplaneId !== '' && dataPlanes.length > 0 && dataplaneId !== dataPlanes[0].id));
 
   const submit = () => {
     setError(null);
@@ -63,7 +68,10 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
         description: description.trim(),
       },
       {
-        onSuccess: () => navigate(listUrl, { state: { success: true, environmentName: name.trim() } }),
+        onSuccess: () => {
+          allowLeave();
+          navigate(listUrl, { state: { success: true, environmentName: name.trim() } });
+        },
         onError: (err) => {
           // The BFF's wording names the resource and its limit, so it is shown as sent.
           setErrorSeverity(isQuotaError(err) ? 'warning' : 'error');
@@ -82,7 +90,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   return (
     <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(listUrl)} sx={{ mb: 2 }}>
-        Back to Environments
+        Back to environments
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
@@ -128,7 +136,14 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
       </BusyFields>
 
       <Stack direction="row" gap={2}>
-        <Button variant="outlined" onClick={() => navigate(listUrl)} disabled={create.isPending}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(listUrl);
+          }}
+          disabled={create.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={submit} disabled={!canSubmit} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

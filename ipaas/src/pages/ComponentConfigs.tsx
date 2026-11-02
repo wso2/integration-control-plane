@@ -212,7 +212,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
               <DialogContentText>This unmounts the configuration from the container and redeploys. This cannot be undone.</DialogContentText>
             </DialogContent>
             <DialogActions>
-              <Button onClick={() => setDeleting(null)} disabled={del.isPending}>
+              <Button variant="outlined" color="inherit" onClick={() => setDeleting(null)} disabled={del.isPending}>
                 Cancel
               </Button>
               <Button variant="contained" color="error" onClick={handleDelete} disabled={del.isPending} startIcon={del.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

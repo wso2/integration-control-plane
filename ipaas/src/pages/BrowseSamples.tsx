@@ -127,7 +127,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
     return (
       <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
-          Back
+          Back to create integration
         </Button>
         <Typography color="error">Failed to load samples. Please try again later.</Typography>
       </PageContent>
@@ -156,7 +156,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
-        Back
+        Back to create integration
       </Button>
 
       <Typography variant="h1" sx={{ mb: 0.5, mt: 1 }}>

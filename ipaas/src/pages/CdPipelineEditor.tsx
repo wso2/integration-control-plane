@@ -83,7 +83,7 @@ export default function CdPipelineEditor(): JSX.Element {
 
   const existing = isEdit ? pipelines?.find((p) => p.id === pipelineId) : undefined;
   if (isEdit && !existing) {
-    return <NotFound message="Pipeline not found" backTo={orgCdPipelinesUrl({ org: orgHandler })} backLabel="Back to CD Pipelines" />;
+    return <NotFound message="Pipeline not found" backTo={orgCdPipelinesUrl({ org: orgHandler })} backLabel="Back to deployment pipelines" />;
   }
 
   return <CdPipelineForm key={pipelineId ?? 'new'} orgHandler={orgHandler} envTemplates={envTemplates} existingPipelines={pipelines ?? []} existing={existing} />;

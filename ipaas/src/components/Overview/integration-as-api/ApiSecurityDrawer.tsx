@@ -185,7 +185,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
       </DrawerPanel.Body>
 
       <DrawerPanel.Footer>
-        <Button variant="outlined" onClick={handleCancel} disabled={saving}>
+        <Button variant="outlined" color="inherit" onClick={handleCancel} disabled={saving}>
           Cancel
         </Button>
         <Button variant="contained" onClick={() => void handleApply()} disabled={saving || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>

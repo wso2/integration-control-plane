@@ -123,7 +123,7 @@ export default function ByoiBuildArea({ componentId, versionId, orgHandler, orgU
 
           {images && images.length > 3 && (
             <Button variant="text" size="small" onClick={() => setHistoryOpen(true)} sx={{ mt: 1, px: 0 }}>
-              View More
+              View more
             </Button>
           )}
         </CardContent>

@@ -20,6 +20,7 @@ import { Alert, Button, CircularProgress, Grid, PageContent, Stack, Typography, 
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import EditProjectSkeleton from '../components/EditProjectSkeleton';
 import PageNotFound from './PageNotFound';
@@ -48,6 +49,7 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
   const descriptionChanged = description.trim() !== originalDescription;
   const changed = displayName.trim() !== project.name || descriptionChanged;
   const canSubmit = changed && !nameError && !updateProject.isPending;
+  const allowLeave = useUnsavedChanges(changed);
 
   const handleSubmit = async () => {
     setSubmitError(null);
@@ -55,6 +57,7 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
       // An untouched description is sent as stored, so a rename keeps any line breaks it has.
       const nextDescription = descriptionChanged ? description.trim() : storedDescription;
       await updateProject.mutateAsync({ id: project.id, name: displayName.trim(), description: nextDescription || ' ', version: project.version });
+      allowLeave();
       navigate(projectHomeUrl);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Failed to update the project. Please try again.');
@@ -108,11 +111,18 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
       </BusyFields>
 
       <Stack direction="row" gap={2} sx={{ mt: 4 }}>
-        <Button variant="outlined" onClick={() => navigate(projectHomeUrl)} disabled={updateProject.isPending}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(projectHomeUrl);
+          }}
+          disabled={updateProject.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit} startIcon={updateProject.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-          {updateProject.isPending ? 'Saving…' : 'Save Changes'}
+          {updateProject.isPending ? 'Updating…' : 'Update project'}
         </Button>
       </Stack>
     </>
@@ -138,12 +148,12 @@ export default function EditProject(scope: ProjectScope): JSX.Element {
         </Alert>
       </PageContent>
     );
-  if (!project) return <PageNotFound title="Project not found" actionTo={resourceUrl({ level: 'organizations', org: scope.org }, 'overview')} actionLabel="Back to Projects" />;
+  if (!project) return <PageNotFound title="Project not found" actionTo={resourceUrl({ level: 'organizations', org: scope.org }, 'overview')} actionLabel="Back to projects" />;
 
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(resourceUrl(scope, 'overview'))} sx={{ mb: 2 }}>
-        Back
+        Back to project
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>

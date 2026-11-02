@@ -52,6 +52,7 @@ import { OAUTH_CLIENT_SECRET } from '../../../constants/tailscale';
 import type { TailscaleAuthMethod, TailscalePortMapping } from '../../../types/tailscale';
 import type { Environment } from '../../../types/environment';
 import { deploymentPollInterval } from '../../../utils/deploymentStatus';
+import { useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 import { joinPortMappings, safeAtob, tailscaleConfigMapName, tailscaleSecretName } from '../../../utils/tailscale';
 
 interface TailscaleEnvCardProps {
@@ -110,6 +111,13 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
 
   const saveAndDeploy = useSaveAndDeployTailscale(projectId);
   const redeploy = useRedeployTailscale();
+  useUnsavedChanges(
+    authKey !== '' ||
+      clientSecret !== '' ||
+      authMethod !== (configuredAuthMethod ?? 'authKey') ||
+      JSON.stringify(mappings) !== JSON.stringify(savedMappings) ||
+      JSON.stringify(form) !== JSON.stringify(editingIndex !== null ? mappings[editingIndex] : emptyForm),
+  );
 
   // Tailscale URL (protocol + selected endpoint), like Devant.
   const hostName = endpoints[0]?.hostName ?? '';
@@ -389,7 +397,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
                         </span>
                       </Tooltip>
                       {editingIndex !== null && (
-                        <Button size="small" onClick={resetForm}>
+                        <Button size="small" variant="outlined" color="inherit" onClick={resetForm}>
                           Cancel
                         </Button>
                       )}
@@ -404,7 +412,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
         {canManage && (
           <Box sx={{ mt: 2 }}>
             <Button variant="contained" onClick={handleSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
-              {saving ? 'Applying…' : 'Save & Deploy'}
+              {saving ? 'Applying…' : 'Save & deploy'}
             </Button>
           </Box>
         )}

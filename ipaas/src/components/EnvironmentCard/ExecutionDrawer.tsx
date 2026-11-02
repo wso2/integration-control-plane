@@ -215,7 +215,7 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
                   ))}
 
                   <Button variant="text" size="small" startIcon={<Plus size={14} />} onClick={() => setArgs((prev) => [...prev, ''])} sx={{ alignSelf: 'flex-start', px: 0 }}>
-                    Add Argument
+                    Add argument
                   </Button>
 
                   {runError && (
@@ -231,7 +231,9 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
           {/* Footer */}
           {!argsLoading && (
             <DrawerPanel.Footer>
-              <Button onClick={onClose}>Cancel</Button>
+              <Button variant="outlined" color="inherit" onClick={onClose}>
+                Cancel
+              </Button>
               <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
                 {trigger.isPending ? 'Executing…' : 'Execute'}
               </Button>

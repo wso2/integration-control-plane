@@ -25,12 +25,6 @@ export const cardSx = {
   p: 2,
 } as const;
 
-export const titleSx = {
-  fontWeight: 600,
-  textTransform: 'capitalize',
-  flexShrink: 0,
-} as const;
-
 /** Title in the placeholder card, where the spacing depends on whether a line follows. */
 export const placeholderTitleSx = (hasSubtitle: boolean) =>
   ({
@@ -45,23 +39,6 @@ export const headerRowSx = (expanded: boolean) =>
   }) as const;
 
 export const minWidthZeroSx = { minWidth: 0 } as const;
-
-export const commitRowSx = {
-  minWidth: 0,
-  cursor: 'default',
-} as const;
-
-export const commitShaSx = {
-  fontFamily: 'monospace',
-  flexShrink: 0,
-} as const;
-
-export const commitMessageSx = {
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
-  whiteSpace: 'nowrap',
-  maxWidth: 260,
-} as const;
 
 export const noShrinkSx = { flexShrink: 0 } as const;
 

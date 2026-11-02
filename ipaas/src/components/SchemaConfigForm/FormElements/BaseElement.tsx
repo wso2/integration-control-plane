@@ -257,7 +257,7 @@ export function BaseElement({
             ))}
           </TextField>
           <Stack direction="row" justifyContent="flex-end" gap={1}>
-            <Button size="small" onClick={() => setLinkAnchorEl(null)}>
+            <Button size="small" variant="outlined" color="inherit" onClick={() => setLinkAnchorEl(null)}>
               Cancel
             </Button>
             <Button size="small" variant="contained" disabled={!selectedGroupId || !selectedKeyId} onClick={handleLinkSave}>
@@ -363,7 +363,7 @@ export function BaseElement({
               }}
             />
             <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ mt: 1.5 }}>
-              <Button size="small" onClick={() => setSecretAnchorEl(null)}>
+              <Button size="small" variant="outlined" color="inherit" onClick={() => setSecretAnchorEl(null)}>
                 Cancel
               </Button>
               <Button size="small" variant="contained" disabled={!secretValue} onClick={handleSecretSave}>
@@ -385,7 +385,7 @@ export function BaseElement({
                 <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
               </Stack>
               <Button size="small" variant="text" startIcon={<Pencil size={13} />} onClick={(e) => setSecretAnchorEl(e.currentTarget as HTMLButtonElement)} sx={{ textTransform: 'none' }}>
-                Update Secret Content
+                Update secret content
               </Button>
             </>
           ) : (
@@ -437,7 +437,7 @@ export function BaseElement({
           </Tooltip>
         </Stack>
         <Button size="small" variant="text" startIcon={<Pencil size={13} />} onClick={() => setShowSensitiveInput(true)} sx={{ textTransform: 'none' }}>
-          Update Sensitive Content
+          Update sensitive content
         </Button>
       </Box>
     );

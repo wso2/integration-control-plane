@@ -92,7 +92,7 @@ function CertLinkForm({ availableCerts, onLink, onCancel }: CertLinkFormProps) {
         ))}
       </MuiSelect>
       <Stack direction="row" gap={1} justifyContent="flex-end">
-        <Button size="small" onClick={onCancel}>
+        <Button size="small" variant="outlined" color="inherit" onClick={onCancel}>
           Cancel
         </Button>
         <Button size="small" variant="contained" disabled={!canLink} onClick={() => selected && onLink(selected, mountPath)}>
@@ -239,7 +239,7 @@ function CertificateMountStep({ projectId, componentId, envId: _envId, deploymen
     <Box>
       <Box sx={{ mb: 1.5 }}>
         <Button variant="outlined" size="small" startIcon={<Link size={14} />} onClick={() => setIsLinking(true)} disabled={isLinking || linkable.length === 0}>
-          Link a Certificate
+          Link a certificate
         </Button>
       </Box>
 
@@ -248,7 +248,7 @@ function CertificateMountStep({ projectId, componentId, envId: _envId, deploymen
       {linkedCerts.length === 0 && !isLinking ? (
         <Box sx={{ py: 3, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            No certificates linked. Click &apos;Link a Certificate&apos; to mount certificates to your component.
+            No certificates linked. Click &apos;Link a certificate&apos; to mount certificates to your integration.
           </Typography>
         </Box>
       ) : (
@@ -261,7 +261,9 @@ function CertificateMountStep({ projectId, componentId, envId: _envId, deploymen
           <Typography variant="body2">Are you sure you want to unlink this certificate? This action cannot be undone.</Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUnlinkTarget(null)}>Cancel</Button>
+          <Button variant="outlined" color="inherit" onClick={() => setUnlinkTarget(null)}>
+            Cancel
+          </Button>
           <Button color="error" variant="contained" onClick={() => unlinkTarget && handleUnlink(unlinkTarget)}>
             Unlink
           </Button>
@@ -631,7 +633,9 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       {/* Footer */}
       {hasSchema && (
         <DrawerPanel.Footer>
-          <Button onClick={handlePrev}>{prevLabel}</Button>
+          <Button variant="outlined" color="inherit" onClick={handlePrev}>
+            {prevLabel}
+          </Button>
           <Button variant="contained" onClick={handleNext} disabled={nextDisabled} startIcon={isApplying ? <CircularProgress color="inherit" size={16} /> : undefined}>
             {nextLabel}
           </Button>
@@ -1130,7 +1134,9 @@ function GenericServiceConfigureDrawer({
         {/* Footer */}
         {showFooter && (
           <DrawerPanel.Footer>
-            <Button onClick={handlePrev}>{prevLabel}</Button>
+            <Button variant="outlined" color="inherit" onClick={handlePrev}>
+              {prevLabel}
+            </Button>
             <Button variant="contained" onClick={handleNext} disabled={nextDisabled} startIcon={(step === lastStep && isApplying) || (step === 1 && generateEp.isPending) ? <CircularProgress color="inherit" size={16} /> : undefined}>
               {nextLabel}
             </Button>

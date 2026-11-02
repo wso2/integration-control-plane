@@ -139,7 +139,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
           <Tooltip title={hasInProgress ? 'A build is already in progress' : !latestCommit ? 'No commits available' : ''}>
             <span>
               <Button variant="outlined" size="small" onClick={handleSelectCommit} disabled={isBuilding || commitsLoading || commits.length === 0}>
-                Show Commits
+                Show commits
               </Button>
             </span>
           </Tooltip>
@@ -152,7 +152,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
                 onClick={handleBuildLatest}
                 disabled={isBuilding || !latestCommit}
                 startIcon={isBuilding ? <CircularProgress color="inherit" size={14} /> : undefined}>
-                {isBuilding ? 'Building' : 'Build Latest'}
+                {isBuilding ? 'Building' : 'Build latest'}
               </Button>
             </span>
           </Tooltip>
@@ -192,7 +192,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
               <ListingTable.Row>
                 <ListingTable.Cell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary" variant="body2">
-                    No builds yet. Click &ldquo;Build Latest&rdquo; to start your first build.
+                    No builds yet. Click &ldquo;Build latest&rdquo; to start your first build.
                   </Typography>
                 </ListingTable.Cell>
               </ListingTable.Row>
@@ -264,7 +264,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
                 <ListingTable.Cell align="right">
                   <ListingTable.RowActions>
                     <Button variant="text" size="small" onClick={() => handleViewDetails(build)} sx={{ textTransform: 'none', fontSize: '0.75rem' }}>
-                      View Details
+                      View details
                     </Button>
                   </ListingTable.RowActions>
                 </ListingTable.Cell>

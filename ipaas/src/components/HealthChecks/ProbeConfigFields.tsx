@@ -125,7 +125,7 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontFamily: 'monospace' }}>
             Eg. [&quot;cat&quot;, &quot;/tmp/healthy&quot;]
           </Typography>
-          <StringArrayInput label="Command" value={form.command} onChange={(command) => onChange({ command })} addLabel="Add Command" />
+          <StringArrayInput label="Command" value={form.command} onChange={(command) => onChange({ command })} addLabel="Add command" />
         </Box>
       )}
     </Box>

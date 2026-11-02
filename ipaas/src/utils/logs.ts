@@ -93,15 +93,18 @@ export function copyLog(log: LogRow) {
   navigator.clipboard.writeText(`${log.timestamp} ${log.logLine}${metaStr}`);
 }
 
-export function downloadLogs(logs: LogRow[]) {
-  const text = logs.map((l) => `${new Date(l.timestamp).toLocaleString()} [${l.level}] ${l.logLine}`).join('\n');
-  const blob = new Blob([text], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
+/** Saves `text` as `<prefix>-<timestamp>.txt`. */
+export function downloadTextFile(text: string, prefix: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+  a.download = `${prefix}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function downloadLogs(logs: LogRow[]) {
+  downloadTextFile(logs.map((l) => `${new Date(l.timestamp).toLocaleString()} [${l.level}] ${l.logLine}`).join('\n'), 'logs');
 }
 
 /** Splits a raw container log into lines, optionally keeping only those matching `keyword`. */

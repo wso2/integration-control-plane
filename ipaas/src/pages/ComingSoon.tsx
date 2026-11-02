@@ -86,7 +86,7 @@ export default function ComingSoon({ title = HEADING, description = 'This featur
         </Stack>
 
         <Button variant="outlined" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(-1)}>
-          Go Back
+          Go back
         </Button>
       </Stack>
     </PageContent>

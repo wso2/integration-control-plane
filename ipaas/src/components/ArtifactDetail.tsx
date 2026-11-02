@@ -72,7 +72,7 @@ function ListenerConfirmDialog({ open, action, listenerName, onConfirm, onCancel
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel} variant="text">
+        <Button onClick={onCancel} variant="outlined" color="inherit">
           Cancel
         </Button>
         <Button onClick={onConfirm} variant="contained" color={action === 'STOP' ? 'error' : 'primary'}>

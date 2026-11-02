@@ -24,6 +24,7 @@ import GitProviderCards from '../components/ProjectCreate/GitProviderCards';
 import GitHubAuthArea from '../components/Import/GitHubAuthArea';
 import { useState, useLayoutEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateMonoRepoProject } from '../hooks/useProjects';
 import { useCreateComponent } from '../hooks/useComponents';
@@ -109,6 +110,8 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   const createMonoRepoProject = useCreateMonoRepoProject();
   const createComponent = useCreateComponent();
   const orgHomeUrl = resourceUrl(scope, 'overview');
+  // The provider choice and the auto-selected GitHub org are not input the user would lose.
+  const allowLeave = useUnsavedChanges(displayName !== '' || description !== '' || effectiveHandler !== '' || repoUrl !== '' || selectedRepo !== '');
 
   // Stabilize scrollbar gutter to prevent layout shift when content height changes
   useLayoutEffect(() => {
@@ -173,6 +176,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       );
     }
 
+    allowLeave();
     navigate(resourceUrl(narrow(scope, project.handler), 'overview'));
   };
 
@@ -470,12 +474,19 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       </BusyFields>
 
       <Stack direction="row" gap={2} sx={{ mt: 2 }}>
-        <Button variant="outlined" onClick={() => navigate(orgHomeUrl)} disabled={isImporting}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(orgHomeUrl);
+          }}
+          disabled={isImporting}>
           Cancel
         </Button>
         {isWorkspace && (
           <Button variant="contained" onClick={handleImport} disabled={!canSubmit || isImporting} startIcon={isImporting ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {isImporting ? 'Importing…' : 'Import Project'}
+            {isImporting ? 'Importing…' : 'Import project'}
           </Button>
         )}
       </Stack>

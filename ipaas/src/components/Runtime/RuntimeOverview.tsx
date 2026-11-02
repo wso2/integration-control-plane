@@ -79,7 +79,7 @@ export default function RuntimeOverview({ componentName, status, lastDeployedAt,
         <Box sx={{ mt: 3 }}>
           {isDeployed ? (
             <Button variant="outlined" startIcon={redeploying ? <CircularProgress size={16} color="inherit" /> : <RotateCw size={18} />} disabled={redeploying || !canRedeploy} onClick={onRedeploy}>
-              Redeploy Release
+              Redeploy release
             </Button>
           ) : (
             <Alert severity="info">No release is currently deployed to this environment.</Alert>

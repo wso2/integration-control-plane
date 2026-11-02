@@ -226,7 +226,7 @@ test.describe('01 fixture project @smoke', () => {
   test('TC_IP_PROJ_001 the organization home lists its projects', async () => {
     await expect(page.getByRole('heading', { name: 'All Projects' })).toBeVisible({ timeout: 60_000 });
     // first(): an org with no projects also offers it in the empty state, and both open the same form.
-    await expect(page.getByRole('button', { name: 'Create Project', exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Create project', exact: true }).first()).toBeVisible();
   });
 
   test('TC_IP_PROJ_002 the organization home links to tutorials and Discord support', async () => {
@@ -242,7 +242,7 @@ test.describe('01 fixture project @smoke', () => {
     const project = activeProject();
 
     // first(): an org with no projects also offers it in the empty state, so first() picks one.
-    await page.getByRole('button', { name: 'Create Project', exact: true }).first().click();
+    await page.getByRole('button', { name: 'Create project', exact: true }).first().click();
     await page.getByRole('textbox', { name: 'Name', exact: true }).fill(project);
     await page.getByRole('button', { name: 'Create', exact: true }).click();
 
@@ -264,7 +264,7 @@ test.describe('01 fixture project @smoke', () => {
       // Project quota is a 402 from platform-api surfaced as a 500, so the console shows a
       // generic failure. Skipped rather than failed: the suite cannot create quota it lacks.
       test.skip(/quota|already exists|internal server error|failed to create/i.test(reason), `Project could not be created: ${reason || 'no error shown'}`);
-      throw new Error(`Create Project did not land on the project. Alert: ${reason || 'none'}`);
+      throw new Error(`Create project did not land on the project. Alert: ${reason || 'none'}`);
     }
 
     test.info().annotations.push({ type: 'fixture', description: `created ${project}` });
@@ -292,7 +292,7 @@ test.describe('02 empty project overview @smoke', () => {
 
   test('TC_IP_OVW_002 offers to import your own integration', async () => {
     await expect(page.getByText('Import your own Integration', { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('button', { name: 'Import from a Public Repository' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Import from a public repository' })).toBeVisible();
   });
 
   test('TC_IP_OVW_003 offers the Start quickly panel with both tabs', async () => {
@@ -360,7 +360,7 @@ test.describe('03 browse samples @smoke', () => {
   });
 
   test('TC_IP_SMPL_002 shows a Back button to the integration creation options', async () => {
-    await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Back to create integration', exact: true })).toBeVisible();
   });
 
   test('TC_IP_SMPL_003 shows the sample search input', async () => {
@@ -375,9 +375,9 @@ test.describe('03 browse samples @smoke', () => {
   });
 
   test('TC_IP_SMPL_005 a search with no matches shows the empty-result message', async () => {
-    // Every SampleGridCard renders a "Quick Deploy" button — asserting on it first confirms
+    // Every SampleGridCard renders a "Quick deploy" button — asserting on it first confirms
     // real results are showing before we search them away.
-    await expect(page.getByRole('button', { name: 'Quick Deploy' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Quick deploy' }).first()).toBeVisible();
     await page.getByPlaceholder('Search samples…').fill(`no-such-sample-${Date.now()}`);
     await expect(page.getByText('No samples match your search.')).toBeVisible();
   });
@@ -388,7 +388,7 @@ test.describe('03 browse samples @smoke', () => {
     await expect(page.getByText('No samples match your search.')).toBeVisible();
     await search.clear();
     await expect(page.getByText('No samples match your search.')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Quick Deploy' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Quick deploy' }).first()).toBeVisible();
   });
 });
 
@@ -475,9 +475,9 @@ test.describe('04b endpoint and consumers @smoke', () => {
   test('TC_IP_DEPLOY_008 the env card offers the endpoint URLs and the resources it exposes', async () => {
     await dismissStrayDialog(page);
     const card = envCard(page);
-    await expect(card.getByText('URLs', { exact: true })).toBeVisible({ timeout: 3 * 60_000 });
-    await expect(card.getByText('Download Spec', { exact: true })).toBeVisible();
-    await expect(card.getByRole('button', { name: 'View Details' }).first(), 'the card lists no resources').toBeVisible();
+    await expect(card.getByText('URLs:', { exact: true })).toBeVisible({ timeout: 3 * 60_000 });
+    await expect(card.getByText('Download Spec:', { exact: true })).toBeVisible();
+    await expect(card.getByRole('button', { name: 'View details' }).first(), 'the card lists no resources').toBeVisible();
   });
 
   test('TC_IP_CONS_001 the consumers section is offered with its security scheme', async () => {
@@ -502,7 +502,7 @@ test.describe('04b endpoint and consumers @smoke', () => {
     await openConsumerDrawer(page);
     // By placeholder: the drawer's label is a sibling Typography, so the field has no accessible name.
     await page.getByPlaceholder('e.g. my-greeting-client').fill(consumerName);
-    await page.getByRole('button', { name: 'Generate Credentials' }).click();
+    await page.getByRole('button', { name: 'Generate credentials' }).click();
 
     const drawer = page.getByRole('dialog').filter({ hasText: consumerName });
     await expect(drawer.getByText('Header', { exact: true })).toBeVisible({ timeout: 60_000 });
@@ -573,7 +573,7 @@ test.describe('04c test console @smoke', () => {
     const field = page.getByPlaceholder('Paste or fetch a test key');
     await expect(field).toBeVisible({ timeout: 60_000 });
     if (!(await field.inputValue())) {
-      await page.getByRole('button', { name: 'Get Test Key' }).click();
+      await page.getByRole('button', { name: 'Get test key' }).click();
     }
     await expect.poll(async () => (await field.inputValue()).length, { message: 'no test key was populated', timeout: 60_000 }).toBeGreaterThan(0);
   });
@@ -614,7 +614,7 @@ test.describe('04c test console @smoke', () => {
 // 04d — an MI automation imported from a public repository: schedule it, then watch it run
 
 async function stopSchedule(page: Page): Promise<void> {
-  await envCard(page).getByRole('button', { name: 'Stop Schedule' }).click();
+  await envCard(page).getByRole('button', { name: 'Stop schedule' }).click();
   await expect(envCard(page).getByRole('button', { name: 'Schedule', exact: true }), 'the schedule is still live').toBeVisible({ timeout: 2 * 60_000 });
 }
 
@@ -650,7 +650,7 @@ test.describe('04d schedule an automation @smoke', () => {
     }
 
     const schedule = envCard(page).getByRole('button', { name: 'Schedule', exact: true });
-    const stop = envCard(page).getByRole('button', { name: 'Stop Schedule' });
+    const stop = envCard(page).getByRole('button', { name: 'Stop schedule' });
     // isVisible() does not wait, and the card renders after the reload.
     const rendered = await schedule
       .or(stop)
@@ -665,7 +665,7 @@ test.describe('04d schedule an automation @smoke', () => {
   test('TC_IP_AUTO_001 the import form resolves the repository and its MI sub path', async () => {
     test.setTimeout(3 * 60_000);
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
-    const importButton = page.getByRole('button', { name: 'Import from a Public Repository' });
+    const importButton = page.getByRole('button', { name: 'Import from a public repository' });
     await reachCreateControl(page, importButton);
     await importButton.click();
     await expect(page.getByRole('heading', { name: 'Import an Integration' })).toBeVisible({ timeout: 30_000 });
@@ -691,8 +691,8 @@ test.describe('04d schedule an automation @smoke', () => {
     await page.getByRole('button', { name: /^Automation/ }).click();
 
     // The cards expose no selected state, so an enabled submit (it needs a technology) is the closest check that detection picked one.
-    const submit = page.getByRole('button', { name: 'Import Integration' });
-    await expect(submit, 'Import Integration stayed disabled — technology detection did not select WSO2 Integrator: MI').toBeEnabled({ timeout: 60_000 });
+    const submit = page.getByRole('button', { name: 'Import integration' });
+    await expect(submit, 'Import integration stayed disabled — technology detection did not select WSO2 Integrator: MI').toBeEnabled({ timeout: 60_000 });
     await submit.click();
 
     await expect(page.getByRole('heading', { name: AUTOMATION }), 'the import did not land on the automation overview').toBeVisible({ timeout: 2 * 60_000 });
@@ -719,7 +719,7 @@ test.describe('04d schedule an automation @smoke', () => {
     await page.getByRole('option', { name: 'Minute', exact: true }).click();
     await drawer.getByRole('button', { name: 'Update', exact: true }).click();
 
-    await expect(envCard(page).getByRole('button', { name: 'Stop Schedule' }), 'the schedule was not accepted').toBeVisible({ timeout: 2 * 60_000 });
+    await expect(envCard(page).getByRole('button', { name: 'Stop schedule' }), 'the schedule was not accepted').toBeVisible({ timeout: 2 * 60_000 });
     await expect(envCard(page).getByText(NO_SCHEDULE)).toHaveCount(0);
   });
 
@@ -761,7 +761,7 @@ test.describe('05 import an AI agent @smoke', () => {
   });
 
   test('TC_IP_AGENT_001 the import form opens from the project', async () => {
-    const importButton = page.getByRole('button', { name: 'Import from a Public Repository' });
+    const importButton = page.getByRole('button', { name: 'Import from a public repository' });
     await reachCreateControl(page, importButton);
     await importButton.click();
     await expect(page.getByRole('heading', { name: 'Import an Integration' })).toBeVisible({ timeout: 30_000 });
@@ -784,8 +784,8 @@ test.describe('05 import an AI agent @smoke', () => {
     await page.getByRole('button', { name: new RegExp(`^${AGENT_TYPE}`) }).click();
 
     // Polled, not read once: `isEnabled()` reports the state at the moment it is called.
-    const submit = page.getByRole('button', { name: 'Import Integration' });
-    await expect(submit, 'Import Integration stayed disabled — technology detection did not settle').toBeEnabled({ timeout: 60_000 });
+    const submit = page.getByRole('button', { name: 'Import integration' });
+    await expect(submit, 'Import integration stayed disabled — technology detection did not settle').toBeEnabled({ timeout: 60_000 });
     await submit.click();
 
     const heading = page.getByRole('heading', { name: AGENT_NAME_PATTERN }).first();
@@ -815,16 +815,16 @@ test.describe('05 import an AI agent @smoke', () => {
     await expect(first, 'the build section did not move back').toBeVisible({ timeout: 30_000 });
   });
 
-  test('TC_IP_AGENT_006 View Logs opens the build logs and Hide Logs closes them', async () => {
-    const viewLogs = page.getByRole('button', { name: 'View Logs' }).first();
+  test('TC_IP_AGENT_006 View logs opens the build logs and Hide logs closes them', async () => {
+    const viewLogs = page.getByRole('button', { name: 'View logs' }).first();
     await expect(viewLogs).toBeVisible({ timeout: 5 * 60_000 });
     await viewLogs.click();
 
-    // One button carries both labels (BuildCard.tsx:208), so the flip is the evidence.
-    const hideLogs = page.getByRole('button', { name: 'Hide Logs' }).first();
+    // One button carries both labels (BuildCard.tsx), so the flip is the evidence.
+    const hideLogs = page.getByRole('button', { name: 'Hide logs' }).first();
     await expect(hideLogs).toBeVisible({ timeout: 30_000 });
     await hideLogs.click();
-    await expect(page.getByRole('button', { name: 'View Logs' }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'View logs' }).first()).toBeVisible({ timeout: 30_000 });
   });
 
   test('TC_IP_AGENT_007 the build completed and the deployment is Active', async () => {
@@ -843,7 +843,7 @@ test.describe('05 import an AI agent @smoke', () => {
     test.setTimeout(DEPLOY_TIMEOUT_MS + 3 * 60_000);
     test.skip(true, 'awaiting a valid model key: E2E_OPENAI_KEY is not issued yet');
 
-    await envCard(page).getByRole('button', { name: 'Configure to Continue' }).click();
+    await envCard(page).getByRole('button', { name: 'Configure to continue' }).click();
     await fillSecret(page.getByRole('textbox', { name: 'Enter a value' }).first(), openAiKey!);
 
     // Stepped through, because the wizard's length is the configuration's — and Apply commits it.
@@ -1208,11 +1208,11 @@ test.describe('09 sign out @smoke', () => {
     await enterOrgHome(page, orgHandler);
 
     await page.getByRole('button', { name: 'Account' }).click();
-    await page.getByRole('menuitem', { name: 'Sign Out' }).click();
+    await page.getByRole('menuitem', { name: 'Sign out' }).click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog, 'signing out did not ask for confirmation').toBeVisible({ timeout: 30_000 });
-    await dialog.getByRole('button', { name: 'Sign Out' }).click();
+    await dialog.getByRole('button', { name: 'Sign out' }).click();
 
     // Cloud has no in-app login page — /login hands off to Thunder's hosted Gate.
     await expect(page).toHaveURL(/\/gate\/signin/, { timeout: 60_000 });

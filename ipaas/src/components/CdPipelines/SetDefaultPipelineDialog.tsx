@@ -52,7 +52,7 @@ export default function SetDefaultPipelineDialog({ projectId, pipeline, onClose,
         <DialogContentText>This will be used as the default pipeline for all components in the project.</DialogContentText>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={setDefault.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={setDefault.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={confirm} disabled={setDefault.isPending} startIcon={setDefault.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

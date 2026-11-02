@@ -22,6 +22,7 @@ import { useState, type JSX } from 'react';
 import { BALLERINA_CENTRAL_TOKEN_EXPIRY_WARNING_DAYS, BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS, BALLERINA_CENTRAL_TOKEN_PANEL_COPY } from '../../../constants/packageRegistries';
 import { useBallerinaCentralToken, useRemoveBallerinaCentralToken, useSaveBallerinaCentralToken } from '../../../hooks/useBallerinaCentralToken';
 import { formatDateTime } from '../../../utils/time';
+import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 
 function daysUntilExpiry(expiresOn?: string): number | null {
   if (!expiresOn) return null;
@@ -41,6 +42,9 @@ export default function BallerinaCentralPanel({ onBack }: { onBack: () => void }
   const daysToExpiry = daysUntilExpiry(tokenStatus?.expiresOn);
   const expiringSoon = daysToExpiry !== null && daysToExpiry <= BALLERINA_CENTRAL_TOKEN_EXPIRY_WARNING_DAYS;
 
+  useUnsavedChanges(tokenInput !== '');
+  const guardNavigation = useLeaveGuard();
+
   const handleSave = () => {
     if (!tokenInput.trim()) return;
     saveToken.mutate(tokenInput.trim(), {
@@ -53,8 +57,8 @@ export default function BallerinaCentralPanel({ onBack }: { onBack: () => void }
 
   return (
     <Box>
-      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={onBack} sx={{ mb: 2 }}>
-        Back to Package Registries
+      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={() => guardNavigation(onBack)} sx={{ mb: 2 }}>
+        Back to package registries
       </Button>
       <Typography variant="h6" sx={{ mb: 0.5 }}>
         Ballerina Central

@@ -23,6 +23,7 @@ import { MENU_SEARCH_THRESHOLD } from '../components/MenuSearchField';
 import { useState, useEffect, useRef, type JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateComponent } from '../hooks/useComponents';
 import { isQuotaError } from '../utils/apiErrors';
@@ -158,6 +159,8 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   })();
 
   const handlerValid = effectiveHandler.length >= 3 && effectiveHandler.length <= 64;
+  // The auto-selected GitHub org and default branch are not input the user would lose.
+  const allowLeave = useUnsavedChanges(repoUrl !== '' || selectedRepo !== '' || displayName !== '' || description !== '' || selectedIntegrationType !== null || ballerinaTokenInput !== '');
 
   // Technology detection
   useEffect(() => {
@@ -343,7 +346,10 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         ...(isPublicRepo ? { enableAutoDeploy: true } : { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId }),
       },
       {
-        onSuccess: (component) => navigate(resourceUrl(narrow(scope, component.handler), 'overview')),
+        onSuccess: (component) => {
+          allowLeave();
+          navigate(resourceUrl(narrow(scope, component.handler), 'overview'));
+        },
         onError: () => {},
       },
     );
@@ -671,7 +677,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     return (
       <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 3 }}>
-          Back
+          Back to create integration
         </Button>
         <Typography variant="h1" sx={{ mb: 0.5 }}>
           Import an Integration
@@ -722,7 +728,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 3 }}>
-        Back
+        Back to create integration
       </Button>
 
       <Typography variant="h1" sx={{ mb: 0.5 }}>
@@ -822,11 +828,18 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       </BusyFields>
 
       <Stack direction="row" gap={2} sx={{ mt: 2 }}>
-        <Button variant="outlined" onClick={() => navigate(backUrl)} disabled={createComponent.isPending}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(backUrl);
+          }}
+          disabled={createComponent.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || createComponent.isPending}>
-          {createComponent.isPending ? <CircularProgress size={18} color="inherit" /> : 'Import Integration'}
+          {createComponent.isPending ? <CircularProgress size={18} color="inherit" /> : 'Import integration'}
         </Button>
       </Stack>
     </PageContent>

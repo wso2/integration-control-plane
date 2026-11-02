@@ -112,7 +112,7 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
         </Stack>
 
         <Button size="small" variant="text" startIcon={isFetching ? <CircularProgress size={14} /> : <RefreshCw size={14} />} onClick={() => refetch()} disabled={isFetching}>
-          Refresh Logs
+          Refresh logs
         </Button>
       </Stack>
 

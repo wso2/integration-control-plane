@@ -276,8 +276,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           )}
           .
         </Alert>
-        {renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add Environment Variable')}
-        {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add Secret')}
+        {renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')}
+        {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')}
         {showErrors && errors.size > 0 && <Alert severity="error">Fix the highlighted keys before saving.</Alert>}
       </>
     );
@@ -312,7 +312,9 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         {/* ManageEndpoint has its own Cancel/Update. */}
         {!(step === 2 && managingEp) && (
           <DrawerPanel.Footer>
-            <Button onClick={step === 2 ? () => setStep(1) : handleClose}>{step === 2 ? 'Back' : 'Cancel'}</Button>
+            <Button variant="outlined" color="inherit" onClick={step === 2 ? () => setStep(1) : handleClose}>
+              {step === 2 ? 'Back' : 'Cancel'}
+            </Button>
             {step < lastStep ? (
               <Button variant="contained" onClick={handleNext}>
                 Next

@@ -3,14 +3,14 @@
 import { expect, type Page } from '@playwright/test';
 import { reseedSessionToken } from './cloud-fixtures.js';
 
-// BuildCard.tsx:118-140. 'Failed' also reads 'Failed while <phrase>', hence the prefix match.
+// BuildCard.tsx (statusLabel). 'Failed' also reads 'Failed while <phrase>', hence the prefix match.
 export const TERMINAL_STATUS = /^(Completed|Failed|Cancelled|Timed Out)/;
 export const STARTING_STATUS = /^(Queued|In Progress)$/;
 
 /** A dev build can sit in the queue for a long while before it starts moving. */
 export const BUILD_TIMEOUT_MS = 30 * 60_000;
 
-/** The status has no role or accessible name (BuildCard.tsx:194-198), so it is matched by its text. */
+/** The status has no role or accessible name (BuildCard.tsx), so it is matched by its text. */
 export function buildStatus(page: Page) {
   return page.getByText(/^(Queued|In Progress|Completed|Failed|Cancelled|Timed Out)/).first();
 }

@@ -56,7 +56,7 @@ export default function ImageStep({ componentId, releaseId, currentImage, onNoti
       <TextField labelPlacement="top" label="Image URL" required fullWidth size="small" value={imageUrl} onChange={(e) => setImageUrl(e.target.value)} />
       <Stack direction="row" justifyContent="flex-end">
         <Button variant="contained" onClick={submit} disabled={!imageUrl.trim() || deploy.isPending} startIcon={deploy.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-          {deploy.isPending ? 'Deploying…' : changed ? 'Update & Deploy' : 'Redeploy'}
+          {deploy.isPending ? 'Deploying…' : changed ? 'Update & deploy' : 'Redeploy'}
         </Button>
       </Stack>
     </Stack>

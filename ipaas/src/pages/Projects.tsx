@@ -125,10 +125,10 @@ export default function Projects(scope: OrgScope): JSX.Element {
         <PageTitle.Actions>
           <Authorized permissions={Permissions.PROJECT_MANAGE}>
             <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>
-              Import Project
+              Import project
             </Button>
             <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={styles.projectActionSx}>
-              Create Project
+              Create project
             </Button>
           </Authorized>
         </PageTitle.Actions>
@@ -148,7 +148,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
           title="No projects found"
           description={query ? 'Try adjusting your search' : canCreateProject ? 'Create your first project to get started' : 'Ask your administrator for access'}
           showAction={!query && canCreateProject}
-          actionLabel="Create Project"
+          actionLabel="Create project"
           onAction={() => navigate(newProjectUrl(scope))}
         />
       ) : (

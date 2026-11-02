@@ -21,7 +21,7 @@ import { SlidersHorizontal } from '@wso2/oxygen-ui-icons-react';
 
 interface ConfigureButtonProps {
   onClick: () => void;
-  /** When true, renders an error-coloured "Configure to Continue" affordance. */
+  /** When true, renders an error-coloured "Configure to continue" affordance. */
   hasMissingConfigs?: boolean;
   disabled?: boolean;
 }
@@ -34,7 +34,7 @@ interface ConfigureButtonProps {
 export default function ConfigureButton({ onClick, hasMissingConfigs, disabled }: ConfigureButtonProps) {
   return (
     <Button variant="outlined" size="small" color={hasMissingConfigs ? 'error' : 'primary'} startIcon={<SlidersHorizontal size={14} />} onClick={onClick} disabled={disabled} sx={{ mr: 1 }}>
-      {hasMissingConfigs ? 'Configure to Continue' : 'Configure'}
+      {hasMissingConfigs ? 'Configure to continue' : 'Configure'}
     </Button>
   );
 }

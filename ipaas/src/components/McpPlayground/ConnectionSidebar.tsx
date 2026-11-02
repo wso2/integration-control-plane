@@ -115,7 +115,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
 
       {onGetTestKey && (
         <Button variant="outlined" size="small" onClick={onGetTestKey} disabled={isTokenFetching}>
-          Get Test Key
+          Get test key
         </Button>
       )}
 

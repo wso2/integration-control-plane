@@ -389,7 +389,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
     navigate(locationState.fromPath ?? newComponentUrl(scope));
   };
 
-  const backLabel = wizardStep === 0 ? 'Back to Create Integration' : 'Go back';
+  const backLabel = wizardStep === 0 ? 'Back to create integration' : 'Go back';
 
   const subtitle =
     wizardStep === 0 ? "Let's start by choosing an application to integrate" : wizardStep === 1 ? `Choose an application to integrate ${firstApp} with` : wizardStep === 2 ? `Get started with pre-built integrations for ${firstApp} and ${secondApp}` : null;

@@ -175,7 +175,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   }
 
   if (!component) {
-    return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+    return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
   }
 
   const envSelector = environments.length > 1 && (
@@ -266,7 +266,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                       sx={{ flex: 1, fontFamily: 'monospace', fontSize: '0.8rem' }}
                       endAdornment={
                         <InputAdornment position="end">
-                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to Clipboard'}>
+                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to clipboard'}>
                             <IconButton
                               size="small"
                               onClick={() => {
@@ -330,7 +330,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                           disabled={fetchingKey || !canGetTestKey}
                           onClick={handleGetTestKey}
                           sx={{ whiteSpace: 'nowrap', textTransform: 'none' }}>
-                          Get Test Key
+                          Get test key
                         </Button>
                       </Stack>
                       {keyError && (

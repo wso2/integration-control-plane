@@ -294,7 +294,7 @@ export default function AutomationExecutions({
                       </Typography>
                     ) : (
                       <Button variant="text" size="small" onClick={() => setLogsExecution(e)}>
-                        View Logs
+                        View logs
                       </Button>
                     )}
                   </ListingTable.Cell>

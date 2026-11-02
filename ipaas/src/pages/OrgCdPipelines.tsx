@@ -54,7 +54,7 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
         {!!pipelines?.length && (
           <PageTitle.Actions>
             <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
-              Create Pipeline
+              Create pipeline
             </Button>
           </PageTitle.Actions>
         )}
@@ -87,7 +87,7 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
           Failed to load deployment pipelines.
         </Alert>
       ) : !pipelines?.length ? (
-        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Create Pipeline" onAction={() => navigate(cdPipelineEditorUrl(scope))} />
+        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Create pipeline" onAction={() => navigate(cdPipelineEditorUrl(scope))} />
       ) : !filteredPipelines?.length ? (
         <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines found" description="Try adjusting your search" showAction={false} />
       ) : (

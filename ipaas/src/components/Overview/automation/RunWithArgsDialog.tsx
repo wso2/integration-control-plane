@@ -115,7 +115,7 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
         </Stack>
 
         <Button variant="text" size="small" startIcon={<Plus size={14} />} onClick={handleAddArg} sx={{ mt: 1.5, px: 0 }}>
-          Add Argument
+          Add argument
         </Button>
 
         {runError && (
@@ -126,7 +126,9 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
       </DrawerPanel.Body>
 
       <DrawerPanel.Footer>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button variant="outlined" color="inherit" onClick={handleClose}>
+          Cancel
+        </Button>
         <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {trigger.isPending ? 'Executing…' : 'Execute'}
         </Button>

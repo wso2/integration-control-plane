@@ -20,6 +20,7 @@ import { Alert, Button, CircularProgress, Grid, IconButton, InputAdornment, Page
 import { ArrowLeft, Edit } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateProject } from '../hooks/useProjects';
 import { useProjectHandler } from '../hooks/useProjectHandler';
@@ -42,6 +43,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
   const createProject = useCreateProject();
   const navigate = useAppNavigate();
   const orgHomeUrl = resourceUrl(scope, 'overview');
+  const allowLeave = useUnsavedChanges(displayName !== '' || description !== '' || effectiveHandler !== '');
 
   const nameError = displayName ? validateProjectName(displayName) : null;
   const handlerInputRef = useRef<HTMLInputElement>(null);
@@ -68,6 +70,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
         description: description.trim(),
         orgHandler: scope.org,
       });
+      allowLeave();
       navigate(resourceUrl(narrow(scope, project.handler), 'overview'));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
@@ -158,7 +161,14 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
       </BusyFields>
 
       <Stack direction="row" gap={2} sx={{ mt: 4 }}>
-        <Button variant="outlined" onClick={() => navigate(orgHomeUrl)} disabled={isCreating}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(orgHomeUrl);
+          }}
+          disabled={isCreating}>
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || isCreating} startIcon={isCreating ? <CircularProgress size={16} color="inherit" /> : undefined}>

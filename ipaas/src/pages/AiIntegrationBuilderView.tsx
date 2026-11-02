@@ -130,7 +130,7 @@ function AiIntegrationBuilderView(scope: ProjectScope): JSX.Element {
   return (
     <PageContent fullWidth sx={{ pt: 5, pb: 2 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(componentsNewUrl(scope.org, scope.project))} sx={{ mb: 1, alignSelf: 'flex-start' }}>
-        Back to Create Integration
+        Back to create integration
       </Button>
 
       {pageError && (

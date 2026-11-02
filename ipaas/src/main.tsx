@@ -26,6 +26,7 @@ import { AuthProvider } from './auth';
 import { loadConfig } from './config/runtimeConfig';
 import { AccessControlProvider } from './contexts/AccessControlContext';
 import { FeaturePreviewProvider } from './contexts/FeaturePreviewContext';
+import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import './index.css';
 import { initTracking } from './services/tracking/tracking';
 import { basePath } from './utils/basePath';
@@ -47,7 +48,9 @@ loadConfig().then(() => {
             <AuthProvider>
               <AccessControlProvider>
                 <FeaturePreviewProvider>
-                  <App />
+                  <UnsavedChangesProvider>
+                    <App />
+                  </UnsavedChangesProvider>
                 </FeaturePreviewProvider>
               </AccessControlProvider>
             </AuthProvider>

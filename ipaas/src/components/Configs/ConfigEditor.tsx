@@ -23,6 +23,7 @@ import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from
 import { useConfigMapDetails, useSaveConfig } from '../../hooks/useDevopsConfigs';
 import { parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
 import type { ConfigKind, ConfigRow } from '../../types/devopsConfigs';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import * as styles from './ConfigEditor.styles';
 
 /** The component/release/env target a config is created against. */
@@ -116,6 +117,22 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const hasEmptySecretValue = isSecret && kind === 'envVars' && rows.some((r) => !r.stored && r.value === '');
   const canSave = !save.isPending && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? rows.length > 0 : !pathErr && fileContent.trim().length > 0);
 
+  // Baselines follow the prefill effect above, so loaded values do not read as edits.
+  const initialRows = existing ? (details?.data && existing.kind !== 'fileMount' ? Object.entries(details.data).map(([key, value]) => ({ key, value })) : existing.keys.map((key) => ({ key, value: '' }))) : [];
+  const initialFileContent = existing?.kind === 'fileMount' ? (details?.data?.data ?? '') : '';
+  const rowsChanged = rows.length !== initialRows.length || rows.some((r, i) => r.key !== initialRows[i].key || r.value !== initialRows[i].value);
+  const isDirty =
+    kind !== (existing?.kind ?? 'envVars') ||
+    isSecret !== (existing?.isSecret ?? false) ||
+    name !== (existing?.name ?? '') ||
+    mountPath !== (existing?.mount.mount_path ?? '') ||
+    fileContent !== initialFileContent ||
+    draftKey !== '' ||
+    draftValue !== '' ||
+    rowsChanged;
+  useUnsavedChanges(isDirty);
+  const guardNavigation = useLeaveGuard();
+
   const addRow = () => {
     const keyErr = validateConfigKey(draftKey);
     if (keyErr) {
@@ -192,8 +209,8 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
 
   return (
     <Box sx={{ maxWidth: 720 }}>
-      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={onBack} sx={{ mb: 2 }}>
-        Back to Configs List
+      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={() => guardNavigation(onBack)} sx={{ mb: 2 }}>
+        Back to configs
       </Button>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
         {isEdit ? 'Edit Config or Secret' : 'Create a Config or Secret'}
@@ -356,7 +373,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
             />
             <Box>
               <Button variant="outlined" startIcon={<Upload size={16} />} onClick={() => fileUploadRef.current?.click()}>
-                Upload File
+                Upload file
               </Button>
               <input
                 ref={fileUploadRef}

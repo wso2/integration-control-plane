@@ -43,19 +43,19 @@ export default function FormExecutionSummary({ commitSha, buildDate, onNewTest, 
       <PageTitle>
         <PageTitle.Header>Test Your Automation</PageTitle.Header>
         <PageTitle.Actions>
-          <Tooltip title="Create New Test">
+          <Tooltip title="Create new test">
             <span>
               <Button variant="text" size="small" startIcon={<Plus size={16} />} disabled={newTestDisabled} onClick={onNewTest}>
-                New Test
+                New test
               </Button>
             </span>
           </Tooltip>
-          <Tooltip title="View Executions">
+          <Tooltip title="View executions">
             <Button variant="text" size="small" startIcon={<History size={16} />} onClick={onExecutions}>
               Executions
             </Button>
           </Tooltip>
-          <Tooltip title="Refresh Test">
+          <Tooltip title="Refresh test">
             <span>
               <Button variant="text" size="small" startIcon={<RefreshCw size={16} />} disabled={refreshDisabled} onClick={onRefresh}>
                 Refresh

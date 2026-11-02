@@ -108,8 +108,11 @@ export function visibilityUrlOptions(ep: EnvEndpoint, externalUrlOverride?: stri
     url: key === 'public' && externalUrlOverride ? externalUrlOverride : getUrl(ep),
   })).filter((o) => !!o.url && (set.length === 0 || set.includes(o.label)));
 
-  // Fallback when no visibility-specific URL is set.
-  if (options.length === 0 && ep.invokeUrl) return [{ key: 'public', label: 'Public', url: ep.invokeUrl }];
+  // Fallback when no visibility-specific URL is set: the invoke URL, under the visibility the endpoint has.
+  if (options.length === 0 && ep.invokeUrl) {
+    const { key, label } = VISIBILITY_URLS.find((v) => set.includes(v.label)) ?? VISIBILITY_URLS[0];
+    return [{ key, label, url: ep.invokeUrl }];
+  }
   return options;
 }
 

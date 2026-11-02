@@ -172,7 +172,9 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
       )}
 
       <Stack direction="row" justifyContent="flex-end" gap={1}>
-        <Button onClick={onBack}>Cancel</Button>
+        <Button variant="outlined" color="inherit" onClick={onBack}>
+          Cancel
+        </Button>
         <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending || visibilities.length === 0} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {updateEp.isPending ? 'Updating…' : 'Update'}
         </Button>

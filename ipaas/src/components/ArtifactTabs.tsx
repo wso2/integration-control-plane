@@ -467,7 +467,7 @@ export function AutomationExecutions({ artifact, orgHandler, projectHandler, com
                   <Chip label={exec.status} size="small" color={statusColor(exec.status)} />
                 </ListingTable.Cell>
                 <ListingTable.Cell>
-                  <Tooltip title="View Logs">
+                  <Tooltip title="View logs">
                     <IconButton size="small" onClick={() => navigate(logsUrl)}>
                       <ScrollText size={16} />
                     </IconButton>

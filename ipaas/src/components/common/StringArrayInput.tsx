@@ -25,7 +25,7 @@ interface StringArrayInputProps {
   label: string;
   value: string[];
   onChange: (value: string[]) => void;
-  /** Label for the empty-state add button (e.g. "Add Command"). */
+  /** Label for the empty-state add button (e.g. "Add command"). */
   addLabel?: string;
   placeholder?: string;
   disabled?: boolean;

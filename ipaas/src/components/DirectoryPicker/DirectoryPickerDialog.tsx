@@ -151,7 +151,9 @@ export default function DirectoryPickerDialog({ open, onClose, onSave, repoName,
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleCancel}>Cancel</Button>
+        <Button variant="outlined" color="inherit" onClick={handleCancel}>
+          Cancel
+        </Button>
         <Button variant="contained" onClick={handleContinue} disabled={isFetching}>
           Continue
         </Button>

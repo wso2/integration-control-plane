@@ -25,6 +25,8 @@ import BuildConfigPanel from './BuildConfigPanel';
 import BuildDetails from './BuildDetails';
 import CommitSelector from './CommitSelector';
 
+const splitBodySx = { p: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } as const;
+
 interface BuildRightDrawerProps {
   open: boolean;
   onClose: () => void;
@@ -49,7 +51,7 @@ export default function BuildRightDrawer({ open, onClose, drawerType, selectedBu
 
   const renderContent = () => {
     if (drawerType === BuildDrawerType.BuildLogs && selectedBuild) {
-      return <BuildDetails componentId={componentId} versionId={versionId} build={selectedBuild} onLogsToggle={setLogsOpen} />;
+      return <BuildDetails componentId={componentId} versionId={versionId} build={selectedBuild} logsOpen={logsOpen} onLogsOpenChange={setLogsOpen} />;
     }
     if (drawerType === BuildDrawerType.CommitSelector) {
       return (
@@ -71,7 +73,7 @@ export default function BuildRightDrawer({ open, onClose, drawerType, selectedBu
   };
 
   return (
-    <DrawerPanel open={open} onClose={onClose} width={logsOpen ? 720 : 480}>
+    <DrawerPanel open={open} onClose={onClose} width={480} expanded={logsOpen}>
       <DrawerPanel.Header>
         <DrawerPanel.Title>{title}</DrawerPanel.Title>
         <DrawerPanel.Actions>
@@ -79,7 +81,8 @@ export default function BuildRightDrawer({ open, onClose, drawerType, selectedBu
         </DrawerPanel.Actions>
       </DrawerPanel.Header>
 
-      <DrawerPanel.Body>{renderContent()}</DrawerPanel.Body>
+      {/* The split layout pads and scrolls its own columns. */}
+      <DrawerPanel.Body sx={logsOpen ? splitBodySx : undefined}>{renderContent()}</DrawerPanel.Body>
     </DrawerPanel>
   );
 }

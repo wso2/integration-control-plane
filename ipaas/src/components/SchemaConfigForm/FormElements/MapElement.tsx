@@ -500,7 +500,7 @@ export const MapElement: React.FC<MapElementProps> = ({
             </Button>
           </Box>
           <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ mt: 1.5 }}>
-            <Button size="small" onClick={handleClosePopover}>
+            <Button size="small" variant="outlined" color="inherit" onClick={handleClosePopover}>
               Cancel
             </Button>
             <Button size="small" variant="contained" onClick={handlePopoverSave} disabled={isSaveDisabled()}>

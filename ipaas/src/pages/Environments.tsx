@@ -158,7 +158,7 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
           <PageTitle.Actions>
             <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
               <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newEnvironmentUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
-                Create Environment
+                Create environment
               </Button>
             </Authorized>
           </PageTitle.Actions>
@@ -180,7 +180,7 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
           Failed to load environments.
         </Alert>
       ) : !templates?.length ? (
-        <EmptyListing icon={<Layers size={48} />} title="No environments found" description={EMPTY_DESCRIPTION} showAction={canManageEnv} actionLabel="Create Environment" onAction={() => navigate(newEnvironmentUrl(scope))} />
+        <EmptyListing icon={<Layers size={48} />} title="No environments found" description={EMPTY_DESCRIPTION} showAction={canManageEnv} actionLabel="Create environment" onAction={() => navigate(newEnvironmentUrl(scope))} />
       ) : (
         <>
           <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 3 }}>

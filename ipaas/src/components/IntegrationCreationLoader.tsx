@@ -63,7 +63,7 @@ export default function IntegrationCreationLoader({ label, subLabel, isPending, 
         </Alert>
         {onBack && (
           <Button variant="outlined" onClick={onBack}>
-            Go Back
+            Go back
           </Button>
         )}
       </Box>

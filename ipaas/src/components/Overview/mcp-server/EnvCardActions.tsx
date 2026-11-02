@@ -39,6 +39,7 @@ export default function EnvCardActions({
   orgHandler,
   projectHandler,
   componentHandler,
+  projectId,
   hasDeployment,
   deploymentStatusV2,
   releaseMgtReleaseId,
@@ -100,7 +101,7 @@ export default function EnvCardActions({
       )}
       {hasDeployment && (
         <Button variant="text" size="small" startIcon={<List size={14} />} onClick={() => setLogsOpen(true)} sx={{ textTransform: 'none' }}>
-          View Logs
+          View logs
         </Button>
       )}
       {(canStop || isInProgress) && (
@@ -130,7 +131,7 @@ export default function EnvCardActions({
           </span>
         </Tooltip>
       )}
-      <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} componentId={component.id} environmentId={env.id} envName={env.name} versionId={versionId} />
+      <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} projectId={projectId} componentHandler={componentHandler} env={env} versionId={versionId} />
     </>
   );
 }

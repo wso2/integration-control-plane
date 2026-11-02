@@ -102,7 +102,7 @@ export default function BuildImageCard({ image, isLatest, variant = 'detail', is
           {isPendingBuild ? '—' : image.runId}
         </Typography>
         {variant === 'detail' && !isPendingBuild && (
-          <Tooltip title={copied ? 'Copied!' : 'Copy Build ID'}>
+          <Tooltip title={copied ? 'Copied!' : 'Copy build ID'}>
             <IconButton size="small" onClick={handleCopy} sx={{ p: 0.25 }}>
               {copied ? <Check size={12} /> : <Copy size={12} />}
             </IconButton>

@@ -97,7 +97,7 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
             <MenuItem value={CREATE}>
               <Stack direction="row" alignItems="center" gap={1} sx={actionItemSx}>
                 <Plus size={16} />
-                Create Project
+                Create project
               </Stack>
             </MenuItem>
             <Divider />
@@ -129,7 +129,7 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
           <MenuItem value={CREATE}>
             <Stack direction="row" alignItems="center" gap={1} sx={actionItemSx}>
               <Plus size={16} />
-              Create Integration
+              Create integration
             </Stack>
           </MenuItem>
           <Divider />
@@ -141,7 +141,7 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
         </TextField>
 
         <Button variant="contained" onClick={go} disabled={!projectHandler || !componentHandler} sx={goButtonSx}>
-          Go to Integration
+          Go to integration
         </Button>
       </Stack>
     </Box>

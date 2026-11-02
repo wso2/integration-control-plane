@@ -19,6 +19,7 @@
 import { Alert, Box, Button, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useAutoscaling, useUpdateAutoscaling } from '../../hooks/useAutoscaling';
+import { useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import { useBillingOrg, useBillingPlan } from '../../hooks/useBillingOrg';
 import { BILLING_PRODUCT_CODE } from '../../constants/subscription';
 import { isPaidPlan } from '../../utils/billing';
@@ -97,6 +98,8 @@ function HpaForm({ autoscaling, canManage, applying, onApply }: { autoscaling: A
   // removable, so the switch stays usable while it is on.
   const memoryLocked = locked || (!autoscaling.memoryEffective && !memoryOn);
   const dirty = !sameBounds(bounds, savedBounds);
+  // Thresholds apply on their own, so only unsent bound edits can be lost.
+  useUnsavedChanges(dirty && !applying);
 
   // Unsaved bound edits stay out of a threshold write: they apply only with Update.
   const appliedBounds = (): ReplicaBounds => (updatedBounds.current && !sameBounds(updatedBounds.current, savedBounds) ? updatedBounds.current : savedBounds);
@@ -384,7 +387,7 @@ export default function CloudAutoscaling({ projectId, componentId, environmentId
           </DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setConfirming(null)} disabled={update.isPending}>
+          <Button variant="outlined" color="inherit" onClick={() => setConfirming(null)} disabled={update.isPending}>
             Cancel
           </Button>
           <Button variant="contained" onClick={confirm} disabled={update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

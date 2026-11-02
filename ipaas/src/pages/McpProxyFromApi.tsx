@@ -21,6 +21,7 @@ import { ArrowLeft, Wrench } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useApimApi } from '../hooks/useApim';
 import { useProjectId } from '../hooks/useProjects';
@@ -78,6 +79,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
   const [displayName, setDisplayName] = useState('');
   const [name, setName] = useState('');
   const [nameEdited, setNameEdited] = useState(false);
+  const [displayNameEdited, setDisplayNameEdited] = useState(false);
   const [description, setDescription] = useState('');
   const [version, setVersion] = useState('1.0');
   useEffect(() => {
@@ -114,6 +116,8 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
   const requiredFilled = displayName.trim().length > 0 && name.trim().length > 0 && version.trim().length > 0;
 
   const create = useCreateMcpProxy();
+  // The seeded name can change as the source loads, so only the user's own typing counts.
+  const allowLeave = useUnsavedChanges(displayNameEdited || nameEdited || description !== '' || version !== '1.0' || selectedApiIdState !== '');
   const canSubmit = !!apimId && !!apiInfo && requiredFilled && nameLengthValid && !nameTaken && versionValid && !create.isPending;
 
   const handleSubmit = () => {
@@ -122,14 +126,19 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
     const selectedOperations = operations.map((o) => ({ id: apimId, verb: o.verb, target: o.target, mcpFeature: 'Tool' as const }));
     create.mutate(
       { orgHandler: scope.org, projectId, name, displayName: displayName.trim(), description, context: basePath, version: version.trim(), endpoint: 'https://localhost:9001', policies: ['Bronze'], selectedOperations },
-      { onSuccess: (component) => navigate(resourceUrl({ level: 'components', org: scope.org, project: scope.project, component: component.handler }, 'overview')) },
+      {
+        onSuccess: (component) => {
+          allowLeave();
+          navigate(resourceUrl({ level: 'components', org: scope.org, project: scope.project, component: component.handler }, 'overview'));
+        },
+      },
     );
   };
 
   return (
     <PageContent fullWidth>
       <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 1, textTransform: 'none' }}>
-        Back
+        {sourceHandler ? `Back to ${sourceName || 'integration'}` : 'Back to create integration'}
       </Button>
       <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1 }}>
         <Typography variant="h1">Generate MCP Server</Typography>
@@ -144,7 +153,20 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
         <Stack gap={ROW_GAP} sx={{ maxWidth: 760 }}>
           {/* Identity — Integration Name + Integration Id, two columns */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
-            <TextField labelPlacement="top" required size="small" label="Integration Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
+            <TextField
+              labelPlacement="top"
+              required
+              size="small"
+              label="Integration Name"
+              value={displayName}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                setDisplayNameEdited(true);
+              }}
+              fullWidth
+              sx={{ flex: 1, ...RESERVE_HELPER_SX }}
+              helperText=" "
+            />
             <TextField
               labelPlacement="top"
               required
@@ -202,9 +224,16 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
 
           <Stack direction="row" gap={1} sx={{ mt: 1 }}>
             <Button variant="contained" startIcon={create.isPending ? <CircularProgress color="inherit" size={16} /> : <Wrench size={16} />} onClick={handleSubmit} disabled={!canSubmit}>
-              {create.isPending ? 'Creating & Deploying ...' : 'Create & Deploy'}
+              {create.isPending ? 'Creating & deploying ...' : 'Create & deploy'}
             </Button>
-            <Button variant="outlined" onClick={() => navigate(backUrl)} disabled={create.isPending}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                allowLeave();
+                navigate(backUrl);
+              }}
+              disabled={create.isPending}>
               Cancel
             </Button>
           </Stack>

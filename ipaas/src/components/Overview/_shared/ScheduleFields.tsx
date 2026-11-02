@@ -102,7 +102,7 @@ export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX
 
       <Box>
         <Button variant="text" size="small" endIcon={advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />} onClick={() => setAdvancedOpen((v) => !v)} sx={{ px: 0 }}>
-          Advanced Settings
+          Advanced settings
         </Button>
         <Collapse in={advancedOpen}>
           <Stack gap={2} sx={{ mt: 1.5 }}>

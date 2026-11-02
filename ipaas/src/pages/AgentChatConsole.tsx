@@ -64,7 +64,7 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
   }
 
   if (!component) {
-    return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+    return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
   }
 
   return (

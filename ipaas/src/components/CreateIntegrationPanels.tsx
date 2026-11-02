@@ -335,9 +335,9 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     <CircularProgress size={22} />
                   ) : (
                     <>
-                      <Tooltip title="Import from a Public Repository" placement="top">
+                      <Tooltip title="Import from a public repository" placement="top">
                         <IconButton
-                          aria-label="Import from a Public Repository"
+                          aria-label="Import from a public repository"
                           onClick={(e) => {
                             e.stopPropagation();
                             trackEvent('component-create-import-public-url', { org: scope.org, project: scope.project });

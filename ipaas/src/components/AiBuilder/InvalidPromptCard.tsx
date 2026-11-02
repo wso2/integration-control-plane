@@ -32,7 +32,7 @@ export function InvalidPromptCard({ response, onGoBack }: InvalidPromptCardProps
     <ResponseCard
       actions={
         <Button variant="contained" color="primary" size="small" onClick={onGoBack}>
-          Try Again
+          Try again
         </Button>
       }>
       <Typography variant="body2" sx={{ mb: 2 }}>

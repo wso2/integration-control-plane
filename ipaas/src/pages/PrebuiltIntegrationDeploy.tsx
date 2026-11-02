@@ -68,7 +68,7 @@ export default function PrebuiltIntegrationDeploy(scope: ProjectScope): JSX.Elem
           Integration not found. Please go back and try again.
         </Alert>
         <Button sx={{ mt: 2 }} onClick={() => navigate(prebuiltIntegrationsUrl(scope.org, scope.project))}>
-          Back to Browse
+          Back to prebuilt integrations
         </Button>
       </PageContent>
     );

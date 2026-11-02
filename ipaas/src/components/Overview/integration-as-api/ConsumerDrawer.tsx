@@ -210,11 +210,11 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
           </>
         ) : (
           <>
-            <Button variant="outlined" onClick={onClose} disabled={busy}>
+            <Button variant="outlined" color="inherit" onClick={onClose} disabled={busy}>
               Cancel
             </Button>
             <Button variant="contained" onClick={() => void handleGenerate()} disabled={!appName.trim() || nameTaken || busy} startIcon={createMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}>
-              Generate Credentials
+              Generate credentials
             </Button>
           </>
         )}

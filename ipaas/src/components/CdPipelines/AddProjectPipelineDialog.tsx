@@ -92,7 +92,7 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={update.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={add} disabled={!selected || update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

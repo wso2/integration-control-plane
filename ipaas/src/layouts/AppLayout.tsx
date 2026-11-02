@@ -111,6 +111,7 @@ import { trackEvent } from '../services/tracking/tracking';
 import { billingUpgradeUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
+import { useLeaveGuard } from '../contexts/UnsavedChangesContext';
 
 // ComplexSelect is content-sized, and at org level there is no card beside the icon to stretch against.
 import { useLoadedImage } from '../hooks/useLoadedImage';
@@ -278,6 +279,7 @@ export default function AppLayout(): JSX.Element {
   };
 
   const navigateTo = useAppNavigate();
+  const guardNavigation = useLeaveGuard();
 
   // The URL now moves only once the destination's code is in, so the highlight
   // would lag the click by the whole download. Mark the clicked item at once and
@@ -288,8 +290,11 @@ export default function AppLayout(): JSX.Element {
   const handleNavSelect = (id: string) => {
     const url = navUrl(scope, id);
     if (!url) return;
-    setPendingNavId(id);
-    navigateTo(url);
+    // Highlights only once the user agrees to leave a dirty form, so "Stay on page" keeps the current item.
+    guardNavigation(() => {
+      setPendingNavId(id);
+      navigateTo(url);
+    });
   };
 
   return (
@@ -389,7 +394,7 @@ export default function AppLayout(): JSX.Element {
                   setProjectSearch('');
                   navigateTo(newProjectUrl({ org: scope.org }));
                 }}>
-                Create Project
+                Create project
               </Button>
               <Divider />
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
@@ -549,7 +554,7 @@ export default function AppLayout(): JSX.Element {
                       setComponentSearch('');
                       navigateTo(newComponentUrl({ org: scope.org, project: scope.project }));
                     }}>
-                    Create Integration
+                    Create integration
                   </Button>
                   <Divider />
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
@@ -668,7 +673,7 @@ export default function AppLayout(): JSX.Element {
               <UserMenu.Trigger name={userName} avatar={userAvatar} />
               <UserMenu.Header name={userName} email={username} role="Admin" avatar={userAvatar} />
               <UserMenu.Divider />
-              <UserMenu.Logout icon={<LogOut size={18} />} label="Sign Out" onClick={() => setConfirmDialogOpen(true)} />
+              <UserMenu.Logout icon={<LogOut size={18} />} label="Sign out" onClick={() => setConfirmDialogOpen(true)} />
             </UserMenu>
           </Header.Actions>
         </Header>
@@ -1068,12 +1073,14 @@ export default function AppLayout(): JSX.Element {
       <AppShell.NotificationPanel>
         {/* Confirm Dialog - managed locally */}
         <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Sign Out</DialogTitle>
+          <DialogTitle>Sign out</DialogTitle>
           <DialogContent>
             <DialogContentText>Are you sure you want to sign out of your account?</DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
+            <Button variant="outlined" color="inherit" onClick={() => setConfirmDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
               variant="contained"
               onClick={async () => {
@@ -1082,7 +1089,7 @@ export default function AppLayout(): JSX.Element {
                 navigate(loginUrl());
                 setConfirmDialogOpen(false);
               }}>
-              Sign Out
+              Sign out
             </Button>
           </DialogActions>
         </Dialog>

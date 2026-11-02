@@ -99,7 +99,7 @@ const APIM_SUBSCRIBERS_ERROR_CODE = 'APIM_SUBSCRIBERS';
 
 // Zero padding and icon offset keep the button's icon flush with the title above it.
 const linkRepoButtonSx = { mt: 1, px: 0, minWidth: 0, textTransform: 'none', fontSize: '0.8125rem', '& .MuiButton-startIcon': { ml: 0 } } as const;
-const projectAvatarSx = { width: 58, height: 58, bgcolor: 'primary.main', color: 'primary.contrastText', flexShrink: 0 } as const;
+const projectAvatarSx = { width: 58, height: 58, flexShrink: 0 } as const;
 const integrationSearchSx = { flex: 1 } as const;
 const descriptionSx = { maxWidth: 260 } as const;
 const INTEGRATIONS_HEADING_ID = 'project-integrations-heading';
@@ -207,11 +207,11 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
           <Typography variant="body2">Please remove them before proceeding.</Typography>
         </DialogContent>
         <DialogActions>
-          <Button variant="outlined" onClick={onClose} disabled={mutation.isPending}>
+          <Button variant="outlined" color="inherit" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </Button>
           <Button variant="contained" color="error" onClick={handleDelete} disabled={mutation.isPending} startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {mutation.isPending ? 'Retrying…' : 'Retry Delete'}
+            {mutation.isPending ? 'Retrying…' : 'Retry delete'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -233,7 +233,7 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         <TextField autoFocus fullWidth placeholder="Enter integration name to confirm" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
       </DialogContent>
       <DialogActions>
-        <Button variant="outlined" onClick={handleClose} disabled={mutation.isPending}>
+        <Button variant="outlined" color="inherit" onClick={handleClose} disabled={mutation.isPending}>
           Cancel
         </Button>
         <Button variant="contained" color="error" disabled={!confirmed || mutation.isPending} startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
@@ -404,7 +404,7 @@ function IntegrationsTable({
           <Tooltip title={quotaReached ? 'You have exceeded the allocated integration quota. Upgrade your subscription.' : ''} placement="top">
             <span>
               <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newComponentUrl(scope))} disabled={quotaReached}>
-                New Integration
+                New integration
               </Button>
             </span>
           </Tooltip>
@@ -492,7 +492,13 @@ function IntegrationsTable({
                               </Typography>
                             )}
                           </ListingTable.Cell>
-                          <ListingTable.Cell>{!init && <Chip variant="outlined" size="small" label={getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)} />}</ListingTable.Cell>
+                          <ListingTable.Cell>
+                            {!init && (
+                              <Typography variant="body2" noWrap>
+                                {getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)}
+                              </Typography>
+                            )}
+                          </ListingTable.Cell>
                           <ListingTable.Cell align="right">
                             {deleting ? (
                               <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
@@ -579,7 +585,13 @@ function IntegrationsTable({
                                 </Typography>
                               )}
                             </ListingTable.Cell>
-                            <ListingTable.Cell>{!init && <Chip variant="outlined" size="small" label={getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)} />}</ListingTable.Cell>
+                            <ListingTable.Cell>
+                              {!init && (
+                                <Typography variant="body2" noWrap>
+                                  {getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null)}
+                                </Typography>
+                              )}
+                            </ListingTable.Cell>
                             <ListingTable.Cell align="right">{!init && <RelativeTime time={formatDistanceToNow(c.lastBuildDate)} dateTime={c.lastBuildDate} tooltip={formatDateTime(c.lastBuildDate)} />}</ListingTable.Cell>
                           </ListingTable.Row>
                         </Tooltip>
@@ -690,7 +702,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
     return <ProjectHomeSkeleton />;
   }
   if (!project) {
-    return <NotFound message="Project not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Projects" />;
+    return <NotFound message="Project not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to projects" />;
   }
 
   const isEmpty = justProvisionedDefaultProject || (isComponentsSuccess ? components.length === 0 : cachedIsEmpty);
@@ -784,7 +796,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
         <Stack component="header" direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: isEmpty ? 3 : 4 }}>
           <Stack sx={{ minWidth: 0 }}>
             <Stack direction="row" alignItems="flex-start" gap={2}>
-              <Avatar sx={projectAvatarSx}>
+              <Avatar variant="light" color="primary" aria-hidden="true" sx={projectAvatarSx}>
                 <BoxIcon size={28} />
               </Avatar>
               <div>
@@ -880,7 +892,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
                   </Stack>
                 ) : (
                   <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => setLinkRepoOpen(true)} sx={linkRepoButtonSx}>
-                    Link a Repository
+                    Link a repository
                   </Button>
                 )}
               </div>
@@ -889,7 +901,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
             <Authorized permissions={[Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT]}>
               <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
-                Edit Project
+                Edit project
               </Button>
             </Authorized>
             {openInCloudComponent && projectRepoUrl && (
@@ -1044,7 +1056,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button variant="outlined" onClick={() => setOpenEditorWarning(null)}>
+          <Button variant="outlined" color="inherit" onClick={() => setOpenEditorWarning(null)}>
             Cancel
           </Button>
           <Button variant="contained" onClick={() => (openEditorWarning === 'cloud' ? doOpenInCloud() : doOpenInIntegrator())} disabled={openEditorWarning === 'cloud' ? !codeServerSample : !openInCloudComponent}>

@@ -85,6 +85,9 @@ export function buildLogText(logs: BuildRunLogs | null | undefined): string | nu
   return lines.join('\n') || '';
 }
 
+/** A build not yet in a terminal state (queued or running), so more log output may arrive. */
+export const isBuildLive = (status: string | null | undefined): boolean => status === 'queued' || status === 'in_progress';
+
 export function getStepStatus(logs: BuildRunLogs | null, key: 'init' | 'build' | 'deploy'): 'success' | 'error' | 'warning' | 'active' | 'pending' {
   const stage = logs?.[key];
   if (!stage) return 'pending';
