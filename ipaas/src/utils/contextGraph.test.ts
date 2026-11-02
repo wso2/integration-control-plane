@@ -270,6 +270,11 @@ describe('cosmosBuffers', () => {
     expect(labelled(m, null, null, null)).toEqual([]);
   });
 
+  it('names each point by its node key, so a redrawn graph can keep its places', () => {
+    const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all' });
+    expect(cosmosBuffers(m, PALETTE).keys).toEqual(m.nodes.map((n) => n.key));
+  });
+
   it('starts an unplaced graph the same way every time', () => {
     const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all' });
     expect(Array.from(cosmosBuffers(m, PALETTE).positions)).toEqual(Array.from(cosmosBuffers(m, PALETTE).positions));

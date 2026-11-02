@@ -286,6 +286,8 @@ export interface GraphPalette {
 }
 
 export interface CosmosBuffers {
+  /** Each point's node key, so a point keeps its place when the graph is drawn again with a different set of nodes. */
+  keys: string[];
   positions: Float32Array;
   /** The canvas's shape codes: documents are squares, everything else a circle. */
   shapes: Float32Array;
@@ -472,7 +474,7 @@ export function cosmosBuffers(m: GraphModel, palette: GraphPalette, { slots, spa
     linkStrengths[i] = LINK_STRENGTH[link.kind];
   });
   const arrows = m.links.map((link) => link.kind === 'relates');
-  return { positions, colors, sizes, shapes, links, linkColors, linkWidths, linkStrengths, arrows, clusters: layout.clusters, clusterPositions: layout.positions, clusterStrengths: layout.strengths };
+  return { keys: m.nodes.map((node) => node.key), positions, colors, sizes, shapes, links, linkColors, linkWidths, linkStrengths, arrows, clusters: layout.clusters, clusterPositions: layout.positions, clusterStrengths: layout.strengths };
 }
 
 /** How strong a link in the lit neighbourhood is drawn; the rest of the canvas is greyed out around it. */

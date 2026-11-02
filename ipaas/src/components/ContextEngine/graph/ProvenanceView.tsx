@@ -213,6 +213,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
           ) : model && buffers && lit ? (
             <CosmosCanvas
               buffers={buffers}
+              layoutKey={engine.id}
               pointColors={pointColors}
               linkColors={linkColors}
               selection={lit}

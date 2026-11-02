@@ -230,6 +230,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, mt: 2, alignItems: 'start' }}>
         <CosmosCanvas
           buffers={buffers}
+          layoutKey={engine.id}
           linkColors={linkColors}
           linkTags={linkTags}
           selection={selection}
