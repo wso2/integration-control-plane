@@ -56,6 +56,7 @@ export const Scopes = {
   PROJECT_CREATE: 'ipaas:project:create',
   PROJECT_UPDATE: 'ipaas:project:update',
   PROJECT_DELETE: 'ipaas:project:delete',
+  INTEGRATION_READ: 'ipaas:integration:read',
   INTEGRATION_CREATE: 'ipaas:integration:create',
   INTEGRATION_UPDATE: 'ipaas:integration:update',
   INTEGRATION_DELETE: 'ipaas:integration:delete',
