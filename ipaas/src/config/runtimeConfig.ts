@@ -35,6 +35,7 @@ interface RuntimeConfig {
   GITHUB_APP_CLIENT_ID?: string;
   GITHUB_APP_AUTH_REDIRECTION_URL?: string;
   GITHUB_APP_SLUG?: string;
+  AZURE_DEVOPS_CLIENT_ID?: string;
   SAMPLES_URL?: string;
   PREBUILT_INTEGRATIONS_URL?: string;
   AI_COPILOT_URL_SUFFIX?: string;
@@ -70,6 +71,10 @@ export interface ApiConfig {
   githubAppAuthRedirectUrl?: string;
   /** GitHub App slug — powers https://github.com/apps/{slug}/installations/new when the App is authorized but not yet installed on any account. */
   githubAppSlug?: string;
+  /** Entra application client id for Azure DevOps delegated repository access. Empty hides the provider. */
+  azureDevOpsClientId?: string;
+  /** Always derived from the active origin/base path so it exactly matches the popup callback. */
+  azureDevOpsRedirectUrl: string;
   billingApiBaseUrl: string;
   /** External billing console base — the Upgrade button links to `${billingConsoleUrl}/cloud/devant/upgrade`. */
   billingConsoleUrl?: string;
@@ -157,6 +162,8 @@ const DEFAULT_CONFIG: ApiConfig = {
   githubAppClientId: '',
   githubAppAuthRedirectUrl: `${window.location.origin}${withBase('/ghapp')}`,
   githubAppSlug: '',
+  azureDevOpsClientId: '',
+  azureDevOpsRedirectUrl: `${window.location.origin}${withBase('/adoapp')}`,
   billingApiBaseUrl: '',
   aiCopilotUrlSuffix: '',
   editorCallbackOrigins: [],
@@ -198,6 +205,8 @@ export async function loadConfig(): Promise<void> {
       githubAppClientId: config.GITHUB_APP_CLIENT_ID || DEFAULT_CONFIG.githubAppClientId,
       githubAppAuthRedirectUrl: config.GITHUB_APP_AUTH_REDIRECTION_URL || DEFAULT_CONFIG.githubAppAuthRedirectUrl,
       githubAppSlug: config.GITHUB_APP_SLUG || DEFAULT_CONFIG.githubAppSlug,
+      azureDevOpsClientId: config.AZURE_DEVOPS_CLIENT_ID?.trim() || DEFAULT_CONFIG.azureDevOpsClientId,
+      azureDevOpsRedirectUrl: `${window.location.origin}${withBase('/adoapp')}`,
       billingApiBaseUrl: trim(config.BILLING_API_BASE_URL || DEFAULT_CONFIG.billingApiBaseUrl),
       samplesUrl: config.SAMPLES_URL || undefined,
       prebuiltIntegrationsUrl: config.PREBUILT_INTEGRATIONS_URL || undefined,

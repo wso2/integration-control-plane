@@ -40,7 +40,7 @@ describe('buildRepoUrl', () => {
     expect(buildRepoUrl(GitProvider.BITBUCKET_SERVER, 'acme', 'svc', 'https://bitbucket.acme.io/')).toBe('https://bitbucket.acme.io/acme/svc');
   });
   it('builds an Azure DevOps _git URL', () => {
-    expect(buildRepoUrl(GitProvider.AZURE_DEVOPS, 'acme', 'svc')).toBe('https://dev.azure.com/acme/_git/svc');
+    expect(buildRepoUrl(GitProvider.AZURE_DEVOPS, 'acme org', 'svc repo', undefined, 'Payments & Billing')).toBe('https://dev.azure.com/acme%20org/Payments%20%26%20Billing/_git/svc%20repo');
   });
 });
 

@@ -40,6 +40,7 @@ const OrgHomeRedirect = lazyPage(() => import('../components/OrgHomeRedirect'));
 
 const OIDCCallback = lazyPage(() => import('../pages/OIDCCallback'));
 const GitHubOAuthCallback = lazyPage(() => import('../pages/GitHubOAuthCallback'));
+const AzureDevOpsOAuthCallback = lazyPage(() => import('../pages/AzureDevOpsOAuthCallback'));
 const CookiePolicy = lazyPage(() => import('../pages/CookiePolicy'));
 const CloudEditorDeployment = lazyPage(() => import('../pages/CloudEditorDeployment'));
 const ProjectsRedirect = lazyPage(() => import('../pages/ProjectsRedirect'));
@@ -121,6 +122,7 @@ const routes: AppRoute[] = [
   { path: '/signin', element: <OIDCCallback /> },
   { path: '/logout', element: <Logout /> },
   { path: '/ghapp', element: <GitHubOAuthCallback /> },
+  { path: '/adoapp', element: <AzureDevOpsOAuthCallback /> },
   {
     element: <ProtectedRoute />,
     children: [

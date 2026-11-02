@@ -77,8 +77,7 @@ const ANN_PREBUILT = 'openchoreo.dev/prebuilt';
 const ANN_COMPONENT_TYPE = 'ipaas.wso2.com/component-type';
 const WEBHOOK_DISPLAY_TYPES = new Set(['webhook', 'miWebhook']);
 // Samples build as integration-as-api, so they carry the identity in componentSubType instead.
-const isWebhookInput = (input: CreateComponentInput): boolean =>
-  WEBHOOK_DISPLAY_TYPES.has(input.displayType) || input.componentSubType === 'webhook';
+const isWebhookInput = (input: CreateComponentInput): boolean => WEBHOOK_DISPLAY_TYPES.has(input.displayType) || input.componentSubType === 'webhook';
 
 // Frontend DisplayType -> OpenChoreo ComponentType reference + Workflow
 // (buildpack builder). `componentType` is the {workloadType}/{componentTypeName}
@@ -182,6 +181,7 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
   // git-app-service provisions the per-run clone secret), and the BFF receives
   // the source binding to persist. Public/sample/prebuilt bodies are unchanged.
   const gitHubRepo = input.gitHubAppInstallationId ? parseGitHubUrl(input.srcGitRepoUrl ?? '') : null;
+  const azureDevOpsRepo = input.azureDevOps;
   return {
     metadata: {
       name: input.name,
@@ -209,7 +209,7 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
             url: input.srcGitRepoUrl ?? '',
             revision: { branch: input.repositoryBranch ?? '' },
             appPath,
-            ...(gitHubRepo ? { secretRef: '' } : {}),
+            ...(gitHubRepo || azureDevOpsRepo ? { secretRef: '' } : {}),
           },
         },
       },
@@ -220,6 +220,18 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
             installationId: Number(input.gitHubAppInstallationId),
             owner: gitHubRepo.org,
             repo: gitHubRepo.repo,
+            branch: input.repositoryBranch ?? '',
+            appPath,
+            repositoryUrl: input.srcGitRepoUrl ?? '',
+          },
+        }
+      : {}),
+    ...(azureDevOpsRepo
+      ? {
+          azureDevOps: {
+            organization: azureDevOpsRepo.organization,
+            adoProject: azureDevOpsRepo.project,
+            repo: azureDevOpsRepo.repo,
             branch: input.repositoryBranch ?? '',
             appPath,
             repositoryUrl: input.srcGitRepoUrl ?? '',

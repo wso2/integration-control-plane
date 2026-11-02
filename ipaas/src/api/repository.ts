@@ -47,11 +47,63 @@ interface GitTreeEntry {
   type: string; // 'tree' | 'blob'
 }
 
+export interface AzureDevOpsOrganization {
+  organization: string;
+}
+
+export interface AzureDevOpsProject {
+  id: string;
+  name: string;
+}
+
+export interface AzureDevOpsRepository {
+  name: string;
+  project: string;
+  defaultBranch: string;
+  webUrl?: string;
+}
+
 // GET repos answers 409 with this marker when the user's GitHub authorization
 // expired or was revoked — the UI falls back to the Authorize button.
 const GITHUB_AUTH_REQUIRED = 'github-auth-required';
+const AZURE_DEVOPS_AUTH_REQUIRED = 'azuredevops-auth-required';
 
 const isGitHubAuthRequired = (err: unknown): boolean => err instanceof BffError && err.status === 409 && err.body.includes(GITHUB_AUTH_REQUIRED);
+export const isAzureDevOpsAuthRequired = (err: unknown): boolean => err instanceof BffError && err.status === 409 && err.body.includes(AZURE_DEVOPS_AUTH_REQUIRED);
+
+export async function connectAzureDevOps(authorizationCode: string, redirectUri: string): Promise<AzureDevOpsOrganization[]> {
+  return items(await bff.post<ListResponse<AzureDevOpsOrganization>>('/git/azuredevops/organizations', { code: authorizationCode, redirectUri }));
+}
+
+export async function fetchAzureDevOpsOrganizations(): Promise<AzureDevOpsOrganization[]> {
+  return items(await bff.get<ListResponse<AzureDevOpsOrganization>>('/git/azuredevops/organizations'));
+}
+
+export async function fetchAzureDevOpsProjects(organization: string): Promise<AzureDevOpsProject[]> {
+  return items(await bff.get<ListResponse<AzureDevOpsProject>>(`/git/azuredevops/projects${q({ organization })}`));
+}
+
+export async function fetchAzureDevOpsRepositories(organization: string, project: string): Promise<AzureDevOpsRepository[]> {
+  return items(await bff.get<ListResponse<AzureDevOpsRepository>>(`/git/azuredevops/repos${q({ organization, project })}`));
+}
+
+export async function fetchAzureDevOpsBranches(organization: string, project: string, repo: string): Promise<RepoBranch[]> {
+  const repository = (await fetchAzureDevOpsRepositories(organization, project)).find((item) => item.name === repo);
+  const defaultBranch = repository?.defaultBranch.replace(/^refs\/heads\//, '');
+  const branches = items(await bff.get<ListResponse<string>>(`/git/azuredevops/branches${q({ organization, project, repo })}`));
+  return branches.map((name) => ({ name: name.replace(/^refs\/heads\//, ''), isDefault: name.replace(/^refs\/heads\//, '') === defaultBranch }));
+}
+
+export async function fetchAzureDevOpsContents(organization: string, project: string, repo: string, branch: string): Promise<RepoTreeNode[]> {
+  const response = await bff.get<{ items: GitTreeEntry[]; truncated?: boolean }>(`/git/azuredevops/tree${q({ organization, project, repo, branch })}`);
+  if (response?.truncated) console.warn(`[cloud] Azure DevOps tree for ${organization}/${project}/${repo}@${branch} is truncated`);
+  return buildRepoTree(response?.items ?? []);
+}
+
+export async function fetchAzureDevOpsMetadata(organization: string, project: string, repo: string, branch: string, subPath: string): Promise<RepoMetadata> {
+  const tree = await fetchAzureDevOpsContents(organization, project, repo, branch);
+  return metadataFromTree(tree, subPath);
+}
 
 // The shared branch/tree signatures identify a repo by owner+name only, so the
 // installation that grants access is resolved through this index, rebuilt on
@@ -213,30 +265,32 @@ function collectBlobPaths(nodes: RepoTreeNode[], acc: string[] = []): string[] {
 export async function fetchRepoMetadata(org: string, repo: string, branch: string, subPath: string, isPublicRepo = false): Promise<RepoMetadata> {
   try {
     const tree = await fetchRepoContents(org, repo, branch, isPublicRepo);
-    if (tree.length === 0) return REPO_METADATA_EMPTY;
-
-    const blobs = collectBlobPaths(tree);
-    const norm = subPath.replace(/^\/+/, '').replace(/\/+$/, '');
-    const atRoot = (file: string) => blobs.includes(file);
-    const atPath = (file: string) => (norm === '' ? atRoot(file) : blobs.includes(`${norm}/${file}`));
-    const childrenOfPath = norm === '' ? blobs : blobs.filter((p) => p.startsWith(`${norm}/`));
-
-    return {
-      ...REPO_METADATA_DEFAULT,
-      isValidRepo: true,
-      isSubPathValid: norm === '' || childrenOfPath.length > 0,
-      isSubPathEmpty: childrenOfPath.length === 0,
-      hasBallerinaTomlInRoot: atRoot('Ballerina.toml'),
-      hasBallerinaTomlInPath: atPath('Ballerina.toml'),
-      hasPomXmlInRoot: atRoot('pom.xml'),
-      hasPomXmlInPath: atPath('pom.xml'),
-      hasDockerfileInPath: atPath('Dockerfile'),
-      isProcfileExists: atPath('Procfile'),
-      isEndpointYamlExists: atPath('endpoints.yaml') || atPath('endpoint.yaml'),
-    };
+    return metadataFromTree(tree, subPath);
   } catch {
     return REPO_METADATA_DEFAULT;
   }
+}
+
+function metadataFromTree(tree: RepoTreeNode[], subPath: string): RepoMetadata {
+  if (tree.length === 0) return REPO_METADATA_EMPTY;
+  const blobs = collectBlobPaths(tree);
+  const norm = subPath.replace(/^\/+/, '').replace(/\/+$/, '');
+  const atRoot = (file: string) => blobs.includes(file);
+  const atPath = (file: string) => (norm === '' ? atRoot(file) : blobs.includes(`${norm}/${file}`));
+  const childrenOfPath = norm === '' ? blobs : blobs.filter((p) => p.startsWith(`${norm}/`));
+  return {
+    ...REPO_METADATA_DEFAULT,
+    isValidRepo: true,
+    isSubPathValid: norm === '' || childrenOfPath.length > 0,
+    isSubPathEmpty: childrenOfPath.length === 0,
+    hasBallerinaTomlInRoot: atRoot('Ballerina.toml'),
+    hasBallerinaTomlInPath: atPath('Ballerina.toml'),
+    hasPomXmlInRoot: atRoot('pom.xml'),
+    hasPomXmlInPath: atPath('pom.xml'),
+    hasDockerfileInPath: atPath('Dockerfile'),
+    isProcfileExists: atPath('Procfile'),
+    isEndpointYamlExists: atPath('endpoints.yaml') || atPath('endpoint.yaml'),
+  };
 }
 
 // The BFF advertises the deployable sample images; today that is only the

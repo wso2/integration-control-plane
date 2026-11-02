@@ -99,6 +99,29 @@ describe('createComponent component-type mapping', () => {
     expect(bodyOf().spec.componentType.name).toBe('deployment/integration-as-api');
   });
 
+  it('sends an Azure DevOps binding and an explicit empty workflow secretRef', async () => {
+    await createComponent({
+      ...baseInput,
+      isPublicRepo: false,
+      srcGitRepoUrl: 'https://dev.azure.com/acme/Payments/_git/order-sync',
+      repositorySubPath: '/integrations/order-sync',
+      azureDevOps: { organization: 'acme', project: 'Payments', repo: 'order-sync' },
+    });
+    const body = post.mock.calls[0][1] as {
+      azureDevOps: Record<string, unknown>;
+      spec: { workflow: { parameters: { repository: Record<string, unknown> } } };
+    };
+    expect(body.azureDevOps).toEqual({
+      organization: 'acme',
+      adoProject: 'Payments',
+      repo: 'order-sync',
+      branch: 'main',
+      appPath: 'integrations/order-sync',
+      repositoryUrl: 'https://dev.azure.com/acme/Payments/_git/order-sync',
+    });
+    expect(body.spec.workflow.parameters.repository.secretRef).toBe('');
+  });
+
   // The mi-* types carry the MI resource defaults; the shared types' defaults OOMKill the MI JVM.
   it.each([
     ['miApiService', 'deployment/mi-integration-as-api'],

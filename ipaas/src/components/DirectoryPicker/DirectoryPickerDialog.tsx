@@ -22,7 +22,6 @@ import { Folder, RefreshCw, Search } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import type { RepoTreeNode } from '../../types/repository';
 import { renderTree, filterDirectories, buildDefaultExpanded } from '../../utils/directoryTree';
-import { external } from '../../paths';
 
 const { SimpleTreeView, TreeItem } = TreeView;
 
@@ -143,11 +142,7 @@ export default function DirectoryPickerDialog({ open, onClose, onSave, repoName,
         </Box>
 
         <Typography variant="caption" color="text.secondary">
-          Hint: To use an empty directory,{' '}
-          <a href={external.githubNew} target="_blank" rel="noopener noreferrer">
-            create it in GitHub
-          </a>{' '}
-          with a <code>.keep</code> file and select it here.
+          Hint: To use an empty directory, commit a <code>.keep</code> file to your repository and select the directory here.
         </Typography>
       </DialogContent>
 

@@ -27,7 +27,7 @@ const trimSlashes = (s: string): string => s.replace(/^\/+|\/+$/g, '');
  * repo picker; `serverUrl` (GitLab self-managed) comes from the stored credential.
  * Mirrors Devant's per-provider builders.
  */
-export function buildRepoUrl(provider: GitProvider, org: string, repo: string, serverUrl?: string): string {
+export function buildRepoUrl(provider: GitProvider, org: string, repo: string, serverUrl?: string, project?: string): string {
   switch (provider) {
     case GitProvider.BITBUCKET_CLOUD:
       return `${gitProviderBase.bitbucket}/${org}/${repo}`;
@@ -36,7 +36,8 @@ export function buildRepoUrl(provider: GitProvider, org: string, repo: string, s
     case GitProvider.BITBUCKET_SERVER:
       return `${(serverUrl || gitProviderBase.bitbucket).replace(/\/$/, '')}/${org}/${repo}`;
     case GitProvider.AZURE_DEVOPS:
-      return `${gitProviderBase.azure}/${org}/_git/${repo}`;
+      if (!project) throw new Error('Azure DevOps project is required');
+      return `${gitProviderBase.azure}/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}`;
     default:
       return `${gitProviderBase.github}/${org}/${repo}`;
   }
