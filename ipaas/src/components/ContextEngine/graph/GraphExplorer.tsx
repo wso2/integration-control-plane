@@ -56,8 +56,10 @@ interface GraphExplorerProps {
  */
 export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain, onSelectKey }: GraphExplorerProps): JSX.Element {
   const { colors, palette } = useGraphTheme();
-  const graph = useContextGraph(engine.id, GRAPH_ENTITY_LIMIT);
   const [filter, setFilter] = useState<ExploreFilter>({ records: true, entities: true, detail: 'all' });
+  // With a source chosen, the engine is asked for that source alone, so its names fill the slots
+  // instead of sharing them with every other source; the browser-side filter then has nothing to hide.
+  const graph = useContextGraph(engine.id, GRAPH_ENTITY_LIMIT, true, filter.sourceId);
   const [selectedKey, setSelectedKey] = useState<string | null>(initialKey);
   const [hovered, setHovered] = useState<number | null>(null);
   const sourcesById = useMemo(() => new Map(engine.sources.map((s) => [s.id, s])), [engine.sources]);
@@ -137,7 +139,8 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
   const selected = selectedIndex !== null ? model.nodes[selectedIndex] : null;
   const counts = { records: data.records.length, entities: data.entities.length };
   const drawn = { entities: model.nodes.filter((n) => n.kind === 'entity').length, relations: model.links.filter((l) => l.kind === 'relates').length };
-  const sourceIds = [...new Set(data.records.map((r) => r.sourceId))];
+  // Every registered source, not only those in the current read: a filtered read holds one.
+  const sourceIds = engine.sources.map((s) => s.id);
   // The legend: the kinds with a colour, in slot order, and a neutral entry when a drawn entity has another kind or none.
   const kindColor = (kind?: string): string | undefined => (kind !== undefined && slots.has(kind) ? colors.kinds[slots.get(kind) as number] : undefined);
   const kindLegend = [...slots.entries()].sort((a, b) => a[1] - b[1]).map(([kind, slot]) => ({ kind, label: kind.charAt(0).toUpperCase() + kind.slice(1), color: colors.kinds[slot] ?? colors.entity }));

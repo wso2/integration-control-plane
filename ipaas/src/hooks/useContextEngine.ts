@@ -140,10 +140,10 @@ export function useContextQueryTrace(queryId: string | null, enabled = true) {
 }
 
 /** The part of the knowledge graph the reader may see; null when the engine does not serve its graph. */
-export function useContextGraph(engineId: string, limit: number, enabled = true) {
+export function useContextGraph(engineId: string, limit: number, enabled = true, sourceId?: string) {
   return useQuery({
-    queryKey: [ROOT_KEY, 'graph', engineId, limit],
-    queryFn: () => getContextGraph(engineId, limit),
+    queryKey: [ROOT_KEY, 'graph', engineId, limit, sourceId ?? ''],
+    queryFn: () => getContextGraph(engineId, limit, sourceId),
     enabled: isContextEngineEnabled() && !!engineId && enabled,
     retry: false,
     staleTime: 60_000,
