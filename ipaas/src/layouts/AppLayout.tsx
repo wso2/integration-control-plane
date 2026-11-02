@@ -19,7 +19,6 @@
 import {
   AppShell,
   Button,
-  Chip,
   ColorSchemeToggle,
   ComplexSelect,
   Dialog,
@@ -38,6 +37,8 @@ import {
   Popover,
   Sidebar,
   Tooltip,
+  TrialBadge,
+  type TrialBadgeUsage,
   Typography,
   UserMenu,
   useAppShell,
@@ -78,8 +79,11 @@ import {
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
 import { useFreshDefaultProject } from '../hooks/useFreshDefaultProject';
-import { useOrgs } from '../hooks/useOrg';
+import { useOrgComponentLimits, useOrgs } from '../hooks/useOrg';
 import { useBillingOrg } from '../hooks/useBillingOrg';
+import { useOrgUuid } from '../hooks/useOrgUuid';
+import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
+import { trialLengthDays } from '../utils/billing';
 import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
@@ -104,7 +108,7 @@ import {
 } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { trackEvent } from '../services/tracking/tracking';
-import { componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
+import { billingUpgradeUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
 
@@ -114,6 +118,8 @@ import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
+
+const trialBadgeSx = { mx: 0.75 } as const;
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
@@ -131,7 +137,14 @@ export default function AppLayout(): JSX.Element {
   // Billing trial indicator shown in the header.
   const { org: billingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
   const billingTrial = billingOrg?.subscription?.status === 'trial' ? billingOrg.subscription.trial : null;
-  const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+  const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined;
+  const orgUuid = useOrgUuid();
+  const upgradeUrl = billingTrial && orgUuid ? billingUpgradeUrl(orgUuid) : null;
+  const openUpgrade = upgradeUrl ? () => window.open(upgradeUrl, '_blank', 'noopener,noreferrer') : undefined;
+  const { data: componentLimits } = useOrgComponentLimits(billingTrial ? (orgUuid ?? '') : '');
+  // The panel's own Upgrade button always renders, so the panel is shown only when it has somewhere to go.
+  const trialUsage: TrialBadgeUsage | undefined =
+    componentLimits && openUpgrade ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, onUpgrade: openUpgrade } : undefined;
 
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
   // a fresh literal here re-triggers it (and its setState) on every render, which on a
@@ -647,9 +660,8 @@ export default function AppLayout(): JSX.Element {
           <Header.Spacer />
           <Header.Actions>
             {billingTrial && (
-              <Tooltip title={trialEndLabel}>
-                <Chip label={`Trial · ${billingTrial.days_remaining} day${billingTrial.days_remaining === 1 ? '' : 's'} remaining`} color="warning" size="medium" sx={{ fontWeight: 500, mx: 0.75 }} />
-              </Tooltip>
+              // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
+              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} sx={trialBadgeSx} />
             )}
             <ColorSchemeToggle />
             <UserMenu>
