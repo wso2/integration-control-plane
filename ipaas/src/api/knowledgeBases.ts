@@ -34,6 +34,8 @@ interface BffKnowledgeBaseDataSource {
   status?: string;
   releaseName?: string;
   createdAt?: string;
+  ingestionStarted?: boolean;
+  ingestionError?: string;
 }
 
 interface BffKnowledgeBase {
@@ -61,6 +63,7 @@ export function toKnowledgeBaseDataSource(d: BffKnowledgeBaseDataSource): Knowle
     status: d.status ?? '',
     releaseName: d.releaseName ?? '',
     createdAt: d.createdAt ?? '',
+    ...(d.ingestionStarted === undefined ? {} : { ingestionStarted: d.ingestionStarted, ingestionError: d.ingestionError ?? '' }),
   };
 }
 

@@ -17,7 +17,7 @@
  */
 
 import { AZURE_DEFAULT_API_VERSION, CHUNKING_STRATEGIES, DATASOURCES, DEFAULT_CHUNKING, EMBEDDING_PROVIDERS, RAG_SECRET_KEYS, VECTOR_STORE_PROVIDERS } from '../constants/ragIngestion';
-import type { KnowledgeBase, KnowledgeBaseSettings } from '../types/knowledgeBase';
+import type { KnowledgeBase, KnowledgeBaseDataSource, KnowledgeBaseSettings } from '../types/knowledgeBase';
 import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, VectorStoreConfig } from '../types/ragIngestion';
 import { datasourceEnvVars, embeddingEnvVars, isEmbeddingValid, isVectorStoreValid, vectorStoreEnvVars } from './ragIngestion';
 
@@ -192,6 +192,18 @@ export const NEVER_FIRES_CRON = '0 0 31 2 *';
 export function isManualSchedule(cronExpression: string): boolean {
   const cron = cronExpression.trim();
   return cron === '' || cron === NEVER_FIRES_CRON;
+}
+
+/** Navigation state carrying a warning from a create to the knowledge base page. */
+export interface IngestionNoticeState {
+  ingestionNotice: string;
+}
+
+/** The warning for sources just created whose first run did not start, or null when every one started. */
+export function ingestionNotice(sources: readonly Pick<KnowledgeBaseDataSource, 'displayName' | 'ingestionStarted' | 'ingestionError'>[]): IngestionNoticeState | null {
+  const failed = sources.filter((s) => s.ingestionStarted === false);
+  if (failed.length === 0) return null;
+  return { ingestionNotice: failed.map((s) => `${s.displayName}: ${s.ingestionError || 'its first ingestion could not be started. Run it with Ingest.'}`).join(' ') };
 }
 
 /** Why a knowledge base cannot be queried yet, or null when it can. */

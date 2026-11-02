@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { toKnowledgeBase } from './knowledgeBases';
+import { toKnowledgeBase, toKnowledgeBaseDataSource } from './knowledgeBases';
 
 describe('toKnowledgeBase', () => {
   it('fills the fields the BFF omits when empty', () => {
@@ -44,5 +44,12 @@ describe('toKnowledgeBase', () => {
       dataSources: [{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], status: 'ACTIVE' }],
     });
     expect(kb.dataSources).toEqual([{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', releaseName: '', createdAt: '' }]);
+  });
+});
+
+describe('toKnowledgeBaseDataSource', () => {
+  it('keeps whether a just-created source started its first run', () => {
+    expect(toKnowledgeBaseDataSource({ name: 'docs-drive', ingestionStarted: false, ingestionError: 'Run it with Ingest.' })).toMatchObject({ ingestionStarted: false, ingestionError: 'Run it with Ingest.' });
+    expect(toKnowledgeBaseDataSource({ name: 'docs-drive' })).not.toHaveProperty('ingestionStarted');
   });
 });

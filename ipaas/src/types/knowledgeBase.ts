@@ -56,6 +56,10 @@ export interface KnowledgeBaseDataSource {
   status: string;
   releaseName: string;
   createdAt: string;
+  /** Set only on the response that creates a source that runs once: whether its first run started. */
+  ingestionStarted?: boolean;
+  /** Why the first run did not start; the source can still be run with Ingest. */
+  ingestionError?: string;
 }
 
 /** Settings split the way the BFF stores them: plain values and secrets. */

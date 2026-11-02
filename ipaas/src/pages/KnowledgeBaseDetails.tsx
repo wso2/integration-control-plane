@@ -44,7 +44,7 @@ import {
 } from '@wso2/oxygen-ui';
 import { ArrowLeft, Clock, Database, ExternalLink, MoreVertical, Play, Plus, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useKnowledgeBase, useUpdateKnowledgeBase } from '../hooks/useKnowledgeBases';
@@ -56,7 +56,7 @@ import { useTriggerComponent } from '../hooks/useExecutions';
 import { knowledgeBasesUrl, newKnowledgeBaseDataSourceUrl, type OrgScope } from '../nav';
 import { componentOverviewUrl } from '../paths';
 import { describeCron } from '../utils/cronUtils';
-import { buildKnowledgeBaseSettings, chunkingFromConfig, dataSourceLabel, embeddingFromConfig, isEditedSettingsValid, isManualSchedule, knowledgeBaseSummary, secretsForUpdate, vectorStoreFromConfig } from '../utils/knowledgeBase';
+import { buildKnowledgeBaseSettings, chunkingFromConfig, dataSourceLabel, embeddingFromConfig, isEditedSettingsValid, isManualSchedule, knowledgeBaseSummary, secretsForUpdate, vectorStoreFromConfig, type IngestionNoticeState } from '../utils/knowledgeBase';
 import { isChunkingValid } from '../utils/ragIngestion';
 import type { KnowledgeBase, KnowledgeBaseDataSource } from '../types/knowledgeBase';
 import type { ChunkingConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
@@ -82,7 +82,7 @@ const TABS = [{ label: 'Overview' }, { label: 'Configurations' }, { label: 'Conn
 const CONNECT_TAB = 2;
 const ROWS_PER_PAGE = 10;
 
-type Notice = { severity: 'success' | 'error'; text: string };
+type Notice = { severity: 'success' | 'warning' | 'error'; text: string };
 
 export default function KnowledgeBaseDetails(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -229,7 +229,9 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
   const { refetch, isFetching } = useKnowledgeBase(kb.name);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  const [notice, setNotice] = useState<Notice | null>(null);
+  // A create that could not start a source's first run says so on arrival here.
+  const arrivedWith = (useLocation().state as IngestionNoticeState | null)?.ingestionNotice;
+  const [notice, setNotice] = useState<Notice | null>(() => (arrivedWith ? { severity: 'warning', text: arrivedWith } : null));
   const [scheduling, setScheduling] = useState<KnowledgeBaseDataSource | null>(null);
   const [viewingLogs, setViewingLogs] = useState<KnowledgeBaseDataSource | null>(null);
   const [deleting, setDeleting] = useState<KnowledgeBaseDataSource | null>(null);

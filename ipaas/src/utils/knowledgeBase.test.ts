@@ -23,6 +23,7 @@ import {
   chunkingFromConfig,
   dataSourceLabel,
   embeddingFromConfig,
+  ingestionNotice,
   isEditedSettingsValid,
   isManualSchedule,
   isNameValid,
@@ -170,5 +171,20 @@ describe('isManualSchedule', () => {
     ['*/30 * * * *', false],
   ])('%j → %s', (cron, manual) => {
     expect(isManualSchedule(cron)).toBe(manual);
+  });
+});
+
+describe('ingestionNotice', () => {
+  it('is null when every first run started, or none was asked for', () => {
+    expect(ingestionNotice([{ displayName: 'Drive', ingestionStarted: true }, { displayName: 'S3' }])).toBeNull();
+  });
+
+  it('names each source whose first run did not start', () => {
+    expect(
+      ingestionNotice([
+        { displayName: 'Drive', ingestionStarted: false, ingestionError: 'Run it with Ingest.' },
+        { displayName: 'S3', ingestionStarted: false },
+      ]),
+    ).toEqual({ ingestionNotice: 'Drive: Run it with Ingest. S3: its first ingestion could not be started. Run it with Ingest.' });
   });
 });
