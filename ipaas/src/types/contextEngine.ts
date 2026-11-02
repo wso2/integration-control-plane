@@ -261,11 +261,39 @@ export type SourceReadingState = 'idle' | 'reading' | 'completed';
 export type SourceIndexingState = 'not_collected' | 'ok' | 'unavailable';
 
 /** Pipeline progress of one source, as `GET /v1/progress/spaces/{id}` reports it. */
+/** Where one running delivery is: the phase of the pipeline it is in and, while the phase counts something, its position. */
+export interface RecordProgress {
+  recordId: string;
+  /** starting, reading, mapping or indexing; inside the write also extracting (bytes of text), merging_nodes, merging_edges or embedding. */
+  phase: string;
+  done: number | null;
+  total: number | null;
+  updatedAt?: string;
+  /** The staged document's size, while the engine still has it. */
+  sizeBytes: number | null;
+}
+
 export interface SourceProgress {
   sourceId: string;
   reading: { state: SourceReadingState; startedAt?: string; completedAt?: string };
-  /** Deliveries since the latest sync run started. `percent` is finished (succeeded + failed) over total; null when nothing was delivered. */
-  processing: { since?: string; total: number; queued: number; running: number; succeeded: number; failed: number; percent: number | null };
+  /**
+   * The source's records since the latest sync run started, each counted once by the state of its latest
+   * delivery. `percent` is finished (succeeded + failed) over total; null when nothing was delivered.
+   * `inProgress` lists the deliveries running now with their pipeline phase and position, and `bytes` the
+   * records' sizes, so the card can show how far one file or a batch has come; `bytes` is null on an
+   * engine that does not report them.
+   */
+  processing: {
+    since?: string;
+    total: number;
+    queued: number;
+    running: number;
+    succeeded: number;
+    failed: number;
+    percent: number | null;
+    inProgress: RecordProgress[];
+    bytes: { delivered: number; finished: number } | null;
+  };
   records: { active: number; quarantined: number; deleted: number };
   /** Active record versions the knowledge backend has indexed, from the last background collection. */
   indexing: {
