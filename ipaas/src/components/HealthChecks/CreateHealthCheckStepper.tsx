@@ -31,6 +31,8 @@ interface CreateHealthCheckStepperProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   environmentId: string;
   onClose: () => void;
   onSaved: (message: string) => void;
@@ -39,7 +41,7 @@ interface CreateHealthCheckStepperProps {
 
 const STEPS = ['Configure Liveness Probe', 'Configure Readiness Probe'];
 
-export default function CreateHealthCheckStepper({ container, projectId, componentId, releaseId, environmentId, onClose, onSaved, onError }: CreateHealthCheckStepperProps): JSX.Element {
+export default function CreateHealthCheckStepper({ container, projectId, componentId, releaseId, deploymentTrackId, environmentId, onClose, onSaved, onError }: CreateHealthCheckStepperProps): JSX.Element {
   const fallbackPort = container.ports?.[0]?.port ?? 8080;
   const [activeStep, setActiveStep] = useState(0);
   const [liveness, setLiveness] = useState<ProbeFormState>(() => defaultProbeForm(fallbackPort));
@@ -55,7 +57,7 @@ export default function CreateHealthCheckStepper({ container, projectId, compone
   const submit = (includeReadiness: boolean): void => {
     const readinessProbe: WriteProbe = includeReadiness ? formToProbe(readiness) : {};
     create.mutate(
-      { componentId, releaseId, environmentId, containerId: container.ID, data: { probes: { liveness_probe: formToProbe(liveness), readiness_probe: readinessProbe } } },
+      { componentId, releaseId, environmentId, deploymentTrackId, containerId: container.ID, data: { probes: { liveness_probe: formToProbe(liveness), readiness_probe: readinessProbe } } },
       {
         onSuccess: () => onSaved('Health check created.'),
         onError: (e) => onError(e instanceof Error ? e.message : 'Failed to create the health check.'),

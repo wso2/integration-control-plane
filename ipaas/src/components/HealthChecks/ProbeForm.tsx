@@ -33,13 +33,15 @@ interface ProbeFormProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   environmentId: string;
   onClose: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
 }
 
-export default function ProbeForm({ kind, healthCheck: hc, container, projectId, componentId, releaseId, environmentId, onClose, onSaved, onError }: ProbeFormProps): JSX.Element {
+export default function ProbeForm({ kind, healthCheck: hc, container, projectId, componentId, releaseId, deploymentTrackId, environmentId, onClose, onSaved, onError }: ProbeFormProps): JSX.Element {
   const fallbackPort = container.ports?.[0]?.port ?? DEFAULT_PORT;
   const isLiveness = kind === PROBE_KIND.LIVENESS;
   const editedProbe = isLiveness ? hc.probes.liveness_probe : hc.probes.readiness_probe;
@@ -62,7 +64,7 @@ export default function ProbeForm({ kind, healthCheck: hc, container, projectId,
       },
     };
     update.mutate(
-      { componentId, releaseId, environmentId, containerId: container.ID, healthCheckId: hc.ID, data },
+      { componentId, releaseId, environmentId, deploymentTrackId, containerId: container.ID, healthCheckId: hc.ID, data },
       {
         onSuccess: () => onSaved(`${kind} probe saved.`),
         onError: (e) => onError(e instanceof Error ? e.message : 'Failed to save the probe.'),

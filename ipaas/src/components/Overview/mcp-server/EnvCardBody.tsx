@@ -56,7 +56,10 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   const activeEndpoint = endpoints[activeIdx] ?? endpoints[0];
 
   // Enforcing gateway URL + a short-lived api-key from the API Platform.
-  const accessRef: EndpointRef | null = useMemo(() => (activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null), [projectId, component.id, env.id, activeEndpoint]);
+  const accessRef: EndpointRef | null = useMemo(
+    () => (activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id, deploymentTrackId: versionId } : null),
+    [projectId, component.id, env.id, activeEndpoint, versionId],
+  );
   const access = useEndpointTestAccess(accessRef, !!accessRef && isDeploymentReady);
 
   // Tools are listed through the apip gateway and nothing else. The raw external

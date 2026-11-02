@@ -44,10 +44,17 @@ import type { IntegrationKind } from '../types/insights';
 
 const TERMINAL_CONCLUSIONS = new Set(['success', 'failure', 'cancelled', 'timed_out', 'neutral', 'skipped']);
 
-export function useComponentDeployment(orgHandler: string, orgUuid: string, componentId: string, versionId: string, environmentId: string, options?: { refetchInterval?: number | false | ((query: Query<ComponentDeployment | null>) => number | false) }) {
+export function useComponentDeployment(
+  orgHandler: string,
+  orgUuid: string,
+  componentId: string,
+  versionId: string | undefined,
+  environmentId: string,
+  options?: { refetchInterval?: number | false | ((query: Query<ComponentDeployment | null>) => number | false) },
+) {
   return useQuery<ComponentDeployment | null, Error, ComponentDeployment | null>({
     queryKey: ['componentDeployment', orgHandler, orgUuid, componentId, versionId, environmentId],
-    queryFn: () => fetchComponentDeployment(orgHandler, orgUuid, componentId, versionId, environmentId),
+    queryFn: () => fetchComponentDeployment(orgHandler, orgUuid, componentId, versionId!, environmentId),
     enabled: !!orgHandler && !!orgUuid && !!componentId && !!versionId && !!environmentId,
     retry: false,
     refetchInterval: options?.refetchInterval,
@@ -66,7 +73,7 @@ export function useComponentDeployments(orgHandler: string, orgUuid: string, com
   });
 }
 
-export function useEnvEndpoints(componentId: string, versionId: string, releaseId: string) {
+export function useEnvEndpoints(componentId: string, versionId: string | undefined, releaseId: string) {
   return useQuery({
     queryKey: ['envEndpoints', componentId, versionId, releaseId],
     queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
@@ -93,10 +100,10 @@ export function useApiDefinition(apimRevisionId: string | null | undefined) {
   });
 }
 
-export function useDeploymentStatus(componentId: string, versionId: string) {
+export function useDeploymentStatus(componentId: string, versionId: string | undefined) {
   return useQuery({
     queryKey: ['deploymentStatus', componentId, versionId],
-    queryFn: () => fetchDeploymentStatus(componentId, versionId),
+    queryFn: () => fetchDeploymentStatus(componentId, versionId!),
     enabled: !!componentId && !!versionId,
     retry: false,
     refetchInterval: (query) => {

@@ -17,14 +17,14 @@
  */
 
 import type { JSX } from 'react';
-import { useAppNavigate } from '../../../hooks/useAppNavigate';
-import { useAccessControl } from '../../../contexts/AccessControlContext';
-import { visibleComponentSettingsSections } from '../../../constants/componentSettingsSections';
-import { useComponentByHandler } from '../../../hooks/useComponents';
-import { useIntegrationIdentity } from '../../../hooks/useIntegrationIdentity';
-import { useProjectId } from '../../../hooks/useProjects';
-import { componentSettingsSectionUrl, hasComponent, useScope } from '../../../nav';
-import SettingsTabs from '../../../components/Settings/SettingsTabs';
+import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { useAccessControl } from '../../contexts/AccessControlContext';
+import { visibleComponentSettingsSections } from '../../constants/componentSettingsSections';
+import { useComponentByHandler } from '../../hooks/useComponents';
+import { useIntegrationIdentity } from '../../hooks/useIntegrationIdentity';
+import { useProjectId } from '../../hooks/useProjects';
+import { componentSettingsSectionUrl, hasComponent, useScope } from '../../nav';
+import SettingsTabs from './SettingsTabs';
 
 /**
  * The Integration (component) Settings header — resolves the sections applicable

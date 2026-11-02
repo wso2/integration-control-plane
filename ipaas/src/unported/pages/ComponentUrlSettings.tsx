@@ -22,7 +22,7 @@ import { Globe, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import Authorized from '../../components/Authorized';
 import EmptyListing from '../../components/EmptyListing';
-import ComponentSettingsTabs from '../components/Settings/ComponentSettingsTabs';
+import ComponentSettingsTabs from '../../components/Settings/ComponentSettingsTabs';
 import { Permissions } from '../../constants/permissions';
 import { useComponentByHandler } from '../../hooks/useComponents';
 import { useComponentUrlMappings, useCreateUrlMapping, useCustomDomains, useDeleteUrlMapping } from '../hooks/useCustomDomains';
