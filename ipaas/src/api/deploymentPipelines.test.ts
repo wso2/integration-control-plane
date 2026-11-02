@@ -98,6 +98,29 @@ describe('appendEnvironmentToDefaultPipeline', () => {
     expect(put).not.toHaveBeenCalled();
   });
 
+  // Each append rereads the pipeline after the previous write, so neither environment is lost.
+  it('runs overlapping appends one after the other', async () => {
+    let stored: Path[] = [{ sourceEnvironment: 'development', targetEnvironments: [] }];
+    get.mockImplementation(async () => ({ items: [{ name: 'default', promotionPaths: stored }] }));
+    put.mockImplementation(async (_url: string, body: { promotionPaths: Path[] }) => {
+      await new Promise((r) => setTimeout(r, 5));
+      stored = body.promotionPaths;
+      return {};
+    });
+    expect(await Promise.all([appendEnvironmentToDefaultPipeline('staging'), appendEnvironmentToDefaultPipeline('production')])).toEqual([true, true]);
+    expect(stored).toEqual([
+      { sourceEnvironment: 'development', targetEnvironments: ['staging'] },
+      { sourceEnvironment: 'staging', targetEnvironments: ['production'] },
+    ]);
+  });
+
+  it('keeps appending after an earlier append fails', async () => {
+    get.mockRejectedValueOnce(new Error('unavailable'));
+    await expect(appendEnvironmentToDefaultPipeline('staging')).rejects.toThrow('unavailable');
+    withDefault([{ sourceEnvironment: 'development', targetEnvironments: [] }]);
+    expect(await appendEnvironmentToDefaultPipeline('staging')).toBe(true);
+  });
+
   it('does nothing for an environment already in the chain', async () => {
     withDefault([{ sourceEnvironment: 'development', targetEnvironments: ['staging'] }]);
     expect(await appendEnvironmentToDefaultPipeline('staging')).toBe(false);

@@ -146,8 +146,21 @@ const toDeploymentPipeline = (p: BffDeploymentPipeline): DeploymentPipeline => (
  * rewrite a topology someone built deliberately.
  *
  * Returns whether the pipeline was updated.
+ *
+ * Appends run one at a time: each is a read-modify-write of the whole promotionPaths
+ * list, so two overlapping appends would both read the same chain and the second PUT
+ * would drop the first's environment. Queued, each rereads the pipeline only after the
+ * previous write has landed. The BFF takes no resource version on update, so this
+ * cannot guard against a write from another tab or user.
  */
-export const appendEnvironmentToDefaultPipeline = async (envSlug: string): Promise<boolean> => {
+let appendQueue: Promise<unknown> = Promise.resolve();
+export const appendEnvironmentToDefaultPipeline = (envSlug: string): Promise<boolean> => {
+  const run = appendQueue.then(() => appendToDefaultPipeline(envSlug));
+  appendQueue = run.catch(() => undefined); // one failed append must not block the next
+  return run;
+};
+
+const appendToDefaultPipeline = async (envSlug: string): Promise<boolean> => {
   const pipeline = items(await bff.get<ListResponse<BffDeploymentPipeline>>('/deploymentpipelines')).find((p) => p.name === DEFAULT_PIPELINE_NAME);
   if (!pipeline) return false;
 
