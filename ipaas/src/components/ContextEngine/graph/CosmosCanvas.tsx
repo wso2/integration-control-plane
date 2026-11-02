@@ -50,6 +50,10 @@ const LINK_SPRING = 0.7;
 const FRICTION = 0.8;
 const DECAY = 1200;
 const NO_TAGS: LinkTag[] = [];
+/** The reading-direction motion on a selected relationship: dots travel from subject to object. */
+const FLOW_PERIOD_MS = 1800;
+const FLOW_DOTS = 3;
+const FLOW_RADIUS = 2.2;
 
 type Point = [number, number];
 
@@ -116,6 +120,8 @@ export default function CosmosCanvas({
   children,
 }: CosmosCanvasProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
+  // A plain 2D canvas over the WebGL one, for the motion that shows which way a relationship reads.
+  const flowRef = useRef<HTMLCanvasElement>(null);
   const graphRef = useRef<CosmosGraph | null>(null);
   const frameRef = useRef<number | null>(null);
   const labelRefs = useRef(new Map<number, HTMLDivElement>());
@@ -367,7 +373,10 @@ export default function CosmosCanvas({
           scalePointsOnZoom: false,
           pointGreyoutOpacity: 0.12,
           linkGreyoutOpacity: 0.06,
+          // Relationships carry an arrow at the object end (see `CosmosBuffers.arrows`); the other
+          // lines have no direction, so none by default.
           linkDefaultArrows: false,
+          linkArrowsSizeScale: 0.8,
           renderHoveredPointRing: true,
           hoveredPointRingColor: accent,
           focusedPointRingColor: accent,
@@ -451,6 +460,7 @@ export default function CosmosCanvas({
     graph.setLinks(buffers.links);
     graph.setLinkColors(buffers.linkColors);
     graph.setLinkWidths(buffers.linkWidths);
+    graph.setLinkArrows(buffers.arrows);
     graph.setLinkStrength(buffers.linkStrengths);
     // Every document's group has a centre of its own; a point in no group is left to the other forces.
     graph.setPointClusters(buffers.clusters);
@@ -475,9 +485,68 @@ export default function CosmosCanvas({
     const graph = graphRef.current;
     if (!graph || !ready) return;
     const ends = linkTags.flatMap((tag) => [buffers.links[tag.link * 2], buffers.links[tag.link * 2 + 1]]);
-    graph.trackPointPositionsByIndices([...new Set([...labels, ...ends])]);
+    // The selected relationships' ends too, so the reading-direction motion can place its dots.
+    const flowing = (selection?.links ?? []).filter((link) => buffers.arrows[link]).flatMap((link) => [buffers.links[link * 2], buffers.links[link * 2 + 1]]);
+    graph.trackPointPositionsByIndices([...new Set([...labels, ...ends, ...flowing])]);
     scheduleLabels();
-  }, [labels, linkTags, buffers, ready, scheduleLabels]);
+  }, [labels, linkTags, selection, buffers, ready, scheduleLabels]);
+
+  // Which way a selected relationship reads: small dots run from its subject to its object, on top
+  // of the arrow head, while something is selected. Arrows alone are easy to miss on a dense graph,
+  // and a reader who takes the object for the subject reads the fact backwards. Off when the reader
+  // asked the system for less motion; the arrows stay.
+  useEffect(() => {
+    const canvas = flowRef.current;
+    const graph = graphRef.current;
+    const host = hostRef.current;
+    if (!canvas || !graph || !host || !ready) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const clear = () => context.clearRect(0, 0, canvas.width, canvas.height);
+    const links = (selection?.links ?? []).filter((link) => buffers.arrows[link]);
+    const lessMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!links.length || lessMotion) {
+      clear();
+      return;
+    }
+    const started = performance.now();
+    let frame = 0;
+    const draw = (now: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.round(host.clientWidth * dpr);
+      const height = Math.round(host.clientHeight * dpr);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      clear();
+      const tracked = graph.getTrackedPointPositionsMap();
+      const phase = ((now - started) / FLOW_PERIOD_MS) % 1;
+      context.fillStyle = accent;
+      for (const link of links) {
+        const from = tracked.get(buffers.links[link * 2]);
+        const to = tracked.get(buffers.links[link * 2 + 1]);
+        if (!from || !to) continue;
+        const a = graph.spaceToScreenPosition(from);
+        const b = graph.spaceToScreenPosition(to);
+        for (let k = 0; k < FLOW_DOTS; k += 1) {
+          const along = (phase + k / FLOW_DOTS) % 1;
+          // Brighter towards the object end, so even a still frame reads in the right direction.
+          context.globalAlpha = 0.3 + 0.7 * along;
+          context.beginPath();
+          context.arc((a[0] + (b[0] - a[0]) * along) * dpr, (a[1] + (b[1] - a[1]) * along) * dpr, FLOW_RADIUS * dpr, 0, Math.PI * 2);
+          context.fill();
+        }
+      }
+      context.globalAlpha = 1;
+      frame = window.requestAnimationFrame(draw);
+    };
+    frame = window.requestAnimationFrame(draw);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      clear();
+    };
+  }, [selection, buffers, ready, accent]);
 
   const placeLabel = useCallback(
     (index: number, el: HTMLDivElement | null) => {
@@ -564,6 +633,7 @@ export default function CosmosCanvas({
         backgroundSize: '22px 22px',
       }}>
       <Box ref={hostRef} sx={{ position: 'absolute', inset: 0, '& canvas': { display: 'block' } }} />
+      <Box component="canvas" ref={flowRef} aria-hidden sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} />
       {failed ? (
         <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 360 }}>
