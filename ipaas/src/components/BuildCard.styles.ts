@@ -54,6 +54,7 @@ export const statusDotSx = (color: string) =>
 export const logsButtonSx = {
   textTransform: 'none',
   fontSize: '0.75rem',
+  ml: 1,
 } as const;
 
 export const centeredRowSx = {
