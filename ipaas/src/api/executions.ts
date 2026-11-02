@@ -42,6 +42,7 @@ interface BffExecution {
   startTime?: string;
   completionTime?: string;
   revisionId?: string;
+  failedReason?: string;
 }
 
 // BFF Schedule (CronJob spec) from GET /components/{name}/schedules/{envId}.
@@ -70,7 +71,7 @@ function toTaskExecution(e: BffExecution): TaskExecution {
     startTime: toUnixSeconds(e.startTime),
     completionTime: toUnixSeconds(e.completionTime),
     revisionId: e.revisionId ?? '',
-    failedReason: '',
+    failedReason: e.failedReason ?? '',
     status: e.status ?? '',
     arguments: null,
   };

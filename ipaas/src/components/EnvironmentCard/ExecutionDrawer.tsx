@@ -191,6 +191,11 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
                   </Box>
                 </Stack>
               </Box>
+              {execution.failedReason && (
+                <Alert severity="error" sx={{ mt: 1.5 }}>
+                  {execution.failedReason}
+                </Alert>
+              )}
             </Box>
 
             {/* Tabs */}

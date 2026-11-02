@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, TablePagination, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { CheckCircle2, ChevronRight, XCircle } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -75,11 +75,22 @@ function isInProgress(status: string, _completionTime: string): boolean {
   return true; // InProgress, Queued, or any non-terminal status
 }
 
-function StatusIcon({ status, inProgress }: { status: string; inProgress: boolean }) {
+function StatusIcon({ status, inProgress, failedReason }: { status: string; inProgress: boolean; failedReason?: string }) {
   if (inProgress) return <CircularProgress size={18} />;
   const val = status?.toLowerCase();
   if (val === 'succeeded' || val === 'success') return <CheckCircle2 size={18} color="green" />;
-  if (val === 'failed' || val === 'failure') return <XCircle size={18} color="red" />;
+  if (val === 'failed' || val === 'failure') {
+    const icon = <XCircle size={18} color="red" aria-label={failedReason || 'Failed'} />;
+    if (!failedReason) return icon;
+    // The span gives the tooltip an element it can hold a ref to.
+    return (
+      <Tooltip title={failedReason}>
+        <Box component="span" sx={{ display: 'inline-flex' }}>
+          {icon}
+        </Box>
+      </Tooltip>
+    );
+  }
   return <CircularProgress size={18} />;
 }
 
@@ -274,7 +285,7 @@ export default function AutomationExecutions({
               return (
                 <ListingTable.Row key={e.id}>
                   <ListingTable.Cell>
-                    <StatusIcon status={e.status} inProgress={inProgress} />
+                    <StatusIcon status={e.status} inProgress={inProgress} failedReason={e.failedReason} />
                   </ListingTable.Cell>
                   <ListingTable.Cell>
                     <Typography variant="body2">{inProgress ? '--' : formatTriggeredAt(e.startTime)}</Typography>
