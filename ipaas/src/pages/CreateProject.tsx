@@ -45,8 +45,9 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
 
   const nameError = displayName ? validateProjectName(displayName) : null;
   const handlerInputRef = useRef<HTMLInputElement>(null);
-  // Shown once the edit is committed (Enter or blur).
-  const handlerError = effectiveHandler && !handlerEdited ? validateProjectHandler(effectiveHandler) : null;
+  const handlerInvalid = effectiveHandler ? validateProjectHandler(effectiveHandler) : null;
+  // Gates submit at once, but the message waits until the edit is committed (Enter or blur).
+  const handlerError = handlerEdited ? null : handlerInvalid;
 
   // The input is disabled until editing starts, so it can only take focus afterwards.
   useEffect(() => {
@@ -55,7 +56,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
 
   // A failed availability check must not hard-block submit — the create call still validates uniqueness.
   const availabilityReady = !effectiveHandler || effectiveHandler.length < 2 || availability !== undefined || availabilityError;
-  const canSubmit = !!displayName.trim() && !nameError && !!effectiveHandler && !handlerError && !handlerTaken && !isCheckingAvailability && availabilityReady;
+  const canSubmit = !!displayName.trim() && !nameError && !!effectiveHandler && !handlerInvalid && !handlerTaken && !isCheckingAvailability && availabilityReady;
 
   const handleSubmit = async () => {
     setIsCreating(true);

@@ -73,6 +73,8 @@ export function useProjectHandler(displayName: string): UseProjectHandlerReturn 
   const startEditing = () => {
     setHandlerEdited(true);
     setManualHandler(effectiveHandler);
+    // The handle shown becomes the user's own, so an earlier swap must not re-apply while they type.
+    setReplacement(null);
   };
 
   const stopEditing = () => {

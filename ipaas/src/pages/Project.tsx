@@ -115,6 +115,8 @@ const rowDeleteSx = { opacity: 0, pointerEvents: 'none', transition: 'opacity 0.
 const integrationRowRevealSx = {
   '&:hover .row-delete, &:focus-within .row-delete': { opacity: 1, pointerEvents: 'auto' },
   '&:hover .row-swap:has(.row-delete) .row-time, &:focus-within .row-swap:has(.row-delete) .row-time': { opacity: 0 },
+  // Touch and pen have no hover, so the button stays shown there.
+  '@media (hover: none)': { '& .row-delete': { opacity: 1, pointerEvents: 'auto' }, '& .row-swap:has(.row-delete) .row-time': { opacity: 0 } },
 } as const;
 
 /** Splits an integration's active API subscribers into internal (Choreo-managed test apps) vs external, deduped by application. */
