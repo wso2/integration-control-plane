@@ -212,8 +212,12 @@ describe('gitProviderLabel', () => {
     expect(gitProviderLabel('GitHub')).toBe('GitHub');
   });
 
+  it('labels azure_devops', () => {
+    expect(gitProviderLabel('azure_devops')).toBe('Azure DevOps');
+  });
+
   it('falls back to the raw provider for unknown values', () => {
-    expect(gitProviderLabel('azure_devops')).toBe('azure_devops');
+    expect(gitProviderLabel('gitea')).toBe('gitea');
   });
 
   it('returns an empty string for an empty provider', () => {
@@ -303,8 +307,16 @@ describe('repoUrl', () => {
     expect(repoUrl(makeRepo({ gitProvider: 'bitbucket_server' }))).toBe('my-org/my-repo');
   });
 
-  it('returns an empty string for an unknown provider', () => {
+  it('builds an azure devops url under the project', () => {
+    expect(repoUrl(makeRepo({ gitProvider: 'azure_devops', projectApp: 'Payments Team' }))).toBe('https://dev.azure.com/my-org/Payments%20Team/_git/my-repo');
+  });
+
+  it('returns an empty string for azure devops without a project', () => {
     expect(repoUrl(makeRepo({ gitProvider: 'azure_devops' }))).toBe('');
+  });
+
+  it('returns an empty string for an unknown provider', () => {
+    expect(repoUrl(makeRepo({ gitProvider: 'gitea' }))).toBe('');
   });
 });
 

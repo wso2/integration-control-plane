@@ -219,6 +219,12 @@ export interface CreateComponentInput {
    * and provisions per-build clone secrets; other variants ignore it.
    */
   gitHubAppInstallationId?: string;
+  /** Azure DevOps source selected through the delegated Entra connection. */
+  azureDevOps?: {
+    organization: string;
+    project: string;
+    repo: string;
+  };
 }
 
 export interface UpdateComponentInput {
