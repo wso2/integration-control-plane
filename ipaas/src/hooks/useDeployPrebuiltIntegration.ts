@@ -51,8 +51,12 @@ export function useDeployPrebuiltIntegration() {
   const deleteComponentRef = useRef(deleteComponent);
   createComponentRef.current = createComponent;
   // Saving configuration needs cloud:resource-type:manage; without it the values travel only in deploy-prebuilt.
+  const can = useCan();
   const canSaveConfigRef = useRef(false);
-  canSaveConfigRef.current = useCan()(Scopes.CONFIG_MANAGE);
+  canSaveConfigRef.current = can(Scopes.CONFIG_MANAGE);
+  // Without ipaas:integration:delete the rollback would only be refused: the half-made integration stays for an Admin to delete.
+  const canDeleteRef = useRef(false);
+  canDeleteRef.current = can(Scopes.INTEGRATION_DELETE);
   deployImageRef.current = deployImage;
   deleteComponentRef.current = deleteComponent;
 
@@ -122,7 +126,7 @@ export function useDeployPrebuiltIntegration() {
       // Log the primary failure before rolling back — otherwise the actual cause
       // (name check, create, deploy, …) is lost and only the generic toast remains.
       console.error('Prebuilt integration deploy failed', { orgHandler, projectId, createdComponentId }, err);
-      if (createdComponentId) {
+      if (createdComponentId && canDeleteRef.current) {
         try {
           await deleteComponentRef.current.mutateAsync({ orgHandler, componentId: createdComponentId, projectId });
         } catch (rollbackErr) {

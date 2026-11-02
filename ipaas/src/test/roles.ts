@@ -17,30 +17,29 @@
  */
 
 // The roles' grants that reach the console's token: their ipaas:* and cloud:* permissions on
-// urn:wso2:cloud and their amp:agent:* permissions on Agent Manager, as the stacks seed them
-// (wso2cloud-deployment 2e2e0253, thunder-idp.yaml, org-role-developer / -platform-engineer / -viewer),
-// less ipaas-service's environment-tier scopes, which it doesn't check.
+// urn:wso2:cloud and their amp:agent:* permissions on Agent Manager, as wso2cloud-deployment#5563
+// grants them (thunder-idp.yaml, org-role-developer / -platform-engineer / -viewer).
 
 export const DEVELOPER = (
-  'cloud:organization:view ipaas:project:read ipaas:project:create ipaas:project:update ipaas:environment:read ipaas:data-plane:read ipaas:deployment-pipeline:read ' +
-  'ipaas:repository:read ipaas:integration:read ipaas:integration:create ipaas:integration:update ipaas:integration:delete ipaas:integration:build ipaas:integration:deploy ' +
-  'ipaas:integration:execute ipaas:editor:use ipaas:config:read ipaas:icp-secret:manage ipaas:endpoint:read ipaas:endpoint:update ipaas:endpoint:expose ipaas:endpoint:test ' +
+  'cloud:organization:view cloud:project:read cloud:project:create cloud:project:update ipaas:environment:read ipaas:data-plane:read ipaas:deployment-pipeline:read ' +
+  'ipaas:repository:read ipaas:integration:read ipaas:integration:create ipaas:integration:update ipaas:integration:build ipaas:integration:deploy ' +
+  'ipaas:integration:execute ipaas:editor:use ipaas:config:read ipaas:endpoint:read ipaas:endpoint:update ipaas:endpoint:expose ipaas:endpoint:test ' +
   'ipaas:application:read ipaas:alert-rule:read ipaas:observability:log-read ipaas:observability:metric-read ' +
   'amp:agent:create amp:agent:read amp:agent:update amp:agent:delete amp:agent:build amp:agent:env-non-production amp:agent:suspend amp:agent:token-manage amp:agent:api-key-manage'
 ).split(' ');
 
 export const PLATFORM_ENGINEER = (
-  'cloud:organization:view cloud:environment:manage cloud:deployment-pipeline:manage cloud:alert:manage cloud:resource-type:manage ipaas:project:read ipaas:project:create ' +
-  'ipaas:project:update ipaas:project:delete ipaas:environment:read ipaas:data-plane:read ipaas:deployment-pipeline:read ipaas:repository:read ' +
+  'cloud:organization:view cloud:environment:manage cloud:deployment-pipeline:manage cloud:alert:manage cloud:resource-type:manage cloud:project:read cloud:project:create ' +
+  'cloud:project:update cloud:project:delete ipaas:environment:read ipaas:data-plane:read ipaas:deployment-pipeline:read ipaas:repository:read ' +
   'ipaas:repository:connect ipaas:integration:read ipaas:integration:create ipaas:integration:update ipaas:integration:delete ipaas:integration:build ipaas:integration:deploy ' +
-  'ipaas:integration:execute ipaas:editor:use ipaas:config:read ipaas:icp-secret:manage ipaas:package-registry:read ipaas:package-registry:manage ipaas:endpoint:read ' +
+  'ipaas:integration:execute ipaas:editor:use ipaas:config:read ipaas:package-registry:read ipaas:package-registry:manage ipaas:endpoint:read ' +
   'ipaas:endpoint:update ipaas:endpoint:expose ipaas:endpoint:test ipaas:endpoint:api-key-manage ipaas:application:read ipaas:application:manage ipaas:alert-rule:read ' +
   'ipaas:observability:log-read ipaas:observability:metric-read ' +
   'amp:agent:read amp:agent:build amp:agent:env-non-production amp:agent:env-production amp:agent:rollback amp:agent:suspend amp:agent:api-key-manage'
 ).split(' ');
 
 export const VIEWER = (
-  'cloud:organization:view ipaas:project:read ipaas:environment:read ipaas:data-plane:read ipaas:deployment-pipeline:read ipaas:repository:read ipaas:integration:read ' +
+  'cloud:organization:view cloud:project:read ipaas:environment:read ipaas:data-plane:read ipaas:deployment-pipeline:read ipaas:repository:read ipaas:integration:read ' +
   'ipaas:endpoint:read ipaas:application:read ipaas:alert-rule:read ipaas:observability:log-read ipaas:observability:metric-read ' +
   'amp:agent:read'
 ).split(' ');

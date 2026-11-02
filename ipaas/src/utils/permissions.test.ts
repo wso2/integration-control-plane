@@ -26,6 +26,6 @@ describe('sessionPermissions', () => {
   });
 
   it('is every gated scope when they are not', () => {
-    expect(sessionPermissions(['openid', 'ipaas:project:read'], false)).toEqual(Object.values(Scopes));
+    expect(sessionPermissions(['openid', 'cloud:project:read'], false)).toEqual(Object.values(Scopes));
   });
 });

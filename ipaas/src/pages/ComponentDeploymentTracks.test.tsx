@@ -19,9 +19,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ComponentDeploymentTracks from './ComponentDeploymentTracks';
 import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
-import { Scopes } from '../constants/permissions';
 import { button, renderWithScopes } from '../test/renderWithScopes';
-import { DEVELOPER, VIEWER } from '../test/roles';
+import { DEVELOPER, PLATFORM_ENGINEER, VIEWER } from '../test/roles';
 import { identifyIntegration } from '../utils/identifyIntegration';
 
 const tracks = [
@@ -61,14 +60,14 @@ describe('Deployment Tracks', () => {
     for (const name of controls) expect(button(c, name)).toBeUndefined();
   });
 
-  it('lets a Developer create, edit and delete a track', async () => {
-    expect(tab(DEVELOPER)).toContain('Deployment tracks');
-    const c = await page(DEVELOPER);
+  it('lets a Platform Engineer create, edit and delete a track', async () => {
+    const c = await page(PLATFORM_ENGINEER);
     for (const name of controls) expect(button(c, name)?.disabled).toBe(false);
   });
 
-  it('keeps Delete from a role that may update but not delete integrations', async () => {
-    const c = await page(DEVELOPER.filter((s) => s !== Scopes.INTEGRATION_DELETE));
+  it('lets a Developer, who may update but not delete integrations, create and edit a track, not delete it', async () => {
+    expect(tab(DEVELOPER)).toContain('Deployment tracks');
+    const c = await page(DEVELOPER);
     expect(button(c, 'Create deployment track')?.disabled).toBe(false);
     expect(button(c, 'Edit next')?.disabled).toBe(false);
     expect(button(c, 'Delete next')).toBeUndefined();

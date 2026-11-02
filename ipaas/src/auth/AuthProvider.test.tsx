@@ -214,9 +214,9 @@ describe('cloud AuthProvider — settling the session', () => {
   });
 
   it("carries the access token's scopes, or none when it has no scope claim", async () => {
-    signedInSdk(accessToken({ scope: 'openid ipaas:project:read  cloud:organization:view' }));
+    signedInSdk(accessToken({ scope: 'openid cloud:project:read  cloud:organization:view' }));
     await render();
-    expect(auth?.scopes).toEqual(['openid', 'ipaas:project:read', 'cloud:organization:view']);
+    expect(auth?.scopes).toEqual(['openid', 'cloud:project:read', 'cloud:organization:view']);
 
     root.unmount();
     root = createRoot(container);

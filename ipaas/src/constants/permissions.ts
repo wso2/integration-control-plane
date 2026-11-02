@@ -53,9 +53,9 @@ export const ALL_USER_MGT_PERMISSIONS = [Permissions.USER_MANAGE_USERS, Permissi
  * with ipaas-service's `middleware/authz`.
  */
 export const Scopes = {
-  PROJECT_CREATE: 'ipaas:project:create',
-  PROJECT_UPDATE: 'ipaas:project:update',
-  PROJECT_DELETE: 'ipaas:project:delete',
+  PROJECT_CREATE: 'cloud:project:create',
+  PROJECT_UPDATE: 'cloud:project:update',
+  PROJECT_DELETE: 'cloud:project:delete',
   INTEGRATION_READ: 'ipaas:integration:read',
   INTEGRATION_CREATE: 'ipaas:integration:create',
   INTEGRATION_UPDATE: 'ipaas:integration:update',

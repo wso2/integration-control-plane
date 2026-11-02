@@ -23,6 +23,7 @@ import BuildHistory from './Build/BuildHistory';
 import DeleteIntegrationButton from './DeleteIntegrationButton';
 import IntegrationTypeSelector from './IntegrationCreate/IntegrationTypeSelector';
 import SampleRowCard from './SampleRowCard';
+import { Scopes } from '../constants/permissions';
 import { AGENT_REFUSAL } from '../hooks/useCan';
 import { button, flush, reasonFor, renderWithScopes } from '../test/renderWithScopes';
 import { DEVELOPER, PLATFORM_ENGINEER } from '../test/roles';
@@ -92,13 +93,14 @@ describe('AI-agent writes, which agent-manager checks against amp:agent:*', () =
     expect(reasonFor(b)).toBe(AGENT_REFUSAL);
   });
 
-  it('lets a Developer create, edit the build parameters of, and delete an AI agent', async () => {
+  it('lets a Developer create and edit the build parameters of an AI agent, and Admin delete one', async () => {
     expect((await agentCard(DEVELOPER)).selected).toBe(true);
     unmount();
     expect((await quickDeploy(DEVELOPER))?.disabled).toBe(false);
     unmount();
     expect((await buildConfiguration(DEVELOPER))?.disabled).toBe(false);
     unmount();
-    expect((await deleteAgent(DEVELOPER))?.disabled).toBe(false);
+    // Admin holds both ipaas:integration:delete and amp:agent:delete; Developer only the second.
+    expect((await deleteAgent([...DEVELOPER, Scopes.INTEGRATION_DELETE]))?.disabled).toBe(false);
   });
 });

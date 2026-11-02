@@ -19,9 +19,13 @@
 import { act } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useDeployPrebuiltIntegration } from './useDeployPrebuiltIntegration';
+import { BffError } from '../api/_client';
+import { deleteComponent } from '../api/components';
 import { savePrebuiltConfig } from '../api/prebuilt';
+import PermissionDeniedNotice from '../components/PermissionDeniedNotice';
 import { Scopes } from '../constants/permissions';
 import { renderWithScopes } from '../test/renderWithScopes';
+import { DEVELOPER, PLATFORM_ENGINEER } from '../test/roles';
 import type { PrebuiltIntegration } from '../types/prebuilt';
 import type { SchemaConfigItem } from '../types/configuration';
 
@@ -34,9 +38,10 @@ vi.mock('../api/prebuilt', () => ({
   savePrebuiltConfig: vi.fn(),
 }));
 vi.mock('../utils/prebuilt', () => ({ derivePrebuiltSlug: () => 'orders' }));
-vi.mock('./useComponents', () => ({
+vi.mock('../api/components', async (importOriginal) => ({ ...(await importOriginal<typeof import('../api/components')>()), deleteComponent: vi.fn() }));
+vi.mock('./useComponents', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./useComponents')>()),
   useCreateComponent: () => ({ mutateAsync: () => Promise.resolve({ id: 'orders', handler: 'orders' }), reset: () => {} }),
-  useDeleteComponent: () => ({ mutateAsync: vi.fn(), reset: () => {} }),
 }));
 vi.mock('./useDeployments', () => ({ useDeployPrebuiltImage: () => ({ mutateAsync: deployImage, reset: () => {} }) }));
 
@@ -45,9 +50,14 @@ const integration = { displayName: 'Orders', imageUrl: 'registry/orders:1', comp
 
 let run: () => Promise<void> = async () => {};
 function Deploy() {
-  const { deploy } = useDeployPrebuiltIntegration();
+  const { deploy, error } = useDeployPrebuiltIntegration();
   run = () => deploy({ integration, orgHandler: 'acme', projectId: 'default', configValues });
-  return null;
+  return (
+    <>
+      <output>{error}</output>
+      <PermissionDeniedNotice />
+    </>
+  );
 }
 
 let unmount = () => {};
@@ -55,12 +65,16 @@ afterEach(() => unmount());
 beforeEach(() => {
   vi.mocked(savePrebuiltConfig).mockReset();
   deployImage.mockReset().mockResolvedValue({});
+  vi.mocked(deleteComponent)
+    .mockReset()
+    .mockRejectedValue(new BffError(403, JSON.stringify({ message: 'insufficient permissions: requires ipaas:integration:delete', code: 'INSUFFICIENT_SCOPE', scope: 'ipaas:integration:delete' })));
 });
 
 async function deployAs(scopes: string[]) {
   const r = await renderWithScopes(<Deploy />, scopes);
   unmount = r.unmount;
   await act(() => run());
+  return r.container;
 }
 
 describe('useDeployPrebuiltIntegration', () => {
@@ -74,5 +88,20 @@ describe('useDeployPrebuiltIntegration', () => {
     await deployAs([Scopes.INTEGRATION_CREATE, Scopes.INTEGRATION_DEPLOY, Scopes.CONFIG_MANAGE]);
     expect(savePrebuiltConfig).toHaveBeenCalled();
     expect(deployImage).toHaveBeenCalledWith(expect.objectContaining({ configurations: configValues }));
+  });
+
+  it('leaves a failed deploy to an Admin when the role may not delete integrations, with only the deploy error', async () => {
+    deployImage.mockRejectedValue(new Error('deploy failed'));
+    const c = await deployAs(DEVELOPER);
+    expect(deleteComponent).not.toHaveBeenCalled();
+    expect(c.querySelector('output')?.textContent).toBe('deploy failed');
+    expect(document.body.textContent).not.toContain("Your role doesn't allow this");
+  });
+
+  it('rolls a failed deploy back for a role that may delete integrations', async () => {
+    deployImage.mockRejectedValue(new Error('deploy failed'));
+    vi.mocked(deleteComponent).mockResolvedValue({ status: 'success', canDelete: true, message: '' } as never);
+    await deployAs(PLATFORM_ENGINEER);
+    expect(deleteComponent).toHaveBeenCalledWith({ orgHandler: 'acme', componentId: 'orders', projectId: 'default' });
   });
 });
