@@ -220,7 +220,17 @@ interface RawEngine {
 interface RawSourceProgress {
   sourceId: string;
   reading: { state: string; runId?: string | null; startedAt?: string | null; completedAt?: string | null };
-  processing: { since?: string | null; total: number; queued: number; running: number; succeeded: number; failed: number; percent?: number | null };
+  processing: {
+    since?: string | null;
+    total: number;
+    queued: number;
+    running: number;
+    succeeded: number;
+    failed: number;
+    percent?: number | null;
+    inProgress?: { recordId: string; phase: string; done?: number | null; total?: number | null; updatedAt?: string | null; sizeBytes?: number | null }[] | null;
+    bytes?: { delivered?: number | null; finished?: number | null } | null;
+  };
   records: { active: number; quarantined: number; deleted: number };
   indexing: { state: string; expected?: number | null; indexed?: number | null; indexing?: number | null; failed?: number | null; missing?: number | null; percent?: number | null; collectedAt?: string | null; failures?: Record<string, number> | null };
 }
@@ -321,6 +331,16 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
     succeeded: raw.processing?.succeeded ?? 0,
     failed: raw.processing?.failed ?? 0,
     percent: raw.processing?.percent ?? null,
+    inProgress: (raw.processing?.inProgress ?? []).map((item) => ({
+      recordId: item.recordId,
+      phase: item.phase,
+      done: item.done ?? null,
+      total: item.total ?? null,
+      updatedAt: orUndefined(item.updatedAt),
+      sizeBytes: item.sizeBytes ?? null,
+    })),
+    // An engine from before the position reports sends no bytes; the card then falls back to item counts.
+    bytes: raw.processing?.bytes ? { delivered: raw.processing.bytes.delivered ?? 0, finished: raw.processing.bytes.finished ?? 0 } : null,
   },
   records: { active: raw.records?.active ?? 0, quarantined: raw.records?.quarantined ?? 0, deleted: raw.records?.deleted ?? 0 },
   indexing: {

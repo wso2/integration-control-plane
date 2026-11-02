@@ -69,6 +69,7 @@ import type {
   GetStartedStep,
   LlmConfig,
   McpClientConfig,
+  RecordProgress,
   SourceCategory,
   SourceConnector,
   SourceFieldDef,
@@ -608,7 +609,64 @@ export function sourceProgressValue(p: SourceProgress): number | null {
   if (status === 'waiting' || status === 'empty') return 0;
   if (status === 'reading') return null;
   if (status === 'indexing') return p.indexing.percent ?? 0;
+  if (status === 'processing') return processingValue(p);
   return p.processing.percent ?? 100;
+}
+
+/**
+ * How far the running work has come, by bytes when the engine reports them: the finished
+ * records' bytes plus each running record's share, which is known while it is being mapped
+ * item by item, and inside the knowledge store's write by the step the provider reports:
+ * the text read, a merge or the embedding. A step that counts nothing yet gives one file
+ * alone an indeterminate bar rather than a number that would be made up. Without bytes the
+ * share of finished records stands in.
+ */
+function processingValue(p: SourceProgress): number | null {
+  const { bytes, inProgress, percent } = p.processing;
+  if (!bytes || bytes.delivered <= 0) return percent ?? 0;
+  let done = bytes.finished;
+  let unknown = false;
+  for (const item of inProgress) {
+    if (item.sizeBytes === null) {
+      unknown = true;
+    } else if (item.done !== null && item.total) {
+      done += (item.sizeBytes * Math.min(item.done, item.total)) / item.total;
+    } else if (item.phase !== 'reading' && item.phase !== 'mapping') {
+      unknown = true;
+    }
+  }
+  if (unknown && bytes.finished === 0 && inProgress.length === 1) return null;
+  return Math.min(100, (done / bytes.delivered) * 100);
+}
+
+/**
+ * What a running delivery is doing, in words: "mapping items 1,200 of 3,129", "writing to the
+ * knowledge store", and inside that write the provider's own steps: "reading the text 1.2 MB of
+ * 2.9 MB" (the model's read, in bytes; no total for a PDF, whose text is shorter than the file),
+ * "merging nodes 8,000 of 15,904", "merging edges 20,000 of 48,375", "embedding 1,200 of 17,660".
+ */
+export function recordPhaseText(item: RecordProgress): string {
+  const count = (n: number) => n.toLocaleString('en-US');
+  const counted = (verb: string, unit = '') => (item.done !== null && item.total !== null ? `${verb} ${count(item.done)} of ${count(item.total)}${unit}` : item.done !== null ? `${verb} ${count(item.done)}${unit} so far` : verb);
+  switch (item.phase) {
+    case 'reading':
+      return 'reading the file';
+    case 'mapping':
+      return item.done !== null && item.total !== null ? `mapping items ${count(item.done)} of ${count(item.total)}` : 'mapping items';
+    case 'indexing':
+      return item.total !== null ? `writing ${count(item.total)} items to the knowledge store` : 'writing to the knowledge store';
+    case 'extracting':
+      if (item.done === null) return 'reading the text';
+      return item.total !== null ? `reading the text ${formatBytes(item.done)} of ${formatBytes(item.total)}` : `reading the text, ${formatBytes(item.done)} so far`;
+    case 'merging_nodes':
+      return counted('merging nodes');
+    case 'merging_edges':
+      return counted('merging edges');
+    case 'embedding':
+      return counted('embedding');
+    default:
+      return 'starting';
+  }
 }
 
 /** Item counts under a source's bar, e.g. "540 of 1,200 items processed · 2 failed · 538 records stored" ("so far" while still reading). */
@@ -624,6 +682,8 @@ export function sourceProgressDetail(p: SourceProgress): string {
   if (failed > 0) parts.push(`${failed.toLocaleString('en-US')} failed`);
   if (p.records.quarantined > 0) parts.push(`${p.records.quarantined.toLocaleString('en-US')} quarantined`);
   parts.push(`${plural(p.records.active, 'record')} stored`);
+  // The deliveries running now, by name and position; a long record shows where it is instead of just "running".
+  for (const item of p.processing.inProgress.slice(0, 2)) parts.push(`${item.recordId.split('/').pop() ?? item.recordId}: ${recordPhaseText(item)}`);
   return parts.join(' · ');
 }
 

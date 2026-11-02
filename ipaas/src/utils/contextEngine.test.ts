@@ -67,6 +67,7 @@ import {
   sourceIndexingText,
   sourceProgressDetail,
   sourceProgressStatus,
+  recordPhaseText,
   sourceProgressValue,
   sourceSyncText,
   summarizeEngineProgress,
@@ -699,7 +700,7 @@ type ProgressOverrides = { [K in keyof SourceProgress]?: K extends 'sourceId' ? 
 const progress = (o: ProgressOverrides = {}): SourceProgress => ({
   sourceId: o.sourceId ?? 'src_1',
   reading: { state: 'idle', ...o.reading },
-  processing: { total: 0, queued: 0, running: 0, succeeded: 0, failed: 0, percent: null, ...o.processing },
+  processing: { total: 0, queued: 0, running: 0, succeeded: 0, failed: 0, percent: null, inProgress: [], bytes: null, ...o.processing },
   records: { active: 0, quarantined: 0, deleted: 0, ...o.records },
   indexing: { state: 'not_collected', expected: null, indexed: null, indexing: null, failed: null, missing: null, percent: null, failures: {}, ...o.indexing },
 });
@@ -752,6 +753,33 @@ describe('source progress', () => {
     expect(sourceProgressValue(progress({ reading: { state: 'completed' }, records: { active: 4 } }))).toBe(100);
     // Nothing stored: the bar is not shown, so it reads as nothing done.
     expect(sourceProgressValue(progress({ reading: { state: 'completed' } }))).toBe(0);
+  });
+
+  it('measures running work by bytes and shows where a running record is', () => {
+    const mapping = { recordId: 'results/osgi_extraction.json', phase: 'mapping', done: 1200, total: 3129, sizeBytes: 1000 };
+    const one = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [mapping], bytes: { delivered: 1000, finished: 0 } } });
+    // One file being mapped: its share of items is the bar.
+    expect(sourceProgressValue(one)).toBeCloseTo(38.35, 1);
+    expect(sourceProgressDetail(one)).toBe('0 of 1 item processed · 0 records stored · osgi_extraction.json: mapping items 1,200 of 3,129');
+    // Inside the store's write the engine has no position: one file alone gets no number.
+    const writing = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [{ ...mapping, phase: 'indexing', done: null }], bytes: { delivered: 1000, finished: 0 } } });
+    expect(sourceProgressValue(writing)).toBeNull();
+    expect(sourceProgressDetail(writing)).toMatch(/osgi_extraction.json: writing 3,129 items to the knowledge store$/);
+    // Many files: finished bytes plus the running file's share, over everything delivered.
+    const batch = progress({ processing: { total: 4, succeeded: 2, running: 1, queued: 1, percent: 50, inProgress: [{ ...mapping, done: 3129 }], bytes: { delivered: 4000, finished: 2000 } } });
+    expect(sourceProgressValue(batch)).toBe(75);
+    // An engine without byte reports falls back to the share of finished records.
+    expect(sourceProgressValue(progress({ processing: { total: 4, succeeded: 1, running: 1, queued: 2, percent: 25 } }))).toBe(25);
+    expect(recordPhaseText({ recordId: 'a', phase: 'starting', done: null, total: null, sizeBytes: null })).toBe('starting');
+    expect(recordPhaseText({ recordId: 'a', phase: 'reading', done: null, total: null, sizeBytes: 5 })).toBe('reading the file');
+    // Inside the knowledge store's write, the provider's own steps.
+    expect(recordPhaseText({ recordId: 'a', phase: 'extracting', done: 1_258_291, total: 3_040_870, sizeBytes: 3_040_870 })).toBe('reading the text 1.2 MB of 2.9 MB');
+    expect(recordPhaseText({ recordId: 'a', phase: 'extracting', done: 524_288, total: null, sizeBytes: 900_000 })).toBe('reading the text, 512 KB so far');
+    expect(recordPhaseText({ recordId: 'a', phase: 'merging_edges', done: 20_000, total: 48_375, sizeBytes: 5 })).toBe('merging edges 20,000 of 48,375');
+    expect(recordPhaseText({ recordId: 'a', phase: 'embedding', done: 1_200, total: null, sizeBytes: 5 })).toBe('embedding 1,200 so far');
+    // One file alone: the step's own share, or no number while the step counts nothing yet.
+    expect(sourceProgressValue(progress({ processing: { total: 1, running: 1, inProgress: [{ recordId: 'a', phase: 'merging_edges', done: 20_000, total: 48_375, sizeBytes: 1000 }], bytes: { delivered: 1000, finished: 0 } } }))).toBeCloseTo(41.3, 0);
+    expect(sourceProgressValue(progress({ processing: { total: 1, running: 1, inProgress: [{ recordId: 'a', phase: 'extracting', done: 512, total: null, sizeBytes: 1000 }], bytes: { delivered: 1000, finished: 0 } } }))).toBeNull();
   });
 
   it('floors percentages so in-flight work never reads 100%', () => {
