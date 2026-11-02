@@ -48,7 +48,7 @@ import type { EndpointRef } from '../types/consumers';
 
 const BASE = '/components/hello/environments/development/endpoints/api';
 const TRACKED: EndpointRef = { componentName: 'hello', environmentName: 'development', endpointName: 'api', deploymentTrackId: 'next-bbbbbb' };
-const DEFAULT: EndpointRef = { componentName: 'hello', environmentName: 'development', endpointName: 'api' };
+const DEFAULT: EndpointRef = { componentName: 'hello', environmentName: 'development', endpointName: 'api', deploymentTrackId: '' };
 
 const urls = () => [...get.mock.calls, ...post.mock.calls, ...put.mock.calls, ...del.mock.calls].map(([url]) => url as string);
 

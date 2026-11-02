@@ -39,53 +39,54 @@ const ROOT = 'devopsConfigs';
 
 // ── reads ─────────────────────────────────────────────────────────────────────
 
-// deploymentTrackId on these hooks is the deployment track the page shows; '' is the default track.
+// deploymentTrackId on these hooks is the deployment track the page shows. It is required, so a call site
+// can't silently read the default track, and the reads wait while it is undefined, before the component loads.
 
 /** The env's release (app-environment) — used to resolve the main container. */
-export function useRelease(projectId: string, componentId: string | undefined, releaseId: string | undefined, deploymentTrackId = '') {
+export function useRelease(projectId: string, componentId: string | undefined, releaseId: string | undefined, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery<ReleaseDetails>({
     queryKey: [ROOT, 'release', orgUuid, projectId, componentId, releaseId, deploymentTrackId],
-    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, releaseId!, deploymentTrackId),
-    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId,
+    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, releaseId!, deploymentTrackId!),
+    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && deploymentTrackId !== undefined,
   });
 }
 
-export function useConfigMaps(projectId: string, environmentId: string | undefined, deploymentTrackId = '') {
+export function useConfigMaps(projectId: string, environmentId: string | undefined, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsConfigMap[]>({
     queryKey: [ROOT, 'configmaps', orgUuid, projectId, environmentId, deploymentTrackId],
-    queryFn: () => getConfigMaps(orgUuid!, projectId, environmentId!, deploymentTrackId),
-    enabled: !!orgUuid && !!projectId && !!environmentId,
+    queryFn: () => getConfigMaps(orgUuid!, projectId, environmentId!, deploymentTrackId!),
+    enabled: !!orgUuid && !!projectId && !!environmentId && deploymentTrackId !== undefined,
   });
 }
 
-export function useSecrets(projectId: string, environmentId: string | undefined, deploymentTrackId = '') {
+export function useSecrets(projectId: string, environmentId: string | undefined, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsSecret[]>({
     queryKey: [ROOT, 'secrets', orgUuid, projectId, environmentId, deploymentTrackId],
-    queryFn: () => getSecrets(orgUuid!, projectId, environmentId!, deploymentTrackId),
-    enabled: !!orgUuid && !!projectId && !!environmentId,
+    queryFn: () => getSecrets(orgUuid!, projectId, environmentId!, deploymentTrackId!),
+    enabled: !!orgUuid && !!projectId && !!environmentId && deploymentTrackId !== undefined,
   });
 }
 
 /** Full data (incl. values) for one ConfigMap — used to prefill the edit form. */
-export function useConfigMapDetails(projectId: string, environmentId: string | undefined, configMapId: string | undefined, deploymentTrackId = '') {
+export function useConfigMapDetails(projectId: string, environmentId: string | undefined, configMapId: string | undefined, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsConfigMapDetails>({
     queryKey: [ROOT, 'configMapDetails', orgUuid, projectId, environmentId, configMapId, deploymentTrackId],
-    queryFn: () => getConfigMapDetails(orgUuid!, projectId, environmentId!, configMapId!, deploymentTrackId),
-    enabled: !!orgUuid && !!projectId && !!environmentId && !!configMapId,
+    queryFn: () => getConfigMapDetails(orgUuid!, projectId, environmentId!, configMapId!, deploymentTrackId!),
+    enabled: !!orgUuid && !!projectId && !!environmentId && !!configMapId && deploymentTrackId !== undefined,
   });
 }
 
 /** Config-mounts on a component's container — the configs actually injected here. */
-export function useContainerConfigMounts(projectId: string, componentId: string | undefined, releaseId: string | undefined, containerId: string | undefined, deploymentTrackId = '') {
+export function useContainerConfigMounts(projectId: string, componentId: string | undefined, releaseId: string | undefined, containerId: string | undefined, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery<DevopsConfigMount[]>({
     queryKey: [ROOT, 'mounts', orgUuid, projectId, componentId, releaseId, containerId, deploymentTrackId],
-    queryFn: () => getContainerConfigMounts(orgUuid!, projectId, componentId!, releaseId!, containerId!, deploymentTrackId),
-    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && !!containerId,
+    queryFn: () => getContainerConfigMounts(orgUuid!, projectId, componentId!, releaseId!, containerId!, deploymentTrackId!),
+    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && !!containerId && deploymentTrackId !== undefined,
   });
 }
 
@@ -102,7 +103,7 @@ function invalidateAll(qc: ReturnType<typeof useQueryClient>) {
  * mounts use `config_type: File` + a `File` mount at `mountPath`. Secrets go to
  * the `/secret` endpoint with `secret_type: Opaque`. Mirrors Devant + the HAR.
  */
-export function useSaveConfig(projectId: string, deploymentTrackId = '') {
+export function useSaveConfig(projectId: string, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
@@ -182,7 +183,7 @@ export function useSaveConfig(projectId: string, deploymentTrackId = '') {
 }
 
 /** Update a release container (resources, image-pull policy, command/args). */
-export function useUpdateContainer(projectId: string, componentId: string, releaseId: string, deploymentTrackId = '') {
+export function useUpdateContainer(projectId: string, componentId: string, releaseId: string, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({
@@ -195,7 +196,7 @@ export function useUpdateContainer(projectId: string, componentId: string, relea
 }
 
 /** Remove a config from the container by deleting its config-mount. */
-export function useDeleteConfig(projectId: string, deploymentTrackId = '') {
+export function useDeleteConfig(projectId: string, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();
   return useMutation({

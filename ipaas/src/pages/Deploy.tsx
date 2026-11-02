@@ -73,6 +73,15 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
     );
   }
 
+  // A loaded integration always resolves a track; the check narrows the type for what follows.
+  if (versionId === undefined) {
+    return (
+      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+        <CircularProgress />
+      </PageContent>
+    );
+  }
+
   if (component.isPrebuilt) {
     return <ComingSoon title="Deploy Not Available for Prebuilt Integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
   }

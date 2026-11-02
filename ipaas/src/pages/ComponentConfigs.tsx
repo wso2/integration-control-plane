@@ -143,7 +143,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
           </Box>
         ) : !comp ? (
           <Typography>Integration not found</Typography>
-        ) : !releaseId || !containerId ? (
+        ) : trackId === undefined ? null : !releaseId || !containerId ? (
           <Alert severity="info">Deploy this integration to the selected environment to manage its configs and secrets.</Alert>
         ) : view.kind === 'create' ? (
           <ConfigEditor ctx={ctx} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />

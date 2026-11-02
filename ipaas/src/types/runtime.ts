@@ -114,7 +114,12 @@ export interface ComponentLevelMetrics {
 export interface RuntimeMetrics {
   podLevelMetrics: PodMetrics[];
   componentLevelMetrics?: ComponentLevelMetrics;
+  /** Why `componentLevelMetrics` is absent, when the user should know. */
+  metricsUnavailableReason?: MetricsUnavailableReason;
 }
+
+/** `sharedWithOtherTracks`: usage can't be told apart from another deployment track deployed in the same environment. */
+export type MetricsUnavailableReason = 'sharedWithOtherTracks';
 
 /**
  * An event the cluster published about a pod. The cluster keeps these for roughly an

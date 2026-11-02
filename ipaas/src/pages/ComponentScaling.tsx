@@ -75,7 +75,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
           </Box>
         ) : !comp ? (
           <Alert severity="error">Integration not found</Alert>
-        ) : (
+        ) : trackId === undefined ? null : (
           <>
             <PageTitle>
               <PageTitle.Header>Scaling</PageTitle.Header>

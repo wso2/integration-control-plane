@@ -23,12 +23,12 @@ import { useOrgUuid } from './useOrgUuid';
 
 const ROOT = 'healthChecks';
 
-export function useHealthChecks(projectId: string, componentId: string | undefined, releaseId: string | undefined, environmentId: string | undefined, deploymentTrackId = '') {
+export function useHealthChecks(projectId: string, componentId: string | undefined, releaseId: string | undefined, environmentId: string | undefined, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery<HealthCheck[]>({
     queryKey: [ROOT, orgUuid, projectId, componentId, releaseId, environmentId, deploymentTrackId],
-    queryFn: () => getHealthChecks(orgUuid!, projectId, componentId!, releaseId!, environmentId!, deploymentTrackId),
-    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && !!environmentId,
+    queryFn: () => getHealthChecks(orgUuid!, projectId, componentId!, releaseId!, environmentId!, deploymentTrackId!),
+    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && !!environmentId && deploymentTrackId !== undefined,
   });
 }
 
@@ -37,8 +37,8 @@ interface WritePath {
   releaseId: string;
   environmentId: string;
   containerId: string;
-  /** The deployment track; absent is the default track. */
-  deploymentTrackId?: string;
+  /** The deployment track the page shows; undefined until the component loads. */
+  deploymentTrackId: string | undefined;
 }
 
 export function useCreateHealthCheck(projectId: string) {

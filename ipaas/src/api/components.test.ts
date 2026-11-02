@@ -27,6 +27,7 @@ vi.mock('./_client', async (importOriginal) => {
   return { ...actual, bff: { ...actual.bff, post, get, put } };
 });
 
+import { BffError } from './_client';
 import { createComponent, createDeploymentTrack, fetchComponentByHandler, updateDeploymentTrack, updateEndpoint } from './components';
 import type { CreateComponentInput } from '../types/component';
 
@@ -211,6 +212,28 @@ describe('deployment tracks', () => {
     });
     const c = await fetchComponentByHandler('proj', 'hello');
     expect(c.deploymentTracks).toEqual([{ id: 'uid-1', branch: undefined, latest: true, autoDeployEnabled: undefined }]);
+  });
+
+  it.each([
+    ['a server error', new BffError(500, 'list deployment tracks: boom')],
+    ['a network failure', new TypeError('Failed to fetch')],
+  ])('falls back to the list endpoint when the detail route fails with %s', async (_label, failure) => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') throw failure;
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      if (path === '/components/hello/deployment-track') return { id: 'uid-1', branch: 'main', latest: true };
+      throw new Error(`unexpected ${path}`);
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.id).toBe('uid-1');
+  });
+
+  it("keeps the detail route's answer about the component when it is a client error", async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') throw new BffError(403, 'forbidden');
+      return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello' }] };
+    });
+    await expect(fetchComponentByHandler('proj', 'hello')).rejects.toMatchObject({ status: 403 });
   });
 
   it('reports a component the list does not have', async () => {

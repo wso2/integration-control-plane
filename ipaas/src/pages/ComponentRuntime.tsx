@@ -145,7 +145,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
               replicasControl={<Chip variant="outlined" label={`Replicas ${replicaCount}`} />}
             />
             <Box sx={{ mt: 4 }}>
-              <ResourceUsageCards usage={usage} usageUnavailable={usageUnavailable} />
+              <ResourceUsageCards usage={usage} usageUnavailable={usageUnavailable} unavailableReason={metrics.data?.metricsUnavailableReason} />
             </Box>
           </>
         )}

@@ -37,7 +37,7 @@ import type {
   CheckDeletableResult,
 } from '../types/component';
 import type { CreateMcpProxyComponentInput } from '../types/mcpProxy';
-import { bff, items, q, seg, type ListResponse } from './_client';
+import { bff, BffError, items, q, seg, type ListResponse } from './_client';
 import { parseGitHubUrl } from '../utils/github';
 import { toVisibilityWire } from './_visibility';
 import { OTHER_BUILDPACK } from '../constants/integrations';
@@ -232,8 +232,18 @@ export const fetchComponents = (_orgHandler: string, projectId: string): Promise
 // leave the page with no id or handler and send later writes to an empty name. Its
 // answer is used only when it names the component; otherwise the component comes
 // from the list endpoint, as it did before the detail endpoint existed.
+// Every integration page loads its component here, so a detail route that fails on the server or the network
+// falls back to the list rather than failing the page. A 4xx is the BFF's answer about this component, so it stands.
+const detailUnavailable = (err: unknown): boolean => !(err instanceof BffError) || err.status >= 500;
+
 export const fetchComponentByHandler = async (projectId: string, componentHandler: string): Promise<ComponentDetail> => {
-  const detail = withFrontendDisplayType(await bff.get<ComponentDetail>(`/projects/${seg(projectId)}/components/${seg(componentHandler)}`));
+  let detail: ComponentDetail;
+  try {
+    detail = withFrontendDisplayType(await bff.get<ComponentDetail>(`/projects/${seg(projectId)}/components/${seg(componentHandler)}`));
+  } catch (err) {
+    if (detailUnavailable(err)) return fetchComponentFromList(projectId, componentHandler);
+    throw err;
+  }
   if (!detail?.id) return fetchComponentFromList(projectId, componentHandler);
   const deploymentTracks: DeploymentTrack[] = detail.deploymentTracks?.length ? detail.deploymentTracks : [{ id: detail.id, latest: true }];
   const apiVersions: ApiVersion[] = deploymentTracks.map((t) => ({ id: t.id, apiVersion: t.apiVersion ?? '', branch: t.branch ?? '', latest: t.latest ?? false }));
@@ -327,8 +337,6 @@ export const createMcpProxyComponent = (_input: CreateMcpProxyComponentInput): P
   throw new Error('[cloud] components.createMcpProxyComponent: not implemented');
 };
 
-// Every track of the integration with its environments, which the component detail leaves out.
-export const fetchDeploymentTracks = (componentId: string): Promise<DeploymentTrack[]> => bff.get<ListResponse<DeploymentTrack>>(`/components/${seg(componentId)}/deployment-tracks`).then(items);
 
 export const createDeploymentTrack = (input: CreateDeploymentTrackInput): Promise<DeploymentTrack> =>
   bff.post<DeploymentTrack>(`/components/${seg(input.componentId)}/deployment-tracks`, {

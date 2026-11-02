@@ -104,7 +104,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
           </Stack>
         ) : !comp ? (
           <Alert severity="error">Integration not found</Alert>
-        ) : !mainC ? (
+        ) : trackId === undefined ? null : !mainC ? (
           <Alert severity="info">This integration has no containers in the selected environment yet. Deploy it to configure health checks.</Alert>
         ) : creating ? (
           <CreateHealthCheckStepper

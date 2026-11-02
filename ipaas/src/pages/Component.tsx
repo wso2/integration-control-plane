@@ -113,6 +113,8 @@ export default function Component(scope: ComponentScope): JSX.Element {
   if (loadingProject || (projectId && pendingComponent)) return <IntegrationOverviewSkeleton />;
   if (!project) return <NotFound message="Project not found" backTo={orgHomeUrl(scope.org)} backLabel="Back to Projects" />;
   if (!component) return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+  // A loaded integration always resolves a track; the check narrows the type for what follows.
+  if (versionId === undefined) return <IntegrationOverviewSkeleton />;
 
   const displayType = component.displayType ?? '';
   const latestCommit = latestCommitOf(commits);

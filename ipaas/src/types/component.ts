@@ -59,10 +59,6 @@ export interface DeploymentTrack {
   apiVersion?: string;
   description?: string;
   latest?: boolean;
-  componentId?: string;
-  createdAt?: string;
-  updatedAt?: string;
-  versionStrategy?: string;
   /** Where the track is deployed. Cloud only. */
   environments?: DeploymentTrackEnvironment[];
 }

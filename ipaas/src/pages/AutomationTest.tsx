@@ -269,7 +269,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
 
   // No runtime arguments → the executions view: a "Total Executions" summary with a
   // direct Test trigger, plus the executions table. Mirrors Devant's no-args layout.
-  const renderExecutionsView = (): JSX.Element => (
+  const renderExecutionsView = (resolvedTrackId: string): JSX.Element => (
     <Box>
       {pageTitle}
       <Card sx={{ mb: 4 }}>
@@ -317,7 +317,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
         releaseId={releaseId}
         projectId={projectId}
         componentId={comp?.id ?? ''}
-        deploymentTrackId={trackId}
+        deploymentTrackId={resolvedTrackId}
         environmentId={envId}
         orgHandler={org}
         projectHandler={project}
@@ -330,7 +330,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   );
 
   // Runtime arguments present → the "Test Your Automation" form view (two panels).
-  const renderFormView = (): JSX.Element => (
+  const renderFormView = (resolvedTrackId: string): JSX.Element => (
     <Box>
       {pageTitle}
       <FormExecutionSummary
@@ -375,7 +375,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
             <TestStepper hasTriggered={!!currentRunId} status={execution?.status} />
             <ExecutionLogsPanel
               componentId={comp?.id ?? ''}
-              deploymentTrackId={trackId}
+              deploymentTrackId={resolvedTrackId}
               environmentId={envId}
               executionId={execution?.id ?? ''}
               run={execution ?? undefined}
@@ -401,12 +401,14 @@ export default function AutomationTest({ org, project, component }: ComponentSco
         </Box>
       );
     if (!comp) return renderNotice(<Alert severity="error">Integration not found.</Alert>);
+    // A loaded integration always resolves a track; the check narrows the type for what follows.
+    if (trackId === undefined) return renderNotice(<CircularProgress />);
     if (!deployment || !releaseId) return renderNotice(<NotDeployedAlert status={deployment?.deploymentStatusV2} />);
     if (hardArgsError) return renderNotice(<Alert severity="error">Could not load this automation&apos;s runtime arguments. Retry in a moment; if it persists, the automation can still be triggered from its environment card.</Alert>);
     // Deployed but not usable yet — say so instead of offering a Run button with
     // no workload behind it.
     if (deployment.deploymentStatusV2 !== 'ACTIVE') return renderNotice(<NotDeployedAlert status={deployment.deploymentStatusV2} />);
-    return hasArgs ? renderFormView() : renderExecutionsView();
+    return hasArgs ? renderFormView(trackId) : renderExecutionsView(trackId);
   };
 
   return (

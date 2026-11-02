@@ -72,6 +72,15 @@ export default function Build(scope: ComponentScope): JSX.Element {
     );
   }
 
+  // A loaded integration always resolves a track; the check narrows the type for what follows.
+  if (versionId === undefined) {
+    return (
+      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+        <CircularProgress />
+      </PageContent>
+    );
+  }
+
   if (component.isPrebuilt) {
     return <ComingSoon title="Build Not Available for Prebuilt Integrations" description="Prebuilt integrations are deployed directly from a published image — there is no source build step." />;
   }

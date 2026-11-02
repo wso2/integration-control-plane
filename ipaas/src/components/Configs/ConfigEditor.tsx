@@ -32,8 +32,8 @@ export interface EditorContext {
   releaseId: string;
   containerId: string;
   envId: string;
-  /** The deployment track; absent is the default track. */
-  deploymentTrackId?: string;
+  /** The deployment track the configs belong to; undefined while the page hasn't resolved it. */
+  deploymentTrackId: string | undefined;
 }
 
 interface ConfigEditorProps {

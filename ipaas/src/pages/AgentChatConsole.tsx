@@ -67,6 +67,15 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
     return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
   }
 
+  // A loaded integration always resolves a track; the check narrows the type for what follows.
+  if (selectedTrackId === undefined) {
+    return (
+      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+        <CircularProgress />
+      </PageContent>
+    );
+  }
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <DeploymentTrackBar component={component} />

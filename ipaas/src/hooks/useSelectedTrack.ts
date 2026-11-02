@@ -59,8 +59,11 @@ export function withTrackParam(url: string, search: string): string {
 export interface SelectedTrack {
   tracks: DeploymentTrack[];
   track: DeploymentTrack | undefined;
-  /** The selected track's id; '' until the component loads. */
-  trackId: string;
+  /**
+   * The selected track's id; undefined until the component loads. Per-track reads wait on it, so none goes out for
+   * the default track while the page is still resolving a `?track=` link.
+   */
+  trackId: string | undefined;
   selectTrack: (id: string) => void;
 }
 
@@ -106,5 +109,5 @@ export function useSelectedTrack(component: Component | undefined): SelectedTrac
     [setParams, tracks],
   );
 
-  return { tracks, track, trackId: track?.id ?? '', selectTrack };
+  return { tracks, track, trackId: track?.id, selectTrack };
 }

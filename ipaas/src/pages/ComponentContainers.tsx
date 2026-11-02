@@ -82,7 +82,7 @@ export default function ComponentContainers({ org, project, component }: Compone
           </Box>
         ) : !comp ? (
           <Alert severity="error">Integration not found</Alert>
-        ) : containers.length === 0 ? (
+        ) : trackId === undefined ? null : containers.length === 0 ? (
           <Alert severity="info">This integration has no containers in the selected environment yet. Deploy it to configure its containers.</Alert>
         ) : (
           containers.map((c) => (

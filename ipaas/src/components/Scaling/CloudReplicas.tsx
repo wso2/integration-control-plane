@@ -98,7 +98,7 @@ export default function CloudReplicas({ projectId, componentId, componentHandler
         }
       />
       <Box sx={usageSx}>
-        <ResourceUsageCards usage={usage} usageUnavailable={usageUnavailable} showPercent readings={readings} />
+        <ResourceUsageCards usage={usage} usageUnavailable={usageUnavailable} showPercent readings={readings} unavailableReason={metrics.data?.metricsUnavailableReason} />
       </Box>
     </>
   );
