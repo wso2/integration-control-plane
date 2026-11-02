@@ -22,11 +22,16 @@
  * routes, so it is an endpoint api-key sent as `X-API-Key`.
  */
 
-/** Identifies one deployed endpoint — the path triple every security call takes. */
+/** Identifies one deployed endpoint's gateway API — the path triple every security call takes, and the deployment track it belongs to. */
 export interface EndpointRef {
   componentName: string;
   environmentName: string;
   endpointName: string;
+  /**
+   * Each deployment track has its own API, with its own URL, security and keys. Required, so a caller can't
+   * silently act on the default track's API; undefined while the page hasn't resolved its track.
+   */
+  deploymentTrackId: string | undefined;
 }
 
 /** One selectable endpoint in the security drawer's endpoint picker. */

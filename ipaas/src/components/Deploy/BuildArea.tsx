@@ -130,7 +130,7 @@ export default function BuildArea({
 
   const isLatest = selectedImage?.imageId === images[0]?.imageId;
   const isDeploying = deployTrack.isPending;
-  const canDeploy = !!selectedImage?.imageId && !!firstEnvId && !isDeploying && !isBuildPending;
+  const canDeploy = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId) && !!firstEnvId && !isDeploying && !isBuildPending;
 
   const handleDeploy = () => {
     if (!canDeploy) return;

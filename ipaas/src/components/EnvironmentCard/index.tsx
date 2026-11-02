@@ -20,6 +20,8 @@ import { Card, CardContent } from '@wso2/oxygen-ui';
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { withTrackParam } from '../../hooks/useSelectedTrack';
+import { useLocation } from 'react-router';
 import { useComponentDeployment, useEnvEndpoints } from '../../hooks/useDeployments';
 import { useExecutionConfigs } from '../../hooks/useExecutions';
 import { useSchemaConfig } from '../../hooks/useConfiguration';
@@ -59,6 +61,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
   const isGenericService = GENERIC_SERVICE_TYPES.has(displayType ?? '');
   const queryClient = useQueryClient();
   const navigate = useAppNavigate();
+  const location = useLocation();
   const [configureOpen, setConfigureOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [notification, setNotification] = useState<{ text: string; severity: 'success' | 'error' } | null>(null);
@@ -259,7 +262,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
           onRefresh={handleRefresh}
           onConfigure={() => setConfigureOpen(true)}
           onViewLogs={isGenericService ? () => setLogsOpen(true) : undefined}
-          onTest={isGenericService ? () => navigate(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test/console`) : undefined}
+          onTest={isGenericService ? () => navigate(withTrackParam(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test/console`, location.search)) : undefined}
           hasMissingConfigs={hasMissingConfigs}
           isBuildInProgress={isBuildInProgress}
         />

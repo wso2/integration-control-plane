@@ -34,6 +34,7 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import NotFound from '../components/NotFound';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import type { EndpointRef } from '../types/consumers';
 import { trackEvent } from '../services/tracking/tracking';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
@@ -66,9 +67,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // Deployment track selection (default to latest) — derived rather than synced via an effect,
   // since an effect+render round trip here would delay useComponentDeployment/useEnvEndpoints below.
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const selectedTrackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { tracks, trackId: selectedTrackId } = useSelectedTrack(component);
 
   // Environment selection (by ID for stability across refetches) — same reasoning.
   const [selectedEnvIdState, setSelectedEnvId] = useState('');
@@ -90,14 +89,15 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // environmentName is the environment slug, which toEnvironment puts in `id` — `name` is the label.
   // The test key comes from the BFF's test-key route (component/environment/endpoint triple), and
-  // the enforcing API Platform gateway URL from the endpoint's security config.
+  // the enforcing API Platform gateway URL from endpoint discovery. Security may also return a
+  // URL, in which case useEndpointTestAccess prefers it.
   const testKeyEndpointRef: EndpointRef | null = useMemo(
-    () => (component && selectedEnv && selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id } : null),
-    [projectId, component, selectedEnv, selectedEndpoint],
+    () => (component && selectedEnv && selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id, deploymentTrackId: selectedTrackId } : null),
+    [projectId, component, selectedEnv, selectedEndpoint, selectedTrackId],
   );
   // Mint the initial test key when the console resolves an api-key-secured endpoint;
   // the button below explicitly refreshes it on demand after that.
-  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef);
+  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef, selectedEndpoint?.publicUrl || '');
   // Try-it-out runs in the browser, so the gateway must return CORS headers for this origin.
   const { data: endpointPolicies } = useEndpointPolicies(testKeyEndpointRef, !!testKeyEndpointRef);
   const testKeyHeader = access.authHeader;
@@ -139,11 +139,12 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   });
   const keyError = access.keyError;
 
-  // Cleared, not just replaced: the hook keys a minted key to its endpoint, so selecting one with
-  // no key must not leave the previous endpoint's credential in the field.
+  // Cleared, not just replaced: the hook keys a minted key to its endpoint and track, so selecting one with
+  // no key must not leave the previous one's credential in the field. Each track has its own API, so a track
+  // change resets the field even when neither track has a minted key.
   useEffect(() => {
     updateSecurityHeader(access.apiKey ?? '');
-  }, [access.apiKey]);
+  }, [access.apiKey, selectedTrackId]);
 
   const handleGetTestKey = async () => {
     if (!canGetTestKey) return;
@@ -192,7 +193,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelector} />}
+      {tracks.length > 0 && <DeploymentTrackBar component={component} extra={envSelector} />}
 
       <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>

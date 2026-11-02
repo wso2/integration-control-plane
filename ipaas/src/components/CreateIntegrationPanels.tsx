@@ -368,14 +368,21 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip title={providerComingSoonLabel(GitProvider.AZURE_DEVOPS)} placement="top">
-                        {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
-                        <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Azure" disabled sx={PROVIDER_ICON_SX}>
+                      {window.API_CONFIG.azureDevOpsClientId && (
+                        <Tooltip title="Import from Azure DevOps" placement="top">
+                          <IconButton
+                            aria-label="Import from Azure DevOps"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (creationBlocked) return;
+                              trackEvent('component-create-import-azure-devops', { org: scope.org, project: scope.project, provider: GitProvider.AZURE_DEVOPS });
+                              navigate(importUrl, { state: { mode: GitProvider.AZURE_DEVOPS } });
+                            }}
+                            sx={PROVIDER_ICON_SX}>
                             <AzureDevOpsIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
-                        </Box>
-                      </Tooltip>
+                        </Tooltip>
+                      )}
                     </>
                   )}
                 </Box>
@@ -480,7 +487,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {featuredSamples.map((sample) => (
-                        <SampleRowCard key={sampleKey(sample)} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
+                        <SampleRowCard
+                          key={sampleKey(sample)}
+                          sample={sample}
+                          onDeploy={() => handleQuickDeploy(sample)}
+                          isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false}
+                          deployDisabled={creationBlocked}
+                          deployDisabledTooltip={blockedTooltip}
+                        />
                       ))}
                     </Box>
                   )}

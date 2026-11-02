@@ -41,6 +41,7 @@ const OrgHomeRedirect = lazyPage(() => import('../components/OrgHomeRedirect'));
 
 const OIDCCallback = lazyPage(() => import('../pages/OIDCCallback'));
 const GitHubOAuthCallback = lazyPage(() => import('../pages/GitHubOAuthCallback'));
+const AzureDevOpsOAuthCallback = lazyPage(() => import('../pages/AzureDevOpsOAuthCallback'));
 const CookiePolicy = lazyPage(() => import('../pages/CookiePolicy'));
 const CloudEditorDeployment = lazyPage(() => import('../pages/CloudEditorDeployment'));
 const ProjectsRedirect = lazyPage(() => import('../pages/ProjectsRedirect'));
@@ -65,6 +66,8 @@ const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
 const ComponentContainers = lazyPage(() => import('../pages/ComponentContainers'));
 const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChecks'));
 const ComponentScaling = lazyPage(() => import('../pages/ComponentScaling'));
+const ComponentDeploymentTracks = lazyPage(() => import('../pages/ComponentDeploymentTracks'));
+const ComponentSettings = lazyPage(() => import('../pages/ComponentSettings'));
 const CdPipelineEditor = lazyPage(() => import('../pages/CdPipelineEditor'));
 const OrgSettings = lazyPage(() => import('../pages/OrgSettings'));
 const BrowseSamples = lazyPage(() => import('../pages/BrowseSamples'));
@@ -121,6 +124,7 @@ const routes: AppRoute[] = [
   { path: '/signin', element: <OIDCCallback /> },
   { path: '/logout', element: <Logout /> },
   { path: '/ghapp', element: <GitHubOAuthCallback /> },
+  { path: '/adoapp', element: <AzureDevOpsOAuthCallback /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -225,6 +229,11 @@ const routes: AppRoute[] = [
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/admin/scaling',
                 element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentScaling, ['components']))),
+              },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/settings', element: createElement(withScope(ComponentSettings, ['components'])) },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/settings/deployment-tracks',
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentDeploymentTracks, ['components']))),
               },
               // Unknown or retired pages (including the unported ones) go back to their level's home.
               { path: 'organizations/:orgHandler/*', element: <HiddenPageRedirect level="organizations" /> },

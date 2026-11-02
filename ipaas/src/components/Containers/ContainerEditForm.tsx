@@ -30,6 +30,8 @@ interface ContainerEditFormProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   /** Paid subscription or Private Data Plane — resource limits are configurable. */
   isPaidOrPdpUser: boolean;
   onClose: () => void;
@@ -40,11 +42,11 @@ interface ContainerEditFormProps {
 const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerEditForm({ container, projectId, componentId, releaseId, isPaidOrPdpUser, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
+export default function ContainerEditForm({ container, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
   const [form, setForm] = useState(() => containerToForm(container));
   const initialForm = useRef(form).current;
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
-  const update = useUpdateContainer(projectId, componentId, releaseId);
+  const update = useUpdateContainer(projectId, componentId, releaseId, deploymentTrackId);
   useUnsavedChanges(isDirty);
   const guardNavigation = useLeaveGuard();
 

@@ -18,7 +18,7 @@
 
 /** The BFF addresses probes per (component, environment) with no id, so the env stands in for every id devant carries. */
 
-import { bff, seg } from './_client';
+import { bff, q, seg } from './_client';
 import { PROBE_TYPE, type HCProbe, type HealthCheck, type HealthCheckWriteData, type ProbeType, type WriteProbe } from '../types/healthChecks';
 
 interface BffProbe {
@@ -40,7 +40,8 @@ interface BffHealthCheck {
   syncMessage?: string;
 }
 
-const hcPath = (componentId: string, env: string): string => `/components/${seg(componentId)}/environments/${seg(env)}/health-check`;
+// deploymentTrackId '' is the default track.
+const hcPath = (componentId: string, env: string, deploymentTrackId: string): string => `/components/${seg(componentId)}/environments/${seg(env)}/health-check${q({ deploymentTrackId })}`;
 
 // The BFF sets exactly one action; the page keys its form off the matching discriminator.
 function probeTypeOf(p: BffProbe): ProbeType {
@@ -100,25 +101,27 @@ function toHealthCheck(env: string, hc: BffHealthCheck): HealthCheck {
   };
 }
 
-const putProbes = async (componentId: string, env: string, data: HealthCheckWriteData): Promise<HealthCheck> => {
+const putProbes = async (componentId: string, env: string, data: HealthCheckWriteData, deploymentTrackId: string): Promise<HealthCheck> => {
   const livenessProbe = toBffProbe(data.probes.liveness_probe);
   const readinessProbe = toBffProbe(data.probes.readiness_probe);
-  await bff.put(hcPath(componentId, env), { livenessProbe, readinessProbe });
+  await bff.put(hcPath(componentId, env, deploymentTrackId), { livenessProbe, readinessProbe });
   return toHealthCheck(env, { livenessProbe, readinessProbe });
 };
 
 // An unconfigured environment reads as no health check at all, so the page shows its empty state.
-export const getHealthChecks = async (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string): Promise<HealthCheck[]> => {
+export const getHealthChecks = async (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, deploymentTrackId = ''): Promise<HealthCheck[]> => {
   if (!environmentId) return [];
-  const hc = await bff.get<BffHealthCheck>(hcPath(componentId, environmentId));
+  const hc = await bff.get<BffHealthCheck>(hcPath(componentId, environmentId, deploymentTrackId));
   if (!hc?.livenessProbe && !hc?.readinessProbe) return [];
   return [toHealthCheck(environmentId, hc)];
 };
 
-export const createHealthCheck = (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, data: HealthCheckWriteData): Promise<HealthCheck> => putProbes(componentId, environmentId, data);
+export const createHealthCheck = (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, data: HealthCheckWriteData, deploymentTrackId = ''): Promise<HealthCheck> =>
+  putProbes(componentId, environmentId, data, deploymentTrackId);
 
-export const updateHealthCheck = (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, _healthCheckId: string, data: HealthCheckWriteData): Promise<HealthCheck> => putProbes(componentId, environmentId, data);
+export const updateHealthCheck = (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, _healthCheckId: string, data: HealthCheckWriteData, deploymentTrackId = ''): Promise<HealthCheck> =>
+  putProbes(componentId, environmentId, data, deploymentTrackId);
 
-export const deleteHealthCheck = async (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, _healthCheckId: string): Promise<void> => {
-  if (environmentId) await bff.delete(hcPath(componentId, environmentId));
+export const deleteHealthCheck = async (_orgUuid: string, _projectId: string, componentId: string, _releaseId: string, environmentId: string, _containerId: string, _healthCheckId: string, deploymentTrackId = ''): Promise<void> => {
+  if (environmentId) await bff.delete(hcPath(componentId, environmentId, deploymentTrackId));
 };

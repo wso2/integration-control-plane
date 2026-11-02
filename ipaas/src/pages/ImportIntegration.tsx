@@ -18,17 +18,30 @@
 
 import { Alert, Box, Button, CircularProgress, FormHelperText, FormLabel, Grid, IconButton, InputAdornment, Link, MenuItem, PageContent, Skeleton, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../constants/import';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { ArrowLeft, GitBranch, RefreshCw, GitHub } from '@wso2/oxygen-ui-icons-react';
 import { MENU_SEARCH_THRESHOLD } from '../components/MenuSearchField';
 import { useState, useEffect, useRef, type JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateComponent } from '../hooks/useComponents';
 import { isQuotaError } from '../utils/apiErrors';
 import type { DisplayType } from '../types/component';
-import { useGitHubUserRepos, useRepoBranches, useRepoContents, useRepoMetadata, useComponentNameAvailability } from '../hooks/useRepository';
+import {
+  useAzureDevOpsBranches,
+  useAzureDevOpsContents,
+  useAzureDevOpsMetadata,
+  useAzureDevOpsOrganizations,
+  useAzureDevOpsProjects,
+  useAzureDevOpsRepositories,
+  useGitHubUserRepos,
+  useRepoBranches,
+  useRepoContents,
+  useRepoMetadata,
+  useComponentNameAvailability,
+  isAzureDevOpsAuthRequired,
+} from '../hooks/useRepository';
 import type { DetectedMode } from '../types/repository';
 import DirectoryPickerField from '../components/DirectoryPicker';
 import IntegrationTypeSelector from '../components/IntegrationCreate/IntegrationTypeSelector';
@@ -42,10 +55,12 @@ import { SAMPLE_REPO_URL } from '../constants/github';
 import { external } from '../paths';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems, selectMenuHeader } from '../components/Import/gitHubSelectActions';
 import { GitProvider } from '../types/credentials';
-import { buildRepoUrl } from '../utils/gitProviderUrl';
+import { buildAzureDevOpsRepoUrl, buildRepoUrl } from '../utils/gitProviderUrl';
 import { URL_DEBOUNCE_MS } from '../constants/project';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
 import { useGitHubAuth } from '../hooks/useGitHubAuth';
+import { useAzureDevOpsAuth } from '../hooks/useAzureDevOpsAuth';
+import AzureDevOpsIcon from '../assets/icons/AzureDevOpsIcon';
 import { toHandler, formatRepoNameToDisplayName } from '../utils/string';
 import { parseGitHubUrl } from '../utils/github';
 import { detectTechnology } from '../utils/technologyDetection';
@@ -75,9 +90,12 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
   const [sourceMode] = useState<SourceMode>(locationState?.mode ?? 'github');
   const isPublicRepo = sourceMode === 'public';
+  const isAzureDevOps = sourceMode === GitProvider.AZURE_DEVOPS;
 
   const { authStatus, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth(preAuthenticated ? 'done' : pendingAuthCode ? 'authenticating' : 'idle');
+  const { authStatus: azureAuthStatus, errorMessage: azureAuthError, startAzureDevOpsAuth } = useAzureDevOpsAuth();
   const [selectedOrg, setSelectedOrg] = useState('');
+  const [selectedAdoProject, setSelectedAdoProject] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
 
   const [repoUrl, setRepoUrl] = useState('');
@@ -108,29 +126,49 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   // Exchange OAuth code on mount (GitHub mode only)
   const authCodeExchangedRef = useRef(false);
   useEffect(() => {
-    if (isPublicRepo || !pendingAuthCode || authCodeExchangedRef.current) return;
+    if (isPublicRepo || isAzureDevOps || !pendingAuthCode || authCodeExchangedRef.current) return;
     authCodeExchangedRef.current = true;
     navigate(location.pathname, { replace: true, state: null });
     exchangeAuthCode(pendingAuthCode);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const reposEnabled = !isPublicRepo && (authStatus === 'done' || preAuthenticated);
+  const reposEnabled = !isPublicRepo && !isAzureDevOps && (authStatus === 'done' || preAuthenticated);
   const { data: userRepos, isLoading: isReposLoading, isSuccess: isReposSuccess, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled);
 
-  // Authorization is proven by a successful repo query, not by a non-empty list —
-  // an authorized account with no repositories is still authenticated.
-  const isAuthenticated = !isPublicRepo && isReposSuccess;
-  const hasRepos = (userRepos?.length ?? 0) > 0;
-  const isCheckingAuth = !isPublicRepo && reposEnabled && isReposLoading;
+  const { data: adoOrganizations, isLoading: isAdoOrganizationsLoading, isError: isAdoOrganizationsError, error: adoOrganizationsError, refetch: refetchAdoOrganizations } = useAzureDevOpsOrganizations(isAzureDevOps);
+  const { data: adoProjects, isLoading: isAdoProjectsLoading, isError: isAdoProjectsError, error: adoProjectsError, refetch: refetchAdoProjects } = useAzureDevOpsProjects(selectedOrg, isAzureDevOps);
+  const { data: adoRepositories, isLoading: isAdoRepositoriesLoading, isError: isAdoRepositoriesError, error: adoRepositoriesError, refetch: refetchAdoRepositories } = useAzureDevOpsRepositories(selectedOrg, selectedAdoProject, isAzureDevOps);
 
-  const { data: branches, isLoading: isBranchesLoading, refetch: refetchBranches } = useRepoBranches(activeOrg, activeRepo, isPublicRepo);
+  // GitHub authorization is proven by a successful repo query, not by a non-empty
+  // list — an authorized account with no repositories is still authenticated.
+  // Azure DevOps differs: git-app-service refuses to bind a connection that
+  // reaches no organization, so an empty list means nothing is connected.
+  const isAuthenticated = !isPublicRepo && (isAzureDevOps ? (adoOrganizations?.length ?? 0) > 0 : isReposSuccess);
+  const hasRepos = (userRepos?.length ?? 0) > 0;
+  const isCheckingAuth = !isPublicRepo && (isAzureDevOps ? isAdoOrganizationsLoading : reposEnabled && isReposLoading);
+
+  const githubBranches = useRepoBranches(isAzureDevOps ? '' : activeOrg, isAzureDevOps ? '' : activeRepo, isPublicRepo);
+  const adoBranches = useAzureDevOpsBranches(selectedOrg, selectedAdoProject, selectedRepo, isAzureDevOps);
+  const branches = isAzureDevOps ? adoBranches.data : githubBranches.data;
+  const isBranchesLoading = isAzureDevOps ? adoBranches.isLoading : githubBranches.isLoading;
+  const refetchBranches = isAzureDevOps ? adoBranches.refetch : githubBranches.refetch;
 
   const showBranchAndSubPath = !!(activeOrg && activeRepo);
   const pathReady = !!(activeOrg && activeRepo && selectedBranch);
 
-  const { data: repoContents = [], isLoading: isContentsLoading, isError: isContentsError, refetch: refetchContents } = useRepoContents(activeOrg, activeRepo, selectedBranch, isPublicRepo);
+  const githubContents = useRepoContents(isAzureDevOps ? '' : activeOrg, isAzureDevOps ? '' : activeRepo, selectedBranch, isPublicRepo);
+  const adoContents = useAzureDevOpsContents(selectedOrg, selectedAdoProject, selectedRepo, selectedBranch, isAzureDevOps);
+  const repoContents = (isAzureDevOps ? adoContents.data : githubContents.data) ?? [];
+  const isContentsLoading = isAzureDevOps ? adoContents.isLoading : githubContents.isLoading;
+  const isContentsError = isAzureDevOps ? adoContents.isError : githubContents.isError;
+  const refetchContents = isAzureDevOps ? adoContents.refetch : githubContents.refetch;
 
-  const { data: repoMetadata, isFetching: isValidating, refetch: refetchMetadata } = useRepoMetadata(activeOrg, activeRepo, selectedBranch, subPath, pathReady, isPublicRepo);
+  const githubMetadata = useRepoMetadata(activeOrg, activeRepo, selectedBranch, subPath, pathReady && !isAzureDevOps, isPublicRepo);
+  const adoMetadata = useAzureDevOpsMetadata(selectedOrg, selectedAdoProject, selectedRepo, selectedBranch, subPath, isAzureDevOps && pathReady);
+  const repoMetadata = isAzureDevOps ? adoMetadata.data : githubMetadata.data;
+  const isValidating = isAzureDevOps ? adoMetadata.isFetching : githubMetadata.isFetching;
+  const refetchMetadata = isAzureDevOps ? adoMetadata.refetch : githubMetadata.refetch;
+  const adoAuthRequired = [adoOrganizationsError, adoProjectsError, adoRepositoriesError, adoBranches.error, adoContents.error, adoMetadata.error].some(isAzureDevOpsAuthRequired);
 
   const handleRevalidate = () => {
     setDetectedMode(null);
@@ -159,8 +197,8 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   })();
 
   const handlerValid = effectiveHandler.length >= 3 && effectiveHandler.length <= 64;
-  // The auto-selected GitHub org and default branch are not input the user would lose.
-  const allowLeave = useUnsavedChanges(repoUrl !== '' || selectedRepo !== '' || displayName !== '' || description !== '' || selectedIntegrationType !== null || ballerinaTokenInput !== '');
+  // The auto-selected org and default branch are not input the user would lose.
+  const allowLeave = useUnsavedChanges(repoUrl !== '' || selectedRepo !== '' || selectedAdoProject !== '' || displayName !== '' || description !== '' || selectedIntegrationType !== null || ballerinaTokenInput !== '');
 
   // Technology detection
   useEffect(() => {
@@ -266,12 +304,13 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subPath]);
 
-  const orgOptions = userRepos?.map((o) => o.orgName) ?? [];
-  const reposForOrg = userRepos?.find((o) => o.orgName === selectedOrg)?.repositories.map((r) => r.name) ?? [];
+  const orgOptions = isAzureDevOps ? (adoOrganizations?.map((item) => item.organization) ?? []) : (userRepos?.map((o) => o.orgName) ?? []);
+  const adoProjectOptions = adoProjects?.map((project) => project.name) ?? [];
+  const reposForOrg = isAzureDevOps ? (adoRepositories?.map((repo) => repo.name) ?? []) : (userRepos?.find((o) => o.orgName === selectedOrg)?.repositories.map((r) => r.name) ?? []);
 
   // Reconcile after a refresh, and pre-select the first org so the repo picker is usable right after authorizing.
   useEffect(() => {
-    if (isPublicRepo || !userRepos) return;
+    if (isPublicRepo || isAzureDevOps || !userRepos) return;
     if (!selectedOrg || !orgOptions.includes(selectedOrg)) {
       setSelectedOrg(orgOptions[0] ?? '');
       setSelectedRepo('');
@@ -284,6 +323,34 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       resetDownstreamState({ includeDisplayName: true, includeTechnology: true });
     }
   }, [userRepos]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isAzureDevOps || !adoOrganizations) return;
+    if (adoOrganizations.length === 1 && !selectedOrg) setSelectedOrg(adoOrganizations[0].organization);
+    if (selectedOrg && !orgOptions.includes(selectedOrg)) {
+      setSelectedOrg('');
+      setSelectedAdoProject('');
+      setSelectedRepo('');
+      resetDownstreamState({ includeDisplayName: true, includeTechnology: true });
+    }
+  }, [adoOrganizations]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isAzureDevOps || !adoProjects) return;
+    if (selectedAdoProject && !adoProjectOptions.includes(selectedAdoProject)) {
+      setSelectedAdoProject('');
+      setSelectedRepo('');
+      resetDownstreamState({ includeDisplayName: true, includeTechnology: true });
+    }
+  }, [adoProjects]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!isAzureDevOps || !adoRepositories) return;
+    if (selectedRepo && !reposForOrg.includes(selectedRepo)) {
+      setSelectedRepo('');
+      resetDownstreamState({ includeDisplayName: true, includeTechnology: true });
+    }
+  }, [adoRepositories]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Submit handler
   //
@@ -316,7 +383,9 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     return undefined;
   };
 
-  const canSubmit = Boolean(activeOrg && activeRepo && selectedBranch && selectedTechnology && selectedIntegrationType && displayName.trim() && handlerValid && projectId && (isPublicRepo || isAuthenticated));
+  const canSubmit = Boolean(
+    activeOrg && activeRepo && selectedBranch && selectedTechnology && selectedIntegrationType && (!isAzureDevOps || selectedIntegrationType !== 'ai-agent') && displayName.trim() && handlerValid && projectId && (isPublicRepo || isAuthenticated),
+  );
 
   const handleSubmit = () => {
     // Fires on click, before the API call. 'component-create-end' fires only on success, so the gap
@@ -326,7 +395,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       project: scope.project,
       integrationType: selectedIntegrationType ?? 'unknown',
       buildpack: selectedTechnology ?? 'unknown',
-      provider: GitProvider.GITHUB,
+      provider: isAzureDevOps ? GitProvider.AZURE_DEVOPS : GitProvider.GITHUB,
       sourceMode,
     });
     createComponent.mutate(
@@ -338,12 +407,12 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         projectId,
         displayType: resolveDisplayType(),
         componentSubType: resolveComponentSubType(),
-        srcGitRepoUrl: buildRepoUrl(GitProvider.GITHUB, activeOrg, activeRepo),
+        srcGitRepoUrl: isAzureDevOps ? buildAzureDevOpsRepoUrl(activeOrg, selectedAdoProject, activeRepo) : buildRepoUrl(GitProvider.GITHUB, activeOrg, activeRepo),
         repositoryBranch: selectedBranch,
         repositorySubPath: subPath || '/',
         isPublicRepo,
         // Private repos build through the GitHub App installation that grants access.
-        ...(isPublicRepo ? { enableAutoDeploy: true } : { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId }),
+        ...(isPublicRepo ? { enableAutoDeploy: true } : isAzureDevOps ? { azureDevOps: { organization: activeOrg, project: selectedAdoProject, repo: activeRepo } } : { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId }),
       },
       {
         onSuccess: (component) => {
@@ -454,6 +523,49 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     );
   };
 
+  const renderAzureDevOpsArea = () => {
+    if (isCheckingAuth || azureAuthStatus === 'authenticating') {
+      return (
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 4, minHeight: 50 }}>
+          <CircularProgress size={18} />
+          <Typography variant="body2" color="text.secondary">
+            Connecting Azure DevOps…
+          </Typography>
+        </Stack>
+      );
+    }
+    if (azureAuthStatus === 'failed' || isAdoOrganizationsError || adoAuthRequired) {
+      return (
+        <Alert
+          severity="error"
+          sx={{ mb: 4 }}
+          action={
+            <Button color="inherit" size="small" onClick={() => startAzureDevOpsAuth(() => refetchAdoOrganizations(), true)}>
+              Reconnect
+            </Button>
+          }>
+          {azureAuthError || 'Your Azure DevOps connection needs to be refreshed.'}
+        </Alert>
+      );
+    }
+    if (!isAuthenticated) {
+      return (
+        <Box sx={{ mb: 4 }}>
+          <Button variant="outlined" startIcon={<AzureDevOpsIcon size={16} />} onClick={() => startAzureDevOpsAuth(() => refetchAdoOrganizations())} size="small">
+            Connect Azure DevOps
+          </Button>
+        </Box>
+      );
+    }
+    return (
+      <Box sx={{ mb: 2 }}>
+        <Button variant="text" size="small" onClick={() => startAzureDevOpsAuth(() => refetchAdoOrganizations(), true)}>
+          Connect another account
+        </Button>
+      </Box>
+    );
+  };
+
   // Row 1 source pickers — switches based on sourceMode:
   const renderRepoPickers = () => (
     <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
@@ -488,105 +600,194 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         </Grid>
       ) : (
         <>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <TextField
-                labelPlacement="top"
-                label="Organization"
-                select
-                required
-                value={selectedOrg}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === GH_SELECT_ACTION.addOrg) {
-                    openGitHubManage(githubInstallUrl, refetchRepos);
-                    return;
-                  }
-                  // Switching organizations should reset every downstream field —
-                  // the user explicitly asked for a fresh start on org change.
-                  setSelectedOrg(v);
-                  setSelectedRepo('');
-                  setSelectedBranch('');
-                  setSubPath('/');
-                  setDisplayName('');
-                  setDescription('');
-                  setSelectedTechnology(null);
-                  setSelectedIntegrationType(null);
-                  displayNameAutoRef.current = false;
-                }}
-                fullWidth
-                disabled={!isAuthenticated || isReposLoading}
-                error={authStatus === 'failed'}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Box sx={{ color: 'text.primary', display: 'flex' }}>
-                          <GitHub size={16} />
-                        </Box>
-                      </InputAdornment>
-                    ),
-                  },
-                }}>
-                {organizationActionItems(!!githubInstallUrl, isAuthenticated ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
-                {orgOptions.map((org) => (
-                  <MenuItem key={org} value={org}>
-                    {org}
-                  </MenuItem>
-                ))}
-              </TextField>
-            </Stack>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <TextField
-                labelPlacement="top"
-                label="Repository"
-                select
-                required
-                value={selectedRepo}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  if (v === GH_SELECT_ACTION.connectRepos) {
-                    openGitHubManage(githubInstallUrl, refetchRepos);
-                    return;
-                  }
-                  if (v === GH_SELECT_ACTION.createRepo) {
-                    openGitHubManage(external.githubNew, refetchRepos);
-                    return;
-                  }
-                  setSelectedRepo(v);
-                }}
-                fullWidth
-                disabled={!selectedOrg || isReposLoading}
-                slotProps={{
-                  select: { onClose: () => setRepoSearch('') },
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Box sx={{ color: 'text.primary', display: 'flex' }}>
-                          <GitHub size={16} />
-                        </Box>
-                      </InputAdornment>
-                    ),
-                  },
-                }}>
-                {selectMenuHeader(
-                  { key: 'repo-search', value: repoSearch, onChange: setRepoSearch, placeholder: 'Search repositories', show: reposForOrg.length > MENU_SEARCH_THRESHOLD },
-                  isAuthenticated ? { label: 'Refresh repositories', onClick: () => refetchRepos(), loading: isReposLoading } : undefined,
-                )}
-                {repositoryActionItems(!!githubInstallUrl)}
-                {reposForOrg
-                  .filter((repo) => repo.toLowerCase().includes(repoSearch.trim().toLowerCase()))
-                  .map((repo) => (
-                    <MenuItem key={repo} value={repo}>
-                      {repo}
+          {isAzureDevOps && (
+            <>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  labelPlacement="top"
+                  label="Organization"
+                  select
+                  required
+                  value={selectedOrg}
+                  onChange={(e) => {
+                    setSelectedOrg(e.target.value);
+                    setSelectedAdoProject('');
+                    setSelectedRepo('');
+                    resetDownstreamState({ includeDisplayName: true, includeTechnology: true });
+                  }}
+                  disabled={!isAuthenticated || isAdoOrganizationsLoading}
+                  fullWidth
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <AzureDevOpsIcon size={16} />
+                        </InputAdornment>
+                      ),
+                    },
+                  }}>
+                  {orgOptions.map((org) => (
+                    <MenuItem key={org} value={org}>
+                      {org}
                     </MenuItem>
                   ))}
-              </TextField>
-            </Stack>
-          </Grid>
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  labelPlacement="top"
+                  label="Project"
+                  select
+                  required
+                  value={selectedAdoProject}
+                  onChange={(e) => {
+                    setSelectedAdoProject(e.target.value);
+                    setSelectedRepo('');
+                    resetDownstreamState({ includeDisplayName: true, includeTechnology: true });
+                  }}
+                  disabled={!selectedOrg || isAdoProjectsLoading}
+                  error={isAdoProjectsError && !isAzureDevOpsAuthRequired(adoProjectsError)}
+                  helperText={isAdoProjectsError && !isAzureDevOpsAuthRequired(adoProjectsError) ? 'Could not load projects. Open the list and select Refresh projects to try again.' : undefined}
+                  fullWidth>
+                  {selectMenuHeader({ key: 'ado-project-search', value: '', onChange: () => {}, placeholder: '', show: false }, { label: 'Refresh projects', onClick: () => refetchAdoProjects(), loading: isAdoProjectsLoading })}
+                  {adoProjectOptions.map((project) => (
+                    <MenuItem key={project} value={project}>
+                      {project}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  labelPlacement="top"
+                  label="Repository"
+                  select
+                  required
+                  value={selectedRepo}
+                  onChange={(e) => setSelectedRepo(e.target.value)}
+                  disabled={!selectedAdoProject || isAdoRepositoriesLoading}
+                  error={isAdoRepositoriesError && !isAzureDevOpsAuthRequired(adoRepositoriesError)}
+                  helperText={isAdoRepositoriesError && !isAzureDevOpsAuthRequired(adoRepositoriesError) ? 'Could not load repositories. Open the list and select Refresh repositories to try again.' : undefined}
+                  fullWidth
+                  slotProps={{ select: { onClose: () => setRepoSearch('') } }}>
+                  {selectMenuHeader(
+                    { key: 'ado-repo-search', value: repoSearch, onChange: setRepoSearch, placeholder: 'Search repositories', show: reposForOrg.length > MENU_SEARCH_THRESHOLD },
+                    { label: 'Refresh repositories', onClick: () => refetchAdoRepositories(), loading: isAdoRepositoriesLoading },
+                  )}
+                  {reposForOrg
+                    .filter((repo) => repo.toLowerCase().includes(repoSearch.trim().toLowerCase()))
+                    .map((repo) => (
+                      <MenuItem key={repo} value={repo}>
+                        {repo}
+                      </MenuItem>
+                    ))}
+                </TextField>
+              </Grid>
+            </>
+          )}
+          {!isAzureDevOps && (
+            <>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <TextField
+                    labelPlacement="top"
+                    label="Organization"
+                    select
+                    required
+                    value={selectedOrg}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === GH_SELECT_ACTION.addOrg) {
+                        openGitHubManage(githubInstallUrl, refetchRepos);
+                        return;
+                      }
+                      // Switching organizations should reset every downstream field —
+                      // the user explicitly asked for a fresh start on org change.
+                      setSelectedOrg(v);
+                      setSelectedRepo('');
+                      setSelectedBranch('');
+                      setSubPath('/');
+                      setDisplayName('');
+                      setDescription('');
+                      setSelectedTechnology(null);
+                      setSelectedIntegrationType(null);
+                      displayNameAutoRef.current = false;
+                    }}
+                    fullWidth
+                    disabled={!isAuthenticated || isReposLoading}
+                    error={authStatus === 'failed'}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Box sx={{ color: 'text.primary', display: 'flex' }}>
+                              <GitHub size={16} />
+                            </Box>
+                          </InputAdornment>
+                        ),
+                      },
+                    }}>
+                    {organizationActionItems(!!githubInstallUrl, isAuthenticated ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
+                    {orgOptions.map((org) => (
+                      <MenuItem key={org} value={org}>
+                        {org}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Stack>
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 3 }}>
+                <Stack direction="row" alignItems="center" spacing={0.5}>
+                  <TextField
+                    labelPlacement="top"
+                    label="Repository"
+                    select
+                    required
+                    value={selectedRepo}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v === GH_SELECT_ACTION.connectRepos) {
+                        openGitHubManage(githubInstallUrl, refetchRepos);
+                        return;
+                      }
+                      if (v === GH_SELECT_ACTION.createRepo) {
+                        openGitHubManage(external.githubNew, refetchRepos);
+                        return;
+                      }
+                      setSelectedRepo(v);
+                    }}
+                    fullWidth
+                    disabled={!selectedOrg || isReposLoading}
+                    slotProps={{
+                      select: { onClose: () => setRepoSearch('') },
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <Box sx={{ color: 'text.primary', display: 'flex' }}>
+                              <GitHub size={16} />
+                            </Box>
+                          </InputAdornment>
+                        ),
+                      },
+                    }}>
+                    {selectMenuHeader(
+                      { key: 'repo-search', value: repoSearch, onChange: setRepoSearch, placeholder: 'Search repositories', show: reposForOrg.length > MENU_SEARCH_THRESHOLD },
+                      isAuthenticated ? { label: 'Refresh repositories', onClick: () => refetchRepos(), loading: isReposLoading } : undefined,
+                    )}
+                    {repositoryActionItems(!!githubInstallUrl)}
+                    {reposForOrg
+                      .filter((repo) => repo.toLowerCase().includes(repoSearch.trim().toLowerCase()))
+                      .map((repo) => (
+                        <MenuItem key={repo} value={repo}>
+                          {repo}
+                        </MenuItem>
+                      ))}
+                  </TextField>
+                </Stack>
+              </Grid>
+            </>
+          )}
         </>
       )}
 
@@ -673,7 +874,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
   // Early returns
 
-  if (!isPublicRepo && (authStatus === 'authenticating' || authStatus === 'installing')) {
+  if (!isPublicRepo && !isAzureDevOps && (authStatus === 'authenticating' || authStatus === 'installing')) {
     return (
       <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 3 }}>
@@ -735,113 +936,120 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         Import an Integration
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 4 }}>
-        {isPublicRepo ? 'Bring an existing integration from a public GitHub repository into this project.' : 'Bring an existing integration from your GitHub repository into this project.'}
+        {isPublicRepo
+          ? 'Bring an existing integration from a public GitHub repository into this project.'
+          : isAzureDevOps
+            ? 'Bring an existing integration from your Azure DevOps repository into this project.'
+            : 'Bring an existing integration from your GitHub repository into this project.'}
       </Typography>
 
-      {!isPublicRepo && renderGitHubArea()}
+      {!isPublicRepo && (isAzureDevOps ? renderAzureDevOpsArea() : renderGitHubArea())}
 
-      <BusyFields busy={createComponent.isPending}>
-        {/* Row 1 — source pickers (mode-aware) + Branch + Directory */}
-        {renderRepoPickers()}
+      <Box>
+        <BusyFields busy={createComponent.isPending}>
+          {/* Row 1 — source pickers (mode-aware) + Branch + Directory */}
+          {renderRepoPickers()}
 
-        {/* Row 2 — Integration Name + auto-generated Integration Id */}
-        <Grid container columnSpacing={3} rowSpacing={1} sx={{ mt: 2, mb: 1 }}>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <TextField
-              labelPlacement="top"
-              label="Integration Name"
-              required
-              value={displayName}
-              onChange={(e) => {
-                setDisplayName(e.target.value);
-                displayNameAutoRef.current = false;
+          {/* Row 2 — Integration Name + auto-generated Integration Id */}
+          <Grid container columnSpacing={3} rowSpacing={1} sx={{ mt: 2, mb: 1 }}>
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                labelPlacement="top"
+                label="Integration Name"
+                required
+                value={displayName}
+                onChange={(e) => {
+                  setDisplayName(e.target.value);
+                  displayNameAutoRef.current = false;
+                }}
+                fullWidth
+                error={!!displayName.trim() && !handlerValid}
+                helperText={displayName.trim() && !handlerValid ? 'Must be 3–64 chars' : undefined}
+              />
+            </Grid>
+
+            <Grid size={{ xs: 12, md: 3 }}>
+              <TextField
+                labelPlacement="top"
+                label="Integration Id"
+                value={effectiveHandler}
+                fullWidth
+                disabled
+                slotProps={{
+                  input: {
+                    endAdornment: isCheckingName ? (
+                      <InputAdornment position="end">
+                        <CircularProgress size={16} />
+                      </InputAdornment>
+                    ) : undefined,
+                  },
+                }}
+              />
+            </Grid>
+          </Grid>
+
+          {/* Row 3 — Description */}
+          <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
+            <Grid size={{ xs: 12, md: 6 }}>
+              <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} />
+            </Grid>
+          </Grid>
+
+          {/* Technology */}
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
+              Technology
+            </Typography>
+            <TechnologySelector selected={selectedTechnology} detectedMode={detectedMode} enabled={showBranchAndSubPath} onSelect={setSelectedTechnology} />
+            {selectedTechnology === 'BI' && (
+              <>
+                {!ballerinaTokenStatus?.configured && (
+                  <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Depend on private packages?
+                    </Typography>
+                    <Link component="button" type="button" variant="body2" underline="hover" onClick={() => setBallerinaDrawerOpen(true)} sx={{ fontWeight: 600 }}>
+                      Add a Ballerina Central token
+                    </Link>
+                  </Stack>
+                )}
+                <BallerinaCentralTokenDrawer open={ballerinaDrawerOpen} onClose={() => setBallerinaDrawerOpen(false)} tokenInput={ballerinaTokenInput} onTokenInputChange={setBallerinaTokenInput} />
+              </>
+            )}
+          </Box>
+
+          {/* Integration Type */}
+          <Box sx={{ mb: 5 }}>
+            <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
+              Integration Type
+            </Typography>
+            <IntegrationTypeSelector
+              selected={selectedIntegrationType}
+              excludedTypes={isAzureDevOps ? ['ai-agent'] : []}
+              onSelect={(type) => {
+                trackEvent(INTEGRATION_TYPE_TRACK_EVENT[type] ?? 'component-create-select-type', { org: scope.org, project: scope.project, integrationType: type });
+                setSelectedIntegrationType(type);
               }}
-              fullWidth
-              error={!!displayName.trim() && !handlerValid}
-              helperText={displayName.trim() && !handlerValid ? 'Must be 3–64 chars' : undefined}
             />
-          </Grid>
+          </Box>
+        </BusyFields>
 
-          <Grid size={{ xs: 12, md: 3 }}>
-            <TextField
-              labelPlacement="top"
-              label="Integration Id"
-              value={effectiveHandler}
-              fullWidth
-              disabled
-              slotProps={{
-                input: {
-                  endAdornment: isCheckingName ? (
-                    <InputAdornment position="end">
-                      <CircularProgress size={16} />
-                    </InputAdornment>
-                  ) : undefined,
-                },
-              }}
-            />
-          </Grid>
-        </Grid>
-
-        {/* Row 3 — Description */}
-        <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} />
-          </Grid>
-        </Grid>
-
-        {/* Technology */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
-            Technology
-          </Typography>
-          <TechnologySelector selected={selectedTechnology} detectedMode={detectedMode} enabled={showBranchAndSubPath} onSelect={setSelectedTechnology} />
-          {selectedTechnology === 'BI' && (
-            <>
-              {!ballerinaTokenStatus?.configured && (
-                <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Depend on private packages?
-                  </Typography>
-                  <Link component="button" type="button" variant="body2" underline="hover" onClick={() => setBallerinaDrawerOpen(true)} sx={{ fontWeight: 600 }}>
-                    Add a Ballerina Central token
-                  </Link>
-                </Stack>
-              )}
-              <BallerinaCentralTokenDrawer open={ballerinaDrawerOpen} onClose={() => setBallerinaDrawerOpen(false)} tokenInput={ballerinaTokenInput} onTokenInputChange={setBallerinaTokenInput} />
-            </>
-          )}
-        </Box>
-
-        {/* Integration Type */}
-        <Box sx={{ mb: 5 }}>
-          <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
-            Integration Type
-          </Typography>
-          <IntegrationTypeSelector
-            selected={selectedIntegrationType}
-            onSelect={(type) => {
-              trackEvent(INTEGRATION_TYPE_TRACK_EVENT[type] ?? 'component-create-select-type', { org: scope.org, project: scope.project, integrationType: type });
-              setSelectedIntegrationType(type);
+        <Stack direction="row" gap={2} sx={{ mt: 2 }}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => {
+              allowLeave();
+              navigate(backUrl);
             }}
-          />
-        </Box>
-      </BusyFields>
-
-      <Stack direction="row" gap={2} sx={{ mt: 2 }}>
-        <Button
-          variant="outlined"
-          color="inherit"
-          onClick={() => {
-            allowLeave();
-            navigate(backUrl);
-          }}
-          disabled={createComponent.isPending}>
-          Cancel
-        </Button>
-        <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || createComponent.isPending}>
-          {createComponent.isPending ? <CircularProgress size={18} color="inherit" /> : 'Import integration'}
-        </Button>
-      </Stack>
+            disabled={createComponent.isPending}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={handleSubmit} disabled={!canSubmit || createComponent.isPending}>
+            {createComponent.isPending ? <CircularProgress size={18} color="inherit" /> : 'Import integration'}
+          </Button>
+        </Stack>
+      </Box>
     </PageContent>
   );
 }

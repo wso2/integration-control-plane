@@ -88,6 +88,7 @@ import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/inte
 import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useAuth } from '../auth';
+import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
 import {
   useScope,
   broaden,
@@ -115,6 +116,7 @@ import { useLeaveGuard } from '../contexts/UnsavedChangesContext';
 
 // ComplexSelect is content-sized, and at org level there is no card beside the icon to stretch against.
 import { useLoadedImage } from '../hooks/useLoadedImage';
+import { withTrackParam } from '../hooks/useSelectedTrack';
 import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
@@ -124,7 +126,7 @@ const trialBadgeSx = { mx: 0.75 } as const;
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const scope = useScope();
 
   const { username, displayName, pictureUrl, logout, userId, orgHandle: sessionOrg } = useAuth();
@@ -293,7 +295,7 @@ export default function AppLayout(): JSX.Element {
     // Highlights only once the user agrees to leave a dirty form, so "Stay on page" keeps the current item.
     guardNavigation(() => {
       setPendingNavId(id);
-      navigateTo(url);
+      navigateTo(scope.level === 'components' ? withTrackParam(url, search) : url);
     });
   };
 
@@ -594,11 +596,11 @@ export default function AppLayout(): JSX.Element {
                 role="button"
                 tabIndex={0}
                 sx={{ position: 'relative', display: 'inline-flex', cursor: 'pointer' }}
-                onClick={() => navigateTo(overviewUrl(scope))}
+                onClick={() => navigateTo(withTrackParam(overviewUrl(scope), search))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    navigateTo(overviewUrl(scope));
+                    navigateTo(withTrackParam(overviewUrl(scope), search));
                   }
                 }}>
                 <ComplexSelect
@@ -795,6 +797,10 @@ export default function AppLayout(): JSX.Element {
                       // MCP (server + proxy): a single Test tab → the MCP playground
                       // (@wso2-org/mcp-playground). No Console/API-Chat sub-items.
                       const mcpType = integrationType === 'mcp-server' || integrationType === 'mcp-proxy';
+                      // Settings shows only when the integration has a section the user can open.
+                      const hasSettings =
+                        !!currentComponent &&
+                        visibleComponentSettingsSections(identifyIntegration(currentComponent.displayType ?? '', currentComponent.componentSubType ?? null), (perms) => hasAnyPermission(perms, projectId || undefined, componentId)).length > 0;
                       return [
                         <Sidebar.Category key="int-overview">
                           <Sidebar.Item id="overview">
@@ -928,6 +934,15 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
                             </Sidebar.Item>
                           </Sidebar.Item>
+
+                          {hasSettings && (
+                            <Sidebar.Item id="component-settings">
+                              <Sidebar.ItemIcon>
+                                <Cog size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
                         </Sidebar.Category>,
                       ];
                     })()

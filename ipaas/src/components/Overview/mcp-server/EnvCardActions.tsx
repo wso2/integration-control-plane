@@ -21,6 +21,8 @@ import { FlaskConical, List, RotateCw, Square } from '@wso2/oxygen-ui-icons-reac
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
+import { withTrackParam } from '../../../hooks/useSelectedTrack';
+import { useLocation } from 'react-router';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
@@ -48,6 +50,7 @@ export default function EnvCardActions({
   requestPoll,
 }: EnvCardActionsProps): ReactNode {
   const navigate = useAppNavigate();
+  const location = useLocation();
   const [logsOpen, setLogsOpen] = useState(false);
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
@@ -93,7 +96,13 @@ export default function EnvCardActions({
       {hasDeployment && (
         <Tooltip title={canTest ? 'Test' : 'Available once the deployment is active'}>
           <span>
-            <Button variant="text" size="small" startIcon={<FlaskConical size={14} />} disabled={!canTest} onClick={() => navigate(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test`)} sx={{ textTransform: 'none' }}>
+            <Button
+              variant="text"
+              size="small"
+              startIcon={<FlaskConical size={14} />}
+              disabled={!canTest}
+              onClick={() => navigate(withTrackParam(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test`, location.search))}
+              sx={{ textTransform: 'none' }}>
               Test
             </Button>
           </span>
