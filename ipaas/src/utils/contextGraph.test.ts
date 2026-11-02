@@ -254,6 +254,9 @@ describe('cosmosBuffers', () => {
       m.links.map((l) => LINK_STRENGTH[l.kind]),
     );
     expect(Array.from(cosmosBuffers(exploreModel(GRAPH, { records: true, entities: true, detail: 'all' }), PALETTE).shapes.slice(0, 4))).toEqual([1, 1, 1, 0]);
+    // Only a relationship reads in a direction, subject to object, so only it gets an arrow head.
+    expect(b.arrows).toEqual(m.links.map((l) => l.kind === 'relates'));
+    expect(b.arrows.filter(Boolean)).toHaveLength(2);
   });
 
   it('draws nothing for an empty graph, such as one whose records were all deleted', () => {

@@ -271,6 +271,12 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
                 Conflict
               </Stack>
             )}
+            <Stack direction="row" alignItems="center" gap={0.75}>
+              <Box component="span" aria-hidden sx={{ fontSize: 14, lineHeight: 1 }}>
+                →
+              </Box>
+              Arrows point at the object
+            </Stack>
             <span>Drag to pan · scroll to zoom · click a node or a label</span>
           </Box>
         </CosmosCanvas>
@@ -328,7 +334,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
                 Click a node
               </Typography>
               <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.55 }}>
-                Documents are the items your sources delivered. Entities are what the language model found in them while building the graph, and the lines between entities are the relationships it found. Click the label on a line to see that relationship; a red “contradicts” label is a conflict between two of them. You see only what you may read.
+                Documents are the items your sources delivered. Entities are what the language model found in them while building the graph, or what a mapping wrote from them. A line between two entities is a relationship. Read it along its arrow, from the subject to the object; select it and the dots on it run the same way. Click the label on a line to see that relationship; a red “contradicts” label is a conflict between two of them. You see only what you may read.
               </Typography>
               <Box component="dl" sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 2, rowGap: 0.5, m: 0, fontSize: 13 }}>
                 <Box component="dt" sx={mutedSx}>

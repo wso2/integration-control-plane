@@ -296,6 +296,12 @@ export interface CosmosBuffers {
   linkWidths: Float32Array;
   /** How hard each link pulls in the layout (see `LINK_STRENGTH`). */
   linkStrengths: Float32Array;
+  /**
+   * Whether each link gets an arrow head at its target. A relationship reads from its subject to its
+   * object and is drawn that way, so a reader knows which way round to read it; a document's line to
+   * the names it holds and a conflict line have no direction.
+   */
+  arrows: boolean[];
   /** Each point's cluster (see `clusterLayout`), or undefined for a point in none. */
   clusters: (number | undefined)[];
   /** The cluster centres, x then y for each, spread over the space. */
@@ -465,7 +471,8 @@ export function cosmosBuffers(m: GraphModel, palette: GraphPalette, { slots, spa
     linkWidths[i] = link.kind === 'relates' ? 1.4 : link.kind === 'conflicts' ? 2.2 : 0.6;
     linkStrengths[i] = LINK_STRENGTH[link.kind];
   });
-  return { positions, colors, sizes, shapes, links, linkColors, linkWidths, linkStrengths, clusters: layout.clusters, clusterPositions: layout.positions, clusterStrengths: layout.strengths };
+  const arrows = m.links.map((link) => link.kind === 'relates');
+  return { positions, colors, sizes, shapes, links, linkColors, linkWidths, linkStrengths, arrows, clusters: layout.clusters, clusterPositions: layout.positions, clusterStrengths: layout.strengths };
 }
 
 /** How strong a link in the lit neighbourhood is drawn; the rest of the canvas is greyed out around it. */
