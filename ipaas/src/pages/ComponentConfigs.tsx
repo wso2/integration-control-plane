@@ -67,9 +67,10 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string; detail?: string } | null>(null);
 
   // Switching track/environment changes the editor's context (release/container/env);
-  // drop any open create/edit view so ConfigEditor can't operate on a stale row.
+  // drop any open create/edit view or removal dialog so neither can operate on a stale row.
   useEffect(() => {
     setView({ kind: 'list' });
+    setDeleting(null);
   }, [trackId, envId]);
 
   const handleDelete = () => {

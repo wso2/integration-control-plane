@@ -578,11 +578,11 @@ export default function AppLayout(): JSX.Element {
                 role="button"
                 tabIndex={0}
                 sx={{ position: 'relative', display: 'inline-flex', cursor: 'pointer' }}
-                onClick={() => navigateTo(overviewUrl(scope))}
+                onClick={() => navigateTo(withTrackParam(overviewUrl(scope), search))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    navigateTo(overviewUrl(scope));
+                    navigateTo(withTrackParam(overviewUrl(scope), search));
                   }
                 }}>
                 <ComplexSelect

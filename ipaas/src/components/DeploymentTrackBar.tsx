@@ -19,8 +19,9 @@
 import { Box, Chip, Divider, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { GitBranch, HelpCircle } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
+import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useSelectedTrack } from '../hooks/useSelectedTrack';
+import { useSelectedTrack, withTrackParam } from '../hooks/useSelectedTrack';
 import { PILL_SELECT_SX } from '../constants/styles';
 import { componentSettingsSectionUrl, hasComponent, useScope } from '../nav';
 import type { Component, DeploymentTrack } from '../types/component';
@@ -63,6 +64,7 @@ function TrackLabel({ track }: { track: DeploymentTrack }) {
  */
 export default function DeploymentTrackBar({ component, extra }: DeploymentTrackBarProps) {
   const navigate = useAppNavigate();
+  const { search } = useLocation();
   const scope = useScope();
   const { tracks, trackId, selectTrack } = useSelectedTrack(component);
   // A single track leaves nothing to pick, whether it is an integration's only
@@ -93,7 +95,7 @@ export default function DeploymentTrackBar({ component, extra }: DeploymentTrack
               value={trackId}
               onChange={(e) => {
                 const value = e.target.value as string;
-                if (value === MANAGE_TRACKS) navigate(tracksUrl);
+                if (value === MANAGE_TRACKS) navigate(withTrackParam(tracksUrl, search));
                 else selectTrack(value);
               }}
               renderValue={(value) => {

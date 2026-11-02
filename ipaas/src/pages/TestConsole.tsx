@@ -139,11 +139,12 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   });
   const keyError = access.keyError;
 
-  // Cleared, not just replaced: the hook keys a minted key to its endpoint, so selecting one with
-  // no key must not leave the previous endpoint's credential in the field.
+  // Cleared, not just replaced: the hook keys a minted key to its endpoint and track, so selecting one with
+  // no key must not leave the previous one's credential in the field. Each track has its own API, so a track
+  // change resets the field even when neither track has a minted key.
   useEffect(() => {
     updateSecurityHeader(access.apiKey ?? '');
-  }, [access.apiKey]);
+  }, [access.apiKey, selectedTrackId]);
 
   const handleGetTestKey = async () => {
     if (!canGetTestKey) return;

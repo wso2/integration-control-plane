@@ -18,12 +18,13 @@
 
 import { PageContent } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { Navigate } from 'react-router';
+import { Navigate, useLocation } from 'react-router';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { firstAvailableComponentSettingsSection } from '../constants/componentSettingsSections';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useIntegrationIdentity } from '../hooks/useIntegrationIdentity';
 import { useProjectId } from '../hooks/useProjects';
+import { withTrackParam } from '../hooks/useSelectedTrack';
 import { componentSettingsSectionUrl, overviewUrl, type ComponentScope } from '../nav';
 import { Loading } from '../components/Settings/AccessControl/shared';
 
@@ -34,6 +35,7 @@ import { Loading } from '../components/Settings/AccessControl/shared';
  */
 export default function ComponentSettings(scope: ComponentScope): JSX.Element {
   const { hasAnyPermission, isOrgPermissionsLoaded } = useAccessControl();
+  const { search } = useLocation();
   const { projectId, isLoading: loadingProject } = useProjectId(scope.project);
   const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
   const identity = useIntegrationIdentity(component);
@@ -46,5 +48,6 @@ export default function ComponentSettings(scope: ComponentScope): JSX.Element {
     );
 
   const section = firstAvailableComponentSettingsSection(identity, (perms) => hasAnyPermission(perms, projectId || undefined, component?.id));
-  return <Navigate to={section ? componentSettingsSectionUrl(scope, section.path) : overviewUrl({ ...scope, level: 'components' })} replace />;
+  const target = section ? componentSettingsSectionUrl(scope, section.path) : overviewUrl({ ...scope, level: 'components' });
+  return <Navigate to={withTrackParam(target, search)} replace />;
 }

@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, ListingTable, MenuItem, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, ListingTable, MenuItem, PageContent, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import TextField from '../components/common/TextField';
 import { GitBranch, Pencil, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import Authorized from '../components/Authorized';
 import EmptyListing from '../components/EmptyListing';
+import NotFound from '../components/NotFound';
 import ComponentSettingsTabs from '../components/Settings/ComponentSettingsTabs';
 import TrackDeleteButton from '../components/Settings/TrackDeleteButton';
 import { Permissions } from '../constants/permissions';
@@ -30,7 +31,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useComponentRepository, useRepoBranches } from '../hooks/useRepository';
-import type { ComponentScope } from '../nav';
+import { broaden, resourceUrl, type ComponentScope } from '../nav';
 import type { DeploymentTrack } from '../types/component';
 import type { Environment } from '../types/environment';
 import type { Repository } from '../types/repository';
@@ -329,19 +330,57 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
   );
 }
 
+/** The tracks table's shape while the integration loads. */
+function TracksSkeleton(): JSX.Element {
+  const columns = ['Branch', 'Description', 'Auto Deploy', 'Environments'];
+  return (
+    <ListingTable.Container>
+      <ListingTable>
+        <ListingTable.Head>
+          <ListingTable.Row>
+            {columns.map((c) => (
+              <ListingTable.Cell key={c}>{c}</ListingTable.Cell>
+            ))}
+          </ListingTable.Row>
+        </ListingTable.Head>
+        <ListingTable.Body>
+          {[0, 1, 2].map((r) => (
+            <ListingTable.Row key={r}>
+              {columns.map((c) => (
+                <ListingTable.Cell key={c}>
+                  <Skeleton variant="text" />
+                </ListingTable.Cell>
+              ))}
+            </ListingTable.Row>
+          ))}
+        </ListingTable.Body>
+      </ListingTable>
+    </ListingTable.Container>
+  );
+}
+
 export default function ComponentDeploymentTracks(scope: ComponentScope): JSX.Element {
-  const { projectId } = useProjectId(scope.project);
-  const { data: comp, isLoading } = useComponentByHandler(projectId, scope.component);
+  const { projectId, isLoading: loadingProject } = useProjectId(scope.project);
+  const { data: comp, isPending, isError, refetch } = useComponentByHandler(projectId, scope.component);
 
   return (
     <PageContent>
       <ComponentSettingsTabs active="deployment-tracks" />
-      {isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-          <CircularProgress />
-        </Box>
+      {/* A disabled query reports isLoading false; isPending stays true until the project resolves too. */}
+      {loadingProject || (projectId && isPending) ? (
+        <TracksSkeleton />
+      ) : isError && !comp ? (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              Retry
+            </Button>
+          }>
+          Failed to load the integration&apos;s deployment tracks.
+        </Alert>
       ) : !comp ? (
-        <Typography>Integration not found</Typography>
+        <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />
       ) : (
         <TracksBody scope={scope} projectId={projectId} componentId={comp.id} tracks={comp.deploymentTracks ?? []} deploymentTracksEnabled={!!comp.deploymentTracksEnabled} versionedApis={hasVersionedApis(comp)} />
       )}

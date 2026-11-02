@@ -99,7 +99,7 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
         ) : !releaseId ? (
           <Alert severity="info">This agent is not deployed in {selectedEnv?.name ?? 'the selected environment'}. Deploy it to start chatting.</Alert>
         ) : (
-          <AgentChat projectId={projectId} componentId={component.id} versionId={selectedTrackId} releaseId={releaseId} environmentName={selectedEnv?.id} envCritical={false} variant="page" onConnectionChange={setConnection} />
+          <AgentChat key={selectedTrackId} projectId={projectId} componentId={component.id} versionId={selectedTrackId} releaseId={releaseId} environmentName={selectedEnv?.id} envCritical={false} variant="page" onConnectionChange={setConnection} />
         )}
       </PageContent>
     </Box>

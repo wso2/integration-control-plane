@@ -46,10 +46,12 @@ interface UseEndpointDrawerResult {
 export function useEndpointDrawer({ open, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: UseEndpointDrawerArgs): UseEndpointDrawerResult {
   const [userSelectedIdx, setUserSelectedIdx] = useState<number | null>(null);
 
-  // Drop the override on close, so reopening derives the endpoint from activeEndpointName again.
+  // Drop the override on close, so reopening derives the endpoint from activeEndpointName again, and when the track
+  // changes, since the index picks from one track's endpoints.
   useEffect(() => {
     if (!open) setUserSelectedIdx(null);
   }, [open]);
+  useEffect(() => setUserSelectedIdx(null), [deploymentTrackId]);
 
   const matchedIdx = useMemo(() => {
     const i = endpoints.findIndex((ep) => ep.name === activeEndpointName);

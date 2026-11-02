@@ -217,6 +217,7 @@ describe('deployment tracks', () => {
   it.each([
     ['a server error', new BffError(500, 'list deployment tracks: boom')],
     ['a network failure', new TypeError('Failed to fetch')],
+    ['a 404 from a BFF without the detail route', new BffError(404, '404 page not found')],
   ])('falls back to the list endpoint when the detail route fails with %s', async (_label, failure) => {
     get.mockImplementation(async (path: string) => {
       if (path === '/projects/proj/components/hello') throw failure;

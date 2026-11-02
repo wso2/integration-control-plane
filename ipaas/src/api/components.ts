@@ -232,9 +232,10 @@ export const fetchComponents = (_orgHandler: string, projectId: string): Promise
 // leave the page with no id or handler and send later writes to an empty name. Its
 // answer is used only when it names the component; otherwise the component comes
 // from the list endpoint, as it did before the detail endpoint existed.
-// Every integration page loads its component here, so a detail route that fails on the server or the network
-// falls back to the list rather than failing the page. A 4xx is the BFF's answer about this component, so it stands.
-const detailUnavailable = (err: unknown): boolean => !(err instanceof BffError) || err.status >= 500;
+// Every integration page loads its component here, so a detail route that fails on the server or the network, or
+// that a BFF without it answers 404 for, falls back to the list rather than failing the page; the list reports a
+// component it doesn't have. Any other 4xx (an auth refusal) is the BFF's answer, so it stands.
+const detailUnavailable = (err: unknown): boolean => !(err instanceof BffError) || err.status >= 500 || err.status === 404;
 
 export const fetchComponentByHandler = async (projectId: string, componentHandler: string): Promise<ComponentDetail> => {
   let detail: ComponentDetail;
