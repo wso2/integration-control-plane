@@ -112,6 +112,8 @@ import {
   toConfigurationPayload,
   toCreateInput,
   toSourceRegistration,
+  queuedUploadText,
+  uploadIsSlow,
 } from './contextEngine';
 import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
 import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
@@ -1070,5 +1072,24 @@ describe('editing models on a running engine', () => {
     expect(modelKeysLabel({ embedding: { provider: 'openai', model: 'e', keyKind: 'encrypted' }, llm: current })).toBe('Keys encrypted by the engine');
     expect(modelKeysLabel({ embedding: { provider: 'azure_openai', model: 'e', keyKind: 'reference' }, llm: null })).toBe('Keys from secret references');
     expect(modelKeysLabel({ embedding: null, llm: null })).toBe('');
+  });
+});
+
+describe('upload and processing time texts', () => {
+  const uploadedAt = '2026-10-30T09:50:00.000Z';
+  const at = (minutes: number) => Date.parse(uploadedAt) + minutes * 60_000;
+
+  it('says what the engine is doing with a queued file and for how long', () => {
+    expect(queuedUploadText({ uploadedAt, running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph · 14 min so far');
+    expect(queuedUploadText({ uploadedAt }, at(0))).toBe('Uploaded · waiting for the engine to start on it · under a minute so far');
+    expect(queuedUploadText({ uploadedAt, retrying: true, running: true }, at(14))).toBe('Running again on the engine from the file it already has · nothing was uploaded.');
+    // A row remembered without a usable time still says what is happening.
+    expect(queuedUploadText({ uploadedAt: 'bad', running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph');
+  });
+
+  it('warns about big files only after two minutes', () => {
+    expect(uploadIsSlow({ uploadedAt }, at(1))).toBe(false);
+    expect(uploadIsSlow({ uploadedAt }, at(2))).toBe(true);
+    expect(uploadIsSlow({ uploadedAt: 'bad' }, at(60))).toBe(false);
   });
 });

@@ -179,7 +179,7 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
   try {
     const job = await getContextJob(jobId);
     if (!CONTEXT_JOB_TERMINAL_STATES.has(job.state)) {
-      patchEntry(sourceId, recordId, { status: 'queued', progress: 100 });
+      patchEntry(sourceId, recordId, { status: 'queued', progress: 100, running: job.state === 'running' });
       timers.set(
         key,
         window.setTimeout(() => void watchJob(engineId, sourceId, recordId, jobId), UPLOAD_POLL_MS),
