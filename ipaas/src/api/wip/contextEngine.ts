@@ -837,10 +837,12 @@ export async function getContextQueryTrace(queryId: string): Promise<ContextQuer
  * records naming them, and their relationships. Null when the engine does not
  * serve its graph yet.
  */
-export async function getContextGraph(engineId: string, limit: number): Promise<ContextGraph | null> {
+export async function getContextGraph(engineId: string, limit: number, sourceId?: string): Promise<ContextGraph | null> {
   requireThisEngine(engineId);
   try {
-    return toGraph(await contextEngineClient.get<RawGraph>(`${V1}/graph?limit=${encodeURIComponent(String(limit))}`));
+    // With a source, the engine cuts within that source's records, so a source with more names than its share of the slots shows whole.
+    const query = `limit=${encodeURIComponent(String(limit))}${sourceId ? `&sourceId=${encodeURIComponent(sourceId)}` : ''}`;
+    return toGraph(await contextEngineClient.get<RawGraph>(`${V1}/graph?${query}`));
   } catch (err) {
     if (isMissingRoute(err)) return null;
     throw err;
