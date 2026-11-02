@@ -186,6 +186,14 @@ export function dataSourceLabel(config: Record<string, string>): string {
   return DATASOURCES.find((d) => d.id === config.DATASOURCE)?.name ?? config.DATASOURCE ?? '';
 }
 
+/** The cron the BFF gives a data source that only runs when triggered: a CronJob needs a schedule, so it gets one that never fires (Feb 31). */
+export const NEVER_FIRES_CRON = '0 0 31 2 *';
+
+export function isManualSchedule(cronExpression: string): boolean {
+  const cron = cronExpression.trim();
+  return cron === '' || cron === NEVER_FIRES_CRON;
+}
+
 /** Why a knowledge base cannot be queried yet, or null when it can. */
 export function retrievalUnavailableReason(kb: Pick<KnowledgeBase, 'status' | 'serviceUrl'>): string | null {
   if (kb.status === 'ERROR') return 'The knowledge base service failed to deploy, so it cannot be queried.';

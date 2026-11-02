@@ -24,6 +24,7 @@ import {
   dataSourceLabel,
   embeddingFromConfig,
   isEditedSettingsValid,
+  isManualSchedule,
   isNameValid,
   knowledgeBaseNameError,
   knowledgeBaseNameFrom,
@@ -157,5 +158,17 @@ describe('retrievalUnavailableReason', () => {
     [{ status: 'ERROR', serviceUrl: 'https://kb' }, 'The knowledge base service failed to deploy, so it cannot be queried.'],
   ])('%j', (kb, reason) => {
     expect(retrievalUnavailableReason(kb)).toBe(reason);
+  });
+});
+
+describe('isManualSchedule', () => {
+  it.each([
+    ['', true],
+    ['0 0 31 2 *', true],
+    [' 0 0 31 2 * ', true],
+    ['0 2 * * *', false],
+    ['*/30 * * * *', false],
+  ])('%j → %s', (cron, manual) => {
+    expect(isManualSchedule(cron)).toBe(manual);
   });
 });

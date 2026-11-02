@@ -32,4 +32,13 @@ export const summaryGridSx = { display: 'grid', gridTemplateColumns: { xs: '1fr'
 
 export const sectionHeaderSx = { mb: 2 } as const;
 
-export const tabsSx = { mb: 3, maxWidth: 480 } as const;
+export const tabsSx = { mb: 3, maxWidth: 640 } as const;
+
+/** The Overview's settings: one column per setting, each marked by a bar on its left. */
+export const overviewGridSx = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }, gap: 3 } as const;
+
+export const overviewItemSx = { borderLeft: '3px solid', borderColor: 'primary.main', pl: 1.5, minWidth: 0 } as const;
+
+export const dataSourceToolbarSx = { mb: 2 } as const;
+
+export const searchFieldSx = { width: { xs: '100%', sm: 320 } } as const;

@@ -39,6 +39,8 @@ export interface KnowledgeBase {
   serviceUrl: string;
   dataSources: KnowledgeBaseDataSource[];
   createdAt: string;
+  /** When the KB Service last changed state, which a redeploy does; absent from older BFFs. */
+  updatedAt?: string;
 }
 
 /** An ingestion job that loads a Google Drive folder or S3 bucket into its knowledge base. */
