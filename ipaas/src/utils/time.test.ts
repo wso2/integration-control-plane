@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getAge, formatDate, formatDistanceToNow } from './time';
+import { getAge, formatDate, formatDistanceToNow, formatElapsed } from './time';
 
 describe('getAge', () => {
   it('returns empty string when to is before from', () => {
@@ -116,5 +116,27 @@ describe('formatDistanceToNow', () => {
 
   it('returns an empty string for an invalid timestamp', () => {
     expect(formatDistanceToNow('not-a-date')).toBe('');
+  });
+});
+
+describe('formatElapsed', () => {
+  const start = '2026-10-30T09:50:00.000Z';
+  const at = (seconds: number) => Date.parse(start) + seconds * 1000;
+
+  it('says under a minute before the first minute is over', () => {
+    expect(formatElapsed(start, at(0))).toBe('under a minute');
+    expect(formatElapsed(start, at(59))).toBe('under a minute');
+  });
+
+  it('counts minutes, then hours and minutes', () => {
+    expect(formatElapsed(start, at(60))).toBe('1 min');
+    expect(formatElapsed(start, at(14 * 60 + 30))).toBe('14 min');
+    expect(formatElapsed(start, at(60 * 60))).toBe('1 h');
+    expect(formatElapsed(start, at(62 * 60))).toBe('1 h 2 min');
+  });
+
+  it('returns empty for an invalid or future start', () => {
+    expect(formatElapsed('not a date', at(0))).toBe('');
+    expect(formatElapsed(start, at(-5))).toBe('');
   });
 });

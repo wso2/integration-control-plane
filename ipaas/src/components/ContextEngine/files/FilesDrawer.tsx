@@ -21,8 +21,23 @@ import { FileText, RefreshCw, Search, Trash2, Upload, Users, X } from '@wso2/oxy
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { changeUploadVisibility, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
 import { useContextEngineProgress, useUploadAudience } from '../../../hooks/useContextEngine';
-import { EVERYONE_VISIBILITY, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
-import { checkStagedFile, contentTypeForFile, describeUploadAudience, engineMessage, formatBytes, isUploadActive, sourceFailureNotice, stagedSummary, summarizeUploads, visibilityError, visibilityTags } from '../../../utils/contextEngine';
+import { useNow } from '../../../hooks/useNow';
+import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
+import {
+  checkStagedFile,
+  contentTypeForFile,
+  describeUploadAudience,
+  engineMessage,
+  formatBytes,
+  isUploadActive,
+  queuedUploadText,
+  sourceFailureNotice,
+  stagedSummary,
+  summarizeUploads,
+  uploadIsSlow,
+  visibilityError,
+  visibilityTags,
+} from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile, stageFiles } from '../../../utils/stagedFiles';
 import { formatDistanceToNow } from '../../../utils/time';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
@@ -70,6 +85,8 @@ function UploadRow({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const active = isUploadActive(entry);
+  // Ticks while the engine has the file, so "14 min so far" keeps counting between polls.
+  const now = useNow(ELAPSED_TICK_MS, entry.status === 'queued');
   const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
@@ -132,7 +149,12 @@ function UploadRow({
           {(entry.status === 'queued' || entry.status === 'indexing') && <LinearProgress variant="indeterminate" aria-label={`${entry.name} indexing`} sx={progressBarSx} />}
           {entry.status === 'queued' && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.75 }}>
-              {entry.retrying ? 'Running again on the engine from the file it already has · nothing was uploaded.' : 'Uploaded · the engine is storing it.'}
+              {queuedUploadText(entry, now)}
+            </Typography>
+          )}
+          {entry.status === 'queued' && !entry.retrying && uploadIsSlow(entry, now) && (
+            <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }}>
+              {UPLOAD_SLOW_NOTE}
             </Typography>
           )}
           {entry.status === 'indexing' && (

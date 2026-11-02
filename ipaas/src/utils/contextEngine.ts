@@ -34,6 +34,7 @@ import {
   STORAGE_BACKENDS,
   UPLOAD_CONTENT_TYPES,
   UPLOAD_MAX_BYTES,
+  UPLOAD_SLOW_AFTER_MS,
 } from '../constants/contextEngine';
 import type { Link, Parent, Root, RootContent, Text } from 'mdast';
 import remarkGfm from 'remark-gfm';
@@ -41,7 +42,7 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
-import { formatDistanceToNow } from './time';
+import { formatDistanceToNow, formatElapsed } from './time';
 import { isEmbeddingValid } from './ragIngestion';
 import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type {
@@ -947,6 +948,20 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
 
 export function isUploadActive(entry: Pick<UploadEntry, 'status'>): boolean {
   return entry.status === 'uploading' || entry.status === 'queued' || entry.status === 'indexing';
+}
+
+/** The caption under a queued file's bar: what the engine is doing with it, and for how long. */
+export function queuedUploadText(entry: Pick<UploadEntry, 'retrying' | 'running' | 'uploadedAt'>, now: number): string {
+  if (entry.retrying) return 'Running again on the engine from the file it already has · nothing was uploaded.';
+  const elapsed = formatElapsed(entry.uploadedAt, now);
+  const soFar = elapsed ? ` · ${elapsed} so far` : '';
+  return entry.running ? `Uploaded · the engine is reading it with its language model and adding it to the graph${soFar}` : `Uploaded · waiting for the engine to start on it${soFar}`;
+}
+
+/** True once a file has been with the engine long enough that the wait may look like a hang. */
+export function uploadIsSlow(entry: Pick<UploadEntry, 'uploadedAt'>, now: number): boolean {
+  const start = Date.parse(entry.uploadedAt);
+  return !Number.isNaN(start) && now - start >= UPLOAD_SLOW_AFTER_MS;
 }
 
 /** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */

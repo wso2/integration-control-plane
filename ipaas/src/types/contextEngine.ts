@@ -384,6 +384,8 @@ export interface UploadEntry extends UploadedFile {
   forbidden?: boolean;
   /** The engine is running the row's job again from the file it already has; nothing was uploaded. */
   retrying?: boolean;
+  /** The engine's worker has started on the file, so the wait is the work itself, not the queue. */
+  running?: boolean;
 }
 
 export interface IngestFileInput {
