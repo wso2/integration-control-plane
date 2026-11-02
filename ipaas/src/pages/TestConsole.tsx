@@ -90,14 +90,15 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // environmentName is the environment slug, which toEnvironment puts in `id` — `name` is the label.
   // The test key comes from the BFF's test-key route (component/environment/endpoint triple), and
-  // the enforcing API Platform gateway URL from the endpoint's security config.
+  // the enforcing API Platform gateway URL from endpoint discovery. Security may also return a
+  // URL, in which case useEndpointTestAccess prefers it.
   const testKeyEndpointRef: EndpointRef | null = useMemo(
     () => (component && selectedEnv && selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id, deploymentTrackId: selectedTrackId } : null),
     [projectId, component, selectedEnv, selectedEndpoint, selectedTrackId],
   );
   // Mint the initial test key when the console resolves an api-key-secured endpoint;
   // the button below explicitly refreshes it on demand after that.
-  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef);
+  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef, selectedEndpoint?.publicUrl || '');
   // Try-it-out runs in the browser, so the gateway must return CORS headers for this origin.
   const { data: endpointPolicies } = useEndpointPolicies(testKeyEndpointRef, !!testKeyEndpointRef);
   const testKeyHeader = access.authHeader;
