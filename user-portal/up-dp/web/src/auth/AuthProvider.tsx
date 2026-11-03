@@ -1,0 +1,142 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (http://www.wso2.com). All Rights Reserved.
+ *
+ * This software is the property of WSO2 LLC. and its suppliers, if any.
+ * Dissemination of any information or reproduction of any material contained
+ * herein is strictly forbidden, unless permitted by WSO2 in accordance with
+ * the WSO2 Commercial License available at http://wso2.com/licenses.
+ * For specific language governing the permissions and limitations under
+ * this license, please see the license as well as any agreement you've
+ * entered into with WSO2 governing the purchase of this software and any
+ * associated services.
+ */
+
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router';
+import i18n from '../i18n';
+import {
+  CALLBACK_PATH,
+  checkScopes,
+  claimsOf,
+  completeSignIn,
+  currentTokens,
+  onSignedOut,
+  onTokens,
+  rejoin,
+  resumeSession,
+  signIn,
+  signOut,
+  type Tokens,
+} from './tokens';
+
+export interface User {
+  id: string;
+  displayName: string;
+  email?: string;
+  initials: string;
+  roles: string[];
+}
+
+interface AuthValue {
+  status: 'loading' | 'ready' | 'signedOut' | 'error';
+  error: Error | null;
+  user: User;
+  hasScope: (scope: string) => boolean;
+  retry: () => void;
+  refreshAccess: () => void;
+  signIn: () => void;
+  signOut: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthValue | null>(null);
+
+function initialsOf(name: string): string {
+  const parts = name.replace(/@.*$/, '').split(/[\s._-]+/).filter(Boolean);
+  const letters = parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : (parts[0] ?? '?').slice(0, 2);
+  return letters.toUpperCase();
+}
+
+function listClaim(claims: Record<string, unknown>, name: string): string[] {
+  const value = claims[name];
+  const items = Array.isArray(value) ? value : typeof value === 'string' ? value.split(',') : [];
+  return items
+    .filter((item): item is string => typeof item === 'string')
+    .map((item) => item.trim())
+    .filter((item) => item !== '');
+}
+
+function scopesOf(tokens: Tokens | null): Set<string> {
+  const scopes = new Set((tokens?.scope ?? '').split(/\s+/).filter(Boolean));
+  const claim = claimsOf(tokens?.accessToken).scope;
+  if (typeof claim === 'string') claim.split(/\s+/).filter(Boolean).forEach((s) => scopes.add(s));
+  return scopes;
+}
+
+/** Finishes a sign-in on the callback, or picks up this tab's tokens; with none, the token store joins the WIdP-DP's session. */
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const navigate = useNavigate();
+  const [tokens, setTokens] = useState<Tokens | null>(currentTokens());
+  const [status, setStatus] = useState<AuthValue['status']>('loading');
+  const [error, setError] = useState<Error | null>(null);
+
+  const start = useCallback(() => {
+    setStatus('loading');
+    setError(null);
+    const begin =
+      window.location.pathname === CALLBACK_PATH
+        ? completeSignIn().then((returnTo) => navigate(returnTo, { replace: true }))
+        : resumeSession();
+    begin
+      .then(() => setStatus('ready'))
+      .catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason : new Error(i18n.t('errors.signIn.couldNotStartSession')));
+        setStatus('error');
+      });
+  }, [navigate]);
+
+  useEffect(() => onTokens(setTokens), []);
+  useEffect(() => onSignedOut(() => setStatus('signedOut')), []);
+  useEffect(() => {
+    start();
+  }, [start]);
+
+  // Published scopes change while the page is open: look again on load and whenever the window gets focus.
+  useEffect(() => {
+    if (status !== 'ready') return;
+    const check = () => void checkScopes().catch(() => undefined);
+    check();
+    window.addEventListener('focus', check);
+    return () => window.removeEventListener('focus', check);
+  }, [status]);
+
+  const value = useMemo<AuthValue>(() => {
+    const id = claimsOf(tokens?.idToken);
+    const text = (key: string) => (typeof id[key] === 'string' && id[key] ? (id[key] as string) : undefined);
+    const displayName = text('name') || text('preferred_username') || text('email') || i18n.t('common.unnamedUser');
+    const scopes = scopesOf(tokens);
+    return {
+      status: status === 'ready' && !tokens ? 'loading' : status,
+      error,
+      user: { id: text('sub') ?? '', displayName, email: text('email'), initials: initialsOf(displayName), roles: listClaim(id, 'roles') },
+      hasScope: (scope) => scopes.has(scope),
+      retry: start,
+      refreshAccess: () => void rejoin().catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason : new Error(i18n.t('errors.signIn.couldNotStartSignIn')));
+        setStatus('error');
+      }),
+      signIn: () => void signIn().catch((reason: unknown) => {
+        setError(reason instanceof Error ? reason : new Error(i18n.t('errors.signIn.couldNotStartSignIn')));
+        setStatus('error');
+      }),
+      signOut,
+    };
+  }, [status, error, tokens, start]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth(): AuthValue {
+  const value = useContext(AuthContext);
+  if (!value) throw new Error('useAuth must be used inside AuthProvider');
+  return value;
+}
