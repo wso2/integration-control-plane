@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, PageContent, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -155,13 +155,6 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             {engine.description || 'No description'}
           </Typography>
         </Box>
-        {!deleting && (
-          <Tooltip title="Delete engine">
-            <IconButton color="error" aria-label={`Delete ${engine.name}`} onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={18} />
-            </IconButton>
-          </Tooltip>
-        )}
       </Stack>
 
       {deleting &&
@@ -212,7 +205,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={deleting} />}
+      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={deleting} onRequestDelete={() => setConfirmDelete(true)} />}
       {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'api' && <ApiTab engine={engine} />}
