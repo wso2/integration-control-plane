@@ -30,7 +30,6 @@ const splitSx = { flex: 1, minHeight: 0 } as const;
 const detailsColumnSx = { width: 448, flexShrink: 0, overflowY: 'auto', p: 2 } as const;
 const logsColumnSx = { flex: 1, minWidth: 0, minHeight: 0, p: 2, pl: 0, display: 'flex', flexDirection: 'column' } as const;
 const logsToggleRowSx = { mt: 2 } as const;
-import { StoppedBuildAlert } from './StoppedBuildAlert';
 
 interface BuildDetailsProps {
   componentId: string;
@@ -103,8 +102,6 @@ export default function BuildDetails({ componentId, versionId, build, logsOpen, 
           )}
         </Stack>
       </Box>
-
-      {build.stopped && <StoppedBuildAlert stopped={build.stopped} sx={{ mt: 2 }} />}
 
       {/* Stage stepper */}
       {(() => {

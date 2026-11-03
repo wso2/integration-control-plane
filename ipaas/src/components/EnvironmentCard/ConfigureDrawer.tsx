@@ -28,7 +28,6 @@ import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings, useFormLinks } from '../../hooks/useConfiguration';
 import { LinkRows } from './LinkRows';
 import { LinkSuggestions } from './LinkSuggestions';
-import { StoppedBuild } from './StoppedBuild';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
@@ -1043,7 +1042,6 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
-        <StoppedBuild projectId={projectId} componentId={componentId} versionId={versionId} open={open} links={links} />
         <LinkRows projectId={projectId} componentId={componentId} env={schemaEnvId} links={links} />
         <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} actions={['Link', 'Link through']} />
         <ConfigForm
