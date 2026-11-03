@@ -44,6 +44,7 @@ type Cache struct {
 
 	mu      sync.Mutex
 	entries map[string]entry
+	sweptAt time.Time
 	group   singleflight.Group
 }
 
@@ -80,9 +81,7 @@ func (c *Cache) Get(ctx context.Context, key string, fill func(context.Context) 
 		if err != nil {
 			return nil, err
 		}
-		c.mu.Lock()
-		c.entries[key] = entry{value: value, fetchedAt: c.now()}
-		c.mu.Unlock()
+		c.store(key, value)
 		return value, nil
 	})
 	if err != nil {
@@ -93,4 +92,22 @@ func (c *Cache) Get(ctx context.Context, key string, fill func(context.Context) 
 		return nil, err
 	}
 	return val, nil
+}
+
+// store keeps value, and at most once per keep drops the entries too old to serve, fresh or stale.
+func (c *Cache) store(key string, value any) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	now := c.now()
+	keep := max(c.ttl, c.stale)
+	if now.Sub(c.sweptAt) >= keep {
+		for k, held := range c.entries {
+			if now.Sub(held.fetchedAt) >= keep {
+				delete(c.entries, k)
+			}
+		}
+		c.sweptAt = now
+	}
+	c.entries[key] = entry{value: value, fetchedAt: now}
 }

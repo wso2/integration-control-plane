@@ -168,3 +168,22 @@ func TestGetFillsWithoutTheCallersCancel(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "v", value)
 }
+
+func TestGetDropsEntriesTooOldToServe(t *testing.T) {
+	c, clk := newTestCache()
+	source := &counter{}
+
+	_, err := c.Get(context.Background(), "old", source.fill)
+	require.NoError(t, err)
+	clk.advance(10 * time.Minute)
+	_, err = c.Get(context.Background(), "kept", source.fill)
+	require.NoError(t, err)
+
+	clk.advance(6 * time.Minute)
+	_, err = c.Get(context.Background(), "new", source.fill)
+	require.NoError(t, err)
+
+	assert.NotContains(t, c.entries, "old", "past the stale window it can't be served, so it is dropped")
+	assert.Contains(t, c.entries, "kept", "inside the stale window it may still stand in for an outage")
+	assert.Contains(t, c.entries, "new")
+}
