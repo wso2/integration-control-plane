@@ -160,7 +160,8 @@ async function endpoints(): Promise<Endpoints> {
 async function discover(issuer: string): Promise<Endpoints> {
   let metadata: DiscoveryDocument;
   try {
-    const response = await fetch(`${issuer}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' }, credentials: 'omit' });
+    // OIDC Discovery 1.0 §4: drop the issuer's terminating "/" before appending the well-known path.
+    const response = await fetch(`${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`, { headers: { Accept: 'application/json' }, credentials: 'omit' });
     if (!response.ok) throw new Error(`discovery answered ${response.status}`);
     metadata = (await response.json()) as DiscoveryDocument;
   } catch {

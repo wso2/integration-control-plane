@@ -160,7 +160,5 @@ func Load(ctx context.Context) (Config, error) {
 		cfg.Portal.Logo.Dark = cfg.Portal.Logo.Light
 	}
 
-	cfg.OIDC.Issuer = strings.TrimSuffix(cfg.OIDC.Issuer, "/")
-
 	return cfg, nil
 }

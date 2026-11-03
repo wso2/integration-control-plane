@@ -80,8 +80,9 @@ read, or none.
 
 UP-DP takes no part. The SPA is the WIdP-DP's public client:
 
-- The SPA reads `${issuer}/.well-known/openid-configuration` once per page and keeps it in
-  memory. Unless its `issuer` equals `auth.issuer` byte for byte, sign-in fails as
+- The SPA reads `${issuer}/.well-known/openid-configuration`, with any terminating `/` of the
+  issuer dropped first, once per page and keeps it in memory. `auth.issuer` is `OIDC_ISSUER` as
+  set, slash and all. Unless the document's `issuer` equals it byte for byte, sign-in fails as
   `unavailable`, as it does when the document can't be read. The authorize, token, revocation
   and end-session endpoints come from it.
 - The redirect URI is `${window.location.origin}/auth/callback` and the post-logout redirect URI
