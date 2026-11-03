@@ -28,6 +28,7 @@ import type { UploadEntry } from '../types/contextEngine';
 const api = vi.hoisted(() => ({
   getContextRecordStatus: vi.fn(),
   getContextJob: vi.fn(),
+  retryContextJob: vi.fn(),
   ingestContextFile: vi.fn(),
   hashContent: vi.fn(async () => 'sha256:test'),
   sendContextRecordEvent: vi.fn(),
@@ -35,7 +36,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('#api/contextEngine', () => api);
 
-import { refreshUploads, startUploads, useSourceUploads } from './contextUploads';
+import { refreshUploads, retryUpload, startUploads, useSourceUploads } from './contextUploads';
 
 const INDEXED = { recordId: 'f0', state: 'active', indexState: 'indexed', currentVersion: '1' };
 let root: Root;
@@ -44,6 +45,8 @@ beforeEach(() => {
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
   localStorage.clear();
   api.getContextRecordStatus.mockReset();
+  api.getContextJob.mockReset();
+  api.retryContextJob.mockReset();
   root = createRoot(document.createElement('div'));
 });
 
@@ -165,5 +168,25 @@ describe('useSourceUploads status reads', () => {
     await settle();
     expect(latest).toHaveLength(1);
     expect(latest[0]).toMatchObject({ recordId: 'f0', status: 'uploading' });
+  });
+  it('does not let a status read from before a retry on the engine overwrite the retried job', async () => {
+    localStorage.setItem(`${CONTEXT_ENGINE_FILES_KEY_PREFIX}s-rerun`, JSON.stringify([{ recordId: 'f0', name: 'f0', size: 1, contentType: 'text/plain', audience: [], version: '1', uploadedAt: '2026-01-01T00:00:00Z', jobId: 'job-1' }]));
+    let answerStale: (job: unknown) => void = () => undefined;
+    api.getContextJob
+      .mockRejectedValueOnce(new HttpError(503, 'HTTP 503: unavailable'))
+      .mockReturnValueOnce(new Promise((resolve) => (answerStale = resolve)))
+      .mockResolvedValue({ id: 'job-1', state: 'running' });
+    api.retryContextJob.mockResolvedValue({ jobId: 'job-1', statusUrl: '/v1/jobs/job-1' });
+    let latest: UploadEntry[] = [];
+    mount('s-rerun', (e) => (latest = e));
+    await settle();
+    expect(latest[0]).toMatchObject({ check: 'retrying' });
+    await settle(3000);
+    act(() => retryUpload('e1', 's-rerun', 'f0'));
+    await settle();
+    answerStale({ id: 'job-1', state: 'failed', error: { message: 'An earlier run failed.' } });
+    await settle();
+    expect(latest[0]).toMatchObject({ recordId: 'f0', status: 'queued' });
+    expect(latest[0].check).toBeUndefined();
   });
 });

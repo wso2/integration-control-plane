@@ -166,7 +166,7 @@ function UploadRow({
               {queuedUploadText(entry, now)}
             </Typography>
           )}
-          {entry.status === 'queued' && !entry.retrying && uploadIsSlow(entry, now) && (
+          {entry.status === 'queued' && !entry.retrying && !retrying && uploadIsSlow(entry, now) && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }}>
               {UPLOAD_SLOW_NOTE}
             </Typography>

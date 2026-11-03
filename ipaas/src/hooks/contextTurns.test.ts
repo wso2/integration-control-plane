@@ -49,6 +49,12 @@ describe('contextTurns', () => {
     expect(ids('e-replace')).toEqual(['q5']);
   });
 
+  it('leaves the mode unset until one is chosen, so the tab picks its default', () => {
+    expect(getPlaygroundConversation('e-fresh').mode).toBeUndefined();
+    appendTurn('e-fresh', turn(1));
+    expect(getPlaygroundConversation('e-fresh').mode).toBeUndefined();
+  });
+
   it('changes the mode without touching the turns', () => {
     appendTurn('e-mode', turn(1));
     setPlaygroundMode('e-mode', 'answer');
