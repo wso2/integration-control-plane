@@ -142,11 +142,14 @@ The list is in display name order. `kind`, repeated for several, is one of `aiAg
 `automation` and `workflow`; without it, the list holds every kind the caller may view;
 `project`, repeated for several, keeps the integrations in any of those projects, by id;
 `search` matches the display name and the description, ignoring case; `limit` is 1 to 100,
-default 20. `cursor` is a page's `nextCursor`, which names where the next page starts, so a page
+default 20. `search` is at most 100 characters, and `project` at most 100 ids of at most 128
+bytes each. `cursor` is a page's `nextCursor`, which names where the next page starts, so a page
 stays the same page while integrations are published and unpublished around it. An unknown
-`kind` or a bad `limit` gets 400. UP-DP keeps each page, keyed by its query and cursor, for
-`CATALOG_CACHE_TTL`, and serves it up to `CATALOG_STALE_TTL` old while iPaaS-Service can't be
-reached; it does the same for one integration, one deployment and the projects.
+`kind`, a bad `limit`, or a `search` or `project` past those bounds gets 400. UP-DP keeps each
+page, keyed by its query and cursor, for `CATALOG_CACHE_TTL`, and serves it up to
+`CATALOG_STALE_TTL` old while iPaaS-Service can't be reached; it does the same for one
+integration, one deployment and the projects. It holds at most 512 reads, and makes room by
+dropping those too old to serve, then the oldest.
 
 Trigger arguments name each runtime argument by `name` and carry one value per entry: an argument
 with `repeat` comes once per value. A checked boolean is `"true"`; an unchecked boolean and an

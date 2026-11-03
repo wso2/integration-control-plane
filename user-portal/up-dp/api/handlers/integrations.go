@@ -24,6 +24,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/go-chi/chi/v5"
 
@@ -40,6 +41,11 @@ const (
 
 	defaultPageSize = 20
 	maxPageSize     = 100
+
+	// Each listing's query is a cache key, so its parts are bounded.
+	maxSearchLength    = 100
+	maxProjects        = 100
+	maxProjectIDLength = 128
 )
 
 type IntegrationHandler struct {
@@ -57,6 +63,20 @@ func (h *IntegrationHandler) List(w http.ResponseWriter, r *http.Request) {
 		Search:   strings.TrimSpace(params.Get("search")),
 		Limit:    defaultPageSize,
 		Cursor:   params.Get("cursor"),
+	}
+	if utf8.RuneCountInString(query.Search) > maxSearchLength {
+		web.StatusBadRequest(w, r, errors.New("search too long"), fmt.Sprintf("search must be at most %d characters.", maxSearchLength))
+		return
+	}
+	if len(query.Projects) > maxProjects {
+		web.StatusBadRequest(w, r, fmt.Errorf("%d projects", len(query.Projects)), fmt.Sprintf("project may be given at most %d times.", maxProjects))
+		return
+	}
+	for _, project := range query.Projects {
+		if len(project) > maxProjectIDLength {
+			web.StatusBadRequest(w, r, errors.New("project id too long"), fmt.Sprintf("project must be at most %d bytes.", maxProjectIDLength))
+			return
+		}
 	}
 	for _, raw := range params["kind"] {
 		kind := domain.IntegrationKind(raw)

@@ -25,6 +25,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -142,11 +143,17 @@ func TestPageWithoutABuildIsUnavailable(t *testing.T) {
 	assert.Contains(t, rec.Body.String(), "not built")
 }
 
-func TestIntegrationsRefusesAnUnknownKindOrLimit(t *testing.T) {
+func TestIntegrationsRefusesAQueryOutOfBounds(t *testing.T) {
 	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user-1","exp":4102444800}`))
 	router := newTestRouter(t)
 
-	for _, query := range []string{"kind=project", "limit=0", "limit=101", "limit=ten"} {
+	queries := []string{
+		"kind=project", "limit=0", "limit=101", "limit=ten",
+		"search=" + strings.Repeat("é", 101),
+		strings.TrimSuffix(strings.Repeat("project=p&", 101), "&"),
+		"project=" + strings.Repeat("p", 129),
+	}
+	for _, query := range queries {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations?"+query, nil)
 		req.Header.Set("Authorization", "Bearer e30."+payload+".c2ln")
 		rec := httptest.NewRecorder()

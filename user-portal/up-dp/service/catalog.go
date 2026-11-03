@@ -62,6 +62,7 @@ func (svc *CatalogService) Integrations(ctx context.Context, perms domain.Permis
 
 	projects := slices.Clone(query.Projects)
 	slices.Sort(projects)
+	projects = slices.Compact(projects)
 	key := url.Values{
 		"kind": kindNames(kinds), "project": projects, "search": {query.Search}, "limit": {strconv.Itoa(query.Limit)}, "cursor": {query.Cursor},
 	}.Encode()

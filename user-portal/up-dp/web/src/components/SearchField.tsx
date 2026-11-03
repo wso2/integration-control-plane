@@ -29,12 +29,13 @@ interface SearchFieldProps {
   onChange: (value: string) => void;
   placeholder?: string;
   fullWidth?: boolean;
+  maxLength?: number;
   /** Filter chips and a filter button at the end of the field. */
   end?: ReactNode;
   sx?: object;
 }
 
-export default function SearchField({ value, onChange, placeholder: placeholderProp, fullWidth, end, sx }: SearchFieldProps) {
+export default function SearchField({ value, onChange, placeholder: placeholderProp, fullWidth, maxLength, end, sx }: SearchFieldProps) {
   const { t } = useTranslation();
   const placeholder = placeholderProp ?? t('common.actions.search');
   return (
@@ -46,7 +47,7 @@ export default function SearchField({ value, onChange, placeholder: placeholderP
       size="small"
       sx={sx}
       slotProps={{
-        htmlInput: { 'aria-label': placeholder },
+        htmlInput: { 'aria-label': placeholder, maxLength },
         input: {
           startAdornment: (
             <InputAdornment position="start">

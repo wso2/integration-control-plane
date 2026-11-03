@@ -33,6 +33,8 @@ import type { Integration, IntegrationKind } from '../types/portal';
 
 const VIEW_KEY = 'user-portal:listing-view';
 const PAGE_SIZE = 24;
+// UP-DP refuses a longer search.
+const MAX_SEARCH_LENGTH = 100;
 
 type View = 'grid' | 'list';
 
@@ -160,6 +162,7 @@ export default function IntegrationsPage({ kind }: { kind: IntegrationKind }) {
           onChange={setQuery}
           placeholder={t(`integrations.listing.${kind}.search`)}
           fullWidth
+          maxLength={MAX_SEARCH_LENGTH}
           end={
             projectList.length > 1 && (
               <Stack direction="row" alignItems="center" gap={0.5}>

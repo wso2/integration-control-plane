@@ -35,12 +35,17 @@ type entry struct {
 	fetchedAt time.Time
 }
 
+// DefaultMaxEntries is how many keys a cache holds unless WithMaxEntries says otherwise.
+const DefaultMaxEntries = 512
+
 // Cache holds reads for ttl, fills each key once however many callers ask, and
-// serves a copy up to stale old when a fill fails to get an answer.
+// serves a copy up to stale old when a fill fails to get an answer. It holds at
+// most maxEntries keys, dropping the oldest to make room.
 type Cache struct {
-	ttl   time.Duration
-	stale time.Duration
-	now   func() time.Time
+	ttl        time.Duration
+	stale      time.Duration
+	maxEntries int
+	now        func() time.Time
 
 	mu      sync.Mutex
 	entries map[string]entry
@@ -55,8 +60,13 @@ func WithClock(now func() time.Time) Option {
 	return func(c *Cache) { c.now = now }
 }
 
+// WithMaxEntries sets how many keys the cache holds.
+func WithMaxEntries(n int) Option {
+	return func(c *Cache) { c.maxEntries = n }
+}
+
 func New(ttl, stale time.Duration, opts ...Option) *Cache {
-	c := &Cache{ttl: ttl, stale: stale, now: time.Now, entries: map[string]entry{}}
+	c := &Cache{ttl: ttl, stale: stale, maxEntries: DefaultMaxEntries, now: time.Now, entries: map[string]entry{}}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -95,19 +105,40 @@ func (c *Cache) Get(ctx context.Context, key string, fill func(context.Context) 
 }
 
 // store keeps value, and at most once per keep drops the entries too old to serve, fresh or stale.
+// A new key on a full cache first drops those, then the oldest entry if none were.
 func (c *Cache) store(key string, value any) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	now := c.now()
-	keep := max(c.ttl, c.stale)
-	if now.Sub(c.sweptAt) >= keep {
-		for k, held := range c.entries {
-			if now.Sub(held.fetchedAt) >= keep {
-				delete(c.entries, k)
-			}
-		}
-		c.sweptAt = now
+	_, held := c.entries[key]
+	full := !held && len(c.entries) >= c.maxEntries
+	if full || now.Sub(c.sweptAt) >= max(c.ttl, c.stale) {
+		c.sweep(now)
+	}
+	if !held && len(c.entries) >= c.maxEntries {
+		c.dropOldest()
 	}
 	c.entries[key] = entry{value: value, fetchedAt: now}
+}
+
+func (c *Cache) sweep(now time.Time) {
+	keep := max(c.ttl, c.stale)
+	for k, held := range c.entries {
+		if now.Sub(held.fetchedAt) >= keep {
+			delete(c.entries, k)
+		}
+	}
+	c.sweptAt = now
+}
+
+func (c *Cache) dropOldest() {
+	var oldest string
+	var at time.Time
+	for k, held := range c.entries {
+		if at.IsZero() || held.fetchedAt.Before(at) {
+			oldest, at = k, held.fetchedAt
+		}
+	}
+	delete(c.entries, oldest)
 }

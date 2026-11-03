@@ -187,3 +187,50 @@ func TestGetDropsEntriesTooOldToServe(t *testing.T) {
 	assert.Contains(t, c.entries, "kept", "inside the stale window it may still stand in for an outage")
 	assert.Contains(t, c.entries, "new")
 }
+
+func TestStoreMakesRoomByDroppingTheOldest(t *testing.T) {
+	clk := &clock{now: time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)}
+	c := New(30*time.Second, 15*time.Minute, WithClock(clk.Now), WithMaxEntries(2))
+	source := &counter{}
+
+	for _, key := range []string{"a", "b", "c"} {
+		_, err := c.Get(context.Background(), key, source.fill)
+		require.NoError(t, err)
+		clk.advance(time.Second)
+	}
+
+	assert.Len(t, c.entries, 2)
+	assert.NotContains(t, c.entries, "a")
+
+	clk.advance(time.Minute)
+	_, err := c.Get(context.Background(), "c", source.fill)
+	require.NoError(t, err)
+	assert.Contains(t, c.entries, "b", "filling a key the cache holds again needs no room")
+}
+
+func TestStoreMakesRoomByDroppingWhatIsTooOldToServeFirst(t *testing.T) {
+	clk := &clock{now: time.Date(2026, 11, 2, 9, 0, 0, 0, time.UTC)}
+	c := New(30*time.Second, 15*time.Minute, WithClock(clk.Now), WithMaxEntries(3))
+	source := &counter{}
+
+	for _, key := range []string{"a", "b"} {
+		_, err := c.Get(context.Background(), key, source.fill)
+		require.NoError(t, err)
+	}
+	clk.advance(10 * time.Minute)
+	_, err := c.Get(context.Background(), "c", source.fill)
+	require.NoError(t, err)
+	clk.advance(6 * time.Minute)
+	_, err = c.Get(context.Background(), "d", source.fill)
+	require.NoError(t, err)
+
+	assert.ElementsMatch(t, []string{"c", "d"}, keys(c.entries), "a full cache drops every entry past the stale window before it drops one it could still serve")
+}
+
+func keys(entries map[string]entry) []string {
+	out := make([]string, 0, len(entries))
+	for k := range entries {
+		out = append(out, k)
+	}
+	return out
+}

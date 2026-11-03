@@ -158,6 +158,8 @@ func TestIntegrationsCacheEachPageByItsQuery(t *testing.T) {
 	require.NoError(t, err)
 	_, err = svc.Integrations(context.Background(), everyone, domain.IntegrationQuery{Limit: 20, Projects: []string{"b", "a"}})
 	require.NoError(t, err)
+	_, err = svc.Integrations(context.Background(), everyone, domain.IntegrationQuery{Limit: 20, Projects: []string{"a", "b", "a"}})
+	require.NoError(t, err)
 	_, err = svc.Integrations(context.Background(), everyone, second)
 	require.NoError(t, err)
 	assert.Len(t, ipaas.queries, 2, "a page inside the ttl must not reach iPaaS-Service again")
