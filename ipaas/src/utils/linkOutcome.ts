@@ -18,16 +18,11 @@
 
 import type { ResourceLinkWrite } from '../types/configuration';
 
-/** The one line a link write answers with: when each environment gets the change, and where the resource has no values yet. */
+/** The one line a link write answers with: what changed, whether it waits for a deploy, and where the resource has no values yet. */
 export function linkOutcomeMessage(w: ResourceLinkWrite, changed: boolean): { severity: 'warning' | 'info'; message: string } {
-  const what = changed && w.connection ? `${w.resourceType} now goes through ${w.connection}.` : `${w.resourceType} is linked.`;
-  const when = {
-    updated: ' Development gets it now; other environments get it when you promote to them.',
-    next_deploy: " Development gets it at the integration's next deploy; other environments get it when you promote to them.",
-    unchanged: '',
-    no_workload: " Development gets it at the integration's first deploy; other environments get it when you promote to them.",
-  }[w.workload];
-  const values = w.environmentsWithoutValues.length > 0 ? ` It has no values in ${listed(w.environmentsWithoutValues)} yet; add them on WSO2 Cloud before you promote.` : '';
+  const what = changed && w.connection ? `${w.resourceType} now uses ${w.connection}.` : `${w.resourceType} linked.`;
+  const when = w.workload === 'next_deploy' ? ' Deploy to apply.' : '';
+  const values = w.environmentsWithoutValues.length > 0 ? ` No values in ${listed(w.environmentsWithoutValues)} yet; add them on WSO2 Cloud.` : '';
   return { severity: values ? 'warning' : 'info', message: what + when + values };
 }
 

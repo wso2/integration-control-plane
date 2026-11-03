@@ -27,9 +27,9 @@ export interface LinkSuggestionRow extends ResourceLinkSuggestion {
 }
 
 /**
- * One row per suggested resource and connection whose action is one of actions. A resource linked from WSO2 Cloud
- * under its own key names is offered as "Link through", one linked through another connection as "Change link". It
- * leaves out a connection whose configurables another link supplies.
+ * One row per suggested resource and connection whose action is one of actions. A resource linked only on WSO2 Cloud
+ * is offered as "Link through" (to add the integration's connection), one linked through another connection as
+ * "Change link". It leaves out a connection whose configurables another link supplies.
  */
 export function linkSuggestionRows(suggestions: ResourceLinkSuggestion[], links: ResourceLink[], actions: LinkSuggestionAction[]): LinkSuggestionRow[] {
   return suggestions.flatMap((s) => {

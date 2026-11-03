@@ -22,22 +22,20 @@ import { linkOutcomeMessage } from './linkOutcome';
 const write = { resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfCrm', environmentsWithoutValues: [] };
 
 describe('linkOutcomeMessage', () => {
-  it('says when each environment gets the link', () => {
-    expect(linkOutcomeMessage({ ...write, workload: 'updated' }, false)).toEqual({
-      severity: 'info',
-      message: 'salesforce-sales is linked. Development gets it now; other environments get it when you promote to them.',
-    });
-    expect(linkOutcomeMessage({ ...write, workload: 'next_deploy' }, false).message).toBe("salesforce-sales is linked. Development gets it at the integration's next deploy; other environments get it when you promote to them.");
+  it('says what changed, and nothing about when for what applies by itself', () => {
+    expect(linkOutcomeMessage({ ...write, workload: 'updated' }, false)).toEqual({ severity: 'info', message: 'salesforce-sales linked.' });
+    expect(linkOutcomeMessage({ ...write, workload: 'no_workload' }, true).message).toBe('salesforce-sales now uses acme.sfdemo.sfCrm.');
+    expect(linkOutcomeMessage({ ...write, workload: 'unchanged' }, true).message).toBe('salesforce-sales now uses acme.sfdemo.sfCrm.');
   });
 
-  it('waits for the first deploy of an integration without a Workload', () => {
-    expect(linkOutcomeMessage({ ...write, workload: 'no_workload' }, true).message).toBe("salesforce-sales now goes through acme.sfdemo.sfCrm. Development gets it at the integration's first deploy; other environments get it when you promote to them.");
+  it('asks for a deploy without auto deploy', () => {
+    expect(linkOutcomeMessage({ ...write, workload: 'next_deploy' }, false).message).toBe('salesforce-sales linked. Deploy to apply.');
   });
 
   it('names the environments without values', () => {
     expect(linkOutcomeMessage({ ...write, workload: 'updated', environmentsWithoutValues: ['staging', 'production'] }, false)).toEqual({
       severity: 'warning',
-      message: 'salesforce-sales is linked. Development gets it now; other environments get it when you promote to them. It has no values in staging and production yet; add them on WSO2 Cloud before you promote.',
+      message: 'salesforce-sales linked. No values in staging and production yet; add them on WSO2 Cloud.',
     });
   });
 });

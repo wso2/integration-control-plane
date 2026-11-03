@@ -17,7 +17,7 @@
  */
 
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useMutation, useMutationState, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import {
   fetchCertificateGroups,
   fetchConfigGroups,
@@ -153,6 +153,15 @@ export function useCreateResourceLink() {
     mutationFn: (input: CreateResourceLinkInput) => createResourceLink(input),
     onSuccess: (_, vars) => invalidateLinks(qc, vars.projectId, vars.componentId),
   });
+}
+
+/** When the component's last successful unlink was submitted; 0 without one. */
+export function useLastUnlinkAt(componentId: string): number {
+  const submitted = useMutationState({
+    filters: { mutationKey: ['resourceLinkWrite', 'unlink'], status: 'success', predicate: (m) => (m.state.variables as DeleteResourceLinkInput).componentId === componentId },
+    select: (m) => m.state.submittedAt,
+  });
+  return Math.max(0, ...submitted);
 }
 
 export function useDeleteResourceLink() {

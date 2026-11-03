@@ -22,12 +22,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResourceLink } from '../../types/configuration';
 import { LinkSuggestions } from './LinkSuggestions';
 
-const create = vi.hoisted(() => ({ current: {} as Record<string, unknown> }));
+const create = vi.hoisted(() => ({ current: {} as Record<string, unknown>, lastUnlinkAt: 0 }));
 vi.mock('../../hooks/useConfiguration', () => ({
   useResourceLinkSuggestions: () => ({
     data: [{ resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfCrm'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' }],
   }),
   useCreateResourceLink: () => create.current,
+  useLastUnlinkAt: () => create.lastUnlinkAt,
 }));
 vi.mock('@wso2/oxygen-ui-icons-react', () => ({ Link: () => <span /> }));
 vi.mock('@wso2/oxygen-ui', () => {
@@ -65,15 +66,24 @@ describe('LinkSuggestions', () => {
     expect(container.querySelector('button')).toBeNull();
   });
 
-  it('says in one line when the change reaches development', async () => {
-    create.current = {
-      mutate: vi.fn(),
-      isPending: false,
-      isError: false,
-      data: { resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfCrm', workload: 'updated', environmentsWithoutValues: [] },
-      variables,
-    };
+  const changed = () => ({
+    mutate: vi.fn(),
+    isPending: false,
+    isError: false,
+    data: { resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfCrm', workload: 'updated', environmentsWithoutValues: [] },
+    variables,
+    submittedAt: 100,
+  });
+
+  it('says in one line what the change did', async () => {
+    Object.assign(create, { current: changed(), lastUnlinkAt: 0 });
     await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} actions={['Change link']} />));
-    expect(container.textContent).toContain('salesforce-sales now goes through acme.sfdemo.sfCrm. Development gets it now; other environments get it when you promote to them.');
+    expect(container.textContent).toContain('salesforce-sales now uses acme.sfdemo.sfCrm.');
+  });
+
+  it('drops the line once an unlink follows the change', async () => {
+    Object.assign(create, { current: changed(), lastUnlinkAt: 200 });
+    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[]} actions={['Change link']} />));
+    expect(container.textContent).not.toContain('now uses');
   });
 });

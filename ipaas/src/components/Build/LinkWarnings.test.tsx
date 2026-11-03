@@ -32,6 +32,7 @@ vi.mock('../../hooks/useConfiguration', () => ({
     return { data: server.suggestions };
   },
   useCreateResourceLink: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
+  useLastUnlinkAt: () => 0,
 }));
 vi.mock('../../hooks/useDeployments', () => ({ useDeployDeploymentTrack: () => deploy }));
 vi.mock('@wso2/oxygen-ui-icons-react', () => ({ Link: () => <span /> }));
@@ -72,11 +73,11 @@ afterEach(() => {
 });
 
 describe('LinkWarnings', () => {
-  it("names a connection the build doesn't read, and offers that build's connections", async () => {
+  it("names a connection the build doesn't have, and offers that build's connections", async () => {
     server.warnings = [{ resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales', reason: 'not_in_build' }];
     server.suggestions = [{ resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfCrm'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' }];
     await render();
-    expect(container.textContent).toContain("salesforce-sales: this build doesn't read sfSales's names");
+    expect(container.textContent).toContain('salesforce-sales: this build has no sfSales');
     expect(server.suggestionsBuild).toBe('sfdemo-1793');
     expect(buttons()).toEqual(['Change link']);
   });

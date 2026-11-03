@@ -48,7 +48,7 @@ export function LinkWarnings({ projectId, componentId, versionId, build, firstEn
         <Alert severity="warning" sx={alertSx}>
           {notInBuild.map((w) => (
             <Typography key={w.resourceType} variant="body2">
-              {w.resourceType}: this build doesn&apos;t read {w.connection.slice(w.connection.lastIndexOf('.') + 1)}&apos;s names
+              {w.resourceType}: this build has no {w.connection.slice(w.connection.lastIndexOf('.') + 1)}
             </Typography>
           ))}
         </Alert>

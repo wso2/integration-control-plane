@@ -18,7 +18,7 @@
 
 import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
 import { Link } from '@wso2/oxygen-ui-icons-react';
-import { useCreateResourceLink, useResourceLinkSuggestions } from '../../hooks/useConfiguration';
+import { useCreateResourceLink, useLastUnlinkAt, useResourceLinkSuggestions } from '../../hooks/useConfiguration';
 import type { ResourceLink } from '../../types/configuration';
 import { type LinkSuggestionAction, linkSuggestionRows } from '../../utils/linkSuggestions';
 import { LinkOutcome } from './LinkOutcome';
@@ -44,9 +44,11 @@ const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 export function LinkSuggestions({ projectId, componentId, open, links, build, actions, bare }: LinkSuggestionsProps) {
   const { data: suggestions = [] } = useResourceLinkSuggestions(projectId, componentId, build, open);
   const create = useCreateResourceLink();
+  const lastUnlinkAt = useLastUnlinkAt(componentId);
 
   const rows = linkSuggestionRows(suggestions, links, actions);
-  const outcome = create.data && <LinkOutcome write={create.data} changed={!!create.variables.changed} />;
+  // An unlink since makes the line about the link stale.
+  const outcome = create.data && create.submittedAt > lastUnlinkAt && <LinkOutcome write={create.data} changed={!!create.variables.changed} />;
   if (rows.length === 0) return outcome || null;
 
   return (
@@ -59,12 +61,13 @@ export function LinkSuggestions({ projectId, componentId, open, links, build, ac
               Suggested resources
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              Resources for the connectors this integration imports. Linking one supplies its connection&apos;s configurables: development gets them with its current build, other environments when you promote to them.
+              For the connectors this integration uses.
             </Typography>
           </>
         )}
         {rows.map((r) => {
           const pending = create.isPending && create.variables?.resourceType === r.resourceType && create.variables.connection === r.connection;
+          const label = r.action === 'Change link' ? r.action : 'Link';
           return (
             <Stack key={`${r.resourceType} ${r.connection}`} direction="row" alignItems="center" gap={1} sx={rowSx}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -73,17 +76,17 @@ export function LinkSuggestions({ projectId, componentId, open, links, build, ac
                   <Chip label={r.package} size="small" variant="outlined" sx={chipSx} />
                 </Stack>
                 <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                  {r.action === 'Link' ? r.connection : r.action === 'Change link' ? `${r.linkedConnection} → ${r.connection}` : `linked under its own key names → ${r.connection}`}
+                  {r.action === 'Link' ? r.connection : r.action === 'Change link' ? `${r.linkedConnection} → ${r.connection}` : `linked on WSO2 Cloud → ${r.connection}`}
                 </Typography>
               </Box>
               <Button
                 size="small"
                 variant="outlined"
-                aria-label={`${r.action} ${r.resourceType} through ${r.connection}`}
+                aria-label={`${label} ${r.resourceType} through ${r.connection}`}
                 startIcon={pending ? <CircularProgress size={14} /> : <Link size={14} />}
                 disabled={create.isPending}
                 onClick={() => create.mutate({ projectId, componentId, resourceType: r.resourceType, connection: r.connection, changed: r.action !== 'Link' })}>
-                {r.action}
+                {label}
               </Button>
             </Stack>
           );
