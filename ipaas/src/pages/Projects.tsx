@@ -117,7 +117,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
   return (
     <PageContent fullWidth>
       <PageTitle>
-        <PageTitle.Header>All Projects</PageTitle.Header>
+        <PageTitle.Header>All projects</PageTitle.Header>
         <PageTitle.Actions>
           <Authorized permissions={Permissions.PROJECT_MANAGE}>
             <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>

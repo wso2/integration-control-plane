@@ -30,7 +30,7 @@ import {
   Footer,
   Header,
   IconButton,
-  InputAdornment,
+  SearchBar,
   MenuItem,
   Box,
   CircularProgress,
@@ -42,7 +42,6 @@ import {
   Typography,
   UserMenu,
   useAppShell,
-  TextField,
 } from '@wso2/oxygen-ui';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -70,7 +69,6 @@ import {
   Maximize2,
   Plus,
   Rocket,
-  Search,
   Server,
   Settings2,
   SlidersHorizontal,
@@ -354,6 +352,7 @@ export default function AppLayout(): JSX.Element {
             {!hasProject(scope) && !projectMenuAnchor && (
               <Tooltip title="Select project">
                 <IconButton
+                  aria-label="Select project"
                   size="small"
                   onClick={() => {
                     setProjectMenuDir('right');
@@ -379,21 +378,7 @@ export default function AppLayout(): JSX.Element {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                   Project
                 </Typography>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder="Search"
-                  inputRef={projectSearchRef}
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Search size={16} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <SearchBar size="small" fullWidth placeholder="Search projects" inputRef={projectSearchRef} value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
               </Box>
               <Button
                 variant="text"
@@ -410,7 +395,7 @@ export default function AppLayout(): JSX.Element {
               </Button>
               <Divider />
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
-                All Projects
+                All projects
               </Typography>
               {selectableProjects.filter((p) => !projectSearch.trim() || p.name.toLowerCase().includes(projectSearch.trim().toLowerCase())).length === 0 ? (
                 <MenuItem disabled>No projects found</MenuItem>
@@ -514,6 +499,7 @@ export default function AppLayout(): JSX.Element {
                 {!hasComponent(scope) && !componentMenuAnchor && (
                   <Tooltip title="Select integration">
                     <IconButton
+                      aria-label="Select integration"
                       size="small"
                       onClick={() => {
                         setComponentMenuDir('right');
@@ -539,21 +525,7 @@ export default function AppLayout(): JSX.Element {
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                       Integration
                     </Typography>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="Search"
-                      inputRef={componentSearchRef}
-                      value={componentSearch}
-                      onChange={(e) => setComponentSearch(e.target.value)}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Search size={16} />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
+                    <SearchBar size="small" fullWidth placeholder="Search integrations" inputRef={componentSearchRef} value={componentSearch} onChange={(e) => setComponentSearch(e.target.value)} />
                   </Box>
                   <Button
                     variant="text"
@@ -570,7 +542,7 @@ export default function AppLayout(): JSX.Element {
                   </Button>
                   <Divider />
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
-                    All Integrations
+                    All integrations
                   </Typography>
                   {components.filter((c) => !componentSearch.trim() || c.displayName.toLowerCase().includes(componentSearch.trim().toLowerCase())).length === 0 ? (
                     <MenuItem disabled>No integrations found</MenuItem>
@@ -762,7 +734,7 @@ export default function AppLayout(): JSX.Element {
                           <Sidebar.ItemIcon>
                             <Logs size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                          <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                         </Sidebar.Item>
                         <Sidebar.Item id="org-metrics">
                           <Sidebar.ItemIcon>
@@ -874,7 +846,7 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemIcon>
                                 <Logs size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                             </Sidebar.Item>
                             <Sidebar.Item id="metrics">
                               <Sidebar.ItemIcon>
@@ -907,14 +879,14 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemIcon>
                                 <FileLock size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Configs &amp; Secrets</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Configs &amp; secrets</Sidebar.ItemLabel>
                             </Sidebar.Item>
                             {isGenericService && (
                               <Sidebar.Item id="health-checks">
                                 <Sidebar.ItemIcon>
                                   <HeartPulse size={20} />
                                 </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Health Checks</Sidebar.ItemLabel>
+                                <Sidebar.ItemLabel>Health checks</Sidebar.ItemLabel>
                               </Sidebar.Item>
                             )}
                             {isGenericService && (
@@ -1004,7 +976,7 @@ export default function AppLayout(): JSX.Element {
                             <Sidebar.ItemIcon>
                               <Logs size={20} />
                             </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                            <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                           </Sidebar.Item>
                           <Sidebar.Item id="proj-metrics">
                             <Sidebar.ItemIcon>

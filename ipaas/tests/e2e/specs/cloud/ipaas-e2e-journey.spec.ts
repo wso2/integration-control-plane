@@ -224,7 +224,7 @@ test.describe('01 fixture project @smoke', () => {
   });
 
   test('TC_IP_PROJ_001 the organization Projects page lists its projects', async () => {
-    await expect(page.getByRole('heading', { name: 'All Projects' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'All projects' })).toBeVisible({ timeout: 60_000 });
     // first(): an org with no projects also offers it in the empty state, and both open the same form.
     await expect(page.getByRole('button', { name: 'Create project', exact: true }).first()).toBeVisible();
   });
@@ -280,18 +280,18 @@ test.describe('02 empty project overview @smoke', () => {
   });
 
   test('TC_IP_OVW_001 offers to create an integration on Cloud', async () => {
-    await expect(page.getByText('Create an Integration on Cloud', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Create an integration on Cloud', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Open Cloud Editor' })).toBeVisible();
   });
 
   test('TC_IP_OVW_002 offers to import your own integration', async () => {
-    await expect(page.getByText('Import your own Integration', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Import your own integration', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Import from a public repository' })).toBeVisible();
   });
 
   test('TC_IP_OVW_003 offers the Start quickly panel with both tabs', async () => {
     await expect(page.getByText('Start quickly', { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('tab', { name: 'Prebuilt Integrations' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Prebuilt integrations' })).toBeVisible();
     await expect(samplesTab(page)).toBeVisible();
   });
 
@@ -301,7 +301,7 @@ test.describe('02 empty project overview @smoke', () => {
   });
 
   test('TC_IP_OVW_005 the Prebuilt Integrations tab is selected by default and lists cards', async () => {
-    await expect(page.getByRole('tab', { name: 'Prebuilt Integrations' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Prebuilt integrations' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('button', { name: 'Explore more prebuilt integrations' })).toBeVisible();
   });
 
@@ -337,7 +337,7 @@ test.describe('03 browse samples @smoke', () => {
     await page.goto(browseSamplesUrl, { waitUntil: 'domcontentloaded' });
     await Promise.race([
       page
-        .getByRole('heading', { name: 'Browse Samples' })
+        .getByRole('heading', { name: 'Browse samples' })
         .waitFor({ state: 'visible', timeout: 30_000 })
         .catch(() => {}),
       page
@@ -349,7 +349,7 @@ test.describe('03 browse samples @smoke', () => {
   });
 
   test('TC_IP_SMPL_001 shows the Browse Samples heading and subtitle', async () => {
-    await expect(page.getByRole('heading', { name: 'Browse Samples' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Browse samples' })).toBeVisible();
     await expect(page.getByText('Deploy a sample to get started quickly.')).toBeVisible();
   });
 
@@ -358,7 +358,7 @@ test.describe('03 browse samples @smoke', () => {
   });
 
   test('TC_IP_SMPL_003 shows the sample search input', async () => {
-    await expect(page.getByPlaceholder('Search samples…')).toBeVisible();
+    await expect(page.getByPlaceholder('Search samples')).toBeVisible();
   });
 
   test('TC_IP_SMPL_004 shows the Type, Technology and Tags filter sections', async () => {
@@ -372,12 +372,12 @@ test.describe('03 browse samples @smoke', () => {
     // Every SampleGridCard renders a "Quick deploy" button — asserting on it first confirms
     // real results are showing before we search them away.
     await expect(page.getByRole('button', { name: 'Quick deploy' }).first()).toBeVisible();
-    await page.getByPlaceholder('Search samples…').fill(`no-such-sample-${Date.now()}`);
+    await page.getByPlaceholder('Search samples').fill(`no-such-sample-${Date.now()}`);
     await expect(page.getByText('No samples match your search.')).toBeVisible();
   });
 
   test('TC_IP_SMPL_006 clearing the search brings the results back', async () => {
-    const search = page.getByPlaceholder('Search samples…');
+    const search = page.getByPlaceholder('Search samples');
     await search.fill(`no-such-sample-${Date.now()}`);
     await expect(page.getByText('No samples match your search.')).toBeVisible();
     await search.clear();
@@ -411,14 +411,14 @@ test.describe('04 deploy a sample @smoke', () => {
   });
 
   test('TC_IP_DEPLOY_003 the integration overview reports a build', async () => {
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 2 * 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 2 * 60_000 });
   });
 
   test('TC_IP_DEPLOY_004 the sample appears in the project with the table columns', async () => {
     await enterProject(page, orgHandler);
     const table = page.getByRole('table').first();
     await expect(table).toBeVisible({ timeout: 30_000 });
-    for (const column of ['Name', 'Type', 'Last Updated']) {
+    for (const column of ['Name', 'Type', 'Last updated']) {
       await expect(table.getByRole('columnheader', { name: column, exact: true })).toBeVisible();
     }
     await expect(integrationRow(page, SAMPLE)).toHaveCount(1);
@@ -427,7 +427,7 @@ test.describe('04 deploy a sample @smoke', () => {
   test('TC_IP_DEPLOY_005 the sample build completes', async () => {
     test.setTimeout(BUILD_TIMEOUT_MS + 2 * 60_000);
     await openIntegration(page, SAMPLE);
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
 
     const status = await waitForBuildToSettle(page);
     test.info().annotations.push({ type: 'build', description: `${SAMPLE}: ${status}` });
@@ -452,7 +452,7 @@ test.describe('04b endpoint and consumers @smoke', () => {
   // Serial: a build that never completed leaves nothing to test, so one failure reports the cause once.
   test('TC_IP_DEPLOY_006 the latest build reports Completed', async () => {
     test.setTimeout(BUILD_TIMEOUT_MS + 2 * 60_000);
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
     const status = await waitForBuildToSettle(page);
     expect(status, `${SAMPLE} build ended as ${status}`).toMatch(/^Completed/);
   });
@@ -470,14 +470,14 @@ test.describe('04b endpoint and consumers @smoke', () => {
     await dismissStrayDialog(page);
     const card = envCard(page);
     await expect(card.getByText('URLs:', { exact: true })).toBeVisible({ timeout: 3 * 60_000 });
-    await expect(card.getByText('Download Spec:', { exact: true })).toBeVisible();
+    await expect(card.getByText('Download spec:', { exact: true })).toBeVisible();
     await expect(card.getByRole('button', { name: 'View details' }).first(), 'the card lists no resources').toBeVisible();
   });
 
   test('TC_IP_CONS_001 the consumers section is offered with its security scheme', async () => {
     const card = envCard(page);
     await expect(card.getByText(/^Consumers\s*\(\d+\)/)).toBeVisible({ timeout: 60_000 });
-    await expect(card.getByText(/^Security Scheme:/)).toBeVisible();
+    await expect(card.getByText(/^Security scheme:/)).toBeVisible();
   });
 
   // Skipped where deletion is unavailable: creating and revoking are still worth exercising.
@@ -500,7 +500,7 @@ test.describe('04b endpoint and consumers @smoke', () => {
 
     const drawer = page.getByRole('dialog').filter({ hasText: consumerName });
     await expect(drawer.getByText('Header', { exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(drawer.getByText('API Key', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('API key', { exact: true })).toBeVisible();
     await drawer.getByRole('button', { name: 'Done', exact: true }).click();
   });
 
@@ -552,7 +552,7 @@ test.describe('04c test console @smoke', () => {
     await expect(testButton).toBeVisible({ timeout: 60_000 });
     await testButton.click();
     await expect(page).toHaveURL(/\/test\/console$/, { timeout: 60_000 });
-    await expect(page.getByRole('heading', { name: 'Test Console', level: 1 })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Test console', level: 1 })).toBeVisible({ timeout: 60_000 });
   });
 
   test('TC_IP_TEST_003 the console names the endpoint, visibility, invoke URL and security header', async () => {
@@ -560,7 +560,7 @@ test.describe('04c test console @smoke', () => {
       await expect(page.getByText(label, { exact: true }), `the console is missing the ${label} field`).toBeVisible({ timeout: 60_000 });
     }
     // Not exact: the label carries the header's name as a caption inside it, so its text is both.
-    await expect(page.getByText(/^Security Header\S/), 'the console is missing the Security Header field, or it names no header').toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/^Security header\S/), 'the console is missing the Security Header field, or it names no header').toBeVisible({ timeout: 60_000 });
   });
 
   test('TC_IP_TEST_004 a test key is held, or fetched on demand', async () => {
@@ -662,19 +662,19 @@ test.describe('04d schedule an automation @smoke', () => {
     const importButton = page.getByRole('button', { name: 'Import from a public repository' });
     await reachCreateControl(page, importButton);
     await importButton.click();
-    await expect(page.getByRole('heading', { name: 'Import an Integration' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Import an integration' })).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('textbox', { name: 'Repository URL' }).fill(AUTOMATION_REPO_URL);
     await expect(page.getByRole('combobox', { name: /^Branch/ }), 'the repository did not resolve into a branch — GitHub public API rate limit is the usual cause').toContainText('main', { timeout: 60_000 });
 
-    await page.getByRole('textbox', { name: 'Repository Sub Path' }).click();
-    const picker = page.getByRole('dialog').filter({ hasText: 'Repository Sub Path' });
+    await page.getByRole('textbox', { name: 'Repository sub path' }).click();
+    const picker = page.getByRole('dialog').filter({ hasText: 'Repository sub path' });
     // Prefix match: an expanded folder's name would also carry its children's.
     await picker.getByRole('treeitem', { name: new RegExp(`^${AUTOMATION_SUB_PATH}`) }).click();
     await picker.getByRole('button', { name: 'Continue', exact: true }).click();
 
-    await expect(page.getByRole('textbox', { name: 'Repository Sub Path' })).toHaveValue(`/${AUTOMATION_SUB_PATH}`);
-    await expect(page.getByRole('textbox', { name: 'Integration Name' })).toHaveValue(AUTOMATION);
+    await expect(page.getByRole('textbox', { name: 'Repository sub path' })).toHaveValue(`/${AUTOMATION_SUB_PATH}`);
+    await expect(page.getByRole('textbox', { name: 'Integration name' })).toHaveValue(AUTOMATION);
   });
 
   test('TC_IP_AUTO_002 WSO2 Integrator: MI is selected and importing provisions the automation', async () => {
@@ -758,7 +758,7 @@ test.describe('05 import an AI agent @smoke', () => {
     const importButton = page.getByRole('button', { name: 'Import from a public repository' });
     await reachCreateControl(page, importButton);
     await importButton.click();
-    await expect(page.getByRole('heading', { name: 'Import an Integration' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Import an integration' })).toBeVisible({ timeout: 30_000 });
   });
 
   test('TC_IP_AGENT_002 the repository URL resolves into a branch and a derived name', async () => {
@@ -769,8 +769,8 @@ test.describe('05 import an AI agent @smoke', () => {
     // the public API's hourly rate limit is spent, which a real user hits too.
     await expect(page.getByRole('combobox', { name: /^Branch/ }), 'the repository did not resolve into a branch — GitHub public API rate limit is the usual cause').toContainText('main', { timeout: 60_000 });
     // Read, never opened: the picker re-runs technology detection, which can leave the submit disabled.
-    await expect(page.getByRole('textbox', { name: 'Repository Sub Path' })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Integration Name' }), 'the integration name was not derived from the repository').not.toHaveValue('');
+    await expect(page.getByRole('textbox', { name: 'Repository sub path' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Integration name' }), 'the integration name was not derived from the repository').not.toHaveValue('');
   });
 
   test('TC_IP_AGENT_003 importing provisions the agent under its derived name', async () => {
@@ -786,7 +786,7 @@ test.describe('05 import an AI agent @smoke', () => {
     await expect(heading, 'the import did not land on the agent overview').toBeVisible({ timeout: 2 * 60_000 });
     agentName = (await heading.textContent())?.trim() ?? '';
     test.info().annotations.push({ type: 'fixture', description: `agent imported as ${agentName}` });
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 2 * 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 2 * 60_000 });
   });
 
   test('TC_IP_AGENT_004 the imported agent reports its source and type', async () => {
@@ -907,18 +907,18 @@ test.describe('06 populated project overview @smoke', () => {
     await expect(page.getByRole('table').first()).toBeVisible({ timeout: 30_000 });
 
     // Current strings: the removed spec asserted text that no longer exists, so it could only pass.
-    await expect(page.getByText('Import your own Integration', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Import your own integration', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Start quickly', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Open Cloud Editor', exact: true })).toHaveCount(0);
   });
 
   test('TC_IP_OVW_010 the architecture panel is offered', async () => {
-    await expect(page.getByRole('heading', { name: 'Architecture Diagram' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Architecture diagram' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: /architecture diagram$/ })).toBeVisible();
   });
 
   test('TC_IP_OVW_011 the integration count panel totals the rows in the table', async () => {
-    await expect(page.getByRole('heading', { name: 'Integration Count by Type' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Integration count by type' })).toBeVisible({ timeout: 30_000 });
 
     const rowCount = await page.getByRole('row', { name: /^View details for / }).count();
     const total = page.getByText('Total', { exact: true }).locator('xpath=following-sibling::*[1]');
@@ -965,8 +965,8 @@ test.describe('07 page availability @smoke', () => {
     await expandSidebar(page);
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
-    await openNavGroup(page, 'Observe', 'Runtime Logs');
-    await expectNavItems(page, ['Runtime Logs', 'Metrics']);
+    await openNavGroup(page, 'Observe', 'Runtime logs');
+    await expectNavItems(page, ['Runtime logs', 'Metrics']);
     await openNavGroup(page, 'Infrastructure', 'Environments');
     await expectNavItems(page, ['Environments', 'Pipelines', 'Settings']);
   });
@@ -976,8 +976,8 @@ test.describe('07 page availability @smoke', () => {
     await expandSidebar(page);
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
-    await openNavGroup(page, 'Observe', 'Runtime Logs');
-    await expectNavItems(page, ['Runtime Logs', 'Metrics']);
+    await openNavGroup(page, 'Observe', 'Runtime logs');
+    await expectNavItems(page, ['Runtime logs', 'Metrics']);
     await openNavGroup(page, 'Infrastructure', 'Environments');
     await expectNavItems(page, ['Environments', 'Pipelines']);
     // Projects have no Settings page: editing is on the overview and deletion on the project list's card.
@@ -995,18 +995,18 @@ test.describe('07 page availability @smoke', () => {
     await expandSidebar(page);
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
-    await openNavGroup(page, 'Observe', 'Runtime Logs');
-    await expectNavItems(page, ['Runtime Logs', 'Metrics']);
+    await openNavGroup(page, 'Observe', 'Runtime logs');
+    await expectNavItems(page, ['Runtime logs', 'Metrics']);
 
     // Opened, not just listed: a nav item survives a page that fails to render, and the
     // integration-scoped observability specs no longer run on cloud to catch that.
-    for (const observePage of ['Runtime Logs', 'Metrics']) {
+    for (const observePage of ['Runtime logs', 'Metrics']) {
       await page.getByRole('button', { name: observePage, exact: true }).click();
       await expect(page.locator('main').getByRole('heading').first(), `${observePage} did not render`).toBeVisible({ timeout: 60_000 });
     }
 
     await openNavGroup(page, 'Operate', 'Runtime');
-    await expectNavItems(page, ['Runtime', 'Containers', 'Configs & Secrets']);
+    await expectNavItems(page, ['Runtime', 'Containers', 'Configs & secrets']);
     await openNavGroup(page, 'Infrastructure', 'Environments');
     await expectNavItems(page, ['Environments', 'Pipelines']);
 
@@ -1040,7 +1040,7 @@ test.describe('07 page availability @smoke', () => {
     await expectPageRendered(page, `organizations/${orgHandler}/settings`);
   });
 
-  const SECTION_IDS: Record<(typeof CLOUD_SECTIONS)[number], string> = { 'Package Registries': 'TC_IP_SET_003' };
+  const SECTION_IDS: Record<(typeof CLOUD_SECTIONS)[number], string> = { 'Package registries': 'TC_IP_SET_003' };
   for (const section of CLOUD_SECTIONS) {
     test(`${SECTION_IDS[section]} organization settings offers "${section}"`, async () => {
       await expectPageRendered(page, `organizations/${orgHandler}/settings`);
@@ -1051,7 +1051,7 @@ test.describe('07 page availability @smoke', () => {
   test('TC_IP_SET_004 organization settings offers no unported section', async () => {
     await expectPageRendered(page, `organizations/${orgHandler}/settings`);
     // Positive assertion first: these absences would pass on a blank page.
-    await expect(page.getByText('Package Registries', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Package registries', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     // Org Details was removed from cloud settings, so it must not come back either.
     await expect(page.getByText('Org Details', { exact: true })).not.toBeVisible();
     for (const section of UNPORTED_SECTIONS) {

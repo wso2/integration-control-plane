@@ -23,6 +23,7 @@ import { useExecutionArguments } from '../../hooks/useExecutions';
 import type { TaskExecution } from '../../types/executions';
 import { executionIdTail } from '../../utils/executionStatus';
 import { useTriggerComponent } from '../../hooks/useExecutions';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 interface ExecutionDrawerProps {
   execution: TaskExecution | null;
@@ -91,6 +92,11 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
     }
   }, [open]);
 
+  const savedArgs = fetchedArgs && fetchedArgs.length > 0 ? fetchedArgs.map((a) => a.argumentValue) : [''];
+  useUnsavedChanges(open && !argsLoading && JSON.stringify(args) !== JSON.stringify(savedArgs));
+  const guardNavigation = useLeaveGuard();
+  const requestClose = () => guardNavigation(handleClose);
+
   const handleCopy = () => {
     if (!execution?.revisionId) return;
     navigator.clipboard.writeText(execution.revisionId).then(() => {
@@ -124,7 +130,7 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
   };
 
   return (
-    <DrawerPanel open={open} onClose={handleClose} width={680}>
+    <DrawerPanel open={open} onClose={requestClose} width={680}>
       <DrawerPanel.Header>
         <Stack direction="row" alignItems="center" gap={0.5} sx={{ flex: 1, minWidth: 0 }}>
           <DrawerPanel.Title sx={{ flex: '0 1 auto' }}>{execution ? `Execution: ${executionIdTail(execution.id)}` : 'Execution'}</DrawerPanel.Title>
@@ -231,7 +237,7 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
           {/* Footer */}
           {!argsLoading && (
             <DrawerPanel.Footer>
-              <Button variant="outlined" color="inherit" onClick={onClose}>
+              <Button variant="outlined" color="inherit" onClick={requestClose}>
                 Cancel
               </Button>
               <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>

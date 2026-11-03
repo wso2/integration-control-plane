@@ -34,7 +34,7 @@ export default function BuildAreaImageDrawer({ open, onClose, images, isLoading,
   return (
     <DrawerPanel open={open} onClose={onClose} width={440}>
       <DrawerPanel.Header>
-        <DrawerPanel.Title>Select Image</DrawerPanel.Title>
+        <DrawerPanel.Title>Select image</DrawerPanel.Title>
         <DrawerPanel.Actions>
           <DrawerPanel.CloseButton />
         </DrawerPanel.Actions>

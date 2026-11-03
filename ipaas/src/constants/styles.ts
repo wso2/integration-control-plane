@@ -27,7 +27,6 @@ export const CARD_HOVER_SX = {
 
 type PrimaryTheme = { palette: { primary: { main: string } } };
 
-/** The theme's primary colour at `percent` opacity. */
 export const primaryTint = (percent: number) => (t: PrimaryTheme) => `color-mix(in srgb, ${t.palette.primary.main} ${percent}%, transparent)`;
 
 /** An icon tile lit by a soft primary glow from its top-left. Size it where it is used. */
@@ -91,4 +90,4 @@ export const CARD_TABLE_SX = {
 } as const;
 
 /** The shared minimum width lines up the commit that follows each card title. */
-export const CARD_HEADER_TITLE_SX = { fontWeight: 600, textTransform: 'capitalize', flexShrink: 0, minWidth: '7em' } as const;
+export const CARD_HEADER_TITLE_SX = { fontWeight: 600, flexShrink: 0, minWidth: '7em' } as const;

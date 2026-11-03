@@ -175,6 +175,10 @@ export function editProjectUrl(scope: { org: string; project: string }): string 
   return `/organizations/${scope.org}/projects/${scope.project}/edit`;
 }
 
+export function linkRepositoryUrl(scope: { org: string; project: string }): string {
+  return `/organizations/${scope.org}/projects/${scope.project}/link-repository`;
+}
+
 export function importProjectUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/projects/import`;
 }
@@ -358,7 +362,6 @@ export function resolveActiveNavId(pathname: string, scope: Scope): string {
   return resolveEntry(scope.level, scopeRest(pathname, scope)).navId;
 }
 
-/** Every expandable sidebar group at a level. */
 export function navGroupIds(level: Level): string[] {
   return [...new Set(NAV[level].flatMap((e) => (e.parent ? [e.parent] : [])))];
 }

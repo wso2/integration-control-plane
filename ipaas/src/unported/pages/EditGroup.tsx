@@ -254,7 +254,7 @@ export function GroupDetailView({ orgHandler, group, onBack, projectId, componen
         <>
           <ListingTable.Container>
             <ListingTable.Toolbar
-              searchSlot={<SearchField value={search} onChange={setSearch} />}
+              searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
               actions={
                 canManageGroups && (
                   <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setAddingUsers(true)}>
@@ -377,7 +377,7 @@ export function GroupDetailView({ orgHandler, group, onBack, projectId, componen
         <>
           <ListingTable.Container>
             <ListingTable.Toolbar
-              searchSlot={<SearchField value={search} onChange={setSearch} />}
+              searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
               actions={
                 canModifyRoles && (
                   <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setAddingRoles(true)}>

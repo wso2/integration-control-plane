@@ -119,7 +119,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
 
   const integrationSelect = (
     <Select value={integrationFilter} onChange={(e) => setIntegrationFilter(e.target.value as string)} size="small" sx={{ minWidth: 200, height: 40 }} inputProps={{ 'aria-label': 'Integration' }}>
-      <MenuItem value="all">All Integrations</MenuItem>
+      <MenuItem value="all">All integrations</MenuItem>
       {allComponents.map((c) => (
         <MenuItem key={c.id} value={c.id}>
           {c.displayName || c.name}
@@ -130,7 +130,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
 
   return (
     <LogsPageLayout
-      title="Runtime Logs"
+      title="Runtime logs"
       filtersElement={<LogsToolbar filters={filters} environments={environments} logs={logs} canRefresh={!!logsRequest} onRefetch={refetch} extraFilters={integrationSelect} />}
       logPanelElement={
         <LogsViewer

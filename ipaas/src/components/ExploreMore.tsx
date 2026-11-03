@@ -33,7 +33,7 @@ export default function ExploreMore(): JSX.Element {
   return (
     <Box sx={sectionSx}>
       <Typography variant="h5" component="h2" sx={headingSx}>
-        Explore More
+        Explore more
       </Typography>
       <Card>
         <CardContent sx={cardContentSx}>

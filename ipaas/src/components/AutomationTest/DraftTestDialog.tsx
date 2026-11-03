@@ -45,7 +45,7 @@ export default function DraftTestDialog({ open, mode, intent, onClose, onDraft, 
   const isExistingDraft = mode === 'existingDraft';
   const isNewTest = intent === 'newTest';
 
-  const title = isNewTest ? 'Start New Test?' : 'Apply Execution?';
+  const title = isNewTest ? 'Start new test?' : 'Apply execution?';
   const description = isExistingDraft
     ? isNewTest
       ? 'A draft test already exists. Starting a new test will override the existing draft.'

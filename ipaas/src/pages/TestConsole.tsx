@@ -197,7 +197,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
       <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>
-          Test Console
+          Test console
         </Typography>
 
         {/* Nothing deployed to call — explain rather than render an empty endpoint picker. */}
@@ -269,6 +269,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                         <InputAdornment position="end">
                           <Tooltip title={urlCopied ? 'Copied!' : 'Copy to clipboard'}>
                             <IconButton
+                              aria-label="Copy invoke URL"
                               size="small"
                               onClick={() => {
                                 navigator.clipboard.writeText(invokeUrl);
@@ -288,7 +289,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                 {testable && (
                   <Stack direction="row" alignItems="flex-start" gap={2}>
                     <Typography variant="body2" sx={{ minWidth: 140, fontWeight: 500, color: 'text.secondary', pt: 1 }}>
-                      Security Header
+                      Security header
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 400 }}>
                         {testKeyHeader}
                       </Typography>
@@ -305,12 +306,13 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                           endAdornment={
                             <InputAdornment position="end">
                               <Tooltip title={showKey ? 'Hide' : 'Show'}>
-                                <IconButton size="small" onClick={() => setShowKey((s) => !s)}>
+                                <IconButton aria-label={showKey ? 'Hide key' : 'Show key'} size="small" onClick={() => setShowKey((s) => !s)}>
                                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title={keyCopied ? 'Copied!' : 'Copy'}>
                                 <IconButton
+                                  aria-label="Copy key"
                                   size="small"
                                   disabled={!securityHeader}
                                   onClick={() => {

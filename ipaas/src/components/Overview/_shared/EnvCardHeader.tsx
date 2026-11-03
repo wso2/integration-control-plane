@@ -21,6 +21,7 @@ import { RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import CommitSummary from '../../CommitSummary';
 import { CARD_HEADER_TITLE_SX } from '../../../constants/styles';
 import type { ReactNode } from 'react';
+import { capitalize } from '../../../utils/string';
 
 export interface EnvCardHeaderProps {
   envName: string;
@@ -49,7 +50,7 @@ export default function EnvCardHeader({ envName, deployedCommit, hasDeployment, 
       {/* Left: env name + commit + type status slot */}
       <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
         <Typography variant="h5" component="h2" sx={CARD_HEADER_TITLE_SX}>
-          {envName}
+          {capitalize(envName)}
         </Typography>
 
         {hasDeployment && deployedCommit?.sha && <CommitSummary sha={deployedCommit.sha} message={deployedCommit.message} />}

@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Stack, Typography } from '@wso2/oxygen-ui';
 import { CirclePlay, CircleStop, Hourglass, Rocket, TriangleAlert } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { deploymentNotice, type DeploymentNoticeKind } from '../utils/deploymentNotice';
+import EnvEmptyNotice from './EnvEmptyNotice';
 
 interface DeploymentNoticeProps {
   hasDeployment: boolean;
@@ -45,12 +45,5 @@ export default function DeploymentNotice({ hasDeployment, status, envCritical }:
   const { kind, message } = deploymentNotice(hasDeployment, status, envCritical);
   const Icon = NOTICE_ICONS[kind];
 
-  return (
-    <Stack alignItems="center" justifyContent="center" gap={1} sx={{ py: 4 }}>
-      <Icon size={24} style={{ opacity: 0.4 }} />
-      <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-        {message}
-      </Typography>
-    </Stack>
-  );
+  return <EnvEmptyNotice icon={Icon}>{message}</EnvEmptyNotice>;
 }

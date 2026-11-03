@@ -33,7 +33,7 @@ function Label({ children }: { children: ReactNode }): JSX.Element {
   );
 }
 
-/** The env card's endpoint row: "Endpoint:", "URLs:" and "Download Spec:", each label beside its value. */
+/** The env card's endpoint row: "Endpoint:", "URLs:" and "Download spec:", each label beside its value. */
 export default function EndpointPanelLayout({ select, urls, download }: { select: ReactNode; urls: ReactNode; download: ReactNode }): JSX.Element {
   return (
     <Stack direction="row" alignItems="center" flexWrap="wrap" columnGap={3} rowGap={1} sx={rowSx}>
@@ -46,7 +46,7 @@ export default function EndpointPanelLayout({ select, urls, download }: { select
         <Box sx={urlsGroupSx}>{urls}</Box>
       </Stack>
       <Stack direction="row" alignItems="center" gap={0.5} sx={downloadGroupSx}>
-        <Label>Download Spec:</Label>
+        <Label>Download spec:</Label>
         {download}
       </Stack>
     </Stack>

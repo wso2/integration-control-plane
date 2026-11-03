@@ -66,7 +66,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
 
   const imageName = containerImageName(c);
   const main = isMainContainer(c);
-  const policyLabel = c.image_pull_policy === 'Always' ? 'Always' : 'If Not Present';
+  const policyLabel = c.image_pull_policy === 'Always' ? 'Always' : 'If not present';
 
   return (
     <Paper variant="outlined" sx={cardSx}>
@@ -75,7 +75,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
           <Typography variant="h6" fontWeight={700}>
             {c.name}
           </Typography>
-          <Chip size="small" variant="outlined" color={main ? 'success' : 'default'} label={main ? 'Main Container' : 'Init Container'} />
+          <Chip size="small" variant="outlined" color={main ? 'success' : 'default'} label={main ? 'Main container' : 'Init container'} />
         </Stack>
         {canManage && (
           <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => setIsEditOpen(true)}>
@@ -102,7 +102,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
             </Alert>
           )}
           <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1.5 }}>
-            <Chip size="small" variant="outlined" label={`Image Pull Policy: ${policyLabel}`} sx={{ borderColor: 'divider', color: 'text.secondary' }} />
+            <Chip size="small" variant="outlined" label={`Image pull policy: ${policyLabel}`} sx={{ borderColor: 'divider', color: 'text.secondary' }} />
             {c.ports?.map((p) => (
               <Chip key={`${p.protocol}-${p.port}`} size="small" variant="outlined" label={`${p.protocol}: ${p.port}`} sx={{ borderColor: 'divider', color: 'text.secondary' }} />
             ))}
@@ -125,10 +125,10 @@ function ResourceBars({ container: c }: { container: ReleaseContainer }): JSX.El
     return (
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <ResourceRangeSlider label="CPU Request / Limit" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={0.01} request={milliToCpu(c.cpu ?? 0)} limit={milliToCpu(c.cpu_limit ?? 0)} viewMode format={cpuFmt} />
+          <ResourceRangeSlider label="CPU request / limit" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={0.01} request={milliToCpu(c.cpu ?? 0)} limit={milliToCpu(c.cpu_limit ?? 0)} viewMode format={cpuFmt} />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <ResourceRangeSlider label="Memory Request / Limit" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={1} request={c.memory ?? 0} limit={c.memory_limit ?? 0} viewMode format={memFmt} />
+          <ResourceRangeSlider label="Memory request / limit" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={1} request={c.memory ?? 0} limit={c.memory_limit ?? 0} viewMode format={memFmt} />
         </Grid>
       </Grid>
     );
@@ -136,10 +136,10 @@ function ResourceBars({ container: c }: { container: ReleaseContainer }): JSX.El
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 6 }}>
-        <ReadonlySingle label="CPU Request" unit="CPU" min={CPU_MIN} max={CPU_MAX} value={milliToCpu(c.cpu ?? 0)} format={cpuFmt} />
+        <ReadonlySingle label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} value={milliToCpu(c.cpu ?? 0)} format={cpuFmt} />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
-        <ReadonlySingle label="Memory Request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} value={c.memory ?? 0} format={memFmt} />
+        <ReadonlySingle label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} value={c.memory ?? 0} format={memFmt} />
       </Grid>
       <Grid size={{ xs: 12 }}>
         <Alert severity="warning">Resource limits are disabled for this container. Containers without resource limits can freely use up resources and can negatively impact the performance of other integrations.</Alert>

@@ -207,7 +207,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
         </Box>
       </Typography>
       <Typography color="text.secondary" sx={styles.intro}>
-        Connect your systems, automate workflows, and build AI-powered integrations, then deploy and run them on one platform.
+        Integrate your systems seamlessly, and run them all on one platform.
       </Typography>
 
       <Box sx={styles.summaryGrid}>
@@ -215,11 +215,11 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           icon={<Workflow size={24} />}
           title="Integrations"
           count={integrationCount}
-          description="Connect apps, data, and services with APIs, automations, and events."
+          description="Create integrations that orchestrate data and events across your systems."
           actionLabel="Create an integration"
           onAction={isLoading ? undefined : createIntegration}
         />
-        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge Bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" comingSoon />
+        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" comingSoon />
         <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" comingSoon />
       </Box>
 

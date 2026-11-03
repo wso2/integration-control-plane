@@ -139,10 +139,10 @@ function HpaForm({ autoscaling, canManage, applying, onApply }: { autoscaling: A
       </Stack>
       <Stack direction={{ xs: 'column', md: 'row' }} gap={2}>
         {/* The autoscaler needs a CPU target, so the metric cannot be switched off. Sliders apply when let go, not while dragging. */}
-        <ThresholdSlider label="CPU Threshold" enabled value={cpu} min={CPU_THRESHOLD.min} max={CPU_THRESHOLD.max} onToggle={noop} onChange={setCpu} onCommit={(v) => scheduleThresholds(v, memoryOn, memoryTarget)} disabled={locked} toggleLocked />
+        <ThresholdSlider label="CPU threshold" enabled value={cpu} min={CPU_THRESHOLD.min} max={CPU_THRESHOLD.max} onToggle={noop} onChange={setCpu} onCommit={(v) => scheduleThresholds(v, memoryOn, memoryTarget)} disabled={locked} toggleLocked />
         {/* Opt-in beside CPU: the HPA follows whichever metric asks for more replicas. */}
         <ThresholdSlider
-          label="Memory Threshold"
+          label="Memory threshold"
           enabled={memoryOn}
           value={memoryTarget}
           min={CLOUD_MEMORY_THRESHOLD.min}
@@ -339,7 +339,7 @@ export default function CloudAutoscaling({ projectId, componentId, environmentId
       </Stack>
 
       <Typography variant="subtitle1" sx={sectionTitleSx}>
-        Scaling Configuration
+        Scaling configuration
       </Typography>
       <Stack gap={2.5} sx={sectionSx}>
         {!paid ? (

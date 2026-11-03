@@ -46,7 +46,7 @@ export const FOOTER_LINKS = [
   ['Privacy Policy', 'https://wso2.com/privacy-policy'],
 ] as const;
 
-export const CLOUD_SECTIONS = ['Package Registries'] as const;
+export const CLOUD_SECTIONS = ['Package registries'] as const;
 export const UNPORTED_SECTIONS = ['Access Control', 'Egress Control', 'Workflows', 'Credentials', 'On-Prem Keys', 'Application Security'] as const;
 
 /** Deleting an integration is asynchronous: the row greys out, then goes. Observed at ~3 minutes on DEV. */

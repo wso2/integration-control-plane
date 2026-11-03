@@ -40,9 +40,9 @@ describe('hasProbe / probeTypeLabel', () => {
   });
 
   it('labels probe types', () => {
-    expect(probeTypeLabel(PROBE_TYPE.HTTP_GET)).toBe('HTTP GET Request');
-    expect(probeTypeLabel(PROBE_TYPE.TCP)).toBe('TCP Socket');
-    expect(probeTypeLabel(PROBE_TYPE.EXEC)).toBe('Execute a Command');
+    expect(probeTypeLabel(PROBE_TYPE.HTTP_GET)).toBe('HTTP GET request');
+    expect(probeTypeLabel(PROBE_TYPE.TCP)).toBe('TCP socket');
+    expect(probeTypeLabel(PROBE_TYPE.EXEC)).toBe('Execute a command');
     expect(probeTypeLabel('')).toBe('');
   });
 });

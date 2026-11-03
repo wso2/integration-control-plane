@@ -34,7 +34,7 @@ export default function McpToolDrawer({ tool, colors }: { tool: McpTool; colors:
       {parameters.length > 0 && (
         <Box>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
-            Input Parameters
+            Input parameters
           </Typography>
           <Stack gap={1}>
             {parameters.map((param) => (
@@ -59,7 +59,7 @@ export default function McpToolDrawer({ tool, colors }: { tool: McpTool; colors:
 
       <Box>
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          Schema Type
+          Schema type
         </Typography>
         <Chip label={tool.inputSchema?.type ?? 'object'} size="small" variant="outlined" />
       </Box>

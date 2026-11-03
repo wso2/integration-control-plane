@@ -18,7 +18,7 @@ export async function gotoOrgHome(page: Page, orgHandler: string): Promise<void>
   // token mode, where the seeded session carries no refresh token and nothing can refresh.
   if (!page.url().startsWith('about:')) await reseedSessionToken(page);
 
-  const landed = page.getByRole('heading', { name: 'All Projects' });
+  const landed = page.getByRole('heading', { name: 'All projects' });
   if (await landed.isVisible({ timeout: 5_000 }).catch(() => false)) return;
 
   await page.goto(`organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });

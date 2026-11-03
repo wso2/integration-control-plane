@@ -61,7 +61,6 @@ import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
 import ArchitectureCard from '../components/ArchitectureCard';
 import ContributorsCard from '../components/ContributorsCard';
-import LinkRepositoryDialog from '../components/ProjectCreate/LinkRepositoryDialog';
 import IntegratorIcon from '../assets/icons/IntegratorIcon';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type JSX } from 'react';
@@ -75,7 +74,7 @@ import type { Component, ComponentDeletionError, ComponentSubscription, Subscrip
 import { useDeleteComponent } from '../hooks/useComponents';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
-import { newComponentUrl, editProjectUrl, type ProjectScope } from '../nav';
+import { newComponentUrl, editProjectUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
 import { componentOverviewUrl, orgProjectsUrl } from '../paths';
@@ -372,7 +371,7 @@ function IntegrationsTable({
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
         <TextField
           size="small"
-          placeholder="Search"
+          placeholder="Search integrations"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           sx={integrationSearchSx}
@@ -458,7 +457,7 @@ function IntegrationsTable({
                     <ListingTable.Cell>Name</ListingTable.Cell>
                     <ListingTable.Cell>Description</ListingTable.Cell>
                     <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                    <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
+                    <ListingTable.Cell align="right">Last updated</ListingTable.Cell>
                   </ListingTable.Row>
                 </ListingTable.Head>
                 <ListingTable.Body>
@@ -559,7 +558,7 @@ function IntegrationsTable({
           {filteredNonIntegrations.length > 0 && (
             <>
               <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mt: filteredIntegrations.length > 0 ? 4 : 0, mb: 2 }}>
-                Non Integrations
+                Non-integrations
               </Typography>
               <ListingTable.Container disablePaper>
                 <ListingTable variant="card" density="compact" sx={CARD_TABLE_SX}>
@@ -568,7 +567,7 @@ function IntegrationsTable({
                       <ListingTable.Cell>Name</ListingTable.Cell>
                       <ListingTable.Cell>Description</ListingTable.Cell>
                       <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                      <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
+                      <ListingTable.Cell align="right">Last updated</ListingTable.Cell>
                     </ListingTable.Row>
                   </ListingTable.Head>
                   <ListingTable.Body>
@@ -679,7 +678,6 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const { data: subscriptions } = useOrgSubscriptions(orgUuid);
   const isUpgraded = (subscriptions ?? []).some((s) => s.subscriptionType === 'devant-subscription' && s.subscriptionStatus === 'active');
   const orgDevantComponentCount = isUpgraded ? 0 : (orgLimits?.billableComponentCount ?? 0);
-  const [linkRepoOpen, setLinkRepoOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const splitButtonRef = useRef<HTMLDivElement>(null);
   const [descEditing, setDescEditing] = useState(false);
@@ -904,6 +902,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
                         <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5 }}>
                           <Tooltip title="Edit description">
                             <IconButton
+                              aria-label="Edit description"
                               size="small"
                               sx={{ p: 0.25, opacity: descHovered ? 1 : 0, transition: 'opacity 0.15s' }}
                               onClick={(e) => {
@@ -963,7 +962,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
                     </Link>
                   </Stack>
                 ) : (
-                  <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => setLinkRepoOpen(true)} sx={linkRepoButtonSx}>
+                  <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => navigate(linkRepositoryUrl(scope))} sx={linkRepoButtonSx}>
                     Link a repository
                   </Button>
                 )}
@@ -1040,8 +1039,6 @@ export default function Project(scope: ProjectScope): JSX.Element {
           </Stack>
         </Stack>
       )}
-
-      {project && <LinkRepositoryDialog open={linkRepoOpen} onClose={() => setLinkRepoOpen(false)} project={project} orgHandler={scope.org} />}
 
       {isEmpty ? (
         <CreateIntegrationPanels scope={scope} />

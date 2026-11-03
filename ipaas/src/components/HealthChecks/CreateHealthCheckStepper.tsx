@@ -40,7 +40,7 @@ interface CreateHealthCheckStepperProps {
   onError: (message: string) => void;
 }
 
-const STEPS = ['Configure Liveness Probe', 'Configure Readiness Probe'];
+const STEPS = ['Configure liveness probe', 'Configure readiness probe'];
 
 export default function CreateHealthCheckStepper({ container, projectId, componentId, releaseId, deploymentTrackId, environmentId, onClose, onSaved, onError }: CreateHealthCheckStepperProps): JSX.Element {
   const fallbackPort = container.ports?.[0]?.port ?? 8080;

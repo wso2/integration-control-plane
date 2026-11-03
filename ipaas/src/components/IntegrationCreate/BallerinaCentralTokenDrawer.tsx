@@ -22,6 +22,7 @@ import { useState, type JSX } from 'react';
 import { BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS, BALLERINA_CENTRAL_TOKEN_PANEL_COPY as PANEL_COPY } from '../../constants/packageRegistries';
 import { useBallerinaCentralToken, useSaveBallerinaCentralToken } from '../../hooks/useBallerinaCentralToken';
 import { formatDateTime } from '../../utils/time';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 interface BallerinaCentralTokenDrawerProps {
   open: boolean;
@@ -36,6 +37,9 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
   const [error, setError] = useState<string | null>(null);
 
   const configured = !!tokenStatus?.configured;
+  useUnsavedChanges(open && tokenInput !== '');
+  const guardNavigation = useLeaveGuard();
+  const requestClose = () => guardNavigation(handleClose);
 
   const handleClose = () => {
     setError(null);
@@ -53,7 +57,7 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
   };
 
   return (
-    <DrawerPanel open={open} onClose={handleClose} width={480}>
+    <DrawerPanel open={open} onClose={requestClose} width={480}>
       <DrawerPanel.Header>
         <DrawerPanel.Title>{PANEL_COPY.heading}</DrawerPanel.Title>
         <DrawerPanel.Actions>
@@ -97,7 +101,7 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
               </Stack>
             </Card>
 
-            <Alert severity="info">You can update this anytime from Settings &gt; Package Registries in your organization's home view.</Alert>
+            <Alert severity="info">You can update this anytime from Settings &gt; Package registries in your organization's home view.</Alert>
           </Stack>
         ) : (
           <Stack gap={2}>
@@ -159,7 +163,7 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
           </Button>
         ) : (
           <>
-            <Button variant="outlined" onClick={handleClose}>
+            <Button variant="outlined" onClick={requestClose}>
               Close
             </Button>
             <Button variant="contained" disabled={!tokenInput.trim() || saveToken.isPending} onClick={handleSave} startIcon={saveToken.isPending ? <CircularProgress size={14} /> : undefined}>

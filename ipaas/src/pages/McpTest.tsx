@@ -88,7 +88,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
 
   // Non-MCP components keep this route's previous Coming Soon behaviour.
   if (component && !isMcp) {
-    return <ComingSoon title="Coming Soon" description="Testing tools are currently under development." />;
+    return <ComingSoon title="Coming soon" description="Testing tools are currently under development." />;
   }
 
   const envSelector = environments.length > 1 && (

@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, MenuItem, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, InputAdornment, MenuItem, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import BusyFields from '../common/BusyFields';
 import { CLOUD_COMING_SOON_PROVIDERS, providerComingSoonLabel } from '../../constants/gitProviders';
-import { ArrowLeft, GitBranch, GitHub, X } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, GitBranch, GitHub } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import GitLogoIcon from '../../assets/icons/GitLogoIcon';
 import GitLabIcon from '../../assets/icons/GitLabIcon';
@@ -32,6 +32,7 @@ import { parseGitHubUrl } from '../../utils/github';
 import { GitProvider } from '../../types/credentials';
 import type { Project } from '../../types/project';
 import GitHubAuthArea from '../Import/GitHubAuthArea';
+import { useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 /** `null` = provider not chosen yet; otherwise GitHub or a public URL. Other providers show as coming soon. */
 type LinkProvider = GitProvider | 'public' | null;
@@ -56,7 +57,16 @@ const CARD_SX = {
   '&:hover': { borderColor: 'primary.main', boxShadow: 1 },
 } as const;
 
-export default function LinkRepositoryDialog({ open, onClose, project, orgHandler }: { open: boolean; onClose: () => void; project: Project; orgHandler: string }): JSX.Element {
+const FORM_SX = { maxWidth: 800 } as const;
+
+interface LinkRepositoryFormProps {
+  project: Project;
+  orgHandler: string;
+  /** Leaves the page: after linking, or on Cancel. */
+  onDone: () => void;
+}
+
+export default function LinkRepositoryForm({ project, orgHandler, onDone }: LinkRepositoryFormProps): JSX.Element {
   const [provider, setProvider] = useState<LinkProvider>(null);
   const [selectedOrg, setSelectedOrg] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
@@ -116,10 +126,12 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
     setError('');
   };
 
-  const handleClose = () => {
-    setProvider(null);
-    resetPickers();
-    onClose();
+  // The first organization is preselected after authorizing, so only the user's own picks count.
+  const allowLeave = useUnsavedChanges(!!selectedRepo || !!repoUrl || !!selectedBranch || directoryPath !== '/');
+
+  const leave = () => {
+    allowLeave();
+    onDone();
   };
 
   const chooseProvider = (key: LinkProvider) => {
@@ -149,7 +161,7 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
         isPublicRepo: isPublic,
       },
       {
-        onSuccess: () => handleClose(),
+        onSuccess: leave,
         onError: (e) => setError(e.message || 'Failed to link the repository.'),
       },
     );
@@ -158,155 +170,149 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
   const authorized = isPublic || (isGitHub && authStatus === 'done');
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <IconButton aria-label="Close" onClick={handleClose} sx={{ position: 'absolute', right: 8, top: 8 }}>
-        <X size={18} />
-      </IconButton>
-      <DialogTitle sx={{ pb: 1 }}>Link a Repository</DialogTitle>
-      <DialogContent>
-        <BusyFields busy={link.isPending}>
-          {error && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-              {error}
-            </Alert>
-          )}
+    <Box sx={FORM_SX}>
+      <BusyFields busy={link.isPending}>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+            {error}
+          </Alert>
+        )}
 
-          {provider == null ? (
-            <>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Select a Git provider to link a repository to this project.
-              </Typography>
-              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
-                {PROVIDER_CARDS.map((c) => {
-                  const soon = typeof c.key === 'string' && CLOUD_COMING_SOON_PROVIDERS.has(c.key);
-                  return (
-                    <Tooltip key={String(c.key)} title={soon ? providerComingSoonLabel(c.key as string) : ''} placement="top">
-                      <Box
-                        role={soon ? undefined : 'button'}
-                        tabIndex={soon ? undefined : 0}
-                        aria-disabled={soon || undefined}
-                        onClick={soon ? undefined : () => chooseProvider(c.key)}
-                        onKeyDown={soon ? undefined : (e) => (e.key === 'Enter' || e.key === ' ') && chooseProvider(c.key)}
-                        sx={{ ...CARD_SX, ...(soon && { cursor: 'default', opacity: 0.5, '&:hover': {} }) }}>
-                        {c.icon}
-                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                          {c.label}
-                        </Typography>
-                      </Box>
-                    </Tooltip>
-                  );
-                })}
-              </Box>
-            </>
-          ) : (
-            <Stack gap={2}>
-              <Button startIcon={<ArrowLeft size={14} />} size="small" onClick={() => setProvider(null)} sx={{ alignSelf: 'flex-start', pl: 0, textTransform: 'none' }}>
-                Choose a different provider
-              </Button>
+        {provider == null ? (
+          <>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              Select a Git provider to link a repository to this project.
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+              {PROVIDER_CARDS.map((c) => {
+                const soon = typeof c.key === 'string' && CLOUD_COMING_SOON_PROVIDERS.has(c.key);
+                return (
+                  <Tooltip key={String(c.key)} title={soon ? providerComingSoonLabel(c.key as string) : ''} placement="top">
+                    <Box
+                      role={soon ? undefined : 'button'}
+                      tabIndex={soon ? undefined : 0}
+                      aria-disabled={soon || undefined}
+                      onClick={soon ? undefined : () => chooseProvider(c.key)}
+                      onKeyDown={soon ? undefined : (e) => (e.key === 'Enter' || e.key === ' ') && chooseProvider(c.key)}
+                      sx={{ ...CARD_SX, ...(soon && { cursor: 'default', opacity: 0.5, '&:hover': {} }) }}>
+                      {c.icon}
+                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                        {c.label}
+                      </Typography>
+                    </Box>
+                  </Tooltip>
+                );
+              })}
+            </Box>
+          </>
+        ) : (
+          <Stack gap={2}>
+            <Button startIcon={<ArrowLeft size={14} />} size="small" onClick={() => setProvider(null)} sx={{ alignSelf: 'flex-start', pl: 0, textTransform: 'none' }}>
+              Choose a different provider
+            </Button>
 
-              {showGitHubAuthArea ? (
-                <GitHubAuthArea authStatus={authStatus} isCheckingAuth={authStatus === 'done' && reposLoading} isAuthenticated={false} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />
-              ) : (
-                <>
-                  {isPublic ? (
+            {showGitHubAuthArea ? (
+              <GitHubAuthArea authStatus={authStatus} isCheckingAuth={authStatus === 'done' && reposLoading} isAuthenticated={false} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />
+            ) : (
+              <>
+                {isPublic ? (
+                  <TextField
+                    labelPlacement="top"
+                    label="Repository URL"
+                    required
+                    value={repoUrl}
+                    onChange={(e) => {
+                      setRepoUrl(e.target.value);
+                      setSelectedBranch('');
+                      setDirectoryPath('/');
+                    }}
+                    fullWidth
+                    size="small"
+                    helperText="Public repository URL"
+                  />
+                ) : (
+                  <Stack direction="row" gap={2}>
                     <TextField
                       labelPlacement="top"
-                      label="Repository URL"
+                      select
+                      label="Organization"
                       required
-                      value={repoUrl}
+                      value={selectedOrg}
                       onChange={(e) => {
-                        setRepoUrl(e.target.value);
+                        setSelectedOrg(e.target.value);
+                        setSelectedRepo('');
                         setSelectedBranch('');
                         setDirectoryPath('/');
                       }}
                       fullWidth
                       size="small"
-                      helperText="Public repository URL"
-                    />
-                  ) : (
-                    <Stack direction="row" gap={2}>
-                      <TextField
-                        labelPlacement="top"
-                        select
-                        label="Organization"
-                        required
-                        value={selectedOrg}
-                        onChange={(e) => {
-                          setSelectedOrg(e.target.value);
-                          setSelectedRepo('');
-                          setSelectedBranch('');
-                          setDirectoryPath('/');
-                        }}
-                        fullWidth
-                        size="small"
-                        disabled={reposLoading || orgOptions.length === 0}
-                        slotProps={{ input: { startAdornment: <InputAdornment position="start">{providerIcon}</InputAdornment> } }}>
-                        {orgOptions.map((o) => (
-                          <MenuItem key={o} value={o}>
-                            {o}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                      <TextField
-                        labelPlacement="top"
-                        select
-                        label="Repository"
-                        required
-                        value={selectedRepo}
-                        onChange={(e) => {
-                          setSelectedRepo(e.target.value);
-                          setSelectedBranch('');
-                          setDirectoryPath('/');
-                        }}
-                        fullWidth
-                        size="small"
-                        disabled={!selectedOrg}>
-                        {reposForOrg.map((r) => (
-                          <MenuItem key={r} value={r}>
-                            {r}
-                          </MenuItem>
-                        ))}
-                      </TextField>
-                    </Stack>
-                  )}
-
-                  <Stack direction="row" gap={2}>
-                    <TextField
-                      labelPlacement="top"
-                      select
-                      label="Branch"
-                      required
-                      value={selectedBranch}
-                      onChange={(e) => setSelectedBranch(e.target.value)}
-                      fullWidth
-                      size="small"
-                      disabled={!activeOrg || !activeRepo}
-                      slotProps={{
-                        input: {
-                          startAdornment: (
-                            <InputAdornment position="start">
-                              <GitBranch size={16} />
-                            </InputAdornment>
-                          ),
-                        },
-                      }}>
-                      {(branches ?? []).map((b) => (
-                        <MenuItem key={b.name} value={b.name}>
-                          {b.name}
-                          {b.isDefault ? ' (default)' : ''}
+                      disabled={reposLoading || orgOptions.length === 0}
+                      slotProps={{ input: { startAdornment: <InputAdornment position="start">{providerIcon}</InputAdornment> } }}>
+                      {orgOptions.map((o) => (
+                        <MenuItem key={o} value={o}>
+                          {o}
                         </MenuItem>
                       ))}
                     </TextField>
-                    <TextField labelPlacement="top" label="Project Directory" optional value={directoryPath} onChange={(e) => setDirectoryPath(e.target.value || '/')} fullWidth size="small" helperText="Path within the repository" />
+                    <TextField
+                      labelPlacement="top"
+                      select
+                      label="Repository"
+                      required
+                      value={selectedRepo}
+                      onChange={(e) => {
+                        setSelectedRepo(e.target.value);
+                        setSelectedBranch('');
+                        setDirectoryPath('/');
+                      }}
+                      fullWidth
+                      size="small"
+                      disabled={!selectedOrg}>
+                      {reposForOrg.map((r) => (
+                        <MenuItem key={r} value={r}>
+                          {r}
+                        </MenuItem>
+                      ))}
+                    </TextField>
                   </Stack>
-                </>
-              )}
-            </Stack>
-          )}
-        </BusyFields>
-      </DialogContent>
-      <DialogActions>
-        <Button variant="outlined" color="inherit" onClick={handleClose} disabled={link.isPending}>
+                )}
+
+                <Stack direction="row" gap={2}>
+                  <TextField
+                    labelPlacement="top"
+                    select
+                    label="Branch"
+                    required
+                    value={selectedBranch}
+                    onChange={(e) => setSelectedBranch(e.target.value)}
+                    fullWidth
+                    size="small"
+                    disabled={!activeOrg || !activeRepo}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <InputAdornment position="start">
+                            <GitBranch size={16} />
+                          </InputAdornment>
+                        ),
+                      },
+                    }}>
+                    {(branches ?? []).map((b) => (
+                      <MenuItem key={b.name} value={b.name}>
+                        {b.name}
+                        {b.isDefault ? ' (default)' : ''}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                  <TextField labelPlacement="top" label="Project directory" optional value={directoryPath} onChange={(e) => setDirectoryPath(e.target.value || '/')} fullWidth size="small" helperText="Path within the repository" />
+                </Stack>
+              </>
+            )}
+          </Stack>
+        )}
+      </BusyFields>
+      <Stack direction="row" gap={2} sx={{ mt: 4 }}>
+        <Button variant="outlined" color="inherit" onClick={leave} disabled={link.isPending}>
           Cancel
         </Button>
         {provider != null && authorized && (
@@ -314,7 +320,7 @@ export default function LinkRepositoryDialog({ open, onClose, project, orgHandle
             {link.isPending ? 'Linking…' : 'Link repository'}
           </Button>
         )}
-      </DialogActions>
-    </Dialog>
+      </Stack>
+    </Box>
   );
 }
