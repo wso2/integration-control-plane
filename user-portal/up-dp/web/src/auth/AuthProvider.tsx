@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import i18n from '../i18n';
 import {
@@ -79,7 +79,7 @@ function scopesOf(tokens: Tokens | null): Set<string> {
 
 /** Finishes a sign-in on the callback, or picks up this tab's tokens; with none, the token store joins the WIdP-DP's session. */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const navigate = useNavigate();
+  const navigate = useRef(useNavigate());
   const [tokens, setTokens] = useState<Tokens | null>(currentTokens());
   const [status, setStatus] = useState<AuthValue['status']>('loading');
   const [error, setError] = useState<Error | null>(null);
@@ -89,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     const begin =
       window.location.pathname === CALLBACK_PATH
-        ? completeSignIn().then((returnTo) => navigate(returnTo, { replace: true }))
+        ? completeSignIn().then((returnTo) => navigate.current(returnTo, { replace: true }))
         : resumeSession();
     begin
       .then(() => setStatus('ready'))
@@ -97,7 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setError(reason instanceof Error ? reason : new Error(i18n.t('errors.signIn.couldNotStartSession')));
         setStatus('error');
       });
-  }, [navigate]);
+  }, []);
 
   useEffect(() => onTokens(setTokens), []);
   useEffect(() => onSignedOut(() => setStatus('signedOut')), []);
