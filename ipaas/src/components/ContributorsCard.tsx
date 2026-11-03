@@ -42,7 +42,7 @@ export default function ContributorsCard({ projectId }: { projectId: string }): 
           {contributors.map((contributor) => (
             <Tooltip key={contributor.email} title={`${contributor.displayName || contributor.email} · ${contributor.totalContributions} contributions`}>
               <Avatar
-                src={contributor.avatarUrl}
+                src={contributor.pictureUrl || undefined}
                 alt={contributor.displayName || contributor.email}
                 role="img"
                 tabIndex={0}

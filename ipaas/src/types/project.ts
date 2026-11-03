@@ -44,7 +44,7 @@ export interface Project {
 export interface ProjectContributor {
   displayName: string;
   email: string;
-  avatarUrl?: string;
+  pictureUrl?: string | null;
   totalContributions: number;
 }
 

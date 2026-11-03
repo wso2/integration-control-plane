@@ -31,7 +31,7 @@ export function mergeContributors(contributors: ProjectContributor[]): ProjectCo
     byEmail.set(email, {
       ...seen,
       displayName: seen.displayName || c.displayName,
-      avatarUrl: seen.avatarUrl || c.avatarUrl,
+      pictureUrl: seen.pictureUrl || c.pictureUrl,
       totalContributions: seen.totalContributions + c.totalContributions,
     });
   }

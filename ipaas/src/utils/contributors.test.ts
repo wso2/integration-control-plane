@@ -23,9 +23,9 @@ describe('mergeContributors', () => {
   it('merges emails that differ only in case or spacing, summing their contributions', () => {
     const merged = mergeContributors([
       { displayName: 'Ada', email: 'Ada@Example.com', totalContributions: 2 },
-      { displayName: '', email: ' ada@example.com', avatarUrl: 'https://img.example/ada.png', totalContributions: 3 },
+      { displayName: '', email: ' ada@example.com', pictureUrl: 'https://img.example/ada.png', totalContributions: 3 },
     ]);
-    expect(merged).toEqual([{ displayName: 'Ada', email: 'ada@example.com', avatarUrl: 'https://img.example/ada.png', totalContributions: 5 }]);
+    expect(merged).toEqual([{ displayName: 'Ada', email: 'ada@example.com', pictureUrl: 'https://img.example/ada.png', totalContributions: 5 }]);
   });
 
   it('keeps different people apart and lists the busiest first', () => {
