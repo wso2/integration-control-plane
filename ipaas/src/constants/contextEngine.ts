@@ -364,6 +364,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Google Calendar',
     description: 'Events of one calendar, backfilled and kept in sync by incremental sync.',
     category: 'collaboration',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}google-calendar.svg`,
     icon: 'calendar',
     // Mirrors the Ballerina `google_calendar` connector's GoogleCalendarSettings: the shared Google
     // auth block plus the calendar, the events to deliver and the page size.
@@ -430,7 +432,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     isStructuredData: true,
   },
   { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
-  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
   {
     id: 'mongodb',
     name: 'MongoDB',
@@ -582,15 +584,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>([
-  'upload', 'confluence', 'notion', 'gitbook',
-  'gdrive', 'amazons3', 'sharepoint', 'onedrive', 'dropbox',
-  'github', 'gitlab', 'jira', 'slack',
-  'google-calendar',
-  'zendesk', 'salesforce', 'hubspot', 'servicenow',
-  'postgresql', 'mysql', 'mssql', 'mongodb',
-  'website', 'sitemap',
-]);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
@@ -598,7 +592,7 @@ export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS
 /** Connectors visible in the Add Source catalog (excludes hidden ones like File Upload). */
 export const CATALOG_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => !c.catalogHidden);
 
-export const POPULAR_CONNECTORS: SourceConnector[] = CATALOG_CONNECTORS.filter((c) => c.popular);
+export const POPULAR_CONNECTORS: SourceConnector[] = CATALOG_CONNECTORS.filter((c) => c.popular).sort((a, b) => Number(isConnectorEnabled(b.id)) - Number(isConnectorEnabled(a.id)));
 
 /** Live connectors offered as quick-add shortcuts, most useful first. */
 export const QUICK_ADD_CONNECTORS: SourceConnector[] = CATALOG_CONNECTORS.filter((c) => isConnectorEnabled(c.id));
