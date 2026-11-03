@@ -34,6 +34,7 @@ import {
   STORAGE_BACKENDS,
   UPLOAD_CONTENT_TYPES,
   UPLOAD_MAX_BYTES,
+  UPLOAD_SLOW_AFTER_MS,
 } from '../constants/contextEngine';
 import type { Link, Parent, Root, RootContent, Text } from 'mdast';
 import remarkGfm from 'remark-gfm';
@@ -41,7 +42,7 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
-import { formatDistanceToNow } from './time';
+import { formatDistanceToNow, formatElapsed } from './time';
 import { isEmbeddingValid } from './ragIngestion';
 import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type {
@@ -68,6 +69,7 @@ import type {
   GetStartedStep,
   LlmConfig,
   McpClientConfig,
+  RecordProgress,
   SourceCategory,
   SourceConnector,
   SourceFieldDef,
@@ -574,7 +576,9 @@ export function formatProgressPercent(percent: number): string {
 /**
  * Where a source is in the pipeline. A connector that is still reading wins over
  * queued work, queued work wins over indexing, and a source that finished with
- * failed or quarantined items needs attention.
+ * failed or quarantined items needs attention. A source whose work is all done
+ * but holds no record is empty, not processed: "Processed" would say it holds
+ * content it does not, for example after every uploaded file was deleted.
  */
 export function sourceProgressStatus(p: SourceProgress): SourceProgressStatus {
   if (p.reading.state === 'reading') return 'reading';
@@ -582,6 +586,7 @@ export function sourceProgressStatus(p: SourceProgress): SourceProgressStatus {
   if (p.indexing.state === 'ok' && (p.indexing.indexing ?? 0) > 0) return 'indexing';
   if (p.reading.state === 'idle' && p.processing.total === 0 && p.records.active === 0) return 'waiting';
   if (p.processing.failed > 0 || p.records.quarantined > 0 || (p.indexing.state === 'ok' && (p.indexing.failed ?? 0) > 0)) return 'attention';
+  if (p.records.active === 0) return 'empty';
   return 'processed';
 }
 
@@ -601,15 +606,75 @@ export function isEngineProgressActive(progress: ContextEngineProgress | undefin
  */
 export function sourceProgressValue(p: SourceProgress): number | null {
   const status = sourceProgressStatus(p);
-  if (status === 'waiting') return 0;
+  if (status === 'waiting' || status === 'empty') return 0;
   if (status === 'reading') return null;
   if (status === 'indexing') return p.indexing.percent ?? 0;
+  if (status === 'processing') return processingValue(p);
   return p.processing.percent ?? 100;
+}
+
+/**
+ * How far the running work has come, by bytes when the engine reports them: the finished
+ * records' bytes plus each running record's share, which is known while it is being mapped
+ * item by item, and inside the knowledge store's write by the step the provider reports:
+ * the text read, a merge or the embedding. A step that counts nothing yet gives one file
+ * alone an indeterminate bar rather than a number that would be made up. Without bytes the
+ * share of finished records stands in.
+ */
+function processingValue(p: SourceProgress): number | null {
+  const { bytes, inProgress, percent } = p.processing;
+  if (!bytes || bytes.delivered <= 0) return percent ?? 0;
+  let done = bytes.finished;
+  let unknown = false;
+  for (const item of inProgress) {
+    if (item.sizeBytes === null) {
+      unknown = true;
+    } else if (item.done !== null && item.total) {
+      done += (item.sizeBytes * Math.min(item.done, item.total)) / item.total;
+    } else if (item.phase !== 'reading' && item.phase !== 'mapping') {
+      unknown = true;
+    }
+  }
+  if (unknown && bytes.finished === 0 && inProgress.length === 1) return null;
+  return Math.min(100, (done / bytes.delivered) * 100);
+}
+
+/**
+ * What a running delivery is doing, in words: "mapping items 1,200 of 3,129", "writing to the
+ * knowledge store", and inside that write the provider's own steps: "reading the text 1.2 MB of
+ * 2.9 MB" (the model's read, in bytes; no total for a PDF, whose text is shorter than the file),
+ * "merging nodes 8,000 of 15,904", "merging edges 20,000 of 48,375", "embedding 1,200 of 17,660".
+ */
+export function recordPhaseText(item: RecordProgress): string {
+  const count = (n: number) => n.toLocaleString('en-US');
+  const counted = (verb: string, unit = '') => (item.done !== null && item.total !== null ? `${verb} ${count(item.done)} of ${count(item.total)}${unit}` : item.done !== null ? `${verb} ${count(item.done)}${unit} so far` : verb);
+  switch (item.phase) {
+    case 'reading':
+      return 'reading the file';
+    case 'mapping':
+      return item.done !== null && item.total !== null ? `mapping items ${count(item.done)} of ${count(item.total)}` : 'mapping items';
+    case 'indexing':
+      return item.total !== null ? `writing ${count(item.total)} items to the knowledge store` : 'writing to the knowledge store';
+    case 'extracting':
+      if (item.done === null) return 'reading the text';
+      return item.total !== null ? `reading the text ${formatBytes(item.done)} of ${formatBytes(item.total)}` : `reading the text, ${formatBytes(item.done)} so far`;
+    case 'merging_nodes':
+      return counted('merging nodes');
+    case 'merging_edges':
+      return counted('merging edges');
+    case 'embedding':
+      return counted('embedding');
+    default:
+      return 'starting';
+  }
 }
 
 /** Item counts under a source's bar, e.g. "540 of 1,200 items processed · 2 failed · 538 records stored" ("so far" while still reading). */
 export function sourceProgressDetail(p: SourceProgress): string {
-  if (sourceProgressStatus(p) === 'waiting') return 'No sync has started yet. Items appear here once the connector delivers them.';
+  const status = sourceProgressStatus(p);
+  if (status === 'waiting') return 'No sync has started yet. Items appear here once the connector delivers them.';
+  // The item counts would still show the deletes as processed work, which reads as if content were stored.
+  if (status === 'empty') return p.records.deleted > 0 ? 'All records were deleted. Nothing is stored.' : 'Nothing is stored. The latest sync delivered nothing.';
   const { total, succeeded, failed } = p.processing;
   const parts: string[] = [];
   if (total > 0) parts.push(`${(succeeded + failed).toLocaleString('en-US')} of ${plural(total, 'item')} processed${p.reading.state === 'reading' ? ' so far' : ''}`);
@@ -617,6 +682,8 @@ export function sourceProgressDetail(p: SourceProgress): string {
   if (failed > 0) parts.push(`${failed.toLocaleString('en-US')} failed`);
   if (p.records.quarantined > 0) parts.push(`${p.records.quarantined.toLocaleString('en-US')} quarantined`);
   parts.push(`${plural(p.records.active, 'record')} stored`);
+  // The deliveries running now, by name and position; a long record shows where it is instead of just "running".
+  for (const item of p.processing.inProgress.slice(0, 2)) parts.push(`${item.recordId.split('/').pop() ?? item.recordId}: ${recordPhaseText(item)}`);
   return parts.join(' · ');
 }
 
@@ -638,6 +705,35 @@ export function sourceIndexingText(p: SourceProgress): string | null {
   return parts.join(' · ');
 }
 
+/**
+ * Why files failed on the model provider, in words the operator can act on. The
+ * reason follows "N files are not searchable: ".
+ */
+const MODEL_FAILURE_REASON: Record<string, string> = {
+  backend_model_access_denied: "the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
+  backend_model_not_found: 'the model provider does not know the configured model name. Fix the model settings, then retry.',
+  backend_model_quota_exceeded: "the model provider's rate limit or budget was reached. Retry later.",
+  backend_model_unavailable: 'the engine could not reach its model provider. Retry later.',
+  backend_model_failed: 'the model provider refused the request. Retry later.',
+};
+
+/**
+ * One sentence for a source whose files failed on the model provider, e.g.
+ * "2 files are not searchable: the model provider rejected the engine's API key, …".
+ * It comes straight from the records' index states, so it clears itself once the
+ * files are retried or removed. A file the engine cannot read is the file's own
+ * problem, told on its row, not here. Null when nothing failed that way.
+ */
+export function sourceFailureNotice(p: SourceProgress): string | null {
+  if (p.indexing.state !== 'ok') return null;
+  const failures = Object.entries(p.indexing.failures ?? {}).filter(([code, count]) => code in MODEL_FAILURE_REASON && count > 0);
+  if (!failures.length) return null;
+  const total = failures.reduce((n, [, count]) => n + count, 0);
+  // One code names its fix. With more than one, no single fix fits every file, so each file's row says its own.
+  const reason = failures.length === 1 ? MODEL_FAILURE_REASON[failures[0][0]] : "the model provider failed on them for more than one reason. Each file's row says why.";
+  return `${plural(total, 'file')} ${total === 1 ? 'is' : 'are'} not searchable: ${reason}`;
+}
+
 /** Roll-up across the engine's sources. Sources without a progress entry are ones the caller may not inspect. */
 export function summarizeEngineProgress(sourceIds: string[], progress: SourceProgress[]): ContextEngineProgressSummary {
   const byId = new Map(progress.map((p) => [p.sourceId, p]));
@@ -652,7 +748,7 @@ export function summarizeEngineProgress(sourceIds: string[], progress: SourcePro
     }
     const status = sourceProgressStatus(p);
     if (status === 'processed' || status === 'attention') sum.processed += 1;
-    else if (status === 'waiting') sum.waiting += 1;
+    else if (status === 'waiting' || status === 'empty') sum.waiting += 1;
     else sum.active += 1;
     if (status === 'reading') sum.reading += 1;
     delivered += p.processing.total;
@@ -870,6 +966,15 @@ export function sharingMismatches(sources: ContextSourceConfig[], queryRoles: st
 /** Role handles as a readable list, for warnings. */
 export const roleList = nameList;
 
+/** What to tell people for the engine's stable index failure codes that name the fix. */
+const INDEX_FAILURE_DETAIL: Record<string, string> = {
+  backend_model_access_denied: "The engine's model provider rejected its API key, or the key may not use the configured model. Fix the model settings, then retry the file.",
+  backend_model_not_found: "The engine's model provider does not know the configured model name. Fix the model settings, then retry the file.",
+  backend_model_quota_exceeded: "The engine's model provider reached its rate limit or budget. Retry the file later.",
+  backend_model_unavailable: 'The engine could not reach its model provider. Retry the file later.',
+  backend_model_failed: 'The model provider refused the request for this file.',
+};
+
 /** Where an uploaded file stands once the engine has taken it, from its record status. */
 export function uploadStatusFromRecord(record: ContextRecordStatus): { status: UploadFileStatus; detail?: string } {
   if (record.state === 'quarantined') {
@@ -890,9 +995,10 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
     case 'reconcile_required':
       return { status: 'indexing', detail: 'The engine is repairing its index entry for this file.' };
     case 'failed':
-      return record.indexError === 'extraction_unsupported'
-        ? { status: 'unreadable', detail: "Stored, but the engine can't read this file type yet. Upload a text or Markdown export to make it searchable." }
-        : { status: 'failed', detail: `Indexing failed${record.indexError ? `: ${record.indexError}` : ''}.` };
+      if (record.indexError === 'extraction_unsupported') {
+        return { status: 'unreadable', detail: "Stored, but the engine can't read this file type yet. Upload a text or Markdown export to make it searchable." };
+      }
+      return { status: 'failed', detail: INDEX_FAILURE_DETAIL[record.indexError ?? ''] ?? `Indexing failed${record.indexError ? `: ${record.indexError}` : ''}.` };
     case 'not_indexed':
       return { status: 'stored', detail: 'The engine is running without its knowledge backend, so nothing is searchable yet.' };
     default:
@@ -902,6 +1008,20 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
 
 export function isUploadActive(entry: Pick<UploadEntry, 'status'>): boolean {
   return entry.status === 'uploading' || entry.status === 'queued' || entry.status === 'indexing';
+}
+
+/** The caption under a queued file's bar: what the engine is doing with it, and for how long. */
+export function queuedUploadText(entry: Pick<UploadEntry, 'retrying' | 'running' | 'uploadedAt'>, now: number): string {
+  if (entry.retrying) return 'Running again on the engine from the file it already has · nothing was uploaded.';
+  const elapsed = formatElapsed(entry.uploadedAt, now);
+  const soFar = elapsed ? ` · ${elapsed} so far` : '';
+  return entry.running ? `Uploaded · the engine is reading it with its language model and adding it to the graph${soFar}` : `Uploaded · waiting for the engine to start on it${soFar}`;
+}
+
+/** True once a file has been with the engine long enough that the wait may look like a hang. */
+export function uploadIsSlow(entry: Pick<UploadEntry, 'uploadedAt'>, now: number): boolean {
+  const start = Date.parse(entry.uploadedAt);
+  return !Number.isNaN(start) && now - start >= UPLOAD_SLOW_AFTER_MS;
 }
 
 /** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */
@@ -932,9 +1052,33 @@ export function engineMessage(err: unknown, fallback = 'The request failed.'): s
   return body.trim() || fallback;
 }
 
+/** The engine's stable error code from a failed request, e.g. "backend_model_access_denied"; null when the body carries none. */
+export function engineErrorCode(err: unknown): string | null {
+  if (!(err instanceof HttpError)) return null;
+  try {
+    const parsed = JSON.parse(err.message.replace(/^HTTP \d+:\s*/, '')) as { code?: unknown };
+    return typeof parsed.code === 'string' && parsed.code ? parsed.code : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The delivery's identity the idempotency key is hashed from: length-prefixed, so no two (record, version) pairs collide. */
 export function deliveryIdentity(recordId: string, version: string): string {
   return `${recordId.length}:${recordId}:${version}`;
+}
+
+/**
+ * Whether sending these bytes with these roles would change nothing on the
+ * engine: they are what the file's last delivery carried. The version number is
+ * only the engine's ordering number and says nothing about change; the hash does.
+ * A file remembered without a hash counts as changed, so it is sent once more.
+ */
+export function unchangedDelivery(previous: Pick<UploadEntry, 'contentHash' | 'audience'> | undefined, contentHash: string, audience: string[]): boolean {
+  if (!previous?.contentHash || previous.contentHash !== contentHash) return false;
+  const before = [...previous.audience].sort();
+  const after = [...audience].sort();
+  return before.length === after.length && before.every((tag, i) => tag === after[i]);
 }
 
 // ── First-run guidance ──────────────────────────────────────────────────────
