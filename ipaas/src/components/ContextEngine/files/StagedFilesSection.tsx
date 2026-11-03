@@ -75,8 +75,6 @@ export function StagedFilesSection({ draft, onChange, onRunningEngine = false }:
  */
 export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }: StagedProps & { orgHandle: string; queryRoles?: string[] }): JSX.Element {
   const staged = draft.staged ?? [];
-  // Skipped files will not upload, so the question counts only the ones that will.
-  const ready = stagedSummary(staged, []).ready;
   if (staged.length === 0) {
     return (
       <Box>
@@ -92,7 +90,7 @@ export function StagedVisibilityField({ draft, onChange, orgHandle, queryRoles }
   return (
     <FileVisibilityField
       id="staged-visibility"
-      label={`Who can see ${ready === 1 ? 'this file' : ready === 0 ? 'these files' : `these ${ready} files`}`}
+      label={`Who can see ${staged.length === 1 ? 'this file' : `these ${staged.length} files`}`}
       hint="Applies to the files you add here; later uploads to this source choose again."
       orgHandle={orgHandle}
       queryRoles={queryRoles}
