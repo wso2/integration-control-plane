@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/wso2-enterprise/integration-user-portal-service/shared/common"
 	ipaasportal "github.com/wso2-enterprise/integration-user-portal-service/shared/external-services/ipaas-portal"
@@ -61,6 +62,14 @@ func newTestScopes(ipaas ipaasportal.Client) (*ScopeService, *clock) {
 	return svc, clk
 }
 
+// scopesOf answers svc's scopes, which must be known.
+func scopesOf(t *testing.T, svc *ScopeService) []string {
+	t.Helper()
+	scopes, err := svc.Scopes(context.Background())
+	require.NoError(t, err)
+	return scopes
+}
+
 func TestScopesAreThePortalsOwnThenThePublishedOnes(t *testing.T) {
 	ipaas := &fakeScopes{published: []string{"purchase:request", "automation:trigger", "hr:read"}}
 	svc, _ := newTestScopes(ipaas)
@@ -68,7 +77,7 @@ func TestScopesAreThePortalsOwnThenThePublishedOnes(t *testing.T) {
 	assert.Equal(t, []string{
 		"openid", "profile", "email", "offline_access", "aiagent:view", "automation:view", "automation:trigger", "workflow:view",
 		"hr:read", "purchase:request",
-	}, svc.Scopes(context.Background()))
+	}, scopesOf(t, svc))
 	assert.Equal(t, svc.scope, ipaas.scope)
 }
 
@@ -76,33 +85,38 @@ func TestScopesAreReadOnceForTheTTL(t *testing.T) {
 	ipaas := &fakeScopes{published: []string{"hr:read"}}
 	svc, clk := newTestScopes(ipaas)
 
-	svc.Scopes(context.Background())
+	scopesOf(t, svc)
 	ipaas.published = []string{"hr:read", "hr:write"}
-	assert.NotContains(t, svc.Scopes(context.Background()), "hr:write")
+	assert.NotContains(t, scopesOf(t, svc), "hr:write")
 	assert.Equal(t, 1, ipaas.reads)
 
 	clk.advance(10 * time.Minute)
-	assert.Contains(t, svc.Scopes(context.Background()), "hr:write")
+	assert.Contains(t, scopesOf(t, svc), "hr:write")
 	assert.Equal(t, 2, ipaas.reads)
 }
 
 func TestScopesKeepTheLastListWhenIPaaSFails(t *testing.T) {
 	ipaas := &fakeScopes{published: []string{"hr:read"}}
 	svc, clk := newTestScopes(ipaas)
-	svc.Scopes(context.Background())
+	scopesOf(t, svc)
 
 	clk.advance(time.Hour)
 	ipaas.err = fmt.Errorf("ipaas: %w", upstream.ErrUnavailable)
-	assert.Contains(t, svc.Scopes(context.Background()), "hr:read")
+	assert.Contains(t, scopesOf(t, svc), "hr:read")
 
 	ipaas.err = fmt.Errorf("ipaas: %w", upstream.ErrNotFound)
-	assert.Contains(t, svc.Scopes(context.Background()), "hr:read")
+	assert.Contains(t, scopesOf(t, svc), "hr:read")
 }
 
-func TestScopesWithoutAnyListAreThePortalsOwn(t *testing.T) {
-	svc, _ := newTestScopes(&fakeScopes{err: fmt.Errorf("ipaas: %w", upstream.ErrUnavailable)})
+func TestScopesAreUnavailableUntilAListIsRead(t *testing.T) {
+	ipaas := &fakeScopes{err: fmt.Errorf("ipaas: %w", upstream.ErrNotFound)}
+	svc, _ := newTestScopes(ipaas)
 
+	_, err := svc.Scopes(context.Background())
+	assert.ErrorIs(t, err, upstream.ErrUnavailable, "the portal's own scopes alone would read as every published scope withdrawn")
+
+	ipaas.err = nil
 	assert.Equal(t, []string{
 		"openid", "profile", "email", "offline_access", "aiagent:view", "automation:view", "automation:trigger", "workflow:view",
-	}, svc.Scopes(context.Background()))
+	}, scopesOf(t, svc), "an empty list read from iPaaS-Service is known")
 }

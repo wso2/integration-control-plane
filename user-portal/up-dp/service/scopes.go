@@ -20,6 +20,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ import (
 
 	ipaasportal "github.com/wso2-enterprise/integration-user-portal-service/shared/external-services/ipaas-portal"
 	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/logging"
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/upstream"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/cache"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/domain"
 )
@@ -49,8 +51,9 @@ type ScopeService struct {
 	own   []string
 	cache *cache.Cache
 
-	mu   sync.Mutex
-	last []string
+	mu    sync.Mutex
+	last  []string
+	known bool
 }
 
 func NewScopeService(ipaas ipaasportal.Client, cfg ScopeConfig) domain.ScopeService {
@@ -60,22 +63,25 @@ func NewScopeService(ipaas ipaasportal.Client, cfg ScopeConfig) domain.ScopeServ
 	return &ScopeService{ipaas: ipaas, scope: cfg.Scope, own: unique(own), cache: cache.New(cfg.TTL, 0)}
 }
 
-func (svc *ScopeService) Scopes(ctx context.Context) []string {
+func (svc *ScopeService) Scopes(ctx context.Context) ([]string, error) {
 	val, err := svc.cache.Get(ctx, scopesKey, func(ctx context.Context) (any, error) {
 		return svc.ipaas.GetScopes(ctx, svc.scope)
 	})
 
 	svc.mu.Lock()
 	defer svc.mu.Unlock()
-	if err != nil {
+	switch {
+	case err == nil:
+		svc.last, svc.known = val.([]string), true
+	case svc.known:
 		logging.S(ctx).Warnw("serving the last published scopes", "error", err)
-	} else {
-		svc.last = val.([]string)
+	default:
+		return nil, fmt.Errorf("scopes: no published scopes read yet: %w: %w", upstream.ErrUnavailable, err)
 	}
 
 	published := slices.Clone(svc.last)
 	slices.Sort(published)
-	return unique(append(slices.Clone(svc.own), published...))
+	return unique(append(slices.Clone(svc.own), published...)), nil
 }
 
 func unique(scopes []string) []string {

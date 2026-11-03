@@ -38,5 +38,10 @@ func NewScopeHandler(scopes domain.ScopeService) *ScopeHandler {
 }
 
 func (h *ScopeHandler) List(w http.ResponseWriter, r *http.Request) {
-	web.WriteResponse(w, r, http.StatusOK, scopeList{Scopes: h.scopes.Scopes(r.Context())})
+	scopes, err := h.scopes.Scopes(r.Context())
+	if err != nil {
+		web.StatusServiceUnavailable(w, r, err)
+		return
+	}
+	web.WriteResponse(w, r, http.StatusOK, scopeList{Scopes: scopes})
 }

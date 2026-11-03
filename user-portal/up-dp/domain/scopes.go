@@ -21,5 +21,5 @@ package domain
 import "context"
 
 type ScopeService interface {
-	Scopes(ctx context.Context) []string
+	Scopes(ctx context.Context) ([]string, error)
 }

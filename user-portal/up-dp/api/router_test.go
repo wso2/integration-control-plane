@@ -21,6 +21,7 @@ package api
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -32,6 +33,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap"
 
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/upstream"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/config"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/service"
 )
@@ -39,7 +41,7 @@ import (
 // fixedScopes always answers the same scopes.
 type fixedScopes []string
 
-func (f fixedScopes) Scopes(context.Context) []string { return f }
+func (f fixedScopes) Scopes(context.Context) ([]string, error) { return f, nil }
 
 const testIndex = `<html><head><title>User Portal</title><script src="/config.js"></script></head><body>spa</body></html>`
 
@@ -63,6 +65,23 @@ func newTestRouter(t *testing.T) http.Handler {
 		OIDC: config.OIDC{Issuer: "https://idp.example", ClientID: "up-portal", Scopes: "openid profile"},
 	}
 	return Mount(&service.Registry{TokenService: service.NewTokenService(), ScopeService: fixedScopes{"openid", "offline_access"}}, cfg, zap.NewNop())
+}
+
+// unknownScopes has never read the published scopes.
+type unknownScopes struct{}
+
+func (unknownScopes) Scopes(context.Context) ([]string, error) {
+	return nil, fmt.Errorf("scopes: %w", upstream.ErrUnavailable)
+}
+
+func TestScopesAnswer503UntilThePublishedOnesAreKnown(t *testing.T) {
+	router := Mount(&service.Registry{TokenService: service.NewTokenService(), ScopeService: unknownScopes{}}, config.Config{SPADir: t.TempDir()}, zap.NewNop())
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/scopes", nil))
+
+	assert.Equal(t, http.StatusServiceUnavailable, rec.Code)
+	assert.Equal(t, "no-store", rec.Header().Get("Cache-Control"))
 }
 
 func TestRouterSplitsTheAPIFromTheSPA(t *testing.T) {

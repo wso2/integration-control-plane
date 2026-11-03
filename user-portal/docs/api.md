@@ -60,8 +60,7 @@ interface PortalConfig {
 ```
 
 `GET /api/v1/auth/scopes` is what the SPA asks for when it signs in. It changes as integrations
-are published, so it is not in `/config.js`. It is `Cache-Control: no-store` and always answers
-200:
+are published, so it is not in `/config.js`. It is `Cache-Control: no-store`:
 
 ```ts
 interface ScopeList {
@@ -74,7 +73,8 @@ interface ScopeList {
 
 UP-DP reads the published scopes from iPaaS-Service and keeps them for `SCOPES_CACHE_TTL`
 (default 10 minutes). When iPaaS-Service doesn't answer, it serves the last published scopes it
-read, or none.
+read. Until it has read them once, as after a restart, it answers 503: the portal's own scopes
+alone would read as every integration's scope withdrawn, and send every open tab to sign in again.
 
 ### Sign-in
 
