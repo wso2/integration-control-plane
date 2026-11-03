@@ -518,9 +518,9 @@ export function storageStepBlocker(storage: ContextEngineStorage): string | null
 }
 
 /** The engine managed store of one kind: embedded in the engine, or on the engine's own PostgreSQL server. */
-export function managedStore(kind: StorageKind, server: EngineManagedServer): { name: string; description: string; placement: string } {
+export function managedStore(kind: StorageKind, server: EngineManagedServer): { name: string; placement: string } {
   const info = STORAGE_BACKEND_BY_KIND[kind];
-  return server === 'postgres' ? { name: info.serverName, description: info.serverDescription, placement: 'own server' } : { name: info.managedName, description: info.managedDescription, placement: 'embedded' };
+  return server === 'postgres' ? { name: info.serverName, placement: 'own server' } : { name: info.managedName, placement: 'embedded' };
 }
 
 /** Two lines describing where a store lives, for the review step and overview. */

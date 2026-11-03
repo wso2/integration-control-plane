@@ -82,7 +82,6 @@ import {
   storageSelectionError,
   storageStepBlocker,
   summarizeStorage,
-  managedStore,
   toStoragePayload,
   suggestedQuestions,
   toDraft,
@@ -712,7 +711,6 @@ describe('storage', () => {
     ['graph', 'postgres', 'PostgreSQL · own server'],
   ] as const)('names the engine managed %s store of a deployment whose engines are %s', (kind, server, secondary) => {
     expect(summarizeStorage(kind, { mode: 'managed' }, server)).toEqual({ primary: 'Engine managed', secondary });
-    expect(managedStore(kind, server).description).not.toBe('');
   });
 
   it('maps to the engine payload and requires a resolved connection for infrastructure', () => {

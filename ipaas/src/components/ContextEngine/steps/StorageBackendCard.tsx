@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { CircleAlert, Database, ExternalLink, Plus, RefreshCw, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { useServerDatabases } from '../../../hooks/usePlatformServices';
@@ -41,8 +41,8 @@ interface StorageBackendCardProps {
   onRefresh: () => void;
   /** Managed databases are switched off for this deployment; the Infrastructure option is then disabled. */
   infrastructureAvailable: boolean;
-  /** Why only the engine managed store can be chosen, when that is so. */
-  alternativeUnavailable?: string;
+  /** Only the engine managed store can be chosen for now. */
+  alternativeUnavailable?: boolean;
   /** Infrastructure list and create pages for this store, when Infrastructure offers it. */
   listUrl?: string;
   createUrl?: string;
@@ -247,23 +247,13 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
             value="managed"
             control={<Radio size="small" />}
             label={
-              <Box>
-                {managedServer ? (
-                  <>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      Engine managed · {managedStore(info.kind, managedServer).name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {managedStore(info.kind, managedServer).description}
-                    </Typography>
-                  </>
-                ) : (
-                  <>
-                    <Skeleton variant="text" width={180} />
-                    <Skeleton variant="text" width={240} />
-                  </>
-                )}
-              </Box>
+              managedServer ? (
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  Engine managed · {managedStore(info.kind, managedServer).name}
+                </Typography>
+              ) : (
+                <Skeleton variant="text" width={180} />
+              )
             }
           />
         </Box>
@@ -271,26 +261,19 @@ export default function StorageBackendCard({ info, managedServer, value, onChang
           <FormControlLabel
             value={alternativeMode}
             control={<Radio size="small" />}
-            disabled={!!alternativeUnavailable || (alternativeMode === 'infrastructure' && !infrastructureAvailable)}
+            disabled={alternativeUnavailable || (alternativeMode === 'infrastructure' && !infrastructureAvailable)}
             label={
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {info.alternativeLabel}
+                  Bring your own database
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {alternativeUnavailable ?? info.alternativeDescription}
-                </Typography>
+                {alternativeUnavailable && <Chip label="Coming soon" size="small" sx={{ mt: 0.5 }} />}
               </Box>
             }
           />
           {value.mode !== 'managed' && <Box sx={storageOptionBodySx}>{alternativeMode === 'infrastructure' ? infraBody() : externalBody()}</Box>}
         </Box>
       </RadioGroup>
-      {!info.infraSegment && (
-        <Typography variant="caption" color="text.secondary">
-          Graph databases are not offered under Infrastructure yet.
-        </Typography>
-      )}
     </Box>
   );
 }

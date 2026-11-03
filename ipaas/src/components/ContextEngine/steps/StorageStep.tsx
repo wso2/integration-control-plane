@@ -35,7 +35,7 @@ interface StorageStepProps {
 
 const MANAGED_HINT: Record<EngineManagedServer, string> = {
   embedded: 'Engine managed stores are embedded and need no setup.',
-  postgres: 'Engine managed stores are on a PostgreSQL server of the engine’s own, created and deleted with it, and need no setup.',
+  postgres: 'Engine managed stores run on the engine’s own PostgreSQL server, created and deleted with it, and need no setup.',
 };
 
 /** Which Infrastructure servers can back a store: pgvector servers for vectors, plain PostgreSQL for relational. */
@@ -58,7 +58,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
         Configure Storage
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        Where the engine keeps its data. {managedServer.data ? `${MANAGED_HINT[managedServer.data]} ` : ''}Servers from Infrastructure and external databases are not available yet.
+        Where the engine keeps its data.{managedServer.data ? ` ${MANAGED_HINT[managedServer.data]}` : ''}
       </Typography>
 
       <Box sx={storageGridSx}>
@@ -74,7 +74,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
             serversError={infrastructureAvailable && servers.isError}
             onRefresh={() => servers.refetch()}
             infrastructureAvailable={infrastructureAvailable}
-            alternativeUnavailable="Not available yet: engines keep their data in engine managed stores for now."
+            alternativeUnavailable
             listUrl={info.infraSegment === 'vector-databases' ? orgVectorDatabasesUrl(orgHandle) : info.infraSegment === 'databases' ? orgDatabasesUrl(orgHandle) : undefined}
             createUrl={info.infraSegment === 'vector-databases' ? newOrgVectorDatabaseUrl(orgHandle) : info.infraSegment === 'databases' ? newOrgDatabaseUrl(orgHandle) : undefined}
           />
