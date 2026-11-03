@@ -20,9 +20,25 @@ import { Alert, Box, Button, Drawer, IconButton, LinearProgress, MenuItem, Stack
 import { FileText, RefreshCw, Search, Trash2, Upload, Users, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { changeUploadVisibility, holdsUploadBytes, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
-import { useUploadAudience } from '../../../hooks/useContextEngine';
-import { EVERYONE_VISIBILITY, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
-import { checkStagedFile, contentTypeForFile, describeUploadAudience, engineMessage, formatBytes, isUploadActive, reselectedFileProblem, stagedSummary, summarizeUploads, visibilityError, visibilityTags } from '../../../utils/contextEngine';
+import { useContextEngineProgress, useUploadAudience } from '../../../hooks/useContextEngine';
+import { useNow } from '../../../hooks/useNow';
+import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
+import {
+  checkStagedFile,
+  contentTypeForFile,
+  describeUploadAudience,
+  engineMessage,
+  formatBytes,
+  isUploadActive,
+  queuedUploadText,
+  reselectedFileProblem,
+  sourceFailureNotice,
+  stagedSummary,
+  summarizeUploads,
+  uploadIsSlow,
+  visibilityError,
+  visibilityTags,
+} from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile, stageFiles } from '../../../utils/stagedFiles';
 import { formatDistanceToNow } from '../../../utils/time';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
@@ -83,6 +99,8 @@ function UploadRow({
     setSharing(null);
     setChosen(null);
   };
+  // Ticks while the engine has the file, so "14 min so far" keeps counting between polls.
+  const now = useNow(ELAPSED_TICK_MS, entry.status === 'queued');
   const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
@@ -113,11 +131,9 @@ function UploadRow({
         {!active && (
           <Stack direction="row" gap={0.25} sx={{ flexShrink: 0 }}>
             {canRetry && (
-              <Tooltip title="Try again">
-                <IconButton size="small" aria-label={`Retry ${entry.name}`} onClick={onRetry}>
-                  <RefreshCw size={16} />
-                </IconButton>
-              </Tooltip>
+              <Button size="small" variant="outlined" startIcon={<RefreshCw size={14} />} aria-label={`Retry ${entry.name}`} onClick={onRetry} sx={{ mr: 0.5, flexShrink: 0 }}>
+                Retry
+              </Button>
             )}
             {entry.jobId && (
               <>
@@ -147,7 +163,12 @@ function UploadRow({
           {(entry.status === 'queued' || entry.status === 'indexing') && <LinearProgress variant="indeterminate" aria-label={`${entry.name} indexing`} sx={progressBarSx} />}
           {entry.status === 'queued' && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.75 }}>
-              Uploaded · the engine is storing it.
+              {queuedUploadText(entry, now)}
+            </Typography>
+          )}
+          {entry.status === 'queued' && !entry.retrying && uploadIsSlow(entry, now) && (
+            <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }}>
+              {UPLOAD_SLOW_NOTE}
             </Typography>
           )}
           {entry.status === 'indexing' && (
@@ -241,6 +262,10 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
   const existingNames = useMemo(() => entries.map((e) => e.name), [entries]);
   const sum = stagedSummary(staged, existingNames);
   const forbidden = entries.some((e) => e.forbidden);
+  // The same progress the Sources card reads: when files failed on the model provider, say so
+  // once at the top, from the records' index states, so it clears itself after a retry.
+  const progress = useContextEngineProgress(engineId).data?.sources.find((p) => p.sourceId === source.id);
+  const notice = progress ? sourceFailureNotice(progress) : null;
   const visible = entries.filter((e) => (statusFilter === 'all' || e.status === statusFilter) && (!filter.trim() || e.name.toLowerCase().includes(filter.trim().toLowerCase())));
 
   const toUploads = (metas: StagedFileMeta[]): FileToUpload[] =>
@@ -302,6 +327,11 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
       </Box>
 
       <Box sx={drawerBodySx}>
+        {notice && (
+          <Alert severity="warning" variant="outlined">
+            {notice}
+          </Alert>
+        )}
         {forbidden && (
           <Alert severity="warning" variant="outlined" action={<OwnerAccessButton engineId={engineId} onGranted={() => retryForbidden(engineId, source.id)} />}>
             Uploading needs upload access to this engine. As an access manager you can give it to yourself.
@@ -389,7 +419,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                     orgHandle={orgHandle}
                     queryRoles={queryRoles}
                     roleNames={roleNames}
-                    canRetry={entry.status === 'failed' && !entry.jobId}
+                    canRetry={entry.status === 'failed'}
                     holdsBytes={holdsUploadBytes(source.id, entry.recordId)}
                     onRetry={() => retryUpload(engineId, source.id, entry.recordId)}
                     onReplace={() => {

@@ -27,6 +27,7 @@ import {
   isSourceProgressActive,
   overallProgress,
   progressHeadline,
+  sourceFailureNotice,
   sourceIndexingText,
   sourceProgressDetail,
   sourceProgressStatus,
@@ -99,9 +100,10 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
   const value = sourceProgressValue(progress);
   const sync = sourceSyncText(progress);
   const indexing = sourceIndexingText(progress);
+  const notice = sourceFailureNotice(progress);
   return (
     <Box sx={sourceProgressBodySx}>
-      {status !== 'waiting' && (
+      {status !== 'waiting' && status !== 'empty' && (
         <LinearProgress
           variant={value === null ? 'indeterminate' : 'determinate'}
           value={value ?? undefined}
@@ -122,6 +124,11 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
         <Typography variant="caption" sx={progressCaptionSx}>
           {indexing}
         </Typography>
+      )}
+      {notice && (
+        <Alert severity="warning" variant="outlined" sx={{ mt: 1 }}>
+          {notice}
+        </Alert>
       )}
     </Box>
   );

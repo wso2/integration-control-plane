@@ -28,6 +28,7 @@ import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../
 import { formatDistanceToNow } from '../../../utils/time';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
+import { engineErrorCode, engineMessage } from '../../../utils/contextEngine';
 import AnsweredTurn from './AnsweredTurn';
 import EvidenceCard from './EvidenceCard';
 import OwnerAccessButton from './OwnerAccessButton';
@@ -62,6 +63,8 @@ interface QueryFailure {
 function queryFailure(e: unknown, mode: ContextQueryMode): QueryFailure {
   if (e instanceof HttpError) {
     if (e.status === 403) return { message: "You don't have query access to this engine.", forbidden: true };
+    // The engine names a model provider failure by its code, so the message says what to fix.
+    if (e.status === 503 && engineErrorCode(e)?.startsWith('backend_model_')) return { message: `${engineMessage(e)}. Fix the engine's model settings, then ask again.` };
     if (e.status === 503 && mode === 'answer') return { message: "The engine couldn't get an answer from its language model just now, and stored nothing. Check the engine's models and keys, or ask in Passages mode." };
     if (e.status === 503) return { message: "The engine is running without its knowledge backend, so it can't search yet. Start it in provider mode with model keys." };
     if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };

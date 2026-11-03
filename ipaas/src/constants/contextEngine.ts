@@ -69,6 +69,8 @@ const MS_GRAPH_APP = [F('tenantId', 'Tenant ID', 'text'), F('clientId', 'Client 
 /** Show a field only for the chosen auth flow (matches a connector's `authType` discriminator). */
 const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'authType', equals: flows });
 
+/** Connection fields shared by the Google connectors, mirroring the Ballerina `google_auth` module's GoogleAuth: one of three OAuth2 flows, chosen by authType. */
+
 /**
  * Optional RML mapping section, appended to connectors whose `isStructuredData` is
  * set. A provided .rml.ttl is used to generate the context graph from the source's
@@ -86,8 +88,7 @@ export const RML_MAPPING = G(
  * Sign-in fields of the Google integrations, nested under their `auth` setting. Service accounts
  * are not offered: the integrations read their key from a file that nothing mounts.
  */
-const GOOGLE_AUTH = G(
-  'Connection',
+const GOOGLE_AUTH = [
   F('authType', 'Authentication', 'select', {
     defaultValue: 'refresh_token',
     options: [
@@ -101,7 +102,7 @@ const GOOGLE_AUTH = G(
   F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.clientSecret' }),
   F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.refreshToken' }),
   F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.', setting: 'auth.token' }),
-);
+];
 
 const SQL_TABLES = (port: string) => [
   F('host', 'Host', 'text'),
@@ -196,7 +197,12 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     popular: true,
     logo: `${RAG_LOGO_BASE}googledrive.svg`,
     icon: 'folder',
-    fields: [...GOOGLE_AUTH, ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' }))],
+    // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
+    // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
+    fields: [
+      ...G('Connection', ...GOOGLE_AUTH),
+      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' })),
+    ],
     summaryKeys: ['folderId'],
   },
   {
@@ -331,6 +337,35 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['label'],
   },
   {
+    id: 'google-calendar',
+    name: 'Google Calendar',
+    description: 'Events of one calendar, backfilled and kept in sync by incremental sync.',
+    category: 'collaboration',
+    icon: 'calendar',
+    // Mirrors the Ballerina `google_calendar` connector's GoogleCalendarSettings: the shared Google
+    // auth block plus the calendar, the events to deliver and the page size.
+    fields: [
+      ...G('Connection', ...GOOGLE_AUTH),
+      ...G(
+        'Data to sync',
+        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '"primary" for the connected account’s own calendar, or a calendar ID (an email-shaped address, including group and holiday calendars).' }),
+        F('eventTypes', 'Event Types', 'text', { defaultValue: 'default, outOfOffice', helper: 'Comma-separated. Any of: default, outOfOffice, focusTime, workingLocation, birthday, fromGmail.', valueType: 'list' }),
+        F('includePrivateEvents', 'Private Events', 'select', {
+          defaultValue: 'false',
+          options: [
+            { value: 'false', label: 'Exclude' },
+            { value: 'true', label: 'Include' },
+          ],
+          helper: 'Private and confidential events. When excluded, an event made private later is removed from the engine.',
+          valueType: 'boolean',
+        }),
+      ),
+      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.', valueType: 'integer' })),
+    ],
+    summaryKeys: ['calendarId'],
+    isStructuredData: true,
+  },
+  {
     id: 'outlook',
     name: 'Outlook',
     description: 'Mail folders from a Microsoft 365 mailbox.',
@@ -347,30 +382,6 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     icon: 'video',
     fields: [F('accountId', 'Account ID', 'text'), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret')],
     summaryKeys: ['accountId'],
-  },
-  {
-    id: 'gcalendar',
-    name: 'Google Calendar',
-    description: 'Events of a calendar, synced on a schedule.',
-    category: 'collaboration',
-    icon: 'calendar',
-    fields: [
-      ...GOOGLE_AUTH,
-      ...G(
-        'Data to sync',
-        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '`primary` for the signed-in account’s own calendar, or a calendar’s id.' }),
-        O('eventTypes', 'Event Types', 'text', { placeholder: 'default, outOfOffice', helper: 'Comma-separated, from birthday, default, focusTime, fromGmail, outOfOffice and workingLocation. Empty syncs meetings and out-of-office events.', valueType: 'list' }),
-        O('includePrivateEvents', 'Private Events', 'select', {
-          defaultValue: 'false',
-          options: [
-            { value: 'false', label: 'Leave out' },
-            { value: 'true', label: 'Include' },
-          ],
-          valueType: 'boolean',
-        }),
-      ),
-    ],
-    summaryKeys: ['calendarId'],
   },
   { id: 'google-chat', name: 'Google Chat', description: 'Conversations in a space.', category: 'collaboration', icon: 'chat', fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')], summaryKeys: ['spaceId'] },
 
@@ -557,7 +568,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'docs_watch', 'gdrive', 'gcalendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'docs_watch', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
 
 /**
  * Connectors the browser feeds itself, registered straight on the engine. Every other enabled
@@ -565,7 +576,7 @@ export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'do
  */
 export const ENGINE_NATIVE_CONNECTOR_IDS: ReadonlySet<string> = new Set(['upload']);
 
-export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive', gcalendar: 'google_calendar' };
+export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive', 'google-calendar': 'google_calendar' };
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
@@ -685,6 +696,7 @@ export const SOURCE_PROGRESS_LABEL: Record<SourceProgressStatus, string> = {
   indexing: 'Indexing',
   processed: 'Processed',
   attention: 'Processed with errors',
+  empty: 'Nothing stored',
 };
 
 export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'info' | 'success' | 'warning'> = {
@@ -694,6 +706,7 @@ export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'inf
   indexing: 'info',
   processed: 'success',
   attention: 'warning',
+  empty: 'default',
 };
 
 /** Progress polling: quick while any source is moving, slow otherwise so a sync started elsewhere still shows up. */
@@ -766,6 +779,15 @@ export const UPLOAD_CONCURRENCY = 3;
 
 /** How often an uploaded file's job and record are checked while it is still moving. */
 export const UPLOAD_POLL_MS = 3000;
+
+/** How often the "14 min so far" texts are refreshed. */
+export const ELAPSED_TICK_MS = 30_000;
+
+/** After this long on the engine, a file's row says that big files take long, so the wait does not look like a hang. */
+export const UPLOAD_SLOW_AFTER_MS = 2 * 60_000;
+
+/** The engine reads every file with its language model, so the time grows with the file. Seen: 3.4 MB of JSON took 58 minutes. */
+export const UPLOAD_SLOW_NOTE = 'Big files take long: a 3 MB file can take about an hour.';
 
 export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
   uploading: 'Uploading',

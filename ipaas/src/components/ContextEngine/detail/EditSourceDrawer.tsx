@@ -52,15 +52,23 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
   const isUpload = source.type === 'upload';
   const [name, setName] = useState(source.name);
   const [visibility, setVisibility] = useState<FileVisibility>(EVERYONE_VISIBILITY);
+  // The engine keeps a source's rules but does not return them, so this form cannot show them. Rules
+  // are sent only when the visibility was changed here; a plain rename leaves them as they are. Once a
+  // save of untouched visibility replaced a connector's rules with an empty set and every later record
+  // of it was held back as unmapped.
+  const [visibilityTouched, setVisibilityTouched] = useState(false);
   const update = useUpdateContextSource(engineId);
   const nameError = sourceNameError(name, otherNames);
   const visError = isUpload ? '' : visibilityError(visibility);
-  const canSave = nameError === '' && visError === '' && !update.isPending;
+  const rules = isUpload ? [] : uploadSourceRules(visibilityTags(visibility, queryRoles));
+  // An empty rule set would make every record of the source unreadable, so it is never sent.
+  const noRules = !isUpload && visibilityTouched && rules.length === 0;
+  const canSave = nameError === '' && visError === '' && !noRules && !update.isPending;
   const forbidden = update.error instanceof HttpError && update.error.status === 403;
 
   const save = () => {
     update.mutate(
-      { sourceId: source.id, name: name.trim(), ...(isUpload ? {} : { audience: uploadSourceRules(visibilityTags(visibility, queryRoles)) }) },
+      { sourceId: source.id, name: name.trim(), ...(isUpload || !visibilityTouched ? {} : { audience: rules }) },
       { onSuccess: onClose },
     );
   };
@@ -115,9 +123,25 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
         ) : (
           <>
             <Alert severity="info" variant="outlined">
-              The engine does not report a source&apos;s current visibility, so this starts from everyone who can query. Saving replaces who can see this content.
+              The engine does not report a source&apos;s current visibility. Leave this as it is to keep the rules the source has; changing it replaces who can see this content.
             </Alert>
-            <FileVisibilityField id="edit-source-visibility" label="Who can see this content" orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={visibility} onChange={setVisibility} />
+            <FileVisibilityField
+              id="edit-source-visibility"
+              label="Who can see this content"
+              orgHandle={orgHandle}
+              queryRoles={queryRoles}
+              engineId={engineId}
+              value={visibility}
+              onChange={(next) => {
+                setVisibility(next);
+                setVisibilityTouched(true);
+              }}
+            />
+            {noRules && (
+              <Alert severity="warning" variant="outlined">
+                No role can query this engine yet, so there is no one to map this content to. Grant query access first, or leave the visibility as it is.
+              </Alert>
+            )}
           </>
         )}
 

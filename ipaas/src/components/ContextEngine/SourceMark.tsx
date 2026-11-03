@@ -17,32 +17,7 @@
  */
 
 import { Box } from '@wso2/oxygen-ui';
-import {
-  BookOpen,
-  Building2,
-  CalendarClock,
-  Cloud,
-  Code,
-  CreditCard,
-  Database,
-  FileText,
-  Folder,
-  GitHub,
-  Globe,
-  Hash,
-  Headset,
-  Kanban,
-  Mail,
-  MessageSquare,
-  Package,
-  Plug,
-  Rss,
-  ShieldCheck,
-  ShoppingCart,
-  Table,
-  Upload,
-  Video,
-} from '@wso2/oxygen-ui-icons-react';
+import { BookOpen, Building2, Calendar, Cloud, Code, CreditCard, Database, FileText, Folder, GitHub, Globe, Hash, Headset, Kanban, Mail, MessageSquare, Package, Plug, Rss, ShieldCheck, ShoppingCart, Table, Upload, Video } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentType, JSX, ReactNode } from 'react';
 import { CONNECTOR_BY_ID, contextLogoUrl } from '../../constants/contextEngine';
 import { sourceMarkSx, sourceTileMarkSx } from './styles';
@@ -51,7 +26,6 @@ import type { SourceIcon } from '../../types/contextEngine';
 const ICONS: Record<SourceIcon, ComponentType<{ size?: number }>> = {
   book: BookOpen,
   building: Building2,
-  calendar: CalendarClock,
   github: GitHub,
   globe: Globe,
   upload: Upload,
@@ -73,6 +47,7 @@ const ICONS: Record<SourceIcon, ComponentType<{ size?: number }>> = {
   cart: ShoppingCart,
   card: CreditCard,
   code: Code,
+  calendar: Calendar,
 };
 
 /** Icon for a connector id; ids the catalog no longer has fall back to a folder. */
