@@ -144,8 +144,8 @@ describe('an open Configure form', () => {
     expect(linkedFields()).toBe('');
   });
 
-  it("doesn't wait for a release when the write leaves development's build as it is", async () => {
-    server.workload = 'next_build';
+  it("doesn't wait for a release when the write leaves development's Workload as it is", async () => {
+    server.workload = 'no_workload';
     await open();
     await act(() => link.mutateAsync({ projectId: 'default', componentId: 'sfdemo', resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales' }));
     const reads = server.reads;

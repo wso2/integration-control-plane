@@ -162,13 +162,14 @@ export interface ResourceLinkEnvironment {
 }
 
 /**
- * What linking, changing or unlinking did to the integration's current build: `updated` (development gets it now),
- * `next_deploy`, `unchanged` or `next_build` (the next build applies it); and where the resource has no values yet.
+ * What linking, changing or unlinking did to the integration's Workload: `updated` (development gets it now),
+ * `next_deploy`, `unchanged` or `no_workload` (the integration's first deploy applies it); and where the resource has no
+ * values yet.
  */
 export interface ResourceLinkWrite {
   resourceType: string;
   connection?: string;
-  workload: 'updated' | 'next_deploy' | 'unchanged' | 'next_build';
+  workload: 'updated' | 'next_deploy' | 'unchanged' | 'no_workload';
   environmentsWithoutValues: string[];
 }
 
