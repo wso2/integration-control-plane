@@ -75,25 +75,30 @@ describe('linkRows', () => {
   it('says what each link delivers in the environment', () => {
     expect(linkRows([sales, support], 'production')).toEqual([
       { resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'no values in production'], canUnlink: true },
-      { resourceType: 'support', notes: ["not linked · this environment's release still delivers it"], canUnlink: false },
+      { resourceType: 'support', notes: ['unlinked · until next release'], canUnlink: false },
     ]);
     expect(linkRows([sales, support], 'staging')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'next release'], canUnlink: true }]);
-    expect(linkRows([cloudLink], 'development')).toEqual([{ resourceType: 'orders-db', notes: ['linked from WSO2 Cloud under its own key names'], canUnlink: false }]);
+    expect(linkRows([cloudLink], 'development')).toEqual([{ resourceType: 'orders-db', notes: ['linked from WSO2 Cloud'], canUnlink: false }]);
   });
 
-  it('says where a link made on WSO2 Cloud is still delivered under its earlier names', () => {
+  it('says where a link made on WSO2 Cloud waits for the next release', () => {
     const renamed: ResourceLink = {
       resourceType: 'salesforce-pilot',
       linked: true,
       environments: [env('development', true, true), env('production', true, true, { 'wso2.sfdemo.sfDeskBaseUrl': 'BASE_URL' }, 'next_release')],
     };
-    expect(linkRows([renamed], 'development')[0].notes).toEqual(['linked from WSO2 Cloud under its own key names']);
-    expect(linkRows([renamed], 'production')[0].notes).toEqual(['linked from WSO2 Cloud · still delivered under its earlier names until the next release']);
+    expect(linkRows([renamed], 'development')[0].notes).toEqual(['linked from WSO2 Cloud']);
+    expect(linkRows([renamed], 'production')[0].notes).toEqual(['linked from WSO2 Cloud', 'next release']);
   });
 
   it("names the release's connection while the link is ahead of it, and that the next release gets the link's", () => {
-    expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'now goes through wso2.sfdemo.sfCrm; next release'], canUnlink: true }]);
-    expect(linkRows([ahead], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'now goes through wso2.sfdemo.sfCrm; next release']);
+    expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'now uses wso2.sfdemo.sfCrm; next release'], canUnlink: true }]);
+    expect(linkRows([ahead], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'now uses wso2.sfdemo.sfCrm; next release']);
+  });
+
+  it("names the release's connection after a rollback to a build before a Change link", () => {
+    const rolledBack: ResourceLink = { ...ahead, environments: [{ ...env('development', true, true, { 'wso2.sfdemo.sfSalesBaseUrl': 'BASE_URL' }), connection: 'wso2.sfdemo.sfSales' }] };
+    expect(linkRows([rolledBack], 'development')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'link now uses wso2.sfdemo.sfCrm']);
   });
 
   it('says a release has yet to carry the names a link has now', () => {
@@ -101,14 +106,14 @@ describe('linkRows', () => {
     expect(linkRows([changed], 'development')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'next release']);
   });
 
-  it('says where names set on WSO2 Cloud take precedence, and offers to unlink only the connection', () => {
+  it('says where names set on WSO2 Cloud override the connection, and offers to unlink only the connection', () => {
     const both: ResourceLink = { ...sales, namesFromWso2Cloud: true };
-    expect(linkRows([both], 'development')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'Names set on WSO2 Cloud take precedence'], canUnlink: true }]);
+    expect(linkRows([both], 'development')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'names overridden on WSO2 Cloud'], canUnlink: true }]);
   });
 
-  it('says where workload.yaml takes precedence, and never waits for a release', () => {
-    expect(linkRows([fromSource], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['through wso2.sfdemo.sfDesk', 'workload.yaml takes precedence'], canUnlink: true }]);
-    expect(linkRows([fromSource], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfDesk', 'workload.yaml takes precedence', 'no values in production']);
+  it('says where workload.yaml overrides the link, and never waits for a release', () => {
+    expect(linkRows([fromSource], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['through wso2.sfdemo.sfDesk', 'overridden by workload.yaml'], canUnlink: true }]);
+    expect(linkRows([fromSource], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfDesk', 'overridden by workload.yaml', 'no values in production']);
   });
 
   it('lists a workload.yaml declaration, with nothing to unlink', () => {

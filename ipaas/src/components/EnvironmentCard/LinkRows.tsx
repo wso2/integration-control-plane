@@ -48,7 +48,7 @@ export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) 
       </Typography>
       {noValues && (
         <Typography variant="caption" color="warning.main" sx={{ display: 'block', mb: 0.5 }}>
-          Add the missing values on WSO2 Cloud; {env} restarts with them by itself.
+          Add the missing values on WSO2 Cloud.
         </Typography>
       )}
       {rows.map((r) => (
@@ -74,11 +74,7 @@ export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) 
       <Dialog open={!!target} onClose={() => setTarget(null)}>
         <DialogTitle>Unlink {target}</DialogTitle>
         <DialogContent>
-          <Typography variant="body2">
-            {links.find((l) => l.resourceType === target)?.namesFromWso2Cloud
-              ? `${target} stays linked with the names set on WSO2 Cloud; unlink it there to drop it.`
-              : `Development drops ${target} now; other environments keep its values until a release without it runs there. Unlinking doesn't revoke access: to cut it off, change the credentials in the resource on WSO2 Cloud.`}
-          </Typography>
+          <Typography variant="body2">{links.find((l) => l.resourceType === target)?.namesFromWso2Cloud ? 'The link set on WSO2 Cloud stays.' : 'To revoke access, also change the credentials on WSO2 Cloud.'}</Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setTarget(null)}>Cancel</Button>
