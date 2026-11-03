@@ -152,9 +152,11 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             </Typography>
             <EngineStateChip state={engine.state} />
           </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {engine.description || 'No description'}
-          </Typography>
+          {engine.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {engine.description}
+            </Typography>
+          )}
         </Box>
       </Stack>
 
