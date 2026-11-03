@@ -37,7 +37,7 @@ const links = (): ResourceLink[] =>
               name: 'development',
               inRelease: server.inRelease,
               hasValues: true,
-              connectionInBuild: true,
+              state: server.inRelease ? 'linked' : 'next_release',
               configurables: server.inRelease ? { 'acme.sfdemo.sfSalesBaseUrl': 'BASE_URL' } : {},
               ...(server.inRelease && { connection: 'acme.sfdemo.sfSales' }),
             },

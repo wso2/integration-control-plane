@@ -75,7 +75,9 @@ export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) 
         <DialogTitle>Unlink {target}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Development drops {target} now; other environments keep its values until a release without it runs there. Unlinking doesn&apos;t revoke access: to cut it off, change the credentials in the resource on WSO2 Cloud.
+            {links.find((l) => l.resourceType === target)?.namesFromWso2Cloud
+              ? `${target} stays linked with the names set on WSO2 Cloud; unlink it there to drop it.`
+              : `Development drops ${target} now; other environments keep its values until a release without it runs there. Unlinking doesn't revoke access: to cut it off, change the credentials in the resource on WSO2 Cloud.`}
           </Typography>
         </DialogContent>
         <DialogActions>

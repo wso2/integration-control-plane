@@ -32,7 +32,7 @@ export const linkedConfigurables = (links: ResourceLink[], env: string): Map<str
     links.flatMap((l) => {
       const e = l.environments.find((x) => x.name === env);
       if (!e?.inRelease) return [];
-      const source: LinkedSource = { resource: l.resourceType, ...(l.declared && { declared: true }), ...(!e.hasValues && { noValuesIn: env }) };
+      const source: LinkedSource = { resource: l.resourceType, ...(l.sourceDefined && { declared: true }), ...(!e.hasValues && { noValuesIn: env }) };
       return Object.keys(e.configurables).map((key) => [key, source] as const);
     }),
   );
@@ -59,15 +59,16 @@ export interface LinkRow {
 export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
   links.flatMap((l) => {
     const e = l.environments.find((x) => x.name === env);
-    if (!l.linked && !l.declared && !e?.inRelease) return [];
-    const ahead = l.linked && e?.inRelease && e.connection && e.connection !== l.connection;
+    if (!l.linked && !l.sourceDefined && !e?.inRelease) return [];
+    const pending = l.linked && !l.sourceDefined && !!e && e.state !== 'linked';
     const notes: string[] = [];
-    if (l.declared) notes.push('declared in workload.yaml');
-    else if (!l.linked) notes.push("not linked · this environment's release still delivers it");
-    else if (!l.connection) notes.push(e?.earlierNames ? 'linked from WSO2 Cloud · still delivered under its earlier names until the next release' : 'linked from WSO2 Cloud under its own key names');
-    else if (ahead) notes.push(`through ${e.connection}`, `now goes through ${l.connection}; next release`);
-    else notes.push(`through ${l.connection}`);
-    if ((l.linked || l.declared) && e && !e.inRelease) notes.push('next release');
+    if (!l.linked) notes.push(l.sourceDefined ? 'declared in workload.yaml' : "not linked · this environment's release still delivers it");
+    else if (!l.connection && pending && e.inRelease) notes.push('linked from WSO2 Cloud · still delivered under its earlier names until the next release');
+    else if (!l.connection) notes.push('linked from WSO2 Cloud under its own key names', ...(pending ? ['next release'] : []));
+    else if (pending && e.inRelease && e.connection && e.connection !== l.connection) notes.push(`through ${e.connection}`, `now goes through ${l.connection}; next release`);
+    else notes.push(`through ${l.connection}`, ...(pending ? ['next release'] : []));
+    if (l.sourceDefined && l.linked) notes.push('workload.yaml takes precedence');
+    else if (l.namesFromWso2Cloud && l.connection) notes.push('Names set on WSO2 Cloud take precedence');
     if (e && !e.hasValues) notes.push(`no values in ${env}`);
-    return [{ resourceType: l.resourceType, notes, canUnlink: l.linked }];
+    return [{ resourceType: l.resourceType, notes, canUnlink: !!l.connection }];
   });

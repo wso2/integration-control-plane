@@ -132,33 +132,33 @@ export interface PostConfigMgtInput {
 
 /**
  * A resource linked to an integration, with what it delivers in each environment, in pipeline order. `connection` is
- * the config key prefix its names follow, absent for a link made on WSO2 Cloud with names of its own. `linked` is
- * false for a resource the integration's workload.yaml declares (`declared`), or that only an environment's release
- * still delivers; there is nothing to unlink.
+ * the config key prefix the integration's names follow, absent for a link made only on WSO2 Cloud. `namesFromWso2Cloud`
+ * is set when WSO2 Cloud set names for the link, which take precedence; `sourceDefined` when the integration's Workload
+ * comes from its workload.yaml, which takes precedence, so the link is recorded but not applied. `linked` is false for
+ * a resource only an environment's release still delivers.
  */
 export interface ResourceLink {
   resourceType: string;
   connection?: string;
+  namesFromWso2Cloud?: true;
+  sourceDefined?: true;
   linked: boolean;
-  declared?: boolean;
   environments: ResourceLinkEnvironment[];
 }
 
 /**
- * What a link delivers in one environment: whether that environment's release carries it, the configurables of
- * that release's build it sets (config key → resource key), whether the resource has values there, and, for a link
- * through a connection, whether the build has it and the connection the release's names follow: not the link's
- * while the environment runs a build from before a Change link, or an older build after a rollback.
+ * What a link delivers in one environment: `state` (`linked` once the environment's release carries what the Workload
+ * does; `in_release` on a row that isn't linked), whether the release carries the link at all, the configurables of
+ * that release's build it sets (config key → resource key), whether the resource has values there, and the connection
+ * the release's names follow: not the link's while the environment runs a release from before a Change link.
  */
 export interface ResourceLinkEnvironment {
   name: string;
+  state: 'linked' | 'next_release' | 'not_deployed' | 'in_release';
   inRelease: boolean;
   configurables: Record<string, string>;
   hasValues: boolean;
-  connectionInBuild: boolean;
   connection?: string;
-  /** For a link without a connection: the release carries it under names or files other than the link's now. */
-  earlierNames?: boolean;
 }
 
 /**
