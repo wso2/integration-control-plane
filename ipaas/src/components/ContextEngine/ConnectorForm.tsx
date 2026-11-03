@@ -19,7 +19,7 @@
 import { Alert, Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ChevronRight, Upload } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useRef, useState, type JSX } from 'react';
-import { EVERYONE_VISIBILITY } from '../../constants/contextEngine';
+import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { sourceFieldError, sourceNameError, visibleFields } from '../../utils/contextEngine';
 import SecretField from '../common/SecretField';
@@ -216,21 +216,23 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
         )}
       </Stack>
 
-      <Box sx={{ mt: 2.5 }}>
-        {upload ? (
-          <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} />
-        ) : (
-          <FileVisibilityField
-            id="source-visibility"
-            label="Who can see this source"
-            hint="Access is set per source: everything this source brings in is visible to the same people."
-            orgHandle={orgHandle}
-            queryRoles={queryRoles}
-            value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}
-            onChange={(stagedVisibility) => change({ ...draft, stagedVisibility })}
-          />
-        )}
-      </Box>
+      {ROLE_VISIBILITY_ENABLED && (
+        <Box sx={{ mt: 2.5 }}>
+          {upload ? (
+            <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} />
+          ) : (
+            <FileVisibilityField
+              id="source-visibility"
+              label="Who can see this source"
+              hint="Access is set per source: everything this source brings in is visible to the same people."
+              orgHandle={orgHandle}
+              queryRoles={queryRoles}
+              value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}
+              onChange={(stagedVisibility) => change({ ...draft, stagedVisibility })}
+            />
+          )}
+        </Box>
+      )}
     </>
   );
 }

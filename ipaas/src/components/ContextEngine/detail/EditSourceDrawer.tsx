@@ -19,7 +19,7 @@
 import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { EVERYONE_VISIBILITY } from '../../../constants/contextEngine';
+import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { useUpdateContextSource } from '../../../hooks/useContextEngine';
 import { engineMessage, sourceNameError, sourceTypeName, uploadSourceRules, visibilityError, visibilityTags } from '../../../utils/contextEngine';
@@ -50,6 +50,8 @@ interface EditSourceDrawerProps {
  */
 export default function EditSourceDrawer({ engineId, orgHandle, source, otherNames, queryRoles, open, onClose }: EditSourceDrawerProps): JSX.Element {
   const isUpload = source.type === 'upload';
+  // With roles turned off the drawer only renames, so a source registered earlier with some roles keeps them.
+  const editsRules = !isUpload && ROLE_VISIBILITY_ENABLED;
   const [name, setName] = useState(source.name);
   const [visibility, setVisibility] = useState<FileVisibility>(EVERYONE_VISIBILITY);
   // The engine keeps a source's rules but does not return them, so this form cannot show them. Rules
@@ -59,18 +61,15 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
   const [visibilityTouched, setVisibilityTouched] = useState(false);
   const update = useUpdateContextSource(engineId);
   const nameError = sourceNameError(name, otherNames);
-  const visError = isUpload ? '' : visibilityError(visibility);
-  const rules = isUpload ? [] : uploadSourceRules(visibilityTags(visibility, queryRoles));
+  const visError = editsRules ? visibilityError(visibility) : '';
+  const rules = editsRules ? uploadSourceRules(visibilityTags(visibility, queryRoles)) : [];
   // An empty rule set would make every record of the source unreadable, so it is never sent.
-  const noRules = !isUpload && visibilityTouched && rules.length === 0;
+  const noRules = editsRules && visibilityTouched && rules.length === 0;
   const canSave = nameError === '' && visError === '' && !noRules && !update.isPending;
   const forbidden = update.error instanceof HttpError && update.error.status === 403;
 
   const save = () => {
-    update.mutate(
-      { sourceId: source.id, name: name.trim(), ...(isUpload || !visibilityTouched ? {} : { audience: rules }) },
-      { onSuccess: onClose },
-    );
+    update.mutate({ sourceId: source.id, name: name.trim(), ...(editsRules && visibilityTouched ? { audience: rules } : {}) }, { onSuccess: onClose });
   };
 
   return (
@@ -111,38 +110,39 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
           />
         </Stack>
 
-        {isUpload ? (
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Who can see uploaded files
-            </Typography>
-            <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5, lineHeight: 1.5 }}>
-              Each file is shared when it is uploaded: with everyone who can query this engine, or with some roles. Change it per file from the Files drawer.
-            </Typography>
-          </Box>
-        ) : (
-          <>
-            <Alert severity="info" variant="outlined">
-              The engine does not report a source&apos;s current visibility. Leave this as it is to keep the rules the source has; changing it replaces who can see this content.
-            </Alert>
-            <FileVisibilityField
-              id="edit-source-visibility"
-              label="Who can see this content"
-              orgHandle={orgHandle}
-              queryRoles={queryRoles}
-              value={visibility}
-              onChange={(next) => {
-                setVisibility(next);
-                setVisibilityTouched(true);
-              }}
-            />
-            {noRules && (
-              <Alert severity="warning" variant="outlined">
-                No role can query this engine yet, so there is no one to map this content to. Grant query access first, or leave the visibility as it is.
+        {ROLE_VISIBILITY_ENABLED &&
+          (isUpload ? (
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                Who can see uploaded files
+              </Typography>
+              <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5, lineHeight: 1.5 }}>
+                Each file is shared when it is uploaded: with everyone who can query this engine, or with some roles. Change it per file from the Files drawer.
+              </Typography>
+            </Box>
+          ) : (
+            <>
+              <Alert severity="info" variant="outlined">
+                The engine does not report a source&apos;s current visibility. Leave this as it is to keep the rules the source has; changing it replaces who can see this content.
               </Alert>
-            )}
-          </>
-        )}
+              <FileVisibilityField
+                id="edit-source-visibility"
+                label="Who can see this content"
+                orgHandle={orgHandle}
+                queryRoles={queryRoles}
+                value={visibility}
+                onChange={(next) => {
+                  setVisibility(next);
+                  setVisibilityTouched(true);
+                }}
+              />
+              {noRules && (
+                <Alert severity="warning" variant="outlined">
+                  No role can query this engine yet, so there is no one to map this content to. Grant query access first, or leave the visibility as it is.
+                </Alert>
+              )}
+            </>
+          ))}
 
         {update.isError && (
           <Alert severity="error" variant="outlined" action={forbidden ? <OwnerAccessButton engineId={engineId} onGranted={save} /> : undefined}>
