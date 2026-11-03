@@ -41,6 +41,11 @@ export interface MiConfigEntry {
 export interface MiConfig {
   envVars: MiConfigEntry[];
   secrets: string[];
+  /**
+   * The `mi-env-vars` group exists but is stored as a secret (e.g. made on Configs &
+   * Secrets). Its values can't be read back, so the editor can't show or change them.
+   */
+  envVarsGroupIsSecret: boolean;
 }
 
 /** The editor's result: secrets with a blank `value` keep their stored value. */

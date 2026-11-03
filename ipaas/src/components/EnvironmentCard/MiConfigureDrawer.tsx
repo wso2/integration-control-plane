@@ -26,7 +26,7 @@ import { navUrl, useScope } from '../../nav';
 import type { EnvEndpoint } from '../../types/component';
 import type { MiConfig, MiConfigDraft } from '../../types/envGroups';
 import { toEndpointOptions } from '../../utils/endpoints';
-import { isEmptyMiConfigSavePlan, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
+import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
 import { EndpointCard } from '../EndpointCard';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -276,7 +276,14 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           )}
           .
         </Alert>
-        {renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')}
+        {data.envVarsGroupIsSecret ? (
+          // Its values can't be read back, and saving variables here would replace them.
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            Environment variables can't be edited here: the <code>{MI_ENV_VARS_GROUP}</code> group on Configs &amp; Secrets is stored as a secret. Edit or delete that group there first.
+          </Alert>
+        ) : (
+          renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')
+        )}
         {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')}
         {showErrors && errors.size > 0 && <Alert severity="error">Fix the highlighted keys before saving.</Alert>}
       </>

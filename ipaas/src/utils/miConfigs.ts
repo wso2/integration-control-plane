@@ -37,6 +37,7 @@ export const miSecretGroup = (key: string): string => `${MI_SECRET_GROUP_PREFIX}
 /** The MI configuration held in an environment's groups. `envVarValues` is the env-var group's data. */
 export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, string>): MiConfig {
   const envGroup = groups.find((g) => g.name === MI_ENV_VARS_GROUP && !g.sensitive);
+  const envVarsGroupIsSecret = groups.some((g) => g.name === MI_ENV_VARS_GROUP && g.sensitive);
   const envVars = (envGroup?.keys ?? []).map((key) => ({ key, value: envVarValues[key] ?? '' }));
   const secrets = groups
     // Only groups named exactly as miSecretGroup names them: writes and deletes address
@@ -45,7 +46,7 @@ export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, stri
     .filter((g) => g.sensitive && g.keys.length === 1 && g.name === miSecretGroup(g.keys[0]))
     .flatMap((g) => g.keys)
     .sort();
-  return { envVars, secrets };
+  return { envVars, secrets, envVarsGroupIsSecret };
 }
 
 /** Number of variables plus secrets — the deploy card's "Configurables" count. */
@@ -82,7 +83,9 @@ export function planMiConfigSave(stored: MiConfig, draft: MiConfigDraft): MiConf
   const draftEnvVars = new Map(draft.envVars.map((e) => [e.key, e.value]));
   const sameEnvVars = storedEnvVars.size === draftEnvVars.size && [...draftEnvVars].every(([key, value]) => storedEnvVars.get(key) === value);
   let envVars: MiConfigSavePlan['envVars'];
-  if (!sameEnvVars) envVars = draftEnvVars.size ? Object.fromEntries(draftEnvVars) : null;
+  // A secret `mi-env-vars` group is never written: a PUT would replace its stored
+  // secrets with the draft's variables, and a delete would drop them.
+  if (!sameEnvVars && !stored.envVarsGroupIsSecret) envVars = draftEnvVars.size ? Object.fromEntries(draftEnvVars) : null;
 
   const draftKeys = new Set(draft.secrets.map((s) => s.key));
   // A blank value keeps a stored secret; a renamed key is a new secret.

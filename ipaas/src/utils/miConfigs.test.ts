@@ -31,12 +31,18 @@ describe('toMiConfig', () => {
         { key: 'PORT', value: '8290' },
       ],
       secrets: ['API_KEY', 'TOKEN'],
+      envVarsGroupIsSecret: false,
     });
+  });
+
+  it('flags an mi-env-vars group stored as a secret instead of reading it', () => {
+    const groups = [group(MI_ENV_VARS_GROUP, true, ['HOST']), group(miSecretGroup('TOKEN'), true, ['TOKEN'])];
+    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: ['TOKEN'], envVarsGroupIsSecret: true });
   });
 
   it('ignores groups made on the Configs & Secrets page', () => {
     const groups = [group('db-settings', false, ['DB_URL']), group('db-creds', true, ['DB_PASSWORD'])];
-    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: [] });
+    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: [], envVarsGroupIsSecret: false });
   });
 
   it('ignores secret groups that only look like MI ones', () => {
@@ -48,7 +54,7 @@ describe('toMiConfig', () => {
 
 describe('miConfigCount', () => {
   it('counts env vars and secrets', () => {
-    expect(miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'] })).toBe(3);
+    expect(miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'], envVarsGroupIsSecret: false })).toBe(3);
   });
 });
 
@@ -77,7 +83,7 @@ describe('validateMiConfigDraft', () => {
 });
 
 describe('planMiConfigSave', () => {
-  const stored: MiConfig = { envVars: [{ key: 'HOST', value: 'a' }], secrets: ['TOKEN'] };
+  const stored: MiConfig = { envVars: [{ key: 'HOST', value: 'a' }], secrets: ['TOKEN'], envVarsGroupIsSecret: false };
 
   it('plans nothing when the draft matches what is stored', () => {
     const plan = planMiConfigSave(stored, { envVars: [{ key: 'HOST', value: 'a' }], secrets: [{ key: 'TOKEN', value: '' }] });
@@ -92,8 +98,21 @@ describe('planMiConfigSave', () => {
 
   it('rewrites the env-var group when a duplicated draft key hides a removed one', () => {
     const plan = planMiConfigSave(
-      { envVars: [{ key: 'HOST', value: 'a' }, { key: 'PORT', value: '80' }], secrets: [] },
-      { envVars: [{ key: 'HOST', value: 'a' }, { key: 'HOST', value: 'a' }], secrets: [] },
+      {
+        envVars: [
+          { key: 'HOST', value: 'a' },
+          { key: 'PORT', value: '80' },
+        ],
+        secrets: [],
+        envVarsGroupIsSecret: false,
+      },
+      {
+        envVars: [
+          { key: 'HOST', value: 'a' },
+          { key: 'HOST', value: 'a' },
+        ],
+        secrets: [],
+      },
     );
     expect(plan.envVars).toEqual({ HOST: 'a' });
   });
@@ -105,7 +124,7 @@ describe('planMiConfigSave', () => {
 
   it('writes only secrets with a value and deletes removed ones', () => {
     const plan = planMiConfigSave(
-      { envVars: [], secrets: ['TOKEN', 'OLD'] },
+      { envVars: [], secrets: ['TOKEN', 'OLD'], envVarsGroupIsSecret: false },
       {
         envVars: [],
         secrets: [
@@ -123,6 +142,13 @@ describe('planMiConfigSave', () => {
     const plan = planMiConfigSave(stored, { envVars: [{ key: 'HOST', value: 'a' }], secrets: [{ key: 'TOKEN', value: 'rotated' }] });
     expect(plan.secretsToPut).toEqual([{ key: 'TOKEN', value: 'rotated' }]);
     expect(plan.secretsToDelete).toEqual([]);
+  });
+
+  it('never writes an mi-env-vars group stored as a secret', () => {
+    const secretGroup: MiConfig = { envVars: [], secrets: ['TOKEN'], envVarsGroupIsSecret: true };
+    const plan = planMiConfigSave(secretGroup, { envVars: [{ key: 'HOST', value: 'a' }], secrets: [{ key: 'TOKEN', value: 'rotated' }] });
+    expect(plan.envVars).toBeUndefined();
+    expect(plan.secretsToPut).toEqual([{ key: 'TOKEN', value: 'rotated' }]);
   });
 });
 
