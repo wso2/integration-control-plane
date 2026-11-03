@@ -33,6 +33,8 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { buildConfigRows, mainContainer } from '../utils/devopsConfigs';
+import { runtimeFromDisplayType } from '../utils/identifyIntegration';
+import { isMiManagedGroup } from '../utils/miConfigs';
 import type { ConfigRow } from '../types/devopsConfigs';
 import type { ComponentScope } from '../nav';
 
@@ -60,6 +62,10 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
   const { data: configMaps = [] } = useConfigMaps(projectId, envId, trackId);
   const { data: secrets = [] } = useSecrets(projectId, envId, trackId);
   const rows = useMemo(() => buildConfigRows(mounts, configMaps, secrets), [mounts, configMaps, secrets]);
+  // An MI integration's configuration is edited in its Configure drawer, which owns these
+  // groups: an edit here could be undone by the drawer's next save, or break its reads.
+  const isMi = runtimeFromDisplayType(comp?.displayType ?? '') === 'mi';
+  const managedByMi = (r: ConfigRow): boolean => isMi && r.kind === 'envVars' && isMiManagedGroup({ name: r.name, sensitive: r.isSecret, keys: r.keys });
 
   const del = useDeleteConfig(projectId, trackId);
   const [view, setView] = useState<View>({ kind: 'list' });
@@ -176,22 +182,31 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
                           <Stack direction="row" alignItems="center" gap={1}>
                             {r.name}
                             {r.isSecret && <Chip label="Secret" size="small" variant="outlined" color="warning" />}
+                            {managedByMi(r) && <Chip label="Managed by Configure" size="small" variant="outlined" />}
                           </Stack>
                         </ListingTable.Cell>
                         <ListingTable.Cell>{r.kind === 'fileMount' ? 'File Mount' : 'Environment Variables'}</ListingTable.Cell>
                         <ListingTable.Cell>{r.kind === 'fileMount' ? r.mount.mount_path || '—' : r.keys.join(', ') || '—'}</ListingTable.Cell>
                         <ListingTable.Cell align="right">
                           <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
-                            <Tooltip title="Edit">
-                              <IconButton size="small" aria-label={`Edit ${r.name}`} onClick={() => setView({ kind: 'edit', row: r })}>
-                                <Pencil size={16} />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Remove">
-                              <IconButton size="small" color="error" aria-label={`Remove ${r.name}`} onClick={() => setDeleting(r)}>
-                                <Trash2 size={16} />
-                              </IconButton>
-                            </Tooltip>
+                            {managedByMi(r) ? (
+                              <Typography variant="body2" color="text.secondary">
+                                Edit in Configure
+                              </Typography>
+                            ) : (
+                              <>
+                                <Tooltip title="Edit">
+                                  <IconButton size="small" aria-label={`Edit ${r.name}`} onClick={() => setView({ kind: 'edit', row: r })}>
+                                    <Pencil size={16} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Remove">
+                                  <IconButton size="small" color="error" aria-label={`Remove ${r.name}`} onClick={() => setDeleting(r)}>
+                                    <Trash2 size={16} />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
                           </Authorized>
                         </ListingTable.Cell>
                       </ListingTable.Row>

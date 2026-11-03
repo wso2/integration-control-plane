@@ -54,8 +54,9 @@ export function validateDisplayName(name: string): string {
   return '';
 }
 
-// The MI configure drawer owns env-var groups named `mi-env-vars` and `mi-secret-<KEY>`
-// (miConfigs.ts) and would adopt, and may delete, a user's group with such a name.
+// The MI configure drawer owns env-var groups named `mi-env-vars`, `mi-secrets` and the
+// older `mi-secret-<KEY>` (miConfigs.ts) and would adopt, and may delete, a user's group
+// with such a name.
 const MI_GROUP_PREFIX = 'mi-';
 
 /** `validateDisplayName` for a new env-var group, whose display name becomes its group name. */
