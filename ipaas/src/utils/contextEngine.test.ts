@@ -789,7 +789,7 @@ describe('source progress', () => {
 
 describe('file uploads', () => {
   const MB = 1024 * 1024;
-  const record = (o: Partial<ContextRecordStatus>): ContextRecordStatus => ({ recordId: 'r', state: 'active', currentVersion: '1', sourceAclVersion: '1', indexState: 'pending', updatedAt: 'x', ...o });
+  const record = (o: Partial<ContextRecordStatus>): ContextRecordStatus => ({ recordId: 'r', state: 'active', currentVersion: '1', indexState: 'pending', updatedAt: 'x', ...o });
 
   it('decides the content type by extension before the browser type', () => {
     expect(contentTypeForFile('notes.md', '')).toBe('text/markdown');
