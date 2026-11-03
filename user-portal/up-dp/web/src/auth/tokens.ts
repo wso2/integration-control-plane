@@ -118,6 +118,8 @@ let completion: Promise<string> | null = null;
 let framing: Promise<Tokens | null> | null = null;
 let renewTimer: number | undefined;
 let leaving = false;
+// Bumped by every sign-out, so a renewal or frame sign-in that began before it can't keep tokens after it.
+let generation = 0;
 const listeners = new Set<(tokens: Tokens | null) => void>();
 const signedOutListeners = new Set<() => void>();
 const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel(CHANNEL_NAME);
@@ -125,7 +127,9 @@ const channel = typeof BroadcastChannel === 'undefined' ? null : new BroadcastCh
 // Signing out in one tab signs every tab out: each revokes its own refresh token, which the
 // WIdP-DP would not revoke for it.
 channel?.addEventListener('message', (event: MessageEvent) => {
-  if (event.data !== SIGNED_OUT || !current) return;
+  if (event.data !== SIGNED_OUT) return;
+  generation++;
+  if (!current) return;
   void revoke(current);
   store(null);
   signedOutListeners.forEach((listener) => listener());
@@ -197,6 +201,16 @@ function store(tokens: Tokens | null) {
   }
   if (tokens) schedule(tokens);
   listeners.forEach((listener) => listener(tokens));
+}
+
+/** Stores tokens fetched since gen, unless this tab signed out in between: then it revokes them instead. */
+function keep(tokens: Tokens, gen: number): Tokens {
+  if (gen !== generation) {
+    void revoke(tokens);
+    throw new SignInError('signed_out');
+  }
+  store(tokens);
+  return tokens;
 }
 
 function schedule(tokens: Tokens) {
@@ -370,6 +384,7 @@ function signInInFrame(): Promise<Tokens | null> {
 
 async function joinInFrame(): Promise<Tokens | null> {
   if (leaving) return null;
+  const gen = generation;
   const tx: SignInTransaction = { state: randomString(), nonce: randomString(), verifier: randomString(), returnTo: '/', silent: true, scope: await requestedScopes() };
   const url = await authorizationUrl(tx);
 
@@ -398,9 +413,7 @@ async function joinInFrame(): Promise<Tokens | null> {
   const query = await answer;
   if (!query || query.get('error')) return null;
   try {
-    const tokens = await exchange(query, tx);
-    store(tokens);
-    return tokens;
+    return keep(await exchange(query, tx), gen);
   } catch {
     return null;
   }
@@ -479,19 +492,17 @@ export function renew(): Promise<Tokens> {
 async function refresh(): Promise<Tokens> {
   const refreshToken = current?.refreshToken;
   if (!refreshToken) return rejoin();
+  const gen = generation;
   try {
-    const tokens = fromResponse(await tokenRequest({ grant_type: 'refresh_token', refresh_token: refreshToken }), current);
-    store(tokens);
-    return tokens;
+    return keep(fromResponse(await tokenRequest({ grant_type: 'refresh_token', refresh_token: refreshToken }), current), gen);
   } catch (error) {
-    if (error instanceof SignInError && !error.retryable) {
-      // The refresh token is spent; the WIdP-DP's own session may still sign this tab back in.
-      const tokens = await signInInFrame();
-      if (tokens) return tokens;
-      store(null);
-      return signIn({ silent: true });
-    }
-    throw error;
+    if (gen !== generation || !(error instanceof SignInError) || error.retryable) throw error;
+    // The refresh token is spent; the WIdP-DP's own session may still sign this tab back in.
+    const tokens = await signInInFrame();
+    if (tokens) return tokens;
+    if (gen !== generation) throw new SignInError('signed_out');
+    store(null);
+    return signIn({ silent: true });
   }
 }
 
@@ -517,6 +528,7 @@ export function onSignedOut(listener: () => void): () => void {
 
 /** Signs every tab out, then ends the WIdP-DP's session, which would otherwise sign them back in. */
 export async function signOut(): Promise<void> {
+  generation++;
   window.clearTimeout(renewTimer);
   channel?.postMessage(SIGNED_OUT);
   const tokens = current;
