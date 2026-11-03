@@ -55,6 +55,13 @@ export interface MiConfig {
   envVarsGroupIsSecret: boolean;
   /** The `mi-secrets` group exists but is not stored as a secret, so the editor leaves it alone. */
   secretsGroupIsPlain: boolean;
+  /**
+   * Keys set by the environment's other env-var groups (e.g. made on Configs & Secrets),
+   * each mapped to its group's name. A key can belong to one group only, so MI can't
+   * add these. Keys MI already has are left out: a clash saved before the BFF checked
+   * for one still saves.
+   */
+  otherGroupKeys: Record<string, string>;
 }
 
 /** The editor's result: secrets with a blank `value` keep their stored value. */

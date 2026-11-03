@@ -31,6 +31,8 @@ import { EndpointCard } from '../EndpointCard';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 
+// No Certificate Mount step, unlike ConfigureDrawer: certificate mounts are not wired
+// to the BFF yet (api/configuration.ts reads none and saves nothing), so it would be empty.
 const STEPS = ['Configurations', 'Endpoints'];
 
 interface Row {
@@ -120,11 +122,16 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     }),
     [envVars, secrets],
   );
-  const storedSecrets = useMemo(() => secrets.filter((s) => s.stored).map((s) => s.key), [secrets]);
+  // From the latest fetch, not the rows seeded on open: a secret removed elsewhere since
+  // (e.g. on Configs & Secrets) has no value to keep, so its row needs a new one.
+  const storedSecrets = useMemo(() => {
+    const current = new Set(data?.secrets ?? []);
+    return secrets.filter((s) => s.stored && current.has(s.key)).map((s) => s.key);
+  }, [secrets, data]);
   // Rows hidden because their group is of the wrong kind are never saved, so they are not validated.
   const envVarsHidden = !!data?.envVarsGroupIsSecret;
   const secretsHidden = !!data?.secretsGroupIsPlain;
-  const errors = useMemo(() => validateMiConfigDraft({ envVars: envVarsHidden ? [] : draft.envVars, secrets: secretsHidden ? [] : draft.secrets }, storedSecrets), [draft, storedSecrets, envVarsHidden, secretsHidden]);
+  const errors = useMemo(() => validateMiConfigDraft({ envVars: envVarsHidden ? [] : draft.envVars, secrets: secretsHidden ? [] : draft.secrets }, storedSecrets, data?.otherGroupKeys), [draft, storedSecrets, data, envVarsHidden, secretsHidden]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
 
@@ -158,7 +165,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     if (!plan) return;
     save.mutate(plan, {
       onSuccess: () => {
-        onClose();
+        handleClose();
         onSaved?.();
       },
       onError: (err) => setSaveError(err instanceof Error ? err.message : 'Failed to save the configurations.'),

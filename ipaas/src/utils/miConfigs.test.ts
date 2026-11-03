@@ -34,6 +34,7 @@ describe('toMiConfig', () => {
       legacySecrets: ['TOKEN'],
       envVarsGroupIsSecret: false,
       secretsGroupIsPlain: false,
+      otherGroupKeys: {},
     });
   });
 
@@ -52,9 +53,14 @@ describe('toMiConfig', () => {
     expect(toMiConfig(groups, {})).toMatchObject({ secrets: ['TOKEN'], legacySecrets: [] });
   });
 
-  it('ignores groups made on the Configs & Secrets page', () => {
+  it('reads groups made on the Configs & Secrets page only as keys MI cannot add', () => {
     const groups = [group('db-settings', false, ['DB_URL']), group('db-creds', true, ['DB_PASSWORD'])];
-    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: [], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false });
+    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: [], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: { DB_URL: 'db-settings', DB_PASSWORD: 'db-creds' } });
+  });
+
+  it('lists the keys of a wrong-kind mi- group as other keys, but not keys MI already has', () => {
+    const groups = [group(MI_ENV_VARS_GROUP, true, ['HOST']), group(MI_SECRETS_GROUP, true, ['TOKEN']), group('shared', false, ['TOKEN', 'URL'])];
+    expect(toMiConfig(groups, {}).otherGroupKeys).toEqual({ HOST: MI_ENV_VARS_GROUP, URL: 'shared' });
   });
 
   it('ignores secret groups that only look like MI ones', () => {
@@ -81,7 +87,7 @@ describe('isMiManagedGroup', () => {
 
 describe('miConfigCount', () => {
   it('counts env vars and secrets', () => {
-    expect(miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false })).toBe(3);
+    expect(miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {} })).toBe(3);
   });
 });
 
@@ -103,6 +109,18 @@ describe('validateMiConfigDraft', () => {
     expect(errors.get('secret:0')).toMatch(/more than once/);
   });
 
+  it('rejects a Ballerina config env var name', () => {
+    const errors = validateMiConfigDraft({ envVars: [{ key: 'BAL_CONFIG_FILES', value: 'x' }], secrets: [{ key: 'BAL_CONFIG_VAR_X', value: 's' }] }, []);
+    expect(errors.get('env:0')).toMatch(/reserved for Ballerina/);
+    expect(errors.get('secret:0')).toMatch(/reserved for Ballerina/);
+  });
+
+  it('rejects a key another config sets', () => {
+    const errors = validateMiConfigDraft({ envVars: [{ key: 'DB_URL', value: 'x' }], secrets: [{ key: 'OK', value: 's' }] }, [], { DB_URL: 'db-settings' });
+    expect(errors.get('env:0')).toBe('"DB_URL" is already set by the "db-settings" config.');
+    expect(errors.has('secret:0')).toBe(false);
+  });
+
   it('requires a value for a new secret', () => {
     const errors = validateMiConfigDraft({ envVars: [], secrets: [{ key: 'TOKEN', value: '' }] }, []);
     expect(errors.get('secret:0')).toMatch(/Enter a value/);
@@ -110,7 +128,7 @@ describe('validateMiConfigDraft', () => {
 });
 
 // A stored MI configuration; secrets are in mi-secrets unless listed in `legacySecrets`.
-const cfg = (c: Partial<MiConfig>): MiConfig => ({ envVars: [], secrets: [], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, ...c });
+const cfg = (c: Partial<MiConfig>): MiConfig => ({ envVars: [], secrets: [], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {}, ...c });
 const env = (e: Record<string, string>) => Object.entries(e).map(([key, value]) => ({ key, value }));
 // The plan's writes, one line each.
 const writesOf = (plan: MiConfigSavePlan): string[] => plan.writes.map((w) => (w.kind === 'delete' ? `delete ${w.group}` : `put ${w.group} ${JSON.stringify(w.data)}${w.keep ? ` keep ${w.keep.join(',')}` : ''}`));

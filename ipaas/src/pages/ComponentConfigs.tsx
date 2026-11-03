@@ -66,6 +66,9 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
   // groups: an edit here could be undone by the drawer's next save, or break its reads.
   const isMi = runtimeFromDisplayType(comp?.displayType ?? '') === 'mi';
   const managedByMi = (r: ConfigRow): boolean => isMi && r.kind === 'envVars' && isMiManagedGroup({ name: r.name, sensitive: r.isSecret, keys: r.keys });
+  // Keys of the env-var groups other than the one being edited (MI Configure's included):
+  // a key can belong to one group only.
+  const otherGroupKeys = (editing?: ConfigRow): Map<string, string> => new Map(rows.filter((r) => r.kind === 'envVars' && r.name !== editing?.name).flatMap((r) => r.keys.map((k): [string, string] => [k, r.name])));
 
   const del = useDeleteConfig(projectId, trackId);
   const [view, setView] = useState<View>({ kind: 'list' });
@@ -153,9 +156,9 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
         ) : trackId === undefined ? null : !releaseId || !containerId ? (
           <Alert severity="info">Deploy this integration to the selected environment to manage its configs and secrets.</Alert>
         ) : view.kind === 'create' ? (
-          <ConfigEditor ctx={ctx} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
+          <ConfigEditor ctx={ctx} otherGroupKeys={otherGroupKeys()} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
         ) : view.kind === 'edit' ? (
-          <ConfigEditor ctx={ctx} existing={view.row} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
+          <ConfigEditor ctx={ctx} existing={view.row} otherGroupKeys={otherGroupKeys(view.row)} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
         ) : (
           <>
             {loadingMounts ? (

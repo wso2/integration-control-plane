@@ -17,7 +17,7 @@
  */
 
 import type { EnvGroup, MiConfig, MiConfigDraft, MiConfigSavePlan, MiConfigWrite } from '../types/envGroups';
-import { validateConfigKey } from './devopsConfigs';
+import { keyInOtherGroupError, validateConfigKey } from './devopsConfigs';
 
 /**
  * MI reads `${configs.x}` from environment variables, so its configuration is a
@@ -62,12 +62,20 @@ export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, stri
     .map((g) => g.keys[0])
     .filter((key) => !grouped.has(key))
     .sort();
+  const secrets = [...grouped, ...legacySecrets].sort();
+  const own = new Set([...envVars.map((e) => e.key), ...secrets]);
+  const otherGroupKeys: Record<string, string> = {};
+  groups
+    .filter((g) => !isMiManagedGroup(g))
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .forEach((g) => g.keys.filter((key) => !own.has(key) && !(key in otherGroupKeys)).forEach((key) => (otherGroupKeys[key] = g.name)));
   return {
     envVars,
-    secrets: [...grouped, ...legacySecrets].sort(),
+    secrets,
     legacySecrets,
     envVarsGroupIsSecret: groups.some((g) => g.name === MI_ENV_VARS_GROUP && g.sensitive),
     secretsGroupIsPlain: groups.some((g) => g.name === MI_SECRETS_GROUP && !g.sensitive),
+    otherGroupKeys,
   };
 }
 
@@ -77,16 +85,17 @@ export const miConfigCount = (config: MiConfig): number => config.envVars.length
 /**
  * Validates a draft. Returns an error per row key (`env:<i>` / `secret:<i>`);
  * an empty map means the draft can be saved. `storedSecrets` are the secrets
- * that already exist, whose value may stay blank (unchanged).
+ * that already exist, whose value may stay blank (unchanged). `otherGroupKeys` are
+ * keys other env-var groups set (`MiConfig.otherGroupKeys`), which MI can't use.
  */
-export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: string[]): Map<string, string> {
+export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: string[], otherGroupKeys: Record<string, string> = {}): Map<string, string> {
   const errors = new Map<string, string>();
   // Every row of a duplicated key is flagged, not just the later one: the row the user
   // is typing in may be the earlier one (an env var clashing with a stored secret).
   const uses = new Map<string, number>();
   [...draft.envVars, ...draft.secrets].forEach(({ key }) => uses.set(key, (uses.get(key) ?? 0) + 1));
   const check = (id: string, key: string) => {
-    const keyErr = validateConfigKey(key);
+    const keyErr = validateConfigKey(key) || keyInOtherGroupError(key, new Map(Object.entries(otherGroupKeys)));
     if (keyErr) errors.set(id, keyErr);
     else if ((uses.get(key) ?? 0) > 1) errors.set(id, `'${key}' is defined more than once.`);
   };

@@ -21,7 +21,7 @@ import { ArrowLeft, Eye, EyeOff, Trash2, Upload } from '@wso2/oxygen-ui-icons-re
 import BusyFields from '../common/BusyFields';
 import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { useConfigMapDetails, useSaveConfig } from '../../hooks/useDevopsConfigs';
-import { parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
+import { keyInOtherGroupError, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
 import type { ConfigKind, ConfigRow } from '../../types/devopsConfigs';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import * as styles from './ConfigEditor.styles';
@@ -41,6 +41,8 @@ interface ConfigEditorProps {
   ctx: EditorContext;
   /** When set, edit an existing config/secret instead of creating one. */
   existing?: ConfigRow;
+  /** Keys set by the component's other env-var groups, each mapped to its group's name. */
+  otherGroupKeys?: ReadonlyMap<string, string>;
   onBack: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
@@ -79,8 +81,10 @@ function TypeCard({ title, description, selected, disabled, onSelect }: { title:
   );
 }
 
+const NO_KEYS: ReadonlyMap<string, string> = new Map();
+
 /** The "Create a Config or Secret" form — env-var set or file mount, optionally a secret. */
-export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }: ConfigEditorProps): JSX.Element {
+export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, onBack, onSaved, onError }: ConfigEditorProps): JSX.Element {
   const isEdit = !!existing;
   const save = useSaveConfig(ctx.projectId, ctx.deploymentTrackId);
   const configId = existing ? (existing.mount.configmap_id ?? existing.mount.secret_id ?? '') : '';
@@ -113,7 +117,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
 
   // An edit keeps the group's stored name, so only a new env-var group is held to the reserved prefix.
   const nameErr = !isEdit && kind === 'envVars' ? validateNewEnvGroupName(name) : validateDisplayName(name);
-  const draftKeyErr = draftKey ? validateConfigKey(draftKey) : '';
+  const draftKeyErr = draftKey ? validateConfigKey(draftKey) || keyInOtherGroupError(draftKey.trim(), otherGroupKeys) : '';
   const pathErr = validateMountPath(mountPath);
   // A key/value typed but not yet added is saved with the rest, as if Add was clicked,
   // instead of being dropped silently.
@@ -154,7 +158,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   })();
 
   const addRow = () => {
-    const keyErr = validateConfigKey(draftKey);
+    const keyErr = validateConfigKey(draftKey) || keyInOtherGroupError(draftKey.trim(), otherGroupKeys);
     if (keyErr) {
       setDraftError(keyErr);
       return;
@@ -188,9 +192,12 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const importEnvFile = (file: File) => {
     void file.text().then((text) => {
       const parsed = parseDotEnv(text).filter((p) => !validateConfigKey(p.key));
+      // A key another config already sets is left out, and said so: the save would be rejected.
+      const taken = parsed.filter((p) => otherGroupKeys.has(p.key));
+      setDraftError(taken.length ? `Not imported, already set by another config: ${taken.map((p) => p.key).join(', ')}.` : '');
       setRows((prev) => {
         const existingKeys = new Set(prev.map((r) => r.key));
-        return [...prev, ...parsed.filter((p) => !existingKeys.has(p.key))];
+        return [...prev, ...parsed.filter((p) => !existingKeys.has(p.key) && !otherGroupKeys.has(p.key))];
       });
     });
   };
@@ -252,7 +259,8 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
         </Stack>
 
         <FormControlLabel control={<Checkbox size="small" checked={isSecret} disabled={isEdit} onChange={(e) => setIsSecret(e.target.checked)} />} label="Mark as a Secret" sx={{ mb: 1 }} />
-        <TextField labelPlacement="top" label="Display Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
+        {/* An env-var group's name is its ID: the BFF keeps the stored name, so a rename would revert. */}
+        <TextField labelPlacement="top" label="Display Name" value={name} onChange={(e) => setName(e.target.value)} disabled={isEdit && kind === 'envVars'} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
 
         {kind === 'envVars' ? (
           <Box>
