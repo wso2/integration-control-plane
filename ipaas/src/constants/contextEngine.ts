@@ -361,7 +361,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'google-calendar',
     name: 'Google Calendar',
-    description: 'Events of one calendar, backfilled and kept in sync by incremental sync.',
+    description: 'Events from one calendar, kept in sync.',
     category: 'collaboration',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}google-calendar.svg`,
@@ -372,7 +372,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...G('Connection', ...GOOGLE_AUTH),
       ...G(
         'Data to sync',
-        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '"primary" for the connected account’s own calendar, or a calendar ID (an email-shaped address, including group and holiday calendars).' }),
+        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '"primary" for the connected account’s calendar, or another calendar’s ID.' }),
         F('eventTypes', 'Event Types', 'text', { defaultValue: 'default, outOfOffice', helper: 'Comma-separated. Any of: default, outOfOffice, focusTime, workingLocation, birthday, fromGmail.' }),
         F('includePrivateEvents', 'Private Events', 'select', {
           defaultValue: 'false',
@@ -380,7 +380,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
             { value: 'false', label: 'Exclude' },
             { value: 'true', label: 'Include' },
           ],
-          helper: 'Private and confidential events. When excluded, an event made private later is removed from the engine.',
+          helper: 'When excluded, an event made private later is removed.',
         }),
       ),
       ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.' })),
@@ -792,11 +792,11 @@ export const UPLOAD_POLL_MS = 3000;
 /** How often the "14 min so far" texts are refreshed. */
 export const ELAPSED_TICK_MS = 30_000;
 
-/** After this long on the engine, a file's row says that big files take long, so the wait does not look like a hang. */
+/** After this long on the engine, a file's row says that large files take long, so the wait does not look like a hang. */
 export const UPLOAD_SLOW_AFTER_MS = 2 * 60_000;
 
 /** The engine reads every file with its language model, so the time grows with the file. Seen: 3.4 MB of JSON took 58 minutes. */
-export const UPLOAD_SLOW_NOTE = 'Big files take long: a 3 MB file can take about an hour.';
+export const UPLOAD_SLOW_NOTE = 'Large files can take an hour or more.';
 /** Status reads in flight at once from one browser, so a restored list of files does not flood the engine. */
 export const UPLOAD_CHECK_CONCURRENCY = 4;
 

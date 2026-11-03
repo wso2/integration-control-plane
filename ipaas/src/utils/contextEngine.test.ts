@@ -118,10 +118,11 @@ import {
   toCreateInput,
   toSourceRegistration,
   queuedUploadText,
+  uploadSourceTitle,
   uploadIsSlow,
 } from './contextEngine';
 import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
-import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress, UploadFileStatus } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
 import type { EmbeddingConfig } from '../types/ragIngestion';
@@ -800,7 +801,7 @@ describe('source progress', () => {
     // Inside the store's write the engine has no position: one file alone gets no number.
     const writing = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [{ ...mapping, phase: 'indexing', done: null }], bytes: { delivered: 1000, finished: 0 } } });
     expect(sourceProgressValue(writing)).toBeNull();
-    expect(sourceProgressDetail(writing)).toMatch(/osgi_extraction.json: writing 3,129 items to the knowledge store$/);
+    expect(sourceProgressDetail(writing)).toMatch(/osgi_extraction.json: indexing 3,129 items$/);
     // Many files: finished bytes plus the running file's share, over everything delivered.
     const batch = progress({ processing: { total: 4, succeeded: 2, running: 1, queued: 1, percent: 50, inProgress: [{ ...mapping, done: 3129 }], bytes: { delivered: 4000, finished: 2000 } } });
     expect(sourceProgressValue(batch)).toBe(75);
@@ -1213,7 +1214,7 @@ describe('upload and processing time texts', () => {
   it('says what the engine is doing with a queued file and for how long', () => {
     expect(queuedUploadText({ uploadedAt, running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph · 14 min so far');
     expect(queuedUploadText({ uploadedAt }, at(0))).toBe('Uploaded · waiting for the engine to start on it · under a minute so far');
-    expect(queuedUploadText({ uploadedAt, retrying: true, running: true }, at(14))).toBe('Running again on the engine from the file it already has · nothing was uploaded.');
+    expect(queuedUploadText({ uploadedAt, retrying: true, running: true }, at(14))).toBe('Running again from the stored file.');
     // A row remembered without a usable time still says what is happening.
     expect(queuedUploadText({ uploadedAt: 'bad', running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph');
   });
@@ -1222,5 +1223,22 @@ describe('upload and processing time texts', () => {
     expect(uploadIsSlow({ uploadedAt }, at(1))).toBe(false);
     expect(uploadIsSlow({ uploadedAt }, at(2))).toBe(true);
     expect(uploadIsSlow({ uploadedAt: 'bad' }, at(60))).toBe(false);
+  });
+});
+
+describe('uploadSourceTitle', () => {
+  const of = (...statuses: UploadFileStatus[]) => statuses.map((status) => ({ status }));
+
+  it('counts the files the engine has while the rest upload', () => {
+    expect(uploadSourceTitle(of('queued', 'uploading', 'uploading'), 'Docs')).toBe('Uploading 3 files to “Docs” · 1 of 3 sent');
+  });
+
+  it('says the files are sent once the engine has them all, while it still indexes them', () => {
+    expect(uploadSourceTitle(of('queued', 'indexing', 'searchable'), 'Docs')).toBe('3 files sent to “Docs” · indexing');
+  });
+
+  it('says how many failed once nothing is running', () => {
+    expect(uploadSourceTitle(of('searchable', 'failed'), 'Docs')).toBe('2 files uploaded to “Docs” · 1 failed');
+    expect(uploadSourceTitle(of('searchable'), 'Docs')).toBe('1 file uploaded to “Docs”');
   });
 });

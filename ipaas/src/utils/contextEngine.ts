@@ -644,8 +644,8 @@ function processingValue(p: SourceProgress): number | null {
 }
 
 /**
- * What a running delivery is doing, in words: "mapping items 1,200 of 3,129", "writing to the
- * knowledge store", and inside that write the provider's own steps: "reading the text 1.2 MB of
+ * What a running delivery is doing, in words: "mapping items 1,200 of 3,129", "indexing",
+ * and inside that step the provider's own steps: "reading the text 1.2 MB of
  * 2.9 MB" (the model's read, in bytes; no total for a PDF, whose text is shorter than the file),
  * "merging nodes 8,000 of 15,904", "merging edges 20,000 of 48,375", "embedding 1,200 of 17,660".
  */
@@ -658,7 +658,7 @@ export function recordPhaseText(item: RecordProgress): string {
     case 'mapping':
       return item.done !== null && item.total !== null ? `mapping items ${count(item.done)} of ${count(item.total)}` : 'mapping items';
     case 'indexing':
-      return item.total !== null ? `writing ${count(item.total)} items to the knowledge store` : 'writing to the knowledge store';
+      return item.total !== null ? `indexing ${count(item.total)} items` : 'indexing';
     case 'extracting':
       if (item.done === null) return 'reading the text';
       return item.total !== null ? `reading the text ${formatBytes(item.done)} of ${formatBytes(item.total)}` : `reading the text, ${formatBytes(item.done)} so far`;
@@ -1041,7 +1041,7 @@ export function isUploadActive(entry: Pick<UploadEntry, 'status'>): boolean {
 
 /** The caption under a queued file's bar: what the engine is doing with it, and for how long. */
 export function queuedUploadText(entry: Pick<UploadEntry, 'retrying' | 'running' | 'uploadedAt'>, now: number): string {
-  if (entry.retrying) return 'Running again on the engine from the file it already has · nothing was uploaded.';
+  if (entry.retrying) return 'Running again from the stored file.';
   const elapsed = formatElapsed(entry.uploadedAt, now);
   const soFar = elapsed ? ` · ${elapsed} so far` : '';
   return entry.running ? `Uploaded · the engine is reading it with its language model and adding it to the graph${soFar}` : `Uploaded · waiting for the engine to start on it${soFar}`;
@@ -1051,6 +1051,20 @@ export function queuedUploadText(entry: Pick<UploadEntry, 'retrying' | 'running'
 export function uploadIsSlow(entry: Pick<UploadEntry, 'uploadedAt'>, now: number): boolean {
   const start = Date.parse(entry.uploadedAt);
   return !Number.isNaN(start) && now - start >= UPLOAD_SLOW_AFTER_MS;
+}
+
+/**
+ * The setup card's line for one upload source. A file counts once the engine has it: indexing can
+ * take far longer than the upload, so while it runs the line says the files are sent.
+ */
+export function uploadSourceTitle(entries: Pick<UploadEntry, 'status'>[], sourceName: string): string {
+  const files = plural(entries.length, 'file');
+  if (!entries.some(isUploadActive)) {
+    const failed = entries.filter((e) => e.status === 'failed').length;
+    return `${files} uploaded to “${sourceName}”${failed ? ` · ${failed} failed` : ''}`;
+  }
+  const sent = entries.filter((e) => e.status !== 'uploading').length;
+  return sent < entries.length ? `Uploading ${files} to “${sourceName}” · ${sent} of ${entries.length} sent` : `${files} sent to “${sourceName}” · indexing`;
 }
 
 /** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */
