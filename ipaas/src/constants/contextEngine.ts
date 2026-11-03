@@ -691,6 +691,9 @@ export const CONTEXT_ENGINE_RULES_KEY_PREFIX = 'contextEngine:rules:';
 /** The default for uploads: anyone who can query the engine can find the files. */
 export const EVERYONE_VISIBILITY: FileVisibility = { kind: 'everyone' };
 
+/** Choosing roles per source or file is turned off for now, so everything is shared with everyone who can query the engine. */
+export const ROLE_VISIBILITY_ENABLED = false;
+
 /** Suggested questions offered in an empty Playground; `{source}` is replaced by a source name. */
 export const PLAYGROUND_SUGGESTIONS = ['Summarize what is in {source}', 'What should a new team member read first?', 'Which documents mention rate limits or quotas?'];
 

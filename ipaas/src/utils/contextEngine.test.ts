@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
   audienceMappingFromRules,
@@ -77,6 +77,8 @@ import {
   connectorCountsByCategory,
   effectiveLlm,
   fromDraft,
+  effectiveVisibility,
+  summarizeSourceVisibility,
   getStartedSteps,
   isFormDirty,
   isGraphUri,
@@ -121,6 +123,25 @@ import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecor
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
 import type { EmbeddingConfig } from '../types/ragIngestion';
+
+// The role path stays tested while choosing roles is turned off, so the switch is read through a getter the tests can flip.
+const roleSwitch = vi.hoisted(() => ({ on: false }));
+vi.mock('../constants/contextEngine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../constants/contextEngine')>()),
+  get ROLE_VISIBILITY_ENABLED() {
+    return roleSwitch.on;
+  },
+}));
+
+/** Run `check` with choosing roles turned on, as before it was switched off. */
+function withRoleVisibility(check: () => void): void {
+  roleSwitch.on = true;
+  try {
+    check();
+  } finally {
+    roleSwitch.on = false;
+  }
+}
 
 const embedding: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'sk-test', azureApiVersion: '', azureBaseUrl: '' };
 
@@ -203,7 +224,7 @@ describe('source validation', () => {
     // Every source defaults to "everyone who can query"; only an empty "only some roles" choice is incomplete.
     const drive = withValues('gdrive', { folderId: 'abc', clientId: 'c', clientSecret: 's', refreshToken: 'r' });
     expect(sourceIncompleteReason(drive)).toBe('');
-    expect(sourceIncompleteReason({ ...drive, stagedVisibility: { kind: 'roles', roles: [] } })).toBe('Choose who can see this content');
+    withRoleVisibility(() => expect(sourceIncompleteReason({ ...drive, stagedVisibility: { kind: 'roles', roles: [] } })).toBe('Choose who can see this content'));
   });
 
   it('rejects empty and duplicate names', () => {
@@ -219,7 +240,7 @@ describe('source validation', () => {
     expect(sourcesStepBlocker([a])).toBeNull();
     expect(sourcesStepBlocker([a, upload()])).toBe('Give each source a unique name');
     expect(sourcesStepBlocker([a, withValues('github', {}, 'Platform docs')])).toBe('Complete “Platform docs” to continue');
-    expect(sourcesStepBlocker([a, { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Second'), stagedVisibility: { kind: 'roles', roles: [] } }])).toBe('Complete “Second” to continue');
+    withRoleVisibility(() => expect(sourcesStepBlocker([a, { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Second'), stagedVisibility: { kind: 'roles', roles: [] } }])).toBe('Complete “Second” to continue'));
     expect(isSourcesStepValid([a, upload('Second')])).toBe(true);
   });
 
@@ -895,10 +916,12 @@ describe('file uploads', () => {
       { group: 'viewer', role: 'viewer' },
     ]);
     // An upload allows every granted role; a connector's audience comes from its own visibility.
-    const sources = withSourceVisibilityRules([upload('Files'), withValues('gdrive', { folderId: 'abc', apiKey: 'k' }), { ...withValues('gdrive', { folderId: 'x', apiKey: 'y' }), stagedVisibility: { kind: 'roles', roles: ['viewer'] } }], ['admin']);
-    expect(sources[0].audience).toEqual([{ group: 'admin', role: 'admin' }]);
-    expect(sources[1].audience).toEqual([{ group: 'admin', role: 'admin' }]);
-    expect(sources[2].audience).toEqual([{ group: 'viewer', role: 'viewer' }]);
+    withRoleVisibility(() => {
+      const sources = withSourceVisibilityRules([upload('Files'), withValues('gdrive', { folderId: 'abc', apiKey: 'k' }), { ...withValues('gdrive', { folderId: 'x', apiKey: 'y' }), stagedVisibility: { kind: 'roles', roles: ['viewer'] } }], ['admin']);
+      expect(sources[0].audience).toEqual([{ group: 'admin', role: 'admin' }]);
+      expect(sources[1].audience).toEqual([{ group: 'admin', role: 'admin' }]);
+      expect(sources[2].audience).toEqual([{ group: 'viewer', role: 'viewer' }]);
+    });
     expect(visibilityError({ kind: 'roles', roles: [] })).toBe('Choose at least one role');
     expect(visibilityError({ kind: 'everyone' })).toBe('');
   });
@@ -928,10 +951,12 @@ describe('file uploads', () => {
     const everyone = ['admin', 'developer', 'viewer'];
     const drive = { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Drive'), stagedVisibility: { kind: 'roles' as const, roles: ['viewer'] } };
     const files = { ...upload('Files'), stagedVisibility: { kind: 'everyone' as const } };
-    // Files shared with everyone cover every role; the drive is shared only with viewer.
-    expect(sharingMismatches([drive, files], ['developer'], everyone, ['admin'])).toEqual({ seeNothing: [], cannotQuery: ['viewer'], hiddenFromMe: ['Drive'] });
-    // With only the connector, Developer can query but sees nothing.
-    expect(sharingMismatches([drive], ['developer', 'viewer'], everyone, ['viewer'])).toEqual({ seeNothing: ['developer'], cannotQuery: [], hiddenFromMe: [] });
+    withRoleVisibility(() => {
+      // Files shared with everyone cover every role; the drive is shared only with viewer.
+      expect(sharingMismatches([drive, files], ['developer'], everyone, ['admin'])).toEqual({ seeNothing: [], cannotQuery: ['viewer'], hiddenFromMe: ['Drive'] });
+      // With only the connector, Developer can query but sees nothing.
+      expect(sharingMismatches([drive], ['developer', 'viewer'], everyone, ['viewer'])).toEqual({ seeNothing: ['developer'], cannotQuery: [], hiddenFromMe: [] });
+    });
   });
 
   it('maps record status to a file status', () => {
@@ -946,9 +971,16 @@ describe('file uploads', () => {
     });
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_model_unavailable' })).detail).toBe('The engine could not reach its model provider. Retry the file later.');
     expect(uploadStatusFromRecord(record({ indexState: 'not_indexed' })).status).toBe('stored');
+    withRoleVisibility(() =>
+      expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
+        status: 'held',
+        detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
+      }),
+    );
+    // Changing who can see a file is hidden while roles are turned off, so the message does not point to it.
     expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
       status: 'held',
-      detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
+      detail: "The source has no rule for this file's roles yet, so nobody can see it.",
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
     expect(summarizeUploads([])).toBe('No files yet');
@@ -973,8 +1005,10 @@ describe('file uploads', () => {
 
   it('blocks a File Upload source whose staged files lack a role choice or their bytes', () => {
     const src: ContextSourceConfig = { ...upload('Files'), staged: [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedVisibility: { kind: 'roles', roles: [] } };
-    expect(stagedBlocker(src)).toBe('Choose who can see the files');
-    expect(isSourceValid(src)).toBe(false);
+    withRoleVisibility(() => {
+      expect(stagedBlocker(src)).toBe('Choose who can see the files');
+      expect(isSourceValid(src)).toBe(false);
+    });
     const labelled: ContextSourceConfig = { ...src, stagedVisibility: { kind: 'everyone' } };
     expect(stagedBlocker(labelled)).toBe('Re-add 1 file');
     expect(sourceIncompleteReason(labelled)).toBe('Re-add 1 file');
@@ -995,6 +1029,30 @@ describe('file uploads', () => {
     // A draft saved with the old label falls back to everyone who can query.
     const old = JSON.stringify({ v: 1, savedAt: 'x', form: { ...form, sources: [{ ...upload('Files'), staged, stagedLabel: 'eng' }] } });
     expect(fromDraft(old)!.form.sources[0].stagedVisibility).toEqual({ kind: 'everyone' });
+  });
+
+  it('shares everything with everyone who can query while choosing roles is turned off', async () => {
+    const actual = await vi.importActual<typeof import('../constants/contextEngine')>('../constants/contextEngine');
+    expect(actual.ROLE_VISIBILITY_ENABLED).toBe(false);
+    const roles = { kind: 'roles' as const, roles: ['viewer'] };
+    expect(effectiveVisibility(roles, false)).toEqual({ kind: 'everyone' });
+    expect(effectiveVisibility(undefined, false)).toEqual({ kind: 'everyone' });
+    expect(effectiveVisibility(roles, true)).toEqual(roles);
+    expect(effectiveVisibility(undefined, true)).toEqual({ kind: 'everyone' });
+
+    // A restored draft that still holds a role choice registers and validates as everyone.
+    const everyone = ['admin', 'developer', 'viewer'];
+    const drive = { ...withValues('gdrive', { folderId: 'abc', clientId: 'c', clientSecret: 's', refreshToken: 'r' }, 'Drive'), stagedVisibility: roles };
+    const [registered] = withSourceVisibilityRules([drive], everyone);
+    expect(registered.audience).toEqual(uploadSourceRules(everyone));
+    expect(summarizeSourceVisibility(drive)).toBe('Everyone who can query');
+    expect(sharingMismatches([drive], ['developer'], everyone, ['admin'])).toEqual({ seeNothing: [], cannotQuery: [], hiddenFromMe: [] });
+    const empty: ContextSourceConfig = { ...upload('Files'), staged: [{ id: 'f9', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedVisibility: { kind: 'roles', roles: [] } };
+    putStagedFile('f9', new Blob(['# a']));
+    expect(stagedBlocker(empty)).toBe('');
+    expect(isSourceValid(empty)).toBe(true);
+    expect(sourceIncompleteReason({ ...drive, stagedVisibility: { kind: 'roles', roles: [] } })).toBe('');
+    dropStagedFile('f9');
   });
 
   it('offers the upload step first on an engine that only has an upload source', () => {

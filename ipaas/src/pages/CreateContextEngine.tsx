@@ -22,8 +22,20 @@ import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngineDraft, useContextEngines, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
-import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
-import { checkStagedFile, engineDescriptionError, engineMessage, engineNameError, isFormDirty, modelsStepBlocker, sourcesStepBlocker, storageStepBlocker, toCreateInput, visibilityTags, withSourceVisibilityRules } from '../utils/contextEngine';
+import {
+  checkStagedFile,
+  effectiveVisibility,
+  engineDescriptionError,
+  engineMessage,
+  engineNameError,
+  isFormDirty,
+  modelsStepBlocker,
+  sourcesStepBlocker,
+  storageStepBlocker,
+  toCreateInput,
+  visibilityTags,
+  withSourceVisibilityRules,
+} from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -134,7 +146,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           });
           staged.forEach((m) => dropStagedFile(m.id));
           if (files.length === 0) continue;
-          const visibility = source.stagedVisibility ?? EVERYONE_VISIBILITY;
+          const visibility = effectiveVisibility(source.stagedVisibility);
           startUploads(id, sourceId, files, visibility, visibilityTags(visibility, everyone));
           uploads.push({ sourceId, name: source.name.trim() });
         }
