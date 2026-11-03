@@ -27,7 +27,7 @@ import { useSyncExternalStore } from 'react';
 import { PLAYGROUND_TURNS_MAX } from '../constants/contextEngine';
 import type { ContextQueryMode, PlaygroundConversation, PlaygroundTurn } from '../types/contextEngine';
 
-const EMPTY: PlaygroundConversation = { turns: [], mode: 'context' };
+const EMPTY: PlaygroundConversation = { turns: [] };
 const conversations = new Map<string, PlaygroundConversation>();
 const listeners = new Set<() => void>();
 

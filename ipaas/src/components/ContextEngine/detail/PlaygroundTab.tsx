@@ -95,7 +95,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const [params, setSearchParams] = useSearchParams();
   const { markAsked } = useAskedFlag(engine.id);
   // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
-  const { turns, mode } = usePlaygroundConversation(engine.id);
+  const { turns, mode = 'context' } = usePlaygroundConversation(engine.id);
   const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
   const principal = useContextPrincipal();
   const groups = principal.data?.groups ?? [];

@@ -833,7 +833,8 @@ export interface PlaygroundTurn {
 
 export interface PlaygroundConversation {
   turns: PlaygroundTurn[];
-  mode: ContextQueryMode;
+  /** The mode the user chose; unset until they choose one, so the tab picks its own default. */
+  mode?: ContextQueryMode;
 }
 
 /** Router state a passage page is opened with, so its Back returns to where the reader came from. */

@@ -128,10 +128,19 @@ function setEntries(sourceId: string, next: UploadEntry[]): void {
 }
 
 function patchEntry(sourceId: string, recordId: string, patch: Partial<UploadEntry>): void {
+  // A row given a new status has moved on, so a status read that could not reach the engine no longer describes it.
+  const next = 'status' in patch && !('check' in patch) ? { ...patch, check: undefined } : patch;
   setEntries(
     sourceId,
-    entriesOf(sourceId).map((e) => (e.recordId === recordId ? { ...e, ...patch } : e)),
+    entriesOf(sourceId).map((e) => (e.recordId === recordId ? { ...e, ...next } : e)),
   );
+}
+
+/** Start a new attempt for a file: pending reads and timers for the earlier one must not touch it. */
+function newAttempt(key: string): void {
+  clearTimer(key);
+  checkAttempts.delete(key);
+  generations.set(key, (generations.get(key) ?? 0) + 1);
 }
 
 function clearTimer(key: string): void {
@@ -341,6 +350,8 @@ function ensureSourceRules(sourceId: string, tags: string[]): Promise<void> {
  * its bytes are gone, so the caller sends the file itself if it still has it.
  */
 async function retryOnEngine(engineId: string, sourceId: string, recordId: string, jobId: string): Promise<boolean> {
+  const key = entryKey(sourceId, recordId);
+  newAttempt(key);
   patchEntry(sourceId, recordId, { status: 'queued', progress: 100, detail: undefined, forbidden: false, jobId, retrying: true });
   try {
     await retryContextJob(jobId);
@@ -357,7 +368,7 @@ async function retryOnEngine(engineId: string, sourceId: string, recordId: strin
         return true;
       }
       if (job.state !== 'failed') {
-        await watchJob(engineId, sourceId, recordId, jobId);
+        await trackCheck(key, () => watchJob(engineId, sourceId, recordId, jobId));
         return true;
       }
       patchEntry(sourceId, recordId, { retrying: false });
@@ -368,7 +379,7 @@ async function retryOnEngine(engineId: string, sourceId: string, recordId: strin
     return true;
   }
   persist(sourceId);
-  await watchJob(engineId, sourceId, recordId, jobId);
+  await trackCheck(key, () => watchJob(engineId, sourceId, recordId, jobId));
   return true;
 }
 
@@ -383,9 +394,7 @@ function enqueue(engineId: string, sourceId: string, file: FileToUpload, audienc
   const recordId = file.name;
   const key = entryKey(sourceId, recordId);
   // A status check still pending for the file this one replaces must not touch it.
-  clearTimer(key);
-  checkAttempts.delete(key);
-  generations.set(key, (generations.get(key) ?? 0) + 1);
+  newAttempt(key);
   pendingBytes.set(key, file);
   const queue = queues.get(sourceId) ?? [];
   queues.set(sourceId, queue);
@@ -399,7 +408,7 @@ function enqueue(engineId: string, sourceId: string, file: FileToUpload, audienc
           // choice stays the new one: it names the same audience, in the words just chosen.
           pendingBytes.delete(key);
           const fresh = entriesOf(sourceId).find((e) => e.recordId === recordId);
-          patchEntry(sourceId, recordId, { ...previous, ...(fresh ? { visibility: fresh.visibility, label: fresh.label } : {}), progress: 100, detail: isUploadActive(previous) ? undefined : UNCHANGED_DETAIL });
+          patchEntry(sourceId, recordId, { ...previous, ...(fresh ? { visibility: fresh.visibility, label: fresh.label } : {}), progress: 100, check: undefined, detail: isUploadActive(previous) ? undefined : UNCHANGED_DETAIL });
           persist(sourceId);
           if (isUploadActive(previous)) await follow(engineId, sourceId, recordId);
           return;
@@ -505,9 +514,10 @@ export async function removeUpload(engineId: string, sourceId: string, recordId:
 export async function changeUploadVisibility(engineId: string, sourceId: string, recordId: string, visibility: FileVisibility, audience: string[]): Promise<void> {
   await ensureSourceRules(sourceId, audience);
   const handle = await sendContextRecordEvent({ engineId, sourceId, recordId, operation: 'acl_changed', audience, version: String(Date.now()) });
+  const key = entryKey(sourceId, recordId);
+  newAttempt(key);
   patchEntry(sourceId, recordId, { visibility, audience, label: undefined, status: 'queued', detail: undefined, jobId: handle.jobId });
   persist(sourceId);
-  const key = entryKey(sourceId, recordId);
   timers.set(
     key,
     window.setTimeout(() => void trackCheck(key, () => watchJob(engineId, sourceId, recordId, handle.jobId)), UPLOAD_POLL_MS),
