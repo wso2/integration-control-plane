@@ -16,15 +16,13 @@
  * under the License.
  */
 
-import { Box, IconButton, Typography } from '@wso2/oxygen-ui';
+import { Box, ButtonBase, IconButton, Typography } from '@wso2/oxygen-ui';
 import { Maximize2, Minus, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import type { Graph as CosmosGraph, GraphConfig } from '@cosmos.gl/graph';
 import type { CosmosBuffers, LinkTag, Selection } from '../../../utils/contextGraph';
-import { linkTagSx } from './graphStyles';
+import { canvasNoteSx, linkTagSx } from './graphStyles';
 
-/** How often the camera refits while the layout is still moving, in milliseconds. */
-const FOLLOW_EVERY = 450;
 /** How far the camera zooms in to frame a selection, so two close points never fill the canvas. */
 const FRAME_MAX_ZOOM = 8;
 const FRAME_PADDING = 0.25;
@@ -32,7 +30,49 @@ const FRAME_PADDING = 0.25;
 const FRAME_LINK_PX = 150;
 /** Which link counts as "nearer": this share of the way up the sorted distances. */
 const FRAME_LINK_RANK = 0.25;
+/**
+ * The layout's forces (see the config below), checked on screenshots of a
+ * made-up graph of 1 to 12 documents. The pull to a cluster's centre is
+ * `CLUSTER_FORCE` times the point's own strength times its distance, with no
+ * other factor, while the pull to the middle of the space is a tenth of
+ * `GRAVITY` times the distance; so a small cluster force is already a firm one,
+ * and ten times this value folds each group into a tight ball. Points push
+ * apart by `REPULSION` over their distance. The layout runs `DECAY` ticks, one
+ * per frame, and is all but still after a third of them.
+ */
+const CLUSTER_FORCE = 0.03;
+const REPULSION = 1.5;
+const GRAVITY = 0.02;
+const LINK_DISTANCE = 14;
+const LINK_SPRING = 0.7;
+const FRICTION = 0.8;
+const DECAY = 1200;
+/**
+ * The layout runs out of sight, many steps per frame, and is shown once its
+ * energy (cosmos.gl's alpha, from 1 down to 0.001 over `DECAY` ticks) is below
+ * this: by then the groups have formed, and what is left is a slow creep of
+ * every point. A slow machine shows it after `ARRANGE_MAX_MS` whatever the energy.
+ */
+const SETTLE_ALPHA = 0.03;
+const ARRANGE_MAX_MS = 8000;
+/** How much of a frame the off-screen steps may take, so the page stays responsive meanwhile. */
+const ARRANGE_FRAME_BUDGET_MS = 14;
+/** A redrawn graph that kept most of its points runs with this much energy, so the new points find a place without the rest leaving theirs far behind. */
+const PARTIAL_ALPHA = 0.3;
+/**
+ * Where each point of a layout ended up, by node key, kept per `layoutKey`
+ * across redraws and across the Graph tab being closed and opened again, so the
+ * graph is not laid out from scratch each time and a point stays where the
+ * reader last saw it, or left it by dragging.
+ */
+const layoutMemory = new Map<string, Map<string, Point>>();
 const NO_TAGS: LinkTag[] = [];
+/** The reading-direction motion on a selected relationship: dots travel from subject to object. */
+const FLOW_PERIOD_MS = 1800;
+const FLOW_DOTS = 3;
+const FLOW_RADIUS = 2.2;
+
+type Point = [number, number];
 
 interface CosmosCanvasProps {
   buffers: CosmosBuffers;
@@ -51,9 +91,10 @@ interface CosmosCanvasProps {
   /** Points that get a label over the canvas, drawn by `renderLabel` at the point's screen position, first the ones that matter most. */
   labels: number[];
   renderLabel: (index: number) => ReactNode;
-  /** Short texts drawn at the middle of a link, such as the relationship a fact names. */
+  /** Short texts drawn at the middle of a link, such as the relationship a fact names. With `onSelectLink`, each is a button that selects its link. */
   linkTags?: LinkTag[];
   onSelect: (index: number | null) => void;
+  onSelectLink?: (link: number) => void;
   onHover?: (index: number | null) => void;
   /** Accent for hover and focus rings, as a hex colour. */
   accent: string;
@@ -62,6 +103,8 @@ interface CosmosCanvasProps {
   ariaLabel: string;
   /** Drawn over the canvas: the legend in the bottom-left corner, or a note across the middle. */
   children?: ReactNode;
+  /** Names the layout whose places are remembered between redraws and mounts, such as the engine's id. */
+  layoutKey?: string;
 }
 
 type Rect = [number, number, number, number];
@@ -71,7 +114,7 @@ type Rect = [number, number, number, number];
  * graph is first drawn, so its WebGL code stays out of every other page. The
  * canvas draws points and links from flat buffers; labels and link tags are
  * ordinary DOM placed over the points it tracks, because the library draws
- * none and so they stay readable, selectable and reachable by keyboard. Their
+ * none and so they stay readable, clickable and reachable by keyboard. Their
  * positions are set straight on the elements once per frame, so React does
  * not render on every tick of the simulation. A browser without WebGL gets a
  * short note instead.
@@ -88,37 +131,53 @@ export default function CosmosCanvas({
   renderLabel,
   linkTags = NO_TAGS,
   onSelect,
+  onSelectLink,
   onHover,
   accent,
   height,
   ariaLabel,
   children,
+  layoutKey,
 }: CosmosCanvasProps): JSX.Element {
   const hostRef = useRef<HTMLDivElement>(null);
+  // A plain 2D canvas over the WebGL one, for the motion that shows which way a relationship reads.
+  const flowRef = useRef<HTMLCanvasElement>(null);
   const graphRef = useRef<CosmosGraph | null>(null);
   const frameRef = useRef<number | null>(null);
   const labelRefs = useRef(new Map<number, HTMLDivElement>());
   const tagRefs = useRef(new Map<number, HTMLDivElement>());
   const linksRef = useRef(buffers.links);
   linksRef.current = buffers.links;
-  // cosmos.gl reads point positions from a GPU buffer it only creates once there are points, so
-  // fitting or framing an empty graph throws; the camera is left alone until something is drawn.
-  const hasPointsRef = useRef(buffers.positions.length > 0);
-  hasPointsRef.current = buffers.positions.length > 0;
-  const followRef = useRef<number | null>(null);
-  // Set once the reader zooms or drags: the camera then stops following the layout.
+  // Set once the reader zooms or drags: the camera is then theirs, and is not fitted again by itself.
   const userMovedRef = useRef(false);
   const framePointsRef = useRef(frame);
   framePointsRef.current = frame;
   const fitToRef = useRef(fitTo);
   fitToRef.current = fitTo;
-  // A focus that arrives while the layout is still moving is framed once it settles.
-  const pendingFrameRef = useRef<number | null>(null);
+  // How many points the graph holds right now. The library makes its position texture only once it has
+  // a point, and reading positions back before then throws, so the camera is never fitted to no points.
+  const pointCountRef = useRef(0);
+  // A framing that arrives while the layout is still moving is run once it settles.
+  const pendingFrameRef = useRef<(() => void) | null>(null);
+  // The layout's current energy, and whether it is being arranged out of sight (see `SETTLE_ALPHA`).
+  const alphaRef = useRef(0);
+  const arrangingRef = useRef(false);
+  const [arranging, setArranging] = useState(false);
+  // The frame request of the off-screen arranging, so it can be stopped.
+  const arrangeFrameRef = useRef<number | null>(null);
+  // The node key of each point drawn now, in point order, and whether the library has drawn a frame
+  // with them: positions read back before that are the previous points', under the wrong keys.
+  const keysRef = useRef<string[]>([]);
+  const placesFreshRef = useRef(false);
+  const layoutKeyRef = useRef(layoutKey);
+  layoutKeyRef.current = layoutKey;
   const lastFocusRef = useRef<number | null>(null);
+  // Whether the last selection was framed as a set, with no focused point, such as a link.
+  const lastFramedRef = useRef(false);
   const focusedRef = useRef(focused);
   focusedRef.current = focused;
-  const handlers = useRef({ onSelect, onHover });
-  handlers.current = { onSelect, onHover };
+  const handlers = useRef({ onSelect, onSelectLink, onHover });
+  handlers.current = { onSelect, onSelectLink, onHover };
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
 
@@ -133,6 +192,12 @@ export default function CosmosCanvas({
       const graph = graphRef.current;
       const host = hostRef.current;
       if (!graph || !host) return;
+      // While the layout is arranged out of sight, nothing is placed over it.
+      if (arrangingRef.current) {
+        labelRefs.current.forEach((el) => (el.style.visibility = 'hidden'));
+        tagRefs.current.forEach((el) => (el.style.visibility = 'hidden'));
+        return;
+      }
       const tracked = graph.getTrackedPointPositionsMap();
       const { clientWidth, clientHeight } = host;
       const screen = (index: number): [number, number] | null => {
@@ -191,10 +256,12 @@ export default function CosmosCanvas({
       // A tag sits at the middle of its link, or further along it, or a little beside it, whichever is free first.
       const links = linksRef.current;
       for (const { link, el, w, h } of measuredTags) {
-        const a = screen(links[link * 2]);
-        const b = screen(links[link * 2 + 1]);
+        const spaceA = tracked.get(links[link * 2]);
+        const spaceB = tracked.get(links[link * 2 + 1]);
         let shown = false;
-        if (a && b) {
+        if (spaceA && spaceB) {
+          const a = graph.spaceToScreenPosition(spaceA);
+          const b = graph.spaceToScreenPosition(spaceB);
           const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
           const nx = -(b[1] - a[1]) / len;
           const ny = (b[0] - a[0]) / len;
@@ -215,10 +282,34 @@ export default function CosmosCanvas({
     });
   }, []);
 
-  const stopFollowing = useCallback(() => {
-    if (followRef.current !== null) window.clearInterval(followRef.current);
-    followRef.current = null;
+  /** The points' places right now, by node key; empty when the canvas has none to read. */
+  const livePlaces = useCallback((): Map<string, Point> => {
+    const graph = graphRef.current;
+    const places = new Map<string, Point>();
+    if (!graph || !pointCountRef.current || !placesFreshRef.current) return places;
+    try {
+      const all = graph.getPointPositions();
+      keysRef.current.forEach((key, i) => {
+        const x = all[i * 2];
+        const y = all[i * 2 + 1];
+        if (Number.isFinite(x) && Number.isFinite(y)) places.set(key, [x, y]);
+      });
+    } catch {
+      // The library has no positions yet; there is nothing to remember.
+    }
+    return places;
   }, []);
+
+  /** Keep where the points are now, for the next redraw or mount of this layout. */
+  const rememberLayout = useCallback(() => {
+    const key = layoutKeyRef.current;
+    if (!key) return;
+    const places = livePlaces();
+    if (!places.size) return;
+    const kept = layoutMemory.get(key) ?? new Map<string, Point>();
+    places.forEach((place, node) => kept.set(node, place));
+    layoutMemory.set(key, kept);
+  }, [livePlaces]);
 
   // The whole graph, or the points given to fit, brought into view. A small set of points is not
   // blown up to fill the canvas: the padding grows so the zoom stays within half the framing cap,
@@ -227,7 +318,8 @@ export default function CosmosCanvas({
     const graph = graphRef.current;
     const host = hostRef.current;
     const to = fitToRef.current;
-    if (!graph || !hasPointsRef.current) return;
+    // With no points there is nothing to fit, and fitView would read positions the library never made.
+    if (!graph || !pointCountRef.current) return;
     if (!to || !to.length || !host) {
       graph.fitView(duration, 0.15, true);
       return;
@@ -243,57 +335,113 @@ export default function CosmosCanvas({
     graph.fitViewByPointIndices(to, duration, padding, true);
   }, []);
 
-  // While the simulation lays the graph out, refit the camera a little at a time so the view
-  // grows with it instead of jumping; a reader who zooms or drags takes over.
-  const follow = useCallback(() => {
-    stopFollowing();
-    userMovedRef.current = false;
-    fitAll(FOLLOW_EVERY);
-    followRef.current = window.setInterval(() => {
-      const graph = graphRef.current;
-      if (!graph || userMovedRef.current || !graph.isSimulationRunning) {
-        stopFollowing();
-        return;
-      }
-      fitAll(FOLLOW_EVERY);
-    }, FOLLOW_EVERY);
-  }, [stopFollowing, fitAll]);
-
   // Frame the focused point with its companions: close enough that the nearer links between them can
   // carry their text, or enough to fit them all when they are near, and never beyond the cap. Far
   // companions may leave the canvas; the fit button brings everything back.
-  const frameFocus = useCallback(
-    (index: number) => {
-      const graph = graphRef.current;
-      const host = hostRef.current;
-      if (!graph || !host || !hasPointsRef.current) return;
-      userMovedRef.current = true;
-      stopFollowing();
-      const points = framePointsRef.current && framePointsRef.current.length ? framePointsRef.current : [index];
-      const all = graph.getPointPositions();
-      const at = (i: number): [number, number] | null => {
-        const x = all[i * 2];
-        const y = all[i * 2 + 1];
-        return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : null;
+  const frameFocus = useCallback((index: number) => {
+    const graph = graphRef.current;
+    const host = hostRef.current;
+    if (!graph || !host || !pointCountRef.current) return;
+    userMovedRef.current = true;
+    const points = framePointsRef.current && framePointsRef.current.length ? framePointsRef.current : [index];
+    const all = graph.getPointPositions();
+    const at = (i: number): [number, number] | null => {
+      const x = all[i * 2];
+      const y = all[i * 2 + 1];
+      return Number.isFinite(x) && Number.isFinite(y) ? [x, y] : null;
+    };
+    const centre = at(index);
+    const others = points
+      .filter((i) => i !== index)
+      .map(at)
+      .filter((p): p is [number, number] => !!p);
+    let zoom = FRAME_MAX_ZOOM;
+    if (centre && others.length) {
+      const distances = others.map(([x, y]) => Math.hypot(x - centre[0], y - centre[1])).sort((a, b) => a - b);
+      const typical = Math.max(distances[Math.floor((distances.length - 1) * FRAME_LINK_RANK)], 1e-6);
+      const spanX = Math.max(...others.map((p) => Math.abs(p[0] - centre[0])), 1e-6);
+      const spanY = Math.max(...others.map((p) => Math.abs(p[1] - centre[1])), 1e-6);
+      const room = 1 - 2 * FRAME_PADDING;
+      const fitAllZoom = Math.min((host.clientWidth * room) / 2 / spanX, (host.clientHeight * room) / 2 / spanY);
+      zoom = Math.min(FRAME_MAX_ZOOM, Math.max(FRAME_LINK_PX / typical, fitAllZoom));
+    }
+    graph.zoomToPointByIndex(index, 600, zoom, true, true);
+  }, []);
+
+  // Frame a set of points with no focused one among them, such as the two ends of a selected link:
+  // close enough that the nearer distances between them give a link room for its text, or enough
+  // to fit them all, and never beyond the cap. The fit takes its zoom from its padding alone, so the
+  // padding is worked out to give that zoom.
+  const frameSet = useCallback((points: number[]) => {
+    const graph = graphRef.current;
+    const host = hostRef.current;
+    if (!graph || !host || !points.length) return;
+    userMovedRef.current = true;
+    const all = graph.getPointPositions();
+    const at = points.map((i): Point => [all[i * 2], all[i * 2 + 1]]).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+    if (!at.length) return;
+    const xs = at.map((p) => p[0]);
+    const ys = at.map((p) => p[1]);
+    const spanX = Math.max(Math.max(...xs) - Math.min(...xs), 1e-6);
+    const spanY = Math.max(Math.max(...ys) - Math.min(...ys), 1e-6);
+    const distances = at.flatMap((a, i) => at.slice(i + 1).map((b) => Math.hypot(b[0] - a[0], b[1] - a[1]))).sort((a, b) => a - b);
+    const typical = Math.max(distances[Math.floor((distances.length - 1) * FRAME_LINK_RANK)] ?? 1e-6, 1e-6);
+    const room = 1 - 2 * FRAME_PADDING;
+    const fitAllZoom = Math.min((host.clientWidth * room) / spanX, (host.clientHeight * room) / spanY);
+    const zoom = Math.min(FRAME_MAX_ZOOM, Math.max(FRAME_LINK_PX / typical, fitAllZoom));
+    const padding = Math.min(0.46, Math.max(0, (1 - zoom * Math.max(spanX / host.clientWidth, spanY / host.clientHeight)) / 2));
+    graph.fitViewByPointIndices(points, 600, padding, true);
+  }, []);
+
+  // The layout has come to rest: its places are kept, a framing that waited for it is run, or the
+  // camera fits the whole picture once unless the reader has taken it over. Called by the library
+  // when a run ends, and by hand for a redraw that had nothing to run.
+  const settled = useCallback(() => {
+    rememberLayout();
+    const pending = pendingFrameRef.current;
+    pendingFrameRef.current = null;
+    if (pending) pending();
+    // Fitted at once, not glided to: the picture is still, and so is the camera.
+    else if (!userMovedRef.current) fitAll(0);
+    scheduleLabels();
+  }, [rememberLayout, fitAll, scheduleLabels]);
+
+  const stopArranging = useCallback(() => {
+    if (arrangeFrameRef.current !== null) window.cancelAnimationFrame(arrangeFrameRef.current);
+    arrangeFrameRef.current = null;
+    arrangingRef.current = false;
+    setArranging(false);
+  }, []);
+
+  /**
+   * Run the layout out of sight, as many steps per frame as the budget allows, until it has
+   * settled (see `SETTLE_ALPHA`) or `ARRANGE_MAX_MS` have passed; then `done`. The library's
+   * own loop is paused, so these are the only steps, and nothing of the run is seen: the graph
+   * appears still, instead of spreading and drifting across the canvas for seconds.
+   */
+  const arrange = useCallback(
+    (graph: CosmosGraph, done: () => void) => {
+      stopArranging();
+      graph.pause();
+      arrangingRef.current = true;
+      setArranging(true);
+      const started = performance.now();
+      const run = () => {
+        arrangeFrameRef.current = null;
+        if (graphRef.current !== graph) return;
+        const frameStart = performance.now();
+        do {
+          graph.step();
+          if (alphaRef.current < SETTLE_ALPHA || performance.now() - started > ARRANGE_MAX_MS) {
+            done();
+            return;
+          }
+        } while (performance.now() - frameStart < ARRANGE_FRAME_BUDGET_MS);
+        arrangeFrameRef.current = window.requestAnimationFrame(run);
       };
-      const centre = at(index);
-      const others = points
-        .filter((i) => i !== index)
-        .map(at)
-        .filter((p): p is [number, number] => !!p);
-      let zoom = FRAME_MAX_ZOOM;
-      if (centre && others.length) {
-        const distances = others.map(([x, y]) => Math.hypot(x - centre[0], y - centre[1])).sort((a, b) => a - b);
-        const typical = Math.max(distances[Math.floor((distances.length - 1) * FRAME_LINK_RANK)], 1e-6);
-        const spanX = Math.max(...others.map((p) => Math.abs(p[0] - centre[0])), 1e-6);
-        const spanY = Math.max(...others.map((p) => Math.abs(p[1] - centre[1])), 1e-6);
-        const room = 1 - 2 * FRAME_PADDING;
-        const fitAllZoom = Math.min((host.clientWidth * room) / 2 / spanX, (host.clientHeight * room) / 2 / spanY);
-        zoom = Math.min(FRAME_MAX_ZOOM, Math.max(FRAME_LINK_PX / typical, fitAllZoom));
-      }
-      graph.zoomToPointByIndex(index, 600, zoom, true, true);
+      arrangeFrameRef.current = window.requestAnimationFrame(run);
     },
-    [stopFollowing],
+    [stopArranging],
   );
 
   useEffect(() => {
@@ -313,7 +461,10 @@ export default function CosmosCanvas({
           scalePointsOnZoom: false,
           pointGreyoutOpacity: 0.12,
           linkGreyoutOpacity: 0.06,
+          // Relationships carry an arrow at the object end (see `CosmosBuffers.arrows`); the other
+          // lines have no direction, so none by default.
           linkDefaultArrows: false,
+          linkArrowsSizeScale: 0.8,
           renderHoveredPointRing: true,
           hoveredPointRingColor: accent,
           focusedPointRingColor: accent,
@@ -322,39 +473,50 @@ export default function CosmosCanvas({
           enableZoom: true,
           // The camera is fitted by hand, following the simulation.
           fitViewOnInit: false,
+          // Points are placed, never glided: the library would otherwise animate every redraw for
+          // 800 ms, which reads as the graph moving by itself.
+          transitionDuration: 0,
           fitViewPadding: 0.15,
           // Fading long links keeps a dense graph readable without hiding its structure.
           linkVisibilityMinTransparency: 0.15,
-          // Gentle forces and quick damping: the layout spreads out once and settles instead of swinging.
-          simulationRepulsion: 0.3,
-          simulationLinkDistance: 12,
-          simulationLinkSpring: 0.7,
-          simulationGravity: 0.3,
-          simulationFriction: 0.8,
-          simulationDecay: 2500,
+          // Each document and the entities it names are pulled gently to a centre of their own, spread
+          // over the space (see `clusterLayout`), so the canvas fills evenly instead of knotting in the
+          // middle. Points push apart firmly and are hardly pulled to the middle at all, so each group
+          // opens into a loose cloud; the friction settles it instead of letting it swing.
+          simulationCluster: CLUSTER_FORCE,
+          simulationRepulsion: REPULSION,
+          simulationGravity: GRAVITY,
+          simulationLinkDistance: LINK_DISTANCE,
+          simulationLinkSpring: LINK_SPRING,
+          simulationFriction: FRICTION,
+          simulationDecay: DECAY,
           simulationCollision: 1,
           simulationCollisionPadding: 1.5,
           onPointClick: (index) => handlers.current.onSelect(index),
           onBackgroundClick: () => handlers.current.onSelect(null),
           onPointMouseOver: (index) => handlers.current.onHover?.(index),
           onPointMouseOut: () => handlers.current.onHover?.(null),
-          onSimulationTick: scheduleLabels,
+          onSimulationTick: (alpha) => {
+            alphaRef.current = alpha;
+            scheduleLabels();
+          },
           onZoom: scheduleLabels,
+          // A reader who zooms or drags takes over: the follow stops at its next tick, and a frame
+          // waiting for the simulation to end is dropped, so the camera stays where the reader put it.
           onZoomStart: (_event, userDriven) => {
-            if (userDriven) userMovedRef.current = true;
+            if (userDriven) {
+              userMovedRef.current = true;
+              pendingFrameRef.current = null;
+            }
           },
           onDragStart: () => {
             userMovedRef.current = true;
+            pendingFrameRef.current = null;
           },
+          // A point the reader dragged stays where they left it, also after a redraw.
+          onDragEnd: rememberLayout,
           onTransition: scheduleLabels,
-          onSimulationEnd: () => {
-            stopFollowing();
-            if (pendingFrameRef.current !== null) {
-              frameFocus(pendingFrameRef.current);
-              pendingFrameRef.current = null;
-            } else if (!userMovedRef.current) fitAll(600);
-            scheduleLabels();
-          },
+          onSimulationEnd: settled,
         };
         graph = new Graph(host as HTMLDivElement, config as GraphConfig);
         graphRef.current = graph;
@@ -366,30 +528,83 @@ export default function CosmosCanvas({
       });
     return () => {
       cancelled = true;
-      stopFollowing();
+      stopArranging();
       if (frameRef.current !== null) window.cancelAnimationFrame(frameRef.current);
       frameRef.current = null;
+      // Closing the tab keeps the layout, so opening it again shows the same picture at once.
+      rememberLayout();
       graph?.destroy();
       graphRef.current = null;
       setReady(false);
     };
     // The canvas is built once; data and selection change through the effects below.
-  }, [accent, scheduleLabels, stopFollowing, fitAll, frameFocus]);
+  }, [accent, scheduleLabels, stopArranging, fitAll, rememberLayout, settled]);
 
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph || !ready) return;
-    graph.setPointPositions(buffers.positions, true);
+    // A point that was drawn before, here or in an earlier mount of this layout, keeps its place:
+    // only the points new to the picture start from their seeded spots. A graph that kept most of
+    // its points is not laid out from scratch again, and one that kept them all does not move at all.
+    rememberLayout();
+    const known = new Map<string, Point>(layoutKey ? layoutMemory.get(layoutKey) : undefined);
+    livePlaces().forEach((place, key) => known.set(key, place));
+    const positions = Float32Array.from(buffers.positions);
+    let kept = 0;
+    buffers.keys.forEach((key, i) => {
+      const place = known.get(key);
+      if (!place) return;
+      positions[i * 2] = place[0];
+      positions[i * 2 + 1] = place[1];
+      kept += 1;
+    });
+    const count = buffers.keys.length;
+    const fresh = kept < count / 2;
+    keysRef.current = buffers.keys;
+    pointCountRef.current = count;
+    placesFreshRef.current = false;
+    graph.setPointPositions(positions, true);
     graph.setPointColors(buffers.colors);
     graph.setPointSizes(buffers.sizes);
     graph.setPointShapes(buffers.shapes);
     graph.setLinks(buffers.links);
     graph.setLinkColors(buffers.linkColors);
     graph.setLinkWidths(buffers.linkWidths);
-    graph.render(1);
-    follow();
+    graph.setLinkArrows(buffers.arrows);
+    graph.setLinkStrength(buffers.linkStrengths);
+    // Every document's group has a centre of its own; a point in no group is left to the other forces.
+    graph.setPointClusters(buffers.clusters);
+    graph.setClusterPositions(buffers.clusterPositions);
+    graph.setPointClusterStrength(buffers.clusterStrengths);
+    const alpha = fresh ? 1 : kept === count ? 0 : PARTIAL_ALPHA;
+    // `render` takes the data and sets the energy; the steps themselves are run out of sight.
+    graph.render(alpha);
+    // The library draws the new points on its next frame; positions read back before then are stale.
+    const shown = (run: () => void) =>
+      window.requestAnimationFrame(() =>
+        window.requestAnimationFrame(() => {
+          if (graphRef.current !== graph || keysRef.current !== buffers.keys) return;
+          placesFreshRef.current = true;
+          run();
+        }),
+      );
+    if (alpha > 0 && count) {
+      arrange(graph, () => {
+        graph.render(0);
+        shown(() => {
+          stopArranging();
+          settled();
+        });
+      });
+    } else {
+      // Nothing to run: every point has its place, or there are none. The library's own loop is
+      // paused too, so it does not end a run of its own and settle this twice.
+      stopArranging();
+      graph.pause();
+      shown(settled);
+    }
     scheduleLabels();
-  }, [buffers, ready, follow, scheduleLabels]);
+  }, [buffers, ready, layoutKey, arrange, stopArranging, livePlaces, rememberLayout, settled, scheduleLabels]);
 
   useEffect(() => {
     const graph = graphRef.current;
@@ -404,9 +619,68 @@ export default function CosmosCanvas({
     const graph = graphRef.current;
     if (!graph || !ready) return;
     const ends = linkTags.flatMap((tag) => [buffers.links[tag.link * 2], buffers.links[tag.link * 2 + 1]]);
-    graph.trackPointPositionsByIndices([...new Set([...labels, ...ends])]);
+    // The selected relationships' ends too, so the reading-direction motion can place its dots.
+    const flowing = (selection?.links ?? []).filter((link) => buffers.arrows[link]).flatMap((link) => [buffers.links[link * 2], buffers.links[link * 2 + 1]]);
+    graph.trackPointPositionsByIndices([...new Set([...labels, ...ends, ...flowing])]);
     scheduleLabels();
-  }, [labels, linkTags, buffers, ready, scheduleLabels]);
+  }, [labels, linkTags, selection, buffers, ready, scheduleLabels]);
+
+  // Which way a selected relationship reads: small dots run from its subject to its object, on top
+  // of the arrow head, while something is selected. Arrows alone are easy to miss on a dense graph,
+  // and a reader who takes the object for the subject reads the fact backwards. Off when the reader
+  // asked the system for less motion; the arrows stay.
+  useEffect(() => {
+    const canvas = flowRef.current;
+    const graph = graphRef.current;
+    const host = hostRef.current;
+    if (!canvas || !graph || !host || !ready) return;
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    const clear = () => context.clearRect(0, 0, canvas.width, canvas.height);
+    const links = (selection?.links ?? []).filter((link) => buffers.arrows[link]);
+    const lessMotion = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!links.length || lessMotion) {
+      clear();
+      return;
+    }
+    const started = performance.now();
+    let frame = 0;
+    const draw = (now: number) => {
+      const dpr = window.devicePixelRatio || 1;
+      const width = Math.round(host.clientWidth * dpr);
+      const height = Math.round(host.clientHeight * dpr);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      clear();
+      const tracked = graph.getTrackedPointPositionsMap();
+      const phase = ((now - started) / FLOW_PERIOD_MS) % 1;
+      context.fillStyle = accent;
+      for (const link of links) {
+        const from = tracked.get(buffers.links[link * 2]);
+        const to = tracked.get(buffers.links[link * 2 + 1]);
+        if (!from || !to) continue;
+        const a = graph.spaceToScreenPosition(from);
+        const b = graph.spaceToScreenPosition(to);
+        for (let k = 0; k < FLOW_DOTS; k += 1) {
+          const along = (phase + k / FLOW_DOTS) % 1;
+          // Brighter towards the object end, so even a still frame reads in the right direction.
+          context.globalAlpha = 0.3 + 0.7 * along;
+          context.beginPath();
+          context.arc((a[0] + (b[0] - a[0]) * along) * dpr, (a[1] + (b[1] - a[1]) * along) * dpr, FLOW_RADIUS * dpr, 0, Math.PI * 2);
+          context.fill();
+        }
+      }
+      context.globalAlpha = 1;
+      frame = window.requestAnimationFrame(draw);
+    };
+    frame = window.requestAnimationFrame(draw);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      clear();
+    };
+  }, [selection, buffers, ready, accent]);
 
   const placeLabel = useCallback(
     (index: number, el: HTMLDivElement | null) => {
@@ -435,33 +709,40 @@ export default function CosmosCanvas({
     });
   }, [selection, focused, ready]);
 
+  // The camera follows the selection: a focused point is framed with its companions; a selection with
+  // no focused point, such as a link, is framed as a set; releasing either shows the whole graph again.
+  // The set's key changes only when it matters, so a node's changing neighbourhood does not refit.
+  const frameKey = focused === null && frame && frame.length ? frame.join(',') : '';
   useEffect(() => {
     const graph = graphRef.current;
     if (!graph || !ready) return;
-    const was = lastFocusRef.current;
+    const had = lastFocusRef.current !== null || lastFramedRef.current;
     lastFocusRef.current = focused;
-    if (focused !== null) {
-      // Still settling: frame it when the simulation ends, so the camera lands on the final layout.
-      if (graph.isSimulationRunning && followRef.current !== null) pendingFrameRef.current = focused;
-      else frameFocus(focused);
-    } else if (was !== null) {
+    lastFramedRef.current = frameKey !== '';
+    // Still being arranged out of sight: frame once it is shown, so the camera lands on the final layout.
+    const once = (run: () => void) => {
+      if (arrangingRef.current) pendingFrameRef.current = run;
+      else run();
+    };
+    if (focused !== null) once(() => frameFocus(focused));
+    else if (frameKey) once(() => frameSet(framePointsRef.current ?? []));
+    else if (had) {
       pendingFrameRef.current = null;
       userMovedRef.current = true;
-      stopFollowing();
       fitAll(600);
     }
-  }, [focused, ready, frameFocus, fitAll, stopFollowing]);
+  }, [focused, frameKey, ready, frameFocus, frameSet, fitAll]);
 
   const zoom = (factor: number) => {
     const graph = graphRef.current;
     if (!graph) return;
     userMovedRef.current = true;
-    stopFollowing();
+    pendingFrameRef.current = null;
     graph.setZoomLevel(graph.getZoomLevel() * factor, 250, true);
   };
   const fit = () => {
     userMovedRef.current = true;
-    stopFollowing();
+    pendingFrameRef.current = null;
     fitAll(400);
   };
 
@@ -482,7 +763,15 @@ export default function CosmosCanvas({
         backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(120,124,140,0.18) 1px, transparent 1.2px)',
         backgroundSize: '22px 22px',
       }}>
-      <Box ref={hostRef} sx={{ position: 'absolute', inset: 0, '& canvas': { display: 'block' } }} />
+      <Box ref={hostRef} sx={{ position: 'absolute', inset: 0, opacity: arranging ? 0 : 1, '& canvas': { display: 'block' } }} />
+      <Box component="canvas" ref={flowRef} aria-hidden sx={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', opacity: arranging ? 0 : 1 }} />
+      {arranging && !failed && (
+        <Box sx={canvasNoteSx}>
+          <Typography variant="caption" color="text.secondary">
+            Arranging the graph…
+          </Typography>
+        </Box>
+      )}
       {failed ? (
         <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 360 }}>
@@ -497,10 +786,21 @@ export default function CosmosCanvas({
             </Box>
           ))}
           {linkTags.map((tag) => (
-            <Box key={tag.link} ref={(el: HTMLDivElement | null) => placeTag(tag.link, el)} sx={floating}>
-              <Box sx={linkTagSx} title={tag.detail ?? tag.text}>
-                {tag.text}
-              </Box>
+            <Box key={tag.link} ref={(el: HTMLDivElement | null) => placeTag(tag.link, el)} sx={{ ...floating, '& > *': { pointerEvents: onSelectLink ? 'auto' : 'none' } }}>
+              {onSelectLink ? (
+                <ButtonBase
+                  onClick={() => handlers.current.onSelectLink?.(tag.link)}
+                  title={tag.detail ?? tag.text}
+                  aria-label={`${tag.text}: select this ${tag.tone === 'conflict' ? 'conflict' : 'relationship'}`}
+                  aria-pressed={!!tag.lit}
+                  sx={linkTagSx(tag.tone, tag.lit)}>
+                  {tag.text}
+                </ButtonBase>
+              ) : (
+                <Box sx={linkTagSx(tag.tone, tag.lit)} title={tag.detail ?? tag.text}>
+                  {tag.text}
+                </Box>
+              )}
             </Box>
           ))}
         </>

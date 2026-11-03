@@ -82,7 +82,7 @@ function UploadSource({ engineId, source }: { engineId: string; source: SetupUpl
               <Typography variant="body2" sx={{ flexGrow: 1, minWidth: 0 }} noWrap>
                 {e.name}
               </Typography>
-              {e.status === 'failed' && !e.jobId && (
+              {e.status === 'failed' && (
                 <Button size="small" variant="text" onClick={() => retryUpload(engineId, source.sourceId, e.recordId)}>
                   Retry
                 </Button>

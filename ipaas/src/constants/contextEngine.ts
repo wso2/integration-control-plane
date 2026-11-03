@@ -636,6 +636,7 @@ export const SOURCE_PROGRESS_LABEL: Record<SourceProgressStatus, string> = {
   indexing: 'Indexing',
   processed: 'Processed',
   attention: 'Processed with errors',
+  empty: 'Nothing stored',
 };
 
 export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'info' | 'success' | 'warning'> = {
@@ -645,6 +646,7 @@ export const SOURCE_PROGRESS_TONE: Record<SourceProgressStatus, 'default' | 'inf
   indexing: 'info',
   processed: 'success',
   attention: 'warning',
+  empty: 'default',
 };
 
 /** Progress polling: quick while any source is moving, slow otherwise so a sync started elsewhere still shows up. */
@@ -720,6 +722,15 @@ export const UPLOAD_CONCURRENCY = 3;
 
 /** How often an uploaded file's job and record are checked while it is still moving. */
 export const UPLOAD_POLL_MS = 3000;
+
+/** How often the "14 min so far" texts are refreshed. */
+export const ELAPSED_TICK_MS = 30_000;
+
+/** After this long on the engine, a file's row says that big files take long, so the wait does not look like a hang. */
+export const UPLOAD_SLOW_AFTER_MS = 2 * 60_000;
+
+/** The engine reads every file with its language model, so the time grows with the file. Seen: 3.4 MB of JSON took 58 minutes. */
+export const UPLOAD_SLOW_NOTE = 'Big files take long: a 3 MB file can take about an hour.';
 
 export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
   uploading: 'Uploading',

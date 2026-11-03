@@ -46,6 +46,21 @@ export function formatDateTime(value?: string | null): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString();
 }
 
+/**
+ * How long something has been going on, for a "14 min so far" text: "under a
+ * minute", "14 min", "1 h 2 min". Returns '' for an invalid or future start.
+ */
+export function formatElapsed(from: string, now: number): string {
+  const start = new Date(from).getTime();
+  if (Number.isNaN(start) || now < start) return '';
+  const minutes = Math.floor((now - start) / 60000);
+  if (minutes < 1) return 'under a minute';
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} h ${rest} min` : `${hours} h`;
+}
+
 /** Relative time (e.g. "3 days ago"). Returns '' for missing/invalid input. */
 export function formatDistanceToNow(dateStr: string): string {
   const time = new Date(dateStr).getTime();
