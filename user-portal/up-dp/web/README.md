@@ -47,7 +47,7 @@ script did not load; starting the session then reports the outage.
 | `src/components/` | Shared console pieces (`detail.tsx` drawers and section cards, `SchemaEditor`, `IntegrationHeader`) and one folder per kind |
 | `src/layouts/AppLayout.tsx` | The signed-in shell: Oxygen `AppShell`, header, sidebar, footer |
 | `src/paths.ts` | Every in-app URL |
-| `src/i18n/` | i18next set-up and the strings, one JSON file per area under `locales/<language>/` |
+| `src/i18n/` | The `t()` that reads the strings, and the strings, one JSON file per area under `locales/en/` |
 
 ## Sign-in
 
@@ -80,13 +80,11 @@ WSO2 Integration Platform wordmark on a light and on a dark background; one set 
 ## Languages
 
 Every string the SPA shows is in `src/i18n/locales/en/`, one JSON file per area, read with
-`t('<area>.<key>')` from react-i18next (`i18n.t` outside React). The keys are type-checked
-against the English files, so a missing or misspelt key fails `pnpm build`. Plurals use i18next's
-`_one`/`_other` suffixes, and dates, times and relative times are formatted with `Intl` in the
-portal's language.
+`t('<area>.<key>')` from `useTranslation()` in `src/i18n` (`i18n.t` outside React). The keys are
+type-checked against the English files, so a missing or misspelt key fails `pnpm build`. Plurals
+use `_one`/`_other` suffixes picked by `count`, and dates, times and relative times are formatted
+with `Intl` in English.
 
-The portal renders in the browser's language when it ships it, otherwise English; a
-`user-portal:language` entry in `localStorage` overrides the browser. To add a language, copy
-`locales/en/` to `locales/<tag>/`, translate the values, add it to `resources` in
-`src/i18n/index.ts`, and import cronstrue's locale for it (`cronstrue/locales/<tag>`) so
-automation schedules are described in it too.
+The portal ships English only. `src/i18n/index.ts` is a small stand-in for i18next, which is
+waiting on security review: it takes the same keys, `{{name}}` values, plurals and
+`returnObjects`, so bringing i18next back changes only that file and `package.json`.

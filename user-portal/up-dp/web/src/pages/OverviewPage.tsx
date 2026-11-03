@@ -20,7 +20,7 @@ import { Alert, Box, Button, Card, Grid, PageContent, PageTitle, Stack, Typograp
 import { ArrowRight, CircleCheckBig, PlugZap } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import { useNavigate } from 'react-router';
 import { useAuth, VIEW_SCOPES } from '../auth';
 import EmptyListing from '../components/EmptyListing';

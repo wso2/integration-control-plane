@@ -19,8 +19,7 @@
 import { Alert, Box, Chip, Collapse, Stack, Typography } from '@wso2/oxygen-ui';
 import { ChevronRight } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import i18n from '../../i18n';
+import i18n, { useTranslation } from '../../i18n';
 import type { StepAttempt, StepStatus, StepType } from '../../types/workflow';
 import { formatDateTime, formatDuration, humanize, plainName } from '../../utils/time';
 import { FailedIcon, InProgressIcon, SkippedIcon, SuccessIcon, WaitingIcon } from '../StatusIcons';

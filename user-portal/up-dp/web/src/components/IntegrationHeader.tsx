@@ -19,7 +19,7 @@
 import { MenuItem, Select, Stack, Typography } from '@wso2/oxygen-ui';
 import { GitBranch } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import { trackLabel } from '../hooks/useIntegrations';
 import type { DeploymentTrack, Integration } from '../types/portal';
 import IntegrationIcon from './IntegrationIcon';

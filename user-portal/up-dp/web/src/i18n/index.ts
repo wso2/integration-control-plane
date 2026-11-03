@@ -16,39 +16,75 @@
  * under the License.
  */
 
-import i18n from 'i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
-import { initReactI18next } from 'react-i18next';
 import en from './locales/en';
 
-/** Every language the portal ships, keyed by its BCP 47 tag. English is the source and the fallback. */
-export const resources = {
-  en: { translation: en },
-} as const;
+/*
+ * Reads the English strings with the subset of i18next's `t()` the SPA uses: `{{name}}` values,
+ * `_one`/`_other` plurals by `count`, and `returnObjects`. It stands in for i18next until that
+ * library clears security review; the call sites and the JSON keep i18next's shape, so putting
+ * it back changes only this file.
+ */
 
-/** A language picked for this browser; nothing in the portal sets it yet, so it wins over the browser's only when set by hand. */
-export const LANGUAGE_KEY = 'user-portal:language';
+type Strings = typeof en;
 
-void i18n
-  .use(LanguageDetector)
-  .use(initReactI18next)
-  .init({
-    resources,
-    fallbackLng: 'en',
-    supportedLngs: Object.keys(resources),
-    nonExplicitSupportedLngs: true,
-    interpolation: { escapeValue: false },
-    detection: { order: ['localStorage', 'navigator'], lookupLocalStorage: LANGUAGE_KEY, caches: [] },
-  });
+/** Every dotted path to a string, as in `workflow.steps.attempts`. */
+type Leaves<T, P extends string = ''> = {
+  [K in keyof T & string]: T[K] extends string ? `${P}${K}` : Leaves<T[K], `${P}${K}.`>;
+}[keyof T & string];
 
-document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
-i18n.on('languageChanged', () => {
-  document.documentElement.lang = i18n.resolvedLanguage ?? 'en';
-});
+/** Every dotted path to a group of strings, as in `integrations.detail.status`. */
+type Branches<T, P extends string = ''> = {
+  [K in keyof T & string]: T[K] extends string ? never : `${P}${K}` | Branches<T[K], `${P}${K}.`>;
+}[keyof T & string];
 
-/** The language the portal renders in, for `Intl` and cronstrue: always one in `resources`. */
-export function currentLanguage(): string {
-  return i18n.resolvedLanguage ?? 'en';
+type PluralSuffix = 'zero' | 'one' | 'two' | 'few' | 'many' | 'other';
+type WithoutPlural<K> = K extends `${infer Base}_${PluralSuffix}` ? Base : K;
+
+/** A key `t()` takes; a plural is read by its base key with a `count`. */
+export type TranslationKey = WithoutPlural<Leaves<Strings>>;
+export type TranslationGroup = Branches<Strings>;
+export type TranslationOptions = { count?: number } & Record<string, unknown>;
+
+const LANGUAGE = 'en';
+const plurals = new Intl.PluralRules(LANGUAGE);
+
+function lookup(path: string): unknown {
+  let node: unknown = en;
+  for (const part of path.split('.')) {
+    if (node === null || typeof node !== 'object') return undefined;
+    node = (node as Record<string, unknown>)[part];
+  }
+  return node;
 }
+
+function interpolate(text: string, values: TranslationOptions): string {
+  return text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, name: string) => (name in values ? String(values[name]) : match));
+}
+
+function t(key: TranslationKey, options?: TranslationOptions): string;
+function t<T = Record<string, string>>(key: TranslationGroup, options: TranslationOptions & { returnObjects: true }): T;
+function t(key: string, options: TranslationOptions & { returnObjects?: boolean } = {}): unknown {
+  if (options.returnObjects) return lookup(key);
+  let text = lookup(key);
+  if (typeof options.count === 'number') {
+    const plural = lookup(`${key}_${plurals.select(options.count)}`) ?? lookup(`${key}_other`);
+    if (typeof plural === 'string') text = plural;
+  }
+  return typeof text === 'string' ? interpolate(text, options) : key;
+}
+
+export type TFunction = typeof t;
+
+/** The same shape as react-i18next's hook, so components read strings as they did. */
+export function useTranslation(): { t: TFunction } {
+  return { t };
+}
+
+/** The language the portal renders in, for `Intl` and cronstrue. */
+export function currentLanguage(): string {
+  return LANGUAGE;
+}
+
+const i18n = { t };
 
 export default i18n;

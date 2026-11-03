@@ -17,7 +17,7 @@
  */
 
 import { Box, Card, CardActionArea, Divider, Stack, Typography } from '@wso2/oxygen-ui';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../../i18n';
 import type { Integration } from '../../types/portal';
 import IntegrationIcon from '../IntegrationIcon';
 import IntegrationStatus from './IntegrationStatus';

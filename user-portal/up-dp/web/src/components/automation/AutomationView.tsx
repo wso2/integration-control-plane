@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Card, CardContent, CircularProgress, Divider, IconButton, ListingTable, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { CalendarClock, Hand, Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../../i18n';
 import { TRIGGER_SCOPE, useAuth } from '../../auth';
 import { latestTrack, useDeployment, useExecutions, useTriggerExecution } from '../../hooks/useIntegrations';
 import type { Execution, ExecutionStatus, Integration } from '../../types/portal';

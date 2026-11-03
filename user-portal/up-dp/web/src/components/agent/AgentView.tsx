@@ -19,10 +19,9 @@
 import { Alert, Avatar, Box, Button, CircularProgress, IconButton, InputBase, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, Copy, SendHorizontal, Sparkles, SquarePen, User } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { usePortalConfig } from '../../config/portalConfig';
 import { useAgentChat, type ChatMessage } from '../../hooks/useAgentChat';
-import { currentLanguage } from '../../i18n';
+import { currentLanguage, useTranslation } from '../../i18n';
 import type { Integration } from '../../types/portal';
 import IntegrationHeader, { PILL_SELECT_SX, TrackSelect } from '../IntegrationHeader';
 import Markdown from '../Markdown';

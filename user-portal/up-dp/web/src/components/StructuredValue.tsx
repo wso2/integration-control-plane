@@ -17,8 +17,7 @@
  */
 
 import { Box, Stack, Typography } from '@wso2/oxygen-ui';
-import type { TFunction } from 'i18next';
-import { useTranslation } from 'react-i18next';
+import { type TFunction, useTranslation } from '../i18n';
 import { humanize } from '../utils/time';
 import { NotProvided } from './detail';
 

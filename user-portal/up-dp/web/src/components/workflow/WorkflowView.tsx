@@ -19,10 +19,9 @@
 import { Alert, Badge, Button, IconButton, ListingTable, MenuItem, Select, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { CircleCheckBig, History, Play, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 import { useWorkItems, type WorkItem } from '../../hooks/useTasks';
-import { currentLanguage } from '../../i18n';
+import { currentLanguage, useTranslation } from '../../i18n';
 import { managedTracks, managementEndpoint, useRuns } from '../../hooks/useWorkflows';
 import type { Integration } from '../../types/portal';
 import { RUN_STATUS_FILTERS, type RunStatusFilter, type RunSummary } from '../../types/workflow';

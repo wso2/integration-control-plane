@@ -18,7 +18,7 @@
 
 import { Alert, Button, CircularProgress, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../../i18n';
 import { useActOnWorkItem, useWorkItemDetail, type WorkItem, type WorkItemAction } from '../../hooks/useTasks';
 import type { HumanTask, Review } from '../../types/workflow';
 import { formatDateTime, humanize, plainName } from '../../utils/time';

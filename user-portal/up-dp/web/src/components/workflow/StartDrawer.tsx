@@ -18,7 +18,7 @@
 
 import { Alert, Button, CircularProgress, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../../i18n';
 import { useDefinitions, useStartRun } from '../../hooks/useWorkflows';
 import type { WorkflowDefinition } from '../../types/workflow';
 import { humanize } from '../../utils/time';

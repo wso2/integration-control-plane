@@ -19,7 +19,7 @@
 import { AppShell, Box, Button, ColorSchemeToggle, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Footer, Header, Sidebar, UserMenu, useAppShell } from '@wso2/oxygen-ui';
 import { Bot, CalendarClock, LayoutDashboard, ListChecks, LogOut, Workflow } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import { NavLink, Outlet, matchPath, useLocation, useNavigate } from 'react-router';
 import { useAuth, VIEW_SCOPES } from '../auth';
 import Logo from '../components/Logo';

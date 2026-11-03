@@ -18,7 +18,7 @@
 
 import { Stack, Typography } from '@wso2/oxygen-ui';
 import { Clock, ListChecks, MessageSquare, Play } from '@wso2/oxygen-ui-icons-react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../../i18n';
 import { latestTrack, useDeployment, useLastExecution } from '../../hooks/useIntegrations';
 import type { Integration } from '../../types/portal';
 import { scheduleOf } from '../../utils/cron';

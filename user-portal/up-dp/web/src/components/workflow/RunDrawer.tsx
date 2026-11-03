@@ -19,7 +19,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Alert, Button, Card, CardActionArea, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../../i18n';
 import { useWorkItems, type WorkItem } from '../../hooks/useTasks';
 import { useCancelRun, useRun, useWorkflowClient, wfKey } from '../../hooks/useWorkflows';
 import type { Integration } from '../../types/portal';

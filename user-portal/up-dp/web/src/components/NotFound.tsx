@@ -18,7 +18,7 @@
 
 import { Button, PageContent, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import { Link } from 'react-router';
 
 export default function NotFound({ message, backTo, backLabel }: { message: string; backTo: string; backLabel?: string }) {

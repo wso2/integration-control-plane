@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Divider, Grid, IconButton, Menu, MenuItem, PageContent, PageTitle, Skeleton, Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Filter, LayoutGrid, List, Lock, PlugZap, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import { useNavigate } from 'react-router';
 import { useAuth, VIEW_SCOPES } from '../auth';
 import EmptyListing from '../components/EmptyListing';

@@ -19,7 +19,7 @@
 import { Box, Chip, FormControlLabel, MenuItem, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
 import { Braces, ListTree } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import { fieldsOf, initialValues, parseJson, toObject, type Field, type FormValues } from '../utils/schema';
 import TextField from './common/TextField';
 

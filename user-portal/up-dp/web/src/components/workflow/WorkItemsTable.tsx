@@ -17,11 +17,10 @@
  */
 
 import { Chip, ListingTable, Stack, Typography } from '@wso2/oxygen-ui';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '../../auth';
 import type { WorkItem } from '../../hooks/useTasks';
 import type { ReviewDecisionRecord } from '../../types/workflow';
-import i18n from '../../i18n';
+import i18n, { useTranslation } from '../../i18n';
 import { formatDateTime, formatRelative, humanize } from '../../utils/time';
 import { rowOpenProps } from '../detail';
 import IntegrationIcon from '../IntegrationIcon';

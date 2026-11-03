@@ -26,7 +26,6 @@ import { answerFrameSignIn, AuthProvider, configureAuth } from './auth';
 import { ToastProvider } from './components/Toast';
 import { PortalConfigProvider, readPageConfig } from './config/portalConfig';
 import { resolveTheme } from './config/themes';
-import './i18n';
 import './index.css';
 
 const queryClient = new QueryClient({ defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } } });

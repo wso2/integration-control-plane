@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Chip, CircularProgress, Drawer, FormControlLabel, FormLabel, IconButton, MenuItem, Radio, RadioGroup, Stack, Switch, Typography } from '@wso2/oxygen-ui';
 import { Plus, X } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../../i18n';
 import type { RuntimeArgument } from '../../types/portal';
 import { argLabel, initialArgValues, invalidNumbers, missingRequired, type ArgValues } from '../../utils/args';
 import TextField from '../common/TextField';

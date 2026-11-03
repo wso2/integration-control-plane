@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Card, CardActionArea, Chip, Collapse, Divider, Drawer, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, Copy, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 
 /**
  * The building blocks of the integration control plane's workflow screens: a detail drawer,

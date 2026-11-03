@@ -19,7 +19,7 @@
 import { Box, Stack, Typography } from '@wso2/oxygen-ui';
 import { TriangleAlert } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import Logo from '../components/Logo';
 
 /** A full-page message outside the shell: a session that would not start, or one that ended. */

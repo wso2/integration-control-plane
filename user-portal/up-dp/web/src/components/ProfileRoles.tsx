@@ -18,7 +18,7 @@
 
 import { Box, Chip, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useLayoutEffect, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 
 const chipSx = {
   maxWidth: '100%',

@@ -19,7 +19,7 @@
 import { InputAdornment } from '@wso2/oxygen-ui';
 import { Search } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import TextField from './common/TextField';
 
 export const FILTER_SELECT_SX = { '&& .MuiSelect-select': { py: '8.5px' } } as const;

@@ -19,7 +19,7 @@
 import { Alert, IconButton, MenuItem, PageContent, PageTitle, Select, Skeleton, Stack, Tab, Tabs } from '@wso2/oxygen-ui';
 import { CircleCheckBig, Inbox, Lock, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '../i18n';
 import { useNavigate } from 'react-router';
 import { useAuth, VIEW_SCOPES } from '../auth';
 import EmptyListing from '../components/EmptyListing';
