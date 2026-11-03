@@ -25,7 +25,7 @@ export function linkOutcomeMessage(w: ResourceLinkWrite, changed: boolean): { se
     updated: ' Development gets it now; other environments get it when you promote to them.',
     next_deploy: " Development gets it at the integration's next deploy; other environments get it when you promote to them.",
     unchanged: '',
-    next_build: ' Build again to use it.',
+    no_workload: " Development gets it at the integration's first deploy; other environments get it when you promote to them.",
   }[w.workload];
   const values = w.environmentsWithoutValues.length > 0 ? ` It has no values in ${listed(w.environmentsWithoutValues)} yet; add them on WSO2 Cloud before you promote.` : '';
   return { severity: values ? 'warning' : 'info', message: what + when + values };

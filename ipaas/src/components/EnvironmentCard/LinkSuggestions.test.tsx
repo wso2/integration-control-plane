@@ -70,10 +70,10 @@ describe('LinkSuggestions', () => {
       mutate: vi.fn(),
       isPending: false,
       isError: false,
-      data: { resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfCrm', workload: 'next_build', environmentsWithoutValues: [] },
+      data: { resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfCrm', workload: 'updated', environmentsWithoutValues: [] },
       variables,
     };
     await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} actions={['Change link']} />));
-    expect(container.textContent).toContain('salesforce-sales now goes through acme.sfdemo.sfCrm. Build again to use it.');
+    expect(container.textContent).toContain('salesforce-sales now goes through acme.sfdemo.sfCrm. Development gets it now; other environments get it when you promote to them.');
   });
 });

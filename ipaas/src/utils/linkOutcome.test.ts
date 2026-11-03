@@ -30,8 +30,8 @@ describe('linkOutcomeMessage', () => {
     expect(linkOutcomeMessage({ ...write, workload: 'next_deploy' }, false).message).toBe("salesforce-sales is linked. Development gets it at the integration's next deploy; other environments get it when you promote to them.");
   });
 
-  it('asks for a build when the current one cannot take a changed link', () => {
-    expect(linkOutcomeMessage({ ...write, workload: 'next_build' }, true).message).toBe('salesforce-sales now goes through acme.sfdemo.sfCrm. Build again to use it.');
+  it('waits for the first deploy of an integration without a Workload', () => {
+    expect(linkOutcomeMessage({ ...write, workload: 'no_workload' }, true).message).toBe("salesforce-sales now goes through acme.sfdemo.sfCrm. Development gets it at the integration's first deploy; other environments get it when you promote to them.");
   });
 
   it('names the environments without values', () => {
