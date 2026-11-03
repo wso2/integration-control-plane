@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Box, Chip, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Chip, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Link2 } from '@wso2/oxygen-ui-icons-react';
-import TextField from '../common/TextField';
 import type { LinkedSource } from '../../utils/resourceLinks';
 
 const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;

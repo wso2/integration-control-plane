@@ -17,9 +17,8 @@
  */
 
 import { useState } from 'react';
-import { Alert, Box, Button, CircularProgress, MenuItem, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Link } from '@wso2/oxygen-ui-icons-react';
-import TextField from '../common/TextField';
 import { useCreateResourceLink, useResourceLinkOptions } from '../../hooks/useConfiguration';
 
 interface LinkResourcePickerProps {
@@ -54,7 +53,7 @@ export function LinkResourcePicker({ projectId, componentId, open, linkedTypes }
         Its values reach the connection&apos;s configurables in every environment. Linking redeploys the integration.
       </Typography>
       <Stack direction="row" gap={1} alignItems="center">
-        <TextField select fullWidth size="small" label="Resource and connection" value={choice} onChange={(e) => setChoice(e.target.value)}>
+        <TextField labelPlacement="top" select fullWidth size="small" label="Resource and connection" value={choice} onChange={(e) => setChoice(e.target.value)}>
           {choices.map((c, i) => (
             <MenuItem key={`${c.resourceType} ${c.connection}`} value={String(i)}>
               {c.label} → {c.connection}
