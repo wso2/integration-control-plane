@@ -121,7 +121,9 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     [envVars, secrets],
   );
   const storedSecrets = useMemo(() => secrets.filter((s) => s.stored).map((s) => s.key), [secrets]);
-  const errors = useMemo(() => validateMiConfigDraft(draft, storedSecrets), [draft, storedSecrets]);
+  // Env rows are hidden while the group is a secret, and never saved, so they are not validated.
+  const envVarsHidden = !!data?.envVarsGroupIsSecret;
+  const errors = useMemo(() => validateMiConfigDraft(envVarsHidden ? { ...draft, envVars: [] } : draft, storedSecrets), [draft, storedSecrets, envVarsHidden]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
 

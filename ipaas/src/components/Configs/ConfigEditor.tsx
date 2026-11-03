@@ -149,6 +149,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
     if (kind === 'envVars' && effectiveRows.length === 0) return 'Add at least one variable.';
     if (kind === 'fileMount' && !mountPath.trim()) return 'Enter the mount path.';
     if (kind === 'fileMount' && !fileContent.trim()) return 'Enter the file content.';
+    if (isEdit && !isDirty) return 'No changes to save.';
     return '';
   })();
 
@@ -232,7 +233,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
 
   return (
     <Box sx={{ maxWidth: 720 }}>
-      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={() => guardNavigation(onBack)} sx={{ mb: 2 }}>
+      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={() => guardNavigation(onBack)} disabled={save.isPending} sx={{ mb: 2 }}>
         Back to configs
       </Button>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
