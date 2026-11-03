@@ -26,7 +26,7 @@ import { navUrl, useScope } from '../../nav';
 import type { EnvEndpoint } from '../../types/component';
 import type { MiConfig, MiConfigDraft } from '../../types/envGroups';
 import { toEndpointOptions } from '../../utils/endpoints';
-import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
+import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, MI_SECRETS_GROUP, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
 import { EndpointCard } from '../EndpointCard';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -121,9 +121,10 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     [envVars, secrets],
   );
   const storedSecrets = useMemo(() => secrets.filter((s) => s.stored).map((s) => s.key), [secrets]);
-  // Env rows are hidden while the group is a secret, and never saved, so they are not validated.
+  // Rows hidden because their group is of the wrong kind are never saved, so they are not validated.
   const envVarsHidden = !!data?.envVarsGroupIsSecret;
-  const errors = useMemo(() => validateMiConfigDraft(envVarsHidden ? { ...draft, envVars: [] } : draft, storedSecrets), [draft, storedSecrets, envVarsHidden]);
+  const secretsHidden = !!data?.secretsGroupIsPlain;
+  const errors = useMemo(() => validateMiConfigDraft({ envVars: envVarsHidden ? [] : draft.envVars, secrets: secretsHidden ? [] : draft.secrets }, storedSecrets), [draft, storedSecrets, envVarsHidden, secretsHidden]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
 
@@ -286,7 +287,14 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         ) : (
           renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')
         )}
-        {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')}
+        {data.secretsGroupIsPlain ? (
+          // Saving secrets here would turn that group into a secret one and drop its values.
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            Secrets can&apos;t be edited here: the <code>{MI_SECRETS_GROUP}</code> group on Configs &amp; Secrets is not stored as a secret. Edit or delete that group there first.
+          </Alert>
+        ) : (
+          renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')
+        )}
         {showErrors && errors.size > 0 && <Alert severity="error">Fix the highlighted keys before saving.</Alert>}
       </>
     );
