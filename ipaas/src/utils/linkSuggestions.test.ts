@@ -39,20 +39,10 @@ describe('linkSuggestionRows', () => {
         resourceType: 'salesforce-sales',
         connection: 'wso2.sfdemo.sfSales',
         linked: true,
-        environments: [{ name: 'development', inRelease: true, hasValues: true, connectionInBuild: true, configurables: { 'wso2.sfdemo.sfSalesBaseUrl': 'SALESFORCE_BASE_URL' } }],
+        environments: [{ name: 'development', state: 'linked', inRelease: true, hasValues: true, configurables: { 'wso2.sfdemo.sfSalesBaseUrl': 'SALESFORCE_BASE_URL' } }],
       },
     ];
     expect(rows(suggestions.slice(1), links)).toEqual(['Link salesforce-support → wso2.sfdemo.support.sfSupport']);
-  });
-
-  it('leaves out a resource workload.yaml declares, and the connection its configurables are', () => {
-    const declared: ResourceLink = {
-      resourceType: 'salesforce-sales',
-      linked: false,
-      declared: true,
-      environments: [{ name: 'development', inRelease: true, hasValues: true, connectionInBuild: false, configurables: { 'wso2.sfdemo.sfSalesBaseUrl': 'SALESFORCE_BASE_URL' } }],
-    };
-    expect(rows(suggestions, [declared])).toEqual(['Link salesforce-support → wso2.sfdemo.support.sfSupport']);
   });
 
   it('offers only the actions asked for', () => {

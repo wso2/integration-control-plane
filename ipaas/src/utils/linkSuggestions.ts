@@ -29,14 +29,11 @@ export interface LinkSuggestionRow extends ResourceLinkSuggestion {
 /**
  * One row per suggested resource and connection whose action is one of actions. A resource linked from WSO2 Cloud
  * under its own key names is offered as "Link through", one linked through another connection as "Change link". It
- * leaves out a resource the integration's workload.yaml declares, and a connection whose configurables another link
- * or a declaration supplies.
+ * leaves out a connection whose configurables another link supplies.
  */
 export function linkSuggestionRows(suggestions: ResourceLinkSuggestion[], links: ResourceLink[], actions: LinkSuggestionAction[]): LinkSuggestionRow[] {
-  const declared = new Set(links.filter((l) => l.declared).map((l) => l.resourceType));
   return suggestions.flatMap((s) => {
-    if (declared.has(s.resourceType)) return [];
-    const taken = links.filter((l) => (l.linked || l.declared) && l.resourceType !== s.resourceType).flatMap((l) => l.environments.flatMap((e) => Object.keys(e.configurables)));
+    const taken = links.filter((l) => l.linked && l.resourceType !== s.resourceType).flatMap((l) => l.environments.flatMap((e) => Object.keys(e.configurables)));
     const action: LinkSuggestionAction = !s.linked ? 'Link' : s.linkedConnection ? 'Change link' : 'Link through';
     if (!actions.includes(action)) return [];
     return s.connections.filter((c) => !taken.some((k) => k.startsWith(c))).map((connection) => ({ ...s, connection, action }));
