@@ -115,9 +115,12 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const nameErr = !isEdit && kind === 'envVars' ? validateNewEnvGroupName(name) : validateDisplayName(name);
   const draftKeyErr = draftKey ? validateConfigKey(draftKey) : '';
   const pathErr = validateMountPath(mountPath);
+  // A key/value typed but not yet added is saved with the rest, as if Add was clicked,
+  // instead of being dropped silently.
+  const pendingRow = kind === 'envVars' && draftKey.trim() ? { key: draftKey.trim(), value: draftValue } : null;
+  const effectiveRows: typeof rows = pendingRow ? [...rows, pendingRow] : rows;
   // A new secret needs a value; a stored one left blank keeps its current value.
-  const hasEmptySecretValue = isSecret && kind === 'envVars' && rows.some((r) => !r.stored && r.value === '');
-  const canSave = !save.isPending && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? rows.length > 0 : !pathErr && fileContent.trim().length > 0);
+  const hasEmptySecretValue = isSecret && kind === 'envVars' && effectiveRows.some((r) => !r.stored && r.value === '');
 
   // Baselines follow the prefill effect above, so loaded values do not read as edits.
   const initialRows = existing ? (details?.data && existing.kind !== 'fileMount' ? Object.entries(details.data).map(([key, value]) => ({ key, value })) : existing.keys.map((key) => ({ key, value: '' }))) : [];
@@ -135,12 +138,15 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   useUnsavedChanges(isDirty);
   const guardNavigation = useLeaveGuard();
 
+  // An unchanged edit is not saved: with stored secrets kept, it would only restart the workload.
+  const canSave = !save.isPending && (!isEdit || isDirty) && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? effectiveRows.length > 0 : !pathErr && fileContent.trim().length > 0);
+
   // Why Save is disabled, for causes no field already explains (a filled-in field shows its own error).
   const blockedReason = (() => {
     if (canSave || save.isPending) return '';
     if (!name.trim()) return 'Enter a display name.';
     if (hasEmptySecretValue) return 'Enter a value for each new secret.';
-    if (kind === 'envVars' && rows.length === 0) return 'Add at least one variable.';
+    if (kind === 'envVars' && effectiveRows.length === 0) return 'Add at least one variable.';
     if (kind === 'fileMount' && !mountPath.trim()) return 'Enter the mount path.';
     if (kind === 'fileMount' && !fileContent.trim()) return 'Enter the file content.';
     return '';
@@ -198,9 +204,13 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const handleSave = () => {
     setError('');
     if (!canSave) return;
+    if (pendingRow) {
+      if (draftKeyErr) return setDraftError(draftKeyErr);
+      if (rows.some((r) => r.key === pendingRow.key)) return setDraftError('A variable with this key already exists.');
+    }
     // Stored secrets left blank are kept as they are, not re-sent.
-    const kept = rows.filter((r) => r.stored && r.value === '');
-    const sent = rows.filter((r) => !(r.stored && r.value === ''));
+    const kept = effectiveRows.filter((r) => r.stored && r.value === '');
+    const sent = effectiveRows.filter((r) => !(r.stored && r.value === ''));
     const data = kind === 'envVars' ? Object.fromEntries(sent.map((r) => [r.key, r.value])) : { data: fileContent };
     save.mutate(
       {
@@ -367,7 +377,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
                 </FormHelperText>
               ) : (
                 <FormHelperText id={draftMessageId} sx={styles.envHelper}>
-                  Press Enter or Add to save. Keys start with a letter or underscore and use letters, digits and underscores.
+                  Press Enter or Add to add it; a variable typed here is also saved on Update. Keys start with a letter or underscore and use letters, digits and underscores.
                 </FormHelperText>
               )}
             </Box>
