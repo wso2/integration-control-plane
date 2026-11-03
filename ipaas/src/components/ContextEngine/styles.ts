@@ -252,6 +252,17 @@ export const summaryRowSx = {
 
 export const mutedSx = { color: 'text.secondary' } as const;
 
+/** Overview card for deleting the engine, outlined in the error colour to mark it as destructive. */
+export const deleteCardSx = {
+  ...summaryCardSx,
+  display: 'flex',
+  flexDirection: { xs: 'column', sm: 'row' },
+  alignItems: { xs: 'flex-start', sm: 'center' },
+  justifyContent: 'space-between',
+  gap: 2,
+  borderColor: 'error.main',
+} as const;
+
 // ── Source visibility rules ─────────────────────────────────────────────────
 
 export const audienceSectionSx = { mt: 3, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' } as const;
