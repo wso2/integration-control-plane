@@ -201,9 +201,11 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
                       <Typography variant="body2" sx={{ fontWeight: 500 }}>
                         {e.name}
                       </Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-                        {e.description || 'No description'}
-                      </Typography>
+                      {e.description && (
+                        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+                          {e.description}
+                        </Typography>
+                      )}
                     </ListingTable.Cell>
                     <ListingTable.Cell>
                       {e.summary ? (

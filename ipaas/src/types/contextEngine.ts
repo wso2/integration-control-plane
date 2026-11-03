@@ -811,7 +811,7 @@ export interface GetStartedStep {
   action?: string;
   id: GetStartedStepId;
   title: string;
-  description: string;
+  description?: string;
   state: 'done' | 'current' | 'todo';
 }
 

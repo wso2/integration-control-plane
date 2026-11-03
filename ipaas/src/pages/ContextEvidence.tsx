@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Check, ChevronRight, Hash, Info, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, Check, ChevronRight, Hash, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -195,7 +195,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
       {readerOnly && (
         <Alert severity="info" variant="outlined" sx={{ mt: 2.5 }}>
-          You can open passages that are cited to you, but you can&apos;t ask this engine questions. Ask an engine manager for query access.
+          You can&apos;t ask this engine questions. Ask an engine manager for access.
         </Alert>
       )}
 
@@ -204,7 +204,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
         <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
         <ChainStep label="Item" value={ev.recordId} />
         <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
-        <ChainStep label="Version" value={evidenceVersionLabel(ev.sourceVersion)} detail="The version that was indexed" />
+        <ChainStep label="Version" value={evidenceVersionLabel(ev.sourceVersion)} />
         <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
         <ChainStep label="Passage" value={primaryPlace(ev)} detail={passageDetail || undefined} mono={!!l?.path} />
       </Stack>
@@ -215,9 +215,6 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             <Box sx={summaryCardHeaderSx}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                 Passage
-              </Typography>
-              <Typography variant="caption" sx={mutedSx}>
-                Exactly as indexed
               </Typography>
             </Box>
             {l?.heading && (
@@ -244,10 +241,6 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 {ev.passage}
               </Typography>
             )}
-            <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.5 }}>
-              <Info size={14} aria-hidden />
-              <Typography variant="caption">Only the cited passage is shown. The rest of the item stays in the engine.</Typography>
-            </Stack>
           </Box>
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
@@ -289,7 +282,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                     Who can open this link
                   </Typography>
                   <Typography variant="body2" sx={{ ...mutedSx, mt: 0.75, lineHeight: 1.55 }}>
-                    Anyone who can query this engine or open its evidence, and who may see this item. Access is checked every time the link opens, and the link stops working when the item gets a new version or is removed.
+                    People who can see this item. The link stops working when the item changes or is removed.
                   </Typography>
                 </Box>
               </Stack>

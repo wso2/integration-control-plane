@@ -133,7 +133,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           )}
           {mismatch.cannotQuery.length > 0 && (
             <Alert severity="warning" variant="outlined">
-              {`Content is shared with ${roleList(mismatch.cannotQuery, roleNames)}, but ${mismatch.cannotQuery.length === 1 ? 'that role' : 'those roles'} can't query this engine. Grant access later from the Access tab, or the sharing has no effect.`}
+              {`Content is shared with ${roleList(mismatch.cannotQuery, roleNames)}, but ${mismatch.cannotQuery.length === 1 ? 'it' : 'they'} can't query this engine.`}
             </Alert>
           )}
           {mismatch.hiddenFromMe.length > 0 && (

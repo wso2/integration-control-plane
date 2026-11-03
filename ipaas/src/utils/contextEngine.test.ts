@@ -35,12 +35,10 @@ import {
   splitSentences,
   askedQuestionMeta,
   citedNumbers,
-  deletionFailureText,
   evidencePlace,
   evidenceVersionLabel,
   isSameModel,
   modelDraftError,
-  modelKeysLabel,
   passageLines,
   toModelInput,
   describeVisibility,
@@ -827,7 +825,7 @@ describe('source progress', () => {
   });
 
   it('describes counts, failures and stored records', () => {
-    expect(sourceProgressDetail(progress())).toMatch(/No sync has started yet/);
+    expect(sourceProgressDetail(progress())).toBe('No sync yet.');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' } }))).toBe('Nothing delivered yet · 0 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' }, processing: { total: 12, succeeded: 12, percent: 100 }, records: { active: 12 } }))).toBe('12 of 12 items processed so far · 12 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1200, queued: 658, succeeded: 540, failed: 2, percent: 45.2 }, records: { active: 538, quarantined: 1 } }))).toBe(
@@ -1000,6 +998,7 @@ describe('file uploads', () => {
   it('maps record status to a file status', () => {
     expect(uploadStatusFromRecord(record({ indexState: 'indexed' }))).toEqual({ status: 'searchable' });
     expect(uploadStatusFromRecord(record({ indexState: 'pending' }))).toEqual({ status: 'indexing' });
+    expect(uploadStatusFromRecord(record({ indexState: 'reconcile_required' }))).toEqual({ status: 'indexing' });
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
     // The engine's model failure codes say what to fix, so the file shows that instead of a code.
@@ -1012,13 +1011,13 @@ describe('file uploads', () => {
     withRoleVisibility(() =>
       expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
         status: 'held',
-        detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
+        detail: 'Nobody can see this file. Change who can see it.',
       }),
     );
     // Changing who can see a file is hidden while roles are turned off, so the message does not point to it.
     expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
       status: 'held',
-      detail: "The source has no rule for this file's roles yet, so nobody can see it.",
+      detail: 'Nobody can see this file.',
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
     expect(summarizeUploads([])).toBe('No files yet');
@@ -1182,11 +1181,6 @@ describe('provenance and evidence', () => {
     expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
   });
-
-  it('explains a failed deletion', () => {
-    expect(deletionFailureText('residue_found')).toMatch(/still searchable/);
-    expect(deletionFailureText(undefined)).toMatch(/continues where the last attempt stopped/);
-  });
 });
 
 describe('editing models on a running engine', () => {
@@ -1209,12 +1203,6 @@ describe('editing models on a running engine', () => {
     expect(toModelInput({ ...draft, keyMode: 'ref', apiKeyRef: ' env:OPENAI_KEY ' })).toEqual({ provider: 'openai', model: 'gpt-4.1', apiKeyRef: 'env:OPENAI_KEY' });
     expect(modelDraftError({ ...draft, provider: 'azure_openai', model: 'dep', apiKey: 'k' }, null)).toBe('Enter the base URL and API version');
     expect(modelDraftError({ ...draft, model: ' ' }, current)).toBe('Choose a model');
-  });
-
-  it('says how the keys are held', () => {
-    expect(modelKeysLabel({ embedding: { provider: 'openai', model: 'e', keyKind: 'encrypted' }, llm: current })).toBe('Keys encrypted by the engine');
-    expect(modelKeysLabel({ embedding: { provider: 'azure_openai', model: 'e', keyKind: 'reference' }, llm: null })).toBe('Keys from secret references');
-    expect(modelKeysLabel({ embedding: null, llm: null })).toBe('');
   });
 });
 

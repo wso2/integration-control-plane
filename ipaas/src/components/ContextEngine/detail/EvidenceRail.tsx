@@ -91,7 +91,7 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, on
             )}
           </Stack>
           <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1 }}>
-            Pinned · click the number again, or press Esc, to release
+            Pinned. Press Esc to release.
           </Typography>
         </Box>
       )}
@@ -178,9 +178,6 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
           </Button>
           {open && (
             <Stack gap={1.25} sx={{ mt: 0.5 }}>
-              <Typography variant="caption" sx={{ ...mutedSx, px: 0.5, lineHeight: 1.5 }}>
-                The answer doesn&apos;t cite these, but it may still draw on them. They&apos;re part of what the engine checks before showing this answer again.
-              </Typography>
               {uncited.map(renderCard)}
             </Stack>
           )}

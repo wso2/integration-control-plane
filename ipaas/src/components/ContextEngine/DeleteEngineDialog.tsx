@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { Database, History, KeyRound, MessageSquare, Upload } from '@wso2/oxygen-ui-icons-react';
+import { Database, KeyRound, MessageSquare, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 
@@ -43,14 +43,14 @@ function Item({ icon, children }: { icon: ReactNode; children: ReactNode }): JSX
   );
 }
 
-/** What deleting removes when the engine deletes its own data, and what it keeps. */
+/** What deleting removes when the engine deletes its own data. */
 function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Element {
   const sources =
     sourceCount === undefined ? 'Its sources and everything indexed from them' : sourceCount === 0 ? 'Everything indexed in it' : `${sourceCount} source${sourceCount === 1 ? '' : 's'} and everything indexed from ${sourceCount === 1 ? 'it' : 'them'}`;
   return (
     <>
       <Typography variant="body2" color="text.secondary">
-        The engine deletes everything it holds for this engine. This can&apos;t be undone.
+        This deletes the following. It can&apos;t be undone.
       </Typography>
       <Stack component="ul" gap={1} sx={{ listStyle: 'none', p: 0, m: 0, mt: 1.75 }}>
         <Item icon={<Database size={16} />}>{sources}</Item>
@@ -58,19 +58,15 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
         <Item icon={<MessageSquare size={16} />}>Stored questions, answers and links to their passages</Item>
         <Item icon={<KeyRound size={16} />}>Its models, keys and every access grant</Item>
       </Stack>
-      <Stack direction="row" gap={1.25} alignItems="flex-start" sx={{ mt: 1.5, color: 'text.secondary' }}>
-        <History size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-        <Typography variant="body2">The job and access history stay as an audit trail.</Typography>
-      </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>
-        Integrations and agents calling its API or MCP endpoint stop getting answers as soon as deletion starts.
+        Agents using its API or MCP endpoint stop working right away.
       </Typography>
     </>
   );
 }
 
 /**
- * Confirm deleting an engine: what the engine removes, what it keeps, and the
+ * Confirm deleting an engine: what the engine removes, and the
  * engine's name typed to confirm. Deletion runs as a job on the engine, so the
  * engine shows as deleting until the job finishes. Without provisioning, it only forgets the engine.
  */
@@ -92,7 +88,7 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
       pendingLabel={forgetOnly ? 'Deleting…' : 'Starting…'}>
       {forgetOnly ? (
         <Typography variant="body2" color="text.secondary">
-          This console stops showing the engine. Its data stays in the engine's databases until they are cleared, so creating an engine again picks up its sources and indexed content.
+          Its data stays in the engine's databases. A new engine picks it up again.
         </Typography>
       ) : (
         <DeletesEverything sourceCount={sourceCount} />

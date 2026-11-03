@@ -23,7 +23,7 @@ import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useDeletionJob } from '../hooks/useContextEngine';
-import { deletionFailureText, engineMessage } from '../utils/contextEngine';
+import { DELETION_FAILURE_TEXT, engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -171,14 +171,14 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               Deleting this engine failed
             </Typography>
-            {deletionFailureText(deletion.data?.error?.code)}
+            {DELETION_FAILURE_TEXT}
           </Alert>
         ) : (
           <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               This engine is being deleted
             </Typography>
-            Questions, uploads and changes are paused, and its API and MCP endpoints have stopped answering. It disappears from your list once the engine finishes.
+            Questions, uploads and changes are paused. API and MCP endpoints are off.
           </Alert>
         ))}
 

@@ -177,7 +177,7 @@ function UploadRow({
           )}
           {entry.status === 'indexing' && !retrying && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.75 }}>
-              {entry.detail ?? 'Uploaded · the engine is writing it into the search index. Usually under a minute.'}
+              {entry.detail ?? 'Indexing. Usually under a minute.'}
             </Typography>
           )}
           {!active && !retrying && entry.detail && (

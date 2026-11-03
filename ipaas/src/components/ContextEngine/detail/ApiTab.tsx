@@ -43,7 +43,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <SurfaceHeader title="REST API" description="Integrations send a question and receive the source-linked passages, or a cited answer, from what the caller may read." />
+      <SurfaceHeader title="REST API" />
 
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Endpoints
@@ -56,12 +56,10 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
       <Stack gap={2} sx={{ mb: 3 }}>
         <Alert severity="info" variant="outlined">
-          Requests carry the caller's platform bearer token. The engine answers only for members of the roles granted on the Access tab, and returns only items whose groups map to one of the caller's roles. Everyone else receives not-found, never a hint that
-          the engine exists.
+          Send the caller's platform bearer token. Callers get only items they may read.
         </Alert>
         <Typography variant="body2" sx={mutedSx}>
-          Send <code>{'{"question": "…"}'}</code>. <code>context</code> returns ranked passages, each with its source, item, version and link. <code>answer</code> returns an answer written from those passages, where each <code>[n]</code> cites the nth passage.
-          A question nothing visible answers returns <code>state: "insufficient_evidence"</code>, with no answer.
+          Send <code>{'{"question": "…"}'}</code>. In <code>answer</code>, <code>[n]</code> cites the nth passage. With no answer, <code>state</code> is <code>"insufficient_evidence"</code>.
         </Typography>
       </Stack>
 

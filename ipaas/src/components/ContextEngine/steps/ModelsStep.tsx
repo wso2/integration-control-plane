@@ -23,7 +23,7 @@ import { blankLlm, contextLogoUrl, LLM_PROVIDERS, RECOMMENDED_MODELS } from '../
 import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
 import { canShareApiKey } from '../../../utils/contextEngine';
 import ModelProviderColumn from './ModelProviderColumn';
-import { modelColumnSx, modelColumnsSx, recommendedBannerSx, stepHeadingSx, stepHintSx } from '../styles';
+import { modelColumnSx, modelColumnsSx, recommendedBannerSx, stepHeadingAloneSx } from '../styles';
 import type { LlmConfig, LlmProvider } from '../../../types/contextEngine';
 import type { EmbeddingConfig, EmbeddingProvider } from '../../../types/ragIngestion';
 
@@ -60,11 +60,8 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled
 
   return (
     <>
-      <Typography variant="subtitle2" sx={stepHeadingSx}>
+      <Typography variant="subtitle2" sx={stepHeadingAloneSx}>
         Configure Models
-      </Typography>
-      <Typography variant="body2" sx={stepHintSx}>
-        The embedding model indexes your sources for search; the language model builds the graph during ingestion and, unless you choose a separate answer model, answers questions.
       </Typography>
 
       <Box sx={recommendedBannerSx}>
@@ -89,18 +86,10 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled
       </Box>
 
       <Box sx={modelColumnsSx}>
-        <ModelProviderColumn<EmbeddingConfig>
-          title="Embedding model"
-          purpose="Turns documents into vectors for retrieval."
-          providers={EMBEDDING_OPTIONS}
-          value={embedding}
-          onChange={onEmbeddingChange}
-          blank={(id) => blankEmbedding(id as EmbeddingProvider)}
-          modelLabel="Embedding model"
-        />
+        <ModelProviderColumn<EmbeddingConfig> title="Embedding model" providers={EMBEDDING_OPTIONS} value={embedding} onChange={onEmbeddingChange} blank={(id) => blankEmbedding(id as EmbeddingProvider)} modelLabel="Embedding model" />
         <ModelProviderColumn<LlmConfig>
           title="Language model"
-          purpose={answersEnabled && !answerLlm ? 'Builds the graph during ingestion and writes answers from retrieved evidence.' : 'Builds the graph during ingestion.'}
+          purpose={answersEnabled && !answerLlm ? 'Builds the graph and writes answers.' : 'Builds the graph.'}
           providers={LLM_OPTIONS}
           value={llm}
           onChange={onLlmChange}
@@ -117,7 +106,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled
               Answers
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Uses an LLM to compose an answer from the evidence each person or agent may read, citing every passage it draws on. Turned off, the engine returns the passages only.
+              Writes cited answers. When off, it returns passages only.
             </Typography>
           </Box>
           <Switch checked={answersEnabled} onChange={(_e, checked) => onAnswersEnabledChange(checked)} inputProps={{ 'aria-label': 'Offer answers' }} />
@@ -132,15 +121,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled
 
       {answersEnabled && answerLlm && (
         <Box sx={{ ...modelColumnsSx, mt: 2.5 }}>
-          <ModelProviderColumn<LlmConfig>
-            title="Answer model"
-            purpose="Writes answers from retrieved evidence instead of the language model."
-            providers={LLM_OPTIONS}
-            value={answerLlm}
-            onChange={onAnswerLlmChange}
-            blank={(id) => blankLlm(id as LlmProvider)}
-            modelLabel="Answer model"
-          />
+          <ModelProviderColumn<LlmConfig> title="Answer model" providers={LLM_OPTIONS} value={answerLlm} onChange={onAnswerLlmChange} blank={(id) => blankLlm(id as LlmProvider)} modelLabel="Answer model" />
         </Box>
       )}
     </>

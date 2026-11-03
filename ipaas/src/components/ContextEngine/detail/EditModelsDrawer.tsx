@@ -91,7 +91,7 @@ function KeyFields({ draft, current, onChange, idPrefix }: { draft: ModelDraft; 
           value={draft.apiKeyRef}
           placeholder={unchanged && current?.keyKind === 'reference' ? 'Leave empty to keep the current reference' : 'env:OPENAI_API_KEY'}
           onChange={(e) => onChange({ ...draft, apiKeyRef: e.target.value })}
-          helperText="The engine resolves it each time it calls the model: env:NAME reads a variable from the engine's environment, cp:ID a control plane secret."
+          helperText="env:NAME for an engine variable. cp:ID for a control plane secret."
           inputProps={{ style: { fontFamily: 'monospace' } }}
         />
       )}
@@ -185,20 +185,11 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
             {failure.body}
           </Alert>
         )}
-        <Typography variant="body2" sx={mutedSx}>
-          The embedding model indexes your sources; the language model writes answers from what it finds.
-        </Typography>
-
         <Box sx={{ ...summaryCardSx, height: 'auto' }}>
           <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Embedding model
-              </Typography>
-              <Typography variant="body2" sx={mutedSx}>
-                Turns documents into vectors for retrieval.
-              </Typography>
-            </Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Embedding model
+            </Typography>
             {locked && <Chip size="small" variant="outlined" icon={<Lock size={13} />} label="Locked" />}
           </Stack>
           <Box sx={{ mt: 2 }}>
@@ -210,16 +201,16 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
                       {models.embedding ? (embeddingProvider?.name ?? models.embedding.provider) : 'Engine default'}
                     </Typography>
-                    <Typography variant="caption" sx={mutedSx}>
-                      {models.embedding ? [models.embedding.model, models.embedding.dimensions ? `${models.embedding.dimensions} dimensions` : ''].filter(Boolean).join(' · ') : 'Set where the engine runs'}
-                    </Typography>
+                    {models.embedding && (
+                      <Typography variant="caption" sx={mutedSx}>
+                        {[models.embedding.model, models.embedding.dimensions ? `${models.embedding.dimensions} dimensions` : ''].filter(Boolean).join(' · ')}
+                      </Typography>
+                    )}
                   </Box>
                 </Stack>
                 <Stack direction="row" gap={1} sx={mutedSx}>
                   <Info size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-                  <Typography variant="body2">
-                    Locked because this engine already holds indexed items, and their vectors only match this model. Changing it needs a full re-index, which isn&apos;t available yet.{models.embedding ? ' You can still replace its key.' : ''}
-                  </Typography>
+                  <Typography variant="body2">Can&apos;t change after indexing.{models.embedding ? ' You can still replace its key.' : ''}</Typography>
                 </Stack>
                 {embedding && <KeyFields draft={embedding} current={models.embedding} onChange={setEmbedding} idPrefix="embedding" />}
               </Stack>
@@ -237,9 +228,6 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
         <Box sx={{ ...summaryCardSx, height: 'auto' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
             Language model
-          </Typography>
-          <Typography variant="body2" sx={mutedSx}>
-            Writes the answer from retrieved evidence.
           </Typography>
           <Box sx={{ mt: 2 }}>
             <ModelEditor kind="llm" providers={LLM_OPTIONS} draft={llm} current={models.llm} onChange={setLlm} />

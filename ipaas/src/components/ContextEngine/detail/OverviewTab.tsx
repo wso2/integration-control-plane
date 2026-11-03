@@ -17,13 +17,13 @@
  */
 
 import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { EyeOff, Info, KeyRound, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
+import { EyeOff, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { CONTEXT_ENGINE_PROVISIONING, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { checkStagedFile, connectorFor, effectiveVisibility, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
+import { checkStagedFile, connectorFor, effectiveVisibility, engineMessage, getStartedSteps, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GetStartedChecklist from './GetStartedChecklist';
@@ -85,15 +85,17 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
         <Typography variant="body2" sx={mutedSx}>
           {label}
         </Typography>
-        {locked && <LockedChip title="Fixed while the engine holds indexed items: their vectors only match this model." />}
+        {locked && <LockedChip title="Can't change after indexing." />}
       </Stack>
       <Box sx={{ textAlign: 'right' }}>
         <Typography variant="body2" sx={{ fontWeight: 500 }}>
           {provider}
         </Typography>
-        <Typography variant="caption" sx={mutedSx}>
-          {model ?? 'Set where the engine runs'}
-        </Typography>
+        {model && (
+          <Typography variant="caption" sx={mutedSx}>
+            {model}
+          </Typography>
+        )}
       </Box>
     </Box>
   );
@@ -155,7 +157,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
           openFiles(created);
         }
         if ((connectorFor(config.type)?.fields.length ?? 0) > 0) {
-          setSourceNotice({ severity: 'warning', message: `“${created.name}” is registered, but its connection settings and credentials are not stored: the engine does not serve the configuration route yet.` });
+          setSourceNotice({ severity: 'warning', message: `“${created.name}” was added, but its settings were not saved.` });
         }
       },
       onError: (e) => {
@@ -263,25 +265,11 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
                   provider={!engine.exposure.answers ? 'Answers off' : engine.models.answer ? providerName('llm', engine.models.answer.provider) : 'Engine default'}
                   model={engine.exposure.answers ? engine.models.answer?.model : undefined}
                 />
-                {modelKeysLabel(engine.models) ? (
-                  <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
-                    <KeyRound size={14} aria-hidden />
-                    <Typography variant="caption">{modelKeysLabel(engine.models)}</Typography>
-                  </Stack>
-                ) : (
-                  !engine.models.embedding &&
-                  !engine.models.llm && (
-                    <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
-                      <Info size={14} aria-hidden />
-                      <Typography variant="caption">Uses the engine host&apos;s models until you choose its own.</Typography>
-                    </Stack>
-                  )
-                )}
               </>
             ) : (
               <Stack direction="row" gap={1} sx={mutedSx}>
                 <EyeOff size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-                <Typography variant="body2">Only people with access to the whole engine can see its models; access to a single source isn&apos;t enough.</Typography>
+                <Typography variant="body2">You need access to the whole engine to see its models.</Typography>
               </Stack>
             )}
           </Card>

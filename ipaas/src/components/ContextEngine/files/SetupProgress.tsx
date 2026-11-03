@@ -112,7 +112,7 @@ export default function SetupProgress({ engineId, engineName, sourceCount, roleC
             Setting up {engineName}
           </Typography>
           <Typography variant="body2" sx={mutedSx}>
-            The engine is ready. Your files are being handed to it now.
+            Uploading your files.
           </Typography>
         </Box>
       </Stack>
