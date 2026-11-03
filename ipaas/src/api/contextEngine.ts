@@ -239,7 +239,6 @@ interface RawRecordStatus {
   recordId: string;
   state: string;
   currentVersion: string;
-  sourceAclVersion: string;
   quarantineReason?: string;
   indexState: string;
   indexError?: string;
@@ -737,8 +736,8 @@ async function findContextDelivery(sourceId: string, key: string): Promise<Conte
 
 /**
  * Upload one file as a record of the source. The record id is the file name, so
- * uploading the same name again is a new version. The version doubles as the
- * ACL version, both epoch milliseconds, so they only grow.
+ * uploading the same name again is a new version. The version is epoch
+ * milliseconds, so it only grows.
  */
 export async function ingestContextFile(input: IngestFileInput): Promise<ContextJobHandle> {
   const key = await deliveryKey(input.sourceId, 'upsert', input.recordId, input.version);
@@ -753,7 +752,6 @@ export async function ingestContextFile(input: IngestFileInput): Promise<Context
     contentHash: await hashBytes(bytes),
     sourceObservedAt: new Date(Number(input.version)).toISOString(),
     audience: input.audience,
-    sourceAclVersion: input.version,
     idempotencyKey: key,
   };
   const form = new FormData();
@@ -782,7 +780,6 @@ export async function sendContextRecordEvent(input: RecordEventInput): Promise<C
     operation: input.operation,
     sourceObservedAt: new Date(Number(input.version)).toISOString(),
     audience: input.audience,
-    sourceAclVersion: input.version,
     idempotencyKey: key,
   };
   const form = new FormData();
@@ -794,7 +791,7 @@ export async function sendContextRecordEvent(input: RecordEventInput): Promise<C
 /** A record's lifecycle and index state. Needs delivery or manage rights on the source. */
 export async function getContextRecordStatus(sourceId: string, recordId: string): Promise<ContextRecordStatus> {
   const raw = await contextEngineClient.get<RawRecordStatus>(`${sourcePath(sourceId)}/records/${encodeURIComponent(recordId)}`);
-  return { recordId: raw.recordId, state: raw.state, currentVersion: raw.currentVersion, sourceAclVersion: raw.sourceAclVersion, quarantineReason: raw.quarantineReason, indexState: raw.indexState, indexError: raw.indexError, updatedAt: raw.updatedAt };
+  return { recordId: raw.recordId, state: raw.state, currentVersion: raw.currentVersion, quarantineReason: raw.quarantineReason, indexState: raw.indexState, indexError: raw.indexError, updatedAt: raw.updatedAt };
 }
 
 // ── Query ───────────────────────────────────────────────────────────────────

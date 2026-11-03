@@ -368,7 +368,6 @@ export interface ContextRecordStatus {
   recordId: string;
   state: 'active' | 'quarantined' | 'deleted' | string;
   currentVersion: string;
-  sourceAclVersion: string;
   quarantineReason?: string;
   indexState: ContextIndexState | string;
   indexError?: string;
