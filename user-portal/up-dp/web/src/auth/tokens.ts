@@ -542,7 +542,8 @@ export function claimsOf(token: string | undefined): Record<string, unknown> {
   const payload = token?.split('.')[1];
   if (!payload) return {};
   try {
-    return JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/'))) as Record<string, unknown>;
+    const bytes = Uint8Array.from(atob(payload.replace(/-/g, '+').replace(/_/g, '/')), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes)) as Record<string, unknown>;
   } catch {
     return {};
   }
