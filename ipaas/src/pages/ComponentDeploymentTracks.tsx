@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, ListingTable, MenuItem, PageContent, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, ListingTable, MenuItem, PageContent, Skeleton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { GitBranch, Pencil, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import Authorized from '../components/Authorized';
@@ -68,15 +67,16 @@ interface BranchFieldProps {
 function BranchField({ repository, value, onChange, tracks, editingId, lockedReason }: BranchFieldProps): JSX.Element {
   const { data: branches, isLoading } = useRepoBranches(repository?.organizationApp ?? '', repository?.nameApp ?? '', false);
 
-  if (lockedReason) return <TextField label="Branch" value={value} fullWidth disabled helperText={lockedReason} slotProps={branchAdornment} />;
+  if (lockedReason) return <TextField labelPlacement="top" label="Branch" value={value} fullWidth disabled helperText={lockedReason} slotProps={branchAdornment} />;
 
   if (!isLoading && !branches?.length) {
-    return <TextField label="Branch" value={value} onChange={(e) => onChange(e.target.value)} fullWidth required helperText="The repository's branches could not be listed, so enter the branch to build." slotProps={branchAdornment} />;
+    return <TextField labelPlacement="top" label="Branch" value={value} onChange={(e) => onChange(e.target.value)} fullWidth required helperText="The repository's branches could not be listed, so enter the branch to build." slotProps={branchAdornment} />;
   }
 
   const options = trackBranchOptions(branches ?? [], tracks, editingId, value);
   return (
     <TextField
+      labelPlacement="top"
       select
       label="Branch"
       value={value}
@@ -119,8 +119,8 @@ interface ApiVersionFieldProps {
 }
 
 function ApiVersionField({ value, onChange, error, locked, required }: ApiVersionFieldProps): JSX.Element {
-  if (locked) return <TextField label="API Version" value={value} fullWidth disabled helperText="A track's API version can't be changed once set." />;
-  return <TextField label="API Version" value={value} onChange={(e) => onChange(e.target.value)} fullWidth required={required} error={!!error} helperText={error ?? API_VERSION_HELP} />;
+  if (locked) return <TextField labelPlacement="top" label="API Version" value={value} fullWidth disabled helperText="A track's API version can't be changed once set." />;
+  return <TextField labelPlacement="top" label="API Version" value={value} onChange={(e) => onChange(e.target.value)} fullWidth required={required} error={!!error} helperText={error ?? API_VERSION_HELP} />;
 }
 
 interface TrackDialogProps {
@@ -176,11 +176,11 @@ function TrackDialog({ orgUuid, componentId, repository, tracks, versionedApis, 
         <Stack gap={2} sx={{ mt: 1 }}>
           <BranchField repository={repository} value={branch} onChange={setBranch} tracks={tracks} editingId={track?.id} lockedReason={lockedReason} />
           {versionedApis && <ApiVersionField value={apiVersion} onChange={setApiVersion} error={versionError} locked={versionLocked} required={!track} />}
-          <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
+          <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={pending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={pending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={!branch.trim() || taken || !!versionError || pending} startIcon={pending ? <CircularProgress size={16} color="inherit" /> : track ? undefined : <Plus size={16} />}>
@@ -231,7 +231,7 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
         <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
           <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
             <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setDialog({})} disabled={!orgUuid}>
-              Create Deployment Track
+              Create deployment track
             </Button>
           </Authorized>
         </Stack>
@@ -364,7 +364,7 @@ export default function ComponentDeploymentTracks(scope: ComponentScope): JSX.El
   const { data: comp, isPending, isError, refetch } = useComponentByHandler(projectId, scope.component);
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <ComponentSettingsTabs active="deployment-tracks" />
       {/* A disabled query reports isLoading false; isPending stays true until the project resolves too. */}
       {loadingProject || (projectId && isPending) ? (

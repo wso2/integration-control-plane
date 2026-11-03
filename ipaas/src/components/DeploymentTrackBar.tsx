@@ -106,7 +106,7 @@ export default function DeploymentTrackBar({ component, extra }: DeploymentTrack
               sx={{ ...PILL_SELECT_SX, minWidth: 160 }}>
               {tracksUrl && (
                 <MenuItem value={MANAGE_TRACKS} sx={manageTracksItemSx}>
-                  Manage Tracks
+                  Manage tracks
                 </MenuItem>
               )}
               {tracksUrl && <Divider sx={{ my: 0.5 }} />}

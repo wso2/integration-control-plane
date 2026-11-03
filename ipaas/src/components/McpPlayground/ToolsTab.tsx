@@ -63,7 +63,7 @@ function ToolPanel({ tool, callTool }: { tool: McpTool; callTool: ToolsTabProps[
 
       <Box>
         <Button variant="contained" size="small" startIcon={running ? <CircularProgress size={14} color="inherit" /> : <Play size={16} />} disabled={running} onClick={() => void run()}>
-          {running ? 'Running…' : 'Run Tool'}
+          {running ? 'Running…' : 'Run tool'}
         </Button>
       </Box>
 

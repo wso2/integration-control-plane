@@ -44,7 +44,7 @@ interface McpPlaygroundProps {
   headerName?: string;
   /** Shows a loading state on the token field while it is being minted. */
   isTokenFetching?: boolean;
-  /** Mint a fresh token ("Get Test Key"). */
+  /** Mint a fresh token ("Get test key"). */
   onTokenRegenerate?: () => void;
   /** Endpoint chooser rendered in the sidebar. */
   endpointSwitcher?: McpSwitcher;

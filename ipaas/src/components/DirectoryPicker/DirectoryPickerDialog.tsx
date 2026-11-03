@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Tooltip, Typography, TreeView } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Tooltip, Typography, TreeView, TextField } from '@wso2/oxygen-ui';
 import { Folder, RefreshCw, Search } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import type { RepoTreeNode } from '../../types/repository';
@@ -79,7 +78,7 @@ export default function DirectoryPickerDialog({ open, onClose, onSave, repoName,
 
       <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pb: 1 }}>
         {/* Path preview */}
-        <TextField size="small" fullWidth value={`/${repoName}${selectedPath === '/' ? '' : selectedPath}`} slotProps={{ input: { readOnly: true } }} label="Selected path" />
+        <TextField labelPlacement="top" size="small" fullWidth value={`/${repoName}${selectedPath === '/' ? '' : selectedPath}`} slotProps={{ input: { readOnly: true } }} label="Selected path" />
 
         {/* Search */}
         <TextField
@@ -147,7 +146,9 @@ export default function DirectoryPickerDialog({ open, onClose, onSave, repoName,
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleCancel}>Cancel</Button>
+        <Button variant="outlined" color="inherit" onClick={handleCancel}>
+          Cancel
+        </Button>
         <Button variant="contained" onClick={handleContinue} disabled={isFetching}>
           Continue
         </Button>

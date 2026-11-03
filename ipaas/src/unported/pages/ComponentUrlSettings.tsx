@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, ListingTable, MenuItem, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, ListingTable, MenuItem, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Globe, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import Authorized from '../../components/Authorized';
@@ -71,8 +70,8 @@ function ConfigureDialog({ componentId, domains, onClose, onDone }: { componentI
           </Alert>
         )}
         <Stack gap={2} sx={{ mt: 1 }}>
-          <TextField label="Default URL" value={defaultUrl} onChange={(e) => setDefaultUrl(e.target.value)} fullWidth required helperText="The endpoint URL to map a custom domain onto." />
-          <TextField select label="Custom Domain" value={domainId} onChange={(e) => setDomainId(e.target.value)} fullWidth required>
+          <TextField labelPlacement="top" label="Default URL" value={defaultUrl} onChange={(e) => setDefaultUrl(e.target.value)} fullWidth required helperText="The endpoint URL to map a custom domain onto." />
+          <TextField labelPlacement="top" select label="Custom Domain" value={domainId} onChange={(e) => setDomainId(e.target.value)} fullWidth required>
             {domains.length === 0 ? (
               <MenuItem value="" disabled>
                 No custom domains configured
@@ -85,8 +84,8 @@ function ConfigureDialog({ componentId, domains, onClose, onDone }: { componentI
               ))
             )}
           </TextField>
-          <TextField label="Path" value={customPath} onChange={(e) => setCustomPath(e.target.value)} fullWidth slotProps={{ input: { startAdornment: <InputAdornment position="start">/</InputAdornment> } }} />
-          {preview && <TextField label="Custom URL" value={preview} fullWidth slotProps={{ input: { readOnly: true } }} />}
+          <TextField labelPlacement="top" label="Path" value={customPath} onChange={(e) => setCustomPath(e.target.value)} fullWidth slotProps={{ input: { startAdornment: <InputAdornment position="start">/</InputAdornment> } }} />
+          {preview && <TextField labelPlacement="top" label="Custom URL" value={preview} fullWidth slotProps={{ input: { readOnly: true } }} />}
         </Stack>
       </DialogContent>
       <DialogActions>

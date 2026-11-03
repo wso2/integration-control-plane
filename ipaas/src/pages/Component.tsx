@@ -111,8 +111,8 @@ export default function Component(scope: ComponentScope): JSX.Element {
 
   // A disabled query reports isLoading false; isPending stays true until the project resolves too.
   if (loadingProject || (projectId && pendingComponent)) return <IntegrationOverviewSkeleton />;
-  if (!project) return <NotFound message="Project not found" backTo={orgHomeUrl(scope.org)} backLabel="Back to Projects" />;
-  if (!component) return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+  if (!project) return <NotFound message="Project not found" backTo={orgHomeUrl(scope.org)} backLabel="Back to projects" />;
+  if (!component) return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
   // A loaded integration always resolves a track; the check narrows the type for what follows.
   if (versionId === undefined) return <IntegrationOverviewSkeleton />;
 
@@ -154,7 +154,7 @@ export default function Component(scope: ComponentScope): JSX.Element {
         <DeploymentTrackBar component={component} />
 
         {/* <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}> */}
-        <PageContent>
+        <PageContent fullWidth>
           {/* Component header */}
           {!hasCustomOverview && (
             <HeaderShell

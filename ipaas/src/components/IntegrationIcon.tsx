@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box } from '@wso2/oxygen-ui';
+import { Avatar } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { EXTERNAL_COMPONENT_ICON, integrationTypeIcon } from '../constants/integrationIcons';
 import type { IntegrationType } from '../types/integration';
@@ -24,18 +24,18 @@ import * as styles from './IntegrationIcon.styles';
 
 interface IntegrationIconProps {
   type: IntegrationType | null | undefined;
-  /** Edge of the square, in px. The glyph scales with it. */
+  /** Diameter of the badge, in px. The glyph scales with it. */
   size?: number;
   /** Owned by another platform — renders the external glyph, muted. */
   external?: boolean;
 }
 
-/** The type badge shown wherever an integration is listed or headlined. */
-export default function IntegrationIcon({ type, size = 32, external = false }: IntegrationIconProps): JSX.Element {
+/** The type badge shown wherever an integration is listed or headlined; styled like ListingCard's badge. */
+export default function IntegrationIcon({ type, size = 40, external = false }: IntegrationIconProps): JSX.Element {
   const Icon = external ? EXTERNAL_COMPONENT_ICON : integrationTypeIcon(type);
   return (
-    <Box sx={styles.iconBox(size, external)}>
-      <Icon size={Math.round(size * 0.55)} />
-    </Box>
+    <Avatar aria-hidden="true" variant={external ? 'circular' : 'light'} color="primary" sx={styles.badge(size, external)}>
+      <Icon size={Math.round(size * 0.45)} />
+    </Avatar>
   );
 }

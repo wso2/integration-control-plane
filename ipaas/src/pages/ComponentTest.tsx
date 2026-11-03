@@ -49,7 +49,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
 
   if (isLoading) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>
@@ -60,7 +60,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
   // Not-found is distinct from an unsupported type — surface it rather than "Coming Soon".
   if (!comp) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography>Integration not found</Typography>
       </PageContent>
     );
@@ -92,7 +92,7 @@ export function AgentChatTestRoute(scope: ComponentScope): JSX.Element {
 
   if (projectId && isPending) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>

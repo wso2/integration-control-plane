@@ -42,7 +42,7 @@ export default function ComponentSettings(scope: ComponentScope): JSX.Element {
 
   if (!isOrgPermissionsLoaded || loadingProject || loadingComponent)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Loading />
       </PageContent>
     );

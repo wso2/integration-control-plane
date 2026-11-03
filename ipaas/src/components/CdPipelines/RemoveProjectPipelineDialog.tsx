@@ -60,7 +60,7 @@ export default function RemoveProjectPipelineDialog({ projectId, pipeline, curre
         <DialogContentText>Components in this project will no longer be able to use this pipeline. You can add it back at any time.</DialogContentText>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={update.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
         <Button variant="contained" color="error" onClick={confirm} disabled={update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

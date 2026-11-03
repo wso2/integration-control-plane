@@ -16,72 +16,31 @@
  * under the License.
  */
 
-import { Box, Checkbox, Drawer, FormControlLabel, IconButton, MenuItem, Select, Stack, Tooltip, Typography, Button } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
-import { Download, RefreshCw, X } from '@wso2/oxygen-ui-icons-react';
-import { useMemo } from 'react';
-import { useInfiniteComponentLogs, useVisibleLogs } from '../../../hooks/useLogs';
-import type { ComponentLogsRequest } from '../../../types/logs';
-import { choreologgingComponentGatewayLogsApiUrl } from '../../../config/runtimeConfig';
-import { useLogsFilters } from '../../../hooks/useLogsFilters';
-import { AUTO_FETCH_INTERVAL, DEFAULT_DP_REGION, LOG_LEVELS, PAGE_SIZE, TIME_PRESETS, downloadLogs } from '../../../utils/logs';
-import SearchField from '../../SearchField';
-import LogsPanel from '../../Logs/LogsPanel';
-import LogEntry from '../../Logs/LogEntry';
-
-function formatLocalDatetime(date: Date): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
+import { Alert, Button, DrawerPanel, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
+import type { JSX } from 'react';
+import { useComponentByHandler } from '../../../hooks/useComponents';
+import { useOrgUuid } from '../../../hooks/useOrgUuid';
+import { useScope } from '../../../nav';
+import type { Environment } from '../../../types/environment';
+import IntegrationLogs from '../../Logs/IntegrationLogs';
 
 interface ServiceLogsDrawerProps {
   open: boolean;
   onClose: () => void;
-  componentId: string;
-  environmentId: string;
-  envName: string;
+  projectId: string;
+  componentHandler: string;
+  env: Environment;
   versionId: string;
   region?: string;
 }
 
-const drawerSx = {
-  '& .MuiDrawer-paper': {
-    width: 720,
-    position: 'fixed',
-    top: 64,
-    height: 'calc(100% - 64px)',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-} as const;
+const toolbarSx = { px: 2, pt: 2, flexShrink: 0 } as const;
 
-export default function ServiceLogsDrawer({ open, onClose, componentId, environmentId, envName, versionId, region }: ServiceLogsDrawerProps) {
-  const filters = useLogsFilters();
-  const { levelFilter, setLevelFilter, timePreset, setTimePreset, customStart, setCustomStart, customEnd, setCustomEnd, sortDir, setSortDir, searchPhrase, setSearchPhrase, autoFetch, setAutoFetch, startTime, endTime, clearFilters } = filters;
-
-  const logsApiUrl = choreologgingComponentGatewayLogsApiUrl();
-
-  const logsRequest = useMemo<ComponentLogsRequest | null>(() => {
-    if (!componentId || !environmentId || !open) return null;
-    return {
-      componentId,
-      environmentId,
-      versionIdList: versionId ? [versionId] : [],
-      regexPhrase: '',
-      logType: 'singleLine',
-      logLevels: levelFilter,
-      startTime,
-      endTime,
-      limit: PAGE_SIZE,
-      sort: sortDir,
-      region: region || DEFAULT_DP_REGION,
-      searchPhrase,
-    };
-  }, [componentId, environmentId, versionId, open, levelFilter, startTime, endTime, sortDir, region, searchPhrase]);
-
-  const { data, isLoading, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteComponentLogs(logsRequest, autoFetch ? AUTO_FETCH_INTERVAL : false, logsApiUrl);
-
-  const logs = useVisibleLogs(data, { levels: levelFilter });
+/** One deployment's runtime logs, in the same toolbar and viewer as the Runtime Logs page. */
+export default function ServiceLogsDrawer({ open, onClose, projectId, componentHandler, env, versionId, region }: ServiceLogsDrawerProps): JSX.Element {
+  const { org } = useScope();
+  const orgUuid = useOrgUuid();
+  const { data: component, isError, refetch } = useComponentByHandler(open ? projectId : '', componentHandler);
 
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
@@ -89,121 +48,49 @@ export default function ServiceLogsDrawer({ open, onClose, componentId, environm
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="h5">Runtime Logs</Typography>
-        <IconButton size="small" aria-label="close" onClick={handleClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
-
-      {/* Filters */}
-      <Box sx={{ px: 2, pt: 2, pb: 1, flexShrink: 0 }}>
-        <Stack direction="row" gap={1.5} flexWrap="wrap" alignItems="center" sx={{ mb: 1 }}>
-          {/* Log level filter */}
-          <Select
-            multiple
-            value={levelFilter}
-            onChange={(e) => setLevelFilter(e.target.value as string[])}
-            displayEmpty
-            renderValue={(selected) => {
-              const sel = selected as string[];
-              return sel.length === 0 ? 'All Levels' : sel.join(', ');
-            }}
-            size="small"
-            sx={{ minWidth: 120 }}
-            inputProps={{ 'aria-label': 'Log level' }}>
-            {LOG_LEVELS.map((l) => (
-              <MenuItem key={l} value={l}>
-                {l}
-              </MenuItem>
-            ))}
-          </Select>
-
-          {/* Time range */}
-          <Stack direction="row" alignItems="center" gap={0.5}>
-            <Select
-              value={timePreset}
-              onChange={(e) => {
-                const v = e.target.value as string;
-                setTimePreset(v);
-                if (v === 'custom') {
-                  setCustomEnd(formatLocalDatetime(new Date()));
-                  setCustomStart(formatLocalDatetime(new Date(Date.now() - 24 * 3600_000)));
-                }
-              }}
-              size="small"
-              sx={{ minWidth: 160 }}
-              inputProps={{ 'aria-label': 'Time range' }}>
-              {TIME_PRESETS.map((p) => (
-                <MenuItem key={p.label} value={p.label}>
-                  {p.label}
-                </MenuItem>
-              ))}
-              <MenuItem value="custom">Custom</MenuItem>
-            </Select>
-            {timePreset !== '' && (
-              <Tooltip title="Clear time filter (defaults to 30 days)">
-                <IconButton size="small" onClick={() => setTimePreset('')}>
-                  <X size={14} />
-                </IconButton>
-              </Tooltip>
-            )}
-          </Stack>
-
-          {/* Sort direction */}
-          <Select value={sortDir} onChange={(e) => setSortDir(e.target.value as 'asc' | 'desc')} size="small" sx={{ minWidth: 120 }} inputProps={{ 'aria-label': 'Sort direction' }}>
-            <MenuItem value="desc">Newest first</MenuItem>
-            <MenuItem value="asc">Oldest first</MenuItem>
-          </Select>
-
-          {/* Search */}
-          <SearchField value={searchPhrase} onChange={setSearchPhrase} placeholder="Search logs..." sx={{ minWidth: 180, flex: 1 }} />
-
-          {/* Auto fetch */}
-          <FormControlLabel control={<Checkbox checked={autoFetch} onChange={(_, c) => setAutoFetch(c)} size="small" />} label="Auto Fetch" sx={{ mr: 0, whiteSpace: 'nowrap' }} slotProps={{ typography: { variant: 'body2' } }} />
-
-          {/* Download */}
-          <Tooltip title="Download logs">
-            <IconButton size="small" aria-label="Download logs" onClick={() => downloadLogs(logs)} disabled={logs.length === 0}>
-              <Download size={18} />
-            </IconButton>
-          </Tooltip>
-
-          {/* Refresh */}
-          <Button variant="outlined" size="small" onClick={() => refetch()} disabled={!logsRequest} startIcon={<RefreshCw size={14} />}>
-            Refresh
-          </Button>
+    <DrawerPanel open={open} onClose={handleClose} width={720}>
+      <DrawerPanel.Header>
+        <Stack sx={{ flex: 1, minWidth: 0 }}>
+          <DrawerPanel.Title>Runtime Logs</DrawerPanel.Title>
+          <Typography variant="caption" color="text.secondary">
+            {env.name}
+          </Typography>
         </Stack>
+        <DrawerPanel.Actions>
+          <DrawerPanel.ExpandButton />
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-        {/* Custom date range */}
-        {timePreset === 'custom' && (
-          <Stack direction="row" gap={1.5} sx={{ mb: 1 }} flexWrap="wrap" alignItems="center">
-            <TextField type="datetime-local" size="small" label="Start" value={customStart} onChange={(e) => setCustomStart(e.target.value)} />
-            <TextField type="datetime-local" size="small" label="End" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} />
-            <Button variant="contained" size="small" onClick={() => refetch()}>
-              Apply
-            </Button>
+      {isError ? (
+        <DrawerPanel.Body>
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => refetch()}>
+                Retry
+              </Button>
+            }>
+            Could not load this integration's logs.
+          </Alert>
+        </DrawerPanel.Body>
+      ) : open && component && orgUuid ? (
+        <IntegrationLogs orgHandler={org} orgUuid={orgUuid} component={component} environments={[env]} region={region} versionIds={versionId ? [versionId] : []}>
+          {({ toolbar, viewer }) => (
+            <>
+              <Stack sx={toolbarSx}>{toolbar}</Stack>
+              <DrawerPanel.Body>{viewer}</DrawerPanel.Body>
+            </>
+          )}
+        </IntegrationLogs>
+      ) : (
+        <DrawerPanel.Body>
+          <Stack gap={1.5} aria-busy="true" aria-label="Loading logs">
+            <Skeleton variant="rounded" height={40} />
+            <Skeleton variant="rounded" height={320} />
           </Stack>
-        )}
-      </Box>
-
-      {/* Log content */}
-      <Box sx={{ flex: 1, overflow: 'hidden', px: 2, pb: 2 }}>
-        <LogsPanel
-          items={logs}
-          getKey={(l, i) => `${i}-${l.timestamp}-${l.logLine.slice(0, 50)}`}
-          renderRow={(l, ex, tg) => <LogEntry log={l} expanded={ex} onToggle={tg} envName={envName} />}
-          isLoading={isLoading}
-          error={error}
-          hasNextPage={hasNextPage}
-          isFetchingNextPage={isFetchingNextPage}
-          onRefetch={refetch}
-          onFetchNextPage={fetchNextPage}
-          onClearFilters={clearFilters}
-        />
-      </Box>
-    </Drawer>
+        </DrawerPanel.Body>
+      )}
+    </DrawerPanel>
   );
 }

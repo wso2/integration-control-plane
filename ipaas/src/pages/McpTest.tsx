@@ -104,7 +104,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
       <DeploymentTrackBar component={component} />
-      <PageContent sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <PageContent fullWidth sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
           <PageTitle>
             <PageTitle.Header>Test</PageTitle.Header>

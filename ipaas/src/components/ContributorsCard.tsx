@@ -27,14 +27,14 @@ export default function ContributorsCard({ projectId }: { projectId: string }): 
   if (!contributors || contributors.length === 0) return null;
 
   return (
-    <Card variant="outlined">
+    <Card>
       <CardContent>
         <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
           <Users size={20} aria-hidden="true" />
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             Contributors
           </Typography>
-          <Tooltip title="Users who have created integrations in this project">
+          <Tooltip title="Contributors to the source of the integrations deployed in this project">
             <Info size={14} aria-label="Contributors info" style={{ color: 'var(--oxygen-palette-text-secondary, #6b7280)', cursor: 'default' }} />
           </Tooltip>
         </Stack>

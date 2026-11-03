@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { capitalize, toCamelCase, toHandler, formatRepoNameToDisplayName, toProjectHandler, truncate, userInitials } from './string';
+import { capitalize, toCamelCase, toHandler, formatRepoNameToDisplayName, toProjectHandler, truncate, userInitials, withRandomSuffix } from './string';
 
 describe('capitalize', () => {
   it('uppercases the first character', () => {
@@ -81,6 +81,27 @@ describe('formatRepoNameToDisplayName', () => {
 
   it('leaves names without hyphens capitalized correctly', () => {
     expect(formatRepoNameToDisplayName('myproject')).toBe('Myproject');
+  });
+});
+
+describe('withRandomSuffix', () => {
+  it('appends the suffix with a hyphen', () => {
+    expect(withRandomSuffix('default', 25, '7qspy')).toBe('default-7qspy');
+  });
+
+  it('trims the handle so the result fits the maximum length', () => {
+    const result = withRandomSuffix('a'.repeat(25), 25, '7qspy');
+    expect(result).toHaveLength(25);
+    expect(result.endsWith('-7qspy')).toBe(true);
+  });
+
+  it('drops a trailing hyphen left by trimming', () => {
+    expect(withRandomSuffix('abc-defg', 10, 'xy')).toBe('abc-def-xy');
+    expect(withRandomSuffix('abcd-efg', 9, 'xyz')).toBe('abcd-xyz');
+  });
+
+  it('generates a lowercase alphanumeric suffix by default', () => {
+    expect(withRandomSuffix('default', 25)).toMatch(/^default-[a-z0-9]{5}$/);
   });
 });
 

@@ -57,14 +57,14 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
 
   if (loadingComponent) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
   }
 
   if (!component) {
-    return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+    return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
   }
 
   // A loaded integration always resolves a track; the check narrows the type for what follows.
@@ -79,7 +79,7 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       <DeploymentTrackBar component={component} />
-      <PageContent>
+      <PageContent fullWidth>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }} flexWrap="wrap" gap={1}>
           <Stack direction="row" alignItems="center" gap={1.5}>
             <Typography variant="h1">Test</Typography>

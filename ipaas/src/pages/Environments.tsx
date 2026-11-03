@@ -16,10 +16,9 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, ListingTable, PageContent, PageTitle, Stack, TablePagination, Tooltip, Typography, TextField, RelativeTime } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX } from '../constants/styles';
 import SearchField from '../components/SearchField';
-import TextField from '../components/common/TextField';
 import { Layers, Plus, Trash2, AlertTriangle } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useLocation } from 'react-router';
@@ -30,7 +29,7 @@ import { useOrgs } from '../hooks/useOrg';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import type { EnvironmentTemplate } from '../types/environment';
 import EmptyListing from '../components/EmptyListing';
-import { formatDistanceToNow } from '../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { editEnvironmentUrl, newEnvironmentUrl, type OrgScope, type ProjectScope } from '../nav';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
@@ -151,10 +150,19 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
   const paginated = filtered.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
         <PageTitle.Header>Environments</PageTitle.Header>
         <PageTitle.SubHeader>Deployment targets for integrations, shared by every project in this organization.</PageTitle.SubHeader>
+        {!isLoading && !isError && !!templates?.length && (
+          <PageTitle.Actions>
+            <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
+              <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newEnvironmentUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+                Create environment
+              </Button>
+            </Authorized>
+          </PageTitle.Actions>
+        )}
       </PageTitle>
 
       {isLoading ? (
@@ -172,16 +180,11 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
           Failed to load environments.
         </Alert>
       ) : !templates?.length ? (
-        <EmptyListing icon={<Layers size={48} />} title="No environments found" description={EMPTY_DESCRIPTION} showAction={canManageEnv} actionLabel="Create Environment" onAction={() => navigate(newEnvironmentUrl(scope))} />
+        <EmptyListing icon={<Layers size={48} />} title="No environments found" description={EMPTY_DESCRIPTION} showAction={canManageEnv} actionLabel="Create environment" onAction={() => navigate(newEnvironmentUrl(scope))} />
       ) : (
         <>
           <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 3 }}>
             <SearchField value={search} onChange={setSearch} placeholder="Search environments..." fullWidth />
-            <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
-              <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newEnvironmentUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
-                Create Environment
-              </Button>
-            </Authorized>
           </Stack>
           {alert && (
             <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 3 }}>
@@ -214,9 +217,13 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
                           <Chip size="small" variant="outlined" color={t.critical ? 'error' : 'default'} label={t.critical ? 'Critical' : 'Non-Critical'} />
                         </ListingTable.Cell>
                         <ListingTable.Cell>
-                          <Typography variant="body2" color="text.secondary">
-                            {t.createdAt ? formatDistanceToNow(t.createdAt) : '—'}
-                          </Typography>
+                          {t.createdAt ? (
+                            <RelativeTime time={formatDistanceToNow(t.createdAt)} dateTime={t.createdAt} tooltip={formatDateTime(t.createdAt)} />
+                          ) : (
+                            <Typography variant="body2" color="text.secondary">
+                              —
+                            </Typography>
+                          )}
                         </ListingTable.Cell>
                         {canManageEnv && (
                           <ListingTable.Cell>

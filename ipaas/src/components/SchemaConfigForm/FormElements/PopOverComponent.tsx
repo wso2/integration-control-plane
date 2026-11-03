@@ -232,7 +232,7 @@ export function PopOverComponent({
         </Box>
 
         <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ mt: 1.5 }}>
-          <Button size="small" onClick={onClose}>
+          <Button size="small" variant="outlined" color="inherit" onClick={onClose}>
             Cancel
           </Button>
           <Button size="small" variant="contained" disabled={isDisableSaveBtn} onClick={onValueAdd}>

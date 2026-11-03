@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
-import { Plus, Trash2, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, DrawerPanel, IconButton, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
 import { useEnvEndpoints } from '../../hooks/useDeployments';
@@ -59,19 +58,6 @@ interface MiConfigureDrawerProps {
   /** Configure & Deploy: offer Continue (calls `onSaved`) when nothing changed or nothing can be set yet. */
   continueWithoutChanges?: boolean;
 }
-
-const drawerSx = {
-  '& .MuiDrawer-paper': {
-    width: 560,
-    position: 'fixed',
-    top: 64,
-    height: 'calc(100% - 64px)',
-    borderLeft: '1px solid',
-    borderColor: 'divider',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-} as const;
 
 /**
  * Configure an MI integration: a free-form list of environment variables and
@@ -290,8 +276,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           )}
           .
         </Alert>
-        {renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add Environment Variable')}
-        {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add Secret')}
+        {renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')}
+        {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')}
         {showErrors && errors.size > 0 && <Alert severity="error">Fix the highlighted keys before saving.</Alert>}
       </>
     );
@@ -305,17 +291,17 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   return (
     <>
-      <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-          <Typography variant="h5">Configurations</Typography>
-          <IconButton size="small" aria-label="close" onClick={handleClose}>
-            <X size={16} />
-          </IconButton>
-        </Stack>
+      <DrawerPanel open={open} onClose={handleClose}>
+        <DrawerPanel.Header>
+          <DrawerPanel.Title>Configurations</DrawerPanel.Title>
+          <DrawerPanel.Actions>
+            <DrawerPanel.CloseButton />
+          </DrawerPanel.Actions>
+        </DrawerPanel.Header>
 
         {showEndpoints && <StepIndicator step={step} steps={STEPS} />}
 
-        <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 2 }}>{step === 1 ? renderContent() : renderEndpoints()}</Box>
+        <DrawerPanel.Body>{step === 1 ? renderContent() : renderEndpoints()}</DrawerPanel.Body>
 
         {saveError && (
           <Alert severity="error" sx={{ mx: 2, mb: 1 }}>
@@ -325,8 +311,10 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
         {/* ManageEndpoint has its own Cancel/Update. */}
         {!(step === 2 && managingEp) && (
-          <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-            <Button onClick={step === 2 ? () => setStep(1) : handleClose}>{step === 2 ? 'Back' : 'Cancel'}</Button>
+          <DrawerPanel.Footer>
+            <Button variant="outlined" color="inherit" onClick={step === 2 ? () => setStep(1) : handleClose}>
+              {step === 2 ? 'Back' : 'Cancel'}
+            </Button>
             {step < lastStep ? (
               <Button variant="contained" onClick={handleNext}>
                 Next
@@ -338,9 +326,9 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
                 </Button>
               )
             )}
-          </Stack>
+          </DrawerPanel.Footer>
         )}
-      </Drawer>
+      </DrawerPanel>
 
       {showEndpoints && <ApiSettingsDrawer open={settingsEp !== null} onClose={() => setSettingsEp(null)} componentName={componentId} envName={envId} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />}
     </>

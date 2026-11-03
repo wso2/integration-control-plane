@@ -68,7 +68,7 @@ export default function ComponentScaling({ org, project, component }: ComponentS
   return (
     <Box>
       {tracks.length > 0 && <DeploymentTrackBar component={comp} extra={envSelect} />}
-      <PageContent>
+      <PageContent fullWidth>
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
             <CircularProgress />

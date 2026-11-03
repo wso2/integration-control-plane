@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Checkbox, FormControlLabel, FormHelperText, IconButton, MenuItem, Select, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Checkbox, FormControlLabel, FormHelperText, IconButton, MenuItem, Select, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, KeyboardEvent } from 'react';
 import type { DynamicFormFieldValue, FormField } from '../../types/executions';
@@ -37,16 +36,7 @@ export default function FormFieldTile({ field, value, onChange, error, helperTex
   const asArray = Array.isArray(value) ? value : [];
   const runtimeType = field.runtimeType ?? '';
 
-  const label = (
-    <Stack direction="row" spacing={0.5} alignItems="baseline">
-      <Typography sx={{ fontWeight: 600 }}>{field.label}</Typography>
-      {field.required && (
-        <Typography component="span" sx={{ color: 'error.main' }}>
-          *
-        </Typography>
-      )}
-    </Stack>
-  );
+  const label = <Typography sx={{ fontWeight: 600 }}>{field.required ? field.label : `${field.label} (Optional)`}</Typography>;
 
   const renderInput = (): JSX.Element => {
     switch (field.inputType) {

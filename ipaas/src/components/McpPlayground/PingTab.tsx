@@ -46,7 +46,7 @@ export default function PingTab({ ping }: PingTabProps): JSX.Element {
       </Typography>
       <Box>
         <Button variant="contained" size="small" startIcon={pinging ? <CircularProgress size={14} color="inherit" /> : <Radio size={16} />} disabled={pinging} onClick={() => void doPing()}>
-          {pinging ? 'Pinging…' : 'Ping Server'}
+          {pinging ? 'Pinging…' : 'Ping server'}
         </Button>
       </Box>
       {result && (

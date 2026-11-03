@@ -23,6 +23,7 @@ import ResourceRangeSlider from '../common/ResourceRangeSlider';
 import { useUpdateContainer } from '../../hooks/useDevopsConfigs';
 import { CPU_MAX, CPU_MIN, CPU_STEP, MEMORY_MAX, MEMORY_MIN, MEMORY_STEP, MIN_GAP_CPU, MIN_GAP_MEMORY, containerToForm, formToWriteData } from '../../utils/containers';
 import { IMAGE_PULL_POLICY, type ImagePullPolicy, type ReleaseContainer } from '../../types/devopsConfigs';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 interface ContainerEditFormProps {
   container: ReleaseContainer;
@@ -46,6 +47,8 @@ export default function ContainerEditForm({ container, projectId, componentId, r
   const initialForm = useRef(form).current;
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
   const update = useUpdateContainer(projectId, componentId, releaseId, deploymentTrackId);
+  useUnsavedChanges(isDirty);
+  const guardNavigation = useLeaveGuard();
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]): void => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -62,8 +65,8 @@ export default function ContainerEditForm({ container, projectId, componentId, r
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={onClose} sx={{ px: 0 }}>
-          Go Back
+        <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => guardNavigation(onClose)} sx={{ px: 0 }}>
+          Back to container
         </Button>
       </Box>
 
@@ -133,11 +136,11 @@ export default function ContainerEditForm({ container, projectId, componentId, r
       </Grid>
 
       <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
-        <Button variant="outlined" onClick={onClose} disabled={update.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={onSubmit} disabled={update.isPending || !isDirty} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-          Save Changes
+          Save changes
         </Button>
       </Stack>
     </Box>

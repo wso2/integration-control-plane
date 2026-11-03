@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, IconButton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Minus, Plus } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 

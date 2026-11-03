@@ -223,7 +223,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
   };
 
   return (
-    <Card variant="outlined" sx={{ mb: 3 }}>
+    <Card sx={{ mb: 3 }}>
       <CardContent sx={{ pb: (theme) => `${theme.spacing(2)} !important` }}>
         <EnvironmentCardHeader
           envName={env.name}
@@ -342,7 +342,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
         buildId={envDeployment?.build?.buildId}
       />
 
-      {isGenericService && <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} componentId={componentId} environmentId={env.id} envName={env.name} versionId={versionId} />}
+      {isGenericService && <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} projectId={projectId} componentHandler={componentHandler} env={env} versionId={versionId} />}
     </Card>
   );
 }

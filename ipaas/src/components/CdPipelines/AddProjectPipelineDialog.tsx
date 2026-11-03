@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Autocomplete, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useOrgDeploymentPipelines, useUpdateProjectDeploymentPipelines } from '../../hooks/useDeploymentPipelines';
 import type { DeploymentPipeline } from '../../types/deploymentPipeline';
@@ -88,12 +87,12 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
             getOptionLabel={(p) => p.name}
             isOptionEqualToValue={(a, b) => a.id === b.id}
             disabled={update.isPending}
-            renderInput={(params) => <TextField {...params} label="Pipeline" />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} label="Pipeline" required />}
           />
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={update.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={add} disabled={!selected || update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

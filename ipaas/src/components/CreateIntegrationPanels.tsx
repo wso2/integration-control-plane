@@ -271,7 +271,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                   {standalone ? 'Create an Integration on Cloud' : 'Create on Cloud'}
                 </Typography>
               </Stack>
-              <Card variant="outlined" sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
+              <Card sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
                   <Box sx={{ flex: 1, minHeight: 260, overflow: 'hidden' }}>
                     <IDEMockup onOpenClick={handleOpenCloudEditor} />
@@ -292,7 +292,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                 {standalone ? 'Import your own Integration' : 'Import your own'}
               </Typography>
             )}
-            <Card variant="outlined" sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
+            <Card sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
               <CardContent
                 sx={{
                   display: 'flex',
@@ -335,9 +335,9 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     <CircularProgress size={22} />
                   ) : (
                     <>
-                      <Tooltip title="Import from a Public Repository" placement="top">
+                      <Tooltip title="Import from a public repository" placement="top">
                         <IconButton
-                          aria-label="Import from a Public Repository"
+                          aria-label="Import from a public repository"
                           onClick={(e) => {
                             e.stopPropagation();
                             trackEvent('component-create-import-public-url', { org: scope.org, project: scope.project });
@@ -397,7 +397,6 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             Start quickly
           </Typography>
           <Card
-            variant="outlined"
             sx={{
               flex: 1,
               boxShadow: 'none',

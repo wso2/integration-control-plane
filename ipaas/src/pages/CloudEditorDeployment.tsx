@@ -189,7 +189,7 @@ export default function CloudEditorDeployment(): JSX.Element {
           <Typography variant="body2">{error}</Typography>
         </Alert>
         <Button variant="outlined" onClick={() => window.close()}>
-          Close Tab
+          Close tab
         </Button>
       </Box>
     );

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, CircularProgress, Divider, IconButton, InputAdornment, OutlinedInput, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, CircularProgress, Divider, IconButton, InputAdornment, OutlinedInput, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Check, Copy, Eye, EyeOff, Key } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import SwaggerUI from 'swagger-ui-react';
@@ -170,14 +169,14 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   if (loadingComponent) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
   }
 
   if (!component) {
-    return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+    return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
   }
 
   const envSelector = environments.length > 1 && (
@@ -196,7 +195,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
       {tracks.length > 0 && <DeploymentTrackBar component={component} extra={envSelector} />}
 
-      <PageContent>
+      <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Test Console
         </Typography>
@@ -268,7 +267,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                       sx={{ flex: 1, fontFamily: 'monospace', fontSize: '0.8rem' }}
                       endAdornment={
                         <InputAdornment position="end">
-                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to Clipboard'}>
+                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to clipboard'}>
                             <IconButton
                               size="small"
                               onClick={() => {
@@ -332,7 +331,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                           disabled={fetchingKey || !canGetTestKey}
                           onClick={handleGetTestKey}
                           sx={{ whiteSpace: 'nowrap', textTransform: 'none' }}>
-                          Get Test Key
+                          Get test key
                         </Button>
                       </Stack>
                       {keyError && (

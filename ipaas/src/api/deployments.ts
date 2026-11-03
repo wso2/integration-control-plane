@@ -129,7 +129,7 @@ export function toEnvEndpoint(ep: BffEndpointResources, releaseId: string): EnvE
   };
 }
 
-export const fetchEnvEndpoints = (componentId: string, _versionId: string, releaseId: string): Promise<EnvEndpoint[]> =>
+export const fetchEnvEndpoints = (componentId: string, _versionId: string | undefined, releaseId: string): Promise<EnvEndpoint[]> =>
   bff.get<{ endpoints?: BffEndpointResources[] }>(`/components/${seg(componentId)}/releases/${seg(releaseId)}/endpoints`).then((r) => (r?.endpoints ?? []).map((ep) => toEnvEndpoint(ep, releaseId)));
 
 // The fields read from GET /components/{name}/builds (BFF WorkflowRun).

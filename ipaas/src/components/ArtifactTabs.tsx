@@ -373,7 +373,7 @@ export function ProxyApiReference({ envId, componentId, artifactType, artifact }
 
   return (
     <Stack gap={2}>
-      <Card variant="outlined" sx={{ '& .MuiCardContent-root:last-child': { pb: 1.5 } }}>
+      <Card sx={{ '& .MuiCardContent-root:last-child': { pb: 1.5 } }}>
         <CardContent>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
             {info.serviceName}
@@ -467,7 +467,7 @@ export function AutomationExecutions({ artifact, orgHandler, projectHandler, com
                   <Chip label={exec.status} size="small" color={statusColor(exec.status)} />
                 </ListingTable.Cell>
                 <ListingTable.Cell>
-                  <Tooltip title="View Logs">
+                  <Tooltip title="View logs">
                     <IconButton size="small" onClick={() => navigate(logsUrl)}>
                       <ScrollText size={16} />
                     </IconButton>

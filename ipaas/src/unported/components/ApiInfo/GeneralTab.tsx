@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Accordion, AccordionDetails, AccordionSummary, Box, Button, IconButton, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, IconButton, Table, TableBody, TableCell, TableHead, TableRow, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import type { ApimApiInfo } from '../../../types/apim';

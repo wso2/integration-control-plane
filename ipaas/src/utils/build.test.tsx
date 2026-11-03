@@ -38,7 +38,7 @@ import AzureDevOpsIcon from '../assets/icons/AzureDevOpsIcon';
 import GitLabIcon from '../assets/icons/GitLabIcon';
 import BitbucketIcon from '../assets/icons/BitbucketIcon';
 import GitLogoIcon from '../assets/icons/GitLogoIcon';
-import { safeAtob, buildLogText, getStepStatus, formatBuildDate, gitProviderLabel, getGitProviderIcon, repoUrl, validateBuildEnvVar } from './build';
+import { safeAtob, buildLogText, getStepStatus, isBuildLive, formatBuildDate, gitProviderLabel, getGitProviderIcon, repoUrl, validateBuildEnvVar } from './build';
 import type { BuildRunLogs, BuildStage } from '../types/build';
 import type { Repository } from '../types/repository';
 
@@ -349,5 +349,17 @@ describe('validateBuildEnvVar', () => {
       { key: 'BAZ', value: 'qux' },
     ];
     expect(validateBuildEnvVar(vars, 0, keyRegex)).toBe(null);
+  });
+});
+
+describe('isBuildLive', () => {
+  it('is live while queued or running', () => {
+    expect(isBuildLive('queued')).toBe(true);
+    expect(isBuildLive('in_progress')).toBe(true);
+  });
+
+  it('is not live once completed or unknown', () => {
+    expect(isBuildLive('completed')).toBe(false);
+    expect(isBuildLive(undefined)).toBe(false);
   });
 });

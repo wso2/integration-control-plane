@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, MenuItem, Stack } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Box, MenuItem, Stack, TextField } from '@wso2/oxygen-ui';
 import { useCallback, useEffect, useRef, useState, type JSX } from 'react';
 import { useFetchServerLogs } from '../../../hooks/usePlatformServices';
 import { LOG_TIME_RANGES } from '../../../../constants/platformServices';
@@ -99,7 +98,7 @@ export default function LogsTab({ serverId, variant = 'db-servers' }: { serverId
   return (
     <Box>
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-        <TextField select size="small" label="Time range" value={rangeMinutes} onChange={(e) => setRangeMinutes(Number(e.target.value))} sx={{ minWidth: 180 }}>
+        <TextField labelPlacement="top" select size="small" label="Time range" value={rangeMinutes} onChange={(e) => setRangeMinutes(Number(e.target.value))} sx={{ minWidth: 180 }}>
           {LOG_TIME_RANGES.map((r) => (
             <MenuItem key={r.minutes} value={r.minutes}>
               {r.label}

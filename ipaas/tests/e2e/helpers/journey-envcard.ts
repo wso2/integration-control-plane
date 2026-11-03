@@ -41,7 +41,7 @@ export function deploymentStatus(page: Page): Locator {
 /** The Latest Build header, so its status is read from the build and not the first match on the page. */
 export function buildCard(page: Page): Locator {
   // Hopped from the heading: the build card is a Box, so there is no Card element to filter on.
-  return page.getByRole('heading', { name: 'Latest Build' }).locator('xpath=ancestor::*[.//button[normalize-space()="View Logs"]][1]');
+  return page.getByRole('heading', { name: 'Latest Build' }).locator('xpath=ancestor::*[.//button[normalize-space()="View logs"]][1]');
 }
 
 /** Closes a modal left open over the page, which would otherwise hide the card being asserted. */
@@ -99,7 +99,7 @@ export async function requireActiveDeployment(page: Page, name = SAMPLE): Promis
 /** Reloaded, not merely awaited: the card renders "Deploy this agent…" until a build lands and does not refetch on its own. */
 export async function waitForConfigureGate(page: Page, timeout = AGENT_GATE_TIMEOUT_MS): Promise<string> {
   const deadline = Date.now() + timeout;
-  const gate = () => envCard(page).getByRole('button', { name: 'Configure to Continue' });
+  const gate = () => envCard(page).getByRole('button', { name: 'Configure to continue' });
 
   for (;;) {
     if (
@@ -132,7 +132,7 @@ export async function requireAutomationReady(page: Page): Promise<void> {
   await expect(
     envCard(page)
       .getByRole('button', { name: 'Schedule', exact: true })
-      .or(envCard(page).getByRole('button', { name: 'Stop Schedule' })),
+      .or(envCard(page).getByRole('button', { name: 'Stop schedule' })),
     `${AUTOMATION} offers no Schedule action, so it is not deployed`,
   ).toBeEnabled({ timeout: MI_DEPLOY_TIMEOUT_MS });
   await expect(envCard(page).getByRole('button', { name: 'Test', exact: true }), `${AUTOMATION} offers no Test action, so it is not deployed`).toBeEnabled({ timeout: MI_DEPLOY_TIMEOUT_MS });
@@ -144,7 +144,7 @@ export function consumerRow(page: Page, name: string): Locator {
 
 /** Opens the create drawer, whose button is named for whether the API has consumers yet. */
 export async function openConsumerDrawer(page: Page): Promise<void> {
-  const create = envCard(page).getByRole('button', { name: /^(Consume API|New Consumer)$/ });
+  const create = envCard(page).getByRole('button', { name: /^(Consume API|New consumer)$/ });
   await expect(create).toBeVisible({ timeout: 30_000 });
   await create.click();
 }
@@ -179,9 +179,9 @@ export async function deleteAllConsumers(page: Page): Promise<string | null> {
   }
 }
 
-/** Finished runs only: a synthesised scheduled or queued row renders "--" and offers no View Logs. */
+/** Finished runs only: a synthesised scheduled or queued row renders "--" and offers no View logs. */
 export function finishedExecutions(page: Page): Locator {
-  return envCard(page).getByRole('button', { name: 'View Logs' });
+  return envCard(page).getByRole('button', { name: 'View logs' });
 }
 
 export async function waitForExecutionsPanel(page: Page): Promise<void> {

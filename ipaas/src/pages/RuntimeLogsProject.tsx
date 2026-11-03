@@ -95,7 +95,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
 
   if (loadingProject || loadingComponents || loadingEnvironments) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -103,7 +103,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
 
   if (allComponents.length === 0) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <EmptyListing icon={<ScrollText size={48} />} title="No integrations found" description="Add an integration to this project before viewing runtime logs." />
       </PageContent>
     );
@@ -111,7 +111,7 @@ export default function RuntimeLogsProject(scope: ProjectScope): JSX.Element {
 
   if (environments.length === 0) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <EmptyListing icon={<ScrollText size={48} />} title="No environments available" description="No deployment environments were found for this project. Deploy your integration first." />
       </PageContent>
     );

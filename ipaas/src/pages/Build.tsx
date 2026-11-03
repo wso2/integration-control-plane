@@ -58,7 +58,7 @@ export default function Build(scope: ComponentScope): JSX.Element {
 
   if (isLoading) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -66,7 +66,7 @@ export default function Build(scope: ComponentScope): JSX.Element {
 
   if (!component) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography color="error">Failed to load component information.</Typography>
       </PageContent>
     );
@@ -102,7 +102,7 @@ export default function Build(scope: ComponentScope): JSX.Element {
   return (
     <>
       <DeploymentTrackBar component={component} />
-      <PageContent>
+      <PageContent fullWidth>
         <BuildHistory componentId={componentId} versionId={versionId} envId={envId} branch={branch} builds={builds} buildsLoading={loadingBuilds} commits={commits} commitsLoading={loadingCommits} repository={repository ?? null} />
       </PageContent>
     </>

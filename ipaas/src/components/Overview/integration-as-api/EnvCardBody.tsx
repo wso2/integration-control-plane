@@ -124,7 +124,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
 
       {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && (
         <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-          This component has not been deployed to this environment yet.
+          This integration has not been deployed to this environment yet.
         </Typography>
       )}
 
@@ -137,14 +137,13 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
         <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} deploymentTrackId={versionId} endpoints={toEndpointOptions(envEndpoints)} />
       )}
 
-      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !gatewayExposureEnabled && (
+      {/* A project-only endpoint has no consumers, so only an exposure in flight or failing is reported. */}
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !gatewayExposureEnabled && (gatewayExposureTransitioning || !!gatewayExposureFailure) && (
         <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           <Typography variant="body2" color={gatewayExposureFailure ? 'error.main' : 'text.secondary'}>
             {gatewayExposureTransitioning
               ? 'API exposure is being updated. Consumer and security settings will be available when the gateway deployment is ready.'
-              : gatewayExposureFailure
-                ? gatewayExposureFailure.reason || 'API exposure could not be completed. Retry the visibility update.'
-                : 'Expose this endpoint to Public or Organization visibility to configure consumers and API security.'}
+              : gatewayExposureFailure?.reason || 'API exposure could not be completed. Retry the visibility update.'}
           </Typography>
         </Box>
       )}

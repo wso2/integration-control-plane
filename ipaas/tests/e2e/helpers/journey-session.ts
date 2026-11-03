@@ -20,7 +20,7 @@
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { reseedSessionToken, waitForApiConfig } from './cloud-fixtures.js';
-import { expandSidebar, gotoOrgHome, openProject } from './console-nav.js';
+import { gotoOrgHome, openProject } from './console-nav.js';
 import { dismissStrayDialog } from './journey-envcard.js';
 import { PROJECT_REMOVAL_TIMEOUT_MS } from './journey-fixtures.js';
 import { activeProject } from './journey-project.js';
@@ -62,12 +62,21 @@ export async function enterProject(page: Page, orgHandler: string): Promise<void
   await openProject(page, activeProject());
 }
 
-/** Reached through the sidebar each time: reloading the settings URL bounces the console back to the project home. */
-export async function openProjectSettings(page: Page, orgHandler: string): Promise<void> {
-  await enterProject(page, orgHandler);
-  await expandSidebar(page);
-  await page.getByRole('button', { name: 'Settings', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 30_000 });
+/** Re-entered and hovered each time: the card fetches its integration count only once hovered. */
+export async function openProjectCard(page: Page, orgHandler: string): Promise<void> {
+  await enterOrgHome(page, orgHandler);
+  await filterToProject(page);
+  const name = page.getByText(activeProject(), { exact: true }).first();
+  await expect(name).toBeVisible({ timeout: 30_000 });
+  await name.hover();
+}
+
+/** `isVisible` ignores its timeout, so this waits for the element before answering. */
+export async function appears(locator: Locator, timeout = 15_000): Promise<boolean> {
+  return locator.waitFor({ state: 'visible', timeout }).then(
+    () => true,
+    () => false,
+  );
 }
 
 /** Narrows the org home to the fixture project: the list pages at ten cards, in no order we control. */
@@ -77,9 +86,9 @@ export async function filterToProject(page: Page): Promise<void> {
   await search.fill(activeProject());
 }
 
-/** Present only on a card that is not being deleted — see ProjectCard in Projects.tsx. */
-export function projectSettingsButton(page: Page): Locator {
-  return page.getByRole('button', { name: `Settings for ${activeProject()}` }).first();
+/** Present only on a card that is not being deleted, and disabled while integrations remain — see ProjectCard in Projects.tsx. */
+export function projectDeleteButton(page: Page, name: string = activeProject()): Locator {
+  return page.getByRole('button', { name: `Delete ${name}`, exact: true }).first();
 }
 
 /** Asked of the page, not remembered: a worker restart resets any flag and would skip every group. */
@@ -90,11 +99,7 @@ export async function enterProjectOrSkip(page: Page, orgHandler: string): Promis
     await enterOrgHome(page, orgHandler);
     await filterToProject(page);
     // Not the card's name: a deleting project keeps its card but is hidden from the switcher.
-    if (
-      await projectSettingsButton(page)
-        .isVisible({ timeout: 15_000 })
-        .catch(() => false)
-    ) {
+    if (await appears(projectDeleteButton(page))) {
       await openProject(page, activeProject());
       return;
     }
