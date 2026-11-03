@@ -1,0 +1,113 @@
+# --------------------------------------------------------------------
+# Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+#
+# WSO2 LLC. licenses this file to you under the Apache License,
+# Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# --------------------------------------------------------------------
+
+# Checks UP-DP on every PR that can change it: the BFF and SPA under
+# user-portal/up-dp, and the shared/ packages and Go module the BFF builds
+# with. The iPaaS mock and the shared *-mock packages are not checked.
+# Needs no secrets or external services.
+name: UP-DP PR Check
+
+on:
+  pull_request:
+    paths:
+      - 'user-portal/up-dp/**'
+      - 'user-portal/shared/**'
+      - 'user-portal/go.mod'
+      - 'user-portal/go.sum'
+      - 'user-portal/.golangci.yaml'
+      - '.github/workflows/up-dp-pr-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bff:
+    name: BFF tests and lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: user-portal
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: user-portal/go.mod
+          cache-dependency-path: user-portal/go.sum
+
+      # UP-DP and every shared/ package but the *-mock ones, as directories:
+      # golangci-lint takes directories, not import paths.
+      - name: List packages
+        run: |
+          SHARED=$(go list -f '{{.Dir}}' ./shared/... | grep -v -- '-mock$' | sed "s#^${PWD}/#./#" | tr '\n' ' ')
+          echo "PACKAGES=./up-dp/... ${SHARED}" >> "$GITHUB_ENV"
+          echo "Checking: ./up-dp/... ${SHARED}"
+
+      - name: Vet
+        run: go vet ${PACKAGES}
+
+      - name: Run tests
+        run: go test -race ${PACKAGES}
+
+      - name: Build
+        run: go build -o ./tmp/up-dp ./up-dp
+
+      # The same version and rules as `make lint`, on the packages above only.
+      - name: Lint
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.11.4
+          working-directory: user-portal
+          args: ${{ env.PACKAGES }} --timeout=5m
+
+  spa:
+    name: SPA type-check and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: user-portal/up-dp/web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: user-portal/up-dp/web/package.json
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: user-portal/up-dp/web/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # `tsc -b` first, so a type error or a misspelt string key fails the check.
+      - name: Build
+        run: pnpm build
