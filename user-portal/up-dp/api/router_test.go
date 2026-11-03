@@ -162,3 +162,18 @@ func TestIntegrationsRefusesAQueryOutOfBounds(t *testing.T) {
 		assert.Equal(t, http.StatusBadRequest, rec.Code, query)
 	}
 }
+
+func TestExecutionsRefusesALimitOutOfBounds(t *testing.T) {
+	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user-1","exp":4102444800}`))
+	router := newTestRouter(t)
+
+	for _, query := range []string{"limit=0", "limit=101", "limit=1000000", "limit=ten"} {
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/i1/deployment-tracks/t1/executions?"+query, nil)
+		req.Header.Set("Authorization", "Bearer e30."+payload+".c2ln")
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, req)
+
+		assert.Equal(t, http.StatusBadRequest, rec.Code, query)
+		assert.Contains(t, rec.Body.String(), "limit must be a number from 1 to 100.", query)
+	}
+}

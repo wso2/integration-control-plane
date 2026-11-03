@@ -61,9 +61,13 @@ func (h *IntegrationHandler) List(w http.ResponseWriter, r *http.Request) {
 	query := domain.IntegrationQuery{
 		Projects: params["project"],
 		Search:   strings.TrimSpace(params.Get("search")),
-		Limit:    defaultPageSize,
 		Cursor:   params.Get("cursor"),
 	}
+	limit, ok := pageLimit(w, r)
+	if !ok {
+		return
+	}
+	query.Limit = limit
 	if utf8.RuneCountInString(query.Search) > maxSearchLength {
 		web.StatusBadRequest(w, r, errors.New("search too long"), fmt.Sprintf("search must be at most %d characters.", maxSearchLength))
 		return
@@ -86,14 +90,6 @@ func (h *IntegrationHandler) List(w http.ResponseWriter, r *http.Request) {
 		}
 		query.Kinds = append(query.Kinds, kind)
 	}
-	if raw := params.Get("limit"); raw != "" {
-		limit, err := strconv.Atoi(raw)
-		if err != nil || limit < 1 || limit > maxPageSize {
-			web.StatusBadRequest(w, r, fmt.Errorf("limit %q", raw), fmt.Sprintf("limit must be a number from 1 to %d.", maxPageSize))
-			return
-		}
-		query.Limit = limit
-	}
 
 	page, err := h.catalog.Integrations(r.Context(), permissions(r), query)
 	if errors.Is(err, ipaasportal.ErrInvalidCursor) {
@@ -105,6 +101,21 @@ func (h *IntegrationHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	web.WriteResponse(w, r, http.StatusOK, page)
+}
+
+// pageLimit is a listing's limit, defaultPageSize when the caller gives none. Outside 1 to
+// maxPageSize, it answers 400 and false.
+func pageLimit(w http.ResponseWriter, r *http.Request) (int, bool) {
+	raw := r.URL.Query().Get("limit")
+	if raw == "" {
+		return defaultPageSize, true
+	}
+	limit, err := strconv.Atoi(raw)
+	if err != nil || limit < 1 || limit > maxPageSize {
+		web.StatusBadRequest(w, r, fmt.Errorf("limit %q", raw), fmt.Sprintf("limit must be a number from 1 to %d.", maxPageSize))
+		return 0, false
+	}
+	return limit, true
 }
 
 func (h *IntegrationHandler) Projects(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +149,10 @@ func (h *IntegrationHandler) Deployment(w http.ResponseWriter, r *http.Request) 
 }
 
 func (h *IntegrationHandler) Executions(w http.ResponseWriter, r *http.Request) {
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	limit, ok := pageLimit(w, r)
+	if !ok {
+		return
+	}
 	page, err := h.catalog.Executions(r.Context(), permissions(r), chi.URLParam(r, IntegrationIDParam), chi.URLParam(r, TrackIDParam), limit, r.URL.Query().Get("before"))
 	if err != nil {
 		writeUpstreamError(w, r, err)

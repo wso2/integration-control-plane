@@ -135,7 +135,7 @@ answer doesn't say it exists. A caller who may view no kind gets empty lists.
 | `GET /api/v1/integrations?kind=&project=&search=&limit=&cursor=` | `IntegrationPage`: the published agents, automations and workflows, a page at a time, see below |
 | `GET /api/v1/integrations/{id}` | `Integration`; 404 when it is not published, or the caller may not view its kind |
 | `GET /api/v1/integrations/{id}/deployment-tracks/{trackId}/deployment` | `Deployment` |
-| `GET /api/v1/integrations/{id}/deployment-tracks/{trackId}/executions?limit=&before=` | `ExecutionPage`. Automations only, with `automation:view` |
+| `GET /api/v1/integrations/{id}/deployment-tracks/{trackId}/executions?limit=&before=` | `ExecutionPage`. Automations only, with `automation:view`. `limit` is 1 to 100, default 20; a bad one gets 400 |
 | `POST /api/v1/integrations/{id}/deployment-tracks/{trackId}/executions` | 202 `Execution`. Body `{"args": [{"name","value"}]}`, see below. Automations only. Needs `automation:trigger`, else 403. A 400 carries the reason in `error` |
 
 The list is in display name order. `kind`, repeated for several, is one of `aiAgent`,
