@@ -30,7 +30,8 @@ import (
 	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/env"
 )
 
-const Version = "0.1.0"
+// Version is set at build time from up-dp/VERSION.
+var Version = "dev"
 
 var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 

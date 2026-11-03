@@ -6,6 +6,8 @@ download:
 tidy:
 	go mod tidy
 
+UP_DP_LDFLAGS = -X github.com/wso2-enterprise/integration-user-portal-service/up-dp/config.Version=$(shell cat up-dp/VERSION)
+
 # Local development: run `make run-mock`, `make run-up-dp` and `make web-dev` in
 # three terminals, then open http://localhost:5173 (or :9200, the mock gateway, after `make web`).
 .PHONY: run-mock
@@ -14,7 +16,7 @@ run-mock:
 
 .PHONY: run-up-dp
 run-up-dp:
-	go run ./up-dp
+	go run -ldflags="$(UP_DP_LDFLAGS)" ./up-dp
 
 .PHONY: web-install
 web-install:
@@ -33,7 +35,7 @@ build: build-up-dp build-mock
 
 .PHONY: build-up-dp
 build-up-dp:
-	go build -o ./tmp/up-dp ./up-dp
+	go build -ldflags="$(UP_DP_LDFLAGS)" -o ./tmp/up-dp ./up-dp
 
 .PHONY: build-mock
 build-mock:

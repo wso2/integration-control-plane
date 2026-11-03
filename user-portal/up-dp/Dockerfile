@@ -40,7 +40,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY shared/ shared/
 COPY up-dp/ up-dp/
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w" -o /out/up-dp ./up-dp
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -trimpath -ldflags="-s -w -X github.com/wso2-enterprise/integration-user-portal-service/up-dp/config.Version=$(cat up-dp/VERSION)" -o /out/up-dp ./up-dp
 
 FROM alpine:${ALPINE_VERSION}
 ARG APP_USER=up-dp-user
