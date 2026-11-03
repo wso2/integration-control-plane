@@ -313,7 +313,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
 
         <FileDropzone compact={entries.length > 0 || staged.length > 0} hint={`Up to ${formatBytes(UPLOAD_MAX_BYTES)} each.`} onFiles={(files) => setStaged((s) => stageFiles(s, files))} />
         <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: -1, lineHeight: 1.5 }}>
-          This list shows files uploaded from this browser. Files added from elsewhere are in the engine but not listed here.
+          Only files uploaded from this browser are listed.
         </Typography>
 
         {staged.length > 0 && (

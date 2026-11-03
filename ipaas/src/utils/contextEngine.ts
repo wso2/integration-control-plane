@@ -1143,10 +1143,10 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
       : {
           id: 'index',
           title: 'Index your sources',
-          description: uploadOnly ? `${indexing}Files become searchable as the engine indexes them, one at a time.` : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
+          description: uploadOnly ? (progress ? `${progressHeadline(progress)}.` : 'Files become searchable after upload.') : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
         },
     { id: 'ask', title: 'Ask it something', description: 'Try the Playground and check the cited passages.' },
-    { id: 'publish', title: 'Connect an agent', description: 'Use the REST API or the MCP server to call this engine from your integrations.' },
+    { id: 'publish', title: 'Connect an agent', description: 'Call it from agents over REST or MCP.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
   ];
   let currentAssigned = false;
@@ -1363,7 +1363,6 @@ export function evidencePart(evidence: Pick<ContextEvidence, 'locator' | 'locati
 }
 
 /** What a part is, for a passage the engine can place only by its part. */
-export const partHint = (part: number): string => `Files are split into parts for search. This passage is from part ${part}.`;
 
 /** A record version as people read it: uploads and most connectors version by epoch milliseconds. */
 export function evidenceVersionLabel(version: string): string {
@@ -1374,7 +1373,7 @@ export function evidenceVersionLabel(version: string): string {
 
 /** The version a passage was taken from, as a label, and what that date means. */
 export const versionFromLabel = (version: string): string => `Version from ${evidenceVersionLabel(version)}`;
-export const VERSION_HINT = 'This passage comes from the copy of the file saved at this time. Changes made after it are not in this passage.';
+export const VERSION_HINT = 'Later changes to the file are not included.';
 
 /** The passage split into its numbered source lines, or null when the lines cannot be lined up with the text. */
 export function passageLines(evidence: Pick<ContextEvidence, 'locator' | 'passage'>): { n: number; text: string }[] | null {

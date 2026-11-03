@@ -17,9 +17,9 @@
  */
 
 import { Box, Chip, IconButton, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, ExternalLink, Info, Link as LinkIcon } from '@wso2/oxygen-ui-icons-react';
+import { Check, ExternalLink, Link as LinkIcon } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { absoluteUrl, evidencePart, evidencePlace, partHint, sourceTypeName, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
+import { absoluteUrl, evidencePlace, sourceTypeName, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import SourceMark from '../SourceMark';
 import { evidenceCardSx, mutedSx, passageSx } from '../styles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
@@ -27,7 +27,6 @@ import type { ContextEvidence, ContextSource } from '../../../types/contextEngin
 /** Where a passage sits: the item, then a JSON path as code, lines or sentences, and its section. */
 export function EvidencePlace({ evidence, showRecord = true }: { evidence: ContextEvidence; showRecord?: boolean }): JSX.Element {
   const place = evidencePlace(evidence);
-  const part = evidencePart(evidence);
   return (
     <Typography component="span" variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.5, minWidth: 0, flexWrap: 'wrap' }}>
       {showRecord && <span>{evidence.recordId}</span>}
@@ -42,13 +41,6 @@ export function EvidencePlace({ evidence, showRecord = true }: { evidence: Conte
       {place.parts.map((p, i) => (
         <span key={p}>{`${showRecord || place.path || i > 0 ? '· ' : ''}${p}`}</span>
       ))}
-      {place.coarse && part !== undefined && (
-        <Tooltip title={partHint(part)}>
-          <Box component="span" tabIndex={0} aria-label={partHint(part)} sx={{ display: 'inline-flex', color: 'text.secondary' }}>
-            <Info size={13} />
-          </Box>
-        </Tooltip>
-      )}
     </Typography>
   );
 }
