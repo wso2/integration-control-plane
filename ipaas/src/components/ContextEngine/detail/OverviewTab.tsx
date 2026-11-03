@@ -21,9 +21,8 @@ import { EyeOff, Info, KeyRound, Lock /* , Play, RefreshCw */ } from '@wso2/oxyg
 import { useState, type JSX, type ReactNode } from 'react';
 import { CONTEXT_ENGINE_PROVISIONING, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
-import { LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
-import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { checkStagedFile, connectorFor, effectiveVisibility, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
+import { EVERYONE_VISIBILITY, STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { checkStagedFile, connectorFor, effectiveVisibility, engineMessage, getStartedSteps, modelKeysLabel, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GetStartedChecklist from './GetStartedChecklist';
@@ -72,11 +71,6 @@ function LockedChip({ title }: { title: string }): JSX.Element {
   );
 }
 
-const providerName = (kind: 'embedding' | 'llm', id: string | undefined): string => {
-  if (!id) return '—';
-  const list: { id: string; name: string }[] = kind === 'embedding' ? EMBEDDING_PROVIDERS : LLM_PROVIDERS;
-  return list.find((p) => p.id === id)?.name ?? id;
-};
 
 function ModelRow({ label, provider, model, locked = false }: { label: string; provider: string; model: string | undefined; locked?: boolean }): JSX.Element {
   return (
@@ -256,11 +250,11 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             }>
             {canSeeModels(permissions.data) ? (
               <>
-                <ModelRow label="Embedding" provider={engine.models.embedding ? providerName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
-                <ModelRow label="Language model" provider={engine.models.llm ? providerName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
+                <ModelRow label="Embedding" provider={engine.models.embedding ? modelProviderName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
+                <ModelRow label="Language model" provider={engine.models.llm ? modelProviderName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
                 <ModelRow
                   label="Answer model"
-                  provider={!engine.exposure.answers ? 'Answers off' : engine.models.answer ? providerName('llm', engine.models.answer.provider) : 'Engine default'}
+                  provider={!engine.exposure.answers ? 'Answers off' : engine.models.answer ? modelProviderName('llm', engine.models.answer.provider) : 'Engine default'}
                   model={engine.exposure.answers ? engine.models.answer?.model : undefined}
                 />
                 {modelKeysLabel(engine.models) ? (

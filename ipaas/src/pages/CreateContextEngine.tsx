@@ -22,6 +22,7 @@ import { useEffect, useMemo, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngineDraft, useContextEngines, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
+import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
 import {
   checkStagedFile,
   effectiveVisibility,
@@ -30,6 +31,7 @@ import {
   engineNameError,
   isFormDirty,
   modelsStepBlocker,
+  nameStepBlocker,
   sourcesStepBlocker,
   storageStepBlocker,
   toCreateInput,
@@ -40,6 +42,7 @@ import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import VerticalStepper from '../components/VerticalStepper';
+import NameStep from '../components/ContextEngine/steps/NameStep';
 import SourcesStep from '../components/ContextEngine/steps/SourcesStep';
 // import AccessStep from '../components/ContextEngine/steps/AccessStep'; — 'Grant Access' step hidden
 import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
@@ -53,8 +56,9 @@ import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
-const STEP_LABELS = ['Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Name & Create'];
+const STEP_LABELS = ['Name', 'Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Review & Create'];
 const LAST_STEP = STEP_LABELS.length - 1;
+const STORAGE_STEP = STEP_LABELS.indexOf('Configure Storage');
 
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
 export interface CreateContextEngineLocationState {
@@ -110,13 +114,15 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   }
 
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
-  const stepBlocker: (string | null)[] = [
+  const setupBlockers: (string | null)[] = [
+    nameStepBlocker(form.name, form.description),
     sourcesStepBlocker(form.sources),
     // null, — 'Grant Access' step hidden
     modelsStepBlocker(form),
     storageStepBlocker(form.storage),
-    !form.name.trim() ? 'Enter a name for the engine' : engineNameError(form.name) || engineDescriptionError(form.description) || null,
   ];
+  // The review step itself asks for nothing, so Create shows the first step still incomplete.
+  const stepBlocker = [...setupBlockers, setupBlockers.find((b) => b !== null) ?? null];
   const stepValid = stepBlocker.map((b) => b === null);
   const canCreate = stepValid.every(Boolean);
 
@@ -193,7 +199,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
             <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
           </Box>
-          <Box sx={{ flex: 1, maxWidth: activeStep === 2 ? 1080 : 960, mt: 2 }}>
+          <Box sx={{ flex: 1, maxWidth: activeStep === STORAGE_STEP ? 1080 : 960, mt: 2 }}>
             {showRestored && (
               <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
                 Draft restored. Re-enter API keys and tokens.
@@ -206,7 +212,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
               </Alert>
             )}
 
-            {activeStep === 0 && (
+            {activeStep === 0 && <NameStep name={form.name} description={form.description} onNameChange={(value) => dispatch({ type: 'name', value })} onDescriptionChange={(value) => dispatch({ type: 'description', value })} />}
+            {activeStep === 1 && (
               <SourcesStep
                 orgHandle={scope.org}
                 sources={form.sources}
@@ -216,9 +223,9 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 roleNames={roleNames}
               />
             )}
-            {/* 'Grant Access' step hidden — restore this branch (as activeStep === 1) and renumber the steps below to bring it back.
-            {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />} */}
-            {activeStep === 1 && (
+            {/* 'Grant Access' step hidden — restore this branch (as activeStep === 2) and renumber the steps below to bring it back.
+            {activeStep === 2 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />} */}
+            {activeStep === 2 && (
               <ModelsStep
                 embedding={form.embedding}
                 llm={form.llm}
@@ -232,19 +239,8 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 onAnswerLlmChange={(value) => dispatch({ type: 'answerLlm', value })}
               />
             )}
-            {activeStep === 2 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
-            {activeStep === 3 && (
-              <ReviewStep
-                form={form}
-                roleNames={roleNames}
-                everyone={everyone}
-                myGroups={myGroups}
-                draftSavedAt={draft.savedAt}
-                onNameChange={(value) => dispatch({ type: 'name', value })}
-                onDescriptionChange={(value) => dispatch({ type: 'description', value })}
-                onEdit={setActiveStep}
-              />
-            )}
+            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
+            {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} draftSavedAt={draft.savedAt} onEdit={setActiveStep} />}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
               <Button variant="outlined" disabled={create.isPending} onClick={activeStep === 0 ? () => (dirty ? setLeaveOpen(true) : navigate(base)) : () => setActiveStep((s) => Math.max(0, s - 1))}>
