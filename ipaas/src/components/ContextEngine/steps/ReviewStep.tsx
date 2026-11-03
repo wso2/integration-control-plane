@@ -20,7 +20,7 @@ import { Alert, Box, Button, Chip, Grid, Link, Stack, Typography } from '@wso2/o
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
-import { modelProviderName, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
+import { answerChoice, modelProviderName, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
 import { mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryDescriptionSx, summaryRowSx } from '../styles';
@@ -67,7 +67,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
   const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
   const embeddingName = form.embedding ? modelProviderName('embedding', form.embedding.provider) : '—';
   const llmName = form.llm ? modelProviderName('llm', form.llm.provider) : '—';
-  const answerName = form.answerLlm ? modelProviderName('llm', form.answerLlm.provider) : 'Language model';
+  const answer = answerChoice(form);
   const n = form.sources.length;
 
   return (
@@ -195,14 +195,16 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
               </Box>
               <Box>
                 <Typography variant="caption" sx={mutedSx}>
-                  Answers
+                  Answer model
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {form.answersEnabled ? answerName : 'Off'}
+                  {answer === 'different' && form.answerLlm ? modelProviderName('llm', form.answerLlm.provider) : answer === 'same' ? 'Same as the language model' : 'Off'}
                 </Typography>
-                <Typography variant="caption" sx={mutedSx}>
-                  {!form.answersEnabled ? 'Passages only' : form.answerLlm ? form.answerLlm.model || '—' : 'Same as the language model'}
-                </Typography>
+                {answer === 'different' && form.answerLlm && (
+                  <Typography variant="caption" sx={mutedSx}>
+                    {form.answerLlm.model || '—'}
+                  </Typography>
+                )}
               </Box>
             </Stack>
           </SummaryCard>

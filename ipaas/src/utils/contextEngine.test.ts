@@ -77,6 +77,8 @@ import {
   summarizeEngineProgress,
   buildMcpClientConfigs,
   buildQueryCurl,
+  answerChoice,
+  applyAnswerChoice,
   canShareApiKey,
   connectorCountsByCategory,
   effectiveLlm,
@@ -592,6 +594,49 @@ describe('shared api key', () => {
     expect(toCreateInput(chosen).answers).toEqual({ enabled: true, model: chosen.answerLlm });
     expect(toCreateInput({ ...chosen, answersEnabled: false }).answers).toEqual({ enabled: false, model: null });
     expect(toCreateInput(completeForm()).answers).toEqual({ enabled: true, model: null });
+  });
+});
+
+describe('answer model choice', () => {
+  const different = { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' };
+
+  it('reads the choice from the form', () => {
+    expect(answerChoice({ answersEnabled: true, answerLlm: null })).toBe('same');
+    expect(answerChoice({ answersEnabled: true, answerLlm: different })).toBe('different');
+    expect(answerChoice({ answersEnabled: false, answerLlm: null })).toBe('off');
+  });
+
+  it('reads a restored draft that is off but still holds a model as off', () => {
+    expect(answerChoice({ answersEnabled: false, answerLlm: different })).toBe('off');
+  });
+
+  it('maps same and off onto no separate model', () => {
+    const form = { ...completeForm(), answerLlm: different };
+    expect(applyAnswerChoice('same', form)).toEqual({ answersEnabled: true, answerLlm: null });
+    expect(applyAnswerChoice('off', form)).toEqual({ answersEnabled: false, answerLlm: null });
+  });
+
+  it('starts a different model on the language model provider', () => {
+    expect(applyAnswerChoice('different', completeForm())).toEqual({ answersEnabled: true, answerLlm: blankLlm('anthropic') });
+    expect(applyAnswerChoice('different', { llm: null, answerLlm: null }).answerLlm).toEqual(blankLlm(LLM_PROVIDERS[0].id));
+  });
+
+  it('keeps a different model already chosen', () => {
+    expect(applyAnswerChoice('different', { ...completeForm(), answerLlm: different })).toEqual({ answersEnabled: true, answerLlm: different });
+  });
+
+  it('round-trips each choice through the form state', () => {
+    for (const choice of ['same', 'different', 'off'] as const) {
+      expect(answerChoice(applyAnswerChoice(choice, completeForm()))).toBe(choice);
+    }
+  });
+
+  it('blocks the models step only while a different model is incomplete', () => {
+    const form = completeForm();
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('same', form) })).toBeNull();
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('off', form) })).toBeNull();
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', form) })).toBe('Complete the answer model');
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', { ...form, answerLlm: different }) })).toBeNull();
   });
 });
 

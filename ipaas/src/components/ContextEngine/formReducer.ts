@@ -17,6 +17,7 @@
  */
 
 import { defaultStorage } from '../../constants/contextEngine';
+import { applyAnswerChoice, type AnswerChoice } from '../../utils/contextEngine';
 import type { ContextEngineForm, ContextSourceConfig, LlmConfig, StorageKind, StorageSelection } from '../../types/contextEngine';
 import type { EmbeddingConfig } from '../../types/ragIngestion';
 
@@ -41,8 +42,8 @@ export type ContextEngineFormAction =
   | { type: 'embedding'; value: EmbeddingConfig | null }
   | { type: 'llm'; value: LlmConfig | null }
   | { type: 'shareApiKey'; value: boolean }
-  | { type: 'answersEnabled'; value: boolean }
   | { type: 'answerLlm'; value: LlmConfig | null }
+  | { type: 'answerChoice'; value: AnswerChoice }
   | { type: 'storage'; kind: StorageKind; value: StorageSelection }
   | { type: 'name'; value: string }
   | { type: 'description'; value: string };
@@ -63,10 +64,10 @@ export function contextEngineFormReducer(state: ContextEngineForm, action: Conte
       return { ...state, llm: action.value };
     case 'shareApiKey':
       return { ...state, shareApiKey: action.value };
-    case 'answersEnabled':
-      return { ...state, answersEnabled: action.value };
     case 'answerLlm':
       return { ...state, answerLlm: action.value };
+    case 'answerChoice':
+      return { ...state, ...applyAnswerChoice(action.value, state) };
     case 'storage':
       return { ...state, storage: { ...state.storage, [action.kind]: action.value } };
     case 'name':
