@@ -111,6 +111,7 @@ function retrieveErrorMessage(err: unknown): string {
   // 503: the KB Service is not routed or still starting.
   const status = httpStatusOf(err);
   if (status === 503) return 'The knowledge base service is not ready yet. Try again in a moment.';
+  if (err instanceof DOMException && err.name === 'TimeoutError') return 'The knowledge base did not answer in time. Please try again.';
   return 'Failed to retrieve chunks. Please try again.';
 }
 

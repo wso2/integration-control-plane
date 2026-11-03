@@ -58,7 +58,7 @@ import { knowledgeBasesUrl, newKnowledgeBaseDataSourceUrl, type OrgScope } from 
 import { componentOverviewUrl } from '../paths';
 import { describeCron } from '../utils/cronUtils';
 import { buildKnowledgeBaseSettings, chunkingFromConfig, dataSourceLabel, embeddingFromConfig, isEditedSettingsValid, isManualSchedule, knowledgeBaseSummary, secretsForUpdate, vectorStoreFromConfig, type IngestionNoticeState } from '../utils/knowledgeBase';
-import { isChunkingValid } from '../utils/ragIngestion';
+import { isChunkingValid, vectorStoreEnvVars } from '../utils/ragIngestion';
 import type { KnowledgeBase, KnowledgeBaseDataSource } from '../types/knowledgeBase';
 import type { ChunkingConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
 import { isNotFoundError } from '../utils/apiErrors';
@@ -618,7 +618,10 @@ function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: Knowledg
   const embeddingKeyStored = embedding?.provider === kb.config.EMBEDDING_MODEL_PROVIDER && kb.secretKeys.includes('EMBEDDING_MODEL_APIKEY');
   const reusableSecrets = [...storedVectorStoreSecrets, ...(embeddingKeyStored ? ['EMBEDDING_MODEL_APIKEY'] : [])];
   const valid = !!displayName.trim() && isEditedSettingsValid(vectorStore, embedding, reusableSecrets) && isChunkingValid(chunking);
-  const changesVectors = !!vectorStore && !!embedding && (vectorStore.provider !== kb.config.VECTORDB_PROVIDER || embedding.provider !== kb.config.EMBEDDING_MODEL_PROVIDER || embedding.model !== kb.config.EMBEDDING_MODEL);
+  const changesVectors =
+    !!vectorStore &&
+    !!embedding &&
+    (vectorStore.provider !== kb.config.VECTORDB_PROVIDER || embedding.provider !== kb.config.EMBEDDING_MODEL_PROVIDER || embedding.model !== kb.config.EMBEDDING_MODEL || vectorStoreEnvVars(vectorStore).COLLECTION_NAME !== kb.config.COLLECTION_NAME);
 
   const save = () => {
     if (!vectorStore || !embedding) return;

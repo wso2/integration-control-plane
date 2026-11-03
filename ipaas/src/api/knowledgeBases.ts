@@ -98,6 +98,8 @@ export const deleteKnowledgeBase = (name: string): Promise<MessageResponse> => b
 export const createKnowledgeBaseDataSource = (knowledgeBase: string, input: CreateKnowledgeBaseDataSourceInput): Promise<KnowledgeBaseDataSource> =>
   bff.post<BffKnowledgeBaseDataSource>(`/knowledge-bases/${seg(knowledgeBase)}/data-sources`, input).then(toKnowledgeBaseDataSource);
 
+export const RETRIEVE_TIMEOUT_MS = 30_000;
+
 /**
  * Query a knowledge base through the BFF, which forwards to its KB Service. The
  * service reads a form-encoded query and identifies the caller by
@@ -110,5 +112,6 @@ export const retrieveFromKnowledgeBase = (name: string, componentId: string, que
     max_retrieve_chunks: String(query.maxChunks),
     min_similarity_threshold: String(query.minSimilarity),
   });
-  return bff.post<RetrieveResponse>(`/knowledge-bases/${seg(name)}/retrieve`, body).then((r) => r.retrieved_chunks ?? []);
+  // Bounded, so a request the BFF never answers fails instead of holding the chat busy.
+  return bff.post<RetrieveResponse>(`/knowledge-bases/${seg(name)}/retrieve`, body, undefined, AbortSignal.timeout(RETRIEVE_TIMEOUT_MS)).then((r) => r.retrieved_chunks ?? []);
 };

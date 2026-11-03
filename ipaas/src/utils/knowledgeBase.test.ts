@@ -117,6 +117,7 @@ describe('names', () => {
     ['docs-', 'Use lowercase letters, digits and hyphens; start with a letter and end with a letter or digit.'],
     ['1docs', 'Use lowercase letters, digits and hyphens; start with a letter and end with a letter or digit.'],
     ['a'.repeat(41), 'Name must be at most 40 characters.'],
+    ['new', '"new" is reserved. Choose another name.'],
   ])('knowledgeBaseNameError(%j)', (name, error) => {
     expect(knowledgeBaseNameError(name)).toBe(error);
   });

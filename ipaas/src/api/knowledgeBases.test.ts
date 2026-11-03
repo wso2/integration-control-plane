@@ -16,8 +16,16 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
-import { toKnowledgeBase, toKnowledgeBaseDataSource } from './knowledgeBases';
+import { describe, expect, it, vi } from 'vitest';
+
+const post = vi.hoisted(() => vi.fn());
+
+vi.mock('./_client', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./_client')>();
+  return { ...actual, bff: { ...actual.bff, post } };
+});
+
+import { retrieveFromKnowledgeBase, toKnowledgeBase, toKnowledgeBaseDataSource } from './knowledgeBases';
 
 describe('toKnowledgeBase', () => {
   it('fills the fields the BFF omits when empty', () => {
@@ -42,8 +50,10 @@ describe('toKnowledgeBase', () => {
       name: 'docs-kb',
       projectName: 'ai-services',
       environment: 'production',
+      secretKeys: ['PINECONE_APIKEY'],
       dataSources: [{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], status: 'ACTIVE' }],
     });
+    expect(kb.secretKeys).toEqual(['PINECONE_APIKEY']);
     expect(kb.dataSources).toEqual([{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', releaseName: '', createdAt: '' }]);
   });
 });
@@ -52,5 +62,23 @@ describe('toKnowledgeBaseDataSource', () => {
   it('keeps whether a just-created source started its first run', () => {
     expect(toKnowledgeBaseDataSource({ name: 'docs-drive', ingestionStarted: false, ingestionError: 'Run it with Ingest.' })).toMatchObject({ ingestionStarted: false, ingestionError: 'Run it with Ingest.' });
     expect(toKnowledgeBaseDataSource({ name: 'docs-drive' })).not.toHaveProperty('ingestionStarted');
+  });
+});
+
+describe('retrieveFromKnowledgeBase', () => {
+  it('sends the query form-encoded, with a deadline', async () => {
+    post.mockResolvedValue({ retrieved_chunks: [{ chunk: 'a' }] });
+    await expect(retrieveFromKnowledgeBase('docs kb', 'orders', { userQuery: 'leave & pay', maxChunks: 5, minSimilarity: 0.4 })).resolves.toEqual([{ chunk: 'a' }]);
+    const [path, body, headers, signal] = post.mock.calls[0];
+    expect(path).toBe('/knowledge-bases/docs%20kb/retrieve');
+    expect(body).toBeInstanceOf(URLSearchParams);
+    expect((body as URLSearchParams).toString()).toBe('rag_component_id=orders&user_query=leave+%26+pay&max_retrieve_chunks=5&min_similarity_threshold=0.4');
+    expect(headers).toBeUndefined();
+    expect(signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('reads a response without chunks as none', async () => {
+    post.mockResolvedValue({});
+    await expect(retrieveFromKnowledgeBase('docs-kb', 'orders', { userQuery: 'q', maxChunks: 5, minSimilarity: 0 })).resolves.toEqual([]);
   });
 });

@@ -31,6 +31,8 @@ export function knowledgeBaseNameError(name: string): string {
   if (!name) return '';
   if (name.length > KNOWLEDGE_BASE_NAME_MAX) return `Name must be at most ${KNOWLEDGE_BASE_NAME_MAX} characters.`;
   if (!KNOWLEDGE_BASE_NAME_RE.test(name)) return 'Use lowercase letters, digits and hyphens; start with a letter and end with a letter or digit.';
+  // The create page's own path segment; a knowledge base named so could not be opened.
+  if (name === 'new') return '"new" is reserved. Choose another name.';
   return '';
 }
 
