@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { useEffect, useState, type JSX, type ReactNode } from 'react';
+import { Fragment, useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useAuth } from '../auth';
-import { Alert, Avatar, Box, Button, ButtonBase, Card, Divider, PageContent, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowRight, BookOpen, Clock, Database, Folder, Plus, Workflow } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Avatar, Box, Button, ButtonBase, Card, Divider, PageContent, RelativeTime, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { ArrowRight, BookOpen, Box as BoxIcon, Database, Folder, Plus, Workflow } from '@wso2/oxygen-ui-icons-react';
 import Authorized from '../components/Authorized';
 import EmptyListing from '../components/EmptyListing';
 import ExploreMore from '../components/ExploreMore';
@@ -31,7 +31,7 @@ import { useProjects } from '../hooks/useProjects';
 import { newComponentUrl, newProjectUrl, type OrgScope } from '../nav';
 import { orgProjectsUrl, projectHomeUrl } from '../paths';
 import type { Project } from '../types/project';
-import { formatDistanceToNow } from '../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { trackEvent } from '../services/tracking/tracking';
 import * as styles from './OrgOverview.styles';
 
@@ -91,8 +91,8 @@ function SummaryCard({ icon, title, count, description, actionLabel, onAction, c
 function ProjectRow({ project, integrations, onOpen }: { project: Project; integrations?: number; onOpen: () => void }): JSX.Element {
   return (
     <ButtonBase onClick={onOpen} disabled={project.deleting} sx={{ ...styles.listRow, opacity: project.deleting ? 0.38 : 1 }}>
-      <Avatar variant="rounded" sx={styles.projectAvatar}>
-        {project.name[0].toUpperCase()}
+      <Avatar variant="light" color="primary" aria-hidden="true" sx={styles.projectAvatar}>
+        <BoxIcon size={20} />
       </Avatar>
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography variant="body2" fontWeight={600} noWrap>
@@ -108,12 +108,15 @@ function ProjectRow({ project, integrations, onOpen }: { project: Project; integ
         <Typography variant="body2" noWrap sx={styles.integrationsColumn}>
           {integrations === undefined ? '' : integrations === 1 ? '1 Integration' : `${integrations} Integrations`}
         </Typography>
-        <Stack direction="row" alignItems="center" gap={0.75} sx={styles.updatedColumn}>
-          <Clock size={14} />
-          <Typography variant="body2" noWrap>
-            {project.deleting ? 'Deleting' : formatDistanceToNow(project.updatedAt)}
-          </Typography>
-        </Stack>
+        <Box sx={styles.updatedColumn}>
+          {project.deleting ? (
+            <Typography variant="body2" noWrap>
+              Deleting
+            </Typography>
+          ) : (
+            <RelativeTime time={formatDistanceToNow(project.updatedAt)} dateTime={project.updatedAt} tooltip={formatDateTime(project.updatedAt)} />
+          )}
+        </Box>
       </Box>
     </ButtonBase>
   );
@@ -123,14 +126,17 @@ function RowsSkeleton(): JSX.Element {
   return (
     <>
       {[0, 1, 2].map((i) => (
-        <Box key={i} sx={styles.listRow}>
-          <Skeleton variant="rounded" width={40} height={40} />
-          <Box sx={{ flex: 1 }}>
-            <Skeleton width="30%" />
-            <Skeleton width="20%" />
+        <Fragment key={i}>
+          <Box sx={styles.listRow}>
+            <Skeleton variant="circular" width={40} height={40} />
+            <Box sx={{ flex: 1 }}>
+              <Skeleton width="30%" />
+              <Skeleton width="20%" />
+            </Box>
+            <Skeleton width={120} />
           </Box>
-          <Skeleton width={120} />
-        </Box>
+          <Divider />
+        </Fragment>
       ))}
     </>
   );
@@ -141,7 +147,11 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
   const [pickingProject, setPickingProject] = useState(false);
   const { displayName, username } = useAuth();
   const { data: projects = [], isLoading, isError, refetch } = useProjects();
-  const { byProject, isLoading: loadingIntegrations } = useOrgComponents(
+  const {
+    byProject,
+    isLoading: loadingIntegrations,
+    isError: integrationsError,
+  } = useOrgComponents(
     scope.org,
     projects.map((p) => p.id),
   );
@@ -150,7 +160,8 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
 
   const firstName = (displayName || username).split(/[\s@]/)[0];
   const openProjects = projects.filter((p) => !p.deleting);
-  const integrationCount = loadingIntegrations ? undefined : [...byProject.values()].reduce((sum, list) => sum + (list?.length ?? 0), 0);
+  // A failed project query would undercount, so the count is left out rather than shown wrong.
+  const integrationCount = loadingIntegrations || integrationsError ? undefined : [...byProject.values()].reduce((sum, list) => sum + (list ? list.length : 0), 0);
 
   // Integrations live in a project, so the user picks one only when there is a choice to make.
   const createIntegration = () => {
@@ -173,11 +184,14 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
     return (
       <>
         {listed.map((p) => (
-          <ProjectRow key={p.id} project={p} integrations={byProject.get(p.id)?.length} onOpen={() => navigate(projectHomeUrl(scope.org, p.handler))} />
+          <Fragment key={p.id}>
+            <ProjectRow project={p} integrations={byProject.get(p.id)?.length} onOpen={() => navigate(projectHomeUrl(scope.org, p.handler))} />
+            <Divider />
+          </Fragment>
         ))}
         <Box sx={styles.allProjectsRow}>
           <Button endIcon={<ArrowRight size={16} />} onClick={() => navigate(orgProjectsUrl(scope.org))} sx={styles.allProjectsLink}>
-            {projects.length > LIST_SIZE ? 'More Projects' : 'All Projects'}
+            {projects.length > LIST_SIZE ? 'More projects' : 'All projects'}
           </Button>
         </Box>
       </>
@@ -185,8 +199,8 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent>
-      <Typography variant="h3" sx={styles.greeting}>
+    <PageContent fullWidth>
+      <Typography variant="h1" sx={styles.greeting}>
         Hello,{' '}
         <Box component="span" sx={{ color: 'primary.main' }}>
           {firstName}
@@ -201,36 +215,36 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           icon={<Workflow size={24} />}
           title="Integrations"
           count={integrationCount}
-          description="Connect applications, data, and services through APIs, automations, and event-driven flows."
-          actionLabel="Create an Integration"
+          description="Connect apps, data, and services with APIs, automations, and events."
+          actionLabel="Create an integration"
           onAction={isLoading ? undefined : createIntegration}
         />
-        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge Bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a Knowledge Base" comingSoon />
-        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a Database" comingSoon />
+        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge Bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" comingSoon />
+        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" comingSoon />
       </Box>
 
-        <Card>
-          <Box sx={styles.sectionHeader}>
-            <Stack direction="row" alignItems="center">
-              <Typography variant="subtitle1" fontWeight={600}>
-                Projects
+      <Card>
+        <Box sx={styles.sectionHeader}>
+          <Stack direction="row" alignItems="center">
+            <Typography variant="subtitle1" fontWeight={600}>
+              Projects
+            </Typography>
+            {!isLoading && !isError && (
+              <Typography variant="body2" color="text.secondary" sx={styles.countDivider}>
+                {projects.length}
               </Typography>
-              {!isLoading && !isError && (
-                <Typography variant="body2" color="text.secondary" sx={styles.countDivider}>
-                  {projects.length}
-                </Typography>
-              )}
-            </Stack>
-            <Box sx={{ flex: 1 }} />
-            <Authorized permissions={Permissions.PROJECT_MANAGE}>
-              <Button variant="outlined" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
-                Create Project
-              </Button>
-            </Authorized>
-          </Box>
-          <Divider />
-          {renderProjects()}
-        </Card>
+            )}
+          </Stack>
+          <Box sx={{ flex: 1 }} />
+          <Authorized permissions={Permissions.PROJECT_MANAGE}>
+            <Button variant="outlined" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
+              Create project
+            </Button>
+          </Authorized>
+        </Box>
+        <Divider />
+        {renderProjects()}
+      </Card>
 
       <ExploreMore />
 

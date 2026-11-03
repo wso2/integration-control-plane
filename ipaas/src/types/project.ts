@@ -42,10 +42,9 @@ export interface Project {
 }
 
 export interface ProjectContributor {
-  id: number;
   displayName: string;
   email: string;
-  pictureUrl: string | null;
+  avatarUrl?: string;
   totalContributions: number;
 }
 

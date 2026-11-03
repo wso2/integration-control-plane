@@ -24,7 +24,7 @@ import * as styles from './dialogs.styles';
 
 interface ProjectPickerDialogProps {
   open: boolean;
-  /** Most recently opened first; the first one is preselected. */
+  /** The first one is preselected. */
   projects: Project[];
   onClose: () => void;
   onSelect: (project: Project) => void;

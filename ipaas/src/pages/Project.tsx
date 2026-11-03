@@ -100,6 +100,8 @@ const APIM_SUBSCRIBERS_ERROR_CODE = 'APIM_SUBSCRIBERS';
 // Zero padding and icon offset keep the button's icon flush with the title above it.
 const linkRepoButtonSx = { mt: 1, px: 0, minWidth: 0, textTransform: 'none', fontSize: '0.8125rem', '& .MuiButton-startIcon': { ml: 0 } } as const;
 const projectAvatarSx = { width: 58, height: 58, flexShrink: 0 } as const;
+// Keeps each integration row at 16px padding around a 32px name cell.
+const NAME_ICON_SIZE = 32;
 const integrationSearchSx = { flex: 1 } as const;
 const descriptionSx = { maxWidth: 260 } as const;
 const INTEGRATIONS_HEADING_ID = 'project-integrations-heading';
@@ -268,8 +270,8 @@ function ComponentNameCell({ component: c, isWorkspace, external = false, isExte
   return (
     <Stack direction="row" alignItems="center" gap={1.5}>
       {init ? (
-        <Box sx={{ position: 'relative', display: 'inline-flex', flexShrink: 0, width: 40, height: 40 }}>
-          <CircularProgress variant="determinate" value={init.progress} size={40} thickness={3} />
+        <Box sx={{ position: 'relative', display: 'inline-flex', flexShrink: 0, width: NAME_ICON_SIZE, height: NAME_ICON_SIZE }}>
+          <CircularProgress variant="determinate" value={init.progress} size={NAME_ICON_SIZE} thickness={3} />
           <Box sx={{ top: 0, left: 0, bottom: 0, right: 0, position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Typography variant="caption" component="div" color="text.secondary" sx={{ fontSize: '0.6rem', fontWeight: 600 }}>
               {init.progress}%
@@ -277,7 +279,7 @@ function ComponentNameCell({ component: c, isWorkspace, external = false, isExte
           </Box>
         </Box>
       ) : (
-        <IntegrationIcon type={identifyIntegration(c.displayType ?? '', c.componentSubType ?? null).type} external={external} />
+        <IntegrationIcon type={identifyIntegration(c.displayType ?? '', c.componentSubType ?? null).type} size={NAME_ICON_SIZE} external={external} />
       )}
       <Stack direction="row" alignItems="center" gap={0.5}>
         <Stack gap={0.25}>
@@ -791,6 +793,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
   };
 
   const commitNameEdit = () => {
+    // Enter and the blur that follows both land here; one update in flight is enough.
+    if (updateProject.isPending) return;
     const trimmed = nameValue.trim();
     if (trimmed === project.name) {
       setNameEditing(false);

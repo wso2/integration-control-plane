@@ -18,11 +18,9 @@
 
 import { LIT_ICON_SX } from '../constants/styles';
 
-// A notch above h3, and heavier, so the greeting leads the page.
 export const greeting = {
   mb: 1,
   fontWeight: 700,
-  fontSize: (theme: { typography: { h3: { fontSize?: string | number } } }) => `calc(${theme.typography.h3.fontSize} * 1.1)`,
 } as const;
 
 export const summaryGrid = {
@@ -90,21 +88,17 @@ export const listRow = {
   alignItems: 'center',
   gap: 2,
   px: 2.5,
-  py: 1.5,
+  py: 1,
   width: '100%',
   borderRadius: 0,
   textAlign: 'left',
   '&:hover': { bgcolor: 'action.hover' },
 } as const;
 
-// Matches the All Projects list's avatar.
 export const projectAvatar = {
   width: 40,
   height: 40,
-  borderRadius: 1,
-  fontSize: 16,
-  bgcolor: 'action.hover',
-  color: 'text.primary',
+  flexShrink: 0,
 } as const;
 
 // Fixed widths, so each column starts at the same x on every row whatever its text.

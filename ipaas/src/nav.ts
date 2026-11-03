@@ -358,6 +358,11 @@ export function resolveActiveNavId(pathname: string, scope: Scope): string {
   return resolveEntry(scope.level, scopeRest(pathname, scope)).navId;
 }
 
+/** Every expandable sidebar group at a level. */
+export function navGroupIds(level: Level): string[] {
+  return [...new Set(NAV[level].flatMap((e) => (e.parent ? [e.parent] : [])))];
+}
+
 /** The expandable group navId to auto-expand for a given sidebar id (if any). */
 export function parentGroupId(scope: Scope, navId: string): string | undefined {
   return NAV_BY_ID[scope.level][navId]?.parent;

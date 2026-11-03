@@ -223,7 +223,7 @@ test.describe('01 fixture project @smoke', () => {
     await enterOrgHome(page, orgHandler);
   });
 
-  test('TC_IP_PROJ_001 the organization home lists its projects', async () => {
+  test('TC_IP_PROJ_001 the organization Projects page lists its projects', async () => {
     await expect(page.getByRole('heading', { name: 'All Projects' })).toBeVisible({ timeout: 60_000 });
     // first(): an org with no projects also offers it in the empty state, and both open the same form.
     await expect(page.getByRole('button', { name: 'Create project', exact: true }).first()).toBeVisible();

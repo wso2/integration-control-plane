@@ -40,9 +40,9 @@ export default function ContributorsCard({ projectId }: { projectId: string }): 
         </Stack>
         <Stack direction="row" flexWrap="wrap" gap={1}>
           {contributors.map((contributor) => (
-            <Tooltip key={contributor.id} title={`${contributor.displayName || contributor.email} · ${contributor.totalContributions} contributions`}>
+            <Tooltip key={contributor.email} title={`${contributor.displayName || contributor.email} · ${contributor.totalContributions} contributions`}>
               <Avatar
-                src={contributor.pictureUrl || undefined}
+                src={contributor.avatarUrl}
                 alt={contributor.displayName || contributor.email}
                 role="img"
                 tabIndex={0}

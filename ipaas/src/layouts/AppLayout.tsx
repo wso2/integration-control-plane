@@ -100,6 +100,7 @@ import {
   hasComponent,
   settingsCrossScopeUrl,
   resolveActiveNavId,
+  navGroupIds,
   parentGroupId,
   navUrl,
   overviewUrl,
@@ -173,12 +174,20 @@ export default function AppLayout(): JSX.Element {
     document.title = formatDocumentTitle(pageTitleFor(activeNavId));
   }, [activeNavId]);
 
-  // Auto-expand the parent group when navigating to a child nav item.
+  // Groups start expanded, so only the ones the user closed are tracked.
+  const [collapsedMenus, setCollapsedMenus] = useState<ReadonlySet<string>>(() => new Set());
+  const expandedMenus = useMemo(() => Object.fromEntries(navGroupIds(scope.level).map((id) => [id, !collapsedMenus.has(id)])), [scope.level, collapsedMenus]);
+  const toggleMenu = (id: string) =>
+    setCollapsedMenus((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+
+  // Navigating to a child reopens its group if the user had closed it.
   useEffect(() => {
     const parent = parentGroupId(scope, activeNavId);
-    if (parent && !shell.expandedMenus[parent]) {
-      actions.toggleMenu(parent);
-    }
+    if (parent) setCollapsedMenus((prev) => (prev.has(parent) ? new Set([...prev].filter((id) => id !== parent)) : prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNavId]);
 
@@ -687,9 +696,9 @@ export default function AppLayout(): JSX.Element {
           <Sidebar
             collapsed={shell.sidebarCollapsed}
             activeItem={pendingNavId ?? activeNavId}
-            expandedMenus={shell.expandedMenus}
+            expandedMenus={expandedMenus}
             onSelect={handleNavSelect}
-            onToggleExpand={actions.toggleMenu}
+            onToggleExpand={toggleMenu}
             sx={{
               backgroundColor: 'background.acrylic',
               backdropFilter: 'blur(3px)',
