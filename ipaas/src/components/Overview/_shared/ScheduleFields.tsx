@@ -43,7 +43,8 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
           <Typography variant="body2" color="text.secondary">
             Repeat beginning of every
           </Typography>
-          <Stack direction="row" gap={2}>
+          {/* Top-aligned: the count's reserved helper line would otherwise stretch the unit select. */}
+          <Stack direction="row" gap={2} alignItems="flex-start">
             <TextField
               inputMode="numeric"
               value={intervalCount}
