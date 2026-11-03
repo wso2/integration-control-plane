@@ -263,6 +263,16 @@ export const deleteCardSx = {
   borderColor: 'error.main',
 } as const;
 
+/** A description on a summary card, cut to three lines so a long one does not stretch the card. */
+export const summaryDescriptionSx = {
+  display: '-webkit-box',
+  mt: 0.5,
+  color: 'text.secondary',
+  overflow: 'hidden',
+  WebkitLineClamp: 3,
+  WebkitBoxOrient: 'vertical',
+} as const;
+
 // ── Source visibility rules ─────────────────────────────────────────────────
 
 export const audienceSectionSx = { mt: 3, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' } as const;
@@ -439,18 +449,6 @@ export const endpointFieldSx = {
 } as const;
 
 // ── Models step ─────────────────────────────────────────────────────────────
-
-export const recommendedBannerSx = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 1.75,
-  p: 2,
-  mb: 2.5,
-  border: '1px solid',
-  borderColor: 'primary.light',
-  borderRadius: 1,
-  bgcolor: 'background.paper',
-} as const;
 
 export const modelColumnsSx = {
   display: 'grid',

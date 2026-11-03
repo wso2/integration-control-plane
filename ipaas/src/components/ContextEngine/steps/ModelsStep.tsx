@@ -16,14 +16,13 @@
  * under the License.
  */
 
-import { Box, Button, Checkbox, Chip, FormControlLabel, Stack, Switch, Typography } from '@wso2/oxygen-ui';
-import { Sparkles } from '@wso2/oxygen-ui-icons-react';
+import { Box, Checkbox, FormControlLabel, Stack, Switch, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { blankLlm, contextLogoUrl, LLM_PROVIDERS, RECOMMENDED_MODELS } from '../../../constants/contextEngine';
-import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
+import { blankLlm, CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, LLM_PROVIDERS } from '../../../constants/contextEngine';
+import { blankEmbedding } from '../../../constants/ragIngestion';
 import { canShareApiKey } from '../../../utils/contextEngine';
 import ModelProviderColumn from './ModelProviderColumn';
-import { modelColumnSx, modelColumnsSx, recommendedBannerSx, stepHeadingSx, stepHintSx } from '../styles';
+import { modelColumnSx, modelColumnsSx, stepHeadingSx, stepHintSx } from '../styles';
 import type { LlmConfig, LlmProvider } from '../../../types/contextEngine';
 import type { EmbeddingConfig, EmbeddingProvider } from '../../../types/ragIngestion';
 
@@ -41,23 +40,11 @@ interface ModelsStepProps {
   onAnswerLlmChange: (value: LlmConfig | null) => void;
 }
 
-const EMBEDDING_OPTIONS = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), models: p.models }));
+const EMBEDDING_OPTIONS = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
 const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
 
-/** Step 3 — embedding and language model side by side, with a one-click recommended pair, then whether and with what the engine answers. */
+/** Embedding and language model side by side, then whether and with what the engine answers. */
 export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled, answerLlm, onEmbeddingChange, onLlmChange, onShareApiKeyChange, onAnswersEnabledChange, onAnswerLlmChange }: ModelsStepProps): JSX.Element {
-  const rec = RECOMMENDED_MODELS;
-  const isRecommended = embedding?.provider === rec.embedding.provider && embedding.model === rec.embedding.model && llm?.provider === rec.llm.provider && llm.model === rec.llm.model;
-  const embeddingName = EMBEDDING_PROVIDERS.find((p) => p.id === rec.embedding.provider)?.name ?? rec.embedding.provider;
-  const llmName = LLM_PROVIDERS.find((p) => p.id === rec.llm.provider)?.name ?? rec.llm.provider;
-
-  const applyRecommended = () => {
-    // Keep any key already typed so applying the default never throws work away.
-    onEmbeddingChange({ ...blankEmbedding(rec.embedding.provider), model: rec.embedding.model, apiKey: embedding?.apiKey ?? '' });
-    onLlmChange({ ...blankLlm(rec.llm.provider), model: rec.llm.model, apiKey: llm?.apiKey ?? '' });
-    onShareApiKeyChange(true);
-  };
-
   return (
     <>
       <Typography variant="subtitle2" sx={stepHeadingSx}>
@@ -66,27 +53,6 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled
       <Typography variant="body2" sx={stepHintSx}>
         The embedding model indexes your sources for search; the language model builds the graph during ingestion and, unless you choose a separate answer model, answers questions.
       </Typography>
-
-      <Box sx={recommendedBannerSx}>
-        <Box sx={{ color: 'primary.main', display: 'flex' }}>
-          <Sparkles size={22} />
-        </Box>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            Recommended pair
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            {embeddingName} · {rec.embedding.model} for indexing, {llmName} · {rec.llm.model} for answers. One key, good quality, low cost.
-          </Typography>
-        </Box>
-        {isRecommended ? (
-          <Chip size="small" color="success" variant="outlined" label="Applied" />
-        ) : (
-          <Button variant="outlined" size="small" onClick={applyRecommended}>
-            Apply recommended
-          </Button>
-        )}
-      </Box>
 
       <Box sx={modelColumnsSx}>
         <ModelProviderColumn<EmbeddingConfig>

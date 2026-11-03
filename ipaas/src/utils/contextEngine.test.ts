@@ -86,7 +86,9 @@ import {
   getStartedSteps,
   isFormDirty,
   isGraphUri,
+  modelProviderName,
   modelsStepBlocker,
+  nameStepBlocker,
   sanitizeStorage,
   storageSelectionError,
   storageStepBlocker,
@@ -100,6 +102,7 @@ import {
   grantAllowsQuery,
   invalidSourceFields,
   isFieldVisible,
+  isCustomModel,
   isFormComplete,
   isHttpUrl,
   isLlmValid,
@@ -122,7 +125,8 @@ import {
   queuedUploadText,
   uploadIsSlow,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import { blankLlm, blankSource, CONTEXT_EMBEDDING_PROVIDERS, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, LLM_PROVIDERS, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
@@ -382,6 +386,35 @@ describe('catalog', () => {
   });
 });
 
+describe('model providers', () => {
+  it('offers OpenAI and Anthropic language models, leaving out the OpenAI model being retired', () => {
+    expect(LLM_PROVIDERS.map((p) => p.id)).toEqual(['openai', 'anthropic']);
+    expect(LLM_PROVIDERS[0].models[0]).toBe('gpt-6-luna');
+    expect(LLM_PROVIDERS[0].models).not.toContain('gpt-5-mini');
+  });
+
+  it('offers OpenAI embeddings only, and leaves the RAG ingestion list as it was', () => {
+    expect(CONTEXT_EMBEDDING_PROVIDERS.map((p) => p.id)).toEqual(['openai']);
+    expect(EMBEDDING_PROVIDERS.map((p) => p.id)).toEqual(['openai', 'azure_openai', 'mistral']);
+  });
+
+  it('names offered, retired and unknown providers', () => {
+    expect(modelProviderName('embedding', 'openai')).toBe('Open AI');
+    expect(modelProviderName('llm', 'anthropic')).toBe('Anthropic AI');
+    expect(modelProviderName('llm', 'azure_openai')).toBe('Azure Open AI');
+    expect(modelProviderName('embedding', 'mistral')).toBe('Mistral AI');
+    expect(modelProviderName('llm', 'acme')).toBe('acme');
+  });
+
+  it('treats a model id outside the list, or any id when there is no list, as typed in', () => {
+    const models = ['gpt-5-mini', 'gpt-6-luna'];
+    expect(isCustomModel('', models)).toBe(false);
+    expect(isCustomModel('gpt-5-mini', models)).toBe(false);
+    expect(isCustomModel('gpt-4.1', models)).toBe(true);
+    expect(isCustomModel('', [])).toBe(true);
+  });
+});
+
 describe('model validation', () => {
   it('requires model and key, plus base url + version for azure', () => {
     expect(isLlmValid(null)).toBe(false);
@@ -403,6 +436,14 @@ describe('name step', () => {
     expect(isNameStepValid('', '')).toBe(false);
     expect(isNameStepValid('ok', '')).toBe(true);
   });
+
+  it('says why the step cannot proceed: a missing name first, then the first field error', () => {
+    expect(nameStepBlocker('', '')).toBe('Enter a name for the engine');
+    expect(nameStepBlocker('   ', '')).toBe('Enter a name for the engine');
+    expect(nameStepBlocker('a'.repeat(CONTEXT_ENGINE_NAME_MAX + 1), '')).toBe(engineNameError('a'.repeat(CONTEXT_ENGINE_NAME_MAX + 1)));
+    expect(nameStepBlocker('Ops', 'x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1))).toBe(engineDescriptionError('x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1)));
+    expect(nameStepBlocker('Ops', '')).toBeNull();
+  });
 });
 
 describe('form completion', () => {
@@ -412,6 +453,12 @@ describe('form completion', () => {
     expect(isFormComplete({ ...form, sources: [] })).toBe(false);
     expect(isFormComplete({ ...form, llm: null })).toBe(false);
     expect(isFormComplete({ ...form, name: '' })).toBe(false);
+  });
+
+  it('is incomplete when only the name step fails, whatever the later steps hold', () => {
+    const form = completeForm();
+    expect(isFormComplete({ ...form, name: '   ' })).toBe(false);
+    expect(isFormComplete({ ...form, description: 'x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1) })).toBe(false);
   });
 
   it('roles are optional — the owner can keep an engine private', () => {
@@ -580,6 +627,17 @@ describe('drafts', () => {
     expect(bad.llm).toEqual({ provider: 'openai', model: '', apiKey: '', azureBaseUrl: '', azureApiVersion: '' });
     expect(fromDraft(JSON.stringify({ ...malformed, form: { ...malformed.form, llm: { provider: 'nope', model: 'x' } } }))!.form.llm).toBeNull();
     expect(fromDraft(JSON.stringify({ v: 1, form: { name: 'x' } }))).toBeNull();
+  });
+
+  it('drops a model whose provider is no longer offered, and keeps the rest of the draft', () => {
+    const form = toDraft(completeForm(), 'x').form;
+    const stale = { v: 1, savedAt: 'x', form: { ...form, embedding: { ...form.embedding, provider: 'azure_openai' }, llm: { ...form.llm, provider: 'mistral' }, answerLlm: { ...blankLlm('openai'), provider: 'azure_openai', model: 'dep' } } };
+    const restored = fromDraft(JSON.stringify(stale))!.form;
+    expect(restored.embedding).toBeNull();
+    expect(restored.llm).toBeNull();
+    expect(restored.answerLlm).toBeNull();
+    expect(restored.name).toBe('Support knowledge');
+    expect(restored.sources).toHaveLength(1);
   });
 
   it('knows when there is nothing worth keeping', () => {

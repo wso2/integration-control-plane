@@ -16,20 +16,18 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Grid, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, Grid, Link, Stack, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
-import { CONTEXT_ENGINE_DESCRIPTION_HINT, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
-import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { engineDescriptionError, engineNameError, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
+import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { modelProviderName, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
-import { fieldStackSx, mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
+import { mutedSx, stepHeadingSx, stepHintSx, summaryCardHeaderSx, summaryCardSx, summaryDescriptionSx, summaryRowSx } from '../styles';
 import type { ContextEngineForm } from '../../../types/contextEngine';
 
-/** Wizard step indexes the summary cards can jump back to (Sources, Models, Storage; 'Grant Access' is hidden). */
-export type EditableStep = 0 | 1 | 2;
+/** Wizard step indexes the summary cards can jump back to (Name, Sources, Models, Storage; 'Grant Access' is hidden). */
+export type EditableStep = 0 | 1 | 2 | 3;
 
 interface ReviewStepProps {
   form: ContextEngineForm;
@@ -41,8 +39,6 @@ interface ReviewStepProps {
   myGroups: string[];
   /** When the draft was last written to session storage, if at all. */
   draftSavedAt: string | null;
-  onNameChange: (value: string) => void;
-  onDescriptionChange: (value: string) => void;
   onEdit: (step: EditableStep) => void;
 }
 
@@ -65,15 +61,13 @@ function SummaryCard({ title, editLabel, onEdit, children }: { title: string; ed
   );
 }
 
-/** Step 4 — name the engine and confirm what will be created; every card jumps back to its step. */
-export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, onNameChange, onDescriptionChange, onEdit }: ReviewStepProps): JSX.Element {
-  const nameError = engineNameError(form.name);
+/** The last step: confirm what will be created; every card jumps back to its step. */
+export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, onEdit }: ReviewStepProps): JSX.Element {
   // Query access and visibility are set in different steps; say where they disagree before anything is created.
   const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
-  const descriptionError = engineDescriptionError(form.description);
-  const embeddingName = EMBEDDING_PROVIDERS.find((p) => p.id === form.embedding?.provider)?.name ?? form.embedding?.provider ?? '—';
-  const llmName = LLM_PROVIDERS.find((p) => p.id === form.llm?.provider)?.name ?? form.llm?.provider ?? '—';
-  const answerName = form.answerLlm ? (LLM_PROVIDERS.find((p) => p.id === form.answerLlm?.provider)?.name ?? form.answerLlm.provider) : 'Language model';
+  const embeddingName = form.embedding ? modelProviderName('embedding', form.embedding.provider) : '—';
+  const llmName = form.llm ? modelProviderName('llm', form.llm.provider) : '—';
+  const answerName = form.answerLlm ? modelProviderName('llm', form.answerLlm.provider) : 'Language model';
   const n = form.sources.length;
 
   return (
@@ -81,40 +75,13 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
         <Box>
           <Typography variant="subtitle2" sx={stepHeadingSx}>
-            Name &amp; Create
+            Review &amp; Create
           </Typography>
           <Typography variant="body2" sx={stepHintSx}>
-            Give the engine a name your team will recognise, then confirm the setup. Anything below can be changed without walking back through the steps.
+            Check the setup.
           </Typography>
         </Box>
         {draftSavedAt && <Chip size="small" variant="outlined" icon={<Check size={14} />} label={`Draft saved · ${formatDistanceToNow(draftSavedAt).toLowerCase()}`} sx={{ flexShrink: 0 }} />}
-      </Stack>
-
-      <Stack sx={{ ...fieldStackSx, mb: 4 }}>
-        <TextField
-          label="Name"
-          required
-          fullWidth
-          size="small"
-          autoFocus
-          value={form.name}
-          error={!!nameError}
-          helperText={nameError || `${form.name.length}/${CONTEXT_ENGINE_NAME_MAX}`}
-          onChange={(e) => onNameChange(e.target.value)}
-          sx={REQUIRED_FIELD_SX}
-          inputProps={{ 'aria-label': 'Engine name' }}
-        />
-        <TextField
-          label="Description"
-          fullWidth
-          multiline
-          minRows={2}
-          size="small"
-          value={form.description}
-          error={!!descriptionError}
-          helperText={descriptionError || `${CONTEXT_ENGINE_DESCRIPTION_HINT} ${form.description.length}/${CONTEXT_ENGINE_DESCRIPTION_MAX}`}
-          onChange={(e) => onDescriptionChange(e.target.value)}
-        />
       </Stack>
 
       {(mismatch.seeNothing.length > 0 || mismatch.cannotQuery.length > 0 || mismatch.hiddenFromMe.length > 0) && (
@@ -124,7 +91,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
               severity="warning"
               variant="outlined"
               action={
-                <Button size="small" onClick={() => onEdit(0)}>
+                <Button size="small" onClick={() => onEdit(1)}>
                   Edit sources
                 </Button>
               }>
@@ -146,7 +113,17 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <SummaryCard title={`Sources (${n})`} editLabel="sources" onEdit={() => onEdit(0)}>
+          <SummaryCard title="Name" editLabel="name" onEdit={() => onEdit(0)}>
+            <Typography variant="body2" sx={{ fontWeight: 500 }} noWrap>
+              {form.name.trim()}
+            </Typography>
+            <Typography variant="caption" sx={summaryDescriptionSx}>
+              {form.description.trim() || 'No description'}
+            </Typography>
+          </SummaryCard>
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+          <SummaryCard title={`Sources (${n})`} editLabel="sources" onEdit={() => onEdit(1)}>
             {form.sources.map((s, i) => (
               <Box key={`${s.type}-${i}`} sx={summaryRowSx}>
                 <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
@@ -191,7 +168,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
         </Grid>
         */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <SummaryCard title="Models" editLabel="models" onEdit={() => onEdit(1)}>
+          <SummaryCard title="Models" editLabel="models" onEdit={() => onEdit(2)}>
             <Stack direction="row" gap={4} flexWrap="wrap">
               <Box>
                 <Typography variant="caption" sx={mutedSx}>
@@ -231,7 +208,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           </SummaryCard>
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(2)}>
+          <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(3)}>
             <Stack direction="row" gap={3} flexWrap="wrap">
               {STORAGE_BACKENDS.map((b) => {
                 const sum = summarizeStorage(b.kind, form.storage[b.kind]);

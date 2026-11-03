@@ -20,8 +20,7 @@ import { Alert, Box, Button, Chip, CircularProgress, Drawer, IconButton, MenuIte
 import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
-import { contextLogoUrl, LLM_AZURE_DEFAULT_API_VERSION, LLM_PROVIDERS } from '../../../constants/contextEngine';
-import { AZURE_DEFAULT_API_VERSION, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
+import { CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, LLM_PROVIDERS } from '../../../constants/contextEngine';
 import { engineMessage, isSameModel, modelDraftError, toModelInput } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { HttpError } from '../../../types/http';
@@ -45,17 +44,17 @@ interface ProviderInfo {
 }
 
 /** Provider tiles with logos resolved against the app base, as the create wizard shows them. */
-const EMBEDDING_OPTIONS: ProviderInfo[] = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), models: p.models }));
+const EMBEDDING_OPTIONS: ProviderInfo[] = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
 const LLM_OPTIONS: ProviderInfo[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
 
 const draftOf = (m: ContextModelSummary | null): ModelDraft | null =>
   m ? { provider: m.provider, model: m.model, baseUrl: m.baseUrl ?? '', apiVersion: m.apiVersion ?? '', dimensions: m.dimensions, keyMode: m.keyKind === 'reference' ? 'ref' : 'key', apiKey: '', apiKeyRef: '' } : null;
 
-const blankDraft = (provider: string, kind: 'embedding' | 'llm'): ModelDraft => ({
+const blankDraft = (provider: string): ModelDraft => ({
   provider,
   model: '',
   baseUrl: '',
-  apiVersion: provider === 'azure_openai' ? (kind === 'embedding' ? AZURE_DEFAULT_API_VERSION : LLM_AZURE_DEFAULT_API_VERSION) : '',
+  apiVersion: '',
   keyMode: 'key',
   apiKey: '',
   apiKeyRef: '',
@@ -105,7 +104,7 @@ function ModelEditor({ kind, providers, draft, current, onChange }: { kind: 'emb
     <Stack gap={2}>
       <Box sx={modelTileGridSx}>
         {providers.map((p) => (
-          <SelectableCard key={p.id} title={p.name} logo={p.logo} selected={draft?.provider === p.id} onSelect={() => onChange(current?.provider === p.id ? draftOf(current)! : blankDraft(p.id, kind))} />
+          <SelectableCard key={p.id} title={p.name} logo={p.logo} selected={draft?.provider === p.id} onSelect={() => onChange(current?.provider === p.id ? draftOf(current)! : blankDraft(p.id))} />
         ))}
       </Box>
       {draft && (
