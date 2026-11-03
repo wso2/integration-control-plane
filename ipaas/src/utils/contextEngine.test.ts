@@ -403,7 +403,7 @@ describe('model providers', () => {
   it('names offered, retired and unknown providers', () => {
     expect(modelProviderName('embedding', 'openai')).toBe('Open AI');
     expect(modelProviderName('llm', 'anthropic')).toBe('Anthropic AI');
-    expect(modelProviderName('llm', 'azure_openai')).toBe('Azure Open AI');
+    expect(modelProviderName('llm', 'azure_openai')).toBe('Azure OpenAI');
     expect(modelProviderName('embedding', 'mistral')).toBe('Mistral AI');
     expect(modelProviderName('llm', 'acme')).toBe('acme');
   });
