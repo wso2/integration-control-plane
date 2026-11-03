@@ -33,7 +33,7 @@ vi.mock('./_client', async (importOriginal) => ({ ...(await importOriginal<typeo
 vi.mock('./_contextEngineAccess', async (importOriginal) => ({ ...(await importOriginal<typeof import('./_contextEngineAccess')>()), engineRequest }));
 
 import { BffError } from './_client';
-import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setUpContextEngine } from './contextEngine';
+import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setUpContextEngine, toEngineManagedServer } from './contextEngine';
 import type { ContextSourceConfig, CreateContextEngineInput } from '../types/contextEngine';
 
 const ENGINE = 'development/docs';
@@ -42,6 +42,19 @@ const bffEngine = { name: 'docs', displayName: 'Docs', description: 'Product doc
 beforeEach(() => {
   Object.values(bff).forEach((f) => f.mockReset());
   engineRequest.mockReset();
+});
+
+describe('engine managed storage', () => {
+  it.each([
+    [{ server: 'postgres' }, 'postgres'],
+    [{ server: 'embedded' }, 'embedded'],
+    // A server this console does not know yet is described as the stores it knows without one.
+    [{ server: 'aurora' }, 'embedded'],
+    [{}, 'embedded'],
+    [null, 'embedded'],
+  ] as const)('reads %j as %s', (raw, want) => {
+    expect(toEngineManagedServer(raw)).toBe(want);
+  });
 });
 
 describe('engines', () => {

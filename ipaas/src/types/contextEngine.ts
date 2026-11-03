@@ -473,6 +473,9 @@ export type StorageSelection = ManagedStorage | InfrastructureStorage | External
 
 export type ContextEngineStorage = Record<StorageKind, StorageSelection>;
 
+/** What a new engine's engine managed stores are: files in its volume, or a PostgreSQL server of its own. */
+export type EngineManagedServer = 'embedded' | 'postgres';
+
 /** How the engine reports one store back, without credentials. */
 export interface StorageSummary {
   provider: string;

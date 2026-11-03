@@ -16,20 +16,22 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { CircleAlert, Database, ExternalLink, Plus, RefreshCw, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { useServerDatabases } from '../../../hooks/usePlatformServices';
 import { STORAGE_DEFAULT_DATABASE, type StorageBackendInfo } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { isGraphUri } from '../../../utils/contextEngine';
+import { isGraphUri, managedStore } from '../../../utils/contextEngine';
 import SecretField from '../../common/SecretField';
 import { sourceTileMarkSx, storageCardSx, storageEmptySx, storageLinksSx, storageOptionBodySx, storageOptionSx, storageRadioGroupSx } from '../styles';
-import type { ExternalStorage, InfrastructureStorage, StorageSelection } from '../../../types/contextEngine';
+import type { EngineManagedServer, ExternalStorage, InfrastructureStorage, StorageSelection } from '../../../types/contextEngine';
 import type { DatabaseServer } from '../../../types/platformServices';
 
 interface StorageBackendCardProps {
   info: StorageBackendInfo;
+  /** What the engine managed store is in this deployment; undefined until the BFF says. */
+  managedServer: EngineManagedServer | undefined;
   value: StorageSelection;
   onChange: (value: StorageSelection) => void;
   /** Infrastructure servers that can back this store (already filtered for the kind). */
@@ -91,7 +93,7 @@ function DatabaseField({ kind, value, onChange }: { kind: StorageBackendInfo['ki
 }
 
 /** One store's card: Engine managed, or an Infrastructure server (or an external database when Infrastructure has none). */
-export default function StorageBackendCard({ info, value, onChange, servers, serversLoading, serversError, onRefresh, infrastructureAvailable, alternativeUnavailable, listUrl, createUrl }: StorageBackendCardProps): JSX.Element {
+export default function StorageBackendCard({ info, managedServer, value, onChange, servers, serversLoading, serversError, onRefresh, infrastructureAvailable, alternativeUnavailable, listUrl, createUrl }: StorageBackendCardProps): JSX.Element {
   const alternativeMode = info.infraSegment ? 'infrastructure' : 'external';
   const chooseMode = (mode: string) => {
     if (mode === 'managed') onChange({ mode: 'managed' });
@@ -246,12 +248,21 @@ export default function StorageBackendCard({ info, value, onChange, servers, ser
             control={<Radio size="small" />}
             label={
               <Box>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Engine managed · {info.managedName}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {info.managedDescription}
-                </Typography>
+                {managedServer ? (
+                  <>
+                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                      Engine managed · {managedStore(info.kind, managedServer).name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {managedStore(info.kind, managedServer).description}
+                    </Typography>
+                  </>
+                ) : (
+                  <>
+                    <Skeleton variant="text" width={180} />
+                    <Skeleton variant="text" width={240} />
+                  </>
+                )}
               </Box>
             }
           />

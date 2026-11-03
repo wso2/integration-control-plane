@@ -798,6 +798,9 @@ export interface StorageBackendInfo {
   /** The engine's embedded store. */
   managedName: string;
   managedDescription: string;
+  /** The engine managed store when the deployment gives each engine its own PostgreSQL server. */
+  serverName: string;
+  serverDescription: string;
   /** The alternative to the embedded store: an Infrastructure server, or an external database. */
   alternativeLabel: string;
   alternativeDescription: string;
@@ -817,6 +820,8 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
     purpose: 'Embeddings and similarity search over your sources.',
     managedName: 'LanceDB',
     managedDescription: 'Embedded vector index inside the engine. Good to start with; not shared or backed up.',
+    serverName: 'PostgreSQL + pgvector',
+    serverDescription: "Embeddings in the engine's own PostgreSQL server, with pgvector. Created and deleted with the engine.",
     alternativeLabel: 'From Infrastructure · Vector Databases',
     alternativeDescription: 'A managed PostgreSQL server with pgvector.',
     infraSegment: 'vector-databases',
@@ -830,6 +835,8 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
     purpose: 'Source records, provenance ledger, grants and evidence.',
     managedName: 'SQLite',
     managedDescription: 'Embedded control-plane store for records, provenance and evidence.',
+    serverName: 'PostgreSQL',
+    serverDescription: "Records, provenance and evidence in the engine's own PostgreSQL server.",
     alternativeLabel: 'From Infrastructure · Databases',
     alternativeDescription: 'A managed PostgreSQL server.',
     infraSegment: 'databases',
@@ -843,6 +850,8 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
     purpose: 'Entities and relationships the engine extracts.',
     managedName: 'Kuzu',
     managedDescription: 'Embedded graph index, isolated per engine. Recommended until a shared graph database is available.',
+    serverName: 'PostgreSQL',
+    serverDescription: "Entities and relationships in the engine's own PostgreSQL server, isolated per engine.",
     alternativeLabel: 'Connect Neo4j',
     alternativeDescription: 'Bring your own Neo4j instance: Bolt URI, database, user and password.',
     infraSegment: null,

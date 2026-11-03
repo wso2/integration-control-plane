@@ -61,6 +61,7 @@ import type {
   ContextSource,
   ContextSourceConfig,
   CreateContextEngineInput,
+  EngineManagedServer,
   AskedQuestion,
   ContextEngineModels,
   ContextModelInput,
@@ -516,12 +517,20 @@ export function storageStepBlocker(storage: ContextEngineStorage): string | null
   return null;
 }
 
+/** The engine managed store of one kind: embedded in the engine, or on the engine's own PostgreSQL server. */
+export function managedStore(kind: StorageKind, server: EngineManagedServer): { name: string; description: string; placement: string } {
+  const info = STORAGE_BACKEND_BY_KIND[kind];
+  return server === 'postgres' ? { name: info.serverName, description: info.serverDescription, placement: 'own server' } : { name: info.managedName, description: info.managedDescription, placement: 'embedded' };
+}
+
 /** Two lines describing where a store lives, for the review step and overview. */
-export function summarizeStorage(kind: StorageKind, sel: StorageSelection): { primary: string; secondary: string } {
+export function summarizeStorage(kind: StorageKind, sel: StorageSelection, server: EngineManagedServer): { primary: string; secondary: string } {
   const info = STORAGE_BACKEND_BY_KIND[kind];
   switch (sel.mode) {
-    case 'managed':
-      return { primary: 'Engine managed', secondary: `${info.managedName} · embedded` };
+    case 'managed': {
+      const store = managedStore(kind, server);
+      return { primary: 'Engine managed', secondary: `${store.name} · ${store.placement}` };
+    }
     case 'infrastructure':
       return { primary: sel.serverName || 'Infrastructure server', secondary: `${info.alternativeProvider} · ${sel.database || 'database not set'}` };
     case 'external': {
