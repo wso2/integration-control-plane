@@ -103,6 +103,14 @@ func TestRouterSplitsTheAPIFromTheSPA(t *testing.T) {
 	}
 }
 
+func TestCallbackMayBeFramedByThePortalOnly(t *testing.T) {
+	rec := httptest.NewRecorder()
+	newTestRouter(t).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/auth/callback", nil))
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "SAMEORIGIN", rec.Header().Get("X-Frame-Options"))
+}
+
 func TestConfigScriptSetsTheSPAConfig(t *testing.T) {
 	rec := httptest.NewRecorder()
 	newTestRouter(t).ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/config.js", nil))
