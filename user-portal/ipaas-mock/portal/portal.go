@@ -213,7 +213,7 @@ func writeError(w http.ResponseWriter, r *http.Request, err error) {
 	case errors.Is(err, catalog.ErrInvalidArgs):
 		web.StatusBadRequest(w, r, err, strings.TrimPrefix(err.Error(), catalog.ErrInvalidArgs.Error()+": "))
 	case errors.Is(err, catalog.ErrInvalidCursor):
-		web.StatusBadRequest(w, r, err, "The cursor is not one this listing gave.")
+		web.StatusBadRequest(w, r, err, ipaasportal.InvalidCursorMessage)
 	default:
 		web.StatusInternalServerError(w, r, err, nil)
 	}

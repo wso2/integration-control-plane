@@ -20,6 +20,7 @@ package ipaasportal
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
@@ -37,6 +38,9 @@ import (
 const serviceName = "ipaasPortal"
 
 var ErrInvalidCursor = errors.New("cursor is not one this listing gave")
+
+// InvalidCursorMessage is the error of the 400 GetComponents gets for a cursor the listing didn't give.
+const InvalidCursorMessage = "The cursor is not one this listing gave."
 
 type DisplayType string
 
@@ -324,8 +328,11 @@ func (svc *client) GetComponents(ctx context.Context, scope Scope, query Compone
 
 	page, err := getJSON[*ComponentPage](ctx, svc, operationName, url)
 	var statusErr *httpclient.StatusError
-	if errors.As(err, &statusErr) && statusErr.StatusCode == http.StatusBadRequest && query.Cursor != "" {
-		return nil, fmt.Errorf("%s:%s: %w", serviceName, operationName, ErrInvalidCursor)
+	if errors.As(err, &statusErr) && statusErr.StatusCode == http.StatusBadRequest {
+		var body ErrorBody
+		if json.Unmarshal([]byte(statusErr.Body), &body) == nil && body.Error == InvalidCursorMessage {
+			return nil, fmt.Errorf("%s:%s: %w", serviceName, operationName, ErrInvalidCursor)
+		}
 	}
 	if err != nil {
 		return nil, err

@@ -265,7 +265,7 @@ end user's identity is sent.
 |---|---|
 | `GET /scopes` | `{"scopes": string[]}`: the scopes of the integrations published in `{envId}`, each once |
 | `GET /projects` | `{"items": Project[]}`: the projects with an integration published in `{envId}` |
-| `GET /components?kind=&project=&search=&limit=&cursor=` | `ComponentPage`, with the same query and order as UP-DP's list. A cursor this listing didn't give gets 400 |
+| `GET /components?kind=&project=&search=&limit=&cursor=` | `ComponentPage`, with the same query and order as UP-DP's list. A cursor this listing didn't give gets 400 with `error` `"The cursor is not one this listing gave."`; UP-DP tells it from other 400s by that message alone |
 | `GET /components/{componentUid}` | `Component` |
 | `GET /components/{componentUid}/deployment-tracks/{trackId}/deployment` | `Deployment` |
 | `GET /components/{componentUid}/deployment-tracks/{trackId}/executions?limit=&before=` | `ExecutionPage` |

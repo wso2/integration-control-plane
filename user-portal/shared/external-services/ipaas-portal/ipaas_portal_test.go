@@ -20,6 +20,7 @@ package ipaasportal
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -76,4 +77,36 @@ func TestEveryCallNamesTheOrgAndTheEnvironment(t *testing.T) {
 	_, err = client.GetProjects(context.Background(), scope, []DisplayType{DisplayTypeAutomation})
 	require.NoError(t, err)
 	assert.Equal(t, "GET "+base+"/projects?kind=automation", paths[2])
+}
+
+func TestABadRequestIsAnInvalidCursorOnlyByItsMessage(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		body    string
+		invalid bool
+	}{
+		{name: "the cursor", body: `{"error":"The cursor is not one this listing gave."}`, invalid: true},
+		{name: "anything else", body: `{"error":"search is malformed"}`},
+		{name: "no JSON", body: `bad request`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				if r.URL.Path == "/token" {
+					_, _ = w.Write([]byte(`{"access_token":"tok","token_type":"Bearer","expires_in":3600}`))
+					return
+				}
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+			t.Cleanup(server.Close)
+			client := NewClient(Config{BaseURL: server.URL + "/portal", TokenURL: server.URL + "/token", ClientID: "c", ClientSecret: "s"},
+				httpclient.WithRetry(httpclient.RetryParams{MaxAttempts: 1}))
+
+			_, err := client.GetComponents(context.Background(), Scope{OrgUUID: common.NewID(), EnvID: common.NewID()}, ComponentQuery{Limit: 20, Cursor: "page-2"})
+
+			require.Error(t, err)
+			assert.Equal(t, tc.invalid, errors.Is(err, ErrInvalidCursor))
+		})
+	}
 }
