@@ -30,8 +30,6 @@ import (
 
 const clockSkew = 30 * time.Second
 
-// TokenService reads the claims of a token the gateway verified. It checks no
-// signature: only the gateway can reach UP-DP.
 type TokenService struct {
 	// now is injected so expiry is testable
 	now func() time.Time

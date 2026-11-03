@@ -41,7 +41,6 @@ func Identity(ctx context.Context) *domain.TokenIdentity {
 }
 
 // WithAuth admits a request only with a bearer token whose claims name a caller.
-// The gateway in front of UP-DP has verified it.
 func WithAuth(tokenSvc domain.TokenService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

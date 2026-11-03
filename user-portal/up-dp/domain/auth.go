@@ -18,8 +18,7 @@
 
 package domain
 
-// TokenService reads the caller from a bearer token the published environment's
-// gateway has already verified.
+// TokenService reads the caller from a bearer token's claims.
 type TokenService interface {
 	Read(rawToken string) (*TokenIdentity, error)
 }
