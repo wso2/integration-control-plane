@@ -721,11 +721,11 @@ export function sourceIndexingText(p: SourceProgress): string | null {
  * reason follows "N files are not searchable: ".
  */
 const MODEL_FAILURE_REASON: Record<string, string> = {
-  backend_model_access_denied: "the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
-  backend_model_not_found: 'the model provider does not know the configured model name. Fix the model settings, then retry.',
-  backend_model_quota_exceeded: "the model provider's rate limit or budget was reached. Retry later.",
-  backend_model_unavailable: 'the engine could not reach its model provider. Retry later.',
-  backend_model_failed: 'the model provider refused the request. Retry later.',
+  backend_model_access_denied: "the model provider rejected the engine's API key, or the key may not use the configured model. Fix the engine's model settings.",
+  backend_model_not_found: "the model provider does not know the configured model name. Fix the engine's model settings.",
+  backend_model_quota_exceeded: "the model provider's rate limit or budget was reached.",
+  backend_model_unavailable: 'the engine could not reach its model provider.',
+  backend_model_failed: 'the model provider refused the request.',
 };
 
 /**
@@ -740,8 +740,8 @@ export function sourceFailureNotice(p: SourceProgress): string | null {
   const failures = Object.entries(p.indexing.failures ?? {}).filter(([code, count]) => code in MODEL_FAILURE_REASON && count > 0);
   if (!failures.length) return null;
   const total = failures.reduce((n, [, count]) => n + count, 0);
-  // One code names its fix. With more than one, no single fix fits every file, so each file's row says its own.
-  const reason = failures.length === 1 ? MODEL_FAILURE_REASON[failures[0][0]] : "the model provider failed on them for more than one reason. Each file's row says why.";
+  // One code names its cause. With more than one, no single cause fits every file.
+  const reason = failures.length === 1 ? MODEL_FAILURE_REASON[failures[0][0]] : 'the model provider failed on them for more than one reason.';
   return `${plural(total, 'file')} in this source ${total === 1 ? 'is' : 'are'} not searchable: ${reason}`;
 }
 
