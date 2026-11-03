@@ -100,10 +100,10 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
       <Dialog open={!!confirming} onClose={() => setConfirming(null)}>
         <DialogTitle>Promote to {targetEnvId}?</DialogTitle>
         <DialogContent>
-          {confirming?.unchecked && <Typography variant="body2">Couldn&apos;t check that the resources this release uses have values in {targetEnvId}. It won&apos;t start there if one has none.</Typography>}
+          {confirming?.unchecked && <Typography variant="body2">Couldn&apos;t check resource values in {targetEnvId}.</Typography>}
           {confirming?.withoutValues.map((r) => (
             <Typography key={r} variant="body2">
-              {r} has no values in {targetEnvId}. It won&apos;t start there until you add them on WSO2 Cloud.
+              {r} has no values in {targetEnvId}.
             </Typography>
           ))}
         </DialogContent>

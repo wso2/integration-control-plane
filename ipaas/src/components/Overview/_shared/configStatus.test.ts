@@ -75,7 +75,7 @@ describe('missingConfigsReason', () => {
   const noValues = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL', 'wso2.sftask.sfSalesAuthClientId': 'SALESFORCE_AUTH_CLIENT_ID' }, false);
 
   it('names the linked resource without values', () => {
-    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [noValues], 'development')).toBe('salesforce-sales has no values in development. Add them on WSO2 Cloud; development restarts with them by itself.');
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [noValues], 'development')).toBe('salesforce-sales has no values in development. Add them on WSO2 Cloud.');
   });
 
   it('says required configurables have no values when no link is the cause', () => {

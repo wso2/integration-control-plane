@@ -59,7 +59,7 @@ export function missingConfigsReason(schemaConfig: SchemaConfigData | null | und
   if (!hasMissingRequiredConfigs(schemaConfig, links, env)) return undefined;
   const withoutValues = links.filter((l) => l.environments.some((e) => e.name === env && e.inRelease && !e.hasValues)).map((l) => l.resourceType);
   if (withoutValues.length === 0) return `Required configurables have no values in ${env}.`;
-  return `${withoutValues.join(', ')} ${withoutValues.length === 1 ? 'has' : 'have'} no values in ${env}. Add them on WSO2 Cloud; ${env} restarts with them by itself.`;
+  return `${withoutValues.join(', ')} ${withoutValues.length === 1 ? 'has' : 'have'} no values in ${env}. Add them on WSO2 Cloud.`;
 }
 
 /** `missingConfigsReason` in env with the integration's links, read once the schema has configurables. */

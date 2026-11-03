@@ -105,7 +105,7 @@ describe('PromoteButton', () => {
     await act(async () => button().click());
     expect(mutate).not.toHaveBeenCalled();
     const dialog = container.querySelector('[role="dialog"]')!;
-    expect(dialog.textContent).toContain("Couldn't check that the resources this release uses have values in production. It won't start there if one has none.");
+    expect(dialog.textContent).toContain("Couldn't check resource values in production.");
     await act(async () => dialog.querySelectorAll('button')[1].click());
     expect(mutate).toHaveBeenCalledTimes(1);
   });
@@ -123,7 +123,7 @@ describe('PromoteButton', () => {
     ]);
     await render();
     await act(async () => button().click());
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain("salesforce-marketing has no values in production. It won't start there until you add them on WSO2 Cloud.");
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('salesforce-marketing has no values in production.');
     expect(mutate).not.toHaveBeenCalled();
   });
 });
