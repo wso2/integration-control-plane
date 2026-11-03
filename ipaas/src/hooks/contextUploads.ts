@@ -85,7 +85,7 @@ const generations = new Map<string, number>();
 let notifyTimer: number | undefined;
 
 const UNCHANGED_DETAIL = 'Unchanged, so it was not sent again.';
-const BYTES_GONE_DETAIL = 'The engine no longer has this file, so it cannot run the job again. Upload the file again.';
+const BYTES_GONE_DETAIL = 'The engine no longer has this file. Upload it again.';
 
 const entryKey = (sourceId: string, recordId: string): string => `${sourceId}\u0000${recordId}`;
 const filesKey = (sourceId: string): string => `${CONTEXT_ENGINE_FILES_KEY_PREFIX}${sourceId}`;

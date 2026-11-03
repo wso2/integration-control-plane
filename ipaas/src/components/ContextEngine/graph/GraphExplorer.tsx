@@ -313,7 +313,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
                 Click a node
               </Typography>
               <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.55 }}>
-                Read each relationship along its arrow. A red “contradicts” label marks a conflict between two of them.
+                A red “contradicts” label marks a conflict between two relationships.
               </Typography>
               <Box component="dl" sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 2, rowGap: 0.5, m: 0, fontSize: 13 }}>
                 <Box component="dt" sx={mutedSx}>

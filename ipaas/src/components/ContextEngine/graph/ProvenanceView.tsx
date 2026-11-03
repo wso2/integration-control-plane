@@ -402,7 +402,7 @@ function DerivationSteps({
       ? {
           title: 'Answer',
           lit: true,
-          body: `${modelName ?? 'The language model'} wrote ${summary.sentences} sentence${summary.sentences === 1 ? '' : 's'} from the ${result.evidence.length} passage${result.evidence.length === 1 ? '' : 's'} it was given. Citations checked: ${citations.join(', ') || 'none'}${uncited.length ? `; ${uncited.map((n) => `passage ${n}`).join(', ')} given, not cited` : ''}.`,
+          body: `${modelName ?? 'The language model'} wrote ${summary.sentences} sentence${summary.sentences === 1 ? '' : 's'} from the ${result.evidence.length} passage${result.evidence.length === 1 ? '' : 's'} it was given. Citations checked: ${citations.join(', ') || 'none'}.${uncited.length ? ` ${uncited.length === 1 ? 'Passage' : 'Passages'} ${uncited.join(', ')} ${uncited.length === 1 ? 'was' : 'were'} given but not cited.` : ''}`,
         }
       : { title: 'Answer', body: result.answerWithheld ? 'Hidden: a passage it was written from is out of your reach now.' : result.insufficientEvidence ? 'None: the passages did not answer the question.' : 'Passages only: no answer was written.' },
     {
