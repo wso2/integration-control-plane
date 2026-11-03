@@ -49,6 +49,11 @@ export interface MiConfig {
    */
   legacySecrets: string[];
   /**
+   * Keys in `mi-secrets` whose old `mi-secret-<KEY>` group also still exists. It is
+   * left alone while the key stays a secret, and deleted once the key leaves `mi-secrets`.
+   */
+  shadowedLegacySecrets: string[];
+  /**
    * The `mi-env-vars` group exists but is stored as a secret (e.g. made on Configs &
    * Secrets). Its values can't be read back, so the editor can't show or change them.
    */
@@ -58,8 +63,8 @@ export interface MiConfig {
   /**
    * Keys set by the environment's other env-var groups (e.g. made on Configs & Secrets),
    * each mapped to its group's name. A key can belong to one group only, so MI can't
-   * add these. Keys MI already has are left out: a clash saved before the BFF checked
-   * for one still saves.
+   * add these to a group. A key the group already has is let through (as the BFF
+   * does), so a clash saved before the BFF checked for one still saves.
    */
   otherGroupKeys: Record<string, string>;
 }

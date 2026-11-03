@@ -32,6 +32,7 @@ describe('toMiConfig', () => {
       ],
       secrets: ['API_KEY', 'TOKEN'],
       legacySecrets: ['TOKEN'],
+      shadowedLegacySecrets: [],
       envVarsGroupIsSecret: false,
       secretsGroupIsPlain: false,
       otherGroupKeys: {},
@@ -50,17 +51,17 @@ describe('toMiConfig', () => {
 
   it('reads a key in both mi-secrets and its old group from mi-secrets only', () => {
     const groups = [group(MI_SECRETS_GROUP, true, ['TOKEN']), group(miSecretGroup('TOKEN'), true, ['TOKEN'])];
-    expect(toMiConfig(groups, {})).toMatchObject({ secrets: ['TOKEN'], legacySecrets: [] });
+    expect(toMiConfig(groups, {})).toMatchObject({ secrets: ['TOKEN'], legacySecrets: [], shadowedLegacySecrets: ['TOKEN'] });
   });
 
   it('reads groups made on the Configs & Secrets page only as keys MI cannot add', () => {
     const groups = [group('db-settings', false, ['DB_URL']), group('db-creds', true, ['DB_PASSWORD'])];
-    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: [], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: { DB_URL: 'db-settings', DB_PASSWORD: 'db-creds' } });
+    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: [], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: { DB_URL: 'db-settings', DB_PASSWORD: 'db-creds' } });
   });
 
-  it('lists the keys of a wrong-kind mi- group as other keys, but not keys MI already has', () => {
+  it('lists the keys of every group MI does not manage, a wrong-kind mi- group included', () => {
     const groups = [group(MI_ENV_VARS_GROUP, true, ['HOST']), group(MI_SECRETS_GROUP, true, ['TOKEN']), group('shared', false, ['TOKEN', 'URL'])];
-    expect(toMiConfig(groups, {}).otherGroupKeys).toEqual({ HOST: MI_ENV_VARS_GROUP, URL: 'shared' });
+    expect(toMiConfig(groups, {}).otherGroupKeys).toEqual({ HOST: MI_ENV_VARS_GROUP, TOKEN: 'shared', URL: 'shared' });
   });
 
   it('ignores secret groups that only look like MI ones', () => {
@@ -87,7 +88,7 @@ describe('isMiManagedGroup', () => {
 
 describe('miConfigCount', () => {
   it('counts env vars and secrets', () => {
-    expect(miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {} })).toBe(3);
+    expect(miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {} })).toBe(3);
   });
 });
 
@@ -116,9 +117,38 @@ describe('validateMiConfigDraft', () => {
   });
 
   it('rejects a key another config sets', () => {
-    const errors = validateMiConfigDraft({ envVars: [{ key: 'DB_URL', value: 'x' }], secrets: [{ key: 'OK', value: 's' }] }, [], { DB_URL: 'db-settings' });
+    const errors = validateMiConfigDraft({ envVars: [{ key: 'DB_URL', value: 'x' }], secrets: [{ key: 'OK', value: 's' }] }, [], cfg({ otherGroupKeys: { DB_URL: 'db-settings' } }));
     expect(errors.get('env:0')).toBe('"DB_URL" is already set by the "db-settings" config.');
     expect(errors.has('secret:0')).toBe(false);
+  });
+
+  it('lets through a shared key the MI group it is written to already has', () => {
+    // Saved before the checks: each key is also in a Configs & Secrets group.
+    const stored = cfg({ envVars: [{ key: 'HOST', value: 'h' }], secrets: ['TOKEN', 'OLD'], legacySecrets: ['OLD'], otherGroupKeys: { HOST: 'shared', TOKEN: 'shared', OLD: 'shared' } });
+    const draft = {
+      envVars: [{ key: 'HOST', value: 'changed' }],
+      secrets: [
+        { key: 'TOKEN', value: 'rotated' },
+        { key: 'OLD', value: '' },
+      ],
+    };
+    expect(validateMiConfigDraft(draft, ['TOKEN', 'OLD'], stored).size).toBe(0);
+  });
+
+  it('rejects a shared key moving to an MI group that does not have it', () => {
+    const stored = cfg({ envVars: [{ key: 'HOST', value: 'h' }], secrets: ['TOKEN', 'OLD'], legacySecrets: ['OLD'], otherGroupKeys: { HOST: 'shared', TOKEN: 'shared', OLD: 'shared' } });
+    // HOST becomes a secret, TOKEN a variable, and OLD gets a new value (so it moves to mi-secrets).
+    const draft = {
+      envVars: [{ key: 'TOKEN', value: 't' }],
+      secrets: [
+        { key: 'HOST', value: 'h' },
+        { key: 'OLD', value: 'new' },
+      ],
+    };
+    const errors = validateMiConfigDraft(draft, ['TOKEN', 'OLD'], stored);
+    expect(errors.get('env:0')).toMatch(/already set by the "shared" config/);
+    expect(errors.get('secret:0')).toMatch(/already set by the "shared" config/);
+    expect(errors.get('secret:1')).toMatch(/already set by the "shared" config/);
   });
 
   it('requires a value for a new secret', () => {
@@ -128,7 +158,7 @@ describe('validateMiConfigDraft', () => {
 });
 
 // A stored MI configuration; secrets are in mi-secrets unless listed in `legacySecrets`.
-const cfg = (c: Partial<MiConfig>): MiConfig => ({ envVars: [], secrets: [], legacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {}, ...c });
+const cfg = (c: Partial<MiConfig>): MiConfig => ({ envVars: [], secrets: [], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {}, ...c });
 const env = (e: Record<string, string>) => Object.entries(e).map(([key, value]) => ({ key, value }));
 // The plan's writes, one line each.
 const writesOf = (plan: MiConfigSavePlan): string[] => plan.writes.map((w) => (w.kind === 'delete' ? `delete ${w.group}` : `put ${w.group} ${JSON.stringify(w.data)}${w.keep ? ` keep ${w.keep.join(',')}` : ''}`));
@@ -196,6 +226,31 @@ describe('planMiConfigSave', () => {
 
   it('deletes the old group of a removed secret', () => {
     expect(writesOf(planMiConfigSave(cfg({ secrets: ['OLD'], legacySecrets: ['OLD'] }), { envVars: [], secrets: [] }))).toEqual(['delete mi-secret-OLD']);
+  });
+
+  it('leaves an old group shadowed by mi-secrets alone while the key stays a secret', () => {
+    const stored = cfg({ secrets: ['A', 'B'], shadowedLegacySecrets: ['A'] });
+    expect(
+      writesOf(
+        planMiConfigSave(stored, {
+          envVars: [],
+          secrets: [
+            { key: 'A', value: 'new' },
+            { key: 'B', value: '' },
+          ],
+        }),
+      ),
+    ).toEqual(['put mi-secrets {"A":"new"} keep B']);
+  });
+
+  it('deletes an old group shadowed by mi-secrets once the key is removed', () => {
+    const stored = cfg({ secrets: ['A', 'B'], shadowedLegacySecrets: ['A'] });
+    expect(writesOf(planMiConfigSave(stored, { envVars: [], secrets: [{ key: 'B', value: '' }] }))).toEqual(['put mi-secrets {} keep B', 'delete mi-secret-A']);
+  });
+
+  it('deletes an old group shadowed by mi-secrets before the key becomes a variable', () => {
+    const stored = cfg({ secrets: ['A', 'B'], shadowedLegacySecrets: ['A'] });
+    expect(writesOf(planMiConfigSave(stored, { envVars: [{ key: 'A', value: 'a' }], secrets: [{ key: 'B', value: '' }] }))).toEqual(['put mi-secrets {} keep B', 'delete mi-secret-A', 'put mi-env-vars {"A":"a"}']);
   });
 
   it('writes mi-secrets before mi-env-vars when a secret becomes a variable', () => {

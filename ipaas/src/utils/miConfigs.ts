@@ -55,24 +55,22 @@ export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, stri
   const envVars = (envGroup?.keys ?? []).map((key) => ({ key, value: envVarValues[key] ?? '' }));
   const secretsGroup = groups.find((g) => g.name === MI_SECRETS_GROUP && g.sensitive);
   const grouped = new Set(secretsGroup?.keys ?? []);
-  // A key in both places is read from `mi-secrets`. Its old group is left alone: deleting it
-  // would also drop the key from the container env that `mi-secrets` sets.
-  const legacySecrets = groups
-    .filter(isLegacySecretGroup)
-    .map((g) => g.keys[0])
-    .filter((key) => !grouped.has(key))
-    .sort();
+  // A key in both places is read from `mi-secrets`. Its old group is left alone while the
+  // key stays there: deleting it would also drop the key from the container env.
+  const legacyKeys = groups.filter(isLegacySecretGroup).map((g) => g.keys[0]);
+  const legacySecrets = legacyKeys.filter((key) => !grouped.has(key)).sort();
+  const shadowedLegacySecrets = legacyKeys.filter((key) => grouped.has(key)).sort();
   const secrets = [...grouped, ...legacySecrets].sort();
-  const own = new Set([...envVars.map((e) => e.key), ...secrets]);
   const otherGroupKeys: Record<string, string> = {};
   groups
     .filter((g) => !isMiManagedGroup(g))
     .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((g) => g.keys.filter((key) => !own.has(key) && !(key in otherGroupKeys)).forEach((key) => (otherGroupKeys[key] = g.name)));
+    .forEach((g) => g.keys.filter((key) => !(key in otherGroupKeys)).forEach((key) => (otherGroupKeys[key] = g.name)));
   return {
     envVars,
     secrets,
     legacySecrets,
+    shadowedLegacySecrets,
     envVarsGroupIsSecret: groups.some((g) => g.name === MI_ENV_VARS_GROUP && g.sensitive),
     secretsGroupIsPlain: groups.some((g) => g.name === MI_SECRETS_GROUP && !g.sensitive),
     otherGroupKeys,
@@ -85,23 +83,31 @@ export const miConfigCount = (config: MiConfig): number => config.envVars.length
 /**
  * Validates a draft. Returns an error per row key (`env:<i>` / `secret:<i>`);
  * an empty map means the draft can be saved. `storedSecrets` are the secrets
- * that already exist, whose value may stay blank (unchanged). `otherGroupKeys` are
- * keys other env-var groups set (`MiConfig.otherGroupKeys`), which MI can't use.
+ * that already exist, whose value may stay blank (unchanged). `stored` is the
+ * configuration the draft was made from: a key another env-var group sets
+ * (`MiConfig.otherGroupKeys`) is rejected unless the MI group it is written to
+ * already has it, as the BFF does.
  */
-export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: string[], otherGroupKeys: Record<string, string> = {}): Map<string, string> {
+export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: string[], stored?: Pick<MiConfig, 'envVars' | 'secrets' | 'legacySecrets' | 'otherGroupKeys'>): Map<string, string> {
   const errors = new Map<string, string>();
+  const otherGroupKeys = new Map(Object.entries(stored?.otherGroupKeys ?? {}));
+  const inEnvVarsGroup = new Set(stored?.envVars.map((e) => e.key));
+  const legacy = new Set(stored?.legacySecrets);
+  const inSecretsGroup = new Set(stored?.secrets.filter((key) => !legacy.has(key)));
   // Every row of a duplicated key is flagged, not just the later one: the row the user
   // is typing in may be the earlier one (an env var clashing with a stored secret).
   const uses = new Map<string, number>();
   [...draft.envVars, ...draft.secrets].forEach(({ key }) => uses.set(key, (uses.get(key) ?? 0) + 1));
-  const check = (id: string, key: string) => {
-    const keyErr = validateConfigKey(key) || keyInOtherGroupError(key, new Map(Object.entries(otherGroupKeys)));
+  // `written` is false for a key no write sends (a stored secret kept in its old group).
+  const check = (id: string, key: string, written: boolean) => {
+    const keyErr = validateConfigKey(key) || (written ? keyInOtherGroupError(key, otherGroupKeys) : '');
     if (keyErr) errors.set(id, keyErr);
     else if ((uses.get(key) ?? 0) > 1) errors.set(id, `'${key}' is defined more than once.`);
   };
-  draft.envVars.forEach((e, i) => check(`env:${i}`, e.key));
+  draft.envVars.forEach((e, i) => check(`env:${i}`, e.key, !inEnvVarsGroup.has(e.key)));
   draft.secrets.forEach((s, i) => {
-    check(`secret:${i}`, s.key);
+    const keptInOldGroup = legacy.has(s.key) && s.value === '' && storedSecrets.includes(s.key);
+    check(`secret:${i}`, s.key, !inSecretsGroup.has(s.key) && !keptInOldGroup);
     if (!errors.has(`secret:${i}`) && s.value === '' && !storedSecrets.includes(s.key)) errors.set(`secret:${i}`, 'Enter a value for the new secret.');
   });
   return errors;
@@ -154,22 +160,30 @@ export function planMiConfigSave(stored: MiConfig, draft: MiConfigDraft): MiConf
   const secretsChanged = Object.keys(data).length > 0 || grouped.some((key) => !finalKeys.has(key));
   const secretsWrite = secretsChanged ? putSecrets(data, keep) : undefined;
 
+  // An old group still holding a key that leaves `mi-secrets` goes right after the
+  // `mi-secrets` write that drops it: before `mi-env-vars` can take the key, which the
+  // BFF rejects while another group lists it.
+  const shadowDeletes: MiConfigWrite[] = stored.shadowedLegacySecrets.filter((key) => !finalKeys.has(key)).map((key) => ({ kind: 'delete', group: miSecretGroup(key) }));
+
   const toEnvVars = grouped.some((key) => !finalKeys.has(key) && draftEnvVars.has(key));
   const incoming = Object.keys(data).filter((key) => storedEnvVars.has(key));
+  // `envWrite` and `secretsWrite` are always set when keys move (narrowed here for the types).
   if (toEnvVars && incoming.length && envWrite && secretsWrite) {
     // Both directions: drop the outgoing secrets first, add the incoming ones last.
     const rest = Object.fromEntries(Object.entries(data).filter(([key]) => !incoming.includes(key)));
     const first = putSecrets(rest, keep);
     if (first) writes.push(first);
-    writes.push(envWrite);
+    writes.push(...shadowDeletes, envWrite);
     const kept = [...keep, ...Object.keys(rest)];
     writes.push({ kind: 'put', group: MI_SECRETS_GROUP, sensitive: true, data: Object.fromEntries(incoming.map((key) => [key, data[key]])), ...(kept.length ? { keep: kept } : {}) });
   } else if (toEnvVars) {
     if (secretsWrite) writes.push(secretsWrite);
+    writes.push(...shadowDeletes);
     if (envWrite) writes.push(envWrite);
   } else {
     if (envWrite) writes.push(envWrite);
     if (secretsWrite) writes.push(secretsWrite);
+    writes.push(...shadowDeletes);
   }
   return { writes };
 }

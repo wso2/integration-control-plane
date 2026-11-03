@@ -36,7 +36,7 @@ const MOUNT_PATH_RE = /^\/(?!\/)(?!.*\/\.\.)(?!.*\/$)[A-Za-z0-9._-]+(\/[A-Za-z0-
 
 // A Ballerina config save rebuilds these env vars and drops any other entry with
 // their names, so an env-var group can't use them (the BFF rejects them too).
-const isBallerinaConfigKey = (key: string): boolean => key === 'BAL_CONFIG_FILES' || key.startsWith('BAL_CONFIG_VAR_');
+export const isBallerinaConfigKey = (key: string): boolean => key === 'BAL_CONFIG_FILES' || key.startsWith('BAL_CONFIG_VAR_');
 
 export function validateConfigKey(key: string): string {
   if (!key.trim()) return 'Key is required.';

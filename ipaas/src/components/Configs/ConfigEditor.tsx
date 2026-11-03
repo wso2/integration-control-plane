@@ -21,7 +21,7 @@ import { ArrowLeft, Eye, EyeOff, Trash2, Upload } from '@wso2/oxygen-ui-icons-re
 import BusyFields from '../common/BusyFields';
 import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { useConfigMapDetails, useSaveConfig } from '../../hooks/useDevopsConfigs';
-import { keyInOtherGroupError, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
+import { isBallerinaConfigKey, keyInOtherGroupError, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
 import type { ConfigKind, ConfigRow } from '../../types/devopsConfigs';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import * as styles from './ConfigEditor.styles';
@@ -100,6 +100,8 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
   const [draftKey, setDraftKey] = useState('');
   const [draftValue, setDraftValue] = useState('');
   const [draftError, setDraftError] = useState('');
+  // What the last .env import left out, and why. Not an error: the rest was imported.
+  const [importNotice, setImportNotice] = useState('');
   const [revealedKeys, setRevealedKeys] = useState<ReadonlySet<string>>(new Set());
   const draftMessageId = useId();
   const [mountPath, setMountPath] = useState(existing?.mount.mount_path ?? '');
@@ -130,20 +132,15 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
   const initialRows = existing ? (details?.data && existing.kind !== 'fileMount' ? Object.entries(details.data).map(([key, value]) => ({ key, value })) : existing.keys.map((key) => ({ key, value: '' }))) : [];
   const initialFileContent = existing?.kind === 'fileMount' ? (details?.data?.data ?? '') : '';
   const rowsChanged = rows.length !== initialRows.length || rows.some((r, i) => r.key !== initialRows[i].key || r.value !== initialRows[i].value);
-  const isDirty =
-    kind !== (existing?.kind ?? 'envVars') ||
-    isSecret !== (existing?.isSecret ?? false) ||
-    name !== (existing?.name ?? '') ||
-    mountPath !== (existing?.mount.mount_path ?? '') ||
-    fileContent !== initialFileContent ||
-    draftKey !== '' ||
-    draftValue !== '' ||
-    rowsChanged;
+  // What Update would save differs from what is stored.
+  const changed = kind !== (existing?.kind ?? 'envVars') || isSecret !== (existing?.isSecret ?? false) || name !== (existing?.name ?? '') || mountPath !== (existing?.mount.mount_path ?? '') || fileContent !== initialFileContent || rowsChanged || !!pendingRow;
+  // Anything typed counts for the leave guard, even a value with no key (which is not saved).
+  const isDirty = changed || draftKey !== '' || draftValue !== '';
   useUnsavedChanges(isDirty);
   const guardNavigation = useLeaveGuard();
 
   // An unchanged edit is not saved: with stored secrets kept, it would only restart the workload.
-  const canSave = !save.isPending && (!isEdit || isDirty) && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? effectiveRows.length > 0 : !pathErr && fileContent.trim().length > 0);
+  const canSave = !save.isPending && (!isEdit || changed) && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? effectiveRows.length > 0 : !pathErr && fileContent.trim().length > 0);
 
   // Why Save is disabled, for causes no field already explains (a filled-in field shows its own error).
   const blockedReason = (() => {
@@ -153,7 +150,8 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
     if (kind === 'envVars' && effectiveRows.length === 0) return 'Add at least one variable.';
     if (kind === 'fileMount' && !mountPath.trim()) return 'Enter the mount path.';
     if (kind === 'fileMount' && !fileContent.trim()) return 'Enter the file content.';
-    if (isEdit && !isDirty) return 'No changes to save.';
+    if (isEdit && !changed && draftValue && !draftKey.trim()) return 'Enter a key for the new value.';
+    if (isEdit && !changed) return 'No changes to save.';
     return '';
   })();
 
@@ -191,10 +189,13 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
 
   const importEnvFile = (file: File) => {
     void file.text().then((text) => {
-      const parsed = parseDotEnv(text).filter((p) => !validateConfigKey(p.key));
-      // A key another config already sets is left out, and said so: the save would be rejected.
-      const taken = parsed.filter((p) => otherGroupKeys.has(p.key));
-      setDraftError(taken.length ? `Not imported, already set by another config: ${taken.map((p) => p.key).join(', ')}.` : '');
+      const all = parseDotEnv(text);
+      const parsed = all.filter((p) => !validateConfigKey(p.key));
+      // Keys the save would reject are left out, and said so.
+      const reserved = all.filter((p) => isBallerinaConfigKey(p.key)).map((p) => p.key);
+      const taken = parsed.filter((p) => otherGroupKeys.has(p.key)).map((p) => p.key);
+      const skipped = [reserved.length ? `reserved for Ballerina configuration: ${reserved.join(', ')}` : '', taken.length ? `already set by another config: ${taken.join(', ')}` : ''].filter(Boolean);
+      setImportNotice(skipped.length ? `Not imported, ${skipped.join('; ')}.` : '');
       setRows((prev) => {
         const existingKeys = new Set(prev.map((r) => r.key));
         return [...prev, ...parsed.filter((p) => !existingKeys.has(p.key) && !otherGroupKeys.has(p.key))];
@@ -383,6 +384,10 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
               {draftMessage ? (
                 <FormHelperText id={draftMessageId} error sx={styles.envHelper}>
                   {draftMessage}
+                </FormHelperText>
+              ) : importNotice ? (
+                <FormHelperText id={draftMessageId} sx={styles.envHelper}>
+                  {importNotice}
                 </FormHelperText>
               ) : (
                 <FormHelperText id={draftMessageId} sx={styles.envHelper}>
