@@ -18,6 +18,7 @@
 
 import type {
   ContextEngineStorage,
+  ContextQueryMode,
   ContextSourceConfig,
   FileVisibility,
   LlmConfig,
@@ -667,6 +668,12 @@ export const ROLE_GRANT_PREFIX = 'role-';
 
 export const CONTEXT_QUERY_DEFAULT_LIMIT = 10;
 export const CONTEXT_QUERY_MAX_LENGTH = 10000;
+
+/** The Playground's query modes, in the order the toggle shows them. */
+export const CONTEXT_QUERY_MODES: readonly { value: ContextQueryMode; label: string; hint: string }[] = [
+  { value: 'answer', label: 'Answer', hint: 'A cited answer from passages you can read.' },
+  { value: 'context', label: 'Context', hint: 'Passages you can read, as an agent gets them.' },
+];
 
 /** Jobs stop being polled once they reach one of these. */
 export const CONTEXT_JOB_TERMINAL_STATES = new Set(['succeeded', 'failed']);

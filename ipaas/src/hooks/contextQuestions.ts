@@ -78,6 +78,11 @@ export function forgetQuestion(engineId: string, queryId: string): void {
   );
 }
 
+/** Empty this browser's list for an engine. The engine keeps the stored questions. */
+export function clearQuestions(engineId: string): void {
+  write(engineId, []);
+}
+
 /** The questions asked from this browser on one engine, newest first. */
 export function useAskedQuestions(engineId: string): AskedQuestion[] {
   return useSyncExternalStore(
