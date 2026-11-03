@@ -19,7 +19,7 @@
 import { Box, Button, Chip, InputAdornment, TextField, Typography } from '@wso2/oxygen-ui';
 import { Search } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { CATALOG_PAGE_SIZE, contextLogoUrl, isConnectorEnabled, POPULAR_CONNECTORS, SOURCE_CATEGORIES, SOURCE_CONNECTORS } from '../../constants/contextEngine';
+import { CATALOG_CONNECTORS, CATALOG_PAGE_SIZE, contextLogoUrl, isConnectorEnabled, POPULAR_CONNECTORS, SOURCE_CATEGORIES } from '../../constants/contextEngine';
 import { connectorCountsByCategory, filterConnectors } from '../../utils/contextEngine';
 import SelectableCard from '../common/SelectableCard';
 import { sourceTypeIcon } from './SourceMark';
@@ -66,8 +66,8 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
   const [visible, setVisible] = useState(CATALOG_PAGE_SIZE);
   const sentinelRef = useRef<HTMLDivElement>(null);
 
-  const counts = useMemo(() => connectorCountsByCategory(SOURCE_CONNECTORS), []);
-  const results = useMemo(() => filterConnectors(SOURCE_CONNECTORS, query, category), [query, category]);
+  const counts = useMemo(() => connectorCountsByCategory(CATALOG_CONNECTORS), []);
+  const results = useMemo(() => filterConnectors(CATALOG_CONNECTORS, query, category), [query, category]);
   const showPopular = query.trim() === '' && category === 'all';
   const shown = results.slice(0, visible);
   const remaining = results.length - shown.length;
@@ -102,7 +102,7 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
         fullWidth
         size="small"
         value={query}
-        placeholder={`Search ${SOURCE_CONNECTORS.length} connectors…`}
+        placeholder={`Search ${CATALOG_CONNECTORS.length} connectors…`}
         onChange={(e) => changeQuery(e.target.value)}
         slotProps={{
           htmlInput: { 'aria-label': 'Search connectors' },
@@ -117,7 +117,7 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
       />
 
       <Box sx={catalogChipsSx} role="group" aria-label="Filter by category">
-        <Chip label={`All ${SOURCE_CONNECTORS.length}`} clickable variant={category === 'all' ? 'filled' : 'outlined'} color={category === 'all' ? 'primary' : 'default'} onClick={() => changeCategory('all')} />
+        <Chip label={`All ${CATALOG_CONNECTORS.length}`} clickable variant={category === 'all' ? 'filled' : 'outlined'} color={category === 'all' ? 'primary' : 'default'} onClick={() => changeCategory('all')} />
         {SOURCE_CATEGORIES.map((c) => (
           <Chip key={c.id} label={`${c.label} ${counts[c.id] ?? 0}`} clickable variant={category === c.id ? 'filled' : 'outlined'} color={category === c.id ? 'primary' : 'default'} onClick={() => changeCategory(c.id)} />
         ))}
