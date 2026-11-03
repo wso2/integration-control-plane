@@ -26,7 +26,7 @@ import CosmosCanvas from './CosmosCanvas';
 import EntityPanel, { EntityChip } from './EntityPanel';
 import { ConflictPanel, RelationPanel, type ConflictView, type LinkEnd, type LinkRecord, type RelationView } from './LinkPanel';
 import { useGraphTheme } from './graphTheme';
-import { GRAPH_HEIGHT, legendDotSx, legendSx, nodeLabelSx, panelLabelSx, panelSx } from './graphStyles';
+import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, nodeLabelSx, panelLabelSx, panelSx } from './graphStyles';
 import { mutedSx } from '../styles';
 import type { ContextEngineDetail, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
 
@@ -252,6 +252,13 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
           accent={colors.accent}
           height={GRAPH_HEIGHT}
           ariaLabel={`The knowledge graph: ${counts.records} documents and ${counts.entities} entities you can see`}>
+          {model.nodes.length === 0 && (
+            <Box sx={canvasNoteSx}>
+              <Typography variant="body2" sx={{ ...mutedSx, textAlign: 'center', maxWidth: 380, bgcolor: 'background.paper', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
+                {counts.records || counts.entities ? 'Nothing matches these filters. Turn on documents or entities to see them.' : 'Nothing to show yet. The graph is built as documents are indexed, and shows only the ones you can see.'}
+              </Typography>
+            </Box>
+          )}
           <Box sx={legendSx}>
             <Stack direction="row" alignItems="center" gap={0.75}>
               <Box sx={legendDotSx(colors.record, true)} />

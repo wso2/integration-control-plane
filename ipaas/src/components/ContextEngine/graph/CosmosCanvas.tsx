@@ -341,7 +341,7 @@ export default function CosmosCanvas({
   const frameFocus = useCallback((index: number) => {
     const graph = graphRef.current;
     const host = hostRef.current;
-    if (!graph || !host) return;
+    if (!graph || !host || !pointCountRef.current) return;
     userMovedRef.current = true;
     const points = framePointsRef.current && framePointsRef.current.length ? framePointsRef.current : [index];
     const all = graph.getPointPositions();

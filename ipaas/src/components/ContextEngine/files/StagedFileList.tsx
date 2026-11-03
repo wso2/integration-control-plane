@@ -32,7 +32,7 @@ interface StagedFileListProps {
   onRemove: (id: string) => void;
 }
 
-const TYPE_NAME: Record<string, string> = { 'text/plain': 'Plain text', 'text/markdown': 'Markdown', 'text/html': 'HTML', 'application/json': 'JSON', 'application/pdf': 'PDF' };
+const TYPE_NAME: Record<string, string> = { 'text/plain': 'Plain text', 'text/markdown': 'Markdown', 'text/html': 'HTML', 'application/json': 'JSON', 'text/csv': 'CSV', 'application/pdf': 'PDF' };
 
 /** Chosen files with what will happen to each: ready, replaces, stored only, or skipped. */
 export default function StagedFileList({ files, existingNames, missingIds, onRemove }: StagedFileListProps): JSX.Element {
