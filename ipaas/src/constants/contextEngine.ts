@@ -627,7 +627,7 @@ export const LLM_PROVIDERS: LlmProviderInfo[] = [
 export const CONTEXT_EMBEDDING_PROVIDERS: EmbeddingProviderInfo[] = [{ id: 'openai', name: 'Open AI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] }];
 
 /** Display names for providers an engine may still run but the console no longer offers. */
-export const RETIRED_MODEL_PROVIDER_NAMES: Record<string, string> = { azure_openai: 'Azure Open AI', mistral: 'Mistral AI' };
+export const RETIRED_MODEL_PROVIDER_NAMES: Record<string, string> = { azure_openai: 'Azure OpenAI', mistral: 'Mistral AI' };
 
 export const LLM_AZURE_DEFAULT_API_VERSION = '2024-06-01';
 
