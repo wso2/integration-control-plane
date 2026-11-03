@@ -742,7 +742,7 @@ export function sourceFailureNotice(p: SourceProgress): string | null {
   const total = failures.reduce((n, [, count]) => n + count, 0);
   // One code names its fix. With more than one, no single fix fits every file, so each file's row says its own.
   const reason = failures.length === 1 ? MODEL_FAILURE_REASON[failures[0][0]] : "the model provider failed on them for more than one reason. Each file's row says why.";
-  return `${plural(total, 'file')} ${total === 1 ? 'is' : 'are'} not searchable: ${reason}`;
+  return `${plural(total, 'file')} in this source ${total === 1 ? 'is' : 'are'} not searchable: ${reason}`;
 }
 
 /** Roll-up across the engine's sources. Sources without a progress entry are ones the caller may not inspect. */
