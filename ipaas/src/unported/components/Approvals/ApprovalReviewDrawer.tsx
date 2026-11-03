@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Divider, Drawer, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Box, Button, Chip, CircularProgress, Divider, Drawer, IconButton, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import { workflowStatusChip } from '../../constants/workflows';
@@ -123,7 +122,7 @@ export default function ApprovalReviewDrawer({ instance, onClose, onActionDone, 
           {isPending && (
             <>
               <Divider />
-              <TextField label="Comment (optional)" value={comment} onChange={(e) => setComment(e.target.value)} multiline minRows={2} fullWidth disabled={busy} />
+              <TextField labelPlacement="top" label="Comment" optional value={comment} onChange={(e) => setComment(e.target.value)} multiline minRows={2} fullWidth disabled={busy} />
               {(review.isError || cancel.isError) && <Alert severity="error">Action failed. Please try again.</Alert>}
               <Stack direction="row" gap={1.5} flexWrap="wrap">
                 <Button variant="contained" color="success" disabled={busy} onClick={() => submit(ReviewerDecision.Approved)}>

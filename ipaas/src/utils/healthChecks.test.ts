@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { defaultProbeForm, formToProbe, hasProbe, isProbeFormValid, probeToForm, probeTypeLabel, serializeProbeForWrite, validatePath, validatePort } from './healthChecks';
+import { defaultProbeForm, formToProbe, hasProbe, isProbeFormChanged, isProbeFormValid, probeToForm, probeTypeLabel, serializeProbeForWrite, validatePath, validatePort } from './healthChecks';
 import { PROBE_TYPE, type HCProbe } from '../types/healthChecks';
 
 const httpProbe: HCProbe = {
@@ -74,6 +74,22 @@ describe('validatePort / validatePath', () => {
     expect(validatePath('/healthz')).toBeUndefined();
     expect(validatePath('')).toBe('This field is required');
     expect(validatePath('healthz')).toBe('Path must start with /');
+  });
+});
+
+describe('isProbeFormChanged', () => {
+  it('is false for an untouched form and true once a field differs', () => {
+    const initial = defaultProbeForm(8080);
+    expect(isProbeFormChanged({ ...initial }, initial)).toBe(false);
+    expect(isProbeFormChanged({ ...initial, path: '/health' }, initial)).toBe(true);
+    expect(isProbeFormChanged({ ...initial, periodSeconds: 60 }, initial)).toBe(true);
+  });
+
+  it('compares header and command lists by value', () => {
+    const initial = { ...defaultProbeForm(), httpHeaders: [{ name: 'a', value: '1' }] };
+    expect(isProbeFormChanged({ ...initial, httpHeaders: [{ name: 'a', value: '1' }] }, initial)).toBe(false);
+    expect(isProbeFormChanged({ ...initial, httpHeaders: [{ name: 'a', value: '2' }] }, initial)).toBe(true);
+    expect(isProbeFormChanged({ ...initial, command: ['sh'] }, initial)).toBe(true);
   });
 });
 

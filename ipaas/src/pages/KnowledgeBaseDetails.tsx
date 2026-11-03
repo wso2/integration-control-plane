@@ -41,6 +41,7 @@ import {
   TableRow,
   Tooltip,
   Typography,
+  TextField,
 } from '@wso2/oxygen-ui';
 import { ArrowLeft, Clock, Database, ExternalLink, MoreVertical, Play, Plus, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
@@ -65,7 +66,6 @@ import PageNotFound from './PageNotFound';
 import PillTabs from '../components/PillTabs';
 import EmptyListing from '../components/EmptyListing';
 import ConfirmDeleteDialog from '../components/ConfirmDeleteDialog';
-import TextField from '../components/common/TextField';
 import CopyButton from '../components/Overview/integration-as-api/CopyButton';
 import DeploymentStatusChip from '../components/KnowledgeBase/DeploymentStatusChip';
 import DeleteKnowledgeBaseDialog from '../components/KnowledgeBase/DeleteKnowledgeBaseDialog';
@@ -641,8 +641,8 @@ function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: Knowledg
       )}
       <Alert severity="warning">Saving restarts the knowledge base service and every data source of this knowledge base, so they pick up the new settings.</Alert>
       <Stack gap={2.5} sx={{ maxWidth: 560 }}>
-        <TextField label="Display Name" required fullWidth size="small" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-        <TextField label="Description" fullWidth size="small" multiline minRows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <TextField labelPlacement="top" label="Display Name" required fullWidth size="small" value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+        <TextField labelPlacement="top" label="Description" fullWidth size="small" multiline minRows={2} value={description} onChange={(e) => setDescription(e.target.value)} />
       </Stack>
       <Box>
         <VectorStoreStep value={vectorStore} onChange={setVectorStore} storedSecretKeys={storedVectorStoreSecrets} />

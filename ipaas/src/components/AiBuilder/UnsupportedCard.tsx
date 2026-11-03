@@ -27,7 +27,7 @@ export function UnsupportedCard({ response, onTryAgain }: { response: Unsupporte
     <ResponseCard
       actions={
         <Button variant="contained" color="primary" size="small" onClick={onTryAgain}>
-          Try Again
+          Try again
         </Button>
       }>
       <Typography variant="body2" sx={{ mb: 1.5 }}>

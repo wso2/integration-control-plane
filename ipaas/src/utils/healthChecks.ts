@@ -136,6 +136,11 @@ export function formToProbe(form: ProbeFormState): HCProbe {
   };
 }
 
+/** Whether any field of a probe form differs from the state it started in. */
+export function isProbeFormChanged(form: ProbeFormState, initial: ProbeFormState): boolean {
+  return (Object.keys(initial) as (keyof ProbeFormState)[]).some((key) => JSON.stringify(form[key]) !== JSON.stringify(initial[key]));
+}
+
 /** Whether a probe form passes all required-field validations for its type. */
 export function isProbeFormValid(form: ProbeFormState): boolean {
   if (form.type === PROBE_TYPE.HTTP_GET) {

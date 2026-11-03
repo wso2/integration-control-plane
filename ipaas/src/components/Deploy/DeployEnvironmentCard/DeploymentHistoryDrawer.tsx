@@ -16,13 +16,11 @@
  * under the License.
  */
 
-import { Box, CircularProgress, Divider, Drawer, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { CheckCircle2, Clock, GitCommitHorizontal, User, X, XCircle } from '@wso2/oxygen-ui-icons-react';
+import { Box, CircularProgress, Divider, DrawerPanel, Stack, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { CheckCircle2, Clock, GitCommitHorizontal, User, XCircle } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useReleaseMgtDeployments } from '../../../hooks/useDeployments';
-import { formatDistanceToNow } from '../../../utils/time';
-
-const drawerSx = { '& .MuiDrawer-paper': { width: 480, p: 0, top: { xs: '56px', sm: '64px' }, height: 'auto', bottom: 0 } };
+import { formatDateTime, formatDistanceToNow } from '../../../utils/time';
 
 // "0001-01-01T00:00:00Z" is the zero-value date the backend returns when not yet deployed
 const isZeroDate = (d: string) => !d || d.startsWith('0001-01-01');
@@ -42,24 +40,20 @@ export default function DeploymentHistoryDrawer({ open, onClose, orgUuid, projec
   const { data: deployments = [], isLoading } = useReleaseMgtDeployments(orgUuid, projectId, componentId, versionId, environmentId);
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={drawerSx}>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2.5, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Stack gap={0.25}>
-          <Typography variant="h3">Deployment History</Typography>
+    <DrawerPanel open={open} onClose={onClose} width={480}>
+      <DrawerPanel.Header>
+        <Stack sx={{ flex: 1, minWidth: 0 }}>
+          <DrawerPanel.Title>Deployment History</DrawerPanel.Title>
           <Typography variant="caption" color="text.secondary">
             {envName}
           </Typography>
         </Stack>
-        <Tooltip title="Close">
-          <IconButton size="small" onClick={onClose}>
-            <X size={18} />
-          </IconButton>
-        </Tooltip>
-      </Stack>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      {/* Body */}
-      <Box sx={{ flex: 1, overflow: 'auto' }}>
+      <DrawerPanel.Body sx={{ p: 0 }}>
         {isLoading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', pt: 4 }}>
             <CircularProgress size={28} />
@@ -102,11 +96,7 @@ export default function DeploymentHistoryDrawer({ open, onClose, orgUuid, projec
                     </Stack>
 
                     {/* Time */}
-                    {time && (
-                      <Typography variant="caption" color="text.secondary">
-                        {formatDistanceToNow(time)}
-                      </Typography>
-                    )}
+                    {time && <RelativeTime time={formatDistanceToNow(time)} dateTime={time} tooltip={formatDateTime(time)} size="small" />}
 
                     {/* Commit hash */}
                     {dep.commitHash && (
@@ -140,7 +130,7 @@ export default function DeploymentHistoryDrawer({ open, onClose, orgUuid, projec
               </Box>
             );
           })}
-      </Box>
-    </Drawer>
+      </DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

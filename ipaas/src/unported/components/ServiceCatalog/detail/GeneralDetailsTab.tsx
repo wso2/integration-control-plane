@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useUpdateGenaiService } from '../../../hooks/useGenaiServices';
@@ -85,9 +84,9 @@ export default function GeneralDetailsTab({ service, lockedTags = [] }: { servic
       )}
 
       <Stack gap={2}>
-        <TextField label="Service Name" required fullWidth value={name} onChange={(e) => setName(e.target.value)} sx={requiredSx} />
-        <TextField label="Summary" fullWidth multiline rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
-        <TextField label="Overview" fullWidth multiline rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <TextField labelPlacement="top" label="Service Name" required fullWidth value={name} onChange={(e) => setName(e.target.value)} sx={requiredSx} />
+        <TextField labelPlacement="top" label="Summary" fullWidth multiline rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
+        <TextField labelPlacement="top" label="Overview" fullWidth multiline rows={4} value={description} onChange={(e) => setDescription(e.target.value)} />
 
         <Box>
           <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.5 }}>

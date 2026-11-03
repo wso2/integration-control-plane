@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Divider, Drawer, IconButton, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
-import { CheckCircle2, Copy, Plus, Trash2, X, XCircle } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, Divider, DrawerPanel, IconButton, Stack, Tab, Tabs, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { CheckCircle2, Copy, Plus, Trash2, XCircle } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState } from 'react';
 import { useExecutionArguments } from '../../hooks/useExecutions';
 import type { TaskExecution } from '../../types/executions';
@@ -61,17 +60,6 @@ function StatusIcon({ status }: { status: string }) {
   if (v === 'succeeded' || v === 'success') return <CheckCircle2 size={16} color="green" />;
   return <XCircle size={16} color="red" />;
 }
-
-const drawerSx = {
-  '& .MuiDrawer-paper': {
-    width: 680,
-    position: 'fixed',
-    top: 64,
-    height: 'calc(100% - 64px)',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-};
 
 export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess, orgHandler, projectId, componentId, releaseId }: ExecutionDrawerProps) {
   const handleClose = () => {
@@ -136,13 +124,10 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Stack direction="row" alignItems="center" gap={0.5}>
-          <Typography variant="h5" sx={{ fontWeight: 600 }}>
-            {execution ? `Execution: ${executionIdTail(execution.id)}` : 'Execution'}
-          </Typography>
+    <DrawerPanel open={open} onClose={handleClose} width={680}>
+      <DrawerPanel.Header>
+        <Stack direction="row" alignItems="center" gap={0.5} sx={{ flex: 1, minWidth: 0 }}>
+          <DrawerPanel.Title sx={{ flex: '0 1 auto' }}>{execution ? `Execution: ${executionIdTail(execution.id)}` : 'Execution'}</DrawerPanel.Title>
           {execution && (
             <Tooltip title={titleCopied ? 'Copied!' : 'Copy execution name'}>
               <IconButton size="small" onClick={handleCopyTitle} aria-label="Copy execution name">
@@ -151,14 +136,14 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
             </Tooltip>
           )}
         </Stack>
-        <IconButton size="small" aria-label="close" onClick={handleClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
       {execution && (
         <>
-          <Box sx={{ flex: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+          <DrawerPanel.Body sx={{ p: 0, display: 'flex', flexDirection: 'column' }}>
             {/* Info card */}
             <Box sx={{ px: 2, pt: 2 }}>
               <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 2, py: 1.5 }}>
@@ -230,7 +215,7 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
                   ))}
 
                   <Button variant="text" size="small" startIcon={<Plus size={14} />} onClick={() => setArgs((prev) => [...prev, ''])} sx={{ alignSelf: 'flex-start', px: 0 }}>
-                    Add Argument
+                    Add argument
                   </Button>
 
                   {runError && (
@@ -241,19 +226,21 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
                 </Stack>
               )}
             </Box>
-          </Box>
+          </DrawerPanel.Body>
 
           {/* Footer */}
           {!argsLoading && (
-            <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-              <Button onClick={onClose}>Cancel</Button>
+            <DrawerPanel.Footer>
+              <Button variant="outlined" color="inherit" onClick={onClose}>
+                Cancel
+              </Button>
               <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
                 {trigger.isPending ? 'Executing…' : 'Execute'}
               </Button>
-            </Stack>
+            </DrawerPanel.Footer>
           )}
         </>
       )}
-    </Drawer>
+    </DrawerPanel>
   );
 }

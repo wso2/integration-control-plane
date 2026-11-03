@@ -207,7 +207,7 @@ describe('cloud AuthProvider — settling the session', () => {
     await render();
 
     expect(auth).toMatchObject({ isAuthenticated: true, userId: 'u1', username: 'ada@example.com', displayName: 'Ada Lovelace', pictureUrl: 'https://img.example/ada.png', orgHandle: 'acme' });
-    expect(localStorage.getItem('org_handle')).toBe('acme');
+    expect(localStorage.getItem('icp:org_handle')).toBe('acme');
     expect(getOrgUuidFromToken()).toBe('org-uuid');
   });
 

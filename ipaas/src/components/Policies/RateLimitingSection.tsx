@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Collapse, FormControlLabel, MenuItem, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Collapse, FormControlLabel, MenuItem, Radio, RadioGroup, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import type { ReactNode } from 'react';
 import { TIME_UNITS } from '../../constants/policy';
 import type { RateLimitConfig, RateLimitLevel, RateLimitOperation, RateLimitRule, TimeUnit } from '../../types/policy';
@@ -65,9 +64,11 @@ export default function RateLimitingSection({ value, onChange, disabled, descrip
       <Collapse in={limited} unmountOnExit>
         <Stack direction="row" alignItems="flex-start" gap={2}>
           <TextField
+            labelPlacement="top"
             size="small"
             type="number"
             label="Max requests"
+            required
             value={value.requestCount}
             onChange={(e) => onChange({ ...value, requestCount: e.target.value })}
             disabled={disabled}
@@ -76,7 +77,7 @@ export default function RateLimitingSection({ value, onChange, disabled, descrip
             sx={{ width: 160 }}
             slotProps={{ htmlInput: { min: 1, step: 1 } }}
           />
-          <TextField select size="small" label="Per" value={value.timeUnit} onChange={(e) => onChange({ ...value, timeUnit: e.target.value as TimeUnit })} disabled={disabled} sx={{ width: 140 }} helperText=" ">
+          <TextField labelPlacement="top" select size="small" label="Per" value={value.timeUnit} onChange={(e) => onChange({ ...value, timeUnit: e.target.value as TimeUnit })} disabled={disabled} sx={{ width: 140 }} helperText=" ">
             {TIME_UNITS.map((u) => (
               <MenuItem key={u.value} value={u.value}>
                 {u.label}
@@ -102,9 +103,11 @@ export default function RateLimitingSection({ value, onChange, disabled, descrip
                   </Typography>
                 </Box>
                 <TextField
+                  labelPlacement="top"
                   size="small"
                   type="number"
                   label="Max requests"
+                  optional
                   value={rule.requestCount}
                   onChange={(e) => setRule(op.key, { ...rule, requestCount: e.target.value })}
                   disabled={disabled}
@@ -113,7 +116,7 @@ export default function RateLimitingSection({ value, onChange, disabled, descrip
                   sx={{ width: 160 }}
                   slotProps={{ htmlInput: { min: 1, step: 1 } }}
                 />
-                <TextField select size="small" label="Per" value={rule.timeUnit} onChange={(e) => setRule(op.key, { ...rule, timeUnit: e.target.value as TimeUnit })} disabled={disabled} sx={{ width: 140 }} helperText=" ">
+                <TextField labelPlacement="top" select size="small" label="Per" value={rule.timeUnit} onChange={(e) => setRule(op.key, { ...rule, timeUnit: e.target.value as TimeUnit })} disabled={disabled} sx={{ width: 140 }} helperText=" ">
                   {TIME_UNITS.map((u) => (
                     <MenuItem key={u.value} value={u.value}>
                       {u.label}

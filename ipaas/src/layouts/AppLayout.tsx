@@ -19,7 +19,6 @@
 import {
   AppShell,
   Button,
-  Chip,
   ColorSchemeToggle,
   ComplexSelect,
   Dialog,
@@ -38,11 +37,13 @@ import {
   Popover,
   Sidebar,
   Tooltip,
+  TrialBadge,
+  type TrialBadgeUsage,
   Typography,
   UserMenu,
   useAppShell,
+  TextField,
 } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
@@ -80,12 +81,16 @@ import {
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
 import { useFreshDefaultProject } from '../hooks/useFreshDefaultProject';
-import { useOrgs } from '../hooks/useOrg';
+import { useOrgComponentLimits, useOrgs } from '../hooks/useOrg';
 import { useBillingOrg } from '../hooks/useBillingOrg';
+import { useOrgUuid } from '../hooks/useOrgUuid';
+import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
+import { trialLengthDays } from '../utils/billing';
 import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useAuth } from '../auth';
+import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
 import {
   useScope,
   broaden,
@@ -105,19 +110,25 @@ import {
   type Scope,
 } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
-import { componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
+import { trackEvent } from '../services/tracking/tracking';
+import { billingUpgradeUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
+import { useLeaveGuard } from '../contexts/UnsavedChangesContext';
 
 // ComplexSelect is content-sized, and at org level there is no card beside the icon to stretch against.
 import { useLoadedImage } from '../hooks/useLoadedImage';
+import { withTrackParam } from '../hooks/useSelectedTrack';
 import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
+import { local } from '../utils/storage';
+
+const trialBadgeSx = { mx: 0.75 } as const;
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const scope = useScope();
 
   const { username, displayName, pictureUrl, logout, userId, orgHandle: sessionOrg } = useAuth();
@@ -131,16 +142,23 @@ export default function AppLayout(): JSX.Element {
   // Billing trial indicator shown in the header.
   const { org: billingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
   const billingTrial = billingOrg?.subscription?.status === 'trial' ? billingOrg.subscription.trial : null;
-  const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+  const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined;
+  const orgUuid = useOrgUuid();
+  const upgradeUrl = billingTrial && orgUuid ? billingUpgradeUrl(orgUuid) : null;
+  const openUpgrade = upgradeUrl ? () => window.open(upgradeUrl, '_blank', 'noopener,noreferrer') : undefined;
+  const { data: componentLimits } = useOrgComponentLimits(billingTrial ? (orgUuid ?? '') : '');
+  // The panel's own Upgrade button always renders, so the panel is shown only when it has somewhere to go.
+  const trialUsage: TrialBadgeUsage | undefined =
+    componentLimits && openUpgrade ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, onUpgrade: openUpgrade } : undefined;
 
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
   // a fresh literal here re-triggers it (and its setState) on every render, which on a
   // sub-'md'-breakpoint viewport becomes an infinite render loop.
-  const appShellOptions = useMemo(() => ({ initialCollapsed: localStorage.getItem('sidebar:collapsed') !== 'false' }), []);
+  const appShellOptions = useMemo(() => ({ initialCollapsed: local.get('sidebar:collapsed') !== 'false' }), []);
   const { state: shell, actions } = useAppShell(appShellOptions);
 
   const handleToggleSidebar = () => {
-    localStorage.setItem('sidebar:collapsed', String(!shell.sidebarCollapsed));
+    local.set('sidebar:collapsed', String(!shell.sidebarCollapsed));
     actions.toggleSidebar();
   };
 
@@ -245,7 +263,7 @@ export default function AppLayout(): JSX.Element {
   // Persist last visited project so post-login can navigate back to it
   useEffect(() => {
     if (userId && hasProject(scope) && !orgAccessDenied) {
-      localStorage.setItem(`last_project:${userId}`, JSON.stringify({ org: scope.org, project: scope.project }));
+      local.set(`last_project:${userId}`, JSON.stringify({ org: scope.org, project: scope.project }));
     }
   }, [userId, scope, orgAccessDenied]);
 
@@ -265,6 +283,7 @@ export default function AppLayout(): JSX.Element {
   };
 
   const navigateTo = useAppNavigate();
+  const guardNavigation = useLeaveGuard();
 
   // The URL now moves only once the destination's code is in, so the highlight
   // would lag the click by the whole download. Mark the clicked item at once and
@@ -275,8 +294,11 @@ export default function AppLayout(): JSX.Element {
   const handleNavSelect = (id: string) => {
     const url = navUrl(scope, id);
     if (!url) return;
-    setPendingNavId(id);
-    navigateTo(url);
+    // Highlights only once the user agrees to leave a dirty form, so "Stay on page" keeps the current item.
+    guardNavigation(() => {
+      setPendingNavId(id);
+      navigateTo(scope.level === 'components' ? withTrackParam(url, search) : url);
+    });
   };
 
   return (
@@ -286,7 +308,7 @@ export default function AppLayout(): JSX.Element {
           <Header.Toggle collapsed={hideSidebarForEmptyProject || shell.sidebarCollapsed} onToggle={handleHeaderToggle} />
           <Header.Brand>
             <Header.BrandLogo>
-              <NavLink to={orgHomeUrl(scope.org)} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <NavLink to={orgHomeUrl(scope.org)} onClick={() => trackEvent('navbar-home')} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
                 <Logo />
               </NavLink>
             </Header.BrandLogo>
@@ -376,7 +398,7 @@ export default function AppLayout(): JSX.Element {
                   setProjectSearch('');
                   navigateTo(newProjectUrl({ org: scope.org }));
                 }}>
-                Create Project
+                Create project
               </Button>
               <Divider />
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
@@ -392,6 +414,7 @@ export default function AppLayout(): JSX.Element {
                       key={p.id}
                       selected={hasProject(scope) && (scope.project === p.handler || scope.project === p.id)}
                       onClick={() => {
+                        trackEvent('navbar-project-dropdown-existing');
                         setProjectMenuAnchor(null);
                         setProjectSearch('');
                         const newScope = narrow({ level: 'organizations', org: scope.org }, p.handler);
@@ -535,7 +558,7 @@ export default function AppLayout(): JSX.Element {
                       setComponentSearch('');
                       navigateTo(newComponentUrl({ org: scope.org, project: scope.project }));
                     }}>
-                    Create Integration
+                    Create integration
                   </Button>
                   <Divider />
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
@@ -575,11 +598,11 @@ export default function AppLayout(): JSX.Element {
                 role="button"
                 tabIndex={0}
                 sx={{ position: 'relative', display: 'inline-flex', cursor: 'pointer' }}
-                onClick={() => navigateTo(overviewUrl(scope))}
+                onClick={() => navigateTo(withTrackParam(overviewUrl(scope), search))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    navigateTo(overviewUrl(scope));
+                    navigateTo(withTrackParam(overviewUrl(scope), search));
                   }
                 }}>
                 <ComplexSelect
@@ -646,16 +669,15 @@ export default function AppLayout(): JSX.Element {
           <Header.Spacer />
           <Header.Actions>
             {billingTrial && (
-              <Tooltip title={trialEndLabel}>
-                <Chip label={`Trial · ${billingTrial.days_remaining} day${billingTrial.days_remaining === 1 ? '' : 's'} remaining`} color="warning" size="medium" sx={{ fontWeight: 500, mx: 0.75 }} />
-              </Tooltip>
+              // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
+              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} sx={trialBadgeSx} />
             )}
             <ColorSchemeToggle />
             <UserMenu>
               <UserMenu.Trigger name={userName} avatar={userAvatar} />
               <UserMenu.Header name={userName} email={username} role="Admin" avatar={userAvatar} />
               <UserMenu.Divider />
-              <UserMenu.Logout icon={<LogOut size={18} />} label="Sign Out" onClick={() => setConfirmDialogOpen(true)} />
+              <UserMenu.Logout icon={<LogOut size={18} />} label="Sign out" onClick={() => setConfirmDialogOpen(true)} />
             </UserMenu>
           </Header.Actions>
         </Header>
@@ -792,6 +814,10 @@ export default function AppLayout(): JSX.Element {
                       // MCP (server + proxy): a single Test tab → the MCP playground
                       // (@wso2-org/mcp-playground). No Console/API-Chat sub-items.
                       const mcpType = integrationType === 'mcp-server' || integrationType === 'mcp-proxy';
+                      // Settings shows only when the integration has a section the user can open.
+                      const hasSettings =
+                        !!currentComponent &&
+                        visibleComponentSettingsSections(identifyIntegration(currentComponent.displayType ?? '', currentComponent.componentSubType ?? null), (perms) => hasAnyPermission(perms, projectId || undefined, componentId)).length > 0;
                       return [
                         <Sidebar.Category key="int-overview">
                           <Sidebar.Item id="overview">
@@ -925,6 +951,15 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
                             </Sidebar.Item>
                           </Sidebar.Item>
+
+                          {hasSettings && (
+                            <Sidebar.Item id="component-settings">
+                              <Sidebar.ItemIcon>
+                                <Cog size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
                         </Sidebar.Category>,
                       ];
                     })()
@@ -1001,13 +1036,6 @@ export default function AppLayout(): JSX.Element {
                             <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
                           </Sidebar.Item>
                         </Sidebar.Item>
-
-                        <Sidebar.Item id="proj-settings">
-                          <Sidebar.ItemIcon>
-                            <Cog size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
-                        </Sidebar.Item>
                       </Sidebar.Category>,
                     ]}
             </Sidebar.Nav>
@@ -1056,7 +1084,7 @@ export default function AppLayout(): JSX.Element {
         )}
         {/* Matches the sidebar's surface rather than sitting as a white band under it. */}
         <Footer sx={{ backgroundColor: 'background.acrylic', backdropFilter: 'blur(3px)' }}>
-          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer">
+          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('navbar-documentation')}>
             Documentation
           </Footer.Link>
           <Footer.Link href="https://discord.com/invite/wso2" target="_blank" rel="noopener noreferrer">
@@ -1077,20 +1105,23 @@ export default function AppLayout(): JSX.Element {
       <AppShell.NotificationPanel>
         {/* Confirm Dialog - managed locally */}
         <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Sign Out</DialogTitle>
+          <DialogTitle>Sign out</DialogTitle>
           <DialogContent>
             <DialogContentText>Are you sure you want to sign out of your account?</DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
+            <Button variant="outlined" color="inherit" onClick={() => setConfirmDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
               variant="contained"
               onClick={async () => {
+                trackEvent('navbar-user-logout');
                 await logout();
                 navigate(loginUrl());
                 setConfirmDialogOpen(false);
               }}>
-              Sign Out
+              Sign out
             </Button>
           </DialogActions>
         </Dialog>

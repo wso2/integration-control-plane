@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { CRITICAL_ENVIRONMENT_HELP, CRITICAL_ENVIRONMENT_LABEL } from '../constants/environment';
-import TextField from '../components/common/TextField';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -27,6 +26,7 @@ import { useAllEnvironments } from '../hooks/useEnvironments';
 import type { Environment } from '../types/environment';
 import { useUpdateEnvironment } from '../hooks/useEnvironments';
 import { resourceUrl } from '../nav';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 
 function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler: string }): JSX.Element {
   const navigate = useAppNavigate();
@@ -37,22 +37,26 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
   const mutation = useUpdateEnvironment();
   const backUrl = resourceUrl({ level: 'organizations', org: orgHandler }, 'environments');
   const isDirty = name !== env.name || description !== (env.description ?? '') || critical !== env.critical;
+  const allowLeave = useUnsavedChanges(isDirty);
 
   const save = () => {
     setError(null);
     mutation.mutate(
       { environmentId: env.id, name, description, critical },
       {
-        onSuccess: () => navigate(backUrl, { state: { updated: true, name } }),
+        onSuccess: () => {
+          allowLeave();
+          navigate(backUrl, { state: { updated: true, name } });
+        },
         onError: (err) => setError(err.message ?? 'Failed to update environment. Please try again.'),
       },
     );
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 2 }}>
-        Back to Environments
+        Back to environments
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
@@ -66,8 +70,8 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
       )}
 
       <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
-        <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth />
-        <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
         <Box>
           <FormControlLabel control={<Checkbox checked={critical} onChange={(_, v) => setCritical(v)} />} label={CRITICAL_ENVIRONMENT_LABEL} />
           <FormHelperText sx={{ mt: 0 }}>{CRITICAL_ENVIRONMENT_HELP}</FormHelperText>
@@ -75,7 +79,13 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
       </Stack>
 
       <Stack direction="row" gap={2}>
-        <Button variant="outlined" onClick={() => navigate(backUrl)}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(backUrl);
+          }}>
           Cancel
         </Button>
         <Button variant="contained" onClick={save} disabled={!name.trim() || !isDirty || mutation.isPending}>
@@ -92,7 +102,7 @@ export default function EditEnvironment(): JSX.Element {
 
   if (isLoading)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>
@@ -100,14 +110,14 @@ export default function EditEnvironment(): JSX.Element {
     );
   if (isError)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography>Failed to load environments</Typography>
       </PageContent>
     );
   const env = environments?.find((e) => e.id === envId);
   if (!env)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography>Environment not found</Typography>
       </PageContent>
     );

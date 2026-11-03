@@ -20,7 +20,7 @@ import { expect, test } from '@playwright/test';
 
 test.describe('cloud login @smoke', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 60_000 });
+    await page.goto('login', { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForURL(/\/gate\/signin/, { timeout: 60_000, waitUntil: 'domcontentloaded' });
 
     // The Gate SPA shows only a progressbar until its flow metadata resolves.

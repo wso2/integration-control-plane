@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isPaidPlan } from './billing';
+import { isPaidPlan, trialLengthDays } from './billing';
 import type { BillingOrg, BillingPlan } from '../types/billing';
 
 const org = (status: string, planCode?: string): BillingOrg => ({
@@ -56,5 +56,28 @@ describe('isPaidPlan', () => {
     expect(isPaidPlan(null, growth)).toBe(false);
     expect(isPaidPlan(org('active', growth.code), null)).toBe(false);
     expect(isPaidPlan({ id: 'org', name: 'Org' }, growth)).toBe(false);
+  });
+});
+
+describe('trialLengthDays', () => {
+  const trialOrg = (start?: string, end?: string): BillingOrg => ({
+    id: 'org',
+    name: 'Org',
+    subscription: { id: 's', org_id: 'org', status: 'trial', current_period_start: start, trial: end ? { days_remaining: 3, trial_end: end } : undefined },
+  });
+
+  it('counts the days from the period start to the trial end', () => {
+    expect(trialLengthDays(trialOrg('2026-10-01T00:00:00Z', '2026-10-31T00:00:00Z'))).toBe(30);
+  });
+
+  it('is undefined when either date is missing or unreadable', () => {
+    expect(trialLengthDays(trialOrg(undefined, '2026-10-31T00:00:00Z'))).toBeUndefined();
+    expect(trialLengthDays(trialOrg('2026-10-01T00:00:00Z'))).toBeUndefined();
+    expect(trialLengthDays(trialOrg('not a date', '2026-10-31T00:00:00Z'))).toBeUndefined();
+    expect(trialLengthDays(null)).toBeUndefined();
+  });
+
+  it('is undefined when the trial ends before it starts', () => {
+    expect(trialLengthDays(trialOrg('2026-10-31T00:00:00Z', '2026-10-01T00:00:00Z'))).toBeUndefined();
   });
 });

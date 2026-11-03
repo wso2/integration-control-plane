@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { knowledgeBaseNameError, knowledgeBaseNameFrom, type NameFields } from '../../../utils/knowledgeBase';
@@ -46,6 +45,7 @@ export default function NameStep({ heading, value, onChange, withDescription = t
       </Typography>
       <Stack sx={fieldStackSx}>
         <TextField
+          labelPlacement="top"
           label="Display Name"
           required
           fullWidth
@@ -55,6 +55,7 @@ export default function NameStep({ heading, value, onChange, withDescription = t
           sx={REQUIRED_FIELD_SX}
         />
         <TextField
+          labelPlacement="top"
           label="Name"
           required
           fullWidth
@@ -65,7 +66,7 @@ export default function NameStep({ heading, value, onChange, withDescription = t
           helperText={nameError || 'Identifies it in URLs and integrations. It cannot be changed later.'}
           sx={REQUIRED_FIELD_SX}
         />
-        {withDescription && <TextField label="Description" fullWidth size="small" multiline minRows={2} value={value.description} onChange={(e) => onChange({ ...value, description: e.target.value })} />}
+        {withDescription && <TextField labelPlacement="top" label="Description" fullWidth size="small" multiline minRows={2} value={value.description} onChange={(e) => onChange({ ...value, description: e.target.value })} />}
       </Stack>
     </>
   );

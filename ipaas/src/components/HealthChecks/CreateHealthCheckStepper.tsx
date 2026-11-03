@@ -22,7 +22,8 @@ import { useState, type JSX } from 'react';
 import ProbeConfigFields from './ProbeConfigFields';
 import ProbeSliderGroup, { type ProbeSliderValues } from './ProbeSliderGroup';
 import { useCreateHealthCheck } from '../../hooks/useHealthChecks';
-import { defaultProbeForm, formToProbe, isProbeFormValid, type ProbeFormState } from '../../utils/healthChecks';
+import { defaultProbeForm, formToProbe, isProbeFormChanged, isProbeFormValid, type ProbeFormState } from '../../utils/healthChecks';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import { PROBE_KIND, type WriteProbe } from '../../types/healthChecks';
 import type { ReleaseContainer } from '../../types/devopsConfigs';
 
@@ -31,6 +32,8 @@ interface CreateHealthCheckStepperProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   environmentId: string;
   onClose: () => void;
   onSaved: (message: string) => void;
@@ -39,12 +42,15 @@ interface CreateHealthCheckStepperProps {
 
 const STEPS = ['Configure Liveness Probe', 'Configure Readiness Probe'];
 
-export default function CreateHealthCheckStepper({ container, projectId, componentId, releaseId, environmentId, onClose, onSaved, onError }: CreateHealthCheckStepperProps): JSX.Element {
+export default function CreateHealthCheckStepper({ container, projectId, componentId, releaseId, deploymentTrackId, environmentId, onClose, onSaved, onError }: CreateHealthCheckStepperProps): JSX.Element {
   const fallbackPort = container.ports?.[0]?.port ?? 8080;
   const [activeStep, setActiveStep] = useState(0);
-  const [liveness, setLiveness] = useState<ProbeFormState>(() => defaultProbeForm(fallbackPort));
-  const [readiness, setReadiness] = useState<ProbeFormState>(() => defaultProbeForm(fallbackPort));
+  const [initialForm] = useState<ProbeFormState>(() => defaultProbeForm(fallbackPort));
+  const [liveness, setLiveness] = useState<ProbeFormState>(initialForm);
+  const [readiness, setReadiness] = useState<ProbeFormState>(initialForm);
   const create = useCreateHealthCheck(projectId);
+  useUnsavedChanges(isProbeFormChanged(liveness, initialForm) || isProbeFormChanged(readiness, initialForm));
+  const guardNavigation = useLeaveGuard();
 
   const isLivenessStep = activeStep === 0;
   const form = isLivenessStep ? liveness : readiness;
@@ -55,7 +61,7 @@ export default function CreateHealthCheckStepper({ container, projectId, compone
   const submit = (includeReadiness: boolean): void => {
     const readinessProbe: WriteProbe = includeReadiness ? formToProbe(readiness) : {};
     create.mutate(
-      { componentId, releaseId, environmentId, containerId: container.ID, data: { probes: { liveness_probe: formToProbe(liveness), readiness_probe: readinessProbe } } },
+      { componentId, releaseId, environmentId, deploymentTrackId, containerId: container.ID, data: { probes: { liveness_probe: formToProbe(liveness), readiness_probe: readinessProbe } } },
       {
         onSuccess: () => onSaved('Health check created.'),
         onError: (e) => onError(e instanceof Error ? e.message : 'Failed to create the health check.'),
@@ -65,8 +71,8 @@ export default function CreateHealthCheckStepper({ container, projectId, compone
 
   return (
     <Box>
-      <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={onClose} sx={{ px: 0, mb: 3 }}>
-        Go Back to Health Checks
+      <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => guardNavigation(onClose)} sx={{ px: 0, mb: 3 }}>
+        Back to health checks
       </Button>
       <Grid container spacing={4}>
         <Grid size={{ xs: 12, md: 3 }}>
@@ -103,7 +109,7 @@ export default function CreateHealthCheckStepper({ container, projectId, compone
           <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
             {isLivenessStep ? (
               <>
-                <Button variant="outlined" onClick={onClose} disabled={create.isPending}>
+                <Button variant="outlined" color="inherit" onClick={onClose} disabled={create.isPending}>
                   Cancel
                 </Button>
                 <Button variant="contained" onClick={() => setActiveStep(1)} disabled={!isProbeFormValid(liveness)}>

@@ -26,12 +26,12 @@ export function samplesTab(page: Page): Locator {
   return page.getByRole('tab', { name: 'Samples', exact: true });
 }
 
-/** An empty project offers these inline; a populated one hides them behind Create an Integration. */
+/** An empty project offers these inline; a populated one hides them behind New integration. */
 export async function reachCreateControl(page: Page, target: Locator): Promise<void> {
   if (await target.isVisible({ timeout: 15_000 }).catch(() => false)) return;
 
-  const createButton = page.getByRole('button', { name: 'Create an Integration', exact: true });
-  await expect(createButton, 'neither the inline control nor Create an Integration was available').toBeVisible({ timeout: 30_000 });
+  const createButton = page.getByRole('button', { name: 'New integration', exact: true });
+  await expect(createButton, 'neither the inline control nor New integration was available').toBeVisible({ timeout: 30_000 });
   await createButton.click();
   await expect(page.getByRole('heading', { name: 'How would you like to create your integration?' })).toBeVisible({ timeout: 30_000 });
   await expect(target, 'the create surface did not offer the expected control').toBeVisible({ timeout: 30_000 });
@@ -63,7 +63,12 @@ export async function confirmRemoval(page: Page, placeholder: string, name: stri
   const confirm = dialog.getByRole('button', { name: 'Delete', exact: true });
   await expect(confirm, 'Delete stayed disabled after the name was typed').toBeEnabled({ timeout: 15_000 });
   await confirm.click();
-  await expect(dialog).not.toBeVisible({ timeout: 60_000 });
+
+  // A rejected delete keeps the dialog open with an alert, so it is raced against the dialog closing.
+  const rejected = dialog.getByRole('alert');
+  await Promise.race([dialog.waitFor({ state: 'hidden', timeout: 2 * 60_000 }).catch(() => {}), rejected.waitFor({ state: 'visible', timeout: 2 * 60_000 }).catch(() => {})]);
+  if (await rejected.isVisible()) throw new Error(`the console rejected the delete: ${(await rejected.textContent())?.trim()}`);
+  await expect(dialog, 'the delete neither completed nor reported an error').not.toBeVisible({ timeout: 30_000 });
 }
 
 /** The row greys out and stays counted until deletion lands, so its disappearance is the signal. */
@@ -75,6 +80,8 @@ export async function deleteIntegration(page: Page, name: string): Promise<void>
     const trash = page.getByRole('button', { name: `Delete ${name}` }).first();
     if (!(await trash.isVisible({ timeout: 5_000 }).catch(() => false))) break;
 
+    // The row's Delete takes clicks only while the row is hovered or focused.
+    await trash.locator('xpath=ancestor::tr[1]').hover();
     await trash.click();
     await confirmRemoval(page, 'Enter integration name to confirm', name);
     // This row must go before looking for the next; it greys out first and still counts.

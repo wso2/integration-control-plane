@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Button, CircularProgress, MenuItem, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Button, CircularProgress, MenuItem, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import MarkdownEditorPane from '../MarkdownEditorPane';
 
@@ -57,15 +56,15 @@ export default function DocFormPage({ view, initialName, initialType, initialOth
       </Typography>
 
       <Stack direction="row" gap={2} sx={{ mb: 2 }}>
-        <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required size="small" sx={{ width: 280, '& .MuiFormLabel-asterisk': { color: 'error.main' } }} />
-        <TextField select label="Document Type" size="small" sx={{ width: 220 }} value={type} onChange={(e) => setType(e.target.value as string)}>
+        <TextField labelPlacement="top" label="Name" value={name} onChange={(e) => setName(e.target.value)} required size="small" sx={{ width: 280, '& .MuiFormLabel-asterisk': { color: 'error.main' } }} />
+        <TextField labelPlacement="top" select label="Document Type" size="small" sx={{ width: 220 }} value={type} onChange={(e) => setType(e.target.value as string)}>
           {DOC_TYPES.map((t) => (
             <MenuItem key={t.value} value={t.value}>
               {t.label}
             </MenuItem>
           ))}
         </TextField>
-        {type === 'OTHER' && <TextField label="Custom Document Type" value={otherType} onChange={(e) => setOtherType(e.target.value)} required size="small" sx={{ width: 260 }} />}
+        {type === 'OTHER' && <TextField labelPlacement="top" label="Custom Document Type" value={otherType} onChange={(e) => setOtherType(e.target.value)} required size="small" sx={{ width: 260 }} />}
       </Stack>
 
       <MarkdownEditorPane key={isCreate ? 'new' : initialName} value={content} onChange={setContent} height={500} theme="vs-dark" placeholderValue={PLACEHOLDER} />

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { DrawerPanel } from '@wso2/oxygen-ui';
 import { useEffect, useState } from 'react';
 import type { Commit, Repository } from '../../types/repository';
 import type { BuildRun } from '../../types/deployment';
@@ -25,6 +24,8 @@ import { BUILD_DRAWER_TITLES, BuildDrawerType } from '../../constants/build';
 import BuildConfigPanel from './BuildConfigPanel';
 import BuildDetails from './BuildDetails';
 import CommitSelector from './CommitSelector';
+
+const splitBodySx = { p: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' } as const;
 
 interface BuildRightDrawerProps {
   open: boolean;
@@ -50,7 +51,7 @@ export default function BuildRightDrawer({ open, onClose, drawerType, selectedBu
 
   const renderContent = () => {
     if (drawerType === BuildDrawerType.BuildLogs && selectedBuild) {
-      return <BuildDetails componentId={componentId} versionId={versionId} build={selectedBuild} onLogsToggle={setLogsOpen} />;
+      return <BuildDetails componentId={componentId} versionId={versionId} build={selectedBuild} logsOpen={logsOpen} onLogsOpenChange={setLogsOpen} />;
     }
     if (drawerType === BuildDrawerType.CommitSelector) {
       return (
@@ -72,17 +73,16 @@ export default function BuildRightDrawer({ open, onClose, drawerType, selectedBu
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={{ '& .MuiDrawer-paper': { width: { xs: '100%', sm: logsOpen ? 720 : 480 }, top: { xs: '56px', sm: '64px' }, height: 'auto', bottom: 0 } }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {title}
-        </Typography>
-        <IconButton size="small" aria-label="close" onClick={onClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={onClose} width={480} expanded={logsOpen}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>{title}</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 2 }}>{renderContent()}</Box>
-    </Drawer>
+      {/* The split layout pads and scrolls its own columns. */}
+      <DrawerPanel.Body sx={logsOpen ? splitBodySx : undefined}>{renderContent()}</DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

@@ -16,11 +16,30 @@
  * under the License.
  */
 
+import { useCallback } from 'react';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchComponentRepository, fetchCommitHistory, fetchGitHubUserRepos, fetchRepoBranches, fetchRepoMetadata, fetchChoreoSampleImages, updateBuildpackConfigs, obtainGithubToken, fetchRepoContents } from '../api/repository';
+import {
+  connectAzureDevOps,
+  fetchAzureDevOpsBranches,
+  fetchAzureDevOpsContents,
+  fetchAzureDevOpsOrganizations,
+  fetchAzureDevOpsProjects,
+  fetchAzureDevOpsRepositories,
+  fetchComponentRepository,
+  fetchCommitHistory,
+  fetchGitHubUserRepos,
+  fetchRepoBranches,
+  fetchRepoMetadata,
+  fetchChoreoSampleImages,
+  updateBuildpackConfigs,
+  obtainGithubToken,
+  fetchRepoContents,
+  markAzureDevOpsDefaultBranch,
+  metadataFromTree,
+} from '../api/repository';
 import { fetchComponentNameAvailability } from '../api/components';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
-import type { Repository } from '../types/repository';
+import type { Repository, RepoTreeNode } from '../types/repository';
 
 export function useComponentRepository(projectId: string, componentHandler: string) {
   return useQuery({
@@ -64,6 +83,63 @@ export function useGitHubUserRepos(enabled: boolean) {
     staleTime: 2 * 60 * 1000,
     retry: false,
   });
+}
+
+export function useAzureDevOpsOrganizations(enabled: boolean) {
+  return useQuery({ queryKey: ['azureDevOpsOrganizations'], queryFn: fetchAzureDevOpsOrganizations, enabled, staleTime: 2 * 60 * 1000, retry: false });
+}
+
+export function useAzureDevOpsProjects(organization: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['azureDevOpsProjects', organization],
+    queryFn: () => fetchAzureDevOpsProjects(organization),
+    enabled: enabled && !!organization,
+    staleTime: 2 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export function useAzureDevOpsRepositories(organization: string, project: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['azureDevOpsRepositories', organization, project],
+    queryFn: () => fetchAzureDevOpsRepositories(organization, project),
+    enabled: enabled && !!organization && !!project,
+    staleTime: 2 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export function useAzureDevOpsBranches(organization: string, project: string, repo: string, enabled: boolean) {
+  const { data: repositories } = useAzureDevOpsRepositories(organization, project, enabled);
+  const defaultBranchRef = repositories?.find((item) => item.name === repo)?.defaultBranch;
+  const select = useCallback((names: string[]) => markAzureDevOpsDefaultBranch(names, defaultBranchRef), [defaultBranchRef]);
+  return useQuery({
+    queryKey: ['azureDevOpsBranches', organization, project, repo],
+    queryFn: () => fetchAzureDevOpsBranches(organization, project, repo),
+    select,
+    enabled: enabled && !!organization && !!project && !!repo,
+    staleTime: 2 * 60 * 1000,
+    retry: false,
+  });
+}
+
+const azureDevOpsContentsQuery = (organization: string, project: string, repo: string, branch: string, enabled: boolean) => ({
+  queryKey: ['azureDevOpsContents', organization, project, repo, branch],
+  queryFn: () => fetchAzureDevOpsContents(organization, project, repo, branch),
+  enabled: enabled && !!organization && !!project && !!repo && !!branch,
+  staleTime: 2 * 60 * 1000,
+  retry: false,
+});
+
+export function useAzureDevOpsContents(organization: string, project: string, repo: string, branch: string, enabled: boolean) {
+  return useQuery(azureDevOpsContentsQuery(organization, project, repo, branch, enabled));
+}
+
+// Metadata is a view over the contents query rather than a cache of its own, so
+// refetching it (Revalidate) re-reads the tree and picks up new commits.
+export function useAzureDevOpsMetadata(organization: string, project: string, repo: string, branch: string, subPath: string, enabled: boolean) {
+  const select = useCallback((tree: RepoTreeNode[]) => metadataFromTree(tree, subPath), [subPath]);
+  return useQuery({ ...azureDevOpsContentsQuery(organization, project, repo, branch, enabled), select });
 }
 
 export function useRepoBranches(repoOrg: string, repoName: string, isPublicRepo: boolean) {
@@ -132,3 +208,16 @@ export function useObtainGithubToken() {
     mutationFn: (authorizationCode: string) => obtainGithubToken(authorizationCode),
   });
 }
+
+export function useConnectAzureDevOps() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ authorizationCode, redirectUri }: { authorizationCode: string; redirectUri: string }) => connectAzureDevOps(authorizationCode, redirectUri),
+    onSuccess: () =>
+      qc.invalidateQueries({
+        predicate: ({ queryKey }) => typeof queryKey[0] === 'string' && queryKey[0].startsWith('azureDevOps'),
+      }),
+  });
+}
+
+export { isAzureDevOpsAuthRequired } from '../api/repository';

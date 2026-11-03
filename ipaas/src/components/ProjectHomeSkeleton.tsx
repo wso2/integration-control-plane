@@ -30,9 +30,9 @@ const ROW_COUNT = 4;
  */
 export default function ProjectHomeSkeleton(): JSX.Element {
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Stack component="header" direction="row" alignItems="flex-start" gap={2} sx={{ mb: 4 }} aria-busy="true" aria-label="Loading project">
-        <Skeleton variant="rounded" width={58} height={58} />
+        <Skeleton variant="circular" width={58} height={58} />
         <Stack gap={1} sx={{ flex: 1, maxWidth: 420 }}>
           <Skeleton variant="text" width="45%" height={34} />
           <Skeleton variant="text" width="70%" />

@@ -17,6 +17,7 @@
  */
 
 import type { ThunderIDProviderProps } from '@thunderid/react';
+import { basePath } from '../utils/basePath';
 
 /** The SDK instance the console uses. Its `state` on the authorize request is prefixed with this. */
 export const THUNDER_INSTANCE_ID = 0;
@@ -33,8 +34,8 @@ export function thunderConfig(): ThunderIDProviderProps {
     clientId: asgardeoClientId,
     scopes: asgardeoScope,
     afterSignInUrl: asgardeoSignInRedirectUrl,
-    // The only post-logout URI the client registers: the bare origin.
-    afterSignOutUrl: window.location.origin,
+    // The only post-logout URI the client registers: the bare origin, or the console's prefix under it.
+    afterSignOutUrl: basePath ? `${window.location.origin}${basePath}/` : window.location.origin,
     // Per tab, and gone when the tab closes (the cloud team's call). A reload keeps it; a new
     // tab signs in again through Thunder, whose own session usually makes that a redirect.
     // Each tab also refreshes its own tokens, so tabs never race on Thunder's rotating refresh token.

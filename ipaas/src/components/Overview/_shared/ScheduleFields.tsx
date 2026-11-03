@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
@@ -56,7 +55,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                 if (typeof intervalCount !== 'number' || intervalCount < 1) setIntervalCount(1);
               }}
               error={!!errors.intervalCount}
-              helperText={errors.intervalCount}
+              helperText={errors.intervalCount || ' '}
               sx={{ width: 120 }}
             />
             <Select value={intervalUnit} onChange={(e) => setIntervalUnit(e.target.value as IntervalUnit)} sx={{ flex: 1 }}>
@@ -95,7 +94,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                 value={cronFields[key as CronField]}
                 onChange={(e) => setCronFields((prev) => ({ ...prev, [key]: e.target.value }))}
                 error={!!errors.cron[key as CronField]}
-                helperText={errors.cron[key as CronField]}
+                helperText={errors.cron[key as CronField] || ' '}
               />
             </Box>
           ))}
@@ -107,7 +106,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
 
       <Box>
         <Button variant="text" size="small" endIcon={advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />} onClick={() => setAdvancedOpen((v) => !v)} sx={{ px: 0 }}>
-          Advanced Settings
+          Advanced settings
         </Button>
         <Collapse in={advancedOpen}>
           <Stack gap={2} sx={{ mt: 1.5 }}>
@@ -128,9 +127,9 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
               <>
                 <Box>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                    Job Timeout (in seconds)
+                    Job Timeout (in seconds) (Optional)
                   </Typography>
-                  <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout} />
+                  <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout || ' '} />
                 </Box>
                 <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow Overlapping Executions" />
               </>

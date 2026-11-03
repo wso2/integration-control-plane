@@ -16,11 +16,6 @@
  * under the License.
  */
 
-import { drawerBody as makeDrawerBody, drawerHeader as sharedDrawerHeader } from '../../constants/drawerStyles';
-
-export const drawerBody = makeDrawerBody(480);
-export const drawerHeader = sharedDrawerHeader;
-
 export const stepIcon = {
   width: 24,
   display: 'flex',

@@ -389,14 +389,14 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
     navigate(locationState.fromPath ?? newComponentUrl(scope));
   };
 
-  const backLabel = wizardStep === 0 ? 'Back to Create Integration' : 'Go back';
+  const backLabel = wizardStep === 0 ? 'Back to create integration' : 'Go back';
 
   const subtitle =
     wizardStep === 0 ? "Let's start by choosing an application to integrate" : wizardStep === 1 ? `Choose an application to integrate ${firstApp} with` : wizardStep === 2 ? `Get started with pre-built integrations for ${firstApp} and ${secondApp}` : null;
 
   if (isLoading) {
     return (
-      <PageContent sx={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <PageContent fullWidth sx={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress />
       </PageContent>
     );
@@ -404,7 +404,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
 
   if (isError) {
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={goBack} sx={{ mb: 3 }}>
           {backLabel}
         </Button>
@@ -414,7 +414,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
   }
 
   return (
-    <PageContent sx={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%', pt: 5, pb: 3 }}>
+    <PageContent fullWidth sx={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%', pt: 5, pb: 3 }}>
       <Box
         sx={{
           width: 280,

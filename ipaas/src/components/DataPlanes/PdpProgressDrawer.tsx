@@ -16,13 +16,13 @@
  * under the License.
  */
 
-import { Box, Chip, CircularProgress, Divider, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { Check, X } from '@wso2/oxygen-ui-icons-react';
+import { Box, Chip, CircularProgress, Divider, DrawerPanel, Stack, Typography } from '@wso2/oxygen-ui';
+import { Check } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import { PDP_PROVISION_STEPS, displayPdpProgress } from '../../constants/dataPlanes';
 import { usePdps } from '../../hooks/useDataPlanes';
 import { capitalize } from '../../utils/string';
-import { drawerBody, drawerHeader, stepIcon } from './PdpProgressDrawer.styles';
+import { stepIcon } from './PdpProgressDrawer.styles';
 
 interface PdpProgressDrawerProps {
   open: boolean;
@@ -36,6 +36,9 @@ function stepStatus(progress: number, index: number): 'done' | 'active' | 'pendi
   return previousDone ? 'active' : 'pending';
 }
 
+// DrawerPanel's title text is noWrap; this long title wraps instead of truncating.
+const wrapTitleSx = { '& .MuiTypography-root': { whiteSpace: 'normal' } } as const;
+
 export default function PdpProgressDrawer({ open, pdpName, onClose }: PdpProgressDrawerProps): JSX.Element | null {
   const { data: pdps, isLoading } = usePdps(open);
   const pdp = pdps?.find((p) => p.name === pdpName);
@@ -45,13 +48,13 @@ export default function PdpProgressDrawer({ open, pdpName, onClose }: PdpProgres
   if (!pdp) {
     if (isLoading) {
       return (
-        <Drawer anchor="right" open onClose={onClose}>
-          <Box sx={drawerBody}>
+        <DrawerPanel open onClose={onClose} width={480} aria-label="Provisioning progress">
+          <DrawerPanel.Body>
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
               <CircularProgress />
             </Box>
-          </Box>
-        </Drawer>
+          </DrawerPanel.Body>
+        </DrawerPanel>
       );
     }
     return null;
@@ -60,27 +63,23 @@ export default function PdpProgressDrawer({ open, pdpName, onClose }: PdpProgres
   const progress = displayPdpProgress(pdp.creationProgress);
 
   return (
-    <Drawer anchor="right" open={open} onClose={onClose}>
-      <Box sx={drawerBody}>
-        <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={drawerHeader}>
-          <Box>
-            <Typography variant="h5" sx={{ fontWeight: 600 }}>
-              Provisioning your new PDP on {capitalize(pdp.cloud)}
+    <DrawerPanel open={open} onClose={onClose} width={480}>
+      <DrawerPanel.Header>
+        <Stack sx={{ flex: 1, minWidth: 0 }}>
+          <DrawerPanel.Title sx={wrapTitleSx}>Provisioning your new PDP on {capitalize(pdp.cloud)}</DrawerPanel.Title>
+          <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1 }}>
+            <Chip label={`${progress}% completed`} size="small" color="primary" variant="outlined" />
+            <Typography variant="body2" color="text.secondary">
+              {pdp.name}
             </Typography>
-            <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 1 }}>
-              <Chip label={`${progress}% completed`} size="small" color="primary" variant="outlined" />
-              <Typography variant="body2" color="text.secondary">
-                {pdp.name}
-              </Typography>
-            </Stack>
-          </Box>
-          <IconButton size="small" aria-label="Close" onClick={onClose}>
-            <X size={18} />
-          </IconButton>
+          </Stack>
         </Stack>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-        <Divider sx={{ mb: 1 }} />
-
+      <DrawerPanel.Body>
         <Stack divider={<Divider />}>
           {PDP_PROVISION_STEPS.map((step, index) => {
             const status = stepStatus(pdp.creationProgress, index);
@@ -96,7 +95,7 @@ export default function PdpProgressDrawer({ open, pdpName, onClose }: PdpProgres
             );
           })}
         </Stack>
-      </Box>
-    </Drawer>
+      </DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

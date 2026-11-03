@@ -19,10 +19,10 @@ Add to `index.ts` only when code outside needs it. ESLint rejects imports of the
 ## How it works
 
 - `AuthProvider` waits for the SDK to settle and shows a loader until then, so no child renders or sends a request before the session is known.
-- Once signed in, it connects the session to `session.ts`, the one place code outside React gets tokens from. It also stores the org handle as `org_handle` in localStorage.
+- Once signed in, it connects the session to `session.ts`, the one place code outside React gets tokens from. It also stores the org handle as `icp:org_handle` in localStorage (`src/utils/storage.ts`).
 - The SDK refreshes tokens itself. A 401 on an expired token ends the session.
 - `/signin` (`OIDCCallback`) only routes after sign-in: it forwards Cloud Editor results, then opens the saved deep link or the user's last project.
-- `logout()` clears the local session and leaves for Thunder's end-session endpoint. Thunder must list the console origin in the client's `postLogoutRedirectUris`.
+- `logout()` clears the local session and leaves for Thunder's end-session endpoint. Thunder matches `postLogoutRedirectUris` exactly, so the client must list the URL the console actually sends: the bare origin for a root build, and `<origin><base path>/` for a build under a prefix (`afterSignOutUrl` in `thunderConfig.ts`). A prefixed deployment that registers only the origin fails sign-out.
 
 ## Rules
 

@@ -19,7 +19,7 @@
 import { Card, CardContent, Chip, Grid, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { type JSX, type ReactNode } from 'react';
 import { formatBytes, formatVcpu } from '../../utils/podMetrics';
-import type { CalculatedUsage, UsageReading } from '../../types/runtime';
+import type { CalculatedUsage, MetricsUnavailableReason, UsageReading } from '../../types/runtime';
 import UsageBar from './UsageBar';
 
 const cardSx = {
@@ -79,11 +79,18 @@ interface ResourceUsageCardsProps {
   showPercent?: boolean;
   /** Replaces the utilization derived from `usage` for a resource, in both the figure and the bar. */
   readings?: { cpu?: UsageReading; memory?: UsageReading };
+  /** Why usage is unavailable, shown under the cards so an empty figure isn't left unexplained. */
+  unavailableReason?: MetricsUnavailableReason;
 }
 
-export default function ResourceUsageCards({ usage, usageUnavailable, showPercent, readings }: ResourceUsageCardsProps): JSX.Element {
+const UNAVAILABLE_REASONS: Record<MetricsUnavailableReason, string> = {
+  sharedWithOtherTracks: "Usage isn't shown while another deployment track of this integration runs in this environment: the metrics source can't tell the tracks' usage apart.",
+};
+
+export default function ResourceUsageCards({ usage, usageUnavailable, showPercent, readings, unavailableReason }: ResourceUsageCardsProps): JSX.Element {
   const cpu = readings?.cpu;
   const memory = readings?.memory;
+  const reason = usageUnavailable && unavailableReason ? UNAVAILABLE_REASONS[unavailableReason] : undefined;
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 6 }}>
@@ -107,6 +114,13 @@ export default function ResourceUsageCards({ usage, usageUnavailable, showPercen
           target={memory?.target}
         />
       </Grid>
+      {reason && (
+        <Grid size={12}>
+          <Typography variant="body2" color="text.secondary">
+            {reason}
+          </Typography>
+        </Grid>
+      )}
     </Grid>
   );
 }

@@ -35,7 +35,7 @@ export default function ExploreMore(): JSX.Element {
       <Typography variant="h5" component="h2" sx={headingSx}>
         Explore More
       </Typography>
-      <Card variant="outlined" sx={cardSx}>
+      <Card sx={cardSx}>
         <CardContent sx={cardContentSx}>
           <Box sx={gridSx}>
             {EXPLORE_GROUPS.map((group) => (

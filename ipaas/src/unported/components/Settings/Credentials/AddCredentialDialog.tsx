@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ComponentType, type JSX, type ReactNode } from 'react';
 import AzureDevOpsIcon from '../../../../assets/icons/AzureDevOpsIcon';

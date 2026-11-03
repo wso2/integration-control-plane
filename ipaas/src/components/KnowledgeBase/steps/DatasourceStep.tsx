@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Grid, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Grid, Stack, ToggleButton, ToggleButtonGroup, Typography, TextField } from '@wso2/oxygen-ui';
 import { type JSX } from 'react';
 import { blankDatasource, DATASOURCES, GDRIVE_AUTH_TYPES, ragLogoUrl } from '../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
@@ -66,12 +65,12 @@ export default function DatasourceStep({ value, onChange }: DatasourceStepProps)
             <SecretField label="API Key" required value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
           ) : (
             <>
-              <TextField label="Client ID" required fullWidth size="small" value={value.clientId} onChange={(e) => onChange({ ...value, clientId: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              <TextField labelPlacement="top" label="Client ID" required fullWidth size="small" value={value.clientId} onChange={(e) => onChange({ ...value, clientId: e.target.value })} sx={REQUIRED_FIELD_SX} />
               <SecretField label="Client Secret" required value={value.clientSecret} onChange={(v) => onChange({ ...value, clientSecret: v })} />
               <SecretField label="Refresh Token" required value={value.refreshToken} onChange={(v) => onChange({ ...value, refreshToken: v })} />
             </>
           )}
-          <TextField label="Folder ID" required fullWidth size="small" value={value.folderId} onChange={(e) => onChange({ ...value, folderId: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Folder ID" required fullWidth size="small" value={value.folderId} onChange={(e) => onChange({ ...value, folderId: e.target.value })} sx={REQUIRED_FIELD_SX} />
         </Stack>
       )}
 
@@ -79,7 +78,7 @@ export default function DatasourceStep({ value, onChange }: DatasourceStepProps)
         <Stack sx={fieldStackSx}>
           <SecretField label="Access Key ID" required value={value.accessKeyId} onChange={(v) => onChange({ ...value, accessKeyId: v })} />
           <SecretField label="Secret Access Key" required value={value.secretAccessKey} onChange={(v) => onChange({ ...value, secretAccessKey: v })} />
-          <TextField label="Bucket Name" required fullWidth size="small" value={value.bucketName} onChange={(e) => onChange({ ...value, bucketName: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Bucket Name" required fullWidth size="small" value={value.bucketName} onChange={(e) => onChange({ ...value, bucketName: e.target.value })} sx={REQUIRED_FIELD_SX} />
         </Stack>
       )}
     </>

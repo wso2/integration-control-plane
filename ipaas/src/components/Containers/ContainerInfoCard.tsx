@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Slider, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, Clock, Copy, Pencil } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Slider, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { Check, Copy, Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import ResourceRangeSlider from '../common/ResourceRangeSlider';
 import ContainerEditForm from './ContainerEditForm';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import { CPU_MAX, CPU_MIN, MEMORY_MAX, MEMORY_MIN, containerImageName, isMainContainer, milliToCpu } from '../../utils/containers';
 import type { ReleaseContainer } from '../../types/devopsConfigs';
 
@@ -30,6 +30,8 @@ interface ContainerInfoCardProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   isPaidOrPdpUser: boolean;
   canManage: boolean;
   onSaved: (message: string) => void;
@@ -40,7 +42,7 @@ const cardSx = { p: 3, mb: 2 } as const;
 const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, isPaidOrPdpUser, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
+export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   if (isEditOpen) {
@@ -50,6 +52,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
         projectId={projectId}
         componentId={componentId}
         releaseId={releaseId}
+        deploymentTrackId={deploymentTrackId}
         isPaidOrPdpUser={isPaidOrPdpUser}
         onClose={() => setIsEditOpen(false)}
         onSaved={(m) => {
@@ -81,11 +84,13 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
         )}
       </Stack>
 
-      <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 2.5, color: 'text.secondary' }}>
-        <Typography variant="body2">Last Updated:</Typography>
-        <Clock size={14} />
-        <Typography variant="body2">{c.UpdatedAt ? formatDistanceToNow(c.UpdatedAt) : '-'}</Typography>
-      </Stack>
+      {c.UpdatedAt ? (
+        <RelativeTime time={formatDistanceToNow(c.UpdatedAt)} dateTime={c.UpdatedAt} tooltip={formatDateTime(c.UpdatedAt)} action="Last updated" sx={{ mb: 2.5 }} />
+      ) : (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          Last updated —
+        </Typography>
+      )}
 
       <Grid container spacing={4}>
         <Grid size={{ xs: 12, md: 5 }}>

@@ -21,11 +21,11 @@ import { toVisibilityLabel, toVisibilityWire } from './_visibility';
 
 describe('endpoint visibility mapping', () => {
   it('maps every label the endpoint editor offers to a wire value', () => {
-    expect(['Public', 'Organization', 'Project'].map(toVisibilityWire)).toEqual(['external', 'internal', 'project']);
+    expect(['Public', 'Organization', 'Project'].map(toVisibilityWire)).toEqual(['public', 'organization', 'project']);
   });
 
   it('reads org-wide visibility back as Organization', () => {
-    expect(toVisibilityLabel('internal')).toBe('Organization');
+    expect(toVisibilityLabel('organization')).toBe('Organization');
   });
 
   it('round-trips every label', () => {

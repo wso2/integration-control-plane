@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, CircularProgress, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, CircularProgress, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus } from '@wso2/oxygen-ui-icons-react';
 import { type JSX, useEffect, useMemo, useState } from 'react';
 import type { CloudDataPlane, Environment } from '../../../types/environment';
@@ -182,7 +181,7 @@ export default function AlertsConfigurePage(props: AlertsConfigurePageProps): JS
                   setSelectedAlertRule(undefined);
                 }
               }}
-              renderInput={(params) => <TextField {...params} size="small" label="Environment" />}
+              renderInput={(params) => <TextField labelPlacement="top" {...params} size="small" label="Environment" />}
               isOptionEqualToValue={(o, v) => o.id === v.id}
               sx={{ minWidth: 200 }}
               size="small"

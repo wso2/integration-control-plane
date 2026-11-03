@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DESCRIPTION_MAX_LENGTH, clampDescription, isAtNewlineLimit } from './description';
+import { DESCRIPTION_MAX_LENGTH, clampDescription, isAtNewlineLimit, toSingleLineDescription } from './description';
 
 describe('clampDescription', () => {
   it('keeps a description within the limits untouched', () => {
@@ -43,6 +43,24 @@ describe('clampDescription', () => {
 
   it('leaves an empty value alone', () => {
     expect(clampDescription('')).toBe('');
+  });
+});
+
+describe('toSingleLineDescription', () => {
+  it('joins lines with a single space', () => {
+    expect(toSingleLineDescription('one\ntwo\r\nthree\rfour')).toBe('one two three four');
+  });
+
+  it('collapses the spaces and blank lines around a break', () => {
+    expect(toSingleLineDescription('one  \n\n  two')).toBe('one two');
+  });
+
+  it('leaves text without breaks untouched', () => {
+    expect(toSingleLineDescription('a  b')).toBe('a  b');
+  });
+
+  it('caps the length', () => {
+    expect(toSingleLineDescription('x'.repeat(DESCRIPTION_MAX_LENGTH + 10))).toHaveLength(DESCRIPTION_MAX_LENGTH);
   });
 });
 

@@ -16,23 +16,20 @@
  * under the License.
  */
 
-import { Box, Button, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useState } from 'react';
 import type { BuildRunLogs } from '../../types/build';
 import { BUILD_STAGES, STEPPER_ICON_COL, STEPPER_ICON_PY, STEPPER_ICON_SIZE, STEPPER_LINE_BOTTOM_EXT, STEPPER_LINE_TOP } from '../../constants/build';
-import { buildLogText, getStepStatus } from '../../utils/build';
-import BuildLogViewer from '../BuildLogViewer';
+import { getStepStatus } from '../../utils/build';
 import { StageIcon, SubStepIcon } from '../StatusIcons';
 
 interface BuildAccordionStepperProps {
   logs: BuildRunLogs;
-  logsLoading: boolean;
   isInProgress?: boolean;
-  onLogsToggle?: (open: boolean) => void;
 }
 
-export default function BuildAccordionStepper({ logs, logsLoading, isInProgress, onLogsToggle }: BuildAccordionStepperProps) {
+export default function BuildAccordionStepper({ logs, isInProgress }: BuildAccordionStepperProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     for (const { key } of BUILD_STAGES) {
@@ -41,7 +38,6 @@ export default function BuildAccordionStepper({ logs, logsLoading, isInProgress,
     }
     return initial;
   });
-  const [showBuildLogs, setShowBuildLogs] = useState(false);
 
   const initStatus = getStepStatus(logs, 'init');
   const deployStatus = getStepStatus(logs, 'deploy');
@@ -65,7 +61,6 @@ export default function BuildAccordionStepper({ logs, logsLoading, isInProgress,
   }, []);
 
   const hadUnitTest = logs.build?.steps.some((s) => s.name === 'Unit Test') ?? false;
-  const hasBuildLog = !!buildLogText(logs);
 
   return (
     <Stack sx={{ background: 'transparent' }}>
@@ -133,18 +128,6 @@ export default function BuildAccordionStepper({ logs, logsLoading, isInProgress,
                   {label}
                 </Typography>
 
-                {isBuild && (hasBuildLog || logsLoading) && (
-                  <Button
-                    variant="text"
-                    size="small"
-                    onClick={(e) => { e.stopPropagation(); setShowBuildLogs((v) => { onLogsToggle?.(!v); return !v; }); }}
-                    disabled={!hasBuildLog}
-                    sx={{ fontSize: '0.75rem', px: 0.75, py: 0, minWidth: 0, textTransform: 'none' }}
-                  >
-                    {showBuildLogs ? 'Hide Logs' : 'View Logs'}
-                  </Button>
-                )}
-
                 {hasSubSteps && (
                   <Box
                     sx={{
@@ -205,12 +188,6 @@ export default function BuildAccordionStepper({ logs, logsLoading, isInProgress,
               </Stack>
             )}
 
-            {/* Build stage log panel */}
-            {isBuild && (
-              <Box sx={{ ml: STEPPER_ICON_COL / 8, mt: 0.5, mb: 1.5 }}>
-                <BuildLogViewer logs={logs} logsLoading={logsLoading} showLogs={showBuildLogs} />
-              </Box>
-            )}
           </Box>
         );
       })}

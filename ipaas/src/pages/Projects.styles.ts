@@ -16,24 +16,17 @@
  * under the License.
  */
 
-export const card = {
-  cursor: 'pointer',
-  transition: 'border-color 0.15s',
-  '&:hover': {
-    boxShadow: 2,
-    borderColor: 'primary.main',
-  },
-} as const;
-
 /** A finalizing project is inert, so it gets no hover affordance at all. */
 export const cardDeleting = {
   opacity: 0.38,
   cursor: 'default',
 } as const;
 
-/** Shared by Create Project and Import Project, so the pair matches: same padding, no wrapping, never squeezed by the search field. */
+/** Shared by Create Project and Import Project, so the pair matches. */
 export const projectActionSx = {
   whiteSpace: 'nowrap',
   flexShrink: 0,
   px: 2.5,
 } as const;
+
+export const searchSx = { mb: 3 } as const;

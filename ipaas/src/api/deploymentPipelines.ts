@@ -139,14 +139,28 @@ const toDeploymentPipeline = (p: BffDeploymentPipeline): DeploymentPipeline => (
  * freshly created environment is actually deployable — an environment that sits
  * outside every promotion path can never be promoted into.
  *
- * The insertion point is the chain's terminal environment: the one promoted *to*
- * but never *from*. A pipeline with no paths, or a branching chain with several
- * terminals, is left untouched — there is no single correct place to insert and
- * guessing would rewrite a topology someone built deliberately.
+ * The insertion point is the chain's terminal environment: the one with nothing to
+ * promote *to*. The terminal may have a path with an empty target list (a new org's
+ * `development → []`); that path gets the new target. A pipeline with no paths, or a branching chain with several terminals,
+ * is left untouched — there is no single correct place to insert and guessing would
+ * rewrite a topology someone built deliberately.
  *
  * Returns whether the pipeline was updated.
+ *
+ * Appends run one at a time: each is a read-modify-write of the whole promotionPaths
+ * list, so two overlapping appends would both read the same chain and the second PUT
+ * would drop the first's environment. Queued, each rereads the pipeline only after the
+ * previous write has landed. The BFF takes no resource version on update, so this
+ * cannot guard against a write from another tab or user.
  */
-export const appendEnvironmentToDefaultPipeline = async (envSlug: string): Promise<boolean> => {
+let appendQueue: Promise<unknown> = Promise.resolve();
+export const appendEnvironmentToDefaultPipeline = (envSlug: string): Promise<boolean> => {
+  const run = appendQueue.then(() => appendToDefaultPipeline(envSlug));
+  appendQueue = run.catch(() => undefined); // one failed append must not block the next
+  return run;
+};
+
+const appendToDefaultPipeline = async (envSlug: string): Promise<boolean> => {
   const pipeline = items(await bff.get<ListResponse<BffDeploymentPipeline>>('/deploymentpipelines')).find((p) => p.name === DEFAULT_PIPELINE_NAME);
   if (!pipeline) return false;
 
@@ -155,12 +169,14 @@ export const appendEnvironmentToDefaultPipeline = async (envSlug: string): Promi
   const targets = new Set(paths.flatMap((p) => p.targetEnvironments));
   if (sources.has(envSlug) || targets.has(envSlug)) return false; // already in the chain
 
-  const terminals = [...targets].filter((t) => !sources.has(t));
+  const promotesOnward = new Set(paths.filter((p) => p.targetEnvironments.length > 0).map((p) => p.sourceEnvironment));
+  const terminals = [...new Set([...sources, ...targets])].filter((e) => !promotesOnward.has(e));
   if (terminals.length !== 1) return false;
+  const [terminal] = terminals;
 
-  await bff.put<BffDeploymentPipeline>(`/deploymentpipelines/${seg(pipeline.name)}`, {
-    promotionPaths: [...paths, { sourceEnvironment: terminals[0], targetEnvironments: [envSlug] }],
-  });
+  // A terminal that is a source has only empty-target paths: fill them in rather than add a second path for it.
+  const promotionPaths = sources.has(terminal) ? paths.map((p) => (p.sourceEnvironment === terminal ? { ...p, targetEnvironments: [envSlug] } : p)) : [...paths, { sourceEnvironment: terminal, targetEnvironments: [envSlug] }];
+  await bff.put<BffDeploymentPipeline>(`/deploymentpipelines/${seg(pipeline.name)}`, { promotionPaths });
   return true;
 };
 

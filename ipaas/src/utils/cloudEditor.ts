@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { withBase } from './basePath';
+
 export interface CloudEditorParams {
   userId: string;
   orgUuid: string;
@@ -29,7 +31,7 @@ export interface CloudEditorParams {
 
 /** Builds the `/editor` deep link the Cloud Editor is opened with. */
 export function buildCloudEditorUrl(params: CloudEditorParams, origin: string): string {
-  const url = new URL('/editor', origin);
+  const url = new URL(withBase('/editor'), origin);
   url.searchParams.set('userId', params.userId);
   url.searchParams.set('orgUuid', params.orgUuid);
   url.searchParams.set('orgHandle', params.orgHandle);

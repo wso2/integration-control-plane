@@ -136,7 +136,9 @@ export default function BuildArea({
   // the BFF cut a new release from the current workload, picking up component changes.
   // Only once the images have loaded: a failed fetch is not the same as having none.
   const redeployCurrent = imagesLoaded && images.length === 0 && !!firstEnvReleaseId;
-  const canDeploy = (!!selectedImage?.imageId || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending;
+  // A picked image must still be in the loaded list, so a stale pick is not deployed.
+  const imagePicked = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId);
+  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending;
 
   const handleDeploy = () => {
     if (!canDeploy) return;
@@ -197,7 +199,6 @@ export default function BuildArea({
   return (
     <>
       <Card
-        variant="outlined"
         sx={{
           width: 320,
           flexShrink: 0,
@@ -287,7 +288,7 @@ export default function BuildArea({
                hidden for file/event/AI-agent, which have no endpoints) ── */}
           {!flags.isAutomation && !hideEndpoints && !!firstEnvReleaseId && (
             <Button variant="text" size="small" startIcon={<Settings size={14} />} onClick={() => setEndpointConfigOpen(true)} sx={{ mb: 2, width: '100%', justifyContent: 'flex-start' }}>
-              Endpoint Configurations
+              Endpoint configurations
             </Button>
           )}
 
@@ -298,7 +299,7 @@ export default function BuildArea({
                 startIcon={isDeploying || isBuildRunning ? <CircularProgress color="inherit" size={14} /> : selectedDeployAction === 'deploy' ? <Rocket size={14} /> : <Settings size={14} />}
                 onClick={handleMainButtonClick}
                 sx={{ whiteSpace: 'nowrap', flex: 1 }}>
-                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & Deploying' : isBuildPending ? 'Build queued' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & Deploy'}
+                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
               </Button>
               <Button size="small" sx={{ px: 0.5 }} aria-label="More deploy options" aria-expanded={splitOpen} onClick={() => setSplitOpen((prev) => !prev)}>
                 <ChevronDown size={14} />
@@ -319,7 +320,7 @@ export default function BuildArea({
                         <MenuItem onClick={handleSelectConfigureAndDeploy} selected={selectedDeployAction === 'configure'}>
                           <Stack direction="row" alignItems="center" gap={1}>
                             <Settings size={14} />
-                            <Typography variant="body2">Configure &amp; Deploy</Typography>
+                            <Typography variant="body2">Configure &amp; deploy</Typography>
                           </Stack>
                         </MenuItem>
                       </MenuList>
@@ -334,7 +335,7 @@ export default function BuildArea({
 
       {/* Endpoint configuration drawer */}
       {!flags.isAutomation && !hideEndpoints && !!firstEnvReleaseId && (
-        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} />
+        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} projectId={projectId} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} />
       )}
 
       {/* Image selection drawer */}
@@ -357,6 +358,7 @@ export default function BuildArea({
         displayType={displayType}
         isAutomation={flags.isAutomation}
         envTemplateId={firstEnvTemplateId}
+        continueWithoutChanges
       />
 
       {/* Confirm deploy after configure */}
@@ -366,7 +368,9 @@ export default function BuildArea({
           <DialogContentText>Configuration saved. Would you like to deploy the selected image to the first environment now?</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeployConfirmOpen(false)}>Cancel</Button>
+          <Button variant="outlined" color="inherit" onClick={() => setDeployConfirmOpen(false)}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             disabled={!canDeploy}

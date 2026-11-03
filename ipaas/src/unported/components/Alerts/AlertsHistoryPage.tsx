@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Autocomplete, Box, CircularProgress, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Autocomplete, Box, CircularProgress, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, TextField } from '@wso2/oxygen-ui';
 import { type JSX, useMemo, useState } from 'react';
 import type { CloudDataPlane, Environment } from '../../../types/environment';
 import { useGetAlertHistory } from '../../hooks/useAlerts';
@@ -93,7 +92,7 @@ export default function AlertsHistoryPage({ componentId, environments }: AlertsH
           onChange={(_, v) => {
             if (v) setSelectedEnvironment(v);
           }}
-          renderInput={(params) => <TextField {...params} size="small" label="Environment" />}
+          renderInput={(params) => <TextField labelPlacement="top" {...params} size="small" label="Environment" />}
           isOptionEqualToValue={(o, v) => o.id === v.id}
           sx={{ minWidth: 200 }}
           size="small"

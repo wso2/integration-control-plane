@@ -136,7 +136,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
   const { CustomHeader, HeaderStatus, EnvCardActions, EnvCardBody, EnvCardFooter } = module;
 
   return (
-    <Card variant="outlined" sx={{ mb: 3 }}>
+    <Card sx={{ mb: 3 }}>
       <CardContent sx={{ pb: (theme) => `${theme.spacing(2)} !important` }}>
         {CustomHeader ? (
           <CustomHeader {...slotProps} isRefreshing={isRefreshing} onRefresh={handleRefresh} />

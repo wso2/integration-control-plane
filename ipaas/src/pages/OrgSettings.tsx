@@ -33,7 +33,7 @@ export default function OrgSettings({ org }: OrgScope): JSX.Element {
 
   if (!isOrgPermissionsLoaded)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Loading />
       </PageContent>
     );

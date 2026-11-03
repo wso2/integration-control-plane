@@ -36,7 +36,7 @@ export default function ArchitectureCard({ projectId, components, isLoading }: {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <Card variant="outlined">
+    <Card>
       <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
         <Stack direction="row" alignItems="center" sx={{ mb: expanded ? 1.5 : 0, cursor: 'pointer' }} onClick={() => setExpanded((prev) => !prev)}>
           <GitBranch size={20} aria-hidden="true" />

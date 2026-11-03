@@ -16,27 +16,36 @@
  * under the License.
  */
 
-import { Alert, Box, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, Copy } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Check, Copy, List } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import { useBuildLogs } from '../../hooks/useBuilds';
 import type { BuildRun } from '../../types/deployment';
 import { BUILD_STAGES } from '../../constants/build';
-import { formatBuildDate, getStepStatus } from '../../utils/build';
+import { buildLogText, formatBuildDate, getStepStatus, isBuildLive } from '../../utils/build';
 import BuildAccordionStepper from './BuildAccordionStepper';
+import BuildLogViewer from '../BuildLogViewer';
+
+const splitSx = { flex: 1, minHeight: 0 } as const;
+const detailsColumnSx = { width: 448, flexShrink: 0, overflowY: 'auto', p: 2 } as const;
+const logsColumnSx = { flex: 1, minWidth: 0, minHeight: 0, p: 2, pl: 0, display: 'flex', flexDirection: 'column' } as const;
+const logsToggleRowSx = { mt: 2 } as const;
 
 interface BuildDetailsProps {
   componentId: string;
   versionId: string;
   build: BuildRun;
-  onLogsToggle?: (open: boolean) => void;
+  logsOpen: boolean;
+  onLogsOpenChange: (open: boolean) => void;
 }
 
-export default function BuildDetails({ componentId, versionId, build, onLogsToggle }: BuildDetailsProps) {
+export default function BuildDetails({ componentId, versionId, build, logsOpen, onLogsOpenChange }: BuildDetailsProps) {
   const [buildIdCopied, setBuildIdCopied] = useState(false);
   const workflowName = build.buildRef ?? String(build.id);
   const isInProgress = build.status === 'in_progress';
   const { data: logs = null, isLoading: logsLoading } = useBuildLogs(componentId, versionId, workflowName, true, { status: build.status, conclusion: build.conclusion });
+  const hasBuildLog = !!buildLogText(logs);
+  const live = isBuildLive(build.status);
 
   // Copy the full identifier; the displayed `#id` is only its numeric suffix.
   const handleCopyBuildId = () => {
@@ -45,7 +54,7 @@ export default function BuildDetails({ componentId, versionId, build, onLogsTogg
     setTimeout(() => setBuildIdCopied(false), 1500);
   };
 
-  return (
+  const details = (
     <Stack gap={2}>
       {/* Build metadata */}
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
@@ -124,11 +133,29 @@ export default function BuildDetails({ componentId, versionId, build, onLogsTogg
           );
         }
         return (
-          <Box sx={{ mt: 2, background: 'transparent' }}>
-            <BuildAccordionStepper logs={logs!} logsLoading={logsLoading} isInProgress={isInProgress} onLogsToggle={onLogsToggle} />
-          </Box>
+          <>
+            {(hasBuildLog || logsLoading) && (
+              <Stack direction="row" justifyContent="flex-start" sx={logsToggleRowSx}>
+                <Button variant="text" size="small" startIcon={<List size={14} />} disabled={!hasBuildLog} onClick={() => onLogsOpenChange(!logsOpen)}>
+                  {logsOpen ? 'Hide logs' : 'View logs'}
+                </Button>
+              </Stack>
+            )}
+            <BuildAccordionStepper logs={logs!} isInProgress={isInProgress} />
+          </>
         );
       })()}
+    </Stack>
+  );
+
+  if (!logsOpen) return details;
+
+  return (
+    <Stack direction="row" gap={2} sx={splitSx}>
+      <Box sx={detailsColumnSx}>{details}</Box>
+      <Box sx={logsColumnSx}>
+        <BuildLogViewer logs={logs} logsLoading={logsLoading} showLogs live={live} fill />
+      </Box>
     </Stack>
   );
 }

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Autocomplete, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useGroups, useInviteUsers } from '../../../../hooks/useAuth';
 import type { Group } from '../../../../types/auth';
@@ -64,7 +63,9 @@ export default function InviteUsersDialog({ orgHandler, onClose, onInvited }: { 
             options={[]}
             value={emails}
             onChange={(_, v) => setEmails((v as string[]).map((s) => s.trim()).filter(Boolean))}
-            renderInput={(params) => <TextField {...params} label="Emails" error={invalidEmails.length > 0} helperText={invalidEmails.length > 0 ? `Invalid email(s): ${invalidEmails.join(', ')}` : 'Press Enter to add each email address.'} />}
+            renderInput={(params) => (
+              <TextField labelPlacement="top" {...params} label="Emails" error={invalidEmails.length > 0} helperText={invalidEmails.length > 0 ? `Invalid email(s): ${invalidEmails.join(', ')}` : 'Press Enter to add each email address.'} />
+            )}
           />
           <Autocomplete
             multiple
@@ -73,7 +74,7 @@ export default function InviteUsersDialog({ orgHandler, onClose, onInvited }: { 
             onChange={(_, v) => setSelectedGroups(v)}
             getOptionLabel={(g) => g.groupName}
             isOptionEqualToValue={(a, b) => a.groupId === b.groupId}
-            renderInput={(params) => <TextField {...params} label="Groups (optional)" />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} label="Groups (optional)" />}
           />
         </Stack>
       </DialogContent>

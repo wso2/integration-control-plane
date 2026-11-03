@@ -16,13 +16,11 @@
  * under the License.
  */
 
-import { Alert, Box, FormControlLabel, MenuItem, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Box, FormControlLabel, MenuItem, Stack, Switch, ToggleButton, ToggleButtonGroup, Typography, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { coerceFieldValue, formatFieldLabel, isSimpleObjectSchema } from '../../utils/mcp';
 import type { JsonSchemaType, JsonValue } from '../../types/mcp';
 
-const REQUIRED_FIELD_SX = { '& .MuiFormLabel-asterisk': { color: 'error.main' } } as const;
 const monospaceInputSx = { '& textarea': { fontFamily: 'monospace', fontSize: 13 } } as const;
 
 interface DynamicJsonFormProps {
@@ -37,8 +35,10 @@ function NestedJsonField({ label, required, value, onChange }: { label: string; 
   const [error, setError] = useState(false);
   return (
     <TextField
+      labelPlacement="top"
       label={label}
       required={required}
+      optional={!required}
       fullWidth
       multiline
       minRows={3}
@@ -46,7 +46,7 @@ function NestedJsonField({ label, required, value, onChange }: { label: string; 
       value={raw}
       error={error}
       helperText={error ? 'Invalid JSON.' : ' '}
-      sx={{ ...(required ? REQUIRED_FIELD_SX : {}), ...monospaceInputSx }}
+      sx={monospaceInputSx}
       onChange={(e) => {
         setRaw(e.target.value);
         try {
@@ -115,17 +115,7 @@ export default function DynamicJsonForm({ schema, value, onChange }: DynamicJson
               }
               if (enumOptions) {
                 return (
-                  <TextField
-                    key={key}
-                    select
-                    label={label}
-                    required={isRequired}
-                    fullWidth
-                    size="small"
-                    value={value[key] ?? ''}
-                    onChange={(e) => setField(key, e.target.value)}
-                    helperText={prop.description || ' '}
-                    sx={isRequired ? REQUIRED_FIELD_SX : undefined}>
+                  <TextField labelPlacement="top" key={key} select label={label} required={isRequired} optional={!isRequired} fullWidth size="small" value={value[key] ?? ''} onChange={(e) => setField(key, e.target.value)} helperText={prop.description || ' '}>
                     {enumOptions.map((opt) => (
                       <MenuItem key={String(opt)} value={String(opt)}>
                         {String(opt)}
@@ -140,9 +130,11 @@ export default function DynamicJsonForm({ schema, value, onChange }: DynamicJson
               const isNumeric = prop.type === 'number' || prop.type === 'integer';
               return (
                 <TextField
+                  labelPlacement="top"
                   key={key}
                   label={label}
                   required={isRequired}
+                  optional={!isRequired}
                   fullWidth
                   size="small"
                   type={isNumeric ? 'number' : 'text'}
@@ -150,7 +142,6 @@ export default function DynamicJsonForm({ schema, value, onChange }: DynamicJson
                   onChange={(e) => setField(key, e.target.value === '' && isNumeric ? '' : coerceFieldValue(prop.type, e.target.value))}
                   placeholder={prop.description}
                   helperText={prop.description || ' '}
-                  sx={isRequired ? REQUIRED_FIELD_SX : undefined}
                 />
               );
             })}

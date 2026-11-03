@@ -50,11 +50,12 @@ import {
   TablePagination,
   Tooltip,
   Typography,
+  TextField,
+  RelativeTime,
 } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX } from '../constants/styles';
-import TextField from '../components/common/TextField';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
-import { ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
 import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
@@ -73,8 +74,8 @@ import { useChoreoSampleImages, useComponentRepositories } from '../hooks/useRep
 import type { Component, ComponentDeletionError, ComponentSubscription, SubscriptionInfo } from '../types/component';
 import { useDeleteComponent } from '../hooks/useComponents';
 import NotFound from '../components/NotFound';
-import { formatDistanceToNow } from '../utils/time';
-import { resourceUrl, broaden, newComponentUrl, type ProjectScope } from '../nav';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
+import { resourceUrl, broaden, newComponentUrl, editProjectUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
 import { componentOverviewUrl } from '../paths';
@@ -86,13 +87,37 @@ import Authorized from '../components/Authorized';
 import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
 import { UUID_RE } from '../utils/string';
 import { isExternalRepoIntegration } from '../utils/projectRepo';
-import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_MAX_NEWLINES, clampDescription, isAtNewlineLimit } from '../utils/description';
+import { DESCRIPTION_MAX_LENGTH, DESCRIPTION_MAX_NEWLINES, toSingleLineDescription } from '../utils/description';
+import { withBase } from '../utils/basePath';
+import { session } from '../utils/storage';
 
 const Markdown = lazy(() => import('../components/Markdown'));
 
 const FREE_COMPONENT_LIMIT = 5;
 
 const APIM_SUBSCRIBERS_ERROR_CODE = 'APIM_SUBSCRIBERS';
+
+// Zero padding and icon offset keep the button's icon flush with the title above it.
+const linkRepoButtonSx = { mt: 1, px: 0, minWidth: 0, textTransform: 'none', fontSize: '0.8125rem', '& .MuiButton-startIcon': { ml: 0 } } as const;
+const projectAvatarSx = { width: 58, height: 58, flexShrink: 0 } as const;
+const integrationSearchSx = { flex: 1 } as const;
+const descriptionSx = { maxWidth: 260 } as const;
+const INTEGRATIONS_HEADING_ID = 'project-integrations-heading';
+const overviewGridSx = { display: 'grid', columnGap: 4, rowGap: 2, gridTemplateColumns: { xs: '1fr', md: '3fr 1fr' } } as const;
+// The heading sits in its own grid row, so the side cards start level with the search row.
+const integrationsHeadingSx = { fontWeight: 600, gridColumn: { md: 1 } } as const;
+const mainColumnSx = { gridColumn: { md: 1 }, gridRow: { md: 2 } } as const;
+const sideColumnSx = { gridColumn: { md: 2 }, gridRow: { md: 2 }, mt: { xs: 2, md: 0 } } as const;
+// The time and the delete button share one grid cell, so swapping them does not shift the column.
+const lastUpdatedSwapSx = { display: 'grid', justifyItems: 'end', alignItems: 'center', '& > *': { gridArea: '1 / 1' } } as const;
+const rowDeleteSx = { opacity: 0, pointerEvents: 'none', transition: 'opacity 0.15s', whiteSpace: 'nowrap' } as const;
+// Opacity rather than display, so the button stays reachable by keyboard focus and by tests.
+const integrationRowRevealSx = {
+  '&:hover .row-delete, &:focus-within .row-delete': { opacity: 1, pointerEvents: 'auto' },
+  '&:hover .row-swap:has(.row-delete) .row-time, &:focus-within .row-swap:has(.row-delete) .row-time': { opacity: 0 },
+  // Touch and pen have no hover, so the button stays shown there.
+  '@media (hover: none)': { '& .row-delete': { opacity: 1, pointerEvents: 'auto' }, '& .row-swap:has(.row-delete) .row-time': { opacity: 0 } },
+} as const;
 
 /** Splits an integration's active API subscribers into internal (Choreo-managed test apps) vs external, deduped by application. */
 function splitSubscribers(data: SubscriptionInfo[]): { internal: ComponentSubscription[]; external: ComponentSubscription[] } {
@@ -182,11 +207,11 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
           <Typography variant="body2">Please remove them before proceeding.</Typography>
         </DialogContent>
         <DialogActions>
-          <Button variant="outlined" onClick={onClose} disabled={mutation.isPending}>
+          <Button variant="outlined" color="inherit" onClick={onClose} disabled={mutation.isPending}>
             Cancel
           </Button>
           <Button variant="contained" color="error" onClick={handleDelete} disabled={mutation.isPending} startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {mutation.isPending ? 'Retrying…' : 'Retry Delete'}
+            {mutation.isPending ? 'Retrying…' : 'Retry delete'}
           </Button>
         </DialogActions>
       </Dialog>
@@ -208,7 +233,7 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         <TextField autoFocus fullWidth placeholder="Enter integration name to confirm" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
       </DialogContent>
       <DialogActions>
-        <Button variant="outlined" onClick={handleClose} disabled={mutation.isPending}>
+        <Button variant="outlined" color="inherit" onClick={handleClose} disabled={mutation.isPending}>
           Cancel
         </Button>
         <Button variant="contained" color="error" disabled={!confirmed || mutation.isPending} startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
@@ -280,8 +305,6 @@ function ComponentNameCell({ component: c, isWorkspace, external = false, isExte
 function IntegrationsTable({
   components,
   isLoading,
-  isRefreshing,
-  onRefresh,
   scope,
   projectId,
   orgDevantComponentCount,
@@ -291,8 +314,6 @@ function IntegrationsTable({
 }: {
   components: Component[];
   isLoading: boolean;
-  isRefreshing: boolean;
-  onRefresh: () => void;
   scope: ProjectScope;
   projectId: string;
   orgDevantComponentCount: number;
@@ -345,25 +366,14 @@ function IntegrationsTable({
   const paginated = filteredIntegrations.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
   return (
-    <section>
-      <Stack direction="row" alignItems="center" gap={2} sx={{ mb: 2 }}>
-        <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
-          Integrations
-        </Typography>
-        <IconButton
-          size="small"
-          aria-label="Refresh integrations"
-          onClick={onRefresh}
-          disabled={isRefreshing}
-          sx={isRefreshing ? { '@keyframes spin': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } }, '& svg': { animation: 'spin 1s linear infinite' } } : undefined}>
-          <RefreshCw size={16} />
-        </IconButton>
+    <section aria-labelledby={INTEGRATIONS_HEADING_ID}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
         <TextField
           size="small"
           placeholder="Search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          sx={{ flex: 1 }}
+          sx={integrationSearchSx}
           slotProps={{
             htmlInput: { 'aria-label': 'Search integrations' },
             input: {
@@ -390,39 +400,39 @@ function IntegrationsTable({
             },
           }}
         />
-        <Menu anchorEl={labelAnchor} open={Boolean(labelAnchor)} onClose={() => setLabelAnchor(null)} slotProps={{ paper: { sx: { minWidth: 180, maxHeight: 320 } } }}>
-          {allLabels.map((label) => (
-            <MenuItem key={label} onClick={() => handleToggleLabel(label)} dense>
-              <Checkbox size="small" checked={selectedLabels.includes(label)} sx={{ p: 0, mr: 1 }} />
-              <Typography variant="body2">{label}</Typography>
-            </MenuItem>
-          ))}
-          {selectedLabels.length > 0 && (
-            <>
-              <Divider />
-              <MenuItem
-                onClick={() => {
-                  setSelectedLabels([]);
-                  setLabelAnchor(null);
-                }}
-                dense>
-                <Typography variant="body2" color="error">
-                  Clear filter
-                </Typography>
-              </MenuItem>
-            </>
-          )}
-        </Menu>
         <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
           <Tooltip title={quotaReached ? 'You have exceeded the allocated integration quota. Upgrade your subscription.' : ''} placement="top">
             <span>
               <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newComponentUrl(scope))} disabled={quotaReached}>
-                Create an Integration
+                New integration
               </Button>
             </span>
           </Tooltip>
         </Authorized>
       </Stack>
+      <Menu anchorEl={labelAnchor} open={Boolean(labelAnchor)} onClose={() => setLabelAnchor(null)} slotProps={{ paper: { sx: { minWidth: 180, maxHeight: 320 } } }}>
+        {allLabels.map((label) => (
+          <MenuItem key={label} onClick={() => handleToggleLabel(label)} dense>
+            <Checkbox size="small" checked={selectedLabels.includes(label)} sx={{ p: 0, mr: 1 }} />
+            <Typography variant="body2">{label}</Typography>
+          </MenuItem>
+        ))}
+        {selectedLabels.length > 0 && (
+          <>
+            <Divider />
+            <MenuItem
+              onClick={() => {
+                setSelectedLabels([]);
+                setLabelAnchor(null);
+              }}
+              dense>
+              <Typography variant="body2" color="error">
+                Clear filter
+              </Typography>
+            </MenuItem>
+          </>
+        )}
+      </Menu>
 
       {deleteAlert && (
         <Alert severity="success" onClose={() => setDeleteAlert(null)} sx={{ mb: 2 }}>
@@ -446,12 +456,7 @@ function IntegrationsTable({
                     <ListingTable.Cell>Name</ListingTable.Cell>
                     <ListingTable.Cell>Description</ListingTable.Cell>
                     <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                    <ListingTable.Cell>Last Updated</ListingTable.Cell>
-                    <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
-                      <ListingTable.Cell width={60} align="right">
-                        Action
-                      </ListingTable.Cell>
-                    </Authorized>
+                    <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
                   </ListingTable.Row>
                 </ListingTable.Head>
                 <ListingTable.Body>
@@ -469,7 +474,7 @@ function IntegrationsTable({
                           aria-disabled={deleting || undefined}
                           aria-label={deleting ? `${c.displayName} is being deleted` : `View details for ${c.displayName}`}
                           // The card variant tints its own background on hover; pin both states so a dying row stays inert.
-                          sx={deleting ? { opacity: 0.38, cursor: 'default', backgroundColor: 'background.acrylic', '&:hover': { backgroundColor: 'background.acrylic' } } : undefined}
+                          sx={deleting ? { opacity: 0.38, cursor: 'default', backgroundColor: 'background.acrylic', '&:hover': { backgroundColor: 'background.acrylic' } } : integrationRowRevealSx}
                           onClick={deleting ? undefined : () => onSelect(c.handler)}
                           onKeyDown={(e) => {
                             if (!deleting && e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
@@ -482,8 +487,8 @@ function IntegrationsTable({
                           </ListingTable.Cell>
                           <ListingTable.Cell>
                             {!init && (
-                              <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>
-                                {c.description?.trim() || ''}
+                              <Typography variant="body2" color="text.secondary" noWrap sx={descriptionSx}>
+                                {c.description?.trim()}
                               </Typography>
                             )}
                           </ListingTable.Cell>
@@ -494,38 +499,36 @@ function IntegrationsTable({
                               </Typography>
                             )}
                           </ListingTable.Cell>
-                          <ListingTable.Cell>
-                            {!init && !deleting && (
-                              <Typography variant="body2" color="text.secondary">
-                                {formatDistanceToNow(c.lastBuildDate)}
-                              </Typography>
-                            )}
-                          </ListingTable.Cell>
-                          <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
-                            <ListingTable.Cell align="right">
-                              {deleting ? (
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                                  <CircularProgress size={14} color="inherit" />
-                                  <Typography variant="body2" color="text.secondary" noWrap>
-                                    Deleting
-                                  </Typography>
-                                </Box>
-                              ) : (
-                                <Tooltip title="Delete">
-                                  <IconButton
+                          <ListingTable.Cell align="right">
+                            {deleting ? (
+                              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                                <CircularProgress size={14} color="inherit" />
+                                <Typography variant="body2" color="text.secondary" noWrap>
+                                  Deleting
+                                </Typography>
+                              </Box>
+                            ) : (
+                              <Box className="row-swap" sx={lastUpdatedSwapSx}>
+                                <Box className="row-time">{!init && <RelativeTime time={formatDistanceToNow(c.lastBuildDate)} dateTime={c.lastBuildDate} tooltip={formatDateTime(c.lastBuildDate)} />}</Box>
+                                <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
+                                  <Button
+                                    className="row-delete"
+                                    variant="outlined"
                                     size="small"
                                     color="error"
+                                    startIcon={<Trash2 size={14} />}
                                     aria-label={`Delete ${c.displayName}`}
+                                    sx={rowDeleteSx}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       setDeleting(c);
                                     }}>
-                                    <Trash2 size={16} />
-                                  </IconButton>
-                                </Tooltip>
-                              )}
-                            </ListingTable.Cell>
-                          </Authorized>
+                                    Delete
+                                  </Button>
+                                </Authorized>
+                              </Box>
+                            )}
+                          </ListingTable.Cell>
                         </ListingTable.Row>
                       </Tooltip>
                     );
@@ -563,8 +566,7 @@ function IntegrationsTable({
                       <ListingTable.Cell>Name</ListingTable.Cell>
                       <ListingTable.Cell>Description</ListingTable.Cell>
                       <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                      <ListingTable.Cell>Last Updated</ListingTable.Cell>
-                      {/* No Action column: another platform owns these, so none of them are actionable from here. */}
+                      <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
                     </ListingTable.Row>
                   </ListingTable.Head>
                   <ListingTable.Body>
@@ -578,8 +580,8 @@ function IntegrationsTable({
                             </ListingTable.Cell>
                             <ListingTable.Cell>
                               {!init && (
-                                <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 150 }}>
-                                  {c.description?.trim() || ''}
+                                <Typography variant="body2" color="text.secondary" noWrap sx={descriptionSx}>
+                                  {c.description?.trim()}
                                 </Typography>
                               )}
                             </ListingTable.Cell>
@@ -590,13 +592,7 @@ function IntegrationsTable({
                                 </Typography>
                               )}
                             </ListingTable.Cell>
-                            <ListingTable.Cell>
-                              {!init && (
-                                <Typography variant="body2" color="text.secondary">
-                                  {formatDistanceToNow(c.lastBuildDate)}
-                                </Typography>
-                              )}
-                            </ListingTable.Cell>
+                            <ListingTable.Cell align="right">{!init && <RelativeTime time={formatDistanceToNow(c.lastBuildDate)} dateTime={c.lastBuildDate} tooltip={formatDateTime(c.lastBuildDate)} />}</ListingTable.Cell>
                           </ListingTable.Row>
                         </Tooltip>
                       );
@@ -646,7 +642,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   // on that first landing — navigating elsewhere and back always shows the header again, even if
   // the project is still empty, so it never vanishes on a repeat visit.
   const justProvisionedDefaultProject = useFreshDefaultProject();
-  const { data: components = [], isLoading: loadingComponents, isFetching: fetchingComponents, isSuccess: isComponentsSuccess, refetch: refetchComponents } = useComponents(scope.org, projectId);
+  const { data: components = [], isLoading: loadingComponents, isSuccess: isComponentsSuccess } = useComponents(scope.org, projectId);
   // The component list carries no repository, so a linked project looks each integration's up.
   const isRepoLinked = !!project?.gitOrganization && !!project?.repository;
   const repoByHandler = useComponentRepositories(
@@ -668,11 +664,11 @@ export default function Project(scope: ProjectScope): JSX.Element {
   // sessionStorage cache covers repeat visits to any other empty project within the same tab
   // session, so only a genuinely first-ever visit to an empty non-onboarding project still waits.
   const emptyProjectCacheKey = projectId ? `project-overview-empty:${projectId}` : null;
-  const cachedIsEmpty = emptyProjectCacheKey ? sessionStorage.getItem(emptyProjectCacheKey) === 'true' : false;
+  const cachedIsEmpty = emptyProjectCacheKey ? session.get(emptyProjectCacheKey) === 'true' : false;
 
   useEffect(() => {
     if (!emptyProjectCacheKey || !isComponentsSuccess) return;
-    sessionStorage.setItem(emptyProjectCacheKey, String(components.length === 0));
+    session.set(emptyProjectCacheKey, String(components.length === 0));
   }, [emptyProjectCacheKey, isComponentsSuccess, components.length]);
 
   const { data: orgs = [] } = useOrgs();
@@ -699,14 +695,14 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const [excludedExpanded, setExcludedExpanded] = useState(true);
   const [primaryAction, setPrimaryAction] = useState<'cloud' | 'integrator'>('cloud');
   useEffect(() => {
-    setDescValue(project?.description?.trim() ?? '');
+    setDescValue(toSingleLineDescription(project?.description?.trim() ?? ''));
   }, [project?.description]);
 
   if (loadingProject) {
     return <ProjectHomeSkeleton />;
   }
   if (!project) {
-    return <NotFound message="Project not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Projects" />;
+    return <NotFound message="Project not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to projects" />;
   }
 
   const isEmpty = justProvisionedDefaultProject || (isComponentsSuccess ? components.length === 0 : cachedIsEmpty);
@@ -727,7 +723,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
       componentId: openInCloudComponent.id,
       codeServerSample: JSON.stringify(codeServerSample),
     });
-    window.open(`${window.location.origin}/editor?${params}`, '_blank', 'noopener,noreferrer');
+    window.open(`${window.location.origin}${withBase('/editor')}?${params}`, '_blank', 'noopener,noreferrer');
     setSplitOpen(false);
     setOpenEditorWarning(null);
   };
@@ -766,7 +762,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
 
   const commitDescEdit = () => {
     const trimmed = descValue.trim();
-    const original = project.description?.trim() ?? '';
+    // Older descriptions may hold line breaks; compare one-line forms so a no-op is not saved.
+    const original = toSingleLineDescription(project.description?.trim() ?? '');
     if (trimmed === original) {
       setDescEditing(false);
       return;
@@ -784,7 +781,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   };
 
   const cancelDescEdit = () => {
-    setDescValue(project.description?.trim() ?? '');
+    setDescValue(toSingleLineDescription(project.description?.trim() ?? ''));
     setDescEditing(false);
   };
 
@@ -792,15 +789,15 @@ export default function Project(scope: ProjectScope): JSX.Element {
     // Vertically centers the empty state for a fresh user's first landing on the auto-provisioned
     // project — the header is hidden in this state too, so this is the only content on the page,
     // and centering it reads as a deliberate welcome screen rather than content stuck at the top.
-    <PageContent sx={justProvisionedDefaultProject ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' } : undefined}>
+    <PageContent fullWidth sx={justProvisionedDefaultProject ? { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' } : undefined}>
       {/* Hidden for a fresh user's still-empty auto-provisioned project — the name/description/
           repo-link controls have nothing to act on yet and only add noise to the empty state. */}
       {!justProvisionedDefaultProject && (
         <Stack component="header" direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: isEmpty ? 3 : 4 }}>
           <Stack sx={{ minWidth: 0 }}>
             <Stack direction="row" alignItems="flex-start" gap={2}>
-              <Avatar variant="rounded" sx={{ width: 58, height: 58, borderRadius: 1, fontSize: 24, bgcolor: 'primary.main', color: 'primary.contrastText', flexShrink: 0 }}>
-                {project?.name?.[0]?.toUpperCase() ?? 'P'}
+              <Avatar variant="light" color="primary" aria-hidden="true" sx={projectAvatarSx}>
+                <BoxIcon size={28} />
               </Avatar>
               <div>
                 <Typography variant="h1" mb={1}>
@@ -851,10 +848,9 @@ export default function Project(scope: ProjectScope): JSX.Element {
                     {descEditing && (
                       <InputBase
                         inputRef={descInputRef}
-                        multiline
                         autoFocus
                         value={descValue}
-                        onChange={(e) => setDescValue(clampDescription(e.target.value))}
+                        onChange={(e) => setDescValue(toSingleLineDescription(e.target.value))}
                         onBlur={commitDescEdit}
                         onKeyDown={(e) => {
                           if (e.key === 'Escape') {
@@ -862,7 +858,11 @@ export default function Project(scope: ProjectScope): JSX.Element {
                             cancelDescEdit();
                             return;
                           }
-                          if (e.key === 'Enter' && isAtNewlineLimit(descValue)) e.preventDefault();
+                          // onBlur commits, so blurring saves once.
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            descInputRef.current?.blur();
+                          }
                         }}
                         inputProps={{ maxLength: DESCRIPTION_MAX_LENGTH }}
                         sx={(theme) => ({
@@ -874,7 +874,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
                           alignItems: 'flex-start',
                           // The ghost text below is line-clamped, so the box cannot grow with the input.
                           overflow: 'hidden',
-                          '& textarea': { ...theme.typography.body2, padding: 0, resize: 'none', border: 'none', outline: 'none', background: 'transparent', overflowY: 'auto !important' },
+                          '& input': { ...theme.typography.body2, padding: 0, border: 'none', outline: 'none', background: 'transparent' },
                         })}
                         disabled={updateProject.isPending}
                         autoComplete="off"
@@ -883,83 +883,89 @@ export default function Project(scope: ProjectScope): JSX.Element {
                   </Box>
                   {updateProject.isPending && <CircularProgress size={12} sx={{ mt: 0.25 }} />}
                 </Stack>
+                {projectRepoUrl ? (
+                  <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 2 }}>
+                    <GitHub size={14} />
+                    <Link href={projectRepoUrl} target="_blank" rel="noreferrer" data-testid="project-repo-link-link" underline="hover" sx={{ color: 'primary.main', fontSize: '0.8125rem' }}>
+                      {projectRepoUrl}
+                    </Link>
+                  </Stack>
+                ) : (
+                  <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => setLinkRepoOpen(true)} sx={linkRepoButtonSx}>
+                    Link a repository
+                  </Button>
+                )}
               </div>
             </Stack>
-            {/* Outside the text column so its left edge lines up with the avatar's. */}
-            {projectRepoUrl ? (
-              <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 2 }}>
-                <GitHub size={14} />
-                <Link href={projectRepoUrl} target="_blank" rel="noreferrer" data-testid="project-repo-link-link" underline="hover" sx={{ color: 'primary.main', fontSize: '0.8125rem' }}>
-                  {projectRepoUrl}
-                </Link>
-              </Stack>
-            ) : (
-              <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => setLinkRepoOpen(true)} sx={{ mt: 2, pl: 0, alignSelf: 'flex-start', textTransform: 'none', fontSize: '0.8125rem' }}>
-                Link a Repository
+          </Stack>
+          <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
+            <Authorized permissions={[Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT]}>
+              <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
+                Edit project
               </Button>
+            </Authorized>
+            {openInCloudComponent && projectRepoUrl && (
+              <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                {openInIntegratorEnabled ? (
+                  <>
+                    <ButtonGroup variant="outlined" size="small" ref={splitButtonRef}>
+                      <Button
+                        startIcon={
+                          <Box component="span" sx={{ color: 'text.primary', display: 'flex' }}>
+                            <IntegratorIcon width={16} height={16} />
+                          </Box>
+                        }
+                        onClick={primaryAction === 'cloud' ? handleOpenInCloud : handleOpenInIntegrator}
+                        disabled={primaryAction === 'cloud' ? !codeServerSample : !openInCloudComponent}
+                        sx={{ whiteSpace: 'nowrap' }}>
+                        {primaryAction === 'cloud' ? <>Open in Cloud</> : 'Open in Integrator'}
+                      </Button>
+                      <Button size="small" sx={{ px: 0.5 }} aria-label="More options" onClick={() => setSplitOpen((prev) => !prev)}>
+                        <ChevronDown size={14} />
+                      </Button>
+                    </ButtonGroup>
+                    <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-end" transition disablePortal style={{ zIndex: 1300 }}>
+                      {({ TransitionProps }) => (
+                        <Grow {...TransitionProps}>
+                          <Paper elevation={3}>
+                            <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
+                              <MenuList dense sx={{ minWidth: 200 }}>
+                                <MenuItem
+                                  onClick={() => {
+                                    setPrimaryAction('cloud');
+                                    handleOpenInCloud();
+                                  }}
+                                  disabled={!codeServerSample}>
+                                  <Stack direction="row" alignItems="center" gap={1}>
+                                    <IntegratorIcon width={16} height={16} />
+                                    <Typography variant="body2">Open in Cloud</Typography>
+                                  </Stack>
+                                </MenuItem>
+                                <MenuItem
+                                  onClick={() => {
+                                    setPrimaryAction('integrator');
+                                    handleOpenInIntegrator();
+                                  }}>
+                                  <Stack direction="row" alignItems="center" gap={1}>
+                                    <IntegratorIcon width={16} height={16} />
+                                    <Typography variant="body2">Open in Integrator</Typography>
+                                  </Stack>
+                                </MenuItem>
+                              </MenuList>
+                            </ClickAwayListener>
+                          </Paper>
+                        </Grow>
+                      )}
+                    </Popper>
+                  </>
+                ) : (
+                  <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
+                    Open in Cloud Editor
+                  </Button>
+                )}
+              </Box>
             )}
           </Stack>
-          {openInCloudComponent && projectRepoUrl && (
-            <Box sx={{ position: 'relative', flexShrink: 0 }}>
-              {openInIntegratorEnabled ? (
-                <>
-                  <ButtonGroup variant="outlined" size="small" ref={splitButtonRef}>
-                    <Button
-                      startIcon={
-                        <Box component="span" sx={{ color: 'text.primary', display: 'flex' }}>
-                          <IntegratorIcon width={16} height={16} />
-                        </Box>
-                      }
-                      onClick={primaryAction === 'cloud' ? handleOpenInCloud : handleOpenInIntegrator}
-                      disabled={primaryAction === 'cloud' ? !codeServerSample : !openInCloudComponent}
-                      sx={{ whiteSpace: 'nowrap' }}>
-                      {primaryAction === 'cloud' ? <>Open in Cloud</> : 'Open in Integrator'}
-                    </Button>
-                    <Button size="small" sx={{ px: 0.5 }} aria-label="More options" onClick={() => setSplitOpen((prev) => !prev)}>
-                      <ChevronDown size={14} />
-                    </Button>
-                  </ButtonGroup>
-                  <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-end" transition disablePortal style={{ zIndex: 1300 }}>
-                    {({ TransitionProps }) => (
-                      <Grow {...TransitionProps}>
-                        <Paper elevation={3}>
-                          <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
-                            <MenuList dense sx={{ minWidth: 200 }}>
-                              <MenuItem
-                                onClick={() => {
-                                  setPrimaryAction('cloud');
-                                  handleOpenInCloud();
-                                }}
-                                disabled={!codeServerSample}>
-                                <Stack direction="row" alignItems="center" gap={1}>
-                                  <IntegratorIcon width={16} height={16} />
-                                  <Typography variant="body2">Open in Cloud</Typography>
-                                </Stack>
-                              </MenuItem>
-                              <MenuItem
-                                onClick={() => {
-                                  setPrimaryAction('integrator');
-                                  handleOpenInIntegrator();
-                                }}>
-                                <Stack direction="row" alignItems="center" gap={1}>
-                                  <IntegratorIcon width={16} height={16} />
-                                  <Typography variant="body2">Open in Integrator</Typography>
-                                </Stack>
-                              </MenuItem>
-                            </MenuList>
-                          </ClickAwayListener>
-                        </Paper>
-                      </Grow>
-                    )}
-                  </Popper>
-                </>
-              ) : (
-                <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
-                  Open in Cloud Editor
-                </Button>
-              )}
-            </Box>
-          )}
         </Stack>
       )}
 
@@ -968,18 +974,14 @@ export default function Project(scope: ProjectScope): JSX.Element {
       {isEmpty ? (
         <CreateIntegrationPanels scope={scope} />
       ) : (
-        <Box
-          sx={{
-            display: 'grid',
-            gap: 4,
-            gridTemplateColumns: { xs: '1fr', md: '3fr 1fr' },
-          }}>
-          <Box>
+        <Box sx={overviewGridSx}>
+          <Typography id={INTEGRATIONS_HEADING_ID} variant="h6" component="h2" sx={integrationsHeadingSx}>
+            Integrations
+          </Typography>
+          <Box sx={mainColumnSx}>
             <IntegrationsTable
               components={components}
               isLoading={loadingComponents}
-              isRefreshing={fetchingComponents && !loadingComponents}
-              onRefresh={refetchComponents}
               scope={scope}
               projectId={projectId}
               orgDevantComponentCount={orgDevantComponentCount}
@@ -1003,7 +1005,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </Card>
             )}
           </Box>
-          <Box>
+          <Box sx={sideColumnSx}>
             <Stack gap={3}>
               <IntegrationTypesCard components={components} />
               <ArchitectureCard projectId={projectId} components={components} isLoading={loadingComponents} />
@@ -1054,7 +1056,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
           </Box>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
-          <Button variant="outlined" onClick={() => setOpenEditorWarning(null)}>
+          <Button variant="outlined" color="inherit" onClick={() => setOpenEditorWarning(null)}>
             Cancel
           </Button>
           <Button variant="contained" onClick={() => (openEditorWarning === 'cloud' ? doOpenInCloud() : doOpenInIntegrator())} disabled={openEditorWarning === 'cloud' ? !codeServerSample : !openInCloudComponent}>

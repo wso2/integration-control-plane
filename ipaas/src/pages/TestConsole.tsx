@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, CircularProgress, Divider, IconButton, InputAdornment, OutlinedInput, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, CircularProgress, Divider, IconButton, InputAdornment, OutlinedInput, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Check, Copy, Eye, EyeOff, Key } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import SwaggerUI from 'swagger-ui-react';
@@ -35,7 +34,9 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import NotFound from '../components/NotFound';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import type { EndpointRef } from '../types/consumers';
+import { trackEvent } from '../services/tracking/tracking';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
@@ -66,9 +67,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // Deployment track selection (default to latest) — derived rather than synced via an effect,
   // since an effect+render round trip here would delay useComponentDeployment/useEnvEndpoints below.
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const selectedTrackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { tracks, trackId: selectedTrackId } = useSelectedTrack(component);
 
   // Environment selection (by ID for stability across refetches) — same reasoning.
   const [selectedEnvIdState, setSelectedEnvId] = useState('');
@@ -90,12 +89,15 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // environmentName is the environment slug, which toEnvironment puts in `id` — `name` is the label.
   // The test key comes from the BFF's test-key route (component/environment/endpoint triple), and
-  // the enforcing API Platform gateway URL from the endpoint's security config.
+  // the enforcing API Platform gateway URL from endpoint discovery. Security may also return a
+  // URL, in which case useEndpointTestAccess prefers it.
   const testKeyEndpointRef: EndpointRef | null = useMemo(
-    () => (component && selectedEnv && selectedEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id } : null),
-    [component, selectedEnv, selectedEndpoint],
+    () => (component && selectedEnv && selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id, deploymentTrackId: selectedTrackId } : null),
+    [projectId, component, selectedEnv, selectedEndpoint, selectedTrackId],
   );
-  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef);
+  // Mint the initial test key when the console resolves an api-key-secured endpoint;
+  // the button below explicitly refreshes it on demand after that.
+  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef, selectedEndpoint?.publicUrl || '');
   // Try-it-out runs in the browser, so the gateway must return CORS headers for this origin.
   const { data: endpointPolicies } = useEndpointPolicies(testKeyEndpointRef, !!testKeyEndpointRef);
   const testKeyHeader = access.authHeader;
@@ -137,16 +139,20 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   });
   const keyError = access.keyError;
 
-  // Cleared, not just replaced: the hook keys a minted key to its endpoint, so selecting one with
-  // no key must not leave the previous endpoint's credential in the field.
+  // Cleared, not just replaced: the hook keys a minted key to its endpoint and track, so selecting one with
+  // no key must not leave the previous one's credential in the field. Each track has its own API, so a track
+  // change resets the field even when neither track has a minted key.
   useEffect(() => {
     updateSecurityHeader(access.apiKey ?? '');
-  }, [access.apiKey]);
+  }, [access.apiKey, selectedTrackId]);
 
   const handleGetTestKey = async () => {
     if (!canGetTestKey) return;
     const key = await access.mintKey();
-    if (key) updateSecurityHeader(key);
+    if (key) {
+      updateSecurityHeader(key);
+      trackEvent('component-test-openapi-get-test-key');
+    }
   };
 
   // Swagger spec for the selected endpoint: its base64 OpenAPI arrives in `apimRevisionId`.
@@ -163,14 +169,14 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   if (loadingComponent) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
   }
 
   if (!component) {
-    return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+    return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
   }
 
   const envSelector = environments.length > 1 && (
@@ -187,9 +193,9 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelector} />}
+      {tracks.length > 0 && <DeploymentTrackBar component={component} extra={envSelector} />}
 
-      <PageContent>
+      <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Test Console
         </Typography>
@@ -261,7 +267,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                       sx={{ flex: 1, fontFamily: 'monospace', fontSize: '0.8rem' }}
                       endAdornment={
                         <InputAdornment position="end">
-                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to Clipboard'}>
+                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to clipboard'}>
                             <IconButton
                               size="small"
                               onClick={() => {
@@ -325,7 +331,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                           disabled={fetchingKey || !canGetTestKey}
                           onClick={handleGetTestKey}
                           sx={{ whiteSpace: 'nowrap', textTransform: 'none' }}>
-                          Get Test Key
+                          Get test key
                         </Button>
                       </Stack>
                       {keyError && (
@@ -374,6 +380,10 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                         request.headers[testKeyHeaderRef.current] = securityHeaderRef.current;
                       }
                       return request;
+                    }}
+                    responseInterceptor={(response) => {
+                      trackEvent('component-test-execute', { status: response.status });
+                      return response;
                     }}
                   />
                 </Box>

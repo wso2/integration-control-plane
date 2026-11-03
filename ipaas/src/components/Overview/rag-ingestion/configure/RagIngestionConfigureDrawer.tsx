@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, Maximize2, Minimize2, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, DrawerPanel, Stack, Typography } from '@wso2/oxygen-ui';
+import { Check } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useComponentDeployment } from '../../../../hooks/useDeployments';
 import { useRelease } from '../../../../hooks/useDevopsConfigs';
@@ -84,48 +84,27 @@ export default function RagIngestionConfigureDrawer({ open, onClose, component, 
 
   const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(orgHandler, orgUuid, component.id, versionId, env.id);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release, isLoading: loadingRelease } = useRelease(projectId, component.id, releaseId);
+  const { data: release, isLoading: loadingRelease } = useRelease(projectId, component.id, releaseId, versionId);
   const containerId = useMemo(() => mainContainer(release?.containers)?.ID ?? '', [release]);
 
-  const ctx: EditorContext = { projectId, componentId: component.id, releaseId, containerId, envId: env.id };
+  const ctx: EditorContext = { projectId, componentId: component.id, releaseId, containerId, envId: env.id, deploymentTrackId: versionId };
   const notify = (message: string, severity: 'success' | 'error') => setNotice({ message, severity });
   const loading = loadingDeployment || loadingRelease;
   const ready = !!releaseId && !!containerId;
   const activeStep = steps[Math.min(stepIndex, steps.length - 1)];
 
-  const drawerSx = {
-    '& .MuiDrawer-paper': {
-      width: enlarged ? 'min(1100px, 96vw)' : 560,
-      maxWidth: '100vw',
-      position: 'fixed',
-      top: 64,
-      height: 'calc(100% - 64px)',
-      borderLeft: '1px solid',
-      borderColor: 'divider',
-      display: 'flex',
-      flexDirection: 'column',
-      transition: 'width 0.2s ease',
-    },
-  } as const;
-
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={drawerSx}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="h5">Configurations</Typography>
-        <Stack direction="row" alignItems="center" gap={0.5}>
-          <Tooltip title={enlarged ? 'Shrink' : 'Enlarge'}>
-            <IconButton size="small" aria-label={enlarged ? 'Shrink drawer' : 'Enlarge drawer'} onClick={() => setEnlarged((v) => !v)}>
-              {enlarged ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </IconButton>
-          </Tooltip>
-          <IconButton size="small" aria-label="close" onClick={onClose}>
-            <X size={16} />
-          </IconButton>
-        </Stack>
-      </Stack>
+    <DrawerPanel open={open} onClose={onClose} expandedWidth="min(1100px, 96vw)" expanded={enlarged} onExpandedChange={setEnlarged}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Configurations</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.ExpandButton expandLabel="Enlarge drawer" collapseLabel="Shrink drawer" />
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
       {/* Numbered step indicator */}
-      <Stack direction="row" alignItems="center" sx={{ px: 3, py: 2, gap: 1, flexShrink: 0, flexWrap: 'wrap' }}>
+      <Stack direction="row" alignItems="center" sx={{ px: 2, py: 2, gap: 1, flexShrink: 0, flexWrap: 'wrap' }}>
         {steps.map((key, i) => {
           const done = i < stepIndex;
           const active = i === stepIndex;
@@ -155,7 +134,7 @@ export default function RagIngestionConfigureDrawer({ open, onClose, component, 
         })}
       </Stack>
 
-      <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 2 }}>
+      <DrawerPanel.Body>
         {notice && (
           <Alert severity={notice.severity} onClose={() => setNotice(null)} sx={{ mb: 2 }}>
             {notice.message}
@@ -174,9 +153,9 @@ export default function RagIngestionConfigureDrawer({ open, onClose, component, 
             {activeStep === 'image' && <ImageStep componentId={component.id} releaseId={releaseId} currentImage={deployment?.imageUrl || ragIngestionImage()} onNotify={notify} />}
           </>
         )}
-      </Box>
+      </DrawerPanel.Body>
 
-      <Stack direction="row" justifyContent="space-between" sx={{ px: 3, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+      <DrawerPanel.Footer sx={{ justifyContent: 'space-between' }}>
         <Button onClick={() => setStepIndex((s) => Math.max(0, s - 1))} disabled={stepIndex === 0}>
           Back
         </Button>
@@ -189,7 +168,7 @@ export default function RagIngestionConfigureDrawer({ open, onClose, component, 
             Done
           </Button>
         )}
-      </Stack>
-    </Drawer>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

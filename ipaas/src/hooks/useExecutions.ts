@@ -49,10 +49,10 @@ export function useTaskExecutions(releaseId: string, componentId = '', envId = '
  * `retry: false` so a 404 (no schema for this component) surfaces promptly to the
  * caller, which treats it the same as an empty schema.
  */
-export function useRuntimeArguments(componentId: string, deploymentTrackId: string, commitHash: string, enabled = true) {
+export function useRuntimeArguments(componentId: string, deploymentTrackId: string | undefined, commitHash: string, enabled = true) {
   return useQuery<RuntimeArgument[]>({
     queryKey: ['runtimeArguments', componentId, deploymentTrackId, commitHash],
-    queryFn: () => fetchRuntimeArguments(componentId, deploymentTrackId, commitHash),
+    queryFn: () => fetchRuntimeArguments(componentId, deploymentTrackId!, commitHash),
     enabled: enabled && !!componentId && !!deploymentTrackId && !!commitHash,
     retry: false,
     staleTime: 5 * 60 * 1000,

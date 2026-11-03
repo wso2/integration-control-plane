@@ -31,3 +31,14 @@ export function isPaidPlan(org: BillingOrg | null, plan: BillingPlan | null): bo
   const sub = org?.subscription;
   return !!sub && ENTITLED_STATUSES.has(sub.status) && !!plan && plan.code === sub.plan?.code && plan.type === 'paid';
 }
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Length of the trial in days, from the period start to the trial end; undefined when billing does not give both. */
+export function trialLengthDays(org: BillingOrg | null): number | undefined {
+  const sub = org?.subscription;
+  const start = Date.parse(sub?.current_period_start ?? '');
+  const end = Date.parse(sub?.trial?.trial_end ?? '');
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return undefined;
+  return Math.round((end - start) / DAY_MS);
+}

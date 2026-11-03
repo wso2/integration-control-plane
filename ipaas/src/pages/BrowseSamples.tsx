@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, InputAdornment, PageContent, Pagination, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Box, Button, CircularProgress, InputAdornment, PageContent, Pagination, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Search } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -32,6 +31,7 @@ import { useSamples } from '../hooks/useSamples';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
 import type { Sample } from '../types/samples';
 import { toHandler } from '../utils/string';
+import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
 
 export default function BrowseSamples(scope: ProjectScope): JSX.Element {
@@ -71,6 +71,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   const handleDeploy = (sample: Sample) => {
     if (!projectId) return;
+    trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
     setDeployingSample(sample);
     createComponent.mutate(
       {
@@ -116,7 +117,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (isSamplesLoading) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -124,9 +125,9 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (isSamplesError) {
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
-          Back
+          Back to create integration
         </Button>
         <Typography color="error">Failed to load samples. Please try again later.</Typography>
       </PageContent>
@@ -135,7 +136,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (createComponent.isPending || createComponent.isSuccess || createComponent.isError) {
     return (
-      <PageContent sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label="Integration"
           subLabel={deployingSample?.displayName}
@@ -153,9 +154,9 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
   }
 
   return (
-    <PageContent sx={{ pt: 5 }}>
+    <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
-        Back
+        Back to create integration
       </Button>
 
       <Typography variant="h1" sx={{ mb: 0.5, mt: 1 }}>

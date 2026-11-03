@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { MenuItem, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { MenuItem, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { type JSX } from 'react';
 import { CHUNKING_STRATEGIES } from '../../../constants/ragIngestion';
 import { fieldStackSx, stepHeadingSx } from '../styles';
@@ -42,7 +41,7 @@ export default function ChunkingStep({ value, onChange }: ChunkingStepProps): JS
         Configure Chunking
       </Typography>
       <Stack sx={fieldStackSx}>
-        <TextField select label="Chunking strategy" fullWidth size="small" value={value.strategy} onChange={(e) => onChange({ ...value, strategy: e.target.value as ChunkingStrategy })}>
+        <TextField labelPlacement="top" select label="Chunking strategy" fullWidth size="small" value={value.strategy} onChange={(e) => onChange({ ...value, strategy: e.target.value as ChunkingStrategy })}>
           {CHUNKING_STRATEGIES.map((s) => (
             <MenuItem key={s.value} value={s.value}>
               {s.label}
@@ -50,6 +49,7 @@ export default function ChunkingStep({ value, onChange }: ChunkingStepProps): JS
           ))}
         </TextField>
         <TextField
+          labelPlacement="top"
           label="Max segment size"
           fullWidth
           size="small"
@@ -59,7 +59,17 @@ export default function ChunkingStep({ value, onChange }: ChunkingStepProps): JS
           error={value.maxSegmentSize <= 0}
           helperText={value.maxSegmentSize <= 0 ? 'Must be greater than 0.' : undefined}
         />
-        <TextField label="Max overlap size" fullWidth size="small" type="number" value={value.maxOverlapSize} onChange={(e) => onChange({ ...value, maxOverlapSize: num(e.target.value) })} error={!!overlapError} helperText={overlapError || undefined} />
+        <TextField
+          labelPlacement="top"
+          label="Max overlap size"
+          fullWidth
+          size="small"
+          type="number"
+          value={value.maxOverlapSize}
+          onChange={(e) => onChange({ ...value, maxOverlapSize: num(e.target.value) })}
+          error={!!overlapError}
+          helperText={overlapError || undefined}
+        />
       </Stack>
     </>
   );

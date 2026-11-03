@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Card, CardContent, Divider, Grid, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Box, Card, CardContent, Divider, Grid, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { File, Folder, FolderOpen, Inbox, Plus, Trash2, Search } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, type JSX } from 'react';
 import type { RepoTreeNode } from '../../types/repository';
@@ -154,7 +153,7 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
       <Grid container spacing={2}>
         {/* Left panel — Workspace Directory Structure */}
         <Grid size={{ xs: 12, md: 5 }}>
-          <Card variant="outlined" sx={{ height: '100%' }}>
+          <Card sx={{ height: '100%' }}>
             <CardContent sx={{ pb: '16px !important' }}>
               <Typography variant="body2" fontWeight={600} sx={{ mb: 1.5 }}>
                 Workspace Directories
@@ -237,7 +236,7 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
 
         {/* Right panel — Configured Components */}
         <Grid size={{ xs: 12, md: 7 }}>
-          <Card variant="outlined" sx={{ height: '100%' }}>
+          <Card sx={{ height: '100%' }}>
             <CardContent sx={{ pb: '16px !important' }}>
               <Typography variant="body2" fontWeight={600} sx={{ mb: 1.5 }}>
                 Configured Integrations

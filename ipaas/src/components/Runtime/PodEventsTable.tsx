@@ -16,13 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Chip, CircularProgress, ListingTable, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Chip, CircularProgress, ListingTable, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { HelpCircle } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import * as styles from './PodEventsTable.styles';
 import { POD_EVENT_COUNT_TOOLTIP } from '../../constants/runtime';
 import { humanizePodStatus } from '../../utils/pods';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import type { PodEvent } from '../../types/runtime';
 
 interface PodEventsTableProps {
@@ -93,7 +93,7 @@ export default function PodEventsTable({ events, isLoading, isError }: PodEvents
               </ListingTable.Cell>
               <ListingTable.Cell>{event.count ?? '-'}</ListingTable.Cell>
               <ListingTable.Cell align="right" sx={styles.time}>
-                {event.timestamp ? formatDistanceToNow(event.timestamp) : '—'}
+                {event.timestamp ? <RelativeTime time={formatDistanceToNow(event.timestamp)} dateTime={event.timestamp} tooltip={formatDateTime(event.timestamp)} /> : '—'}
               </ListingTable.Cell>
             </ListingTable.Row>
           ))}
