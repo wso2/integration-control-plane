@@ -29,7 +29,7 @@ const environment = (name: string, inRelease: boolean) => ({
   name,
   inRelease,
   hasValues: true,
-  connectionInBuild: inRelease,
+  state: inRelease ? 'linked' : 'next_release',
   configurables: inRelease ? { 'acme.sfdemo.sfSalesBaseUrl': 'BASE_URL' } : {},
   ...(inRelease && { connection: 'acme.sfdemo.sfSales' }),
 });

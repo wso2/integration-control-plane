@@ -43,7 +43,7 @@ const value = (key: string, v: string) => ({ key, values: [{ environmentUuid: 'd
 const link = (configurables: Record<string, string>, hasValues = true): ResourceLink => ({
   resourceType: 'salesforce-sales',
   linked: true,
-  environments: [{ name: 'development', inRelease: true, hasValues, connectionInBuild: true, configurables }],
+  environments: [{ name: 'development', state: 'linked', inRelease: true, hasValues, configurables }],
 });
 const sales = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL', 'wso2.sftask.sfSalesAuthClientId': 'SALESFORCE_AUTH_CLIENT_ID' });
 

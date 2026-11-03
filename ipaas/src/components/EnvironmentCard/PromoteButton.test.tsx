@@ -116,8 +116,8 @@ describe('PromoteButton', () => {
         resourceType: 'salesforce-marketing',
         linked: true,
         environments: [
-          { name: 'development', inRelease: true, hasValues: true, configurables: {}, connectionInBuild: true },
-          { name: 'production', inRelease: false, hasValues: false, configurables: {}, connectionInBuild: false },
+          { name: 'development', state: 'linked', inRelease: true, hasValues: true, configurables: {} },
+          { name: 'production', state: 'next_release', inRelease: false, hasValues: false, configurables: {} },
         ],
       },
     ]);

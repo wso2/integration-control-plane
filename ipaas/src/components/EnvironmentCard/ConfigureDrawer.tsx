@@ -572,7 +572,6 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     }
     return (
       <>
-        <StoppedBuild projectId={projectId} componentId={componentId} versionId={deploymentTrackId} open={open} links={links} />
         <LinkRows projectId={projectId} componentId={componentId} env={envId} links={links} />
         <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} actions={['Link', 'Link through']} />
         <ConfigForm
