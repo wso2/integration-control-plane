@@ -1,13 +1,30 @@
-# CLAUDE.md
+# AGENTS.md — User Portal
 
 UP-DP, the User Portal's data plane instance: a single-tenant Go BFF that serves a Vite SPA, plus
 `ipaas-mock`, which stands in for the cloud. One module, no database. `docs/api.md` is the
 contract between the BFF, the SPA, iPaaS-Service and the gateway; change it with any route,
 status or wire JSON change.
 
+## Commands
+
+Run from `user-portal/`.
+
+| Task                    | Command                                                       |
+| ----------------------- | ------------------------------------------------------------- |
+| Run locally             | `make run-mock`, `make run-up-dp` and `make web-dev`, each in its own terminal (see `README.md`) |
+| Build the Go binaries   | `make build`                                                  |
+| Build the SPA           | `make web`                                                    |
+| Go tests                | `make test`                                                   |
+| Lint                    | `make lint`                                                   |
+| Coverage report         | `make cover`                                                  |
+
+The UP-DP image is released only by the `UP-DP Release` workflow
+(`.github/workflows/up-dp-release.yml`). It sets `up-dp/VERSION`; never edit that file or push
+an image by hand.
+
 ## Architecture
 
-- **`shared/` is copied from `main`; don't rewrite it.** Fix a bug there on `main` too. The one
+- **`shared/` was ported from the earlier User Portal service; keep its shape.** The one
   addition is `shared/external-services/ipaas-portal`, which both the BFF's client and the mock
   use, so the portal contract is declared once.
 - **`up-dp` and `ipaas-mock` never import each other.**
