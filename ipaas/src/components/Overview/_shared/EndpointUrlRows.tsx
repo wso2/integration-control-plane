@@ -61,10 +61,18 @@ function VisibilityUrlRow({ option, note }: { option: EndpointVisibilityUrl; not
           <Icon size={15} aria-hidden="true" />
         </Box>
       </Tooltip>
-      <Typography variant="body2" sx={urlSx} title={option.url}>
-        {option.url}
-      </Typography>
-      <CopyButton url={option.url} />
+      {option.url ? (
+        <>
+          <Typography variant="body2" sx={urlSx} title={option.url}>
+            {option.url}
+          </Typography>
+          <CopyButton url={option.url} />
+        </>
+      ) : (
+        <Typography variant="body2" color="text.secondary" sx={urlSx} aria-label={`Not on the ${option.label.toLowerCase()} host`}>
+          —
+        </Typography>
+      )}
     </Stack>
   );
 }
@@ -81,7 +89,7 @@ export default function EndpointUrlRows({ options, gatewayUrl }: { options: Endp
   return (
     <Stack gap={0.5}>
       {options.map((option) => (
-        <VisibilityUrlRow key={option.key} option={option} note={gatewayUrl && option.url === gatewayUrl ? 'through the API gateway' : undefined} />
+        <VisibilityUrlRow key={option.key} option={option} note={gatewayUrl && option.url && option.url === gatewayUrl ? 'through the API gateway' : undefined} />
       ))}
     </Stack>
   );

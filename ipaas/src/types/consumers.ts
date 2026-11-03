@@ -108,6 +108,11 @@ export interface SecurityConfig {
   };
   /** Gateway invoke URL, distinct from the component's open raw route. Populated on GET, ignored on PUT. */
   publicUrl?: string;
+  /** False outside the pipeline's entry environment, where the API only changes by promotion. Absent from older BFFs: editable. */
+  editable?: boolean;
+  entryEnvironment?: string;
+  /** The environment runs a build made before builds recorded their settings, so what it enforces is unknown. */
+  stateUnknown?: boolean;
 }
 
 /** The non-auth gateway behaviour of an exposed endpoint API (GET/PUT `.../policies`). */
@@ -119,6 +124,10 @@ export interface EndpointPolicyConfig {
   /** Which of the CORS entries the platform seeded. Read-only: ignored on PUT. */
   platformOrigins?: string[];
   platformHeaders?: string[];
+  /** See SecurityConfig.editable. Read-only: ignored on PUT. */
+  editable?: boolean;
+  entryEnvironment?: string;
+  stateUnknown?: boolean;
 }
 
 export interface EndpointPolicyOperation {

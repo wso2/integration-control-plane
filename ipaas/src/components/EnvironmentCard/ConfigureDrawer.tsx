@@ -29,7 +29,7 @@ import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/use
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
-import { EndpointCard } from '../EndpointCard';
+import { EndpointCardList } from '../EndpointCardList';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
@@ -1073,13 +1073,7 @@ function GenericServiceConfigureDrawer({
         </Box>
       );
     }
-    return (
-      <Box>
-        {endpoints.map((ep, idx) => (
-          <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} onEdit={setManagingEp} onSettings={handleSettings} />
-        ))}
-      </Box>
-    );
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} />;
   };
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();

@@ -16,20 +16,23 @@
  * under the License.
  */
 
-import { Box, CircularProgress, Divider, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Divider, Typography } from '@wso2/oxygen-ui';
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { useApiDefinition, useComponentDeployment, useEnvEndpoints } from '../../../hooks/useDeployments';
+import { useApiDefinition, useComponentDeployment, useEnvEndpoints, useRetryProxyReconciliation } from '../../../hooks/useDeployments';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import type { EnvCardBodyProps } from '../../../types/integration';
+import type { ProxyReconciliationStatus } from '../../../types/deployment';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 import ConsumersPanel from './ConsumersPanel';
 import ServiceInsights from './ServiceInsights';
 import SwaggerOperationsList, { type SwaggerDocument } from './SwaggerOperationsList';
 import GraphqlOperationsList from './GraphqlOperationsList';
-import { toEndpointOptions } from '../../../utils/endpoints';
+import { gatewayExposureState, toEndpointOptions } from '../../../utils/endpoints';
+import { friendlyApiError } from '../../../utils/apiSecurity';
+import { isProxyReconciliationActive, proxyReconciliationNotice } from '../../../utils/proxyReconciliation';
 
 /**
  * Integration-as-API's content-only body: a deployment-in-progress spinner, the
@@ -52,11 +55,22 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];
   const isGraphql = activeEndpoint?.type === 'GraphQL';
-  const publicExposure = activeEndpoint?.visibilityStatus?.public;
-  const organizationExposure = activeEndpoint?.visibilityStatus?.organization;
-  const gatewayExposureEnabled = publicExposure?.status === 'ENABLED' || organizationExposure?.status === 'ENABLED';
-  const gatewayExposureTransitioning = [publicExposure?.status, organizationExposure?.status].some((status) => status === 'ENABLING' || status === 'DISABLING');
-  const gatewayExposureFailure = [publicExposure, organizationExposure].find((state) => state?.status === 'FAILED' || state?.status === 'UNKNOWN' || state?.status === 'UNAVAILABLE');
+  const gatewayExposure = gatewayExposureState(activeEndpoint?.visibilityStatus);
+  // An UNKNOWN host still means the API is on the gateway, so consumers and security stay available.
+  const gatewayExposureEnabled = gatewayExposure.state === 'enabled' || gatewayExposure.state === 'unknown';
+
+  // The API gateway's state for this environment's release; polled while it is being updated.
+  const { data: deployment } = useComponentDeployment(orgHandler, orgUuid, component.id, versionId, env.id, {
+    refetchInterval: (query) => (isProxyReconciliationActive(query.state.data?.proxyReconciliation) ? 3_000 : false),
+  });
+  const reconciliation = proxyReconciliationNotice(deployment?.proxyReconciliation);
+  const retryReconciliation = useRetryProxyReconciliation(component.id, env.id, projectId, versionId);
+  // A failed retry explains the status it was tried on; once the status moves on, that status speaks for itself.
+  const [retryFailedOn, setRetryFailedOn] = useState<ProxyReconciliationStatus | undefined>();
+  const retry = () => {
+    const triedOn = deployment?.proxyReconciliation;
+    retryReconciliation.mutate(undefined, { onError: () => setRetryFailedOn(triedOn) });
+  };
 
   // The enforcing API Platform gateway URL for the selected endpoint. Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
   // of the raw OpenChoreo external route.
@@ -138,14 +152,35 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
       )}
 
       {/* A project-only endpoint has no consumers, so only an exposure in flight or failing is reported. */}
-      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !gatewayExposureEnabled && (gatewayExposureTransitioning || !!gatewayExposureFailure) && (
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && (gatewayExposure.state === 'transitioning' || gatewayExposure.state === 'failed') && (
         <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-          <Typography variant="body2" color={gatewayExposureFailure ? 'error.main' : 'text.secondary'}>
-            {gatewayExposureTransitioning
+          <Typography variant="body2" color={gatewayExposure.state === 'failed' ? 'error.main' : 'text.secondary'}>
+            {gatewayExposure.state === 'transitioning'
               ? 'API exposure is being updated. Consumer and security settings will be available when the gateway deployment is ready.'
-              : gatewayExposureFailure?.reason || 'API exposure could not be completed. Retry the visibility update.'}
+              : gatewayExposure.reason || 'API exposure could not be completed. Retry the visibility update.'}
           </Typography>
         </Box>
+      )}
+
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && gatewayExposure.state === 'unknown' && (
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 1 }}>
+          The API is on the gateway, but which host it serves can’t be confirmed yet.
+        </Typography>
+      )}
+
+      {hasDeployment && deploymentStatusV2 !== 'IN_PROGRESS' && reconciliation && (
+        <Alert
+          severity={reconciliation.severity}
+          sx={{ mt: 2 }}
+          action={
+            reconciliation.retry ? (
+              <Button color="inherit" size="small" disabled={retryReconciliation.isPending} onClick={retry}>
+                {retryReconciliation.isPending ? 'Retrying…' : 'Retry'}
+              </Button>
+            ) : undefined
+          }>
+          {retryReconciliation.isError && retryFailedOn === deployment?.proxyReconciliation ? friendlyApiError(retryReconciliation.error, 'Could not retry the API gateway update.') : reconciliation.text}
+        </Alert>
       )}
 
       {showInsights && <ServiceInsights envName={env.name} envId={env.id} apimEnvId={env.apimEnvId} projectId={projectId} apiId={insightsApiId} />}

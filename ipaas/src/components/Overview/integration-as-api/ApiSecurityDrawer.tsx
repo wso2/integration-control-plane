@@ -21,7 +21,7 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { API_KEY_SCHEME_DESCRIPTION, COMING_SOON_OAUTH, COMING_SOON_UPSTREAM_ATTRS, DEFAULT_API_KEY_HEADER, OAUTH_HEADER, OAUTH_SCHEME_DESCRIPTION } from '../../../constants/apiConsumption';
 import { useEndpointSecurity, useSetEndpointSecurity } from '../../../hooks/useConsumers';
 import type { EndpointOption, SecurityConfig, SecurityMode } from '../../../types/consumers';
-import { endpointLoadNotice, friendlyApiError } from '../../../utils/apiSecurity';
+import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
 import { useEndpointDrawer } from './useEndpointDrawer';
 import * as styles from './apiConsumption.styles';
 
@@ -77,6 +77,9 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
     readFailed: 'Could not read the current security configuration.',
   });
 
+  const readOnlyNotice = readOnlyApiSettingsNotice(security);
+  const readOnly = readOnlyNotice !== null;
+
   const isApiKey = mode === 'api-key';
   const isOAuth = mode === 'jwt';
 
@@ -117,6 +120,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
           <Stack gap={2.5}>
             {error && <Alert severity="error">{error}</Alert>}
             {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
+            {readOnlyNotice && !notice && !error && <Alert severity="info">{readOnlyNotice}</Alert>}
 
             <Stack direction="row" alignItems="center" gap={2}>
               <Typography variant="body2" fontWeight={500}>
@@ -135,7 +139,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
               <Box sx={styles.loadingRow}>
                 <CircularProgress size={20} />
               </Box>
-            ) : (
+            ) : security?.stateUnknown ? null : (
               <RadioGroup value={mode} name="security-scheme">
                 <Table size="small">
                   <TableHead>
@@ -147,10 +151,10 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
                   <TableBody>
                     <TableRow>
                       <TableCell sx={styles.schemeCell}>
-                        <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => selectScheme('api-key')} size="small" />} label="API Key" />
+                        <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => !readOnly && selectScheme('api-key')} size="small" disabled={readOnly} />} label="API Key" disabled={readOnly} />
                       </TableCell>
                       <TableCell>
-                        <TextField size="small" value={apiKeyHeader} onChange={(e) => setApiKeyHeader(e.target.value)} disabled={!isApiKey} fullWidth />
+                        <TextField size="small" value={apiKeyHeader} onChange={(e) => setApiKeyHeader(e.target.value)} disabled={!isApiKey || readOnly} fullWidth />
                         <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
                           {API_KEY_SCHEME_DESCRIPTION}
                         </Typography>
@@ -190,7 +194,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
         <Button variant="outlined" color="inherit" onClick={handleCancel} disabled={saving}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={() => void handleApply()} disabled={saving || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
+        <Button variant="contained" onClick={() => void handleApply()} disabled={saving || readOnly || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
           {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
         </Button>
       </DrawerPanel.Footer>

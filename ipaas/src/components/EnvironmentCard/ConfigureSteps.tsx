@@ -16,11 +16,21 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Radio, Stack, Typography } from '@wso2/oxygen-ui';
+import { Building2, EyeOff, Globe } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import { useUpdateEndpoint } from '../../hooks/useComponents';
-import type { EnvEndpoint } from '../../types/component';
-import { VISIBILITY_OPTS } from '../EndpointCard';
+import type { EndpointExposure, EnvEndpoint } from '../../types/component';
+import { friendlyApiError } from '../../utils/apiSecurity';
+import { editorExposure, exposureLabels } from '../../utils/endpoints';
+
+// The gateway serves an endpoint on one host at a time: the public one, the organization's internal
+// one, or neither. Project access is always on and its URL always shows, so it is not a choice here.
+const EXPOSURE_OPTS: { value: EndpointExposure; label: string; Icon: typeof Globe; description: string }[] = [
+  { value: 'none', label: 'Not exposed', Icon: EyeOff, description: 'Not on the API gateway. Only integrations in the same project can call the endpoint.' },
+  { value: 'public', label: 'Public', Icon: Globe, description: 'On the gateway’s public host. Any client can call it, including integrations in your organization.' },
+  { value: 'organization', label: 'Organization', Icon: Building2, description: 'On the gateway’s internal host. Only integrations in your organization can call it.' },
+];
 
 // Pieces shared by the configure drawers (ConfigureDrawer and MiConfigureDrawer).
 
@@ -83,21 +93,18 @@ interface ManageEndpointProps {
 }
 
 export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, environmentId, onBack }: ManageEndpointProps) {
-  const [visibilities, setVisibilities] = useState<string[]>(() => Array.from(new Set([...(ep.displayProjectUrl === false ? [] : ['Project']), ...(ep.networkVisibilities ?? []).filter((value) => value !== 'Project')])));
+  const [{ exposure: seededExposure, legacyBothHosts }] = useState(() => editorExposure(ep));
+  const [exposure, setExposure] = useState<EndpointExposure>(seededExposure);
   const [saveError, setSaveError] = useState<string | null>(null);
   const updateEp = useUpdateEndpoint();
-
-  const handleToggle = (key: string) => {
-    setVisibilities((prev) => (prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]));
-  };
 
   const handleSave = () => {
     setSaveError(null);
     updateEp.mutate(
-      { componentId, projectId, environmentId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: visibilities },
+      { componentId, projectId, environmentId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: exposureLabels(exposure) },
       {
         onSuccess: onBack,
-        onError: (err) => setSaveError(err instanceof Error ? err.message : 'Failed to update endpoint'),
+        onError: (err) => setSaveError(friendlyApiError(err, 'Could not update the endpoint visibility.')),
       },
     );
   };
@@ -125,24 +132,24 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
         )}
       </Box>
 
-      {/* Network visibility */}
+      {/* Gateway exposure: one host at a time, or none */}
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Network Visibility
       </Typography>
-      <Stack gap={1} sx={{ mb: 2 }}>
-        {VISIBILITY_OPTS.map(({ key, label, Icon, description }) => {
-          const checked = visibilities.includes(key);
+      <Stack gap={1} sx={{ mb: 1.5 }} role="radiogroup" aria-label="Network visibility">
+        {EXPOSURE_OPTS.map(({ value, label, Icon, description }) => {
+          const selected = exposure === value;
           return (
             <Box
-              key={key}
-              onClick={() => handleToggle(key)}
+              key={value}
+              onClick={() => setExposure(value)}
               sx={{
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: 1.25,
                 p: 1.5,
                 border: '1px solid',
-                borderColor: checked ? 'primary.main' : 'divider',
+                borderColor: selected ? 'primary.main' : 'divider',
                 borderRadius: 1,
                 cursor: 'pointer',
                 transition: 'border-color 0.15s',
@@ -159,11 +166,16 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
                   {description}
                 </Typography>
               </Box>
-              <Checkbox checked={checked} size="small" sx={{ p: 0, flexShrink: 0, mt: 0.25 }} onClick={(e) => e.stopPropagation()} onChange={() => handleToggle(key)} />
+              <Radio checked={selected} size="small" value={value} sx={{ p: 0, flexShrink: 0, mt: 0.25 }} inputProps={{ 'aria-label': label }} onClick={(e) => e.stopPropagation()} onChange={() => setExposure(value)} />
             </Box>
           );
         })}
       </Stack>
+      {legacyBothHosts && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          This endpoint was exposed on both the public and the organization host. An endpoint is now served on one host, so it is shown as Public, which stays reachable from inside the organization through the public URL.
+        </Alert>
+      )}
 
       {saveError && (
         <Alert severity="error" sx={{ mb: 1 }}>
@@ -175,7 +187,7 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
         <Button variant="outlined" color="inherit" onClick={onBack}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending || visibilities.length === 0} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {updateEp.isPending ? 'Updating…' : 'Update'}
         </Button>
       </Stack>

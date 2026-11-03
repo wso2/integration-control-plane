@@ -23,7 +23,7 @@ import type { EndpointOption } from '../../../types/consumers';
 import type { CorsConfig, RateLimitConfig } from '../../../types/policy';
 import { configToPolicy, policyToConfig, toRateLimitOperations } from '../../../utils/endpointPolicy';
 import { isRateLimitValid } from '../../../utils/policy';
-import { endpointLoadNotice, friendlyApiError } from '../../../utils/apiSecurity';
+import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
 import CorsSection from '../../Policies/CorsSection';
 import RateLimitingSection from '../../Policies/RateLimitingSection';
 import { useEndpointDrawer } from './useEndpointDrawer';
@@ -84,7 +84,9 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
     readFailed: 'Could not read the current API settings.',
   });
 
-  const canApply = !!endpointRef && !!cors && !!rateLimit && isRateLimitValid(rateLimit) && !loadError && !isLoading && !saving;
+  const readOnlyNotice = readOnlyApiSettingsNotice(policies);
+  const readOnly = readOnlyNotice !== null;
+  const canApply = !readOnly && !!endpointRef && !!cors && !!rateLimit && isRateLimitValid(rateLimit) && !loadError && !isLoading && !saving;
 
   const handleApply = async () => {
     if (!endpointRef || !cors || !rateLimit || !canApply) return;
@@ -118,6 +120,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
           <Stack gap={2.5}>
             {error && <Alert severity="error">{error}</Alert>}
             {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
+            {readOnlyNotice && !notice && !error && <Alert severity="info">{readOnlyNotice}</Alert>}
 
             <Stack direction="row" alignItems="center" gap={2}>
               <Typography variant="body2" fontWeight={500}>
@@ -137,6 +140,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
                 <CircularProgress size={20} />
               </Box>
             ) : (
+              !policies?.stateUnknown &&
               cors &&
               rateLimit && (
                 <>
@@ -144,7 +148,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
                     <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
                       CORS
                     </Typography>
-                    <CorsSection value={cors} onChange={setCors} disabled={saving} />
+                    <CorsSection value={cors} onChange={setCors} disabled={saving || readOnly} />
                   </Box>
 
                   <Divider />
@@ -153,7 +157,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
                     <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
                       Rate Limiting
                     </Typography>
-                    <RateLimitingSection value={rateLimit} onChange={setRateLimit} disabled={saving} description="Limit how many requests the gateway accepts for this endpoint." apiLevelLabel="Whole endpoint" operations={operations} />
+                    <RateLimitingSection value={rateLimit} onChange={setRateLimit} disabled={saving || readOnly} description="Limit how many requests the gateway accepts for this endpoint." apiLevelLabel="Whole endpoint" operations={operations} />
                   </Box>
 
                   <Divider />
