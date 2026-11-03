@@ -77,12 +77,12 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
 
   const { data: fetchedArgs, isLoading: argsLoading } = useExecutionArguments(execution?.runId ?? '', componentId, releaseId, open && !!execution?.runId);
 
-  // Populate editable args from fetched data
+  // Re-seeded on every open: a cached run returns the same args object, so a close-reset would otherwise stick.
   useEffect(() => {
-    if (fetchedArgs) {
+    if (open && fetchedArgs) {
       setArgs(fetchedArgs.length > 0 ? fetchedArgs.map((a) => a.argumentValue) : ['']);
     }
-  }, [fetchedArgs]);
+  }, [open, fetchedArgs]);
 
   // Reset state when drawer closes
   useEffect(() => {

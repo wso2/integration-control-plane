@@ -98,7 +98,6 @@ import {
   hasComponent,
   settingsCrossScopeUrl,
   resolveActiveNavId,
-  navGroupIds,
   parentGroupId,
   navUrl,
   overviewUrl,
@@ -121,6 +120,7 @@ import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
+import { expandedMenusFrom } from '../utils/sidebar';
 
 const trialBadgeSx = { mx: 0.75 } as const;
 
@@ -174,7 +174,7 @@ export default function AppLayout(): JSX.Element {
 
   // Groups start expanded, so only the ones the user closed are tracked.
   const [collapsedMenus, setCollapsedMenus] = useState<ReadonlySet<string>>(() => new Set());
-  const expandedMenus = useMemo(() => Object.fromEntries(navGroupIds(scope.level).map((id) => [id, !collapsedMenus.has(id)])), [scope.level, collapsedMenus]);
+  const expandedMenus = useMemo(() => expandedMenusFrom(collapsedMenus), [collapsedMenus]);
   const toggleMenu = (id: string) =>
     setCollapsedMenus((prev) => {
       const next = new Set(prev);

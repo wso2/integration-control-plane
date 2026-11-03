@@ -21,8 +21,14 @@ import type { ProjectContributor } from '../types/project';
 /** One entry per person, busiest first; the BFF matches emails exactly, so case and stray spaces still split a person. */
 export function mergeContributors(contributors: ProjectContributor[]): ProjectContributor[] {
   const byEmail = new Map<string, ProjectContributor>();
+  // Authors without an email can't be matched to anyone, so each stays on its own.
+  const unmatched: ProjectContributor[] = [];
   for (const c of contributors) {
-    const email = c.email.trim().toLowerCase();
+    const email = (c.email ?? '').trim().toLowerCase();
+    if (!email) {
+      unmatched.push(c);
+      continue;
+    }
     const seen = byEmail.get(email);
     if (!seen) {
       byEmail.set(email, { ...c, email });
@@ -35,5 +41,5 @@ export function mergeContributors(contributors: ProjectContributor[]): ProjectCo
       totalContributions: seen.totalContributions + c.totalContributions,
     });
   }
-  return [...byEmail.values()].sort((a, b) => b.totalContributions - a.totalContributions);
+  return [...byEmail.values(), ...unmatched].sort((a, b) => b.totalContributions - a.totalContributions);
 }

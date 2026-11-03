@@ -46,8 +46,8 @@ export const LEVEL_COLORS: Record<string, { bg: string; text: string }> = {
 export const DISPLAY_FIELDS: { key: keyof LogRow; label: string }[] = [
   { key: 'timestamp', label: 'Timestamp' },
   { key: 'level', label: 'Log level' },
-  { key: 'gatewayCode', label: 'Gateway Code' },
-  { key: 'statusCode', label: 'Status Code' },
+  { key: 'gatewayCode', label: 'Gateway code' },
+  { key: 'statusCode', label: 'Status code' },
   { key: 'logLine', label: 'Log entry' },
   { key: 'class', label: 'Class' },
   { key: 'logFilePath', label: 'Log file path' },

@@ -21,7 +21,9 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import EditProjectSkeleton from '../components/EditProjectSkeleton';
+import Authorized from '../components/Authorized';
 import LinkRepositoryForm from '../components/ProjectCreate/LinkRepositoryForm';
+import { PROJECT_EDIT_PERMISSIONS } from '../constants/permissions';
 import PageNotFound from './PageNotFound';
 import { useProjectId } from '../hooks/useProjects';
 import { resourceUrl, type ProjectScope } from '../nav';
@@ -50,16 +52,20 @@ export default function LinkRepository(scope: ProjectScope): JSX.Element {
   if (!project) return <PageNotFound title="Project not found" actionTo={orgProjectsUrl(scope.org)} actionLabel="Back to projects" />;
 
   return (
-    <PageContent fullWidth sx={{ pt: 5 }}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(projectHomeUrl)} sx={{ mb: 2 }}>
-        Back to project
-      </Button>
+    <Authorized
+      permissions={PROJECT_EDIT_PERMISSIONS}
+      fallback={<PageNotFound title="You can't link a repository to this project" description="Linking a repository needs permission to edit the project." actionTo={projectHomeUrl} actionLabel="Back to project" />}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
+        <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(projectHomeUrl)} sx={{ mb: 2 }}>
+          Back to project
+        </Button>
 
-      <PageTitle>
-        <PageTitle.Header>Link a repository</PageTitle.Header>
-      </PageTitle>
+        <PageTitle>
+          <PageTitle.Header>Link a repository</PageTitle.Header>
+        </PageTitle>
 
-      <LinkRepositoryForm project={project} orgHandler={scope.org} onDone={() => navigate(projectHomeUrl)} />
-    </PageContent>
+        <LinkRepositoryForm project={project} orgHandler={scope.org} onDone={() => navigate(projectHomeUrl)} />
+      </PageContent>
+    </Authorized>
   );
 }

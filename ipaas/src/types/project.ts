@@ -43,7 +43,8 @@ export interface Project {
 
 export interface ProjectContributor {
   displayName: string;
-  email: string;
+  /** Null for a git author with no mapped email. */
+  email: string | null;
   pictureUrl?: string | null;
   totalContributions: number;
 }

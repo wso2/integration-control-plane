@@ -283,7 +283,7 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
                           </TableCell>
                           <TableCell>
                             <Tooltip title="Remove" placement="top">
-                              <IconButton aria-label="Remove" size="small" onClick={() => removeModule(module.path)} sx={{ color: 'error.main' }}>
+                              <IconButton aria-label={`Remove ${module.displayName || module.path || '/'}`} size="small" onClick={() => removeModule(module.path)} sx={{ color: 'error.main' }}>
                                 <Trash2 size={16} />
                               </IconButton>
                             </Tooltip>

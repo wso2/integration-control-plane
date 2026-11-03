@@ -25,6 +25,7 @@ import EmptyListing from '../components/EmptyListing';
 import ExploreMore from '../components/ExploreMore';
 import ProjectPickerDialog from '../components/OrgOverview/ProjectPickerDialog';
 import { Permissions } from '../constants/permissions';
+import { useAccessControl } from '../contexts/AccessControlContext';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useOrgComponents } from '../hooks/useComponents';
 import { useProjects } from '../hooks/useProjects';
@@ -40,18 +41,16 @@ const LIST_SIZE = 3;
 interface SummaryCardProps {
   icon: ReactNode;
   title: string;
-  /** Omitted while the count is loading or has no backend to come from. */
-  count?: number;
   description: string;
   actionLabel: string;
   onAction?: () => void;
-  /** Shows the action disabled, with a "Coming soon" tooltip. */
-  comingSoon?: boolean;
+  /** Disables the action and explains why in its tooltip. */
+  disabledReason?: string;
 }
 
-function SummaryCard({ icon, title, count, description, actionLabel, onAction, comingSoon }: SummaryCardProps): JSX.Element {
+function SummaryCard({ icon, title, description, actionLabel, onAction, disabledReason }: SummaryCardProps): JSX.Element {
   const action = (
-    <Button fullWidth disabled={comingSoon || !onAction} onClick={onAction} endIcon={<ArrowRight size={16} />} sx={styles.summaryAction}>
+    <Button fullWidth disabled={!!disabledReason || !onAction} onClick={onAction} endIcon={<ArrowRight size={16} />} sx={styles.summaryAction}>
       {actionLabel}
     </Button>
   );
@@ -60,25 +59,18 @@ function SummaryCard({ icon, title, count, description, actionLabel, onAction, c
       <Box sx={styles.summaryBody}>
         <Box sx={styles.iconTile}>{icon}</Box>
         <Box>
-          <Stack direction="row" alignItems="center" sx={{ mb: 0.5 }}>
-            <Typography fontWeight={600} sx={styles.summaryTitle}>
-              {title}
-            </Typography>
-            {count !== undefined && (
-              <Typography variant="body2" color="text.secondary" sx={styles.countDivider}>
-                {count}
-              </Typography>
-            )}
-          </Stack>
+          <Typography fontWeight={600} sx={styles.summaryTitle}>
+            {title}
+          </Typography>
           <Typography variant="body2" color="text.secondary">
             {description}
           </Typography>
         </Box>
       </Box>
       <Divider />
-      {comingSoon ? (
+      {disabledReason ? (
         // A disabled button fires no mouse events, so the tooltip listens on a wrapper.
-        <Tooltip title="Coming soon" placement="top">
+        <Tooltip title={disabledReason} placement="top">
           <Box component="span">{action}</Box>
         </Tooltip>
       ) : (
@@ -106,7 +98,7 @@ function ProjectRow({ project, integrations, onOpen }: { project: Project; integ
       </Box>
       <Box sx={styles.rowMeta}>
         <Typography variant="body2" noWrap sx={styles.integrationsColumn}>
-          {integrations === undefined ? '' : integrations === 1 ? '1 Integration' : `${integrations} Integrations`}
+          {integrations === undefined ? '' : integrations === 1 ? '1 integration' : `${integrations} integrations`}
         </Typography>
         <Box sx={styles.updatedColumn}>
           {project.deleting ? (
@@ -146,22 +138,23 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
   const [pickingProject, setPickingProject] = useState(false);
   const { displayName, username } = useAuth();
+  const { hasOrgPermission } = useAccessControl();
   const { data: projects = [], isLoading, isError, refetch } = useProjects();
-  const {
-    byProject,
-    isLoading: loadingIntegrations,
-    isError: integrationsError,
-  } = useOrgComponents(
+  // The BFF returns projects unordered, so the most recently updated are picked here.
+  const listed = [...projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, LIST_SIZE);
+  // Only the listed rows need counts; the BFF has no org-wide count, and listing every project would cost a call each.
+  const { byProject } = useOrgComponents(
     scope.org,
-    projects.map((p) => p.id),
+    listed.map((p) => p.id),
   );
 
   useEffect(() => trackEvent('visit-home'), []);
 
   const firstName = (displayName || username).split(/[\s@]/)[0];
   const openProjects = projects.filter((p) => !p.deleting);
-  // A failed project query would undercount, so the count is left out rather than shown wrong.
-  const integrationCount = loadingIntegrations || integrationsError ? undefined : [...byProject.values()].reduce((sum, list) => sum + (list ? list.length : 0), 0);
+  // With no project yet the action creates one first, so it needs that permission instead.
+  const createDeniedReason =
+    openProjects.length === 0 ? (hasOrgPermission(Permissions.PROJECT_MANAGE) ? undefined : 'You do not have permission to create projects.') : hasOrgPermission(Permissions.INTEGRATION_MANAGE) ? undefined : 'You do not have permission to create integrations.';
 
   // Integrations live in a project, so the user picks one only when there is a choice to make.
   const createIntegration = () => {
@@ -169,8 +162,6 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
     else if (openProjects.length === 1) navigate(newComponentUrl({ org: scope.org, project: openProjects[0].handler }));
     else setPickingProject(true);
   };
-
-  const listed = projects.slice(0, LIST_SIZE);
 
   const renderProjects = (): ReactNode => {
     if (isLoading) return <RowsSkeleton />;
@@ -214,13 +205,13 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
         <SummaryCard
           icon={<Workflow size={24} />}
           title="Integrations"
-          count={integrationCount}
           description="Create integrations that orchestrate data and events across your systems."
           actionLabel="Create an integration"
           onAction={isLoading ? undefined : createIntegration}
+          disabledReason={createDeniedReason}
         />
-        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" comingSoon />
-        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" comingSoon />
+        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" disabledReason="Coming soon" />
+        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" disabledReason="Coming soon" />
       </Box>
 
       <Card>

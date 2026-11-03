@@ -28,6 +28,14 @@ describe('mergeContributors', () => {
     expect(merged).toEqual([{ displayName: 'Ada', email: 'ada@example.com', pictureUrl: 'https://img.example/ada.png', totalContributions: 5 }]);
   });
 
+  it('keeps authors without an email apart instead of merging them into one', () => {
+    const merged = mergeContributors([
+      { displayName: 'Ada', email: null, totalContributions: 1 },
+      { displayName: 'Bob', email: '', totalContributions: 2 },
+    ]);
+    expect(merged.map((c) => c.displayName)).toEqual(['Bob', 'Ada']);
+  });
+
   it('keeps different people apart and lists the busiest first', () => {
     const merged = mergeContributors([
       { displayName: 'Ada', email: 'ada@example.com', totalContributions: 1 },

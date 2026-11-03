@@ -16,18 +16,10 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
-import { navGroupIds, parentGroupId } from './nav';
-
-describe('navGroupIds', () => {
-  it('lists each expandable group at a level once', () => {
-    const ids = navGroupIds('projects');
-    expect(ids).toEqual(expect.arrayContaining(['proj-observability', 'proj-admin']));
-    expect(new Set(ids).size).toBe(ids.length);
-  });
-
-  it('covers the group of every child item, so no child starts hidden', () => {
-    const groups = navGroupIds('organizations');
-    expect(groups).toContain(parentGroupId({ level: 'organizations', org: 'acme' }, 'org-logs'));
-  });
-});
+/**
+ * The Sidebar's `expandedMenus`, open for every group id unless the user closed it. A map of known ids
+ * would miss groups that exist only in the JSX, such as an Integration's Infrastructure links.
+ */
+export function expandedMenusFrom(collapsed: ReadonlySet<string>): Record<string, boolean> {
+  return new Proxy({}, { get: (_, id) => typeof id === 'string' && !collapsed.has(id) });
+}

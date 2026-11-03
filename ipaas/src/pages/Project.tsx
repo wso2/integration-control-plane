@@ -78,7 +78,7 @@ import { newComponentUrl, editProjectUrl, linkRepositoryUrl, type ProjectScope }
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
 import { componentOverviewUrl, orgProjectsUrl } from '../paths';
-import { Permissions } from '../constants/permissions';
+import { Permissions, PROJECT_EDIT_PERMISSIONS } from '../constants/permissions';
 import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import IntegrationIcon from '../components/IntegrationIcon';
@@ -866,11 +866,13 @@ export default function Project(scope: ProjectScope): JSX.Element {
                 ) : (
                   <Stack direction="row" alignItems="center" gap={0.5} mb={1} onMouseEnter={() => setNameHovered(true)} onMouseLeave={() => setNameHovered(false)}>
                     <Typography variant="h1">{project.name}</Typography>
-                    <Tooltip title="Edit name">
-                      <IconButton size="small" aria-label="Edit project name" onClick={startNameEdit} sx={{ opacity: nameHovered ? 1 : 0, transition: 'opacity 0.15s' }}>
-                        <Pencil size={14} />
-                      </IconButton>
-                    </Tooltip>
+                    <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
+                      <Tooltip title="Edit name">
+                        <IconButton size="small" aria-label="Edit project name" onClick={startNameEdit} sx={{ opacity: nameHovered ? 1 : 0, transition: 'opacity 0.15s' }}>
+                          <Pencil size={14} />
+                        </IconButton>
+                      </Tooltip>
+                    </Authorized>
                   </Stack>
                 )}
                 <Stack direction="row" alignItems="flex-start" gap={1} onMouseEnter={() => setDescHovered(true)} onMouseLeave={() => setDescHovered(false)}>
@@ -962,15 +964,17 @@ export default function Project(scope: ProjectScope): JSX.Element {
                     </Link>
                   </Stack>
                 ) : (
-                  <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => navigate(linkRepositoryUrl(scope))} sx={linkRepoButtonSx}>
-                    Link a repository
-                  </Button>
+                  <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
+                    <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => navigate(linkRepositoryUrl(scope))} sx={linkRepoButtonSx}>
+                      Link a repository
+                    </Button>
+                  </Authorized>
                 )}
               </div>
             </Stack>
           </Stack>
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
-            <Authorized permissions={[Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT]}>
+            <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
               <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
                 Edit project
               </Button>
