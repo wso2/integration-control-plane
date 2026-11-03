@@ -135,6 +135,17 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   useUnsavedChanges(isDirty);
   const guardNavigation = useLeaveGuard();
 
+  // Why Save is disabled, for causes no field already explains (a filled-in field shows its own error).
+  const blockedReason = (() => {
+    if (canSave || save.isPending) return '';
+    if (!name.trim()) return 'Enter a display name.';
+    if (hasEmptySecretValue) return 'Enter a value for each new secret.';
+    if (kind === 'envVars' && rows.length === 0) return 'Add at least one variable.';
+    if (kind === 'fileMount' && !mountPath.trim()) return 'Enter the mount path.';
+    if (kind === 'fileMount' && !fileContent.trim()) return 'Enter the file content.';
+    return '';
+  })();
+
   const addRow = () => {
     const keyErr = validateConfigKey(draftKey);
     if (keyErr) {
@@ -404,11 +415,16 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
         )}
       </BusyFields>
 
-      <Box sx={{ mt: 3 }}>
+      <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 3 }}>
         <Button variant="contained" onClick={handleSave} disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
           {save.isPending ? 'Saving…' : isEdit ? 'Update' : 'Create'}
         </Button>
-      </Box>
+        {blockedReason && (
+          <Typography variant="body2" color="text.secondary">
+            {blockedReason}
+          </Typography>
+        )}
+      </Stack>
     </Box>
   );
 }
