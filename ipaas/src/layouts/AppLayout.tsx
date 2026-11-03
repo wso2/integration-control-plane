@@ -72,6 +72,7 @@ import {
   Server,
   Settings2,
   SlidersHorizontal,
+  Waypoints,
   Workflow,
   X,
 } from '@wso2/oxygen-ui-icons-react';
@@ -845,7 +846,7 @@ export default function AppLayout(): JSX.Element {
                             {aiAgentType && (
                               <Sidebar.Item id="traces">
                                 <Sidebar.ItemIcon>
-                                  <Activity size={20} />
+                                  <Waypoints size={20} />
                                 </Sidebar.ItemIcon>
                                 <Sidebar.ItemLabel>Traces</Sidebar.ItemLabel>
                               </Sidebar.Item>

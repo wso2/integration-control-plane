@@ -21,6 +21,7 @@ import { CircleAlert, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import * as styles from './TraceSpansDrawer.styles';
 import SpanDetailPanel from './SpanDetailPanel';
+import { apiErrorMessage } from '../../utils/apiErrors';
 import { buildSpanTree, formatDuration } from '../../utils/traces';
 import { useTraceSpans } from '../../hooks/useTraces';
 import type { TraceOverview, TraceQuery } from '../../types/traces';
@@ -37,7 +38,10 @@ interface TraceSpansDrawerProps {
 
 export default function TraceSpansDrawer({ open, onClose, trace, componentId, envId, window: traceWindowQuery }: TraceSpansDrawerProps): JSX.Element {
   const traceId = trace?.traceId ?? '';
-  const { data, isLoading, isError, refetch } = useTraceSpans(componentId, envId, open ? traceId : '', traceWindowQuery);
+  // Addressed by the trace alone, never by `open`. The drawer keeps its children
+  // mounted through the slide-out, and a key that has never been fetched reads as
+  // a settled empty result, so closing would flash the "no spans" notice.
+  const { data, isLoading, isError, error, refetch } = useTraceSpans(componentId, envId, traceId, traceWindowQuery);
 
   const rows = useMemo(() => buildSpanTree(data?.spans ?? []), [data?.spans]);
 
@@ -75,7 +79,7 @@ export default function TraceSpansDrawer({ open, onClose, trace, componentId, en
       ) : isError ? (
         <Box sx={styles.detailPane}>
           <Alert severity="error" action={<Button onClick={() => refetch()}>Retry</Button>}>
-            Could not load the spans of this trace.
+            {apiErrorMessage(error, 'Could not load the spans of this trace.')}
           </Alert>
         </Box>
       ) : rows.length === 0 ? (

@@ -19,6 +19,7 @@
 import { Alert, Box, Button, Chip, CircularProgress, Divider, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import * as styles from './TraceSpansDrawer.styles';
+import { apiErrorMessage } from '../../utils/apiErrors';
 import { formatAttributeValue, formatDuration } from '../../utils/traces';
 import { useSpanDetail } from '../../hooks/useTraces';
 import type { TraceQuery } from '../../types/traces';
@@ -54,7 +55,7 @@ function AttributeList({ title, attributes }: { title: string; attributes: Recor
 }
 
 export default function SpanDetailPanel({ componentId, envId, traceId, spanId, window: traceWindowQuery }: SpanDetailPanelProps): JSX.Element {
-  const { data: span, isLoading, isError, refetch } = useSpanDetail(componentId, envId, traceId, spanId, traceWindowQuery);
+  const { data: span, isLoading, isError, error, refetch } = useSpanDetail(componentId, envId, traceId, spanId, traceWindowQuery);
 
   if (isLoading) {
     return (
@@ -69,7 +70,7 @@ export default function SpanDetailPanel({ componentId, envId, traceId, spanId, w
   if (isError) {
     return (
       <Alert severity="error" action={<Button onClick={() => refetch()}>Retry</Button>}>
-        Could not load this span.
+        {apiErrorMessage(error, 'Could not load this span.')}
       </Alert>
     );
   }

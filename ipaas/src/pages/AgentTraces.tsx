@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, MenuItem, PageContent, Select, Stack, Typography } from '@wso2/oxygen-ui';
-import { Activity, RefreshCw } from '@wso2/oxygen-ui-icons-react';
+import { RefreshCw, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import AgentTracesSkeleton from '../components/Traces/AgentTracesSkeleton';
 import EmptyListing from '../components/EmptyListing';
@@ -29,6 +29,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useTraces } from '../hooks/useTraces';
+import { apiErrorMessage } from '../utils/apiErrors';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { TRACE_RANGES, traceWindow } from '../utils/traces';
 import { resourceUrl, type ComponentScope } from '../nav';
@@ -44,20 +45,22 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
   const { data: comp, isLoading: loadingComponent } = useComponentByHandler(projectId, component);
   const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError, refetch: refetchEnvironments } = useEnvironments(orgUuid ?? '', projectId);
 
-  const [envId, setEnvId] = useState('');
-  useEffect(() => {
-    if (environments.length) setEnvId((prev) => (prev && environments.some((e) => e.id === prev) ? prev : environments[0].id));
-  }, [environments]);
+  // The environment the user picked, falling back to the first once the listing
+  // arrives. Derived rather than stored: an effect runs after paint, so the page
+  // would show one frame of "no traces" before it had an environment to ask about.
+  const [pickedEnvId, setPickedEnvId] = useState('');
+  const envId = environments.some((environment) => environment.id === pickedEnvId) ? pickedEnvId : (environments[0]?.id ?? '');
 
   const [rangeMinutes, setRangeMinutes] = useState<number>(DEFAULT_RANGE_MINUTES);
   // A fixed instant, or every render would shift "now" and the cursor would stop lining up.
   const [windowAnchor, setWindowAnchor] = useState(() => new Date());
   const [cursors, setCursors] = useState<string[]>([]);
-  // The route survives an integration or environment switch, so the cursor has
-  // to be dropped explicitly or it is sent against a listing it did not come from.
+  // The route survives an integration switch, so the cursor has to be dropped
+  // explicitly or it is sent against a listing it did not come from. Each handler
+  // below drops it in the same tick; this covers the environment going away.
   useEffect(() => setCursors([]), [comp?.id, envId]);
 
-  const window = useMemo<TraceQuery>(
+  const range = useMemo<TraceQuery>(
     () => ({
       ...traceWindow(rangeMinutes, windowAnchor),
       limit: PAGE_SIZE,
@@ -69,10 +72,10 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
   );
 
   // The drawer reads spans over the same window, without the listing's paging.
-  const spanWindow = useMemo<TraceQuery>(() => ({ startTime: window.startTime, endTime: window.endTime }), [window.startTime, window.endTime]);
+  const spanWindow = useMemo<TraceQuery>(() => ({ startTime: range.startTime, endTime: range.endTime }), [range.startTime, range.endTime]);
 
   const componentId = comp?.id ?? '';
-  const { data, isLoading: loadingTraces, isError: tracesError, isFetching, refetch } = useTraces(componentId, envId, window);
+  const { data, isLoading: loadingTraces, isError: tracesFailed, error: tracesError, isFetching, refetch } = useTraces(componentId, envId, range);
 
   const [selectedTrace, setSelectedTrace] = useState<TraceOverview | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -88,7 +91,12 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
     setWindowAnchor(new Date());
   };
 
-  const changeEnvironment = (nextEnvId: string) => setEnvId(nextEnvId);
+  const changeEnvironment = (nextEnvId: string) => {
+    setPickedEnvId(nextEnvId);
+    // In the same tick as the environment. Left to the effect, one render would
+    // pair the new environment with a cursor the old one issued.
+    setCursors([]);
+  };
 
   if (loadingProject || loadingComponent || loadingEnvironments) {
     return (
@@ -127,6 +135,23 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
     );
   }
 
+  // Traces are read per environment, so with none there is nothing to ask for —
+  // distinct from an agent that has simply not run yet.
+  if (environments.length === 0) {
+    return (
+      <PageContent>
+        <Typography variant="h1" sx={{ mb: 3 }}>
+          Traces
+        </Typography>
+        <EmptyListing
+          icon={<Waypoints size={48} />}
+          title="No environments in this project"
+          description="Traces are recorded per environment. Create one and deploy the agent to it, and its executions appear here."
+        />
+      </PageContent>
+    );
+  }
+
   const traces = data?.traces ?? [];
   const onFirstPage = cursors.length === 0;
 
@@ -158,15 +183,15 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
 
         {loadingTraces ? (
           <AgentTracesSkeleton />
-        ) : tracesError ? (
+        ) : tracesFailed ? (
           <Alert severity="error" action={<Button onClick={() => refetch()}>Retry</Button>}>
-            Could not load traces for this agent.
+            {apiErrorMessage(tracesError, 'Could not load traces for this agent.')}
           </Alert>
         ) : (
           <>
             {traces.length === 0 ? (
               <EmptyListing
-                icon={<Activity size={48} />}
+                icon={<Waypoints size={48} />}
                 title={onFirstPage ? 'No traces in this range' : 'No traces on this page'}
                 description={
                   onFirstPage
