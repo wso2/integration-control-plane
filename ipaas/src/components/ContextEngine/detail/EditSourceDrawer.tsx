@@ -123,7 +123,7 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
           ) : (
             <>
               <Alert severity="info" variant="outlined">
-                The engine does not report a source&apos;s current visibility. Leave this as it is to keep the rules the source has; changing it replaces who can see this content.
+                The engine does not report a source&apos;s current visibility. Leave this as it is to keep the source&apos;s rules. Changing it replaces who can see this content.
               </Alert>
               <FileVisibilityField
                 id="edit-source-visibility"
