@@ -50,6 +50,7 @@ interface BffKnowledgeBase {
   serviceUrl?: string;
   dataSources?: BffKnowledgeBaseDataSource[];
   createdAt?: string;
+  updatedAt?: string;
 }
 
 export function toKnowledgeBaseDataSource(d: BffKnowledgeBaseDataSource): KnowledgeBaseDataSource {
@@ -80,6 +81,7 @@ export function toKnowledgeBase(kb: BffKnowledgeBase): KnowledgeBase {
     serviceUrl: kb.serviceUrl ?? '',
     dataSources: (kb.dataSources ?? []).map(toKnowledgeBaseDataSource),
     createdAt: kb.createdAt ?? '',
+    updatedAt: kb.updatedAt ?? '',
   };
 }
 

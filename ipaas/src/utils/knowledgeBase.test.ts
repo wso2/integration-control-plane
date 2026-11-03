@@ -22,6 +22,7 @@ import {
   buildKnowledgeBaseSettings,
   chunkingFromConfig,
   dataSourceLabel,
+  dataSourceNameFor,
   embeddingFromConfig,
   ingestionNotice,
   isEditedSettingsValid,
@@ -126,6 +127,20 @@ describe('names', () => {
     ['x'.repeat(39) + ' y', 'x'.repeat(39)],
   ])('knowledgeBaseNameFrom(%j)', (displayName, name) => {
     expect(knowledgeBaseNameFrom(displayName)).toBe(name);
+    expect(knowledgeBaseNameError(name)).toBe('');
+  });
+});
+
+describe('dataSourceNameFor', () => {
+  it.each([
+    ['docs', 'gdrive', 'docs-gdrive'],
+    // A name at or near the limit must still get its suffix, or it is the knowledge base's own name.
+    ['a'.repeat(40), 'gdrive', 'a'.repeat(33) + '-gdrive'],
+    ['a'.repeat(39), 'amazons3', 'a'.repeat(31) + '-amazons3'],
+    ['a'.repeat(32) + '-bbbb', 'gdrive', 'a'.repeat(32) + '-gdrive'],
+  ])('%j + %j', (kb, type, name) => {
+    expect(dataSourceNameFor(kb, type)).toBe(name);
+    expect(name).not.toBe(kb);
     expect(knowledgeBaseNameError(name)).toBe('');
   });
 });

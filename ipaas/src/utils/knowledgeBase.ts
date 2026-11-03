@@ -55,6 +55,16 @@ export function knowledgeBaseNameFrom(displayName: string): string {
     .replace(/-+$/, '');
 }
 
+/**
+ * The name of a knowledge base's first data source: the knowledge base's name with the
+ * source type appended. The knowledge base part is shortened to fit, so the suffix is
+ * never cut off, which would give the data source the knowledge base's own name.
+ */
+export function dataSourceNameFor(knowledgeBaseName: string, type: string): string {
+  const suffix = `-${type}`;
+  return `${knowledgeBaseName.slice(0, KNOWLEDGE_BASE_NAME_MAX - suffix.length).replace(/-+$/, '')}${suffix}`;
+}
+
 function split(env: Record<string, string>): KnowledgeBaseSettings {
   const config: Record<string, string> = {};
   const secrets: Record<string, string> = {};

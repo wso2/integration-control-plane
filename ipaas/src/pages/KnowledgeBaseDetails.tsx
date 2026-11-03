@@ -130,6 +130,8 @@ function KnowledgeBaseView({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }
   const navigate = useAppNavigate();
   const [tab, setTab] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  // Above the configuration tab, which remounts when a save changes the stored settings.
+  const [configSaved, setConfigSaved] = useState(false);
   return (
     <>
       <PageTitle>
@@ -158,7 +160,7 @@ function KnowledgeBaseView({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }
 
       {tab === 0 && <OverviewTab scope={scope} kb={kb} onConnect={() => setTab(CONNECT_TAB)} />}
       {/* Keyed on the stored settings, so a save or a refetch restarts the form from them. */}
-      {tab === 1 && <ConfigurationTab key={JSON.stringify(kb.config) + kb.secretKeys.join()} kb={kb} />}
+      {tab === 1 && <ConfigurationTab key={JSON.stringify(kb.config) + kb.secretKeys.join()} kb={kb} saved={configSaved} onSavedChange={setConfigSaved} />}
       {tab === CONNECT_TAB && <ConnectTab scope={scope} kb={kb} onDelete={() => setDeleting(true)} />}
       {tab === 3 && <KnowledgeBaseRetrieval knowledgeBase={kb} componentId={kb.name} />}
 
@@ -565,6 +567,8 @@ function KnowledgeBaseServiceTable({ scope, kb, onDelete }: { scope: OrgScope; k
 function DeleteDataSourceDialog({ kb, dataSource, orgHandler, onClose }: { kb: KnowledgeBase; dataSource: KnowledgeBaseDataSource; orgHandler: string; onClose: () => void }): JSX.Element {
   const del = useDeleteComponent();
   const { refetch } = useKnowledgeBase(kb.name);
+  // The BFF refuses some deletes without failing the request, reporting canDelete: false.
+  const [refused, setRefused] = useState('');
   return (
     <ConfirmDeleteDialog
       title={
@@ -574,47 +578,53 @@ function DeleteDataSourceDialog({ kb, dataSource, orgHandler, onClose }: { kb: K
       }
       isPending={del.isPending}
       onClose={onClose}
-      onConfirm={() =>
+      onConfirm={() => {
+        setRefused('');
         del.mutate(
           { orgHandler, componentId: dataSource.name, projectId: kb.projectName },
           {
-            onSuccess: () => {
+            onSuccess: (result) => {
+              if (!result.canDelete) {
+                setRefused(result.message || 'The data source could not be deleted.');
+                return;
+              }
               refetch();
               onClose();
             },
           },
-        )
-      }>
+        );
+      }}>
       <Typography variant="body2">The data source stops ingesting. Documents it already loaded stay in the knowledge base.</Typography>
-      {del.error && (
+      {(del.error || refused) && (
         <Alert severity="error" sx={{ mt: 2 }}>
-          {del.error.message}
+          {del.error?.message || refused}
         </Alert>
       )}
     </ConfirmDeleteDialog>
   );
 }
 
-function ConfigurationTab({ kb }: { kb: KnowledgeBase }): JSX.Element {
+function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: KnowledgeBase; saved: boolean; onSavedChange: (saved: boolean) => void }): JSX.Element {
   const update = useUpdateKnowledgeBase(kb.name);
   const [displayName, setDisplayName] = useState(kb.displayName);
   const [description, setDescription] = useState(kb.description);
   const [vectorStore, setVectorStore] = useState<VectorStoreConfig | null>(() => vectorStoreFromConfig(kb.config));
   const [embedding, setEmbedding] = useState<EmbeddingConfig | null>(() => embeddingFromConfig(kb.config));
   const [chunking, setChunking] = useState<ChunkingConfig>(() => chunkingFromConfig(kb.config));
-  const [saved, setSaved] = useState(false);
 
-  // A stored secret only stands in for the same provider's field.
-  const storedVectorStoreSecrets = vectorStore?.provider === kb.config.VECTORDB_PROVIDER ? kb.secretKeys : [];
+  // A stored secret only stands in for the same provider's field: an empty key after a
+  // provider switch must be filled in, not resolved to the old provider's key.
+  const storedVectorStoreSecrets = vectorStore?.provider === kb.config.VECTORDB_PROVIDER ? kb.secretKeys.filter((k) => k !== 'EMBEDDING_MODEL_APIKEY') : [];
   const embeddingKeyStored = embedding?.provider === kb.config.EMBEDDING_MODEL_PROVIDER && kb.secretKeys.includes('EMBEDDING_MODEL_APIKEY');
-  const valid = !!displayName.trim() && isEditedSettingsValid(vectorStore, embedding, [...storedVectorStoreSecrets, ...(embeddingKeyStored ? ['EMBEDDING_MODEL_APIKEY'] : [])]) && isChunkingValid(chunking);
+  const reusableSecrets = [...storedVectorStoreSecrets, ...(embeddingKeyStored ? ['EMBEDDING_MODEL_APIKEY'] : [])];
+  const valid = !!displayName.trim() && isEditedSettingsValid(vectorStore, embedding, reusableSecrets) && isChunkingValid(chunking);
   const changesVectors = !!vectorStore && !!embedding && (vectorStore.provider !== kb.config.VECTORDB_PROVIDER || embedding.provider !== kb.config.EMBEDDING_MODEL_PROVIDER || embedding.model !== kb.config.EMBEDDING_MODEL);
 
   const save = () => {
     if (!vectorStore || !embedding) return;
     const settings = buildKnowledgeBaseSettings(vectorStore, embedding, chunking);
     setSaved(false);
-    update.mutate({ displayName: displayName.trim(), description: description.trim(), config: settings.config, secrets: secretsForUpdate(settings, kb.secretKeys) }, { onSuccess: () => setSaved(true) });
+    update.mutate({ displayName: displayName.trim(), description: description.trim(), config: settings.config, secrets: secretsForUpdate(settings, reusableSecrets) }, { onSuccess: () => setSaved(true) });
   };
 
   return (

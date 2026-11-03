@@ -18,7 +18,7 @@
 
 import { Stack, Typography } from '@wso2/oxygen-ui';
 import TextField from '../../common/TextField';
-import { useState, type JSX } from 'react';
+import type { JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { knowledgeBaseNameError, knowledgeBaseNameFrom, type NameFields } from '../../../utils/knowledgeBase';
 import { fieldStackSx, stepHeadingSx } from '../styles';
@@ -33,10 +33,11 @@ interface NameStepProps {
 
 /**
  * Display name, name and description. The name follows the display name until
- * the user edits it, since it cannot be changed once created.
+ * the user edits it, since it cannot be changed once created. Whether it was edited
+ * is read from the values, not kept in state, so it survives going Back and returning.
  */
 export default function NameStep({ heading, value, onChange, withDescription = true }: NameStepProps): JSX.Element {
-  const [nameEdited, setNameEdited] = useState(false);
+  const nameEdited = value.name !== knowledgeBaseNameFrom(value.displayName);
   const nameError = knowledgeBaseNameError(value.name);
   return (
     <>
@@ -59,10 +60,7 @@ export default function NameStep({ heading, value, onChange, withDescription = t
           fullWidth
           size="small"
           value={value.name}
-          onChange={(e) => {
-            setNameEdited(true);
-            onChange({ ...value, name: e.target.value });
-          }}
+          onChange={(e) => onChange({ ...value, name: e.target.value })}
           error={!!nameError}
           helperText={nameError || 'Identifies it in URLs and integrations. It cannot be changed later.'}
           sx={REQUIRED_FIELD_SX}

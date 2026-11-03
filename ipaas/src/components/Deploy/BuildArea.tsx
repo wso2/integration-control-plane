@@ -17,6 +17,7 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   ButtonGroup,
@@ -82,7 +83,7 @@ export default function BuildArea({
   const isBuildRunning = pendingBuild?.status === 'in_progress';
   const buildingCommit = pendingBuild ? (commits.find((c) => c.sha === pendingBuild.sha) ?? null) : null;
 
-  const { data: images = [], isLoading: imagesLoading } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
+  const { data: images = [], isLoading: imagesLoading, isSuccess: imagesLoaded, isError: imagesFailed, refetch: refetchImages } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
   const { data: firstEnvDeployment } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, firstEnvId);
   const firstEnvReleaseId = firstEnvDeployment?.releaseId ?? '';
 
@@ -133,7 +134,8 @@ export default function BuildArea({
   // Image-only components (e.g. knowledge base data sources) have no builds, so there is
   // no image to pick. Once deployed they can still be redeployed: an empty imageId makes
   // the BFF cut a new release from the current workload, picking up component changes.
-  const redeployCurrent = !imagesLoading && images.length === 0 && !!firstEnvReleaseId;
+  // Only once the images have loaded: a failed fetch is not the same as having none.
+  const redeployCurrent = imagesLoaded && images.length === 0 && !!firstEnvReleaseId;
   const canDeploy = (!!selectedImage?.imageId || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending;
 
   const handleDeploy = () => {
@@ -236,6 +238,17 @@ export default function BuildArea({
                 variant="detail"
               />
             </Box>
+          ) : imagesFailed ? (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => refetchImages()}>
+                  Retry
+                </Button>
+              }>
+              Could not load the build images.
+            </Alert>
           ) : images.length === 0 ? (
             <Box sx={{ py: 2 }}>
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, color: 'text.secondary' }}>

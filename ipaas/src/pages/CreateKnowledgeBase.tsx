@@ -23,7 +23,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
 import { DAILY_INGESTION, DATASOURCES, DEFAULT_CHUNKING } from '../constants/ragIngestion';
-import { buildDataSourceSettings, buildKnowledgeBaseSettings, ingestionNotice, isNameValid, knowledgeBaseNameFrom, type NameFields } from '../utils/knowledgeBase';
+import { buildDataSourceSettings, buildKnowledgeBaseSettings, dataSourceNameFor, ingestionNotice, isNameValid, type NameFields } from '../utils/knowledgeBase';
 import { isChunkingValid, isDatasourceValid, isEmbeddingValid, isVectorStoreValid } from '../utils/ragIngestion';
 import type { ChunkingConfig, DatasourceConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
 import type { CreateKnowledgeBaseDataSourceInput } from '../types/knowledgeBase';
@@ -77,7 +77,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
     if (withDataSource && datasource) {
       const label = DATASOURCES.find((d) => d.id === datasource.type)?.name ?? datasource.type;
       dataSource = {
-        name: knowledgeBaseNameFrom(`${names.name} ${datasource.type}`),
+        name: dataSourceNameFor(names.name, datasource.type),
         displayName: `${names.displayName} ${label}`,
         ...buildDataSourceSettings(datasource),
         cronExpression: mode === 'scheduled' ? schedule.cron : '',

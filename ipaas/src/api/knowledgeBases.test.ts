@@ -33,6 +33,7 @@ describe('toKnowledgeBase', () => {
       serviceUrl: '',
       dataSources: [],
       createdAt: '',
+      updatedAt: '',
     });
   });
 
