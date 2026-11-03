@@ -29,6 +29,7 @@ import {
   postCertificateMappings,
   fetchResourceLinks,
   fetchResourceLinkSuggestions,
+  fetchLinkWarnings,
   createResourceLink,
   deleteResourceLink,
 } from '../api/configuration';
@@ -136,6 +137,15 @@ export function useResourceLinkSuggestions(projectId: string, componentId: strin
   });
 }
 
+export function useLinkWarnings(projectId: string, componentId: string, build: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ['linkWarnings', projectId, componentId, build],
+    queryFn: () => fetchLinkWarnings(projectId, componentId, build),
+    enabled: enabled && !!projectId && !!componentId && !!build,
+    retry: false,
+  });
+}
+
 export function useCreateResourceLink() {
   const qc = useQueryClient();
   return useMutation({
@@ -158,6 +168,7 @@ export function useDeleteResourceLink() {
 const invalidateLinks = (qc: QueryClient, projectId: string, componentId: string) => {
   qc.invalidateQueries({ queryKey: ['resourceLinks', projectId, componentId] });
   qc.invalidateQueries({ queryKey: ['resourceLinkSuggestions', projectId, componentId] });
+  qc.invalidateQueries({ queryKey: ['linkWarnings', projectId, componentId] });
   qc.invalidateQueries({ queryKey: ['componentDeployment'] });
 };
 

@@ -35,6 +35,7 @@ import type {
   ConfigMgtSaveItem,
   ResourceLink,
   ResourceLinkSuggestion,
+  LinkWarning,
   ResourceLinkWrite,
   CreateResourceLinkInput,
   DeleteResourceLinkInput,
@@ -67,6 +68,8 @@ export const fetchResourceLinks = (projectId: string, componentId: string): Prom
 /** The resources build calls for (the latest build when absent). */
 export const fetchResourceLinkSuggestions = (projectId: string, componentId: string, build?: string): Promise<ResourceLinkSuggestion[]> =>
   bff.get<ResourceLinkSuggestion[]>(`/components/${seg(componentId)}/link-suggestions${q({ projectName: projectId, build })}`);
+
+export const fetchLinkWarnings = (projectId: string, componentId: string, build: string): Promise<LinkWarning[]> => bff.get<LinkWarning[]>(`/components/${seg(componentId)}/link-warnings${q({ projectName: projectId, build })}`);
 
 export const createResourceLink = ({ projectId, componentId, resourceType, connection }: CreateResourceLinkInput): Promise<ResourceLinkWrite> =>
   bff.post<ResourceLinkWrite>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`, { resourceType, connection });

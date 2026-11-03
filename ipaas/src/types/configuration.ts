@@ -191,6 +191,16 @@ export interface ResourceLinkSuggestion {
   linkedConnection?: string;
 }
 
+/**
+ * What a build needs from a link: the build reads none of its connection's names (`not_in_build`, a rename in code),
+ * or reads names no deploy has applied yet (`not_applied`).
+ */
+export interface LinkWarning {
+  resourceType: string;
+  connection: string;
+  reason: 'not_in_build' | 'not_applied';
+}
+
 export interface CreateResourceLinkInput {
   projectId: string;
   componentId: string;

@@ -30,17 +30,22 @@ import { findCommitBySha } from '../utils/commits';
 import { isBuildLive } from '../utils/build';
 import type { Commit } from '../types/repository';
 import BuildLogViewer from './BuildLogViewer';
+import { LinkWarnings } from './Build/LinkWarnings';
 import HorizontalStepper from './HorizontalStepper';
 import * as styles from './BuildCard.styles';
 
 interface BuildCardProps {
+  projectId: string;
   componentId: string;
   versionId: string;
+  /** Where the card's Deploy puts the build. */
+  firstEnvId: string;
+  deploymentPipelineId: string;
   /** Recent commit history, joined against the build's own SHA to caption it. */
   commits?: Commit[];
 }
 
-export default function BuildCard({ componentId, versionId, commits }: BuildCardProps) {
+export default function BuildCard({ projectId, componentId, versionId, firstEnvId, deploymentPipelineId, commits }: BuildCardProps) {
   const { data: deployments, isPending: loadingBuilds } = useDeploymentStatus(componentId, versionId);
   const lastBuild = deployments?.[0] ?? null;
 
@@ -208,6 +213,8 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
           </Tooltip>
         </Stack>
       </Stack>
+
+      {status === 'completed' && conclusion === 'success' && <LinkWarnings projectId={projectId} componentId={componentId} versionId={versionId} build={lastBuild.name} firstEnvId={firstEnvId} deploymentPipelineId={deploymentPipelineId} />}
 
       <Collapse in={expanded} timeout={animateBody ? undefined : 0}>
         <Divider sx={{ mb: 2 }} />

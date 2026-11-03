@@ -32,9 +32,10 @@ describe('link mutations', () => {
   it.each([
     ['link', useCreateResourceLink],
     ['unlink', useDeleteResourceLink],
-  ])('%s refetches the suggestions', (_, hook) => {
+  ])('%s refetches the suggestions and the Build card warning', (_, hook) => {
     invalidateQueries.mockClear();
     (hook() as unknown as Mutation).onSuccess(undefined, { projectId: 'default', componentId: 'sfdemo' });
     expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['resourceLinkSuggestions', 'default', 'sfdemo'] });
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['linkWarnings', 'default', 'sfdemo'] });
   });
 });
