@@ -66,11 +66,6 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
         </Typography>
       </Stack>
 
-      {question && (
-        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1 }}>
-          {route === 'answer' ? 'Prefilled with your Playground question, sent to the answer route.' : 'Pre-filled with the question you asked in the Playground.'}
-        </Typography>
-      )}
       <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, question, route)} showCopyButton wrapLongLines />
       <Box sx={{ mt: 2 }}>
         <CodeViewer title="Example response" language="json" code={buildQueryResponseExample(engine.sources[0]?.id)} showCopyButton wrapLongLines />

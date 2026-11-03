@@ -196,7 +196,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           <Box sx={{ flex: 1, maxWidth: activeStep === 2 ? 1080 : 960, mt: 2 }}>
             {showRestored && (
               <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
-                We restored the draft you left in this tab. API keys and tokens are never stored, and chosen files need adding again after a reload. Re-enter them before creating.
+                Draft restored. Re-enter API keys, tokens and files.
               </Alert>
             )}
 
@@ -272,7 +272,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
       <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Leave without creating?</DialogTitle>
         <DialogContent>
-          <DialogContentText>Your sources and settings are kept as a draft for this tab. API keys and tokens are not stored and will need re-entering. Chosen files will need adding again.</DialogContentText>
+          <DialogContentText>Your draft is kept for this tab. API keys, tokens and files are not.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setLeaveOpen(false)}>Stay</Button>

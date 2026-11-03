@@ -636,7 +636,8 @@ describe('first run', () => {
   it('talks about files, not a connector, when every source is an upload', () => {
     const uploads = engineDetail({ sources: [{ id: 's1', name: 'File Upload', type: 'upload', state: 'ready' }] });
     const summary = { sourceCount: 1, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
-    expect(getStartedSteps(uploads, false, summary)[0].description).toMatch(/Files become searchable as the engine indexes them, one at a time\.$/);
+    expect(getStartedSteps(uploads, false, summary)[0].description).toBe('1 of 1 source processed.');
+    expect(getStartedSteps(uploads, false)[0].description).toBe('Files become searchable after upload.');
     expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent' });
   });
 });

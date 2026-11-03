@@ -16,13 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Check, ChevronRight, Hash, Info, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions } from '../hooks/useContextEngine';
-import { absoluteUrl, evidenceBackTarget, evidencePart, evidencePlace, evidenceVersionLabel, partHint, passageLines, sourceTypeName } from '../utils/contextEngine';
+import { absoluteUrl, evidenceBackTarget, evidencePart, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
 import { contextEngineUrl, contextEvidenceUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -178,13 +178,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             <Typography variant="h6" component="h1" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
               {ev.recordId}
             </Typography>
-            {place.coarse && part !== undefined ? (
-              <Tooltip title={partHint(part)}>
-                <Chip size="small" variant="outlined" label={primaryPlace(ev)} />
-              </Tooltip>
-            ) : (
-              <Chip size="small" variant="outlined" label={primaryPlace(ev)} sx={l?.path ? { fontFamily: 'monospace' } : undefined} />
-            )}
+            <Chip size="small" variant="outlined" label={primaryPlace(ev)} sx={l?.path ? { fontFamily: 'monospace' } : undefined} />
           </Stack>
           <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
             A passage from {engineName ?? 'this context engine'}, cited as evidence.
