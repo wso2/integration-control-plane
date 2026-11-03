@@ -47,7 +47,6 @@ import { isEmbeddingValid } from './ragIngestion';
 import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type {
   AudienceRule,
-  ContextEngineDetail,
   ContextEngineDraft,
   ContextEngineForm,
   ContextEngineProgress,
