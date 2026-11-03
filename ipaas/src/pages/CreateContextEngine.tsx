@@ -24,6 +24,7 @@ import { useRoles } from '../hooks/useAuth';
 import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngineDraft, useContextEngines, useCreateContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
 import {
+  answerChoice,
   checkStagedFile,
   effectiveVisibility,
   engineDescriptionError,
@@ -57,6 +58,7 @@ import type { OrgScope } from '../nav';
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
 const STEP_LABELS = ['Name', 'Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Review & Create'];
 const LAST_STEP = STEP_LABELS.length - 1;
+const MODELS_STEP = STEP_LABELS.indexOf('Configure Models');
 const STORAGE_STEP = STEP_LABELS.indexOf('Configure Storage');
 
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
@@ -198,7 +200,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
             <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
           </Box>
-          <Box sx={{ flex: 1, maxWidth: activeStep === STORAGE_STEP ? 1080 : 960, mt: 2 }}>
+          <Box sx={{ flex: 1, maxWidth: activeStep === MODELS_STEP || activeStep === STORAGE_STEP ? 1080 : 960, mt: 2 }}>
             {showRestored && (
               <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
                 We restored the draft you left in this session. API keys and tokens are never stored, so re-enter them before creating.
@@ -229,12 +231,12 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 embedding={form.embedding}
                 llm={form.llm}
                 shareApiKey={form.shareApiKey}
-                answersEnabled={form.answersEnabled}
+                answerChoice={answerChoice(form)}
                 answerLlm={form.answerLlm}
                 onEmbeddingChange={(value) => dispatch({ type: 'embedding', value })}
                 onLlmChange={(value) => dispatch({ type: 'llm', value })}
                 onShareApiKeyChange={(value) => dispatch({ type: 'shareApiKey', value })}
-                onAnswersEnabledChange={(value) => dispatch({ type: 'answersEnabled', value })}
+                onAnswerChoiceChange={(value) => dispatch({ type: 'answerChoice', value })}
                 onAnswerLlmChange={(value) => dispatch({ type: 'answerLlm', value })}
               />
             )}

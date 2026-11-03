@@ -17,6 +17,7 @@
  */
 
 import {
+  blankLlm,
   CONNECTOR_BY_ID,
   CONTEXT_EMBEDDING_PROVIDERS,
   CONTEXT_ENGINE_DESCRIPTION_MAX,
@@ -265,6 +266,21 @@ export function effectiveLlm(form: Pick<ContextEngineForm, 'embedding' | 'llm' |
   if (!form.llm) return null;
   if (form.shareApiKey && form.embedding && canShareApiKey(form.embedding, form.llm)) return { ...form.llm, apiKey: form.embedding.apiKey };
   return form.llm;
+}
+
+/** Who writes answers: the language model, a model of its own, or nobody. */
+export type AnswerChoice = 'same' | 'different' | 'off';
+
+export function answerChoice(form: Pick<ContextEngineForm, 'answersEnabled' | 'answerLlm'>): AnswerChoice {
+  if (!form.answersEnabled) return 'off';
+  return form.answerLlm ? 'different' : 'same';
+}
+
+/** The form fields for an answer choice. A different model keeps the one already chosen, or starts on the language model's provider. */
+export function applyAnswerChoice(choice: AnswerChoice, form: Pick<ContextEngineForm, 'llm' | 'answerLlm'>): Pick<ContextEngineForm, 'answersEnabled' | 'answerLlm'> {
+  if (choice === 'off') return { answersEnabled: false, answerLlm: null };
+  if (choice === 'same') return { answersEnabled: true, answerLlm: null };
+  return { answersEnabled: true, answerLlm: form.answerLlm ?? blankLlm(form.llm?.provider ?? LLM_PROVIDERS[0].id) };
 }
 
 /** Why the Models step cannot proceed, or null. */

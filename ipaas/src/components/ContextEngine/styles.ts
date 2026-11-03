@@ -452,7 +452,8 @@ export const endpointFieldSx = {
 
 export const modelColumnsSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+  // Fits as many columns as the space allows, since the sidebar changes the width a viewport breakpoint sees.
+  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
   gap: 2.5,
 } as const;
 

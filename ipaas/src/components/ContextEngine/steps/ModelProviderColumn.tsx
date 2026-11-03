@@ -17,7 +17,7 @@
  */
 
 import { Box, Checkbox, FormControlLabel, Link, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { useState, type JSX } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { isCustomModel } from '../../../utils/contextEngine';
 import SelectableCard from '../../common/SelectableCard';
@@ -64,10 +64,14 @@ interface ModelProviderColumnProps<T extends ModelLike> {
   shareKey?: ShareKeyOption;
   /** Accessible name for the model selector. */
   modelLabel: string;
+  /** Shown under the purpose line, before the providers. */
+  choice?: ReactNode;
+  /** False leaves only the title, purpose and choice. */
+  showProviders?: boolean;
 }
 
-/** One model choice — provider tiles, model, credentials — laid out as a column so two fit side by side. */
-export default function ModelProviderColumn<T extends ModelLike>({ title, purpose, providers, value, onChange, blank, shareKey, modelLabel }: ModelProviderColumnProps<T>): JSX.Element {
+/** One model choice — provider tiles, model, credentials — laid out as a column so three fit side by side. */
+export default function ModelProviderColumn<T extends ModelLike>({ title, purpose, providers, value, onChange, blank, shareKey, modelLabel, choice, showProviders = true }: ModelProviderColumnProps<T>): JSX.Element {
   const providerInfo = providers.find((p) => p.id === value?.provider);
   const models = providerInfo?.models ?? [];
   const keyShared = !!shareKey?.available && shareKey.checked;
@@ -85,22 +89,26 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
         </Typography>
       </Box>
 
-      <Box sx={modelTileGridSx}>
-        {providers.map((p) => (
-          <SelectableCard
-            key={p.id}
-            title={p.name}
-            logo={p.logo}
-            selected={value?.provider === p.id}
-            onSelect={() => {
-              setOtherChosen(false);
-              onChange(blank(p.id));
-            }}
-          />
-        ))}
-      </Box>
+      {choice}
 
-      {value && (
+      {showProviders && (
+        <Box sx={modelTileGridSx}>
+          {providers.map((p) => (
+            <SelectableCard
+              key={p.id}
+              title={p.name}
+              logo={p.logo}
+              selected={value?.provider === p.id}
+              onSelect={() => {
+                setOtherChosen(false);
+                onChange(blank(p.id));
+              }}
+            />
+          ))}
+        </Box>
+      )}
+
+      {showProviders && value && (
         <Stack gap={2}>
           {!typed ? (
             <Select
