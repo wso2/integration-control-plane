@@ -69,6 +69,26 @@ const MS_GRAPH_APP = [F('tenantId', 'Tenant ID', 'text'), F('clientId', 'Client 
 /** Show a field only for the chosen auth flow (matches a connector's `authType` discriminator). */
 const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'authType', equals: flows });
 
+/** Connection fields shared by the Google connectors, mirroring the Ballerina `google_auth` module's GoogleAuth: one of three OAuth2 flows, chosen by authType. */
+const GOOGLE_AUTH = [
+  F('authType', 'Authentication', 'select', {
+    defaultValue: 'refresh_token',
+    options: [
+      { value: 'refresh_token', label: 'Refresh token' },
+      { value: 'bearer', label: 'Access token' },
+      { value: 'service_account', label: 'Service account' },
+    ],
+    helper: 'OAuth2 flow used to connect.',
+  }),
+  F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
+  F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
+  F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
+  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+  F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
+  F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'Path to the service account private key in PEM form.' }),
+  O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional user to impersonate under domain-wide delegation.' }),
+];
+
 /**
  * Optional RML mapping section, appended to connectors whose `isStructuredData` is
  * set. A provided .rml.ttl is used to generate the context graph from the source's
@@ -185,25 +205,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
     // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
     fields: [
-      ...G(
-        'Connection',
-        F('authType', 'Authentication', 'select', {
-          defaultValue: 'refresh_token',
-          options: [
-            { value: 'refresh_token', label: 'Refresh token' },
-            { value: 'bearer', label: 'Access token' },
-            { value: 'service_account', label: 'Service account' },
-          ],
-          helper: 'OAuth2 flow used to connect.',
-        }),
-        F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
-        F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
-        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
-        F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
-        F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'Path to the service account private key in PEM form.' }),
-        O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional user to impersonate under domain-wide delegation.' }),
-      ),
+      ...G('Connection', ...GOOGLE_AUTH),
       ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' })),
     ],
     summaryKeys: ['folderId'],
@@ -338,6 +340,34 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     icon: 'mail',
     fields: [F('label', 'Label', 'text', { placeholder: 'support' }), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret'), F('refreshToken', 'Refresh Token', 'secret')],
     summaryKeys: ['label'],
+  },
+  {
+    id: 'google-calendar',
+    name: 'Google Calendar',
+    description: 'Events of one calendar, backfilled and kept in sync by incremental sync.',
+    category: 'collaboration',
+    icon: 'calendar',
+    // Mirrors the Ballerina `google_calendar` connector's GoogleCalendarSettings: the shared Google
+    // auth block plus the calendar, the events to deliver and the page size.
+    fields: [
+      ...G('Connection', ...GOOGLE_AUTH),
+      ...G(
+        'Data to sync',
+        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '"primary" for the connected account’s own calendar, or a calendar ID (an email-shaped address, including group and holiday calendars).' }),
+        F('eventTypes', 'Event Types', 'text', { defaultValue: 'default, outOfOffice', helper: 'Comma-separated. Any of: default, outOfOffice, focusTime, workingLocation, birthday, fromGmail.' }),
+        F('includePrivateEvents', 'Private Events', 'select', {
+          defaultValue: 'false',
+          options: [
+            { value: 'false', label: 'Exclude' },
+            { value: 'true', label: 'Include' },
+          ],
+          helper: 'Private and confidential events. When excluded, an event made private later is removed from the engine.',
+        }),
+      ),
+      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.' })),
+    ],
+    summaryKeys: ['calendarId'],
+    isStructuredData: true,
   },
   {
     id: 'outlook',
@@ -521,7 +551,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
