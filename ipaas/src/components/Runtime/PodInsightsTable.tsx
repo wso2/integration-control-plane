@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, ListingTable, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, ListingTable, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { Activity, Check, CircleCheck, Info, RefreshCw, ScrollText } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX, type ReactNode } from 'react';
 import * as styles from './PodInsightsTable.styles';
@@ -25,7 +25,7 @@ import PodLogsDrawer from './PodLogsDrawer';
 import { POD_ACTION_LABELS } from '../../constants/runtime';
 import { podLastActivity, podRestartCount } from '../../utils/podMetrics';
 import { getPodStatus, podStatusPalette, runningPodCount } from '../../utils/pods';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import type { ClusterPod, PodScope } from '../../types/runtime';
 
 const COLUMN_COUNT = 6;
@@ -143,7 +143,7 @@ export default function PodInsightsTable({ pods, isLoading, isError, isFetching,
                         {statuses.filter((s) => s.ready).length}/{statuses.length || pod.spec.containers.length}
                       </ListingTable.Cell>
                       <ListingTable.Cell>{podRestartCount(pod)}</ListingTable.Cell>
-                      <ListingTable.Cell>{lastActivity ? formatDistanceToNow(lastActivity) : '—'}</ListingTable.Cell>
+                      <ListingTable.Cell>{lastActivity ? <RelativeTime time={formatDistanceToNow(lastActivity)} dateTime={lastActivity} tooltip={formatDateTime(lastActivity)} /> : '—'}</ListingTable.Cell>
                       <ListingTable.Cell align="right">
                         <Stack direction="row" justifyContent="flex-end" gap={0.5}>
                           <Tooltip title={canManage ? POD_ACTION_LABELS.events : POD_ACTION_LABELS.noPermission}>

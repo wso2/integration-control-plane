@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, FormControlLabel, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, Checkbox, FormControlLabel, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -124,8 +123,8 @@ export default function CreateRole(): JSX.Element {
       )}
 
       <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
-        <TextField label="Role Name" required value={roleName} onChange={(e) => setRoleName(e.target.value)} fullWidth />
-        <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Role Name" required value={roleName} onChange={(e) => setRoleName(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
       </Stack>
 
       {allPermsData && <PermissionsEditor allPermissions={allPermsData.groupedByDomain} selectedIds={selectedIds} onChange={setSelectedIds} />}

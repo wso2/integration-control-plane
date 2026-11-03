@@ -176,7 +176,7 @@ setup('authenticate cloud', async ({ page }) => {
   const startedAt = Date.now();
 
   console.log(`Signing in to ${process.env.E2E_CLOUD_BASE_URL ?? 'the cloud console'} as ${username}...`);
-  await page.goto('/login', { waitUntil: 'domcontentloaded', timeout: 120_000 });
+  await page.goto('login', { waitUntil: 'domcontentloaded', timeout: 120_000 });
 
   // The cloud build renders no in-app sign-in UI; Login.tsx redirects straight to Thunder's Gate.
   await page.waitForURL(/\/gate\/signin/, { timeout: 60_000, waitUntil: 'domcontentloaded' });

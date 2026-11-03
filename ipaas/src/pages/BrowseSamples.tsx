@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, InputAdornment, PageContent, Pagination, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Box, Button, CircularProgress, InputAdornment, PageContent, Pagination, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Search } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -26,12 +25,13 @@ import { isQuotaError } from '../utils/apiErrors';
 import FilterSection from '../components/FilterSection';
 import SampleGridCard from '../components/SampleGridCard';
 import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
-import { componentSubTypeFromSample, displayTypeFromSample, formatComponentType, normalizeComponentType } from '../constants/integrations';
-import { PAGE_SIZE } from '../constants/samples';
+import { componentSubTypeFromSample, displayTypeFromSample, formatBuildPack, formatComponentType, normalizeComponentType } from '../constants/integrations';
+import { PAGE_SIZE, sampleKey } from '../constants/samples';
 import { useSamples } from '../hooks/useSamples';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
 import type { Sample } from '../types/samples';
 import { toHandler } from '../utils/string';
+import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
 
 export default function BrowseSamples(scope: ProjectScope): JSX.Element {
@@ -40,13 +40,15 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
   const { data: samplesData, isLoading: isSamplesLoading, isError: isSamplesError } = useSamples();
 
   const uniqueTypes = samplesData?.uniqueTypes ?? [];
+  const uniqueBuildPacks = samplesData?.uniqueBuildPacks ?? [];
   const uniqueTags = samplesData?.uniqueTags ?? [];
 
   const [search, setSearch] = useState('');
   const [selectedTypes, setSelectedTypes] = useState<Set<string>>(new Set());
+  const [selectedBuildPacks, setSelectedBuildPacks] = useState<Set<string>>(new Set());
   const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const [page, setPage] = useState(1);
-  const [deployingSample, setDeployingSample] = useState<string | null>(null);
+  const [deployingSample, setDeployingSample] = useState<Sample | null>(null);
 
   const toggleFilter = (setter: React.Dispatch<React.SetStateAction<Set<string>>>) => (value: string) => {
     setter((prev) => {
@@ -57,11 +59,20 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
     });
   };
 
+  const hasFilters = selectedTypes.size > 0 || selectedBuildPacks.size > 0 || selectedTags.size > 0;
+  const clearFilters = () => {
+    setSearch('');
+    setSelectedTypes(new Set());
+    setSelectedBuildPacks(new Set());
+    setSelectedTags(new Set());
+  };
+
   const createComponent = useCreateComponent();
 
   const handleDeploy = (sample: Sample) => {
     if (!projectId) return;
-    setDeployingSample(sample.displayName);
+    trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
+    setDeployingSample(sample);
     createComponent.mutate(
       {
         displayName: sample.displayName,
@@ -89,11 +100,12 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
     const q = search.toLowerCase();
     return samples.filter((s) => {
       const matchesType = selectedTypes.size === 0 || selectedTypes.has(normalizeComponentType(s.componentType));
+      const matchesBuildPack = selectedBuildPacks.size === 0 || selectedBuildPacks.has(s.buildPack);
       const matchesTags = selectedTags.size === 0 || s.tags.some((t) => selectedTags.has(t));
       const matchesSearch = !q || s.displayName.toLowerCase().includes(q) || s.description.toLowerCase().includes(q) || s.tags.some((t) => t.toLowerCase().includes(q));
-      return matchesType && matchesTags && matchesSearch;
+      return matchesType && matchesBuildPack && matchesTags && matchesSearch;
     });
-  }, [samplesData?.samples, search, selectedTypes, selectedTags]);
+  }, [samplesData?.samples, search, selectedTypes, selectedBuildPacks, selectedTags]);
 
   // Reset to page 1 whenever filters change
   useEffect(() => {
@@ -105,7 +117,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (isSamplesLoading) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -113,9 +125,9 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (isSamplesError) {
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
-          Back
+          Back to create integration
         </Button>
         <Typography color="error">Failed to load samples. Please try again later.</Typography>
       </PageContent>
@@ -124,10 +136,10 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
   if (createComponent.isPending || createComponent.isSuccess || createComponent.isError) {
     return (
-      <PageContent sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
+      <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label="Integration"
-          subLabel={deployingSample || undefined}
+          subLabel={deployingSample?.displayName}
           isPending={createComponent.isPending}
           isSuccess={createComponent.isSuccess}
           error={createComponent.isError ? (createComponent.error?.message ?? 'Something went wrong. Please try again.') : null}
@@ -142,9 +154,9 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
   }
 
   return (
-    <PageContent sx={{ pt: 5 }}>
+    <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(newComponentUrl(scope))} sx={{ mb: 2 }}>
-        Back
+        Back to create integration
       </Button>
 
       <Typography variant="h1" sx={{ mb: 0.5, mt: 1 }}>
@@ -187,12 +199,23 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
 
           <Box sx={{ borderTop: '1px solid', borderColor: 'divider', my: 1 }} />
 
+          <FilterSection title="Technology" items={uniqueBuildPacks} selected={selectedBuildPacks} onToggle={toggleFilter(setSelectedBuildPacks)} labelFn={formatBuildPack} />
+
+          <Box sx={{ borderTop: '1px solid', borderColor: 'divider', my: 1 }} />
+
           <FilterSection title="Tags" items={uniqueTags} selected={selectedTags} onToggle={toggleFilter(setSelectedTags)} />
         </Box>
 
         {/* Grid */}
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          {filtered.length === 0 ? (
+          {filtered.length === 0 && hasFilters ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography color="text.secondary">{search ? 'No samples match your search and the selected filters.' : 'No samples match the selected filters.'}</Typography>
+              <Button size="small" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            </Box>
+          ) : filtered.length === 0 ? (
             <Typography color="text.secondary">No samples match your search.</Typography>
           ) : (
             <>
@@ -208,7 +231,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
                   gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                 }}>
                 {paginated.map((sample) => (
-                  <SampleGridCard key={sample.displayName} sample={sample} onDeploy={() => handleDeploy(sample)} isDeploying={deployingSample === sample.displayName} />
+                  <SampleGridCard key={sampleKey(sample)} sample={sample} onDeploy={() => handleDeploy(sample)} isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false} />
                 ))}
               </Box>
 

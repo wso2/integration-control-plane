@@ -58,7 +58,7 @@ export default function IntegrationRenderer({ component, identity, environments,
     return (
       <>
         {environments.map((env) => (
-          <Card key={env.id} variant="outlined" sx={{ mb: 3 }}>
+          <Card key={env.id} sx={{ mb: 3 }}>
             <CardContent>
               <Skeleton variant="text" width="30%" height={32} />
               <EnvCardSkeleton />

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useState, type JSX, type ReactNode } from 'react';
+import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useAuth } from '../auth';
 import { Alert, Avatar, Box, Button, ButtonBase, Card, Divider, PageContent, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowRight, BookOpen, Clock, Database, Folder, Plus, Workflow } from '@wso2/oxygen-ui-icons-react';
@@ -32,6 +32,7 @@ import { newComponentUrl, newProjectUrl, type OrgScope } from '../nav';
 import { orgProjectsUrl, projectHomeUrl } from '../paths';
 import type { Project } from '../types/project';
 import { formatDistanceToNow } from '../utils/time';
+import { trackEvent } from '../services/tracking/tracking';
 import * as styles from './OrgOverview.styles';
 
 const LIST_SIZE = 3;
@@ -144,6 +145,8 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
     scope.org,
     projects.map((p) => p.id),
   );
+
+  useEffect(() => trackEvent('visit-home'), []);
 
   const firstName = (displayName || username).split(/[\s@]/)[0];
   const openProjects = projects.filter((p) => !p.deleting);

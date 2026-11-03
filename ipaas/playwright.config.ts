@@ -18,13 +18,18 @@
 
 import { defineConfig, devices } from '@playwright/test';
 
-const CLOUD_BASE_URL = process.env.E2E_CLOUD_BASE_URL ?? 'https://ipaas-console-development.gateway.dev.cloud.wso2.com';
+// Specs navigate with relative paths, so the trailing slash is load-bearing: without it
+// `new URL('login', base)` drops the console's base path and lands on the host root.
+const CLOUD_BASE_URL = `${(process.env.E2E_CLOUD_BASE_URL ?? 'https://ipaas-console-development.gateway.dev.cloud.wso2.com').replace(/\/+$/, '')}/`;
 
 // Thunder's Gate SPA intermittently stalls on its spinner; a fresh load clears it.
 const CLOUD_RETRIES = process.env.CI ? 2 : 1;
 
 // /artifacts in-cluster, where an uploader sidecar ships the run to S3; unset locally.
 const ARTIFACT_DIR = process.env.E2E_ARTIFACT_DIR;
+
+// In-cluster only: the uploader ships ${ARTIFACT_DIR}/junit/*.xml to the test-results dashboard.
+const JUNIT_REPORTER = ARTIFACT_DIR ? [['junit', { outputFile: `${ARTIFACT_DIR}/junit/junit.xml` }] as const] : [];
 
 // Selecting the setup by an explicit flag rather than by whether a token source happens
 // to be set: a mistyped E2E_TOKEN_URL would otherwise fall back to the browser login and
@@ -39,7 +44,7 @@ export default defineConfig({
   // Playwright reads the host's core count, not the container's cgroup limit, so a
   // containerised run must state its worker count rather than inherit the default.
   workers: process.env.PW_WORKERS ? Number(process.env.PW_WORKERS) : process.env.CI ? 1 : undefined,
-  reporter: [['html', { open: 'never', outputFolder: ARTIFACT_DIR ? `${ARTIFACT_DIR}/report` : 'playwright-report' }], ['list']],
+  reporter: [['html', { open: 'never', outputFolder: ARTIFACT_DIR ? `${ARTIFACT_DIR}/report` : 'playwright-report' }], ['list'], ...JUNIT_REPORTER],
   timeout: 60_000,
   use: {
     trace: 'retain-on-failure',

@@ -34,8 +34,8 @@ export interface EnvStatusDotProps {
   orgHandler: string;
   orgUuid: string;
   componentId: string;
-  /** Deployment track id — `versionId` in the deployments API. */
-  versionId: string;
+  /** Deployment track id — `versionId` in the deployments API; undefined while the page hasn't resolved it. */
+  versionId: string | undefined;
   envId: string;
 }
 

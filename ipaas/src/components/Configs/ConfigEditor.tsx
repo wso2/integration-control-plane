@@ -16,14 +16,15 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, IconButton, Paper, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
-import { ArrowLeft, Trash2, Upload } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, FormHelperText, IconButton, InputAdornment, Paper, Stack, Typography, TextField } from '@wso2/oxygen-ui';
+import { ArrowLeft, Eye, EyeOff, Trash2, Upload } from '@wso2/oxygen-ui-icons-react';
 import BusyFields from '../common/BusyFields';
-import { useEffect, useRef, useState, type JSX } from 'react';
+import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { useConfigMapDetails, useSaveConfig } from '../../hooks/useDevopsConfigs';
-import { parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath } from '../../utils/devopsConfigs';
+import { parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
 import type { ConfigKind, ConfigRow } from '../../types/devopsConfigs';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
+import * as styles from './ConfigEditor.styles';
 
 /** The component/release/env target a config is created against. */
 export interface EditorContext {
@@ -32,6 +33,8 @@ export interface EditorContext {
   releaseId: string;
   containerId: string;
   envId: string;
+  /** The deployment track the configs belong to; undefined while the page hasn't resolved it. */
+  deploymentTrackId: string | undefined;
 }
 
 interface ConfigEditorProps {
@@ -79,17 +82,22 @@ function TypeCard({ title, description, selected, disabled, onSelect }: { title:
 /** The "Create a Config or Secret" form — env-var set or file mount, optionally a secret. */
 export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }: ConfigEditorProps): JSX.Element {
   const isEdit = !!existing;
-  const save = useSaveConfig(ctx.projectId);
+  const save = useSaveConfig(ctx.projectId, ctx.deploymentTrackId);
   const configId = existing ? (existing.mount.configmap_id ?? existing.mount.secret_id ?? '') : '';
   // Prefill values for an existing ConfigMap (secret values are write-only, so re-entered).
-  const { data: details } = useConfigMapDetails(ctx.projectId, existing && !existing.isSecret ? ctx.envId : undefined, existing && !existing.isSecret ? configId : undefined);
+  const { data: details } = useConfigMapDetails(ctx.projectId, existing && !existing.isSecret ? ctx.envId : undefined, existing && !existing.isSecret ? configId : undefined, ctx.deploymentTrackId);
 
   const [kind, setKind] = useState<ConfigKind>(existing?.kind ?? 'envVars');
   const [isSecret, setIsSecret] = useState(existing?.isSecret ?? false);
   const [name, setName] = useState(existing?.name ?? '');
-  const [rows, setRows] = useState<Array<{ key: string; value: string }>>(existing ? existing.keys.map((k) => ({ key: k, value: '' })) : []);
+  // A `stored` row is a secret already saved: its value is write-only, so it loads blank
+  // and stays as it is unless a new value is typed.
+  const [rows, setRows] = useState<Array<{ key: string; value: string; stored?: boolean }>>(existing ? existing.keys.map((k) => ({ key: k, value: '', stored: existing.isSecret })) : []);
   const [draftKey, setDraftKey] = useState('');
   const [draftValue, setDraftValue] = useState('');
+  const [draftError, setDraftError] = useState('');
+  const [revealedKeys, setRevealedKeys] = useState<ReadonlySet<string>>(new Set());
+  const draftMessageId = useId();
   const [mountPath, setMountPath] = useState(existing?.mount.mount_path ?? '');
   const [fileContent, setFileContent] = useState('');
   const [error, setError] = useState('');
@@ -103,29 +111,61 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
     else setRows(Object.entries(details.data).map(([key, value]) => ({ key, value })));
   }, [details, existing?.kind]);
 
-  const nameErr = validateDisplayName(name);
+  // An edit keeps the group's stored name, so only a new env-var group is held to the reserved prefix.
+  const nameErr = !isEdit && kind === 'envVars' ? validateNewEnvGroupName(name) : validateDisplayName(name);
   const draftKeyErr = draftKey ? validateConfigKey(draftKey) : '';
   const pathErr = validateMountPath(mountPath);
-  // Secret values are write-only, so existing-secret rows load blank and must be
-  // re-entered — never persist a secret env var with an empty value.
-  const hasEmptySecretValue = isSecret && kind === 'envVars' && rows.some((r) => r.value === '');
+  // A new secret needs a value; a stored one left blank keeps its current value.
+  const hasEmptySecretValue = isSecret && kind === 'envVars' && rows.some((r) => !r.stored && r.value === '');
   const canSave = !save.isPending && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? rows.length > 0 : !pathErr && fileContent.trim().length > 0);
+
+  // Baselines follow the prefill effect above, so loaded values do not read as edits.
+  const initialRows = existing ? (details?.data && existing.kind !== 'fileMount' ? Object.entries(details.data).map(([key, value]) => ({ key, value })) : existing.keys.map((key) => ({ key, value: '' }))) : [];
+  const initialFileContent = existing?.kind === 'fileMount' ? (details?.data?.data ?? '') : '';
+  const rowsChanged = rows.length !== initialRows.length || rows.some((r, i) => r.key !== initialRows[i].key || r.value !== initialRows[i].value);
+  const isDirty =
+    kind !== (existing?.kind ?? 'envVars') ||
+    isSecret !== (existing?.isSecret ?? false) ||
+    name !== (existing?.name ?? '') ||
+    mountPath !== (existing?.mount.mount_path ?? '') ||
+    fileContent !== initialFileContent ||
+    draftKey !== '' ||
+    draftValue !== '' ||
+    rowsChanged;
+  useUnsavedChanges(isDirty);
+  const guardNavigation = useLeaveGuard();
 
   const addRow = () => {
     const keyErr = validateConfigKey(draftKey);
     if (keyErr) {
-      setError(keyErr);
+      setDraftError(keyErr);
       return;
     }
     if (rows.some((r) => r.key === draftKey.trim())) {
-      setError('A variable with this key already exists.');
+      setDraftError('A variable with this key already exists.');
       return;
     }
     setRows((prev) => [...prev, { key: draftKey.trim(), value: draftValue }]);
     setDraftKey('');
     setDraftValue('');
-    setError('');
+    setDraftError('');
   };
+
+  const toggleReveal = (key: string) =>
+    setRevealedKeys((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const addOnEnter = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (draftKey.trim() && !draftKeyErr) addRow();
+  };
+
+  const draftMessage = (!!draftKey && draftKeyErr) || draftError;
 
   const importEnvFile = (file: File) => {
     void file.text().then((text) => {
@@ -147,7 +187,10 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const handleSave = () => {
     setError('');
     if (!canSave) return;
-    const data = kind === 'envVars' ? Object.fromEntries(rows.map((r) => [r.key, r.value])) : { data: fileContent };
+    // Stored secrets left blank are kept as they are, not re-sent.
+    const kept = rows.filter((r) => r.stored && r.value === '');
+    const sent = rows.filter((r) => !(r.stored && r.value === ''));
+    const data = kind === 'envVars' ? Object.fromEntries(sent.map((r) => [r.key, r.value])) : { data: fileContent };
     save.mutate(
       {
         componentId: ctx.componentId,
@@ -158,6 +201,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
         kind,
         name: name.trim(),
         data,
+        keep: kind === 'envVars' && kept.length ? kept.map((r) => r.key) : undefined,
         mountPath: kind === 'fileMount' ? mountPath.trim() : undefined,
         existing: existing ? { configId, mountId: existing.mount.ID } : undefined,
       },
@@ -166,9 +210,9 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   };
 
   return (
-    <Box sx={{ maxWidth: 720, '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
-      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={onBack} sx={{ mb: 2 }}>
-        Back to Configs List
+    <Box sx={{ maxWidth: 720 }}>
+      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={() => guardNavigation(onBack)} sx={{ mb: 2 }}>
+        Back to configs
       </Button>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
         {isEdit ? 'Edit Config or Secret' : 'Create a Config or Secret'}
@@ -186,14 +230,22 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
         </Stack>
 
         <FormControlLabel control={<Checkbox size="small" checked={isSecret} disabled={isEdit} onChange={(e) => setIsSecret(e.target.checked)} />} label="Mark as a Secret" sx={{ mb: 1 }} />
-        <TextField label="Display Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
+        <TextField labelPlacement="top" label="Display Name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
 
         {kind === 'envVars' ? (
           <Box>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mt: 3, mb: 2 }}>
-              <Typography sx={{ fontWeight: 600 }}>Environment Variables</Typography>
-              <Button size="small" variant="outlined" startIcon={<Upload size={14} />} onClick={() => envImportRef.current?.click()}>
-                Import from .env file
+            <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2} sx={styles.envHeader}>
+              <Box>
+                <Stack direction="row" alignItems="center" gap={1}>
+                  <Typography sx={styles.envTitle}>Environment variables</Typography>
+                  <Chip size="small" label={rows.length} sx={styles.envCountChip} />
+                </Stack>
+                <Typography variant="body2" color="text.secondary">
+                  Injected into the container at runtime.
+                </Typography>
+              </Box>
+              <Button size="small" variant="outlined" startIcon={<Upload size={14} />} onClick={() => envImportRef.current?.click()} sx={styles.envImportButton}>
+                Import .env
               </Button>
               <input
                 ref={envImportRef}
@@ -207,39 +259,112 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
                 }}
               />
             </Stack>
-            {rows.length > 0 && (
-              <Stack gap={1} sx={{ mb: 1 }}>
-                {rows.map((r, i) => (
-                  <Stack key={`${r.key}-${i}`} direction="row" gap={1} alignItems="center">
-                    <TextField size="small" value={r.key} disabled fullWidth sx={{ flex: 1 }} />
+            {rows.some((r) => r.stored) && (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                Secret values are hidden. Leave one blank to keep it, or type a new value to replace it.
+              </Typography>
+            )}
+            <Box sx={styles.envTable}>
+              <Box sx={styles.envRow}>
+                <Typography sx={styles.envHeadCell}>Key</Typography>
+                <Typography sx={styles.envHeadCell}>Value</Typography>
+                <span />
+              </Box>
+              {rows.map((r, i) => {
+                const revealed = revealedKeys.has(r.key);
+                return (
+                  <Box key={`${r.key}-${i}`} sx={styles.envRow}>
+                    <Typography sx={styles.envKeyText} title={r.key}>
+                      {r.key}
+                    </Typography>
                     <TextField
                       size="small"
-                      type={isSecret ? 'password' : 'text'}
+                      type={isSecret && !revealed ? 'password' : 'text'}
                       value={r.value}
-                      placeholder={isSecret ? 'Re-enter value' : ''}
-                      error={isSecret && r.value === ''}
+                      placeholder={r.stored ? '••••••••' : isSecret ? 'Enter a value' : ''}
+                      error={isSecret && !r.stored && r.value === ''}
                       onChange={(e) => setRows((prev) => prev.map((row, idx) => (idx === i ? { ...row, value: e.target.value } : row)))}
                       fullWidth
-                      sx={{ flex: 1 }}
+                      sx={styles.envValueInput}
+                      slotProps={{
+                        htmlInput: { 'aria-label': `Value of ${r.key}` },
+                        input: isSecret
+                          ? {
+                              endAdornment: (
+                                <InputAdornment position="end">
+                                  <IconButton size="small" edge="end" aria-label={revealed ? `Hide ${r.key}` : `Show ${r.key}`} onClick={() => toggleReveal(r.key)}>
+                                    {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
+                                  </IconButton>
+                                </InputAdornment>
+                              ),
+                            }
+                          : undefined,
+                      }}
                     />
-                    <IconButton size="small" color="error" aria-label={`Remove ${r.key}`} onClick={() => setRows((prev) => prev.filter((_, idx) => idx !== i))}>
-                      <Trash2 size={16} />
-                    </IconButton>
-                  </Stack>
-                ))}
-              </Stack>
-            )}
-            <Stack direction="row" gap={1} alignItems="flex-start">
-              <TextField size="small" label="Enter a new key" value={draftKey} onChange={(e) => setDraftKey(e.target.value)} error={!!draftKey && !!draftKeyErr} helperText={(!!draftKey && draftKeyErr) || ' '} sx={{ flex: 1 }} />
-              <TextField size="small" label="Enter a value" type={isSecret ? 'password' : 'text'} value={draftValue} onChange={(e) => setDraftValue(e.target.value)} helperText=" " sx={{ flex: 1 }} />
-              <Button variant="outlined" onClick={addRow} disabled={!draftKey.trim() || !!draftKeyErr} sx={{ mt: 0.25 }}>
-                Add
-              </Button>
-            </Stack>
+                    <Box sx={styles.envActions}>
+                      <IconButton
+                        size="small"
+                        color="error"
+                        aria-label={`Remove ${r.key}`}
+                        onClick={() => {
+                          setRows((prev) => prev.filter((_, idx) => idx !== i));
+                          setRevealedKeys((prev) => {
+                            const next = new Set(prev);
+                            next.delete(r.key);
+                            return next;
+                          });
+                        }}>
+                        <Trash2 size={16} />
+                      </IconButton>
+                    </Box>
+                  </Box>
+                );
+              })}
+              <Box sx={styles.envAddRow}>
+                <TextField
+                  size="small"
+                  placeholder="NEW_KEY"
+                  value={draftKey}
+                  onChange={(e) => {
+                    setDraftKey(e.target.value);
+                    setDraftError('');
+                  }}
+                  onKeyDown={addOnEnter}
+                  error={!!draftMessage}
+                  fullWidth
+                  sx={styles.envDraftInput}
+                  slotProps={{ htmlInput: { 'aria-label': 'New key', 'aria-describedby': draftMessageId } }}
+                />
+                <TextField
+                  size="small"
+                  placeholder="value"
+                  type={isSecret ? 'password' : 'text'}
+                  value={draftValue}
+                  onChange={(e) => setDraftValue(e.target.value)}
+                  onKeyDown={addOnEnter}
+                  fullWidth
+                  sx={styles.envDraftInput}
+                  slotProps={{ htmlInput: { 'aria-label': 'New value' } }}
+                />
+                <Button variant="outlined" onClick={addRow} disabled={!draftKey.trim() || !!draftKeyErr} sx={styles.envAddButton}>
+                  Add
+                </Button>
+              </Box>
+              {draftMessage ? (
+                <FormHelperText id={draftMessageId} error sx={styles.envHelper}>
+                  {draftMessage}
+                </FormHelperText>
+              ) : (
+                <FormHelperText id={draftMessageId} sx={styles.envHelper}>
+                  Press Enter or Add to save. Keys start with a letter or underscore and use letters, digits and underscores.
+                </FormHelperText>
+              )}
+            </Box>
           </Box>
         ) : (
           <Stack gap={3} sx={{ mt: 2 }}>
             <TextField
+              labelPlacement="top"
               label="File Mount path"
               value={mountPath}
               onChange={(e) => setMountPath(e.target.value)}
@@ -250,7 +375,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
             />
             <Box>
               <Button variant="outlined" startIcon={<Upload size={16} />} onClick={() => fileUploadRef.current?.click()}>
-                Upload File
+                Upload file
               </Button>
               <input
                 ref={fileUploadRef}
@@ -264,6 +389,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
               />
             </Box>
             <TextField
+              labelPlacement="top"
               label="File Content"
               value={fileContent}
               onChange={(e) => setFileContent(e.target.value)}

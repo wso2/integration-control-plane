@@ -41,6 +41,6 @@ describe('API Insights configuration', () => {
   });
 });
 
-it('builds a postMessage-authenticated embed URL without credentials', () => {
-  expect(moesifInsightsUrl('https://www.moesif.com')).toBe('https://www.moesif.com/wrap/basic#auth=post');
+it('builds a postMessage-authenticated embed URL for the isolated APIs section, without credentials', () => {
+  expect(moesifInsightsUrl('https://www.moesif.com')).toBe('https://www.moesif.com/wrap/basic/apis?embedded_ui=true&isolated_section=true#auth=post');
 });

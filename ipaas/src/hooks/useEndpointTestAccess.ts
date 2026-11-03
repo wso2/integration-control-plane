@@ -62,7 +62,7 @@ export interface EndpointTestAccess {
 const MINT_FAILED = 'Could not mint a test key.';
 
 /** Identity of the endpoint a minted key belongs to, so a key can never leak across endpoints. */
-const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.componentName ?? ''}|${ref?.environmentName ?? ''}|${ref?.endpointName ?? ''}`;
+const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.componentName ?? ''}|${ref?.environmentName ?? ''}|${ref?.endpointName ?? ''}|${ref?.deploymentTrackId ?? ''}`;
 
 /**
  * Test-time access to a deployed endpoint exposed on the API Platform gateway:
@@ -78,7 +78,7 @@ const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.component
  * the caller must call `mintKey()` explicitly, because the BFF's test-key route
  * switches the endpoint to api-key auth as a side effect.
  */
-export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabled = true): EndpointTestAccess {
+export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabled = true, gatewayUrlFallback = ''): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError } = useEndpointSecurity(ref, enabled);
   const createTestKey = useCreateEndpointTestKey(ref);
 
@@ -139,7 +139,11 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
     void mintKey();
   }, [mode, refKey, mintKey]);
 
-  const gatewayUrl = security?.publicUrl ?? '';
+  // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
+  // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
+  // that authoritative gateway address without making a missing optional field look like an
+  // unexposed API.
+  const gatewayUrl = security?.publicUrl || gatewayUrlFallback;
 
   return {
     gatewayUrl,

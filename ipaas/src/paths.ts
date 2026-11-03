@@ -3,6 +3,8 @@
  * Navigation for the main matrix pages is handled by src/nav.ts.
  */
 
+import { withBase } from './utils/basePath';
+
 export function loginUrl(): string {
   return '/login';
 }
@@ -29,6 +31,13 @@ export function cookiePolicyUrl(): string {
 
 export function termsOfUseUrl(): string {
   return 'https://wso2.com/integration-platform/terms-of-use';
+}
+
+/** The billing console's upgrade page for an org, or null when billing is not configured. */
+export function billingUpgradeUrl(orgUuid: string): string | null {
+  const base = window.API_CONFIG?.billingConsoleUrl;
+  if (!window.API_CONFIG?.enableBillingFeature || !base || !orgUuid) return null;
+  return `${base}/cloud/devant/upgrade?orgId=${encodeURIComponent(orgUuid)}`;
 }
 
 export function documentationUrl(): string {
@@ -275,7 +284,7 @@ export const gitProviderBase = {
 // redirectUri falls back to window.location.origin + '/ghapp' when empty.
 export function buildGitHubOAuthUrl(redirectUri: string, clientId: string, state: string, scope = 'repo,read:user'): string {
   const params = new URLSearchParams({
-    redirect_uri: redirectUri || `${window.location.origin}/ghapp`,
+    redirect_uri: redirectUri || `${window.location.origin}${withBase('/ghapp')}`,
     client_id: clientId,
     scope,
     state,
@@ -291,7 +300,6 @@ export function buildGitHubAppInstallUrl(slug: string): string {
 
 /** Moesif dashboard and the ipaas-service viewer-token endpoint. */
 export const MOESIF_ORIGINS = ['https://www.moesif.com', 'https://web-dev.moesif.com'] as const;
-// TODO: switch to Moesif's API-only overview (the reverse of isAiOnly) once it exists, to drop the
-// LLM, MCP and A2A traffic cards: https://github.com/wso2-enterprise/moesif-internal/issues/32
-export const moesifInsightsUrl = (origin: string): string => `${origin}/wrap/basic#auth=post`;
+// The isolated APIs section leaves out the LLM, MCP and A2A traffic cards.
+export const moesifInsightsUrl = (origin: string): string => `${origin}/wrap/basic/apis?embedded_ui=true&isolated_section=true#auth=post`;
 export const analyticsViewerTokenUrl = (base: string): string => `${base}/analytics/id-token`;

@@ -89,3 +89,6 @@ export const PILL_SELECT_SX = {
 export const CARD_TABLE_SX = {
   '& .MuiTableBody-root .MuiTableCell-root': { py: 2 },
 } as const;
+
+/** The shared minimum width lines up the commit that follows each card title. */
+export const CARD_HEADER_TITLE_SX = { fontWeight: 600, textTransform: 'capitalize', flexShrink: 0, minWidth: '7em' } as const;

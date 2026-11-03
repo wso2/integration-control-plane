@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListingTable, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListingTable, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, RotateCcw, Trash2, Download } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useCreateKafkaUser, useDeleteKafkaUser, useKafkaUsers, useResetKafkaUserCredentials } from '../../hooks/usePlatformServices';
@@ -204,6 +203,7 @@ export default function UsersTab({ brokerId }: { brokerId: string }): JSX.Elemen
             <Stack gap={2} sx={{ mt: 1 }}>
               {addError && <Alert severity="error">{addError}</Alert>}
               <TextField
+                labelPlacement="top"
                 label="Username"
                 fullWidth
                 size="small"

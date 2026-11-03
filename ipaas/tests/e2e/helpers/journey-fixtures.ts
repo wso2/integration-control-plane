@@ -20,7 +20,12 @@
 
 export const PROJECT = 'IPAAS-E2E';
 export const SAMPLE = 'Hello World Service';
-export const AUTOMATION = 'Scheduled Logger';
+/** Derived by the import from the sub path's last segment, so it is fixed. */
+export const AUTOMATION = 'Mi Automation';
+export const AUTOMATION_REPO_URL = 'https://github.com/Dilhasha/mi-cloud-samples';
+export const AUTOMATION_SUB_PATH = 'mi-automation';
+export const MI_TECHNOLOGY = 'WSO2 Integrator: MI';
+export const MI_SAMPLE_TECHNOLOGY = 'WSO2 MI';
 export const AGENT_TYPE = 'AI Agent';
 export const ENV = 'Development';
 
@@ -49,6 +54,8 @@ export const REMOVAL_TIMEOUT_MS = 10 * 60_000;
 /** A project goes only once its integrations are gone, so it is given longer than any one of them. */
 export const PROJECT_REMOVAL_TIMEOUT_MS = 15 * 60_000;
 export const DEPLOY_TIMEOUT_MS = 7 * 60_000;
+/** MI deployments run longer than Ballerina ones. */
+export const MI_DEPLOY_TIMEOUT_MS = 10 * 60_000;
 /** The card reports the previous deployment for a moment after Apply, so the status waits it out. */
 export const REDEPLOY_SETTLE_MS = 60_000;
 export const AGENT_REPLY_TIMEOUT_MS = 90_000;

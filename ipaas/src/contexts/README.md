@@ -80,3 +80,32 @@ Other approaches are less suitable:
 - **Global/app-level state** — introduces coupling to an unrelated part of the app.
 
 Context provides the right balance: data is **transient, isolated, and cleaned up as soon as the flow completes**.
+
+---
+
+## 4. Unsaved Changes Context
+
+**File:** `UnsavedChangesContext.tsx`
+
+### Purpose
+
+This context asks the user to confirm before they leave a form they have partly filled in. While any registered form is dirty, it shows an in-app "Leave this page?" dialog for:
+
+- navigations through `useAppNavigate` (which waits on `guardNavigation`);
+- clicks on links to another page of the console (a capture-phase document listener; new-tab, modified and download clicks pass through);
+- browser back and forward (the popped entry is restored with `history.go`, then replayed on Leave);
+- in-page "back" actions wrapped with `useLeaveGuard()`.
+
+Reload and tab close can only show the browser's own `beforeunload` prompt.
+
+Usage:
+
+- `const allowLeave = useUnsavedChanges(isDirty)` — `isDirty` is true when any field differs from its initial value. Call `allowLeave()` right before navigating after a successful save or an explicit Cancel, so that navigation is not prompted.
+- `const guardNavigation = useLeaveGuard()` — `guardNavigation(proceed)` runs `proceed` at once when nothing is dirty, otherwise after the user chooses Leave.
+
+The provider is mounted inside the router in `main.tsx`. The click and history decisions are pure functions in `utils/unsavedChanges.ts`.
+
+#### Why Context
+
+> [!IMPORTANT]
+> The dirty forms (pages, editors inside a page) and the code that navigates away (sidebar, header switchers, links, the browser) have no common parent below the router. The console uses `<BrowserRouter>`, not a data router, so React Router's `useBlocker` is unavailable. A context lets each form register its dirty flag and lets every navigation path consult one guard and one dialog. Dirty flags live in a ref, so registering does not re-render the tree.

@@ -21,7 +21,7 @@ export async function gotoOrgHome(page: Page, orgHandler: string): Promise<void>
   const landed = page.getByRole('heading', { name: 'All Projects' });
   if (await landed.isVisible({ timeout: 5_000 }).catch(() => false)) return;
 
-  await page.goto(`/organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });
   await expect(landed, `the org project list did not render for ${orgHandler}`).toBeVisible({ timeout: 60_000 });
 }
 

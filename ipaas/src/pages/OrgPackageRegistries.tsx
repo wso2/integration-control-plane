@@ -38,7 +38,7 @@ export default function OrgPackageRegistries(_scope: OrgScope): JSX.Element {
   const [view, setView] = useState<View>({ kind: 'list' });
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <OrgSettingsTabs active="package-registries" />
 
       {view.kind === 'ballerina-central' ? (
@@ -51,7 +51,7 @@ export default function OrgPackageRegistries(_scope: OrgScope): JSX.Element {
 
               return (
                 <Grid key={service.id} size={{ xs: 12, sm: 6, md: 4 }}>
-                  <Card variant="outlined" sx={{ height: '100%', borderRadius: 2, p: 3 }}>
+                  <Card sx={{ height: '100%', borderRadius: 2, p: 3 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                       <Box component="img" src={SERVICE_ICONS[service.iconType]} alt={service.name} sx={{ width: 48, height: 48, flexShrink: 0, objectFit: 'contain' }} />
                       <Chip size="small" variant="outlined" color={connected ? 'success' : 'default'} label={connected ? 'Connected' : 'Not connected'} />

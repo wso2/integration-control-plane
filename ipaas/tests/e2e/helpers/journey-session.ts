@@ -28,7 +28,7 @@ import { activeProject } from './journey-project.js';
 /** Parked on config.json first: reseeding writes through the page, so it needs the console's origin. */
 export async function refreshSession(page: Page): Promise<void> {
   if (!process.env.E2E_TOKEN_MODE) return;
-  await page.goto('/config.json', { waitUntil: 'domcontentloaded' });
+  await page.goto('config.json', { waitUntil: 'domcontentloaded' });
   await reseedSessionToken(page);
 }
 
@@ -36,7 +36,7 @@ export async function refreshSession(page: Page): Promise<void> {
 export async function reseedHere(page: Page): Promise<void> {
   if (!process.env.E2E_TOKEN_MODE) return;
   const here = page.url();
-  await page.goto('/config.json', { waitUntil: 'domcontentloaded' });
+  await page.goto('config.json', { waitUntil: 'domcontentloaded' });
   await reseedSessionToken(page);
   await page.goto(here, { waitUntil: 'domcontentloaded' });
 }
@@ -51,7 +51,7 @@ export function assertSignedIn(page: Page): void {
 
 export async function enterOrgHome(page: Page, orgHandler: string): Promise<void> {
   await refreshSession(page);
-  await page.goto(`/organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });
   assertSignedIn(page);
   await waitForApiConfig(page);
   await gotoOrgHome(page, orgHandler);
@@ -62,48 +62,33 @@ export async function enterProject(page: Page, orgHandler: string): Promise<void
   await openProject(page, activeProject());
 }
 
-/** Narrows the org home to one project: the list pages at ten cards, in no order we control. */
-export async function filterToProject(page: Page, name = activeProject()): Promise<void> {
+/** Re-entered and hovered each time: the card fetches its integration count only once hovered. */
+export async function openProjectCard(page: Page, orgHandler: string): Promise<void> {
+  await enterOrgHome(page, orgHandler);
+  await filterToProject(page);
+  const name = page.getByText(activeProject(), { exact: true }).first();
+  await expect(name).toBeVisible({ timeout: 30_000 });
+  await name.hover();
+}
+
+/** `isVisible` ignores its timeout, so this waits for the element before answering. */
+export async function appears(locator: Locator, timeout = 15_000): Promise<boolean> {
+  return locator.waitFor({ state: 'visible', timeout }).then(
+    () => true,
+    () => false,
+  );
+}
+
+/** Narrows the org home to the fixture project: the list pages at ten cards, in no order we control. */
+export async function filterToProject(page: Page): Promise<void> {
   const search = page.getByPlaceholder('Search projects');
   if (!(await search.isVisible({ timeout: 15_000 }).catch(() => false))) return;
-  await search.fill(name);
+  await search.fill(activeProject());
 }
 
-/** Present only on a card that is not being deleted — see ProjectCard in Projects.tsx. */
-export function projectDeleteButton(page: Page, name = activeProject()): Locator {
+/** Present only on a card that is not being deleted, and disabled while integrations remain — see ProjectCard in Projects.tsx. */
+export function projectDeleteButton(page: Page, name: string = activeProject()): Locator {
   return page.getByRole('button', { name: `Delete ${name}`, exact: true }).first();
-}
-
-/**
- * Opens the delete dialog from the org's project list, the only place a project is deleted from.
- * The button stays disabled while the project holds integrations, so `emptyWithin` bounds the wait for them to go.
- */
-export async function openProjectDeleteDialog(page: Page, orgHandler: string, name = activeProject(), emptyWithin = 60_000): Promise<Locator> {
-  await enterOrgHome(page, orgHandler);
-  await filterToProject(page, name);
-  const button = projectDeleteButton(page, name);
-  await expect(button, `${name} still holds integrations, so its delete button stayed disabled`).toBeEnabled({ timeout: emptyWithin });
-  await button.click();
-  const dialog = page.getByRole('dialog').filter({ hasText: 'Are you sure you want to remove the project' });
-  await expect(dialog).toBeVisible({ timeout: 30_000 });
-  return dialog;
-}
-
-/** The dialog asks for the name only once the project is empty. */
-export function projectDeleteConfirmField(dialog: Locator): Locator {
-  return dialog.getByPlaceholder('Enter project name to confirm');
-}
-
-/** Confirms an open delete dialog; throws with the console's reason when the delete is refused. */
-export async function confirmProjectDelete(dialog: Locator, name: string): Promise<void> {
-  await projectDeleteConfirmField(dialog).fill(name);
-  const confirm = dialog.getByRole('button', { name: 'Delete', exact: true });
-  await expect(confirm, 'Delete stayed disabled after the name was typed').toBeEnabled({ timeout: 15_000 });
-  await confirm.click();
-  const rejected = dialog.getByRole('alert').filter({ hasText: /Failed to delete the project/i });
-  await Promise.race([dialog.waitFor({ state: 'hidden', timeout: 60_000 }).catch(() => {}), rejected.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {})]);
-  if (await rejected.isVisible().catch(() => false)) throw new Error(`the console rejected the delete: ${(await rejected.textContent())?.trim()}`);
-  await expect(dialog, 'the delete dialog neither closed nor reported an error').toBeHidden({ timeout: 30_000 });
 }
 
 /** Asked of the page, not remembered: a worker restart resets any flag and would skip every group. */
@@ -114,11 +99,7 @@ export async function enterProjectOrSkip(page: Page, orgHandler: string): Promis
     await enterOrgHome(page, orgHandler);
     await filterToProject(page);
     // Not the card's name: a deleting project keeps its card but is hidden from the switcher.
-    if (
-      await projectDeleteButton(page)
-        .isVisible({ timeout: 15_000 })
-        .catch(() => false)
-    ) {
+    if (await appears(projectDeleteButton(page))) {
       await openProject(page, activeProject());
       return;
     }

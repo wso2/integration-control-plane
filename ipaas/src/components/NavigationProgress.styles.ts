@@ -24,7 +24,7 @@ import type { Theme } from '@wso2/oxygen-ui';
  * still visible, and click-through so it can never swallow an interaction.
  */
 /** Shared with PageLoader, so the two progress bars stay the same weight. */
-export const BAR_HEIGHT = 3;
+const BAR_HEIGHT = 3;
 
 export const bar = {
   position: 'fixed',

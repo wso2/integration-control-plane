@@ -17,6 +17,7 @@
  */
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react';
+import { local } from '../utils/storage';
 
 type FeatureMap = Record<string, boolean>;
 
@@ -34,7 +35,7 @@ const STORAGE_KEY = 'feature_preview';
 
 function loadFromStorage(): FeatureMap {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const stored = local.get(STORAGE_KEY);
     return stored ? (JSON.parse(stored) as FeatureMap) : {};
   } catch {
     return {};
@@ -47,7 +48,7 @@ export function FeaturePreviewProvider({ children }: { children: React.ReactNode
   const updateFeatures = useCallback((updated: FeatureMap) => {
     setFeatures((prev) => {
       const next = { ...prev, ...updated };
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      local.set(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }, []);

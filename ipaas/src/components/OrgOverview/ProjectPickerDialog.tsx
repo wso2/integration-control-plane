@@ -17,9 +17,8 @@
  */
 
 import { useState, type JSX } from 'react';
-import { Box, Button, Dialog, DialogContent, IconButton, MenuItem, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Dialog, DialogContent, IconButton, MenuItem, TextField, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
-import TextField from '../common/TextField';
 import type { Project } from '../../types/project';
 import * as styles from './dialogs.styles';
 
@@ -51,7 +50,7 @@ export default function ProjectPickerDialog({ open, projects, onClose, onSelect 
             <X size={16} />
           </IconButton>
         </Box>
-        <TextField select label="Project" value={selected?.id ?? ''} onChange={(e) => setPicked(e.target.value)} fullWidth sx={{ mt: 3 }}>
+        <TextField select label="Project" labelPlacement="top" value={selected?.id ?? ''} onChange={(e) => setPicked(e.target.value)} fullWidth sx={{ mt: 3 }}>
           {projects.map((p) => (
             <MenuItem key={p.id} value={p.id}>
               {p.name}

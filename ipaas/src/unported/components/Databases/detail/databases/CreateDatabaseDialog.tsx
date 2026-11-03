@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from '@wso2/oxygen-ui';
-import TextField from '../../../../../components/common/TextField';
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useCreateDatabase } from '../../../../hooks/usePlatformServices';
 import type { Notify } from './types';
@@ -53,6 +52,7 @@ export default function CreateDatabaseDialog({ serverId, existingNames, onClose,
       <DialogTitle>Create a New Database</DialogTitle>
       <DialogContent>
         <TextField
+          labelPlacement="top"
           autoFocus
           fullWidth
           size="small"

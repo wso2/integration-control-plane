@@ -20,7 +20,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useProjectHandlerAvailability } from './useProjects';
 import type { ProjectHandlerAvailability } from '../types/project';
 import { HANDLER_DEBOUNCE_MS, PROJECT_HANDLER_MAX_LENGTH } from '../constants/project';
-import { toProjectHandler } from '../utils/string';
+import { toProjectHandler, withRandomSuffix } from '../utils/string';
 
 export interface UseProjectHandlerReturn {
   handler: string;
@@ -28,6 +28,10 @@ export interface UseProjectHandlerReturn {
   isCheckingAvailability: boolean;
   availability: ProjectHandlerAvailability | undefined;
   availabilityError: boolean;
+  /** Whether the availability check says the handle now shown is taken. */
+  handlerTaken: boolean;
+  /** The user's own handle when it was taken and swapped for `handler`; null otherwise. */
+  replacedHandler: string | null;
   startEditing: () => void;
   stopEditing: () => void;
   onHandlerChange: (value: string) => void;
@@ -37,11 +41,14 @@ export function useProjectHandler(displayName: string): UseProjectHandlerReturn 
   const [handlerEdited, setHandlerEdited] = useState(false);
   const [manualHandler, setManualHandler] = useState('');
   const [debouncedCandidate, setDebouncedCandidate] = useState('');
+  // A free handle swapped in for a taken one, kept only while `base` is still the requested handle.
+  const [replacement, setReplacement] = useState<{ base: string; handler: string } | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const autoHandler = toProjectHandler(displayName, PROJECT_HANDLER_MAX_LENGTH);
   // Use manualHandler when set (confirmed or in-progress override), otherwise fall back to auto.
-  const effectiveHandler = manualHandler || autoHandler;
+  const requestedHandler = manualHandler || autoHandler;
+  const effectiveHandler = replacement?.base === requestedHandler ? replacement.handler : requestedHandler;
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -57,9 +64,17 @@ export function useProjectHandler(displayName: string): UseProjectHandlerReturn 
 
   const { data: availability, isFetching: isCheckingAvailability, isError: availabilityError } = useProjectHandlerAvailability(debouncedCandidate, debouncedCandidate.length >= 2);
 
+  // A taken handle becomes the BFF's suggestion, else gets a random suffix; never while the user is typing.
+  useEffect(() => {
+    if (handlerEdited || !availability || availability.handlerUnique || debouncedCandidate !== effectiveHandler) return;
+    setReplacement({ base: requestedHandler, handler: availability.alternateHandlerCandidate || withRandomSuffix(requestedHandler, PROJECT_HANDLER_MAX_LENGTH) });
+  }, [handlerEdited, availability, debouncedCandidate, effectiveHandler, requestedHandler]);
+
   const startEditing = () => {
     setHandlerEdited(true);
     setManualHandler(effectiveHandler);
+    // The handle shown becomes the user's own, so an earlier swap must not re-apply while they type.
+    setReplacement(null);
   };
 
   const stopEditing = () => {
@@ -74,9 +89,12 @@ export function useProjectHandler(displayName: string): UseProjectHandlerReturn 
   return {
     handler: effectiveHandler,
     handlerEdited,
-    isCheckingAvailability,
+    // Also true during the debounce, so submit waits for the handle actually shown to be checked.
+    isCheckingAvailability: isCheckingAvailability || (effectiveHandler.length >= 2 && debouncedCandidate !== effectiveHandler),
     availability,
     availabilityError,
+    handlerTaken: !!availability && !availability.handlerUnique && debouncedCandidate === effectiveHandler,
+    replacedHandler: manualHandler && effectiveHandler !== requestedHandler ? requestedHandler : null,
     startEditing,
     stopEditing,
     onHandlerChange,

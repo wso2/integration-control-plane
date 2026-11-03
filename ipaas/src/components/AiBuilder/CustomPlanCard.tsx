@@ -48,7 +48,7 @@ export function CustomPlanCard({ response, onOpenEditor }: { response: CustomInt
     <ResponseCard
       actions={
         <Button variant="contained" color="primary" size="small" endIcon={<Send size={14} />} onClick={onOpenEditor}>
-          Generate &amp; Open in Editor
+          Generate &amp; open in editor
         </Button>
       }>
       {response.message && (

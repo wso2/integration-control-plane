@@ -16,9 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, Drawer, FormControlLabel, IconButton, MenuItem, Radio, RadioGroup, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Checkbox, CircularProgress, DrawerPanel, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { API_KEY_SCHEME_DESCRIPTION, COMING_SOON_OAUTH, COMING_SOON_UPSTREAM_ATTRS, DEFAULT_API_KEY_HEADER, OAUTH_HEADER, OAUTH_SCHEME_DESCRIPTION } from '../../../constants/apiConsumption';
 import { useEndpointSecurity, useSetEndpointSecurity } from '../../../hooks/useConsumers';
@@ -38,6 +36,8 @@ interface ApiSecurityDrawerProps {
   endpoints: EndpointOption[];
   /** Endpoint selected when the drawer opens (the env card's active endpoint). */
   activeEndpointName?: string;
+  /** The deployment track whose API is configured; absent means the default track. */
+  deploymentTrackId?: string;
 }
 
 /**
@@ -45,12 +45,12 @@ interface ApiSecurityDrawerProps {
  * the APIM SecurityDrawer's layout (endpoint selector + security-scheme table)
  * minus the Resources section, which has no cloud equivalent.
  */
-export default function ApiSecurityDrawer({ open, onClose, componentName, envName, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
+export default function ApiSecurityDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
   const [mode, setMode] = useState<SecurityMode>('none');
   const [apiKeyHeader, setApiKeyHeader] = useState(DEFAULT_API_KEY_HEADER);
   const [error, setError] = useState<string | null>(null);
 
-  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, endpoints, activeEndpointName });
+  const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, deploymentTrackId, endpoints, activeEndpointName });
 
   const { data: security, isLoading: loadingSecurity, error: securityError } = useEndpointSecurity(endpointRef, open);
   const setSecurityMutation = useSetEndpointSecurity(endpointRef);
@@ -102,102 +102,98 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
   };
 
   return (
-    <Drawer anchor="right" open={open} onClose={handleCancel} variant="temporary" sx={styles.rightDrawer}>
-      <Box sx={styles.drawerFrame}>
-        <Box sx={styles.drawerHeader}>
-          <Typography variant="subtitle1" fontWeight={600}>
-            Configure Security
-          </Typography>
-          <IconButton size="small" aria-label="close" onClick={handleCancel}>
-            <X size={16} />
-          </IconButton>
-        </Box>
+    <DrawerPanel open={open} onClose={handleCancel}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Configure Security</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-        <Box sx={styles.drawerBody}>
-          {!selectedEndpoint ? (
-            <Alert severity="info">No endpoint associated with this component.</Alert>
-          ) : (
-            <Stack gap={2.5}>
-              {error && <Alert severity="error">{error}</Alert>}
-              {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
+      <DrawerPanel.Body>
+        {!selectedEndpoint ? (
+          <Alert severity="info">No endpoint associated with this component.</Alert>
+        ) : (
+          <Stack gap={2.5}>
+            {error && <Alert severity="error">{error}</Alert>}
+            {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
 
-              <Stack direction="row" alignItems="center" gap={2}>
-                <Typography variant="body2" fontWeight={500}>
-                  Endpoints:
-                </Typography>
-                <Select size="small" value={selectedIdx} onChange={(e) => selectEndpoint(Number(e.target.value))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
-                  {endpoints.map((ep, i) => (
-                    <MenuItem key={ep.name} value={i}>
-                      {ep.displayName}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </Stack>
-
-              {loadingSecurity ? (
-                <Box sx={styles.loadingRow}>
-                  <CircularProgress size={20} />
-                </Box>
-              ) : (
-                <RadioGroup value={mode} name="security-scheme">
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell sx={styles.tableHeadCell}>Security Scheme</TableCell>
-                        <TableCell sx={styles.tableHeadCell}>Security Header</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell sx={styles.schemeCell}>
-                          <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => selectScheme('api-key')} size="small" />} label="API Key" />
-                        </TableCell>
-                        <TableCell>
-                          <TextField size="small" value={apiKeyHeader} onChange={(e) => setApiKeyHeader(e.target.value)} disabled={!isApiKey} fullWidth />
-                          <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
-                            {API_KEY_SCHEME_DESCRIPTION}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                      {/* Visible but unselectable until jwt-auth is wired end to end. */}
-                      <TableRow>
-                        <TableCell sx={styles.schemeCell}>
-                          <Tooltip title={COMING_SOON_OAUTH}>
-                            <Box component="span" sx={styles.disabledTooltipTarget}>
-                              <FormControlLabel value="jwt" control={<Radio checked={isOAuth} size="small" disabled />} label="OAuth" disabled />
-                            </Box>
-                          </Tooltip>
-                        </TableCell>
-                        <TableCell>
-                          <TextField size="small" value={OAUTH_HEADER} disabled fullWidth />
-                          <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
-                            {OAUTH_SCHEME_DESCRIPTION}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </RadioGroup>
-              )}
-
-              <Tooltip title={COMING_SOON_UPSTREAM_ATTRS}>
-                <Box component="span" sx={styles.disabledTooltipTarget}>
-                  <FormControlLabel control={<Checkbox checked={false} size="small" disabled />} label="Pass end-user attributes to upstream" disabled />
-                </Box>
-              </Tooltip>
+            <Stack direction="row" alignItems="center" gap={2}>
+              <Typography variant="body2" fontWeight={500}>
+                Endpoints:
+              </Typography>
+              <Select size="small" value={selectedIdx} onChange={(e) => selectEndpoint(Number(e.target.value))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
+                {endpoints.map((ep, i) => (
+                  <MenuItem key={ep.name} value={i}>
+                    {ep.displayName}
+                  </MenuItem>
+                ))}
+              </Select>
             </Stack>
-          )}
-        </Box>
 
-        <Box sx={styles.drawerFooter}>
-          <Button variant="outlined" onClick={handleCancel} disabled={saving}>
-            Cancel
-          </Button>
-          <Button variant="contained" onClick={() => void handleApply()} disabled={saving || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
-            {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
-          </Button>
-        </Box>
-      </Box>
-    </Drawer>
+            {loadingSecurity ? (
+              <Box sx={styles.loadingRow}>
+                <CircularProgress size={20} />
+              </Box>
+            ) : (
+              <RadioGroup value={mode} name="security-scheme">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell sx={styles.tableHeadCell}>Security Scheme</TableCell>
+                      <TableCell sx={styles.tableHeadCell}>Security Header</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell sx={styles.schemeCell}>
+                        <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => selectScheme('api-key')} size="small" />} label="API Key" />
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" value={apiKeyHeader} onChange={(e) => setApiKeyHeader(e.target.value)} disabled={!isApiKey} fullWidth />
+                        <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
+                          {API_KEY_SCHEME_DESCRIPTION}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                    {/* Visible but unselectable until jwt-auth is wired end to end. */}
+                    <TableRow>
+                      <TableCell sx={styles.schemeCell}>
+                        <Tooltip title={COMING_SOON_OAUTH}>
+                          <Box component="span" sx={styles.disabledTooltipTarget}>
+                            <FormControlLabel value="jwt" control={<Radio checked={isOAuth} size="small" disabled />} label="OAuth" disabled />
+                          </Box>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <TextField size="small" value={OAUTH_HEADER} disabled fullWidth />
+                        <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
+                          {OAUTH_SCHEME_DESCRIPTION}
+                        </Typography>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </RadioGroup>
+            )}
+
+            <Tooltip title={COMING_SOON_UPSTREAM_ATTRS}>
+              <Box component="span" sx={styles.disabledTooltipTarget}>
+                <FormControlLabel control={<Checkbox checked={false} size="small" disabled />} label="Pass end-user attributes to upstream" disabled />
+              </Box>
+            </Tooltip>
+          </Stack>
+        )}
+      </DrawerPanel.Body>
+
+      <DrawerPanel.Footer>
+        <Button variant="outlined" color="inherit" onClick={handleCancel} disabled={saving}>
+          Cancel
+        </Button>
+        <Button variant="contained" onClick={() => void handleApply()} disabled={saving || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
+          {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
+        </Button>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

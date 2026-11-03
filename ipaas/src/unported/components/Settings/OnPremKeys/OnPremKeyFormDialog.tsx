@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 
 interface OnPremKeyFormDialogProps {
@@ -40,7 +39,7 @@ export default function OnPremKeyFormDialog({ title, submitLabel, busyLabel, ini
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
-        <TextField label="Key name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required autoFocus sx={{ mt: 1, '& .MuiFormLabel-asterisk': { color: 'error.main' } }} />
+        <TextField labelPlacement="top" label="Key name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required autoFocus sx={{ mt: 1, '& .MuiFormLabel-asterisk': { color: 'error.main' } }} />
         {error && (
           <Alert severity="error" sx={{ mt: 2 }}>
             {error}

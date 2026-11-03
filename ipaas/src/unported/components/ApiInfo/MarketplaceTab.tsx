@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, Card, Chip, CircularProgress, Divider, IconButton, InputAdornment, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Box, Button, Card, Chip, CircularProgress, Divider, IconButton, InputAdornment, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Clock, Edit, Eye } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import type { ApimApiInfo } from '../../../types/apim';
@@ -221,11 +220,12 @@ export default function MarketplaceTab({ componentId, version, endpoint, endpoin
             {endpointName}
           </Typography>
 
-          <TextField label="Display Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth size="small" slotProps={{ htmlInput: { 'aria-label': 'Display Name' } }} />
+          <TextField labelPlacement="top" label="Display Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth size="small" slotProps={{ htmlInput: { 'aria-label': 'Display Name' } }} />
 
-          <TextField label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} fullWidth multiline rows={3} size="small" disabled={!serviceReady} slotProps={{ htmlInput: { 'aria-label': 'Summary' } }} />
+          <TextField labelPlacement="top" label="Summary" value={summary} onChange={(e) => setSummary(e.target.value)} fullWidth multiline rows={3} size="small" disabled={!serviceReady} slotProps={{ htmlInput: { 'aria-label': 'Summary' } }} />
 
           <TextField
+            labelPlacement="top"
             label="Overview"
             value={overviewSaved}
             fullWidth

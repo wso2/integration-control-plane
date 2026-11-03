@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Grid, MenuItem, Select, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Grid, MenuItem, Select, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { type JSX } from 'react';
 import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
@@ -79,13 +78,13 @@ export default function EmbeddingModelStep({ value, onChange }: EmbeddingModelSt
               ))}
             </Select>
           ) : (
-            <TextField label="Model Id" required fullWidth size="small" value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
+            <TextField labelPlacement="top" label="Model Id" required fullWidth size="small" value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
           )}
 
           {value.provider === 'azure_openai' && (
             <>
-              <TextField label="Base URL" required fullWidth size="small" value={value.azureBaseUrl} onChange={(e) => onChange({ ...value, azureBaseUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
-              <TextField label="API Version" required fullWidth size="small" value={value.azureApiVersion} onChange={(e) => onChange({ ...value, azureApiVersion: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              <TextField labelPlacement="top" label="Base URL" required fullWidth size="small" value={value.azureBaseUrl} onChange={(e) => onChange({ ...value, azureBaseUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              <TextField labelPlacement="top" label="API Version" required fullWidth size="small" value={value.azureApiVersion} onChange={(e) => onChange({ ...value, azureApiVersion: e.target.value })} sx={REQUIRED_FIELD_SX} />
             </>
           )}
 

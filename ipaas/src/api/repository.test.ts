@@ -19,13 +19,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const put = vi.hoisted(() => vi.fn());
+const get = vi.hoisted(() => vi.fn());
+const post = vi.hoisted(() => vi.fn());
 
 vi.mock('./_client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./_client')>();
-  return { ...actual, bff: { ...actual.bff, put } };
+  return { ...actual, bff: { ...actual.bff, get, post, put } };
 });
 
-import { updateBuildpackConfigs } from './repository';
+import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, markAzureDevOpsDefaultBranch, updateBuildpackConfigs } from './repository';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
 
 const baseInput: UpdateBuildpackConfigsInput = {
@@ -44,9 +46,10 @@ describe('updateBuildpackConfigs', () => {
     put.mockResolvedValue({ success: true });
   });
 
-  it('sends the unit test opt-in and build environment variables without row ids', async () => {
+  it('sends the unit test opt-in, the submodule setting and build environment variables without row ids', async () => {
     await updateBuildpackConfigs({
       ...baseInput,
+      pullLatestSubmodules: true,
       environmentVariables: [
         { id: 'row-1', key: 'FOO', value: 'bar' },
         { key: 'MI_VERSION', value: '4.4.0' },
@@ -55,6 +58,7 @@ describe('updateBuildpackConfigs', () => {
 
     expect(put).toHaveBeenCalledWith('/components/demo-svc/buildpack-config', {
       isUnitTestEnabled: true,
+      pullLatestSubmodules: true,
       environmentVariables: [
         { key: 'FOO', value: 'bar' },
         { key: 'MI_VERSION', value: '4.4.0' },
@@ -65,13 +69,56 @@ describe('updateBuildpackConfigs', () => {
   it('sends an empty list so removing every variable clears them', async () => {
     await updateBuildpackConfigs({ ...baseInput, environmentVariables: [] });
 
-    expect(put.mock.calls[0][1]).toEqual({ isUnitTestEnabled: true, environmentVariables: [] });
+    expect(put.mock.calls[0][1]).toEqual({ isUnitTestEnabled: true, pullLatestSubmodules: false, environmentVariables: [] });
   });
 
   it('leaves the stored variables untouched when none are given', async () => {
     await updateBuildpackConfigs(baseInput);
 
     const body = put.mock.calls[0][1] as Record<string, unknown>;
-    expect(JSON.parse(JSON.stringify(body))).toEqual({ isUnitTestEnabled: true });
+    expect(JSON.parse(JSON.stringify(body))).toEqual({ isUnitTestEnabled: true, pullLatestSubmodules: false });
+  });
+});
+
+describe('Azure DevOps repository API', () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+  });
+
+  it('binds the authorization code with the exact callback URI', async () => {
+    post.mockResolvedValue({ items: [{ organization: 'acme' }] });
+    await expect(connectAzureDevOps('code', 'https://console.example/ipaas/adoapp')).resolves.toEqual([{ organization: 'acme' }]);
+    expect(post).toHaveBeenCalledWith('/git/azuredevops/organizations', { code: 'code', redirectUri: 'https://console.example/ipaas/adoapp' });
+  });
+
+  it('uses the cascading organization, project and repository query shapes', async () => {
+    get
+      .mockResolvedValueOnce({ items: [{ organization: 'acme' }] })
+      .mockResolvedValueOnce({ items: [{ id: 'p1', name: 'Payments' }] })
+      .mockResolvedValueOnce({ items: [{ name: 'order-sync', project: 'Payments', defaultBranch: 'refs/heads/main' }] });
+
+    await fetchAzureDevOpsOrganizations();
+    await fetchAzureDevOpsProjects('acme org');
+    await fetchAzureDevOpsRepositories('acme org', 'Payments & Billing');
+
+    expect(get.mock.calls.map((call) => call[0])).toEqual(['/git/azuredevops/organizations', '/git/azuredevops/projects?organization=acme%20org', '/git/azuredevops/repos?organization=acme%20org&project=Payments%20%26%20Billing']);
+  });
+
+  it('lists branch names without refetching the repository list', async () => {
+    get.mockResolvedValueOnce({ items: ['refs/heads/main', 'feature/demo'] });
+    await expect(fetchAzureDevOpsBranches('acme', 'Payments', 'order-sync')).resolves.toEqual(['main', 'feature/demo']);
+    expect(get.mock.calls.map((call) => call[0])).toEqual(['/git/azuredevops/branches?organization=acme&project=Payments&repo=order-sync']);
+  });
+
+  it('marks the default branch from the repository list ref', () => {
+    expect(markAzureDevOpsDefaultBranch(['main', 'feature/demo'], 'refs/heads/main')).toEqual([
+      { name: 'main', isDefault: true },
+      { name: 'feature/demo', isDefault: false },
+    ]);
+  });
+
+  it('marks no default for a repository without one', () => {
+    expect(markAzureDevOpsDefaultBranch(['main'], undefined)).toEqual([{ name: 'main', isDefault: false }]);
   });
 });

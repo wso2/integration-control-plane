@@ -16,36 +16,43 @@
  * under the License.
  */
 
+import type { Theme } from '@wso2/oxygen-ui';
 import type { OperationTileColors } from './OperationTile';
 
 // ── Operation tile / header (shared by OperationTile + OperationHeader) ──────
 
+/** A palette token such as `primary.main` as a CSS colour; a raw colour passes through. */
+const cssColor = (theme: Theme, value: string): string => {
+  const [group, shade] = value.split('.');
+  const palette = (theme.vars ?? theme).palette as unknown as Record<string, Record<string, string> | undefined>;
+  return (shade && palette[group]?.[shade]) || value;
+};
+
+/** Dark mode swaps `cardBg` (Devant's light method colours) for a deeper wash, since those glare there. */
+const tileBackground = (colors: OperationTileColors) => (theme: Theme) => ({
+  border: '1px solid',
+  borderColor: `color-mix(in srgb, ${cssColor(theme, colors.badgeBg)} 30%, transparent)`,
+  bgcolor: colors.cardBg ?? `color-mix(in srgb, ${cssColor(theme, colors.badgeBg)} 8%, transparent)`,
+  ...theme.applyStyles('dark', { bgcolor: `color-mix(in srgb, ${cssColor(theme, colors.badgeBg)} 16%, transparent)` }),
+});
+
 /** Tile row container — colour-dependent, so built per consumer's `colors`. */
-export const operationTileSx = (colors: OperationTileColors) =>
-  ({
+export const operationTileSx = (colors: OperationTileColors) => [
+  {
     display: 'flex',
     alignItems: 'center',
     gap: 1.5,
     px: 1,
     py: 0.75,
     mb: 0.75,
-    border: '0.5px solid',
-    borderColor: colors.border ?? colors.badgeBg,
     borderRadius: 0.5,
-    bgcolor: colors.cardBg,
     '&:last-child': { mb: 0 },
-  }) as const;
+  } as const,
+  tileBackground(colors),
+];
 
 /** In-drawer header row that visually mirrors the tile. */
-export const operationHeaderRowSx = (colors: OperationTileColors) =>
-  ({
-    border: '0.5px solid',
-    borderColor: colors.border ?? colors.badgeBg,
-    borderRadius: 0.5,
-    px: 1.5,
-    py: 1,
-    bgcolor: colors.cardBg,
-  }) as const;
+export const operationHeaderRowSx = (colors: OperationTileColors) => [{ borderRadius: 0.5, px: 1.5, py: 1 } as const, tileBackground(colors)];
 
 /** The coloured type/verb badge. `minWidth` differs between tile (72) and header (64). */
 export const operationBadgeSx = (colors: OperationTileColors, minWidth: number) =>
@@ -62,28 +69,10 @@ export const operationBadgeSx = (colors: OperationTileColors, minWidth: number) 
     flexShrink: 0,
   }) as const;
 
-/** Right drawer paper — width varies (default 720; MCP tools use a narrower drawer). */
-export const operationDrawerPaperSx = (width: number) =>
-  ({
-    '& .MuiDrawer-paper': {
-      width,
-      maxWidth: '100vw',
-      position: 'fixed',
-      top: 64,
-      height: 'calc(100% - 64px)',
-      borderLeft: '1px solid',
-      borderColor: 'divider',
-      display: 'flex',
-      flexDirection: 'column',
-    },
-  }) as const;
-
 export const OPERATION_TILE_LABEL_SX = { flex: 1, fontSize: '13px', fontWeight: 500, wordBreak: 'break-word', color: 'text.primary' } as const;
 export const OPERATION_HEADER_LABEL_SX = { fontFamily: 'monospace', fontWeight: 500, wordBreak: 'break-word', color: 'text.primary' } as const;
 export const OPERATION_DESCRIPTION_SX = { mt: 1, px: 0.5 } as const;
 export const VIEW_DETAILS_BUTTON_SX = { fontSize: '12px', flexShrink: 0, textTransform: 'none' } as const;
-export const OPERATION_DRAWER_HEADER_SX = { px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 } as const;
-export const OPERATION_DRAWER_BODY_SX = { flex: 1, overflowY: 'auto', px: 2, py: 2 } as const;
 
 // ── File / event runtime-log body ────────────────────────────────────────────
 

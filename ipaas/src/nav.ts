@@ -21,6 +21,7 @@ import { Outlet, useParams, useLocation } from 'react-router';
 import { capitalize } from './utils/string';
 import { SETTINGS_SECTIONS, type SettingsSectionDef } from './constants/orgSettingsSections';
 import { COMPONENT_SETTINGS_SECTIONS } from './constants/componentSettingsSections';
+import { local } from './utils/storage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -167,7 +168,11 @@ export function sidebarItems(scope: Scope, currentResource: Resource | null): Si
 }
 
 export function newProjectUrl(scope: { org: string }): string {
-  return `/organizations/${scope.org}/projects/new`;
+  return `/organizations/${scope.org}/new`;
+}
+
+export function editProjectUrl(scope: { org: string; project: string }): string {
+  return `/organizations/${scope.org}/projects/${scope.project}/edit`;
 }
 
 export function importProjectUrl(scope: { org: string }): string {
@@ -295,6 +300,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'configs-secrets', navId: 'configs-secrets', segment: 'admin/configs', parent: 'operate' },
     { key: 'health-checks', navId: 'health-checks', segment: 'admin/health-checks', parent: 'operate' },
     { key: 'scaling', navId: 'scaling', segment: 'admin/scaling', parent: 'operate' },
+    { key: 'settings', navId: 'component-settings', segment: 'settings' },
   ],
 };
 
@@ -447,7 +453,7 @@ export function ScopeResolver(): JSX.Element {
   const { pathname } = useLocation();
   // When not inside an org route (e.g. /profile), fall back to the stored handle so the
   // nav shows the correct org rather than a synthetic 'default' that would produce bad URLs.
-  const stored = localStorage.getItem('org_handle');
+  const stored = local.get('org_handle');
   const validUrl = urlOrgHandler && urlOrgHandler !== 'default' ? urlOrgHandler : null;
   const orgHandler = validUrl ?? (stored && stored !== 'default' ? stored : '');
   const scope = resolveScope(orgHandler, projectHandler, componentHandler);

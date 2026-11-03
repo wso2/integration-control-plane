@@ -34,8 +34,6 @@ export const POD_EVENT_COUNT_TOOLTIP = 'The number of times this event has been 
 /** Typing in the Since Seconds box would otherwise refetch on every keystroke. */
 export const SINCE_SECONDS_DEBOUNCE_MS = 300;
 
-/** Pod drawers open below the app bar; the expanded state takes the full window width. */
-export const POD_DRAWER_TOP_OFFSET = 64;
 export const POD_DRAWER_WIDTH = 960;
 
 /**

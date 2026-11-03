@@ -30,6 +30,7 @@ import { formatComponentType } from '../constants/integrations';
 import { usePrebuiltIntegrations, usePrebuiltInstructions, usePrebuiltConfigSchema } from '../hooks/usePrebuiltIntegrations';
 import { derivePrebuiltSlug } from '../utils/prebuilt';
 import { usePrebuiltIntegrationConfig } from '../contexts/PrebuiltIntegrationConfigContext';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import type { ProjectScope } from '../nav';
 import { prebuiltIntegrationsUrl, prebuiltIntegrationDeployUrl } from '../paths';
 import type { PrebuiltIntegration } from '../types/prebuilt';
@@ -86,6 +87,8 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
   const [tomlValues, setTomlValues] = useState<Map<string, BaseType> | null>(null);
   const [tomlError, setTomlError] = useState<string | null>(null);
   const { setIntegration, setConfigValues: storeConfigValues } = usePrebuiltIntegrationConfig();
+  // The form seeds required booleans as false on mount, so only other values count as input.
+  const allowLeave = useUnsavedChanges(tomlFileName !== null || configValues.some((item) => item.values.some((v) => v.value !== 'false')));
 
   const { instructions, isInstructionsLoading } = usePrebuiltInstructions(integration);
   const { configSchema, isConfigSchemaLoading } = usePrebuiltConfigSchema(integration);
@@ -100,6 +103,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
     if (!integration || !slug) return;
     setIntegration(integration);
     storeConfigValues(configValues);
+    allowLeave();
     navigate(prebuiltIntegrationDeployUrl(scope.org, scope.project, slug));
   };
 
@@ -115,7 +119,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
   if (!integration) {
     if (!fromState && isPrebuiltLoading) {
       return (
-        <PageContent sx={{ pt: 5 }}>
+        <PageContent fullWidth sx={{ pt: 5 }}>
           <Skeleton variant="rounded" width={220} height={36} sx={{ mb: 3 }} />
           <Skeleton variant="rounded" height={72} sx={{ mb: 4 }} />
           <Skeleton variant="rounded" height={360} />
@@ -123,9 +127,9 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
       );
     }
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={handleBack} sx={{ mb: 3, pl: 0 }}>
-          Select a different integration
+          Back to prebuilt integrations
         </Button>
         <Typography color="error">Integration not found. Please go back and select an integration.</Typography>
       </PageContent>
@@ -133,9 +137,9 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
   }
 
   return (
-    <PageContent sx={{ pt: 5, pb: 6 }}>
+    <PageContent fullWidth sx={{ pt: 5, pb: 6 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={handleBack} sx={{ mb: 3, pl: 0 }}>
-        Select a different integration
+        Back to prebuilt integrations
       </Button>
 
       {/* ── Header ── */}
@@ -227,7 +231,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
             <Tooltip title="Please fill the required fields to deploy the integration" disableHoverListener={deployEnabled} placement="top" arrow>
               <span>
                 <Button variant="contained" endIcon={<ArrowRight size={16} />} onClick={handleDeploy} disabled={!deployEnabled}>
-                  Deploy Integration
+                  Deploy integration
                 </Button>
               </span>
             </Tooltip>

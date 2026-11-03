@@ -19,7 +19,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { fetchSamples } from '../api/samples';
 import type { SamplesData } from '../types/samples';
-import { ALLOWED_SAMPLE_TYPES, MI_BUILDPACK, normalizeComponentType } from '../constants/integrations';
+import { ALLOWED_SAMPLE_TYPES, normalizeComponentType } from '../constants/integrations';
 
 const DEFAULT_SAMPLES_URL = 'https://raw.githubusercontent.com/wso2/integration-samples/main/.metadata/samples.json';
 
@@ -29,11 +29,12 @@ export function useSamples() {
     queryFn: async ({ signal }) => {
       const url = window.API_CONFIG?.samplesUrl ?? DEFAULT_SAMPLES_URL;
       const rawData = await fetchSamples(url, signal);
-      const samples = rawData.samples.filter((s) => ALLOWED_SAMPLE_TYPES.has(s.componentType) && s.buildPack !== MI_BUILDPACK);
+      const samples = rawData.samples.filter((s) => ALLOWED_SAMPLE_TYPES.has(s.componentType));
       return {
         samples,
         featuredSamples: samples.slice(0, 3),
         uniqueTypes: Array.from(new Set(samples.map((s) => normalizeComponentType(s.componentType)))),
+        uniqueBuildPacks: Array.from(new Set(samples.map((s) => s.buildPack))).sort(),
         uniqueTags: Array.from(new Set(samples.flatMap((s) => s.tags))).sort(),
       };
     },

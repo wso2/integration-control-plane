@@ -40,8 +40,8 @@ import {
   Stack,
   Tooltip,
   Typography,
+  TextField,
 } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
 import { ArrowRight, ChevronDown, Copy, Eye, EyeOff, Pencil, Plus, RefreshCw, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import StatusDot from '../_shared/StatusDot';
@@ -52,6 +52,7 @@ import { OAUTH_CLIENT_SECRET } from '../../../constants/tailscale';
 import type { TailscaleAuthMethod, TailscalePortMapping } from '../../../types/tailscale';
 import type { Environment } from '../../../types/environment';
 import { deploymentPollInterval } from '../../../utils/deploymentStatus';
+import { useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 import { joinPortMappings, safeAtob, tailscaleConfigMapName, tailscaleSecretName } from '../../../utils/tailscale';
 
 interface TailscaleEnvCardProps {
@@ -110,6 +111,13 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
 
   const saveAndDeploy = useSaveAndDeployTailscale(projectId);
   const redeploy = useRedeployTailscale();
+  useUnsavedChanges(
+    authKey !== '' ||
+      clientSecret !== '' ||
+      authMethod !== (configuredAuthMethod ?? 'authKey') ||
+      JSON.stringify(mappings) !== JSON.stringify(savedMappings) ||
+      JSON.stringify(form) !== JSON.stringify(editingIndex !== null ? mappings[editingIndex] : emptyForm),
+  );
 
   // Tailscale URL (protocol + selected endpoint), like Devant.
   const hostName = endpoints[0]?.hostName ?? '';
@@ -164,7 +172,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
   };
 
   return (
-    <Card variant="outlined" sx={{ mb: 3 }}>
+    <Card sx={{ mb: 3 }}>
       <CardContent>
         <Stack direction="row" alignItems="center" gap={2} sx={{ mb: 1.5 }}>
           <Typography variant="h6">{env.name}</Typography>
@@ -193,12 +201,12 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
         {hostName && namespace && (
           <Box sx={{ mb: 2 }}>
             <Stack direction="row" gap={2} alignItems="flex-end" flexWrap="wrap">
-              <TextField select size="small" label="Protocol" value={protocol} onChange={(e) => setProtocol(e.target.value as 'http' | 'https')} sx={{ width: 120 }}>
+              <TextField labelPlacement="top" select size="small" label="Protocol" value={protocol} onChange={(e) => setProtocol(e.target.value as 'http' | 'https')} sx={{ width: 120 }}>
                 <MenuItem value="http">HTTP</MenuItem>
                 <MenuItem value="https">HTTPS</MenuItem>
               </TextField>
               {mappings.length > 0 && (
-                <TextField select size="small" label="Endpoint" value={selectedPort === '' ? '' : String(selectedPort)} onChange={(e) => setSelectedPort(Number(e.target.value))} sx={{ minWidth: 200 }}>
+                <TextField labelPlacement="top" select size="small" label="Endpoint" value={selectedPort === '' ? '' : String(selectedPort)} onChange={(e) => setSelectedPort(Number(e.target.value))} sx={{ minWidth: 200 }}>
                   {mappings.map((m, idx) => (
                     <MenuItem key={`${m.port}-${idx}`} value={String(m.port)}>
                       {m.name} (:{m.port})
@@ -207,6 +215,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
                 </TextField>
               )}
               <TextField
+                labelPlacement="top"
                 size="small"
                 label="Tailscale URL"
                 value={tailscaleUrl}
@@ -260,6 +269,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
               </Alert>
             )}
             <TextField
+              labelPlacement="top"
               fullWidth
               size="small"
               sx={{ mt: 1 }}
@@ -363,19 +373,19 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
                 </Typography>
                 <Grid container spacing={1} alignItems="center">
                   <Grid size={{ xs: 3 }}>
-                    <TextField size="small" fullWidth label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
+                    <TextField labelPlacement="top" size="small" required fullWidth label="Name" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} />
                   </Grid>
                   <Grid size={{ xs: 2 }}>
-                    <TextField size="small" fullWidth type="number" label="Port" value={form.port || ''} onChange={(e) => setForm((f) => ({ ...f, port: Number(e.target.value) }))} />
+                    <TextField labelPlacement="top" size="small" required fullWidth type="number" label="Port" value={form.port || ''} onChange={(e) => setForm((f) => ({ ...f, port: Number(e.target.value) }))} />
                   </Grid>
                   <Grid size={{ xs: 1 }} sx={{ textAlign: 'center' }}>
                     <ArrowRight size={16} />
                   </Grid>
                   <Grid size={{ xs: 3 }}>
-                    <TextField size="small" fullWidth label="Device IP" value={form.ip} onChange={(e) => setForm((f) => ({ ...f, ip: e.target.value }))} />
+                    <TextField labelPlacement="top" size="small" required fullWidth label="Device IP" value={form.ip} onChange={(e) => setForm((f) => ({ ...f, ip: e.target.value }))} />
                   </Grid>
                   <Grid size={{ xs: 2 }}>
-                    <TextField size="small" fullWidth type="number" label="Device Port" value={form.targetPort || ''} onChange={(e) => setForm((f) => ({ ...f, targetPort: Number(e.target.value) }))} />
+                    <TextField labelPlacement="top" size="small" required fullWidth type="number" label="Device Port" value={form.targetPort || ''} onChange={(e) => setForm((f) => ({ ...f, targetPort: Number(e.target.value) }))} />
                   </Grid>
                   <Grid size={{ xs: 1 }}>
                     <Stack direction="row">
@@ -387,7 +397,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
                         </span>
                       </Tooltip>
                       {editingIndex !== null && (
-                        <Button size="small" onClick={resetForm}>
+                        <Button size="small" variant="outlined" color="inherit" onClick={resetForm}>
                           Cancel
                         </Button>
                       )}
@@ -402,7 +412,7 @@ export default function TailscaleEnvCard({ orgHandler, projectId, component, ver
         {canManage && (
           <Box sx={{ mt: 2 }}>
             <Button variant="contained" onClick={handleSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
-              {saving ? 'Applying…' : 'Save & Deploy'}
+              {saving ? 'Applying…' : 'Save & deploy'}
             </Button>
           </Box>
         )}

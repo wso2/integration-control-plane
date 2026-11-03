@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Card, CircularProgress, Drawer, IconButton, InputAdornment, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
-import { ArrowUpRight, CheckCircle2, Lock, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Card, CircularProgress, DrawerPanel, InputAdornment, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { ArrowUpRight, CheckCircle2, Lock } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS, BALLERINA_CENTRAL_TOKEN_PANEL_COPY as PANEL_COPY } from '../../constants/packageRegistries';
 import { useBallerinaCentralToken, useSaveBallerinaCentralToken } from '../../hooks/useBallerinaCentralToken';
@@ -54,137 +53,121 @@ export default function BallerinaCentralTokenDrawer({ open, onClose, tokenInput,
   };
 
   return (
-    <Drawer
-      anchor="right"
-      open={open}
-      onClose={handleClose}
-      sx={{
-        '& .MuiDrawer-paper': {
-          width: { xs: '100%', sm: 480 },
-          top: { xs: '56px', sm: '64px' },
-          height: 'auto',
-          bottom: 0,
-        },
-      }}>
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-        {/* Header */}
-        <Box sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h5">{PANEL_COPY.heading}</Typography>
-          <IconButton size="small" onClick={handleClose} aria-label="Close Ballerina Central access">
-            <X size={16} />
-          </IconButton>
-        </Box>
+    <DrawerPanel open={open} onClose={handleClose} width={480}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>{PANEL_COPY.heading}</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton label="Close Ballerina Central access" />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-        {/* Content */}
-        <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 2 }}>
-          {isLoading ? (
-            <Skeleton variant="rounded" height={160} />
-          ) : configured ? (
-            <Stack gap={2}>
-              <Alert severity="success">{PANEL_COPY.saveSuccessMessage}</Alert>
+      <DrawerPanel.Body>
+        {isLoading ? (
+          <Skeleton variant="rounded" height={160} />
+        ) : configured ? (
+          <Stack gap={2}>
+            <Alert severity="success">{PANEL_COPY.saveSuccessMessage}</Alert>
 
-              <Card variant="outlined" sx={{ p: 2.5, borderRadius: 1 }}>
-                <Stack direction="row" alignItems="center" gap={1} sx={{ color: 'success.main', mb: 2 }}>
-                  <CheckCircle2 size={18} />
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'success.main' }}>
-                    Token configured
+            <Card sx={{ p: 2.5, borderRadius: 1 }}>
+              <Stack direction="row" alignItems="center" gap={1} sx={{ color: 'success.main', mb: 2 }}>
+                <CheckCircle2 size={18} />
+                <Typography variant="subtitle2" sx={{ fontWeight: 700, color: 'success.main' }}>
+                  Token configured
+                </Typography>
+              </Stack>
+              <Stack direction="row">
+                <Stack gap={0.5} sx={{ flex: 1 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Added on
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                    {formatDateTime(tokenStatus?.addedOn)}
                   </Typography>
                 </Stack>
-                <Stack direction="row">
+                {tokenStatus?.expiresOn && (
                   <Stack gap={0.5} sx={{ flex: 1 }}>
                     <Typography variant="body2" color="text.secondary">
-                      Added on
+                      Expires on
                     </Typography>
                     <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                      {formatDateTime(tokenStatus?.addedOn)}
+                      {formatDateTime(tokenStatus.expiresOn)}
                     </Typography>
                   </Stack>
-                  {tokenStatus?.expiresOn && (
-                    <Stack gap={0.5} sx={{ flex: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Expires on
-                      </Typography>
-                      <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                        {formatDateTime(tokenStatus.expiresOn)}
-                      </Typography>
-                    </Stack>
-                  )}
-                </Stack>
-              </Card>
-
-              <Alert severity="info">You can update this anytime from Settings &gt; Package Registries in your organization's home view.</Alert>
-            </Stack>
-          ) : (
-            <Stack gap={2}>
-              {error && <Alert severity="error">{error}</Alert>}
-
-              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
-                <Stack gap={1.5}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                    {BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.heading}
-                  </Typography>
-                  <Stack component="ol" gap={1} sx={{ m: 0, pl: 2.5 }}>
-                    {BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.steps.map((step) => (
-                      <Typography key={step} component="li" variant="body2">
-                        {step}
-                      </Typography>
-                    ))}
-                  </Stack>
-                  <Link href={BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.linkUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontWeight: 600, width: 'fit-content' }}>
-                    {BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.linkLabel} <ArrowUpRight size={16} />
-                  </Link>
-                </Stack>
-              </Box>
-
-              <Stack gap={1}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                  {PANEL_COPY.accessTokenLabel}
-                </Typography>
-                <TextField
-                  fullWidth
-                  type="password"
-                  value={tokenInput}
-                  onChange={(e) => onTokenInputChange(e.target.value)}
-                  placeholder={PANEL_COPY.tokenPlaceholder}
-                  disabled={saveToken.isPending}
-                  slotProps={{ htmlInput: { 'aria-label': PANEL_COPY.accessTokenLabel } }}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Lock size={16} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                )}
               </Stack>
+            </Card>
 
-              <Alert severity="info">
-                <Typography component="span" variant="body2">
-                  {PANEL_COPY.infoMessage}
+            <Alert severity="info">You can update this anytime from Settings &gt; Package Registries in your organization's home view.</Alert>
+          </Stack>
+        ) : (
+          <Stack gap={2}>
+            {error && <Alert severity="error">{error}</Alert>}
+
+            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
+              <Stack gap={1.5}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  {BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.heading}
                 </Typography>
-              </Alert>
-            </Stack>
-          )}
-        </Box>
+                <Stack component="ol" gap={1} sx={{ m: 0, pl: 2.5 }}>
+                  {BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.steps.map((step) => (
+                    <Typography key={step} component="li" variant="body2">
+                      {step}
+                    </Typography>
+                  ))}
+                </Stack>
+                <Link href={BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.linkUrl} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, fontWeight: 600, width: 'fit-content' }}>
+                  {BALLERINA_CENTRAL_TOKEN_INSTRUCTIONS.linkLabel} <ArrowUpRight size={16} />
+                </Link>
+              </Stack>
+            </Box>
 
-        {/* Footer */}
-        <Box sx={{ px: 3, py: 2, borderTop: '1px solid', borderColor: 'divider', display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-          {configured ? (
-            <Button variant="contained" onClick={handleClose}>
+            <Stack gap={1}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                {PANEL_COPY.accessTokenLabel}
+              </Typography>
+              <TextField
+                fullWidth
+                type="password"
+                value={tokenInput}
+                onChange={(e) => onTokenInputChange(e.target.value)}
+                placeholder={PANEL_COPY.tokenPlaceholder}
+                disabled={saveToken.isPending}
+                slotProps={{ htmlInput: { 'aria-label': PANEL_COPY.accessTokenLabel } }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Lock size={16} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Stack>
+
+            <Alert severity="info">
+              <Typography component="span" variant="body2">
+                {PANEL_COPY.infoMessage}
+              </Typography>
+            </Alert>
+          </Stack>
+        )}
+      </DrawerPanel.Body>
+
+      <DrawerPanel.Footer>
+        {configured ? (
+          <Button variant="contained" onClick={handleClose}>
+            Close
+          </Button>
+        ) : (
+          <>
+            <Button variant="outlined" onClick={handleClose}>
               Close
             </Button>
-          ) : (
-            <>
-              <Button variant="outlined" onClick={handleClose}>
-                Close
-              </Button>
-              <Button variant="contained" disabled={!tokenInput.trim() || saveToken.isPending} onClick={handleSave} startIcon={saveToken.isPending ? <CircularProgress size={14} /> : undefined}>
-                {PANEL_COPY.saveLabel}
-              </Button>
-            </>
-          )}
-        </Box>
-      </Box>
-    </Drawer>
+            <Button variant="contained" disabled={!tokenInput.trim() || saveToken.isPending} onClick={handleSave} startIcon={saveToken.isPending ? <CircularProgress size={14} /> : undefined}>
+              {PANEL_COPY.saveLabel}
+            </Button>
+          </>
+        )}
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

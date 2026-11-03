@@ -13,6 +13,7 @@ Run from `ipaas/`. Use Node.js 20 or later; the unit tests fail on Node 18.
 | Install              | `pnpm install`                               |
 | Type-check and build | `pnpm build:check` (`tsc -b && vite build`)  |
 | Build only           | `pnpm build`                                 |
+| Build under a prefix | `BASE_PATH=/integration-platform pnpm build` |
 | Lint                 | `pnpm lint`                                  |
 | Unit tests           | `pnpm test:unit`                             |
 | One unit test file   | `pnpm exec vitest run src/utils/foo.test.ts` |
@@ -50,6 +51,11 @@ All signed-in routes live under `/organizations/:org/`. The org handle comes fro
 - **Auth:** import auth only from `src/auth` (its `index.ts`). ESLint rejects imports of files inside it.
 - **Unported code:** nothing outside `src/unported/` imports from it. ESLint enforces this.
 - **URLs:** build every in-app URL with the helpers in `nav.ts` or `paths.ts`. No route strings in components.
+- **Base path:** the console can be served under a path prefix (`BASE_PATH` build arg → Vite `base`, default the root).
+  The router's basename covers router-relative code, so only window-level URLs — `window.open`, `window.location`,
+  `new URL`, and pathname comparisons — go through `withBase` / `stripBase` in `src/utils/basePath.ts`.
+- **Browser storage:** read and write it through `src/utils/storage.ts`, which prefixes this console's keys. The
+  console shares one origin with the other WSO2 Cloud consoles, so unprefixed names collide with theirs.
 - **Runtime config:** read backend URLs from `window.API_CONFIG`, never from `import.meta.env`. New keys go through `src/config/runtimeConfig.ts` and `docs/runtime-config.md`.
 
 ## Code rules

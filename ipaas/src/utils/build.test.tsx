@@ -38,7 +38,7 @@ import AzureDevOpsIcon from '../assets/icons/AzureDevOpsIcon';
 import GitLabIcon from '../assets/icons/GitLabIcon';
 import BitbucketIcon from '../assets/icons/BitbucketIcon';
 import GitLogoIcon from '../assets/icons/GitLogoIcon';
-import { safeAtob, buildLogText, getStepStatus, formatBuildDate, gitProviderLabel, getGitProviderIcon, repoUrl, validateBuildEnvVar } from './build';
+import { safeAtob, buildLogText, getStepStatus, isBuildLive, formatBuildDate, gitProviderLabel, getGitProviderIcon, repoUrl, validateBuildEnvVar } from './build';
 import type { BuildRunLogs, BuildStage } from '../types/build';
 import type { Repository } from '../types/repository';
 
@@ -212,8 +212,12 @@ describe('gitProviderLabel', () => {
     expect(gitProviderLabel('GitHub')).toBe('GitHub');
   });
 
+  it('labels azure_devops', () => {
+    expect(gitProviderLabel('azure_devops')).toBe('Azure DevOps');
+  });
+
   it('falls back to the raw provider for unknown values', () => {
-    expect(gitProviderLabel('azure_devops')).toBe('azure_devops');
+    expect(gitProviderLabel('gitea')).toBe('gitea');
   });
 
   it('returns an empty string for an empty provider', () => {
@@ -303,8 +307,16 @@ describe('repoUrl', () => {
     expect(repoUrl(makeRepo({ gitProvider: 'bitbucket_server' }))).toBe('my-org/my-repo');
   });
 
-  it('returns an empty string for an unknown provider', () => {
+  it('builds an azure devops url under the project', () => {
+    expect(repoUrl(makeRepo({ gitProvider: 'azure_devops', projectApp: 'Payments Team' }))).toBe('https://dev.azure.com/my-org/Payments%20Team/_git/my-repo');
+  });
+
+  it('returns an empty string for azure devops without a project', () => {
     expect(repoUrl(makeRepo({ gitProvider: 'azure_devops' }))).toBe('');
+  });
+
+  it('returns an empty string for an unknown provider', () => {
+    expect(repoUrl(makeRepo({ gitProvider: 'gitea' }))).toBe('');
   });
 });
 
@@ -337,5 +349,17 @@ describe('validateBuildEnvVar', () => {
       { key: 'BAZ', value: 'qux' },
     ];
     expect(validateBuildEnvVar(vars, 0, keyRegex)).toBe(null);
+  });
+});
+
+describe('isBuildLive', () => {
+  it('is live while queued or running', () => {
+    expect(isBuildLive('queued')).toBe(true);
+    expect(isBuildLive('in_progress')).toBe(true);
+  });
+
+  it('is not live once completed or unknown', () => {
+    expect(isBuildLive('completed')).toBe(false);
+    expect(isBuildLive(undefined)).toBe(false);
   });
 });

@@ -29,7 +29,7 @@ const CARD_COUNT = 3;
  */
 export default function ProjectCardListSkeleton(): JSX.Element {
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
         <PageTitle.Header>
           <Skeleton variant="text" width={140} />
@@ -39,7 +39,7 @@ export default function ProjectCardListSkeleton(): JSX.Element {
       <Grid container spacing={2} aria-busy="true" aria-label="Loading projects">
         {Array.from({ length: CARD_COUNT }, (_, i) => (
           <Grid key={i} size={{ xs: 12, sm: 6, md: 4 }}>
-            <Card variant="outlined">
+            <Card>
               <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
                 <Skeleton variant="rounded" width={48} height={48} />
                 <Skeleton variant="text" width="55%" />

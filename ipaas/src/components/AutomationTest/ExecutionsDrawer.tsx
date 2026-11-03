@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Box, ButtonBase, CircularProgress, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { CheckCircle2, FileText, Inbox, X, XCircle } from '@wso2/oxygen-ui-icons-react';
+import { Box, ButtonBase, CircularProgress, DrawerPanel, Stack, Typography } from '@wso2/oxygen-ui';
+import { CheckCircle2, FileText, Inbox, XCircle } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { TaskExecution } from '../../types/executions';
 import { executionPhase } from '../../utils/executionStatus';
@@ -55,15 +55,15 @@ const rowSx = { width: '100%', textAlign: 'left', border: '1px solid', borderCol
  */
 export default function ExecutionsDrawer({ open, onClose, executions, hasDraft, onSelectDraft, onSelectExecution }: ExecutionsDrawerProps): JSX.Element {
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} variant="temporary" sx={{ '& .MuiDrawer-paper': { width: 440, top: 64, height: 'calc(100% - 64px)' } }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="h5">Executions</Typography>
-        <IconButton size="small" aria-label="close" onClick={onClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={onClose} width={440}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Executions</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 2 }}>
+      <DrawerPanel.Body>
         <Stack gap={1}>
           {hasDraft && (
             <ButtonBase onClick={onSelectDraft} sx={{ ...rowSx, borderStyle: 'dashed', borderColor: 'primary.main' }}>
@@ -111,7 +111,7 @@ export default function ExecutionsDrawer({ open, onClose, executions, hasDraft, 
             ))
           )}
         </Stack>
-      </Box>
-    </Drawer>
+      </DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

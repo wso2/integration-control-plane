@@ -48,7 +48,7 @@ setup('TC_IP_AUTH_005 seed the cloud session from a token', async ({ browser }, 
   // org whose home has never been opened it also provisions the default project.
   const context = await newConsoleContext(browser, { storageState: AUTH_FILE, baseURL });
   const page = await context.newPage();
-  await page.goto('/');
+  await page.goto('./');
   await waitForApiConfig(page);
   assertClientMatchesConsole(claims, await page.evaluate(() => (window as unknown as { API_CONFIG: { asgardeoClientId: string } }).API_CONFIG.asgardeoClientId));
   await expect(page, 'Token did not produce a signed-in session').toHaveURL(

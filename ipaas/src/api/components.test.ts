@@ -19,13 +19,16 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const post = vi.hoisted(() => vi.fn());
+const get = vi.hoisted(() => vi.fn());
+const put = vi.hoisted(() => vi.fn());
 
 vi.mock('./_client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./_client')>();
-  return { ...actual, bff: { ...actual.bff, post } };
+  return { ...actual, bff: { ...actual.bff, post, get, put } };
 });
 
-import { createComponent } from './components';
+import { BffError } from './_client';
+import { createComponent, createDeploymentTrack, fetchComponentByHandler, updateDeploymentTrack, updateEndpoint } from './components';
 import type { CreateComponentInput } from '../types/component';
 
 const baseInput: CreateComponentInput = {
@@ -98,6 +101,30 @@ describe('createComponent component-type mapping', () => {
     expect(bodyOf().spec.componentType.name).toBe('deployment/integration-as-api');
   });
 
+  it('sends an Azure DevOps binding and an explicit empty workflow secretRef', async () => {
+    await createComponent({
+      ...baseInput,
+      isPublicRepo: false,
+      srcGitRepoUrl: 'https://dev.azure.com/acme/Payments/_git/order-sync',
+      repositorySubPath: '/integrations/order-sync',
+      azureDevOps: { organization: 'acme', project: 'Payments', repo: 'order-sync' },
+    });
+    const body = post.mock.calls[0][1] as {
+      azureDevOps: Record<string, unknown>;
+      spec: { workflow: { parameters: { repository: Record<string, unknown> } } };
+    };
+    expect(body.azureDevOps).toEqual({
+      organization: 'acme',
+      adoProject: 'Payments',
+      repo: 'order-sync',
+      branch: 'main',
+      appPath: 'integrations/order-sync',
+      repositoryUrl: 'https://dev.azure.com/acme/Payments/_git/order-sync',
+    });
+    expect(body.spec.workflow.parameters.repository.secretRef).toBe('');
+    expect(body.spec.workflow.parameters.repository.url).toBe('https://dev.azure.com/acme/Payments/_git/order-sync');
+  });
+
   // The mi-* types carry the MI resource defaults; the shared types' defaults OOMKill the MI JVM.
   it.each([
     ['miApiService', 'deployment/mi-integration-as-api'],
@@ -109,5 +136,168 @@ describe('createComponent component-type mapping', () => {
     await createComponent({ ...baseInput, displayType } as CreateComponentInput);
     expect(bodyOf().spec.componentType.name).toBe(expected);
     expect(bodyOf().spec.workflow?.name).toBe('mi-image-builder');
+  });
+});
+
+describe('updateEndpoint visibility reconciliation', () => {
+  it('targets one environment and sends product-facing values', async () => {
+    put.mockResolvedValue({});
+    await updateEndpoint({
+      projectId: 'project-a',
+      componentId: 'orders',
+      environmentId: 'development',
+      versionId: 'v1',
+      releaseId: 'r1',
+      endpointId: 'http',
+      displayName: 'HTTP',
+      networkVisibilities: ['Project', 'Public'],
+    });
+    expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?projectName=project-a&deploymentTrackId=v1', {
+      visibility: ['project', 'public'],
+      displayProjectUrl: true,
+    });
+  });
+
+  it('keeps implicit project access while hiding its URL', async () => {
+    put.mockResolvedValue({});
+    await updateEndpoint({
+      projectId: 'project-a',
+      componentId: 'orders',
+      environmentId: 'development',
+      versionId: 'v1',
+      releaseId: 'r1',
+      endpointId: 'http',
+      displayName: 'HTTP',
+      networkVisibilities: ['Public'],
+    });
+    expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?projectName=project-a&deploymentTrackId=v1', {
+      visibility: ['project', 'public'],
+      displayProjectUrl: false,
+    });
+  });
+});
+
+describe('deployment tracks', () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+    put.mockReset();
+    post.mockResolvedValue({ id: 'next-bbbbbb' });
+    put.mockResolvedValue({ id: 'next-bbbbbb' });
+  });
+
+  it('reads the tracks from the component detail', async () => {
+    get.mockResolvedValue({
+      id: 'uid-1',
+      handler: 'hello',
+      deploymentTracksEnabled: true,
+      deploymentTracks: [
+        { id: 'main-aaaaaa', branch: 'main', latest: true },
+        { id: 'next-bbbbbb', branch: 'next' },
+      ],
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(get).toHaveBeenCalledWith('/projects/proj/components/hello');
+    expect(c.deploymentTracks?.map((t) => t.id)).toEqual(['main-aaaaaa', 'next-bbbbbb']);
+    expect(c.apiVersions?.map((v) => [v.id, v.branch, v.latest])).toEqual([
+      ['main-aaaaaa', 'main', true],
+      ['next-bbbbbb', 'next', false],
+    ]);
+  });
+
+  // Pages key their track-scoped queries off a track id, so a component the BFF
+  // reports no tracks for still gets one: its own id, which the BFF reads as the default.
+  it('gives a component without tracks one track named by its id', async () => {
+    get.mockResolvedValue({ id: 'uid-1', handler: 'hello' });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', latest: true }]);
+  });
+
+  // A BFF that predates the detail endpoint answers it with an empty stub.
+  it('falls back to the list endpoint when the detail answer names no component', async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') return { orgHandler: 'proj' };
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      if (path === '/components/hello/deployment-track') return { id: 'uid-1', branch: 'main', latest: true };
+      throw new Error(`unexpected ${path}`);
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.id).toBe('uid-1');
+    expect(c.handler).toBe('hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', branch: 'main', latest: true, autoDeployEnabled: undefined }]);
+    expect(c.apiVersions?.map((v) => [v.id, v.branch, v.latest])).toEqual([['uid-1', 'main', true]]);
+  });
+
+  it('keeps the fallback usable when the track lookup fails', async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') return {};
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      throw new Error('HTTP 500');
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.deploymentTracks).toEqual([{ id: 'uid-1', branch: undefined, latest: true, autoDeployEnabled: undefined }]);
+  });
+
+  it.each([
+    ['a server error', new BffError(500, 'list deployment tracks: boom')],
+    ['a network failure', new TypeError('Failed to fetch')],
+    ['a 404 from a BFF without the detail route', new BffError(404, '404 page not found')],
+  ])('falls back to the list endpoint when the detail route fails with %s', async (_label, failure) => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') throw failure;
+      if (path === '/projects/proj/components') return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello', displayType: 'ballerinaService' }] };
+      if (path === '/components/hello/deployment-track') return { id: 'uid-1', branch: 'main', latest: true };
+      throw new Error(`unexpected ${path}`);
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.id).toBe('uid-1');
+  });
+
+  it("keeps the detail route's answer about the component when it is a client error", async () => {
+    get.mockImplementation(async (path: string) => {
+      if (path === '/projects/proj/components/hello') throw new BffError(403, 'forbidden');
+      return { items: [{ id: 'uid-1', handler: 'hello', name: 'hello' }] };
+    });
+    await expect(fetchComponentByHandler('proj', 'hello')).rejects.toMatchObject({ status: 403 });
+  });
+
+  it('reports a component the list does not have', async () => {
+    get.mockImplementation(async (path: string) => (path === '/projects/proj/components' ? { items: [] } : {}));
+    await expect(fetchComponentByHandler('proj', 'hello')).rejects.toThrow('Component "hello" not found in project "proj"');
+  });
+
+  it('creates a track from a branch with its API version', async () => {
+    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', apiVersion: 'v1.1', branch: 'next', description: 'preview' });
+    expect(post).toHaveBeenCalledWith('/components/hello/deployment-tracks', { branch: 'next', description: 'preview', enableAutoDeploy: undefined, apiVersion: 'v1.1' });
+  });
+
+  // JSON drops an undefined field, so the BFF assigns the version itself.
+  it('leaves the API version out when none is given', async () => {
+    await createDeploymentTrack({ orgUuid: 'org', componentId: 'hello', branch: 'next' });
+    expect(JSON.parse(JSON.stringify(post.mock.calls[0][1]))).toEqual({ branch: 'next' });
+  });
+
+  it('updates a track in place', async () => {
+    await updateDeploymentTrack({ componentId: 'hello', deploymentTrackId: 'next-bbbbbb', branch: 'release' });
+    expect(put).toHaveBeenCalledWith('/components/hello/deployment-tracks/next-bbbbbb', expect.objectContaining({ branch: 'release' }));
+    expect(JSON.parse(JSON.stringify(put.mock.calls[0][1]))).not.toHaveProperty('apiVersion');
+  });
+
+  it('sets the API version of a track that has none', async () => {
+    await updateDeploymentTrack({ componentId: 'hello', deploymentTrackId: 'old-cccccc', apiVersion: 'v1.2' });
+    expect(put).toHaveBeenCalledWith('/components/hello/deployment-tracks/old-cccccc', expect.objectContaining({ apiVersion: 'v1.2' }));
+  });
+
+  it("lists each track's API version", async () => {
+    get.mockResolvedValue({
+      id: 'uid-1',
+      handler: 'hello',
+      deploymentTracks: [
+        { id: 'main-aaaaaa', branch: 'main', latest: true, apiVersion: 'v1.0' },
+        { id: 'old-cccccc', branch: 'old' },
+      ],
+    });
+    const c = await fetchComponentByHandler('proj', 'hello');
+    expect(c.apiVersions?.map((v) => v.apiVersion)).toEqual(['v1.0', '']);
   });
 });

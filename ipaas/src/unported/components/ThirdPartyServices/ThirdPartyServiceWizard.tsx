@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, FormControlLabel, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, ArrowRight, Eye, EyeOff, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useEnvTemplates } from '../../../hooks/useDeploymentPipelines';
@@ -135,13 +134,13 @@ export default function ThirdPartyServiceWizard({ orgHandle, submitting, submitE
               </Typography>
               <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
                 <Box sx={{ flex: 1 }}>
-                  <TextField label="Name" required fullWidth value={name} onChange={(e) => setName(e.target.value)} sx={requiredSx} />
+                  <TextField labelPlacement="top" label="Name" required fullWidth value={name} onChange={(e) => setName(e.target.value)} sx={requiredSx} />
                 </Box>
                 <Box sx={{ flex: 1 }}>
-                  <TextField label="Version" fullWidth value={version} onChange={(e) => setVersion(e.target.value)} helperText="Optional" />
+                  <TextField labelPlacement="top" label="Version" fullWidth value={version} onChange={(e) => setVersion(e.target.value)} helperText="Optional" />
                 </Box>
               </Stack>
-              <TextField label="Summary" fullWidth multiline rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} helperText="Optional" />
+              <TextField labelPlacement="top" label="Summary" fullWidth multiline rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} helperText="Optional" />
 
               <Box>
                 <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
@@ -215,8 +214,8 @@ export default function ThirdPartyServiceWizard({ orgHandle, submitting, submitE
                     </Stack>
 
                     <Stack gap={2}>
-                      <TextField label="Name" required size="small" fullWidth value={ep.name} onChange={(e) => patch(ep.id, { name: e.target.value })} sx={requiredSx} />
-                      <TextField label="Endpoint URL" required size="small" fullWidth value={ep.serviceUrl} onChange={(e) => patch(ep.id, { serviceUrl: e.target.value })} sx={requiredSx} />
+                      <TextField labelPlacement="top" label="Name" required size="small" fullWidth value={ep.name} onChange={(e) => patch(ep.id, { name: e.target.value })} sx={requiredSx} />
+                      <TextField labelPlacement="top" label="Endpoint URL" required size="small" fullWidth value={ep.serviceUrl} onChange={(e) => patch(ep.id, { serviceUrl: e.target.value })} sx={requiredSx} />
 
                       <Box>
                         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>

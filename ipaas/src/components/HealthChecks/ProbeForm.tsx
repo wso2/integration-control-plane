@@ -22,7 +22,8 @@ import { useState, type JSX } from 'react';
 import ProbeConfigFields from './ProbeConfigFields';
 import ProbeSliderGroup, { type ProbeSliderValues } from './ProbeSliderGroup';
 import { useUpdateHealthCheck } from '../../hooks/useHealthChecks';
-import { DEFAULT_PORT, defaultProbeForm, probeToForm, formToProbe, isProbeFormValid, serializeProbeForWrite, hasProbe, type ProbeFormState } from '../../utils/healthChecks';
+import { DEFAULT_PORT, defaultProbeForm, probeToForm, formToProbe, isProbeFormChanged, isProbeFormValid, serializeProbeForWrite, hasProbe, type ProbeFormState } from '../../utils/healthChecks';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import { PROBE_KIND, type HealthCheck, type ProbeKind, type WriteProbe } from '../../types/healthChecks';
 import type { ReleaseContainer } from '../../types/devopsConfigs';
 
@@ -33,20 +34,25 @@ interface ProbeFormProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   environmentId: string;
   onClose: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
 }
 
-export default function ProbeForm({ kind, healthCheck: hc, container, projectId, componentId, releaseId, environmentId, onClose, onSaved, onError }: ProbeFormProps): JSX.Element {
+export default function ProbeForm({ kind, healthCheck: hc, container, projectId, componentId, releaseId, deploymentTrackId, environmentId, onClose, onSaved, onError }: ProbeFormProps): JSX.Element {
   const fallbackPort = container.ports?.[0]?.port ?? DEFAULT_PORT;
   const isLiveness = kind === PROBE_KIND.LIVENESS;
   const editedProbe = isLiveness ? hc.probes.liveness_probe : hc.probes.readiness_probe;
   const existed = hasProbe(editedProbe);
 
-  const [form, setForm] = useState<ProbeFormState>(() => (existed ? probeToForm(editedProbe, fallbackPort) : defaultProbeForm(fallbackPort)));
+  const [initialForm] = useState<ProbeFormState>(() => (existed ? probeToForm(editedProbe, fallbackPort) : defaultProbeForm(fallbackPort)));
+  const [form, setForm] = useState<ProbeFormState>(initialForm);
   const update = useUpdateHealthCheck(projectId);
+  useUnsavedChanges(isProbeFormChanged(form, initialForm));
+  const guardNavigation = useLeaveGuard();
 
   const patch = (p: Partial<ProbeFormState>): void => setForm((prev) => ({ ...prev, ...p }));
   const setSlider = (field: keyof ProbeSliderValues, value: number): void => patch({ [field]: value } as Partial<ProbeFormState>);
@@ -62,7 +68,7 @@ export default function ProbeForm({ kind, healthCheck: hc, container, projectId,
       },
     };
     update.mutate(
-      { componentId, releaseId, environmentId, containerId: container.ID, healthCheckId: hc.ID, data },
+      { componentId, releaseId, environmentId, deploymentTrackId, containerId: container.ID, healthCheckId: hc.ID, data },
       {
         onSuccess: () => onSaved(`${kind} probe saved.`),
         onError: (e) => onError(e instanceof Error ? e.message : 'Failed to save the probe.'),
@@ -72,8 +78,8 @@ export default function ProbeForm({ kind, healthCheck: hc, container, projectId,
 
   return (
     <Box>
-      <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={onClose} sx={{ px: 0, mb: 3 }}>
-        Go Back to Health Checks
+      <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => guardNavigation(onClose)} sx={{ px: 0, mb: 3 }}>
+        Back to health checks
       </Button>
       <Typography variant="h5" fontWeight={700} sx={{ mb: 3 }}>
         {existed ? 'Edit' : 'Configure'} {kind} Probe
@@ -90,7 +96,7 @@ export default function ProbeForm({ kind, healthCheck: hc, container, projectId,
       <ProbeConfigFields kind={kind} form={form} onChange={patch} />
 
       <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
-        <Button variant="outlined" onClick={onClose} disabled={update.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={onSubmit} disabled={update.isPending || !isProbeFormValid(form)} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

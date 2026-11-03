@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Check, Copy } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useCreateExternalCiToken } from '../../hooks/useExternalCi';
@@ -92,6 +91,7 @@ export default function CreateCiTokenDialog({ projectId, componentId, onClose }:
         ) : (
           <Box sx={{ pt: 1 }}>
             <TextField
+              labelPlacement="top"
               label="Token Name"
               required
               fullWidth

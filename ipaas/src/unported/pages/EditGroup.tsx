@@ -42,8 +42,8 @@ import {
   ToggleButtonGroup,
   Tooltip,
   Typography,
+  TextField,
 } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
 import { ArrowLeft, Lock, Plus, Trash2, Users } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -102,7 +102,7 @@ function AddRolesToGroupDialog({ orgHandler, groupId, existingRoleIds, onClose, 
             value={selected}
             onChange={(_, v) => setSelected(v)}
             isOptionEqualToValue={(a, b) => a.roleId === b.roleId}
-            renderInput={(params) => <TextField {...params} label="Roles" />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} label="Roles" />}
           />
           <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2, bgcolor: 'background.paper' }}>
             <Typography variant="body2" sx={{ mb: 1 }}>
@@ -113,7 +113,7 @@ function AddRolesToGroupDialog({ orgHandler, groupId, existingRoleIds, onClose, 
               <FormControlLabel value="selected" control={<Radio />} label="Selected Environments" />
             </RadioGroup>
             {envMode === 'selected' && (
-              <TextField select fullWidth label="Select applicable environments" value={selectedEnvs[0] || ''} onChange={(e) => setSelectedEnvs(e.target.value ? [e.target.value] : [])} sx={{ mt: 2 }}>
+              <TextField labelPlacement="top" select fullWidth label="Select applicable environments" value={selectedEnvs[0] || ''} onChange={(e) => setSelectedEnvs(e.target.value ? [e.target.value] : [])} sx={{ mt: 2 }}>
                 {allEnvironments.map((env) => (
                   <MenuItem key={env.id} value={env.id}>
                     {env.name}
@@ -171,7 +171,7 @@ function AddUsersToGroupDialog({ orgHandler, groupId, existingUserIds, onClose, 
         value={selected}
         onChange={(_, v) => setSelected(v)}
         isOptionEqualToValue={(a, b) => a.userId === b.userId}
-        renderInput={(params) => <TextField {...params} label="Users" />}
+        renderInput={(params) => <TextField labelPlacement="top" {...params} label="Users" />}
       />
     </FormDialog>
   );

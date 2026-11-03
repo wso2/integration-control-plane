@@ -16,15 +16,11 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
-import { projectDeleteBlockedMessage } from './projectDeletion';
+import type { JSX } from 'react';
+import { Navigate } from 'react-router';
+import { newProjectUrl, type OrgScope } from '../nav';
 
-describe('projectDeleteBlockedMessage', () => {
-  it('speaks of one integration in the singular', () => {
-    expect(projectDeleteBlockedMessage(1)).toBe('This project still has 1 integration. Delete it before deleting the project.');
-  });
-
-  it('speaks of several integrations in the plural', () => {
-    expect(projectDeleteBlockedMessage(3)).toBe('This project still has 3 integrations. Delete them before deleting the project.');
-  });
-});
+/** Old bookmarks of the create page would otherwise resolve `new` as a project handle. */
+export default function LegacyNewProjectRedirect(scope: OrgScope): JSX.Element {
+  return <Navigate to={newProjectUrl(scope)} replace />;
+}

@@ -16,84 +16,142 @@
  * under the License.
  */
 
-import { Box, CircularProgress, IconButton, Tooltip } from '@wso2/oxygen-ui';
-import { Check, Copy } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useRef, useState } from 'react';
+import { Box, CircularProgress, Divider, IconButton, Paper, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { ArrowDown, Check, Copy, Download } from '@wso2/oxygen-ui-icons-react';
+import { useEffect, useRef, useState, type JSX, type UIEvent } from 'react';
 import type { BuildRunLogs } from '../types/build';
 import { buildLogText } from '../utils/build';
+import { downloadTextFile } from '../utils/logs';
+import * as styles from './BuildLogViewer.styles';
 
 export interface BuildLogViewerProps {
   logs: BuildRunLogs | null | undefined;
   logsLoading: boolean;
   showLogs: boolean;
+  /** The build has not reached a terminal state, so more output may still arrive. */
+  live?: boolean;
+  /** Fills its container's height instead of growing to a capped height, e.g. as a drawer column. */
+  fill?: boolean;
 }
 
-export default function BuildLogViewer({ logs, logsLoading, showLogs }: BuildLogViewerProps) {
+// Within this many pixels of the end counts as following the output.
+const FOLLOW_SLACK_PX = 24;
+
+function StreamStatus({ live, hasOutput }: { live: boolean; hasOutput: boolean }): JSX.Element {
+  if (live && !hasOutput) {
+    return (
+      <Box component="span" role="status" aria-label="Waiting for build logs" sx={styles.streamStatusSx(true)}>
+        <Box component="span" aria-hidden="true" sx={styles.streamDotSx(true)} />
+        <span aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <Box key={i} component="span" sx={styles.pendingDotSx(i)}>
+              .
+            </Box>
+          ))}
+        </span>
+      </Box>
+    );
+  }
+  return (
+    <Box component="span" sx={styles.streamStatusSx(live)}>
+      <Box component="span" aria-hidden="true" sx={styles.streamDotSx(live)} />
+      {live ? 'Live' : 'Live logs ended'}
+    </Box>
+  );
+}
+
+export default function BuildLogViewer({ logs, logsLoading, showLogs, live = false, fill = false }: BuildLogViewerProps): JSX.Element | null {
   const logsRef = useRef<HTMLPreElement>(null);
   const [copied, setCopied] = useState(false);
+  const [following, setFollowing] = useState(true);
+
+  const logText = buildLogText(logs);
+  const hasOutput = !!logText;
+  const lineCount = logText ? logText.replace(/\n+$/, '').split('\n').length : 0;
 
   useEffect(() => {
-    if (showLogs && logsRef.current) {
-      logsRef.current.scrollTop = logsRef.current.scrollHeight;
-    }
-  }, [logs, showLogs]);
+    if (showLogs && following && logsRef.current) logsRef.current.scrollTop = logsRef.current.scrollHeight;
+  }, [logText, showLogs, following]);
+
+  useEffect(() => {
+    if (!copied) return;
+    const timer = setTimeout(() => setCopied(false), 1500);
+    return () => clearTimeout(timer);
+  }, [copied]);
 
   if (!showLogs) return null;
 
-  const logText = buildLogText(logs);
+  if (logsLoading && !logs) {
+    return (
+      <Box sx={styles.loadingSx}>
+        <CircularProgress size={24} />
+      </Box>
+    );
+  }
 
-  const handleCopy = () => {
+  const handleScroll = (e: UIEvent<HTMLPreElement>): void => {
+    const el = e.currentTarget;
+    setFollowing(el.scrollHeight - el.scrollTop - el.clientHeight <= FOLLOW_SLACK_PX);
+  };
+
+  const handleCopy = (): void => {
     if (!logText) return;
-    void navigator.clipboard.writeText(logText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    // Some browsers and embedded views refuse clipboard writes; the button then simply stays unconfirmed.
+    navigator.clipboard.writeText(logText).then(
+      () => setCopied(true),
+      () => setCopied(false),
+    );
   };
 
   return (
-    <>
-      {logsLoading && !logs ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', py: 3 }}>
-          <CircularProgress size={24} />
-        </Box>
-      ) : (
-        <Box sx={{ position: 'relative' }}>
+    <Paper variant="outlined" sx={styles.paperSx(fill)}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={styles.headerSx}>
+        <StreamStatus live={live} hasOutput={hasOutput} />
+        <Stack direction="row" alignItems="center" gap={1}>
+          <Typography component="span" sx={styles.lineCountSx}>
+            {lineCount} lines
+          </Typography>
+          <Divider orientation="vertical" flexItem />
           <Tooltip title={copied ? 'Copied!' : 'Copy logs'}>
-            <IconButton
-              size="small"
-              onClick={handleCopy}
-              disabled={!logText}
-              sx={{
-                mr: 1.5,
-                position: 'absolute',
-                top: 6,
-                right: 6,
-                zIndex: 1,
-                color: copied ? 'success.light' : 'grey.500',
-                '&:hover': { color: 'grey.200', bgcolor: 'grey.800' },
-              }}>
-              {copied ? <Check size={14} /> : <Copy size={14} />}
-            </IconButton>
+            <span>
+              <IconButton size="small" aria-label="Copy logs" onClick={handleCopy} disabled={!hasOutput} sx={styles.toolButtonSx(copied)}>
+                {copied ? <Check size={15} /> : <Copy size={15} />}
+              </IconButton>
+            </span>
           </Tooltip>
-          <Box
-            component="pre"
-            ref={logsRef}
-            sx={(theme) => ({
-              m: 0,
-              p: 2,
-              bgcolor: theme.syntax.dark.background,
-              fontFamily: 'monospace',
-              fontSize: '0.75rem',
-              lineHeight: 1.6,
-              overflowY: 'auto',
-              maxHeight: 320,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-all',
-              color: theme.syntax.dark.text,
-            })}>
-            {logText === null ? 'No log data available' : logText || 'Waiting for build logs...'}
+          <Tooltip title="Download logs (.txt)">
+            <span>
+              <IconButton size="small" aria-label="Download logs" onClick={() => logText && downloadTextFile(logText, 'build-logs')} disabled={!hasOutput} sx={styles.toolButtonSx(false)}>
+                <Download size={15} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Stack>
+      </Stack>
+
+      <Box component="pre" ref={logsRef} onScroll={handleScroll} role="log" aria-label="Build log output" sx={styles.logBodySx}>
+        {logText}
+        {live ? (
+          <Box component="span" sx={styles.waitingSx}>
+            {hasOutput ? '\n' : ''}waiting for build logs
+            <Box component="span" aria-hidden="true" sx={styles.cursorSx} />
           </Box>
-        </Box>
+        ) : (
+          !hasOutput && (
+            <Box component="span" sx={styles.waitingSx}>
+              {logText === null ? 'No log data available' : 'No build logs yet'}
+            </Box>
+          )
+        )}
+      </Box>
+
+      {!following && hasOutput && (
+        <Tooltip title="Jump to latest">
+          <IconButton size="small" aria-label="Jump to latest" onClick={() => setFollowing(true)} sx={styles.jumpButtonSx}>
+            <ArrowDown size={16} />
+          </IconButton>
+        </Tooltip>
       )}
-    </>
+    </Paper>
   );
 }

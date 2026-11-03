@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Network, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import Authorized from '../../components/Authorized';
@@ -92,8 +91,20 @@ function CreateProxyForm({ projectId, onCancel, onCreated }: { projectId: string
       )}
       <Stack gap={2}>
         <Stack direction="row" gap={2} alignItems="flex-start">
-          <TextField label="Proxy Name" value={displayName} onChange={(e) => onNameChange(e.target.value)} fullWidth required error={!!displayName && !!nameError} helperText={(!!displayName && nameError) || ' '} autoFocus sx={{ flex: 1 }} />
           <TextField
+            labelPlacement="top"
+            label="Proxy Name"
+            value={displayName}
+            onChange={(e) => onNameChange(e.target.value)}
+            fullWidth
+            required
+            error={!!displayName && !!nameError}
+            helperText={(!!displayName && nameError) || ' '}
+            autoFocus
+            sx={{ flex: 1 }}
+          />
+          <TextField
+            labelPlacement="top"
             label="Proxy Id"
             value={handle}
             onChange={(e) => onHandleChange(e.target.value)}
@@ -104,7 +115,7 @@ function CreateProxyForm({ projectId, onCancel, onCreated }: { projectId: string
             sx={{ flex: 1 }}
           />
         </Stack>
-        <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
+        <TextField labelPlacement="top" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
         <Box>
           <Button variant="contained" onClick={handleCreate} disabled={!canCreate} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : <Plus size={16} />}>
             {create.isPending ? 'Creating…' : 'Create'}

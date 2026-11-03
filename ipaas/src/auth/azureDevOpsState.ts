@@ -16,7 +16,18 @@
  * under the License.
  */
 
-/** Why a project with integrations cannot be deleted yet; the BFF refuses the delete until it is empty. */
-export function projectDeleteBlockedMessage(integrations: number): string {
-  return integrations === 1 ? 'This project still has 1 integration. Delete it before deleting the project.' : `This project still has ${integrations} integrations. Delete them before deleting the project.`;
+import { session } from '../utils/storage';
+
+const AZURE_DEVOPS_OAUTH_STATE_KEY = 'azure_devops_oauth_state';
+
+export function generateAndSaveAzureDevOpsState(): string {
+  const state = crypto.randomUUID();
+  session.set(AZURE_DEVOPS_OAUTH_STATE_KEY, state);
+  return state;
+}
+
+export function validateAndClearAzureDevOpsState(state: string): boolean {
+  const saved = session.get(AZURE_DEVOPS_OAUTH_STATE_KEY);
+  session.remove(AZURE_DEVOPS_OAUTH_STATE_KEY);
+  return saved !== null && saved === state;
 }
