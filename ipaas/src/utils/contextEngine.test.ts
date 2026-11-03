@@ -79,6 +79,7 @@ import {
   buildQueryCurl,
   canShareApiKey,
   connectorCountsByCategory,
+  defaultQueryMode,
   effectiveLlm,
   fromDraft,
   effectiveVisibility,
@@ -122,7 +123,7 @@ import {
   queuedUploadText,
   uploadIsSlow,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_MODES, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
 import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
@@ -629,6 +630,20 @@ describe('first run', () => {
     expect(moving[0].description).toBe('Syncing 1 of 2 sources. Items become searchable as the connector delivers them from 2 sources.');
     expect(getStartedSteps(engineDetail(), false, { ...summary, active: 0, waiting: 1 })[0].state).toBe('done');
     expect(getStartedSteps(engineDetail(), false, { ...summary, processed: 0, active: 0, waiting: 2 })[0].state).toBe('current');
+  });
+});
+
+describe('playground modes', () => {
+  it('starts in Answer when the engine offers answers', () => {
+    expect(defaultQueryMode(engineDetail())).toBe('answer');
+  });
+
+  it('starts in Context when the engine is set up without answers', () => {
+    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false } }))).toBe('context');
+  });
+
+  it('lists Answer before Context', () => {
+    expect(CONTEXT_QUERY_MODES.map((m) => m.label)).toEqual(['Answer', 'Context']);
   });
 });
 

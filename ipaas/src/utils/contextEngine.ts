@@ -69,6 +69,7 @@ import type {
   ModelDraft,
   ContextEvidence,
   ContextEvidenceLocationState,
+  ContextQueryMode,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -1159,6 +1160,11 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
 }
 
 // ── Playground ──────────────────────────────────────────────────────────────
+
+/** The mode a new Playground conversation starts in: Answer when the engine offers answers, Context otherwise. */
+export function defaultQueryMode(engine: { exposure: Pick<ContextEngineDetail['exposure'], 'answers'> }): ContextQueryMode {
+  return engine.exposure.answers ? 'answer' : 'context';
+}
 
 /** Questions to offer in an empty Playground, seeded from the engine's sources. */
 export function suggestedQuestions(engine: Pick<ContextEngineDetail, 'sources'>): string[] {
