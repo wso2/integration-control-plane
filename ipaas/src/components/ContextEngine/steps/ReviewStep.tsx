@@ -16,11 +16,12 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Grid, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, Grid, Link, MenuItem, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { CONTEXT_ENGINE_DESCRIPTION_HINT, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
+import { useEngineManagedServer } from '../../../hooks/useContextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { engineDescriptionError, engineHandleFrom, engineNameError, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
@@ -72,6 +73,7 @@ function SummaryCard({ title, editLabel, onEdit, children }: { title: string; ed
 /** Step 4 — name the engine and confirm what will be created; every card jumps back to its step. */
 export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, environments, environment, onEnvironmentChange, onNameChange, onDescriptionChange, onEdit }: ReviewStepProps): JSX.Element {
   const nameError = engineNameError(form.name);
+  const managedServer = useEngineManagedServer();
   // Query access and visibility are set in different steps; say where they disagree before anything is created.
   const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
   const descriptionError = engineDescriptionError(form.description);
@@ -245,18 +247,28 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(2)}>
             <Stack direction="row" gap={3} flexWrap="wrap">
               {STORAGE_BACKENDS.map((b) => {
-                const sum = summarizeStorage(b.kind, form.storage[b.kind]);
+                // An engine managed store depends on the deployment, which the BFF reports.
+                const sum = managedServer.data ? summarizeStorage(b.kind, form.storage[b.kind], managedServer.data) : null;
                 return (
                   <Box key={b.kind} sx={{ minWidth: 120 }}>
                     <Typography variant="caption" sx={mutedSx}>
                       {b.title.replace(' database', '')}
                     </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {sum.primary}
-                    </Typography>
-                    <Typography variant="caption" sx={mutedSx}>
-                      {sum.secondary}
-                    </Typography>
+                    {sum ? (
+                      <>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {sum.primary}
+                        </Typography>
+                        <Typography variant="caption" sx={mutedSx}>
+                          {sum.secondary}
+                        </Typography>
+                      </>
+                    ) : (
+                      <>
+                        <Skeleton variant="text" width={110} />
+                        <Skeleton variant="text" width={140} />
+                      </>
+                    )}
                   </Box>
                 );
               })}

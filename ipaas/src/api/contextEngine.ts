@@ -79,6 +79,7 @@ import type {
   SourceIndexingState,
   SourceProgress,
   SourceReadingState,
+  EngineManagedServer,
   StorageKind,
   StorageSummary,
   ContextEntityView,
@@ -365,8 +366,9 @@ const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = 
   lancedb: { label: 'LanceDB', detail: 'Engine managed · embedded' },
   sqlite: { label: 'SQLite', detail: 'Engine managed · embedded' },
   kuzu: { label: 'Kuzu', detail: 'Engine managed · embedded' },
-  pgvector: { label: 'PostgreSQL + pgvector', detail: 'External' },
-  postgres: { label: 'PostgreSQL', detail: 'External' },
+  // The console offers PostgreSQL only as the engine's own server, which the BFF creates with it.
+  pgvector: { label: 'PostgreSQL + pgvector', detail: 'Engine managed · own server' },
+  postgres: { label: 'PostgreSQL', detail: 'Engine managed · own server' },
   neo4j: { label: 'Neo4j', detail: 'External' },
 };
 
@@ -509,6 +511,18 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
 }
 
 /** Ask the BFF for a new engine. It starts provisioning; {@link setUpContextEngine} runs once it is ready. */
+interface BffManagedStorage {
+  server?: string;
+}
+
+/** A server the console does not know yet reads as embedded, the stores it describes without one. */
+export const toEngineManagedServer = (raw: BffManagedStorage | null | undefined): EngineManagedServer => (raw?.server === 'postgres' ? 'postgres' : 'embedded');
+
+/** GET /context-engine-storage: where engines created now keep their engine managed stores. */
+export async function getEngineManagedServer(): Promise<EngineManagedServer> {
+  return toEngineManagedServer(await viaBff(() => bff.get<BffManagedStorage>('/context-engine-storage')));
+}
+
 export async function createContextEngine(input: CreateContextEngineInput): Promise<ContextEngine> {
   return toEngine(await viaBff(() => bff.post<BffEngine>('/context-engines', toBffCreateRequest(input))));
 }

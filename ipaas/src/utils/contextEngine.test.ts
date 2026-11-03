@@ -82,6 +82,7 @@ import {
   storageSelectionError,
   storageStepBlocker,
   summarizeStorage,
+  managedStore,
   toStoragePayload,
   suggestedQuestions,
   toDraft,
@@ -697,9 +698,21 @@ describe('storage', () => {
   });
 
   it('summarizes each mode in two lines', () => {
-    expect(summarizeStorage('graph', { mode: 'managed' })).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · embedded' });
-    expect(summarizeStorage('vector', { mode: 'infrastructure', serverId: 's1', serverName: 'support-vectors', database: 'context_vectors' })).toEqual({ primary: 'support-vectors', secondary: 'pgvector · context_vectors' });
-    expect(summarizeStorage('graph', { mode: 'external', uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'u', password: 'p' })).toEqual({ primary: 'Neo4j', secondary: 'graph.internal:7687 · neo4j' });
+    expect(summarizeStorage('graph', { mode: 'managed' }, 'embedded')).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · embedded' });
+    expect(summarizeStorage('vector', { mode: 'infrastructure', serverId: 's1', serverName: 'support-vectors', database: 'context_vectors' }, 'embedded')).toEqual({ primary: 'support-vectors', secondary: 'pgvector · context_vectors' });
+    expect(summarizeStorage('graph', { mode: 'external', uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'u', password: 'p' }, 'embedded')).toEqual({ primary: 'Neo4j', secondary: 'graph.internal:7687 · neo4j' });
+  });
+
+  it.each([
+    ['vector', 'embedded', 'LanceDB · embedded'],
+    ['relational', 'embedded', 'SQLite · embedded'],
+    ['graph', 'embedded', 'Kuzu · embedded'],
+    ['vector', 'postgres', 'PostgreSQL + pgvector · own server'],
+    ['relational', 'postgres', 'PostgreSQL · own server'],
+    ['graph', 'postgres', 'PostgreSQL · own server'],
+  ] as const)('names the engine managed %s store of a deployment whose engines are %s', (kind, server, secondary) => {
+    expect(summarizeStorage(kind, { mode: 'managed' }, server)).toEqual({ primary: 'Engine managed', secondary });
+    expect(managedStore(kind, server).description).not.toBe('');
   });
 
   it('maps to the engine payload and requires a resolved connection for infrastructure', () => {

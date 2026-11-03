@@ -29,6 +29,7 @@ import {
   getContextEngineProgress,
   getContextEngineSummary,
   getContextEntity,
+  getEngineManagedServer,
   getContextEvidence,
   getContextGraph,
   getContextPermissions,
@@ -81,6 +82,16 @@ export function useContextEngines(environment: string) {
     enabled: isContextEngineEnabled() && !!environment,
     retry: false,
     refetchInterval: (query) => (query.state.data?.some((e) => TRANSIENT_STATES.has(e.state)) ? DELETION_POLL_MS : false),
+  });
+}
+
+/** Where engines created now keep their engine managed stores; it changes only with the deployment. */
+export function useEngineManagedServer() {
+  return useQuery({
+    queryKey: [ROOT_KEY, 'managed-server'],
+    queryFn: getEngineManagedServer,
+    enabled: isContextEngineEnabled(),
+    staleTime: Infinity,
   });
 }
 
