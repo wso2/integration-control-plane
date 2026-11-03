@@ -143,7 +143,7 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
 
       {results.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No connectors match “{query.trim()}”. Try another name, or pick a category.
+          No connectors match “{query.trim()}”.
         </Typography>
       ) : (
         <Box sx={catalogGridSx}>

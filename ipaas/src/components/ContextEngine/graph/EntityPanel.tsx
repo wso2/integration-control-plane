@@ -170,7 +170,7 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
       {view && (
         <>
           <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-            Found by the language model while the graph was built. Mentioned in {mentioned.length} passage{mentioned.length === 1 ? '' : 's'} across {records.size} document{records.size === 1 ? '' : 's'}.
+            Mentioned in {mentioned.length} passage{mentioned.length === 1 ? '' : 's'} across {records.size} document{records.size === 1 ? '' : 's'}.
           </Typography>
 
           {derivation?.answer && (

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ChevronRight, Upload } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useRef, useState, type JSX } from 'react';
 import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../constants/contextEngine';
@@ -185,7 +185,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
           size="small"
           value={draft.name}
           error={!!nameError && draft.name.trim() !== ''}
-          helperText={draft.name.trim() !== '' ? nameError || undefined : 'How this source appears in the engine.'}
+          helperText={(draft.name.trim() !== '' && nameError) || undefined}
           onChange={(e) => change({ ...draft, name: e.target.value })}
           sx={REQUIRED_FIELD_SX}
         />
@@ -205,15 +205,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
             </Box>
           );
         })}
-        {upload ? (
-          <StagedFilesSection draft={draft} onChange={change} onRunningEngine={queryRoles !== undefined} />
-        ) : (
-          connector.fields.length === 0 && (
-            <Alert severity="info" variant="outlined">
-              No connection settings.
-            </Alert>
-          )
-        )}
+        {upload && <StagedFilesSection draft={draft} onChange={change} onRunningEngine={queryRoles !== undefined} />}
       </Stack>
 
       {ROLE_VISIBILITY_ENABLED && (

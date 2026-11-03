@@ -21,7 +21,7 @@ import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
-import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
+import { useAskedFlag, useContextPermissions, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
 import { clearQuestions, forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
 import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
 import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MODES } from '../../../constants/contextEngine';
@@ -97,8 +97,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   // A question pending from before a tab switch still counts, so it is not asked twice.
   const asking = pending !== undefined;
   const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
-  const principal = useContextPrincipal();
-  const groups = principal.data?.groups ?? [];
   const permissions = useContextPermissions(engine.id);
   const canQuery = !permissions.data || permissions.data.includes('context.read');
   const canGrantSelf = !!permissions.data?.includes('access.manage');
@@ -222,7 +220,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 The answer is hidden
               </Typography>
               <Typography variant="body2" sx={mutedSx}>
-                One of the passages it was written from is no longer available to you, and showing the answer could reveal it. The passages you can still read are below.
+                A passage it used is no longer available to you.
               </Typography>
             </Box>
             <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || asking} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
@@ -240,7 +238,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = (
         <Alert severity="info" variant="outlined">
-          No passages you can read matched this question. The engine only searches indexed items whose groups map to a role you belong to{groups.length ? ` (your groups: ${groups.join(', ')})` : ''}.
+          No passages you can read matched this question.
         </Alert>
       );
     } else if (t.mode === 'answer') {
@@ -251,9 +249,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               No answer from the passages you can read
             </Typography>
-            The engine found related passages, but none of them answers this, so it wrote nothing. It never answers without a passage it can cite.
+            Related passages were found, but none answers this.
           </Alert>
-          <SectionHeading title="Passages it checked" caption="Shown so you can judge for yourself" />
+          <SectionHeading title="Passages it checked" />
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
@@ -288,7 +286,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mt: 1.5, p: 1.5, borderRadius: 1, border: '1px dashed', borderColor: 'divider', color: 'text.secondary' }}>
               <Unlink size={16} aria-hidden style={{ marginTop: 2 }} />
               <Typography variant="body2">
-                {lost} passage{lost === 1 ? '' : 's'} from when you asked {lost === 1 ? 'is' : 'are'} no longer available. Their items changed, were removed, or are now outside what you can see.
+                {lost} passage{lost === 1 ? '' : 's'} from when you asked {lost === 1 ? 'is' : 'are'} no longer available.
               </Typography>
             </Box>
           )}
@@ -334,7 +332,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                     {m.label}
                   </ToggleButton>
                 ) : (
-                  <Tooltip key={m.value} title="This engine is set up without answers, so it returns passages only.">
+                  <Tooltip key={m.value} title="Answers are off for this engine.">
                     <span>
                       <ToggleButton value={m.value} disabled>
                         {m.label}
@@ -358,7 +356,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
 
         {!canQuery && (
           <Alert severity="info" variant="outlined" action={canGrantSelf ? <OwnerAccessButton engineId={engine.id} /> : undefined}>
-            You can open passages that are cited to you, but you can&apos;t ask this engine questions. Ask an engine manager for query access.
+            You can&apos;t ask this engine questions. Ask an engine manager for access.
           </Alert>
         )}
 

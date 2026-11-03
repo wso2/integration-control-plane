@@ -18,7 +18,6 @@
 
 import type {
   ContextEngineStorage,
-  ContextQueryMode,
   ContextSourceConfig,
   FileVisibility,
   LlmConfig,
@@ -32,7 +31,7 @@ import type {
   StorageKind,
   UploadFileStatus,
 } from '../types/contextEngine';
-import type { EmbeddingProviderInfo } from './ragIngestion';
+import type { EmbeddingProvider } from '../types/ragIngestion';
 
 const GENAI_LOGO_BASE = 'assets/images/genai/';
 
@@ -78,15 +77,14 @@ const GOOGLE_AUTH = [
       { value: 'bearer', label: 'Access token' },
       { value: 'service_account', label: 'Service account' },
     ],
-    helper: 'OAuth2 flow used to connect.',
   }),
   F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
   F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
   F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.' }),
   F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
-  F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'Path to the service account private key in PEM form.' }),
-  O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional user to impersonate under domain-wide delegation.' }),
+  F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'PEM file path.' }),
+  O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional. Needs domain-wide delegation.' }),
 ];
 
 /**
@@ -98,7 +96,7 @@ export const RML_MAPPING = G(
   { label: 'RML Mapping', collapsed: true },
   O('rmlMapping', 'Mapping file', 'file', {
     accept: '.rml.ttl,.ttl',
-    helper: 'Optional. Upload an .rml.ttl to control how your records are turned into a graph. Leave it empty and AI builds the graph for you.',
+    helper: 'Optional. Leave empty to let AI build the graph.',
   }),
 );
 
@@ -129,10 +127,10 @@ const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[]
   ),
   ...G(
     'Data to sync',
-    F('tableName', 'Table', 'text', { helper: 'Each row becomes one record.' }),
-    F('primaryKey', 'Primary Key', 'text', { helper: 'Column that uniquely identifies each row.' }),
-    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated columns to ingest. Empty ingests every column.' }),
-    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: "Column holding each row's last-updated time (epoch ms). Recommended for clean re-syncs." }),
+    F('tableName', 'Table', 'text'),
+    F('primaryKey', 'Primary Key', 'text'),
+    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated. Leave empty for all columns.' }),
+    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Last-updated time in epoch ms. Recommended.' }),
   ),
   ...G(
     { label: 'Sync options', collapsed: true },
@@ -202,7 +200,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'gdrive',
     name: 'Google Drive',
-    description: 'A Drive folder subtree, backfilled and kept in sync by the Changes API.',
+    description: 'Files in a Drive folder and its subfolders.',
     category: 'cloud-storage',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}gdrive.svg`,
@@ -211,7 +209,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
     fields: [
       ...G('Connection', ...GOOGLE_AUTH),
-      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' })),
+      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'Subfolders are included.' })),
     ],
     summaryKeys: ['folderId'],
   },
@@ -277,7 +275,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Docs, markdown and code in a repository branch.',
     category: 'code',
     popular: true,
-    logo: `${CONNECTOR_LOGO_BASE}github.svg`, logoDark: `${CONNECTOR_LOGO_BASE}github-dark.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}github.svg`,
     icon: 'github',
     fields: [
       F('repositoryUrl', 'Repository URL', 'url', { placeholder: 'https://github.com/org/repo' }),
@@ -416,7 +414,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'postgresql',
     name: 'PostgreSQL',
-    description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.',
+    description: 'Rows of a table, kept in sync.',
     category: 'databases',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}postgresql.svg`,
@@ -425,15 +423,15 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...DATABASE_FIELDS('5432', 'public'),
       ...G(
         { label: 'Sync options', collapsed: true },
-        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional logical replication slot name; a default is used when empty.' }),
-        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional publication name; a default is used when empty.' }),
+        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Leave empty for the default.' }),
+        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Leave empty for the default.' }),
       ),
     ],
     summaryKeys: ['host', 'database'],
     isStructuredData: true,
   },
-  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
-  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
   {
     id: 'mongodb',
     name: 'MongoDB',
@@ -482,7 +480,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Zendesk',
     description: 'Tickets and help-center articles.',
     category: 'saas',
-    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`, logoDark: `${CONNECTOR_LOGO_BASE}zendesk-dark.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`,
     icon: 'headset',
     fields: [F('subdomain', 'Subdomain', 'text', { placeholder: 'your-org' }), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['subdomain'],
@@ -490,7 +488,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'salesforce',
     name: 'Salesforce',
-    description: 'Records of an object, synced by SOQL backfill and Change Data Capture.',
+    description: 'Records of a Salesforce object, kept in sync.',
     category: 'saas',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}salesforce.svg`,
@@ -500,7 +498,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [
       ...G(
         'Connection',
-        F('baseUrl', 'Instance URL', 'url', { placeholder: 'https://your-domain.my.salesforce.com', helper: 'Your My Domain URL; the OAuth token endpoint is derived from it.' }),
+        F('baseUrl', 'Instance URL', 'url', { placeholder: 'https://your-domain.my.salesforce.com', helper: 'Your My Domain URL.' }),
         F('authType', 'Authentication', 'select', {
           defaultValue: 'client_credentials',
           options: [
@@ -508,18 +506,13 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
             { value: 'refresh_token', label: 'Refresh token' },
             { value: 'bearer', label: 'Access token' },
           ],
-          helper: 'OAuth2 flow used to connect.',
         }),
         F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token') }),
         F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token') }),
         F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.' }),
       ),
-      ...G(
-        'Data to sync',
-        F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'The SObject to sync. It must have Change Data Capture enabled.' }),
-        F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated business fields to ingest as content.' }),
-      ),
+      ...G('Data to sync', F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'Must have Change Data Capture enabled.' }), F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated.' })),
       ...G({ label: 'Sync options', collapsed: true }, O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' })),
     ],
     summaryKeys: ['baseUrl', 'sobject'],
@@ -574,7 +567,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   },
   { id: 'sitemap', name: 'Sitemap', description: 'Every page listed in a sitemap.xml.', category: 'web-files', icon: 'globe', fields: [F('sitemapUrl', 'Sitemap URL', 'url', { placeholder: 'https://example.com/sitemap.xml' })], summaryKeys: ['sitemapUrl'] },
   { id: 'rss', name: 'RSS Feed', description: 'Articles from a feed.', category: 'web-files', icon: 'rss', fields: [F('feedUrl', 'Feed URL', 'url')], summaryKeys: ['feedUrl'] },
-  { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, catalogHidden: true },
+  { id: 'upload', name: 'File Upload', description: 'Files you upload.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, catalogHidden: true },
 ];
 
 export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntries(SOURCE_CONNECTORS.map((c) => [c.id, c]));
@@ -608,35 +601,23 @@ export function blankSource(connectorId: string): ContextSourceConfig {
   return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [], stagedVisibility: EVERYONE_VISIBILITY };
 }
 
-// ── Models step: embedding and language model providers ─────────────────────
+// ── Step 3: LLM providers (embedding providers are shared with RAG) ─────────
 
 export interface LlmProviderInfo {
   id: LlmProvider;
   name: string;
   /** Logo path under the public folder, resolved with {@link contextLogoUrl}. */
   logo: string;
-  /** Light variant of a dark logo, for the dark theme. */
-  logoDark?: string;
-  /** Selectable model ids. Empty means the provider takes a free-text model id. */
+  /** Selectable model ids. Empty means the provider takes a free-text deployment id (Azure). */
   models: string[];
 }
 
-/**
- * Light logos for the embedding providers whose marks are dark, for the dark theme. The embedding list
- * belongs to RAG ingestion, so the Context Engine screens keep their own dark variants here.
- */
-export const EMBEDDING_LOGO_DARK: Readonly<Record<string, string>> = { openai: `${GENAI_LOGO_BASE}openai-dark.svg`, mistral: `${GENAI_LOGO_BASE}mistral-dark.svg` };
-
 export const LLM_PROVIDERS: LlmProviderInfo[] = [
-  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, logoDark: `${GENAI_LOGO_BASE}openai-dark.svg`, models: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra'] },
-  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, logoDark: `${GENAI_LOGO_BASE}anthropic-dark.svg`, models: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  { id: 'openai', name: 'Open AI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'] },
+  { id: 'anthropic', name: 'Anthropic AI', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  { id: 'azure_openai', name: 'Azure Open AI', logo: `${GENAI_LOGO_BASE}azure-openai.svg`, models: [] },
+  { id: 'mistral', name: 'Mistral AI', logo: `${GENAI_LOGO_BASE}mistral.svg`, models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] },
 ];
-
-/** Embedding providers a context engine offers. RAG ingestion keeps its own, longer list. */
-export const CONTEXT_EMBEDDING_PROVIDERS: EmbeddingProviderInfo[] = [{ id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] }];
-
-/** Display names for providers an engine may still run but the console no longer offers. */
-export const RETIRED_MODEL_PROVIDER_NAMES: Record<string, string> = { azure_openai: 'Azure OpenAI', mistral: 'Mistral AI' };
 
 export const LLM_AZURE_DEFAULT_API_VERSION = '2024-06-01';
 
@@ -663,7 +644,7 @@ export const CONTEXT_ENGINE_LOCAL_KEY = 'contextEngine:local';
 export const CONTEXT_ENGINE_NAME_MAX = 120;
 export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Shown under the description field: people browsing engines and AI agents connected over MCP both read it. */
-export const CONTEXT_ENGINE_DESCRIPTION_HINT = 'Tells people and AI agents what this engine contains, so they know when to search it.';
+export const CONTEXT_ENGINE_DESCRIPTION_HINT = 'Agents read this to decide when to search the engine.';
 
 /** Engine actions a querying role receives — read context, open evidence, see the trace. */
 export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
@@ -674,17 +655,12 @@ export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.re
 /** The creator's grant is keyed `owner-<principalId>`. */
 export const OWNER_GRANT_PREFIX = 'owner-';
 
+
 /** Grants created for an org role are keyed `role-<handle>` so they can be told apart from ad-hoc grants. */
 export const ROLE_GRANT_PREFIX = 'role-';
 
 export const CONTEXT_QUERY_DEFAULT_LIMIT = 10;
 export const CONTEXT_QUERY_MAX_LENGTH = 10000;
-
-/** The Playground's query modes, in the order the toggle shows them. */
-export const CONTEXT_QUERY_MODES: readonly { value: ContextQueryMode; label: string; hint: string }[] = [
-  { value: 'answer', label: 'Answer', hint: 'A cited answer from passages you can read.' },
-  { value: 'context', label: 'Context', hint: 'Passages you can read, as an agent gets them.' },
-];
 
 /** Jobs stop being polled once they reach one of these. */
 export const CONTEXT_JOB_TERMINAL_STATES = new Set(['succeeded', 'failed']);
@@ -698,9 +674,17 @@ export interface ContextMcpToolInfo {
 
 /** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
-  { name: 'get_context', description: 'Returns the passages the caller may read that best answer a question, each with its source, version and link.' },
-  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage.' },
+  { name: 'get_context', description: 'Returns passages the caller may read that answer a question.' },
+  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage. Offered when the engine offers answers.' },
 ];
+
+// ── Recommended models ──────────────────────────────────────────────────────
+
+/** One-click default pair: one provider, one key, good quality at low cost. */
+export const RECOMMENDED_MODELS: { embedding: { provider: EmbeddingProvider; model: string }; llm: { provider: LlmProvider; model: string } } = {
+  embedding: { provider: 'openai', model: 'text-embedding-3-small' },
+  llm: { provider: 'openai', model: 'gpt-4.1' },
+};
 
 // ── Source progress ─────────────────────────────────────────────────────────
 
@@ -744,6 +728,7 @@ export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
 export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
 /** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
 export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
+
 
 /** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
 export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';

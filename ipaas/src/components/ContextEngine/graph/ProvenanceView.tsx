@@ -212,7 +212,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
 
       {data.answerWithheld && (
         <Alert severity="info" sx={{ mt: 1.5 }}>
-          The answer is hidden because a passage it was written from is no longer within your reach. The passages you can still read are shown.
+          The answer is hidden. A passage it used is no longer available to you.
         </Alert>
       )}
 
@@ -254,7 +254,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
               {facts.length === 0 && conflicts.length === 0 && (
                 <Box sx={canvasNoteSx}>
                   <Typography variant="body2" sx={{ ...mutedSx, textAlign: 'center', maxWidth: 380, bgcolor: 'background.paper', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
-                    No graph relationships took part in this answer. It was written from the passages listed on the right.
+                    No graph relationships were used.
                   </Typography>
                 </Box>
               )}
@@ -273,11 +273,11 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
               </Box>
             </CosmosCanvas>
           ) : (
-            <Alert severity="info">This engine doesn’t serve its graph yet, so the entities this answer used can’t be drawn. The steps on the right still show how it was derived.</Alert>
+            <Alert severity="info">The graph can’t be drawn for this engine.</Alert>
           )}
           {whole && whole.missing.length > 0 && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1, lineHeight: 1.5 }}>
-              Not in the graph shown: {whole.missing.join(', ')}. The graph view holds the most-mentioned entities; the facts still stand on the passages listed.
+              Not in the graph shown: {whole.missing.join(', ')}.
             </Typography>
           )}
         </Box>
@@ -395,11 +395,7 @@ function DerivationSteps({
     },
     {
       title: 'Access check',
-      body: trace
-        ? trace.suppressed
-          ? `${trace.suppressed} withheld by the access check; the engine never says which.`
-          : 'Every passage passed the access check: active, indexed, readable by you, at its current version.'
-        : 'Every passage shown passed the access check: active, indexed, readable by you, at its current version.',
+      body: trace?.suppressed ? `${trace.suppressed} withheld by the access check.` : 'Every passage passed the access check.',
     },
     result.answer
       ? {
@@ -412,8 +408,8 @@ function DerivationSteps({
       title: 'Entities',
       body: [
         result.facts.length
-          ? `${result.facts.length} fact${result.facts.length === 1 ? '' : 's'} from the graph stand on these passages, naming ${summary.entities} entit${summary.entities === 1 ? 'y' : 'ies'}. They are lit on the graph. They explain what the passages contain; the answer cites passages, not facts.`
-          : 'No graph facts came with this query, so its derivation runs through passages alone.',
+          ? `${result.facts.length} fact${result.facts.length === 1 ? '' : 's'} from these passages name${result.facts.length === 1 ? 's' : ''} ${summary.entities} entit${summary.entities === 1 ? 'y' : 'ies'}, lit on the graph.`
+          : 'No graph facts were used.',
         result.conflicts.length
           ? `The index flagged ${result.conflicts.length} conflict${result.conflicts.length === 1 ? '' : 's'} among the facts behind these passages. ${conflictsDrawnText(result.conflicts.length, drawnConflicts)} The model was told about them.`
           : '',
@@ -431,14 +427,9 @@ function DerivationSteps({
   };
   return (
     <Box component="aside" aria-label="How the answer was derived" sx={panelSx(false)}>
-      <Box>
-        <Typography variant="subtitle2" component="h2" sx={{ fontWeight: 600 }}>
-          How the answer was derived
-        </Typography>
-        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.5, lineHeight: 1.5 }}>
-          What the engine recorded for this question. No model reasoning is kept.
-        </Typography>
-      </Box>
+      <Typography variant="subtitle2" component="h2" sx={{ fontWeight: 600 }}>
+        How the answer was derived
+      </Typography>
       <Stack component="ol" gap={1.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
         {steps.map((step, i) => (
           <Stack component="li" key={step.title} direction="row" gap={1.25}>
@@ -511,8 +502,6 @@ function DerivationSteps({
       <Typography variant="caption" sx={{ ...mutedSx, borderTop: '1px solid', borderColor: 'divider', pt: 1.25, lineHeight: 1.5 }}>
         {trace ? `Trace ${trace.traceId} · ${trace.outcome.replace('_', ' ')}${trace.retrievalMode ? ` · ${trace.retrievalMode} mode` : ''}` : `Trace ${result.traceId}`}
         {permissionsKnown && !canTrace ? ' · retrieval counts need trace access' : ''}
-        <br />
-        Click an entity on the graph, or a passage here, to see its part in the answer.
       </Typography>
     </Box>
   );
@@ -597,7 +586,7 @@ function PassagePanel({
             </Stack>
           ) : (
             <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5, lineHeight: 1.5 }}>
-              The model was given it but cited it nowhere. It still counts: the engine checks it before showing this answer again.
+              Given to the model but not cited.
             </Typography>
           )}
         </Box>
@@ -660,9 +649,6 @@ function AnswerPanel({ result, onSelectPassage, onClose }: { result: ContextQuer
           );
         })}
       </Stack>
-      <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-        Each number is a passage the model was given; the engine kept only citations of those.
-      </Typography>
     </Box>
   );
 }

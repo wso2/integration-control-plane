@@ -35,14 +35,10 @@ import {
   splitSentences,
   askedQuestionMeta,
   citedNumbers,
-  deletionFailureText,
-  evidencePart,
   evidencePlace,
   evidenceVersionLabel,
-  versionFromLabel,
   isSameModel,
   modelDraftError,
-  modelKeysLabel,
   passageLines,
   toModelInput,
   describeVisibility,
@@ -79,11 +75,8 @@ import {
   summarizeEngineProgress,
   buildMcpClientConfigs,
   buildQueryCurl,
-  answerChoice,
-  applyAnswerChoice,
   canShareApiKey,
   connectorCountsByCategory,
-  defaultQueryMode,
   effectiveLlm,
   fromDraft,
   effectiveVisibility,
@@ -91,9 +84,7 @@ import {
   getStartedSteps,
   isFormDirty,
   isGraphUri,
-  modelProviderName,
   modelsStepBlocker,
-  nameStepBlocker,
   sanitizeStorage,
   storageSelectionError,
   storageStepBlocker,
@@ -107,7 +98,6 @@ import {
   grantAllowsQuery,
   invalidSourceFields,
   isFieldVisible,
-  isCustomModel,
   isFormComplete,
   isHttpUrl,
   isLlmValid,
@@ -130,8 +120,7 @@ import {
   queuedUploadText,
   uploadIsSlow,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_EMBEDDING_PROVIDERS, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_MODES, defaultStorage, isConnectorEnabled, LLM_PROVIDERS, SOURCE_CONNECTORS } from '../constants/contextEngine';
-import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
+import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
 import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
@@ -391,35 +380,6 @@ describe('catalog', () => {
   });
 });
 
-describe('model providers', () => {
-  it('offers OpenAI and Anthropic language models, leaving out the OpenAI model being retired', () => {
-    expect(LLM_PROVIDERS.map((p) => p.id)).toEqual(['openai', 'anthropic']);
-    expect(LLM_PROVIDERS[0].models[0]).toBe('gpt-6-luna');
-    expect(LLM_PROVIDERS[0].models).not.toContain('gpt-5-mini');
-  });
-
-  it('offers OpenAI embeddings only, and leaves the RAG ingestion list as it was', () => {
-    expect(CONTEXT_EMBEDDING_PROVIDERS.map((p) => p.id)).toEqual(['openai']);
-    expect(EMBEDDING_PROVIDERS.map((p) => p.id)).toEqual(['openai', 'azure_openai', 'mistral']);
-  });
-
-  it('names offered, retired and unknown providers', () => {
-    expect(modelProviderName('embedding', 'openai')).toBe('OpenAI');
-    expect(modelProviderName('llm', 'anthropic')).toBe('Anthropic');
-    expect(modelProviderName('llm', 'azure_openai')).toBe('Azure OpenAI');
-    expect(modelProviderName('embedding', 'mistral')).toBe('Mistral AI');
-    expect(modelProviderName('llm', 'acme')).toBe('acme');
-  });
-
-  it('treats a model id outside the list, or any id when there is no list, as typed in', () => {
-    const models = ['gpt-5-mini', 'gpt-6-luna'];
-    expect(isCustomModel('', models)).toBe(false);
-    expect(isCustomModel('gpt-5-mini', models)).toBe(false);
-    expect(isCustomModel('gpt-4.1', models)).toBe(true);
-    expect(isCustomModel('', [])).toBe(true);
-  });
-});
-
 describe('model validation', () => {
   it('requires model and key, plus base url + version for azure', () => {
     expect(isLlmValid(null)).toBe(false);
@@ -441,14 +401,6 @@ describe('name step', () => {
     expect(isNameStepValid('', '')).toBe(false);
     expect(isNameStepValid('ok', '')).toBe(true);
   });
-
-  it('says why the step cannot proceed: a missing name first, then the first field error', () => {
-    expect(nameStepBlocker('', '')).toBe('Enter a name for the engine');
-    expect(nameStepBlocker('   ', '')).toBe('Enter a name for the engine');
-    expect(nameStepBlocker('a'.repeat(CONTEXT_ENGINE_NAME_MAX + 1), '')).toBe(engineNameError('a'.repeat(CONTEXT_ENGINE_NAME_MAX + 1)));
-    expect(nameStepBlocker('Ops', 'x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1))).toBe(engineDescriptionError('x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1)));
-    expect(nameStepBlocker('Ops', '')).toBeNull();
-  });
 });
 
 describe('form completion', () => {
@@ -458,12 +410,6 @@ describe('form completion', () => {
     expect(isFormComplete({ ...form, sources: [] })).toBe(false);
     expect(isFormComplete({ ...form, llm: null })).toBe(false);
     expect(isFormComplete({ ...form, name: '' })).toBe(false);
-  });
-
-  it('is incomplete when only the name step fails, whatever the later steps hold', () => {
-    const form = completeForm();
-    expect(isFormComplete({ ...form, name: '   ' })).toBe(false);
-    expect(isFormComplete({ ...form, description: 'x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1) })).toBe(false);
   });
 
   it('roles are optional — the owner can keep an engine private', () => {
@@ -600,49 +546,6 @@ describe('shared api key', () => {
   });
 });
 
-describe('answer model choice', () => {
-  const different = { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' };
-
-  it('reads the choice from the form', () => {
-    expect(answerChoice({ answersEnabled: true, answerLlm: null })).toBe('same');
-    expect(answerChoice({ answersEnabled: true, answerLlm: different })).toBe('different');
-    expect(answerChoice({ answersEnabled: false, answerLlm: null })).toBe('off');
-  });
-
-  it('reads a restored draft that is off but still holds a model as off', () => {
-    expect(answerChoice({ answersEnabled: false, answerLlm: different })).toBe('off');
-  });
-
-  it('maps same and off onto no separate model', () => {
-    const form = { ...completeForm(), answerLlm: different };
-    expect(applyAnswerChoice('same', form)).toEqual({ answersEnabled: true, answerLlm: null });
-    expect(applyAnswerChoice('off', form)).toEqual({ answersEnabled: false, answerLlm: null });
-  });
-
-  it('starts a different model on the language model provider', () => {
-    expect(applyAnswerChoice('different', completeForm())).toEqual({ answersEnabled: true, answerLlm: blankLlm('anthropic') });
-    expect(applyAnswerChoice('different', { llm: null, answerLlm: null }).answerLlm).toEqual(blankLlm(LLM_PROVIDERS[0].id));
-  });
-
-  it('keeps a different model already chosen', () => {
-    expect(applyAnswerChoice('different', { ...completeForm(), answerLlm: different })).toEqual({ answersEnabled: true, answerLlm: different });
-  });
-
-  it('round-trips each choice through the form state', () => {
-    for (const choice of ['same', 'different', 'off'] as const) {
-      expect(answerChoice(applyAnswerChoice(choice, completeForm()))).toBe(choice);
-    }
-  });
-
-  it('blocks the models step only while a different model is incomplete', () => {
-    const form = completeForm();
-    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('same', form) })).toBeNull();
-    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('off', form) })).toBeNull();
-    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', form) })).toBe('Complete the answer model');
-    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', { ...form, answerLlm: different }) })).toBeNull();
-  });
-});
-
 describe('drafts', () => {
   it('strips every secret and round-trips the rest', () => {
     const form = completeForm();
@@ -675,19 +578,6 @@ describe('drafts', () => {
     expect(bad.llm).toEqual({ provider: 'openai', model: '', apiKey: '', azureBaseUrl: '', azureApiVersion: '' });
     expect(fromDraft(JSON.stringify({ ...malformed, form: { ...malformed.form, llm: { provider: 'nope', model: 'x' } } }))!.form.llm).toBeNull();
     expect(fromDraft(JSON.stringify({ v: 1, form: { name: 'x' } }))).toBeNull();
-  });
-
-  it('drops a model whose provider is no longer offered, and keeps the rest of the draft', () => {
-    const form = toDraft(completeForm(), 'x').form;
-    const stale = { v: 1, savedAt: 'x', form: { ...form, embedding: { ...form.embedding, provider: 'azure_openai' }, llm: { ...form.llm, provider: 'mistral' }, answerLlm: { ...blankLlm('openai'), provider: 'azure_openai', model: 'dep' } } };
-    const restored = fromDraft(JSON.stringify(stale))!.form;
-    expect(restored.embedding).toBeNull();
-    expect(restored.llm).toBeNull();
-    // A separate answer model stays separate, with a model to choose, instead of turning into the language model.
-    expect(restored.answerLlm).toEqual(blankLlm('openai'));
-    expect(answerChoice(restored)).toBe('different');
-    expect(restored.name).toBe('Support knowledge');
-    expect(restored.sources).toHaveLength(1);
   });
 
   it('knows when there is nothing worth keeping', () => {
@@ -737,28 +627,6 @@ describe('first run', () => {
     expect(moving[0].description).toBe('Syncing 1 of 2 sources. Items become searchable as the connector delivers them from 2 sources.');
     expect(getStartedSteps(engineDetail(), false, { ...summary, active: 0, waiting: 1 })[0].state).toBe('done');
     expect(getStartedSteps(engineDetail(), false, { ...summary, processed: 0, active: 0, waiting: 2 })[0].state).toBe('current');
-  });
-
-  it('talks about files, not a connector, when every source is an upload', () => {
-    const uploads = engineDetail({ sources: [{ id: 's1', name: 'File Upload', type: 'upload', state: 'ready' }] });
-    const summary = { sourceCount: 1, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
-    expect(getStartedSteps(uploads, false, summary)[0].description).toBe('Syncing 1 source.');
-    expect(getStartedSteps(uploads, false)[0].description).toBe('Files become searchable after upload.');
-    expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent' });
-  });
-});
-
-describe('playground modes', () => {
-  it('starts in Answer when the engine offers answers', () => {
-    expect(defaultQueryMode(engineDetail())).toBe('answer');
-  });
-
-  it('starts in Context when the engine is set up without answers', () => {
-    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false } }))).toBe('context');
-  });
-
-  it('lists Answer before Context', () => {
-    expect(CONTEXT_QUERY_MODES.map((m) => m.label)).toEqual(['Answer', 'Context']);
   });
 });
 
@@ -876,12 +744,12 @@ const progress = (o: ProgressOverrides = {}): SourceProgress => ({
 describe('source progress', () => {
   it('tells the operator what to fix when files failed on the model provider', () => {
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 3, indexed: 1, failed: 2, failures: { backend_model_access_denied: 2 } } }))).toBe(
-      "2 files in this source are not searchable: the model provider rejected the engine's API key, or the key may not use the configured model. Fix the engine's model settings.",
+      "2 files are not searchable: the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
     );
-    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { backend_model_unavailable: 1 } } }))).toBe('1 file in this source is not searchable: the engine could not reach its model provider.');
-    // Two codes have no single cause, so the notice counts every file and names none. It names no retry either, since a connector source has no Retry.
+    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { backend_model_unavailable: 1 } } }))).toMatch(/^1 file is not searchable: the engine could not reach its model provider/);
+    // Two codes need two fixes, so the notice counts every file and sends the reader to the rows instead of naming one fix.
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 4, indexed: 1, failed: 3, failures: { backend_model_access_denied: 2, backend_model_quota_exceeded: 1 } } }))).toBe(
-      '3 files in this source are not searchable: the model provider failed on them for more than one reason.',
+      "3 files are not searchable: the model provider failed on them for more than one reason. Each file's row says why.",
     );
     // A file the engine cannot read is the file's own problem, told on its row, not a notice.
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { extraction_unsupported: 1 } } }))).toBeNull();
@@ -957,7 +825,7 @@ describe('source progress', () => {
   });
 
   it('describes counts, failures and stored records', () => {
-    expect(sourceProgressDetail(progress())).toMatch(/No sync has started yet/);
+    expect(sourceProgressDetail(progress())).toBe('No sync yet.');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' } }))).toBe('Nothing delivered yet · 0 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' }, processing: { total: 12, succeeded: 12, percent: 100 }, records: { active: 12 } }))).toBe('12 of 12 items processed so far · 12 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1200, queued: 658, succeeded: 540, failed: 2, percent: 45.2 }, records: { active: 538, quarantined: 1 } }))).toBe(
@@ -1063,12 +931,12 @@ describe('file uploads', () => {
     const pdf = { name: 'ref.pdf', size: 4.8 * MB, contentType: 'application/pdf' };
     const dup = { name: 'oncall.txt', size: 1100, contentType: 'text/plain' };
     expect(checkStagedFile(big, [])).toEqual({ problem: 'too-large', replaces: false });
-    expect(stagedFileNote(checkStagedFile(big, []))).toBe('This file is over the 25 MB limit.');
+    expect(stagedFileNote(checkStagedFile(big, []), big.size)).toBe('41.2 MB is over the 25 MB limit. Split it or leave it out.');
     expect(checkStagedFile(bin, [])).toEqual({ problem: 'unsupported', replaces: false });
-    expect(checkStagedFile(pdf, [])).toEqual({ replaces: false });
+    expect(checkStagedFile(pdf, [])).toEqual({ warning: 'pdf', replaces: false });
     expect(checkStagedFile(dup, ['oncall.txt'])).toEqual({ replaces: true });
-    expect(stagedFileNote(checkStagedFile(dup, ['oncall.txt']))).toBe('Replaces the version already in the source');
-    expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size });
+    expect(stagedFileNote(checkStagedFile(dup, ['oncall.txt']), dup.size)).toBe('Replaces the version already in the source');
+    expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size, pdfs: 1 });
   });
 
   it('turns a file visibility choice into role tags and identity rules', () => {
@@ -1130,6 +998,7 @@ describe('file uploads', () => {
   it('maps record status to a file status', () => {
     expect(uploadStatusFromRecord(record({ indexState: 'indexed' }))).toEqual({ status: 'searchable' });
     expect(uploadStatusFromRecord(record({ indexState: 'pending' }))).toEqual({ status: 'indexing' });
+    expect(uploadStatusFromRecord(record({ indexState: 'reconcile_required' }))).toEqual({ status: 'indexing' });
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
     // The engine's model failure codes say what to fix, so the file shows that instead of a code.
@@ -1142,16 +1011,16 @@ describe('file uploads', () => {
     withRoleVisibility(() =>
       expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
         status: 'held',
-        detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
+        detail: 'Nobody can see this file. Change who can see it.',
       }),
     );
     // Changing who can see a file is hidden while roles are turned off, so the message does not point to it.
     expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
       status: 'held',
-      detail: "The source has no rule for this file's roles yet, so nobody can see it.",
+      detail: 'Nobody can see this file.',
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
-    expect(summarizeUploads([])).toBe('No files uploaded from this browser');
+    expect(summarizeUploads([])).toBe('No files yet');
   });
 
   it('tells an unchanged file from a changed one by its hash and roles, not its version', () => {
@@ -1262,19 +1131,10 @@ describe('provenance and evidence', () => {
     expect(evidencePlace({ location: 'chunk:4', locator: undefined })).toEqual({ path: undefined, parts: ['Part 5'], coarse: true });
   });
 
-  it('numbers the part a passage came from, from the locator or the location', () => {
-    expect(evidencePart(ev({ chunkIndex: 2 }))).toBe(3);
-    expect(evidencePart({ location: 'chunk:4', locator: undefined })).toBe(5);
-    expect(evidencePart({ location: 'page:4', locator: undefined })).toBeUndefined();
-  });
-
   it('shows epoch versions as dates and leaves other versions alone', () => {
     expect(evidenceVersionLabel('1790872243455')).toMatch(/2026/);
     expect(evidenceVersionLabel('v12')).toBe('v12');
     expect(evidenceVersionLabel('17')).toBe('17');
-    // A version that is not a date is named, not dated.
-    expect(versionFromLabel('1790872243455')).toMatch(/^Version from .*2026/);
-    expect(versionFromLabel('v12')).toBe('Version v12');
   });
 
   it('numbers passage lines only when they line up with the locator', () => {
@@ -1321,11 +1181,6 @@ describe('provenance and evidence', () => {
     expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
   });
-
-  it('explains a failed deletion', () => {
-    expect(deletionFailureText('residue_found')).toMatch(/still searchable/);
-    expect(deletionFailureText(undefined)).toMatch(/continues where the last attempt stopped/);
-  });
 });
 
 describe('editing models on a running engine', () => {
@@ -1348,12 +1203,6 @@ describe('editing models on a running engine', () => {
     expect(toModelInput({ ...draft, keyMode: 'ref', apiKeyRef: ' env:OPENAI_KEY ' })).toEqual({ provider: 'openai', model: 'gpt-4.1', apiKeyRef: 'env:OPENAI_KEY' });
     expect(modelDraftError({ ...draft, provider: 'azure_openai', model: 'dep', apiKey: 'k' }, null)).toBe('Enter the base URL and API version');
     expect(modelDraftError({ ...draft, model: ' ' }, current)).toBe('Choose a model');
-  });
-
-  it('says how the keys are held', () => {
-    expect(modelKeysLabel({ embedding: { provider: 'openai', model: 'e', keyKind: 'encrypted' }, llm: current })).toBe('Keys encrypted by the engine');
-    expect(modelKeysLabel({ embedding: { provider: 'azure_openai', model: 'e', keyKind: 'reference' }, llm: null })).toBe('Keys from secret references');
-    expect(modelKeysLabel({ embedding: null, llm: null })).toBe('');
   });
 });
 

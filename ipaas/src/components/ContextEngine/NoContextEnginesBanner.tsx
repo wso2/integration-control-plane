@@ -33,7 +33,7 @@ const featureSx = {
 
 const featureIconSx = { color: 'primary.main', mt: 0.25, flexShrink: 0 } as const;
 
-function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }): JSX.Element {
+function Feature({ icon, title, text }: { icon: ReactNode; title: string; text?: string }): JSX.Element {
   return (
     <Box sx={featureSx}>
       <Box sx={featureIconSx}>{icon}</Box>
@@ -41,9 +41,11 @@ function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: 
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           {title}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {text}
-        </Typography>
+        {text && (
+          <Typography variant="caption" color="text.secondary">
+            {text}
+          </Typography>
+        )}
       </Box>
     </Box>
   );
@@ -58,7 +60,7 @@ export default function NoContextEnginesBanner({ onCreate }: { onCreate: () => v
           Give your integrations grounded context
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          A Context Engine builds a governed knowledge graph from the sources you choose. Selected roles can ask it questions in natural language, and you can publish it as an API or an MCP server for your agents.
+          Build a knowledge graph from your sources. Ask it questions, or call it from agents over API or MCP.
         </Typography>
         <Box>
           <Button variant="contained" startIcon={<Plus size={20} />} onClick={onCreate} sx={{ mt: 1 }}>
@@ -71,13 +73,13 @@ export default function NoContextEnginesBanner({ onCreate }: { onCreate: () => v
           <Feature icon={<Waypoints size={20} />} title="Choose sources" text="Drive, S3, SharePoint, Confluence, GitHub, websites or uploads." />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<ShieldCheck size={20} />} title="Grant access" text="Pick the org roles that may query; evidence is access-checked on every read." />
+          <Feature icon={<ShieldCheck size={20} />} title="Grant access" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<Braces size={20} />} title="Expose as API" text="Ask questions over REST with source-linked evidence." />
+          <Feature icon={<Braces size={20} />} title="Expose as API" />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<Plug size={20} />} title="Expose as MCP" text="Let agents call query, evidence and explain tools." />
+          <Feature icon={<Plug size={20} />} title="Expose as MCP" />
         </Grid>
       </Grid>
     </Stack>
