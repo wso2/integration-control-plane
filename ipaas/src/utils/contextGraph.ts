@@ -295,6 +295,7 @@ export interface CosmosBuffers {
   sizes: Float32Array;
   links: Float32Array;
   linkColors: Float32Array;
+  /** Each link's width in screen pixels (see `LINK_WIDTH`). */
   linkWidths: Float32Array;
   /** How hard each link pulls in the layout (see `LINK_STRENGTH`). */
   linkStrengths: Float32Array;
@@ -318,6 +319,14 @@ export interface CosmosBuffers {
  * them all into one knot around it, and fewer lines cross.
  */
 export const LINK_STRENGTH: Record<GraphLinkKind, number> = { relates: 1, conflicts: 0.8, mentions: 0.35 };
+
+/**
+ * How wide each kind of link is drawn, in screen pixels. The lines are kept
+ * thin so a selected one does not shout over the points it joins; a conflict
+ * is a little wider so it still stands out. The arrow head grows with the
+ * width, so the canvas sets a larger arrow scale to keep it easy to see.
+ */
+export const LINK_WIDTH: Record<GraphLinkKind, number> = { relates: 1, conflicts: 1.6, mentions: 0.5 };
 
 // The canvas's shape codes (its PointShape values), kept here so this module needs no WebGL.
 const CIRCLE = 0;
@@ -470,7 +479,7 @@ export function cosmosBuffers(m: GraphModel, palette: GraphPalette, { slots, spa
     links[i * 2] = link.source;
     links[i * 2 + 1] = link.target;
     linkColors.set(palette.link[link.kind], i * 4);
-    linkWidths[i] = link.kind === 'relates' ? 1.4 : link.kind === 'conflicts' ? 2.2 : 0.6;
+    linkWidths[i] = LINK_WIDTH[link.kind];
     linkStrengths[i] = LINK_STRENGTH[link.kind];
   });
   const arrows = m.links.map((link) => link.kind === 'relates');
@@ -774,6 +783,41 @@ export function linkSelection(m: GraphModel, graph: ContextGraph, link: number):
   }
   const chosen = [...links];
   return { points: [...points], links: chosen, tags: chosen.filter((i) => !!m.links[i].label).map((i) => linkTag(m, i, true)) };
+}
+
+/**
+ * An answer's lit part with a clicked label's link added to it, for the
+ * derivation view. What the link selects (see `linkSelection`) joins the part,
+ * so the answer stays lit around it, and the tags of the selected links are
+ * drawn lit. A tag the part already has keeps its text, which is the answer's
+ * own wording of the fact.
+ */
+export function withLinkSelection(part: FactSelection, pick: LinkSelection): FactSelection {
+  const chosen = new Set(pick.links);
+  const had = new Set(part.tags.map((tag) => tag.link));
+  return {
+    ...part,
+    points: [...new Set([...part.points, ...pick.points])],
+    links: [...new Set([...part.links, ...pick.links])],
+    tags: [...part.tags.map((tag) => (chosen.has(tag.link) ? { ...tag, lit: true } : tag)), ...pick.tags.filter((tag) => !had.has(tag.link))],
+  };
+}
+
+/** An entity as a fact or a link names it: its name, and its kind when known. */
+export interface NamedEnd {
+  name: string;
+  kind?: string;
+}
+
+/**
+ * Whether a fact is this relationship: the same relation from the same subject
+ * to the same object. Names and the relation are compared without case. A kind
+ * counts only when both sides know one, since an entity is its name and its kind.
+ */
+export function factIs(fact: ContextFact, subject: NamedEnd, relation: string, object: NamedEnd): boolean {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const end = (name: string, kind: string | undefined, want: NamedEnd) => same(name, want.name) && (!kind || !want.kind || kind === want.kind);
+  return same(fact.relation, relation) && end(fact.subject, fact.subjectKind, subject) && end(fact.object, fact.objectKind, object);
 }
 
 /** Narrows the facts lit: those naming one entity, or those standing on one passage. */

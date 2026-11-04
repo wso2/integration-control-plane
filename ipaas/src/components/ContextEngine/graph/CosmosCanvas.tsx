@@ -67,10 +67,23 @@ const PARTIAL_ALPHA = 0.3;
  */
 const layoutMemory = new Map<string, Map<string, Point>>();
 const NO_TAGS: LinkTag[] = [];
-/** The reading-direction motion on a selected relationship: dots travel from subject to object. */
-const FLOW_PERIOD_MS = 1800;
+/**
+ * The reading-direction motion on a selected relationship: dots travel from
+ * subject to object. They move at a slow, steady speed on screen, so a long line
+ * does not make them race; on a short line one trip still takes at least
+ * `FLOW_MIN_TRIP_MS`. They are small and soft so they do not pull the eye more
+ * than the line itself.
+ */
+const FLOW_SPEED_PX_PER_S = 30;
+const FLOW_MIN_TRIP_MS = 3000;
 const FLOW_DOTS = 3;
-const FLOW_RADIUS = 2.2;
+const FLOW_RADIUS = 1.6;
+const FLOW_ALPHA_FROM = 0.25;
+const FLOW_ALPHA_TO = 0.75;
+/** The space the dots leave between them and a point's edge, in screen pixels. */
+const FLOW_GAP_PX = 2;
+/** The longest gap between two frames the dots catch up on, so they do not jump after the tab was hidden. */
+const FLOW_MAX_FRAME_MS = 100;
 
 type Point = [number, number];
 
@@ -464,7 +477,9 @@ export default function CosmosCanvas({
           // Relationships carry an arrow at the object end (see `CosmosBuffers.arrows`); the other
           // lines have no direction, so none by default.
           linkDefaultArrows: false,
-          linkArrowsSizeScale: 0.8,
+          // The library sizes an arrow head from its line's width. The lines are thin (see `LINK_WIDTH`),
+          // so this keeps the heads about as big as before, and easy to see.
+          linkArrowsSizeScale: 1.1,
           renderHoveredPointRing: true,
           hoveredPointRingColor: accent,
           focusedPointRingColor: accent,
@@ -643,9 +658,14 @@ export default function CosmosCanvas({
       clear();
       return;
     }
-    const started = performance.now();
+    // Each line keeps its own place in the trip, moved on by the time since the last frame. A zoom
+    // changes the line's length and so its trip time, and the dots carry on from where they were.
+    const along = new Map<number, number>();
+    let last = performance.now();
     let frame = 0;
     const draw = (now: number) => {
+      const elapsed = Math.min(FLOW_MAX_FRAME_MS, Math.max(0, now - last));
+      last = now;
       const dpr = window.devicePixelRatio || 1;
       const width = Math.round(host.clientWidth * dpr);
       const height = Math.round(host.clientHeight * dpr);
@@ -655,7 +675,6 @@ export default function CosmosCanvas({
       }
       clear();
       const tracked = graph.getTrackedPointPositionsMap();
-      const phase = ((now - started) / FLOW_PERIOD_MS) % 1;
       context.fillStyle = accent;
       for (const link of links) {
         const from = tracked.get(buffers.links[link * 2]);
@@ -663,12 +682,25 @@ export default function CosmosCanvas({
         if (!from || !to) continue;
         const a = graph.spaceToScreenPosition(from);
         const b = graph.spaceToScreenPosition(to);
+        const length = Math.hypot(b[0] - a[0], b[1] - a[1]);
+        // The dots run from the edge of one point to the edge of the other and never over a point, so a
+        // selected entity with many lines is not buried under them. A point's size is its width in screen
+        // pixels, as the canvas does not grow points with the zoom.
+        const start = buffers.sizes[buffers.links[link * 2]] / 2 + FLOW_GAP_PX;
+        const run = length - buffers.sizes[buffers.links[link * 2 + 1]] / 2 - FLOW_GAP_PX - start;
+        if (run <= 0) continue;
+        const tripMs = Math.max(FLOW_MIN_TRIP_MS, (run / FLOW_SPEED_PX_PER_S) * 1000);
+        const phase = ((along.get(link) ?? 0) + elapsed / tripMs) % 1;
+        along.set(link, phase);
+        const ux = (b[0] - a[0]) / length;
+        const uy = (b[1] - a[1]) / length;
         for (let k = 0; k < FLOW_DOTS; k += 1) {
-          const along = (phase + k / FLOW_DOTS) % 1;
-          // Brighter towards the object end, so even a still frame reads in the right direction.
-          context.globalAlpha = 0.3 + 0.7 * along;
+          const at = (phase + k / FLOW_DOTS) % 1;
+          const d = start + run * at;
+          // Stronger towards the object end, so even a still frame reads in the right direction.
+          context.globalAlpha = FLOW_ALPHA_FROM + (FLOW_ALPHA_TO - FLOW_ALPHA_FROM) * at;
           context.beginPath();
-          context.arc((a[0] + (b[0] - a[0]) * along) * dpr, (a[1] + (b[1] - a[1]) * along) * dpr, FLOW_RADIUS * dpr, 0, Math.PI * 2);
+          context.arc((a[0] + ux * d) * dpr, (a[1] + uy * d) * dpr, FLOW_RADIUS * dpr, 0, Math.PI * 2);
           context.fill();
         }
       }
