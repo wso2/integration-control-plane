@@ -137,7 +137,9 @@ export default function Component(scope: ComponentScope): JSX.Element {
   // deployed from a prebuilt image with no source repo — hide Source/Commit,
   // the editor, and the Build card (same treatment as a proxy).
   const isRagNoSource = RAG_NO_SOURCE_SUBTYPES.has(component.componentSubType ?? '');
-  const hasSource = !isProxyComponent && !isRagNoSource;
+  // A voice agent runs a prebuilt image chosen by the BFF: no repository, no builds.
+  const isVoiceAgent = identity?.type === 'voice-agent';
+  const hasSource = !isProxyComponent && !isRagNoSource && !isVoiceAgent;
   const showBuildCard = !component.isPrebuilt && hasSource;
 
   return (
