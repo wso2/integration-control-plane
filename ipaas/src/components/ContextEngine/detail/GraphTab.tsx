@@ -58,7 +58,7 @@ export default function GraphTab({ engine, orgHandle }: GraphTabProps): JSX.Elem
         onSelectKey={setNode}
         onBackToAnswer={() => navigate(`${contextEngineUrl(orgHandle, engine.id, 'playground')}?open=${encodeURIComponent(queryId)}`)}
         onExit={() => setParams(new URLSearchParams())}
-        onExploreEntity={(id) => setParams(new URLSearchParams({ node: id }))}
+        onExploreNode={(key) => setParams(new URLSearchParams({ node: key }))}
       />
     );
   }

@@ -21,11 +21,11 @@ import { MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
 import { type JSX, type ReactNode } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { contextEngineUrl } from '../../../paths';
-import { sameRelation } from '../../../utils/contextGraph';
+import { conflictLink, conflictsOn, relationLink, relationOf, sameRelation, type GraphModel } from '../../../utils/contextGraph';
 import { EntityChip } from './EntityPanel';
 import { mutedSx } from '../styles';
 import { panelLabelSx, panelSx, selectRowSx } from './graphStyles';
-import type { ContextGraphRelation } from '../../../types/contextEngine';
+import type { ContextGraph, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
 
 /** An entity at one end of a relationship, as the panel names it. */
 export interface LinkEnd {
@@ -231,6 +231,79 @@ export function ConflictPanel({ engineId, orgHandle, conflicts, onSelectEntity, 
         </Stack>
       )}
     </Box>
+  );
+}
+
+interface LinkDetailsProps {
+  engineId: string;
+  orgHandle: string;
+  /** The graph as drawn, and the graph served that it was drawn from. */
+  model: GraphModel;
+  graph: ContextGraph;
+  /** The selected link: a relationship, or a conflict line. */
+  link: number;
+  sourceName: (sourceId: string) => string | undefined;
+  onSelectEntity: (name: string, kind?: string) => void;
+  onSelectRecord: (id: string) => void;
+  /** Select another link, such as one side of a conflict. */
+  onSelectLink: (link: number) => void;
+  onClose: () => void;
+}
+
+/**
+ * The panel for a link selected by clicking its label: the relationship it
+ * stands for, or the conflicts on a conflict line. The explorer and the
+ * derivation view both show it, so a label works the same in both.
+ */
+export function LinkDetails({ engineId, orgHandle, model, graph, link, sourceName, onSelectEntity, onSelectRecord, onSelectLink, onClose }: LinkDetailsProps): JSX.Element | null {
+  const line = model.links[link];
+  // A document line has no label, so it is never selected.
+  if (!line || line.kind === 'mentions') return null;
+  const end = (id: string): LinkEnd => {
+    const entity = graph.entities.find((e) => e.id === id);
+    return entity ? { name: entity.name, ...(entity.kind ? { kind: entity.kind } : {}) } : { name: id };
+  };
+  const recordView = (id: string): LinkRecord => {
+    const record = graph.records.find((r) => r.id === id);
+    return { id, label: record?.recordId ?? id, sourceName: record ? sourceName(record.sourceId) : undefined, drawn: model.index.has(id) };
+  };
+  const relationView = (relation: ContextGraphRelation): RelationView => ({ relation, subject: end(relation.subjectId), object: end(relation.objectId), records: relation.recordNodeIds.map(recordView), drawn: relationLink(model, relation) !== undefined });
+  const conflictView = ({ index, conflict }: { index: number; conflict: ContextGraphConflict }): ConflictView => ({
+    index,
+    first: relationView(conflict.first),
+    second: relationView(conflict.second),
+    reason: conflict.reason,
+    confidence: conflict.confidence,
+    drawn: conflictLink(model, conflict) !== undefined,
+  });
+  const selectRelation = (relation: ContextGraphRelation) => {
+    const at = relationLink(model, relation);
+    if (at !== undefined) onSelectLink(at);
+  };
+  const selectConflict = (index: number) => {
+    const at = graph.conflicts[index] ? conflictLink(model, graph.conflicts[index]) : undefined;
+    if (at !== undefined) onSelectLink(at);
+  };
+
+  if (line.kind === 'conflicts') {
+    return <ConflictPanel engineId={engineId} orgHandle={orgHandle} conflicts={conflictsOn(model, graph, link).map(conflictView)} onSelectEntity={onSelectEntity} onSelectRelation={selectRelation} onClose={onClose} />;
+  }
+  // The relationship as the graph served it, or, when it is not found there, as the line itself names it.
+  const relation = relationOf(model, graph, link) ?? { subjectId: model.nodes[line.source].key, relation: line.label ?? '', objectId: model.nodes[line.target].key, recordNodeIds: [] };
+  return (
+    <RelationPanel
+      engineId={engineId}
+      orgHandle={orgHandle}
+      view={relationView(relation)}
+      conflicts={graph.conflicts
+        .map((conflict, index) => ({ index, conflict }))
+        .filter(({ conflict }) => sameRelation(conflict.first, relation) || sameRelation(conflict.second, relation))
+        .map(conflictView)}
+      onSelectEntity={onSelectEntity}
+      onSelectRecord={onSelectRecord}
+      onSelectConflict={selectConflict}
+      onClose={onClose}
+    />
   );
 }
 
