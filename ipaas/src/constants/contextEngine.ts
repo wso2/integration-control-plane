@@ -18,6 +18,7 @@
 
 import type {
   ContextEngineStorage,
+  ContextQueryMode,
   ContextSourceConfig,
   FileVisibility,
   LlmConfig,
@@ -276,7 +277,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Docs, markdown and code in a repository branch.',
     category: 'code',
     popular: true,
-    logo: `${CONNECTOR_LOGO_BASE}github.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}github.svg`, logoDark: `${CONNECTOR_LOGO_BASE}github-dark.svg`,
     icon: 'github',
     fields: [
       F('repositoryUrl', 'Repository URL', 'url', { placeholder: 'https://github.com/org/repo' }),
@@ -431,7 +432,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['host', 'database'],
     isStructuredData: true,
   },
-  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
   { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
   {
     id: 'mongodb',
@@ -481,7 +482,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Zendesk',
     description: 'Tickets and help-center articles.',
     category: 'saas',
-    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`, logoDark: `${CONNECTOR_LOGO_BASE}zendesk-dark.svg`,
     icon: 'headset',
     fields: [F('subdomain', 'Subdomain', 'text', { placeholder: 'your-org' }), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['subdomain'],
@@ -614,13 +615,21 @@ export interface LlmProviderInfo {
   name: string;
   /** Logo path under the public folder, resolved with {@link contextLogoUrl}. */
   logo: string;
+  /** Light variant of a dark logo, for the dark theme. */
+  logoDark?: string;
   /** Selectable model ids. Empty means the provider takes a free-text model id. */
   models: string[];
 }
 
+/**
+ * Light logos for the embedding providers whose marks are dark, for the dark theme. The embedding list
+ * belongs to RAG ingestion, so the Context Engine screens keep their own dark variants here.
+ */
+export const EMBEDDING_LOGO_DARK: Readonly<Record<string, string>> = { openai: `${GENAI_LOGO_BASE}openai-dark.svg`, mistral: `${GENAI_LOGO_BASE}mistral-dark.svg` };
+
 export const LLM_PROVIDERS: LlmProviderInfo[] = [
-  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra'] },
-  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, logoDark: `${GENAI_LOGO_BASE}openai-dark.svg`, models: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra'] },
+  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, logoDark: `${GENAI_LOGO_BASE}anthropic-dark.svg`, models: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
 ];
 
 /** Embedding providers a context engine offers. RAG ingestion keeps its own, longer list. */
@@ -671,6 +680,12 @@ export const ROLE_GRANT_PREFIX = 'role-';
 export const CONTEXT_QUERY_DEFAULT_LIMIT = 10;
 export const CONTEXT_QUERY_MAX_LENGTH = 10000;
 
+/** The Playground's query modes, in the order the toggle shows them. */
+export const CONTEXT_QUERY_MODES: readonly { value: ContextQueryMode; label: string; hint: string }[] = [
+  { value: 'answer', label: 'Answer', hint: 'A cited answer from passages you can read.' },
+  { value: 'context', label: 'Context', hint: 'Passages you can read, as an agent gets them.' },
+];
+
 /** Jobs stop being polled once they reach one of these. */
 export const CONTEXT_JOB_TERMINAL_STATES = new Set(['succeeded', 'failed']);
 
@@ -684,7 +699,7 @@ export interface ContextMcpToolInfo {
 /** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
   { name: 'get_context', description: 'Returns the passages the caller may read that best answer a question, each with its source, version and link.' },
-  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage. Offered when the engine offers answers.' },
+  { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage.' },
 ];
 
 // ── Source progress ─────────────────────────────────────────────────────────
