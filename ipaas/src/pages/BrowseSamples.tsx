@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, InputAdornment, PageContent, Pagination, Typography, TextField } from '@wso2/oxygen-ui';
-import { ArrowLeft, Search } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, CircularProgress, PageContent, Pagination, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCreateComponent } from '../hooks/useComponents';
@@ -33,6 +33,7 @@ import type { Sample } from '../types/samples';
 import { toHandler } from '../utils/string';
 import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
+import SearchField from '../components/SearchField';
 
 export default function BrowseSamples(scope: ProjectScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -160,7 +161,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
       </Button>
 
       <Typography variant="h1" sx={{ mb: 0.5, mt: 1 }}>
-        Browse Samples
+        Browse samples
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 5 }}>
         Deploy a sample to get started quickly.
@@ -177,23 +178,7 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
             borderColor: 'divider',
             pr: 2,
           }}>
-          <TextField
-            size="small"
-            placeholder="Search samples…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            fullWidth
-            sx={{ mb: 2 }}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search size={16} />
-                  </InputAdornment>
-                ),
-              },
-            }}
-          />
+          <SearchField value={search} onChange={setSearch} placeholder="Search samples" fullWidth sx={{ mb: 2 }} />
 
           <FilterSection title="Type" items={uniqueTypes} selected={selectedTypes} onToggle={toggleFilter(setSelectedTypes)} labelFn={formatComponentType} />
 

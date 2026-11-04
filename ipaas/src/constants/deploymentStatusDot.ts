@@ -26,7 +26,7 @@
 export const DEPLOYMENT_STATUS_DOT: Record<string, { label: string; dotColor: string }> = {
   ACTIVE: { label: 'Active', dotColor: 'success.main' },
   ERROR: { label: 'Error', dotColor: 'error.main' },
-  IN_PROGRESS: { label: 'In Progress', dotColor: 'warning.main' },
+  IN_PROGRESS: { label: 'In progress', dotColor: 'warning.main' },
   SUSPENDED: { label: 'Suspended', dotColor: 'text.disabled' },
-  NOT_DEPLOYED: { label: 'Not Deployed', dotColor: 'text.disabled' },
+  NOT_DEPLOYED: { label: 'Not deployed', dotColor: 'text.disabled' },
 };

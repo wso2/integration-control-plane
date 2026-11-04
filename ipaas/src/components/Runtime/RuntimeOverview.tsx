@@ -30,7 +30,7 @@ function statusMeta(status: string): { label: string; color: PaletteColor } {
     case 'active':
       return { label: 'Active', color: 'success' };
     case 'inprogress':
-      return { label: 'In Progress', color: 'info' };
+      return { label: 'In progress', color: 'info' };
     case 'error':
     case 'failed':
     case 'failure':
@@ -38,7 +38,7 @@ function statusMeta(status: string): { label: string; color: PaletteColor } {
     case 'suspended':
       return { label: 'Suspended', color: 'warning' };
     case 'notdeployed':
-      return { label: 'Not Deployed', color: 'default' };
+      return { label: 'Not deployed', color: 'default' };
     default:
       return { label: status || 'Unknown', color: 'default' };
   }

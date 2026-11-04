@@ -36,10 +36,10 @@ describe('getDeploymentStatusLabel', () => {
   it('maps each status to the correct label', () => {
     expect(getDeploymentStatusLabel(DeploymentStatus.Active)).toBe('Active');
     expect(getDeploymentStatusLabel(DeploymentStatus.Error)).toBe('Error');
-    expect(getDeploymentStatusLabel(DeploymentStatus.InProgress)).toBe('In Progress');
+    expect(getDeploymentStatusLabel(DeploymentStatus.InProgress)).toBe('In progress');
     expect(getDeploymentStatusLabel(DeploymentStatus.Suspended)).toBe('Suspended');
-    expect(getDeploymentStatusLabel(DeploymentStatus.NotDeployed)).toBe('Not Deployed');
-    expect(getDeploymentStatusLabel(undefined)).toBe('Not Deployed');
+    expect(getDeploymentStatusLabel(DeploymentStatus.NotDeployed)).toBe('Not deployed');
+    expect(getDeploymentStatusLabel(undefined)).toBe('Not deployed');
   });
 });
 

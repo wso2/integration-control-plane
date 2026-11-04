@@ -131,7 +131,7 @@ export default function OIDCCallback(): JSX.Element {
           <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
             Please try logging in again.
           </Typography>
-          <a href={withBase(loginUrl())}>Return to Login</a>
+          <a href={withBase(loginUrl())}>Return to login</a>
         </Box>
       </Box>
     );

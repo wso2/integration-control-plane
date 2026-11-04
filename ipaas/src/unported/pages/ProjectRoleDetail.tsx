@@ -249,7 +249,7 @@ export default function ProjectRoleDetail(): JSX.Element {
       )}
       <ListingTable.Container>
         <ListingTable.Toolbar
-          searchSlot={<SearchField value={search} onChange={setSearch} />}
+          searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
           actions={
             hasAnyPermission(roleModifyPerms, projectId || undefined) && (
               <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => setAddingGroups(true)}>

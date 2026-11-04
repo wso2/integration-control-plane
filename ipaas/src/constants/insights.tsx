@@ -68,10 +68,10 @@ export const OUTCOME_COLOR: Record<'success' | 'failure' | 'timeout', string> = 
 
 export const DEPLOYMENT_STATUS_CHIP: Record<string, { label: string; color: 'success' | 'warning' | 'error' | 'default' }> = {
   ACTIVE: { label: 'Active', color: 'success' },
-  IN_PROGRESS: { label: 'In Progress', color: 'warning' },
+  IN_PROGRESS: { label: 'In progress', color: 'warning' },
   ERROR: { label: 'Error', color: 'error' },
   SUSPENDED: { label: 'Suspended', color: 'default' },
-  NOT_DEPLOYED: { label: 'Not Deployed', color: 'default' },
+  NOT_DEPLOYED: { label: 'Not deployed', color: 'default' },
   UNKNOWN: { label: 'Unknown', color: 'default' },
 };
 
@@ -185,3 +185,6 @@ export const UNIT_BY_KIND: Record<IntegrationKind, string> = {
   auto: 'runs',
   rag: 'runs',
 };
+
+// Hidden until the per-environment insights queries stop loading forever on the cards.
+export const ENV_CARD_INSIGHTS_ENABLED = false;

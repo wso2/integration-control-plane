@@ -69,13 +69,13 @@ function NoLogs(): JSX.Element {
   );
 }
 
-/** "Execution Logs" accordion — spinner while running, log lines once available, else an empty state. */
+/** "Execution logs" accordion — spinner while running, log lines once available, else an empty state. */
 export default function ExecutionLogsPanel({ componentId, deploymentTrackId, environmentId, executionId, run, isRunning, expanded, onToggle }: ExecutionLogsPanelProps): JSX.Element {
   return (
     <Accordion expanded={expanded} onChange={(_, v) => onToggle(v)} disableGutters variant="outlined" sx={{ '&:before': { display: 'none' } }}>
       <AccordionSummary expandIcon={<ChevronDown size={16} />}>
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Execution Logs
+          Execution logs
         </Typography>
       </AccordionSummary>
       <AccordionDetails sx={{ maxHeight: 320, overflowY: 'auto' }}>

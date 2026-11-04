@@ -22,6 +22,7 @@ import CommitSummary from '../CommitSummary';
 import { CARD_HEADER_TITLE_SX } from '../../constants/styles';
 import ScheduleButton, { type ScheduleButtonProps } from '../Overview/_shared/ScheduleButton';
 import RunButton from '../Overview/automation/RunButton';
+import { capitalize } from '../../utils/string';
 
 interface EnvironmentCardHeaderProps {
   envName: string;
@@ -52,9 +53,9 @@ interface EnvironmentCardHeaderProps {
 const STATUS_DOT_MAP: Record<string, { label: string; dotColor: string }> = {
   ACTIVE: { label: 'Active', dotColor: 'success.main' },
   ERROR: { label: 'Error', dotColor: 'error.main' },
-  IN_PROGRESS: { label: 'In Progress', dotColor: 'warning.main' },
+  IN_PROGRESS: { label: 'In progress', dotColor: 'warning.main' },
   SUSPENDED: { label: 'Suspended', dotColor: 'text.disabled' },
-  NOT_DEPLOYED: { label: 'Not Deployed', dotColor: 'text.disabled' },
+  NOT_DEPLOYED: { label: 'Not deployed', dotColor: 'text.disabled' },
 };
 
 export default function EnvironmentCardHeader({
@@ -95,7 +96,7 @@ export default function EnvironmentCardHeader({
       {/* Left: env name + status chip + commit info + configure */}
       <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
         <Typography variant="h5" component="h2" sx={CARD_HEADER_TITLE_SX}>
-          {envName}
+          {capitalize(envName)}
         </Typography>
         {hasDeployment && deployedCommit?.sha && <CommitSummary sha={deployedCommit.sha} message={deployedCommit.message} />}
         {statusDot && (

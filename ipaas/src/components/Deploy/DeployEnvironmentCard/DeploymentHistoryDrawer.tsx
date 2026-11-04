@@ -43,7 +43,7 @@ export default function DeploymentHistoryDrawer({ open, onClose, orgUuid, projec
     <DrawerPanel open={open} onClose={onClose} width={480}>
       <DrawerPanel.Header>
         <Stack sx={{ flex: 1, minWidth: 0 }}>
-          <DrawerPanel.Title>Deployment History</DrawerPanel.Title>
+          <DrawerPanel.Title>Deployment history</DrawerPanel.Title>
           <Typography variant="caption" color="text.secondary">
             {envName}
           </Typography>

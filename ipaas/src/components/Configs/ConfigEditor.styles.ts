@@ -36,7 +36,7 @@ export const envImportButton = { flexShrink: 0 } as const;
 
 export const envTable = { borderTop: 1, borderColor: 'divider' } as const;
 
-export const envHeadCell = { fontSize: '0.6875rem', fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'text.secondary' } as const;
+export const envHeadCell = { fontSize: '0.6875rem', fontWeight: 600, color: 'text.secondary' } as const;
 
 export const envRow = { ...envGrid, py: 1, borderBottom: 1, borderColor: 'divider' } as const;
 

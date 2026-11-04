@@ -50,7 +50,7 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
   return (
     <PageContent fullWidth>
       <PageTitle>
-        <PageTitle.Header>Deployment Pipeline</PageTitle.Header>
+        <PageTitle.Header>Deployment pipeline</PageTitle.Header>
         <PageTitle.SubHeader>The promotion path this project's integrations deploy along.</PageTitle.SubHeader>
         {/* Cloud binds one pipeline per project, so adding a second is really a swap. */}
         {!!pipelines?.length && (

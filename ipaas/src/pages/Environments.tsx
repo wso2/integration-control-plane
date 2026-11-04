@@ -184,7 +184,7 @@ export default function Environments(scope: OrgScope | ProjectScope): JSX.Elemen
       ) : (
         <>
           <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 3 }}>
-            <SearchField value={search} onChange={setSearch} placeholder="Search environments..." fullWidth />
+            <SearchField value={search} onChange={setSearch} placeholder="Search environments" fullWidth />
           </Stack>
           {alert && (
             <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 3 }}>

@@ -66,7 +66,7 @@ export default function BuildDetails({ componentId, versionId, build, logsOpen, 
             <Stack direction="row" alignItems="center" gap={0.75}>
               {build.isTriggeredAtCreation ? (
                 <Chip
-                  label="Initial Build"
+                  label="Initial build"
                   size="small"
                   variant="outlined"
                   color="default"
@@ -85,7 +85,7 @@ export default function BuildDetails({ componentId, versionId, build, logsOpen, 
                 #{build.id}
               </Typography>
               <Tooltip title={buildIdCopied ? 'Copied!' : 'Copy full build ID'}>
-                <IconButton size="small" onClick={handleCopyBuildId} sx={{ p: 0.25 }}>
+                <IconButton aria-label="Copy full build ID" size="small" onClick={handleCopyBuildId} sx={{ p: 0.25 }}>
                   {buildIdCopied ? <Check size={13} /> : <Copy size={13} />}
                 </IconButton>
               </Tooltip>
@@ -95,7 +95,7 @@ export default function BuildDetails({ componentId, versionId, build, logsOpen, 
           {build.startedAt && (
             <Stack direction="row" alignItems="center" justifyContent="space-between">
               <Typography variant="body2" color="text.secondary">
-                Started Time
+                Started time
               </Typography>
               <Typography variant="body2">{formatBuildDate(build.startedAt)}</Typography>
             </Stack>

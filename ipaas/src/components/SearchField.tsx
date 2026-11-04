@@ -16,37 +16,18 @@
  * under the License.
  */
 
-import { InputAdornment, TextField } from '@wso2/oxygen-ui';
-import { Search } from '@wso2/oxygen-ui-icons-react';
+import { SearchBar } from '@wso2/oxygen-ui';
 
 type SearchFieldProps = {
   value: string;
   onChange: (value: string) => void;
-  placeholder?: string;
+  /** Names what is searched ("Search projects"); SearchBar also uses it as the field's accessible name. */
+  placeholder: string;
   size?: 'small' | 'medium';
   fullWidth?: boolean;
   sx?: object;
 };
 
-export default function SearchField({ value, onChange, placeholder = 'Search...', size = 'small', fullWidth, sx }: SearchFieldProps) {
-  return (
-    <TextField
-      fullWidth={fullWidth}
-      placeholder={placeholder}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      size={size}
-      sx={sx}
-      slotProps={{
-        htmlInput: { 'aria-label': placeholder },
-        input: {
-          startAdornment: (
-            <InputAdornment position="start">
-              <Search size={size === 'small' ? 18 : 20} />
-            </InputAdornment>
-          ),
-        },
-      }}
-    />
-  );
+export default function SearchField({ value, onChange, placeholder, size = 'small', fullWidth, sx }: SearchFieldProps) {
+  return <SearchBar value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} size={size} fullWidth={fullWidth} sx={sx} />;
 }

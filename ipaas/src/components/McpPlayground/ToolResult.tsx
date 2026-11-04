@@ -59,14 +59,14 @@ function ContentBlock({ block }: { block: McpToolContent }): JSX.Element {
   );
 }
 
-/** The result of a tool invocation: a "Tool Result: Success/Error" label plus each returned content block. */
+/** The result of a tool invocation: a "Tool result: Success/Error" label plus each returned content block. */
 export default function ToolResult({ result }: { result: McpToolResult }): JSX.Element {
   const copyAll = () => void navigator.clipboard?.writeText(JSON.stringify(result.content, null, 2)).catch(() => undefined);
   return (
     <Stack gap={1}>
       <Stack direction="row" alignItems="center" gap={1}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Tool Result:{' '}
+          Tool result:{' '}
           <Box component="span" sx={{ color: result.isError ? 'error.main' : 'success.main' }}>
             {result.isError ? 'Error' : 'Success'}
           </Box>

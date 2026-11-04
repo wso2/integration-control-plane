@@ -48,7 +48,7 @@ export default function PodEventsTable({ events, isLoading, isError }: PodEvents
     return (
       <Box sx={styles.emptyState}>
         <Typography variant="h5" gutterBottom>
-          No Pod Events available at this time.
+          No pod events available at this time.
         </Typography>
         <Typography variant="body2" color="text.secondary">
           Events are only published during container creation, restarts, and termination to assist in diagnosing issues. These records are only kept up to an hour.
@@ -63,7 +63,7 @@ export default function PodEventsTable({ events, isLoading, isError }: PodEvents
         <ListingTable.Head>
           <ListingTable.Row>
             <ListingTable.Cell>Event</ListingTable.Cell>
-            <ListingTable.Cell>Event Message</ListingTable.Cell>
+            <ListingTable.Cell>Event message</ListingTable.Cell>
             <ListingTable.Cell>
               <Stack direction="row" alignItems="center" gap={0.5}>
                 Count

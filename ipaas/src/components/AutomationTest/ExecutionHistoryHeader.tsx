@@ -34,7 +34,7 @@ export default function ExecutionHistoryHeader({ componentId, releaseId, environ
   return (
     <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 2 }}>
       <Typography variant="h5" component="h2" sx={{ fontWeight: 600 }}>
-        Execution History
+        Execution history
       </Typography>
       <NextRunLabel cron={scheduleConfig?.cronjobFrequency ?? ''} timeZone={scheduleConfig?.cronjobTimezone ?? ''} />
     </Stack>

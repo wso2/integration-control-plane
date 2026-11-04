@@ -61,7 +61,6 @@ import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
 import ArchitectureCard from '../components/ArchitectureCard';
 import ContributorsCard from '../components/ContributorsCard';
-import LinkRepositoryDialog from '../components/ProjectCreate/LinkRepositoryDialog';
 import IntegratorIcon from '../assets/icons/IntegratorIcon';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState, type JSX } from 'react';
@@ -75,11 +74,11 @@ import type { Component, ComponentDeletionError, ComponentSubscription, Subscrip
 import { useDeleteComponent } from '../hooks/useComponents';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
-import { resourceUrl, broaden, newComponentUrl, editProjectUrl, type ProjectScope } from '../nav';
+import { newComponentUrl, editProjectUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
-import { componentOverviewUrl } from '../paths';
-import { Permissions } from '../constants/permissions';
+import { componentOverviewUrl, orgProjectsUrl } from '../paths';
+import { Permissions, PROJECT_EDIT_PERMISSIONS } from '../constants/permissions';
 import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import IntegrationIcon from '../components/IntegrationIcon';
@@ -100,6 +99,8 @@ const APIM_SUBSCRIBERS_ERROR_CODE = 'APIM_SUBSCRIBERS';
 // Zero padding and icon offset keep the button's icon flush with the title above it.
 const linkRepoButtonSx = { mt: 1, px: 0, minWidth: 0, textTransform: 'none', fontSize: '0.8125rem', '& .MuiButton-startIcon': { ml: 0 } } as const;
 const projectAvatarSx = { width: 58, height: 58, flexShrink: 0 } as const;
+// Keeps each integration row at 16px padding around a 32px name cell.
+const NAME_ICON_SIZE = 32;
 const integrationSearchSx = { flex: 1 } as const;
 const descriptionSx = { maxWidth: 260 } as const;
 const INTEGRATIONS_HEADING_ID = 'project-integrations-heading';
@@ -268,8 +269,8 @@ function ComponentNameCell({ component: c, isWorkspace, external = false, isExte
   return (
     <Stack direction="row" alignItems="center" gap={1.5}>
       {init ? (
-        <Box sx={{ position: 'relative', display: 'inline-flex', flexShrink: 0, width: 40, height: 40 }}>
-          <CircularProgress variant="determinate" value={init.progress} size={40} thickness={3} />
+        <Box sx={{ position: 'relative', display: 'inline-flex', flexShrink: 0, width: NAME_ICON_SIZE, height: NAME_ICON_SIZE }}>
+          <CircularProgress variant="determinate" value={init.progress} size={NAME_ICON_SIZE} thickness={3} />
           <Box sx={{ top: 0, left: 0, bottom: 0, right: 0, position: 'absolute', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <Typography variant="caption" component="div" color="text.secondary" sx={{ fontSize: '0.6rem', fontWeight: 600 }}>
               {init.progress}%
@@ -277,7 +278,7 @@ function ComponentNameCell({ component: c, isWorkspace, external = false, isExte
           </Box>
         </Box>
       ) : (
-        <IntegrationIcon type={identifyIntegration(c.displayType ?? '', c.componentSubType ?? null).type} external={external} />
+        <IntegrationIcon type={identifyIntegration(c.displayType ?? '', c.componentSubType ?? null).type} size={NAME_ICON_SIZE} external={external} />
       )}
       <Stack direction="row" alignItems="center" gap={0.5}>
         <Stack gap={0.25}>
@@ -370,7 +371,7 @@ function IntegrationsTable({
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
         <TextField
           size="small"
-          placeholder="Search"
+          placeholder="Search integrations"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           sx={integrationSearchSx}
@@ -456,7 +457,7 @@ function IntegrationsTable({
                     <ListingTable.Cell>Name</ListingTable.Cell>
                     <ListingTable.Cell>Description</ListingTable.Cell>
                     <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                    <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
+                    <ListingTable.Cell align="right">Last updated</ListingTable.Cell>
                   </ListingTable.Row>
                 </ListingTable.Head>
                 <ListingTable.Body>
@@ -557,7 +558,7 @@ function IntegrationsTable({
           {filteredNonIntegrations.length > 0 && (
             <>
               <Typography variant="h6" component="h3" sx={{ fontWeight: 600, mt: filteredIntegrations.length > 0 ? 4 : 0, mb: 2 }}>
-                Non Integrations
+                Non-integrations
               </Typography>
               <ListingTable.Container disablePaper>
                 <ListingTable variant="card" density="compact" sx={CARD_TABLE_SX}>
@@ -566,7 +567,7 @@ function IntegrationsTable({
                       <ListingTable.Cell>Name</ListingTable.Cell>
                       <ListingTable.Cell>Description</ListingTable.Cell>
                       <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-                      <ListingTable.Cell align="right">Last Updated</ListingTable.Cell>
+                      <ListingTable.Cell align="right">Last updated</ListingTable.Cell>
                     </ListingTable.Row>
                   </ListingTable.Head>
                   <ListingTable.Body>
@@ -677,13 +678,16 @@ export default function Project(scope: ProjectScope): JSX.Element {
   const { data: subscriptions } = useOrgSubscriptions(orgUuid);
   const isUpgraded = (subscriptions ?? []).some((s) => s.subscriptionType === 'devant-subscription' && s.subscriptionStatus === 'active');
   const orgDevantComponentCount = isUpgraded ? 0 : (orgLimits?.billableComponentCount ?? 0);
-  const [linkRepoOpen, setLinkRepoOpen] = useState(false);
   const [splitOpen, setSplitOpen] = useState(false);
   const splitButtonRef = useRef<HTMLDivElement>(null);
   const [descEditing, setDescEditing] = useState(false);
   const [descHovered, setDescHovered] = useState(false);
   const [descValue, setDescValue] = useState('');
   const descInputRef = useRef<HTMLInputElement>(null);
+  const [nameEditing, setNameEditing] = useState(false);
+  const [nameHovered, setNameHovered] = useState(false);
+  const [nameValue, setNameValue] = useState('');
+  const [nameError, setNameError] = useState('');
   const { userId } = useAuth();
   const { features } = useFeaturePreview();
   const openInIntegratorEnabled = !!features['Project level Open in local Integrator'];
@@ -702,7 +706,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
     return <ProjectHomeSkeleton />;
   }
   if (!project) {
-    return <NotFound message="Project not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to projects" />;
+    return <NotFound message="Project not found" backTo={orgProjectsUrl(scope.org)} backLabel="Back to projects" />;
   }
 
   const isEmpty = justProvisionedDefaultProject || (isComponentsSuccess ? components.length === 0 : cachedIsEmpty);
@@ -780,6 +784,31 @@ export default function Project(scope: ProjectScope): JSX.Element {
     );
   };
 
+  const startNameEdit = () => {
+    setNameValue(project.name);
+    setNameError('');
+    setNameEditing(true);
+  };
+
+  const commitNameEdit = () => {
+    // Enter and the blur that follows both land here; one update in flight is enough.
+    if (updateProject.isPending) return;
+    const trimmed = nameValue.trim();
+    if (trimmed === project.name) {
+      setNameEditing(false);
+      return;
+    }
+    if (!trimmed) return setNameError('Project name is required.');
+    if (allProjects.some((p) => p.id !== project.id && p.name.trim().toLowerCase() === trimmed.toLowerCase())) return setNameError('A project with this name already exists.');
+    updateProject.mutate(
+      { id: project.id, name: trimmed, description: project.description ?? '', version: project.version },
+      {
+        onSuccess: () => setNameEditing(false),
+        onError: () => setNameError('Failed to rename the project. Please try again.'),
+      },
+    );
+  };
+
   const cancelDescEdit = () => {
     setDescValue(toSingleLineDescription(project.description?.trim() ?? ''));
     setDescEditing(false);
@@ -800,9 +829,52 @@ export default function Project(scope: ProjectScope): JSX.Element {
                 <BoxIcon size={28} />
               </Avatar>
               <div>
-                <Typography variant="h1" mb={1}>
-                  {project.name}
-                </Typography>
+                {nameEditing ? (
+                  <Box sx={{ mb: 1 }}>
+                    <InputBase
+                      autoFocus
+                      value={nameValue}
+                      onChange={(e) => {
+                        setNameValue(e.target.value);
+                        setNameError('');
+                      }}
+                      onBlur={commitNameEdit}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitNameEdit();
+                        if (e.key === 'Escape') setNameEditing(false);
+                      }}
+                      inputProps={{ 'aria-label': 'Project name' }}
+                      disabled={updateProject.isPending}
+                      autoComplete="off"
+                      // Same box as the h1 it replaces: an outline (not a border) and no input padding, so the header does not jump.
+                      sx={(theme) => ({
+                        ...theme.typography.h1,
+                        display: 'flex',
+                        px: 0.5,
+                        mx: -0.5,
+                        outline: `2px solid ${nameError ? theme.palette.error.main : theme.palette.primary.main}`,
+                        borderRadius: `${theme.shape.borderRadius}px`,
+                        '& .MuiInputBase-input': { p: 0, height: 'auto', lineHeight: 'inherit' },
+                      })}
+                    />
+                    {nameError && (
+                      <Typography variant="caption" color="error" component="p" sx={{ mt: 0.5 }}>
+                        {nameError}
+                      </Typography>
+                    )}
+                  </Box>
+                ) : (
+                  <Stack direction="row" alignItems="center" gap={0.5} mb={1} onMouseEnter={() => setNameHovered(true)} onMouseLeave={() => setNameHovered(false)}>
+                    <Typography variant="h1">{project.name}</Typography>
+                    <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
+                      <Tooltip title="Edit name">
+                        <IconButton size="small" aria-label="Edit project name" onClick={startNameEdit} sx={{ opacity: nameHovered ? 1 : 0, transition: 'opacity 0.15s' }}>
+                          <Pencil size={14} />
+                        </IconButton>
+                      </Tooltip>
+                    </Authorized>
+                  </Stack>
+                )}
                 <Stack direction="row" alignItems="flex-start" gap={1} onMouseEnter={() => setDescHovered(true)} onMouseLeave={() => setDescHovered(false)}>
                   <Box
                     sx={{ position: 'relative', flex: 1, cursor: 'text', mt: 0.25 }}
@@ -832,6 +904,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
                         <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5 }}>
                           <Tooltip title="Edit description">
                             <IconButton
+                              aria-label="Edit description"
                               size="small"
                               sx={{ p: 0.25, opacity: descHovered ? 1 : 0, transition: 'opacity 0.15s' }}
                               onClick={(e) => {
@@ -891,15 +964,17 @@ export default function Project(scope: ProjectScope): JSX.Element {
                     </Link>
                   </Stack>
                 ) : (
-                  <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => setLinkRepoOpen(true)} sx={linkRepoButtonSx}>
-                    Link a repository
-                  </Button>
+                  <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
+                    <Button size="small" variant="text" color="primary" startIcon={<Link2 size={14} />} onClick={() => navigate(linkRepositoryUrl(scope))} sx={linkRepoButtonSx}>
+                      Link a repository
+                    </Button>
+                  </Authorized>
                 )}
               </div>
             </Stack>
           </Stack>
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
-            <Authorized permissions={[Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT]}>
+            <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
               <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
                 Edit project
               </Button>
@@ -968,8 +1043,6 @@ export default function Project(scope: ProjectScope): JSX.Element {
           </Stack>
         </Stack>
       )}
-
-      {project && <LinkRepositoryDialog open={linkRepoOpen} onClose={() => setLinkRepoOpen(false)} project={project} orgHandler={scope.org} />}
 
       {isEmpty ? (
         <CreateIntegrationPanels scope={scope} />
