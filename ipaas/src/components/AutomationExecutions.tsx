@@ -80,12 +80,13 @@ function StatusIcon({ status, inProgress, failedReason }: { status: string; inPr
   const val = status?.toLowerCase();
   if (val === 'succeeded' || val === 'success') return <CheckCircle2 size={18} color="green" />;
   if (val === 'failed' || val === 'failure') {
-    const icon = <XCircle size={18} color="red" aria-label={failedReason || 'Failed'} />;
+    const icon = <XCircle size={18} color="red" role="img" aria-label={failedReason || 'Failed'} />;
     if (!failedReason) return icon;
-    // The span gives the tooltip an element it can hold a ref to.
+    // The span gives the tooltip an element it can hold a ref to, and keyboard
+    // users a stop that opens it.
     return (
       <Tooltip title={failedReason}>
-        <Box component="span" sx={{ display: 'inline-flex' }}>
+        <Box component="span" tabIndex={0} sx={{ display: 'inline-flex' }}>
           {icon}
         </Box>
       </Tooltip>

@@ -55,10 +55,19 @@ function isTerminal(status: string): boolean {
   return v === 'succeeded' || v === 'success' || v === 'failed' || v === 'failure';
 }
 
-function StatusIcon({ status }: { status: string }) {
+function isSucceeded(status: string): boolean {
   const v = status?.toLowerCase();
+  return v === 'succeeded' || v === 'success';
+}
+
+// A finished run that did not succeed; the status icon and the failure alert agree on this.
+function isFailed(status: string): boolean {
+  return isTerminal(status) && !isSucceeded(status);
+}
+
+function StatusIcon({ status }: { status: string }) {
   if (!isTerminal(status)) return <CircularProgress size={16} />;
-  if (v === 'succeeded' || v === 'success') return <CheckCircle2 size={16} color="green" />;
+  if (isSucceeded(status)) return <CheckCircle2 size={16} color="green" />;
   return <XCircle size={16} color="red" />;
 }
 
@@ -191,7 +200,8 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
                   </Box>
                 </Stack>
               </Box>
-              {execution.failedReason && (
+              {/* A run that recovered on a retry can still carry the reason its first attempt failed. */}
+              {execution.failedReason && isFailed(execution.status) && (
                 <Alert severity="error" sx={{ mt: 1.5 }}>
                   {execution.failedReason}
                 </Alert>

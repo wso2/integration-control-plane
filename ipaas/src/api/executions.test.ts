@@ -23,7 +23,7 @@ const resolveComponentProject = vi.hoisted(() => vi.fn());
 
 vi.mock('./logs', () => ({ queryObsLogEntries, resolveComponentProject }));
 
-import { executionLogWindow, fetchExecutionLogs, podBelongsToJob, toExecutionLogEntry } from './executions';
+import { executionLogWindow, fetchExecutionLogs, podBelongsToJob, toExecutionLogEntry, toTaskExecution } from './executions';
 import { formatExecutionLogLine, spansMultipleContainers } from '../utils/logs';
 import { HttpError } from '../types/http';
 import type { ObsLogEntry } from './logs';
@@ -242,5 +242,17 @@ describe('fetchExecutionLogs', () => {
     queryObsLogEntries.mockRejectedValue(new HttpError(500, 'HTTP 500: {"errorCode":"OBS-V1-L-29"}'));
 
     await expect(fetchExecutionLogs('scheduled-logger', 'track', JOB, 'development', run)).rejects.toThrow('OBS-V1-L-29');
+  });
+});
+
+describe('toTaskExecution', () => {
+  it('carries the reason a run failed', () => {
+    const run = toTaskExecution({ jobId: 'job-1', status: 'Failed', failedReason: 'The run exceeded its timeout and was stopped.' });
+    expect(run.failedReason).toBe('The run exceeded its timeout and was stopped.');
+  });
+
+  it('defaults to no reason when the backend sends none', () => {
+    // Older backends omit the field entirely.
+    expect(toTaskExecution({ jobId: 'job-1', status: 'Failed' }).failedReason).toBe('');
   });
 });

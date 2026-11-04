@@ -63,7 +63,7 @@ function toUnixSeconds(iso?: string): string {
   return Number.isNaN(t) ? '' : String(Math.floor(t / 1000));
 }
 
-function toTaskExecution(e: BffExecution): TaskExecution {
+export function toTaskExecution(e: BffExecution): TaskExecution {
   const jobId = e.jobId ?? '';
   return {
     id: jobId,
