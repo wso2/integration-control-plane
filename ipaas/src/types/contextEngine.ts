@@ -218,6 +218,8 @@ export interface SourceConnector {
   single?: boolean;
   /** Reads structured records, so it can take an optional RML mapping that maps them into the graph. */
   isStructuredData?: boolean;
+  /** Hidden from the Add Source catalog but still usable programmatically. */
+  catalogHidden?: boolean;
 }
 
 /** A configured source in the wizard: the connector, a display name and the connector's field values. */
