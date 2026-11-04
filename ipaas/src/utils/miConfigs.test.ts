@@ -36,6 +36,8 @@ describe('toMiConfig', () => {
       envVarsGroupIsSecret: false,
       secretsGroupIsPlain: false,
       otherGroupKeys: {},
+      otherPlainGroupKeys: {},
+      otherSecretGroupKeys: {},
     });
   });
 
@@ -62,12 +64,25 @@ describe('toMiConfig', () => {
 
   it('reads groups made on the Configs & Secrets page only as keys MI cannot add', () => {
     const groups = [group('db-settings', false, ['DB_URL']), group('db-creds', true, ['DB_PASSWORD'])];
-    expect(toMiConfig(groups, {})).toEqual({ envVars: [], secrets: [], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: { DB_URL: 'db-settings', DB_PASSWORD: 'db-creds' } });
+    expect(toMiConfig(groups, {})).toEqual({
+      envVars: [],
+      secrets: [],
+      legacySecrets: [],
+      shadowedLegacySecrets: [],
+      envVarsGroupIsSecret: false,
+      secretsGroupIsPlain: false,
+      otherGroupKeys: { DB_URL: 'db-settings', DB_PASSWORD: 'db-creds' },
+      otherPlainGroupKeys: { DB_URL: 'db-settings' },
+      otherSecretGroupKeys: { DB_PASSWORD: 'db-creds' },
+    });
   });
 
   it('lists the keys of every group MI does not manage, a wrong-kind mi- group included', () => {
     const groups = [group(MI_ENV_VARS_GROUP, true, ['HOST']), group(MI_SECRETS_GROUP, true, ['TOKEN']), group('shared', false, ['TOKEN', 'URL'])];
-    expect(toMiConfig(groups, {}).otherGroupKeys).toEqual({ HOST: MI_ENV_VARS_GROUP, TOKEN: 'shared', URL: 'shared' });
+    const config = toMiConfig(groups, {});
+    expect(config.otherGroupKeys).toEqual({ HOST: MI_ENV_VARS_GROUP, TOKEN: 'shared', URL: 'shared' });
+    expect(config.otherSecretGroupKeys).toEqual({ HOST: MI_ENV_VARS_GROUP });
+    expect(config.otherPlainGroupKeys).toEqual({ TOKEN: 'shared', URL: 'shared' });
   });
 
   it('ignores secret groups that only look like MI ones', () => {
@@ -94,7 +109,9 @@ describe('isMiManagedGroup', () => {
 
 describe('miConfigCount', () => {
   it('counts env vars and secrets', () => {
-    expect(miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {} })).toBe(3);
+    expect(
+      miConfigCount({ envVars: [{ key: 'A', value: '1' }], secrets: ['B', 'C'], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {}, otherPlainGroupKeys: {}, otherSecretGroupKeys: {} }),
+    ).toBe(3);
   });
 });
 
@@ -122,14 +139,68 @@ describe('validateMiConfigDraft', () => {
     expect(errors.get('secret:0')).toMatch(/reserved for Ballerina/);
   });
 
-  it('lets through a reserved Ballerina key the MI group it is written to already has', () => {
-    // Saved before the check: rejecting it would block every save until it is removed.
+  it('lets through a reserved Ballerina key that no write sends', () => {
+    // Saved before the check. The BFF checks only the keys a write sends.
     const stored = cfg({ envVars: [{ key: 'BAL_CONFIG_FILES', value: 'x' }], secrets: ['BAL_CONFIG_VAR_X'] });
-    const draft = { envVars: [{ key: 'BAL_CONFIG_FILES', value: 'changed' }], secrets: [{ key: 'BAL_CONFIG_VAR_X', value: '' }] };
-    expect(validateMiConfigDraft(draft, ['BAL_CONFIG_VAR_X'], stored).size).toBe(0);
-    // Moving between the groups writes it to one that lacks it, so it is rejected.
-    const moved = validateMiConfigDraft({ envVars: [{ key: 'BAL_CONFIG_VAR_X', value: 'v' }], secrets: [] }, ['BAL_CONFIG_VAR_X'], stored);
-    expect(moved.get('env:0')).toMatch(/reserved for Ballerina/);
+    const unchanged = {
+      envVars: [{ key: 'BAL_CONFIG_FILES', value: 'x' }],
+      secrets: [
+        { key: 'BAL_CONFIG_VAR_X', value: '' },
+        { key: 'NEW', value: 'n' },
+      ],
+    };
+    expect(validateMiConfigDraft(unchanged, ['BAL_CONFIG_VAR_X'], stored).size).toBe(0);
+  });
+
+  it('rejects a stored reserved Ballerina key once a write sends it', () => {
+    const stored = cfg({ envVars: [{ key: 'BAL_CONFIG_FILES', value: 'x' }], secrets: ['BAL_CONFIG_VAR_X'] });
+    // Writing mi-env-vars sends every variable; a new secret value is sent too.
+    const draft = {
+      envVars: [
+        { key: 'BAL_CONFIG_FILES', value: 'x' },
+        { key: 'HOST', value: 'h' },
+      ],
+      secrets: [{ key: 'BAL_CONFIG_VAR_X', value: 'rotated' }],
+    };
+    const errors = validateMiConfigDraft(draft, ['BAL_CONFIG_VAR_X'], stored);
+    expect(errors.get('env:0')).toMatch(/reserved for Ballerina/);
+    expect(errors.has('env:1')).toBe(false);
+    expect(errors.get('secret:0')).toMatch(/reserved for Ballerina/);
+  });
+
+  it('rejects a key a config of the other kind also sets, once its MI group is written', () => {
+    // Saved before the checks: HOST is also in a secret config, TOKEN in a plain one.
+    const stored = cfg({ envVars: [{ key: 'HOST', value: 'h' }], secrets: ['TOKEN'], otherGroupKeys: { HOST: 'creds', TOKEN: 'settings' }, otherSecretGroupKeys: { HOST: 'creds' }, otherPlainGroupKeys: { TOKEN: 'settings' } });
+    const unchanged = { envVars: [{ key: 'HOST', value: 'h' }], secrets: [{ key: 'TOKEN', value: '' }] };
+    expect(validateMiConfigDraft(unchanged, ['TOKEN'], stored).size).toBe(0);
+    // Any change to a group writes all of it, kept secrets included.
+    const changed = {
+      envVars: [
+        { key: 'HOST', value: 'h' },
+        { key: 'PORT', value: '1' },
+      ],
+      secrets: [
+        { key: 'TOKEN', value: '' },
+        { key: 'NEW', value: 'n' },
+      ],
+    };
+    const errors = validateMiConfigDraft(changed, ['TOKEN'], stored);
+    expect(errors.get('env:0')).toBe('"HOST" is also set by the secret "creds" config. Remove it from one of them.');
+    expect(errors.get('secret:0')).toBe('"TOKEN" is also set by the non-secret "settings" config. Remove it from one of them.');
+    expect(errors.has('env:1')).toBe(false);
+    expect(errors.has('secret:1')).toBe(false);
+  });
+
+  it('lets through an old per-secret key a plain config also sets while it stays in its old group', () => {
+    const stored = cfg({ secrets: ['OLD', 'TOKEN'], legacySecrets: ['OLD'], otherGroupKeys: { OLD: 'settings' }, otherPlainGroupKeys: { OLD: 'settings' } });
+    const draft = {
+      envVars: [],
+      secrets: [
+        { key: 'OLD', value: '' },
+        { key: 'TOKEN', value: 'rotated' },
+      ],
+    };
+    expect(validateMiConfigDraft(draft, ['OLD', 'TOKEN'], stored).size).toBe(0);
   });
 
   it('rejects an env var with the key of an old per-secret group while mi-secrets is plain', () => {
@@ -181,7 +252,7 @@ describe('validateMiConfigDraft', () => {
 });
 
 // A stored MI configuration; secrets are in mi-secrets unless listed in `legacySecrets`.
-const cfg = (c: Partial<MiConfig>): MiConfig => ({ envVars: [], secrets: [], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {}, ...c });
+const cfg = (c: Partial<MiConfig>): MiConfig => ({ envVars: [], secrets: [], legacySecrets: [], shadowedLegacySecrets: [], envVarsGroupIsSecret: false, secretsGroupIsPlain: false, otherGroupKeys: {}, otherPlainGroupKeys: {}, otherSecretGroupKeys: {}, ...c });
 const env = (e: Record<string, string>) => Object.entries(e).map(([key, value]) => ({ key, value }));
 // The plan's writes, one line each.
 const writesOf = (plan: MiConfigSavePlan): string[] => plan.writes.map((w) => (w.kind === 'delete' ? `delete ${w.group}` : `put ${w.group} ${JSON.stringify(w.data)}${w.keep ? ` keep ${w.keep.join(',')}` : ''}`));

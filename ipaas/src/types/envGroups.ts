@@ -67,6 +67,12 @@ export interface MiConfig {
    * does), so a clash saved before the BFF checked for one still saves.
    */
   otherGroupKeys: Record<string, string>;
+  /**
+   * `otherGroupKeys` split by the kind of group that sets them. The BFF rejects a write of
+   * a group listing a key that a group of the other kind also lists, even one it already has.
+   */
+  otherPlainGroupKeys: Record<string, string>;
+  otherSecretGroupKeys: Record<string, string>;
 }
 
 /** The editor's result: secrets with a blank `value` keep their stored value. */

@@ -62,14 +62,22 @@ export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, stri
   const shadowedLegacySecrets = legacyKeys.filter((key) => grouped.has(key)).sort();
   const secrets = [...grouped, ...legacySecrets].sort();
   const otherGroupKeys: Record<string, string> = {};
+  const otherPlainGroupKeys: Record<string, string> = {};
+  const otherSecretGroupKeys: Record<string, string> = {};
+  // Each key maps to the first group by name that sets it.
+  const take = (key: string, group: string, sensitive: boolean) => {
+    if (!(key in otherGroupKeys)) otherGroupKeys[key] = group;
+    const byKind = sensitive ? otherSecretGroupKeys : otherPlainGroupKeys;
+    if (!(key in byKind)) byKind[key] = group;
+  };
   groups
     .filter((g) => !isMiManagedGroup(g))
     .sort((a, b) => a.name.localeCompare(b.name))
-    .forEach((g) => g.keys.filter((key) => !(key in otherGroupKeys)).forEach((key) => (otherGroupKeys[key] = g.name)));
+    .forEach((g) => g.keys.forEach((key) => take(key, g.name, g.sensitive)));
   const secretsGroupIsPlain = groups.some((g) => g.name === MI_SECRETS_GROUP && !g.sensitive);
   // With `mi-secrets` left alone, its Secrets section is hidden, so the old per-secret
   // groups can't be edited here either: their keys are taken, like another group's.
-  if (secretsGroupIsPlain) legacySecrets.filter((key) => !(key in otherGroupKeys)).forEach((key) => (otherGroupKeys[key] = miSecretGroup(key)));
+  if (secretsGroupIsPlain) legacySecrets.forEach((key) => take(key, miSecretGroup(key), true));
   return {
     envVars,
     secrets,
@@ -78,43 +86,63 @@ export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, stri
     envVarsGroupIsSecret: groups.some((g) => g.name === MI_ENV_VARS_GROUP && g.sensitive),
     secretsGroupIsPlain,
     otherGroupKeys,
+    otherPlainGroupKeys,
+    otherSecretGroupKeys,
   };
 }
 
 /** Number of variables plus secrets — the deploy card's "Configurables" count. */
 export const miConfigCount = (config: MiConfig): number => config.envVars.length + config.secrets.length;
 
+/** The error for a key that a group of the other kind also sets, or ''. */
+const kindClashError = (key: string, groups: ReadonlyMap<string, string>, otherKind: 'secret' | 'plain'): string => {
+  const group = groups.get(key);
+  return group === undefined ? '' : `"${key}" is also set by the ${otherKind === 'secret' ? 'secret' : 'non-secret'} "${group}" config. Remove it from one of them.`;
+};
+
 /**
  * Validates a draft. Returns an error per row key (`env:<i>` / `secret:<i>`);
  * an empty map means the draft can be saved. `storedSecrets` are the secrets
  * that already exist, whose value may stay blank (unchanged). `stored` is the
- * configuration the draft was made from: a key another env-var group sets
- * (`MiConfig.otherGroupKeys`) is rejected unless the MI group it is written to
- * already has it, as the BFF does. A reserved Ballerina key it already has is let
- * through the same way.
+ * configuration the draft was made from. The checks follow the BFF's, for the
+ * writes `planMiConfigSave` makes:
+ *   - a reserved Ballerina key is rejected when it is sent. Every write of
+ *     `mi-env-vars` sends all its variables; a stored secret left blank is kept, not sent;
+ *   - a key another env-var group sets (`MiConfig.otherGroupKeys`) is rejected unless
+ *     the MI group it is written to already has it;
+ *   - a key in an MI group that is written is rejected while a group of the other kind
+ *     (plain or secret) also sets it, even one the MI group already has.
  */
-export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: string[], stored?: Pick<MiConfig, 'envVars' | 'secrets' | 'legacySecrets' | 'otherGroupKeys'>): Map<string, string> {
+export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: string[], stored?: Pick<MiConfig, 'envVars' | 'secrets' | 'legacySecrets' | 'otherGroupKeys' | 'otherPlainGroupKeys' | 'otherSecretGroupKeys'>): Map<string, string> {
   const errors = new Map<string, string>();
   const otherGroupKeys = new Map(Object.entries(stored?.otherGroupKeys ?? {}));
-  const inEnvVarsGroup = new Set(stored?.envVars.map((e) => e.key));
+  const otherPlain = new Map(Object.entries(stored?.otherPlainGroupKeys ?? {}));
+  const otherSecret = new Map(Object.entries(stored?.otherSecretGroupKeys ?? {}));
+  const storedEnvVars = new Map(stored?.envVars.map((e) => [e.key, e.value]));
   const legacy = new Set(stored?.legacySecrets);
   const inSecretsGroup = new Set(stored?.secrets.filter((key) => !legacy.has(key)));
+  // Whether each MI group is written, as planMiConfigSave decides. Without `stored`, assume it is.
+  const draftEnvVars = new Map(draft.envVars.map((e) => [e.key, e.value]));
+  const envVarsWritten = !stored || draftEnvVars.size !== storedEnvVars.size || [...draftEnvVars].some(([key, value]) => storedEnvVars.get(key) !== value);
+  const draftSecretKeys = new Set(draft.secrets.map((s) => s.key));
+  const secretsWritten = !stored || draft.secrets.some((s) => s.value !== '') || [...inSecretsGroup].some((key) => !draftSecretKeys.has(key));
   // Every row of a duplicated key is flagged, not just the later one: the row the user
   // is typing in may be the earlier one (an env var clashing with a stored secret).
   const uses = new Map<string, number>();
   [...draft.envVars, ...draft.secrets].forEach(({ key }) => uses.set(key, (uses.get(key) ?? 0) + 1));
-  // `written` is false for a key its group already has, or no write sends (a stored secret
-  // kept in its old group). Such a key is let through the reserved-name and other-group
-  // checks, so a key saved before them doesn't block every later save.
-  const check = (id: string, key: string, written: boolean) => {
-    const keyErr = written ? validateConfigKey(key) || keyInOtherGroupError(key, otherGroupKeys) : isBallerinaConfigKey(key) ? '' : validateConfigKey(key);
+  // `sent`: the write sends the key's value. `newToGroup`: the group it is written to
+  // doesn't have it yet. `groupWritten`: that group is written at all.
+  const check = (id: string, key: string, sent: boolean, newToGroup: boolean, groupWritten: boolean, clashKind: 'secret' | 'plain') => {
+    const formatErr = isBallerinaConfigKey(key) && !sent ? '' : validateConfigKey(key);
+    const keyErr = formatErr || (newToGroup ? keyInOtherGroupError(key, otherGroupKeys) : '') || (groupWritten ? kindClashError(key, clashKind === 'secret' ? otherSecret : otherPlain, clashKind) : '');
     if (keyErr) errors.set(id, keyErr);
     else if ((uses.get(key) ?? 0) > 1) errors.set(id, `'${key}' is defined more than once.`);
   };
-  draft.envVars.forEach((e, i) => check(`env:${i}`, e.key, !inEnvVarsGroup.has(e.key)));
+  draft.envVars.forEach((e, i) => check(`env:${i}`, e.key, envVarsWritten, !storedEnvVars.has(e.key), envVarsWritten, 'secret'));
   draft.secrets.forEach((s, i) => {
+    // A stored secret left blank in its old group is not written at all.
     const keptInOldGroup = legacy.has(s.key) && s.value === '' && storedSecrets.includes(s.key);
-    check(`secret:${i}`, s.key, !inSecretsGroup.has(s.key) && !keptInOldGroup);
+    check(`secret:${i}`, s.key, s.value !== '', !inSecretsGroup.has(s.key) && !keptInOldGroup, secretsWritten && !keptInOldGroup, 'plain');
     if (!errors.has(`secret:${i}`) && s.value === '' && !storedSecrets.includes(s.key)) errors.set(`secret:${i}`, 'Enter a value for the new secret.');
   });
   return errors;
@@ -123,9 +151,10 @@ export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: strin
 /**
  * The writes, in order, that take `stored` to `draft`.
  *
- * Writing a group drops the keys it no longer has from the container env, whichever
- * group set them. So a key moving between the two groups must leave its old group
- * before its new group sets it:
+ * A key moving between groups must leave its old group before its new group sets it.
+ * The BFF rejects a key another group lists; without that check (before devant#2821),
+ * writing a group dropped the keys it no longer has from the container env, whichever
+ * group set them. So:
  *   - old per-secret groups are deleted first;
  *   - a secret becoming a variable: `mi-secrets` is written before `mi-env-vars`;
  *   - a variable becoming a secret: `mi-env-vars` is written before `mi-secrets`;
