@@ -21,14 +21,14 @@ import { ArrowRight, Search, Waypoints, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useContextGraph } from '../../../hooks/useContextEngine';
 import { useAskedQuestions } from '../../../hooks/contextQuestions';
-import { conflictLink, conflictsOn, cosmosBuffers, entityConflicts, exploreModel, kindSlots, labelled, linkIndex, linkKey, linkSelection, litLinkColors, neighbourhood, relationLink, relationOf, relationTags, sameRelation, searchLabel, searchNodes, shortLabel, type ExploreFilter, type LinkTag, type Selection } from '../../../utils/contextGraph';
+import { conflictLink, cosmosBuffers, entityConflicts, exploreModel, kindSlots, labelled, linkIndex, linkKey, linkSelection, litLinkColors, neighbourhood, relationTags, searchLabel, searchNodes, shortLabel, type ExploreFilter, type LinkTag, type Selection } from '../../../utils/contextGraph';
 import CosmosCanvas from './CosmosCanvas';
 import EntityPanel, { EntityChip } from './EntityPanel';
-import { ConflictPanel, RelationPanel, type ConflictView, type LinkEnd, type LinkRecord, type RelationView } from './LinkPanel';
+import { LinkDetails } from './LinkPanel';
 import { useGraphTheme } from './graphTheme';
 import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, nodeLabelSx, panelLabelSx, panelSx } from './graphStyles';
 import { mutedSx } from '../styles';
-import type { ContextEngineDetail, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
+import type { ContextEngineDetail } from '../../../types/contextEngine';
 
 /** Entities the overview asks the engine for; the most mentioned come first. */
 export const GRAPH_ENTITY_LIMIT = 10000;
@@ -146,31 +146,6 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
   const kindLegend = [...slots.entries()].sort((a, b) => a[1] - b[1]).map(([kind, slot]) => ({ kind, label: kind.charAt(0).toUpperCase() + kind.slice(1), color: colors.kinds[slot] ?? colors.entity }));
   const otherEntities = model.nodes.some((n) => n.kind === 'entity' && kindColor(n.entityKind) === undefined);
   const selectedEntity = selected?.kind === 'entity' ? data.entities.find((e) => e.id === selected.key) : undefined;
-  // The selected link, as the panels show it: its relationship from the graph served, or the conflicts on its line.
-  const pickedLink = selectedLink !== undefined ? model.links[selectedLink] : null;
-  const pickedRelation: ContextGraphRelation | undefined =
-    pickedLink?.kind === 'relates' && selectedLink !== undefined ? (relationOf(model, data, selectedLink) ?? { subjectId: model.nodes[pickedLink.source].key, relation: pickedLink.label ?? '', objectId: model.nodes[pickedLink.target].key, recordNodeIds: [] }) : undefined;
-  const end = (id: string): LinkEnd => {
-    const entity = data.entities.find((e) => e.id === id);
-    return entity ? { name: entity.name, ...(entity.kind ? { kind: entity.kind } : {}) } : { name: id };
-  };
-  const recordView = (id: string): LinkRecord => {
-    const record = data.records.find((r) => r.id === id);
-    return { id, label: record?.recordId ?? id, sourceName: record ? sourcesById.get(record.sourceId)?.name : undefined, drawn: model.index.has(id) };
-  };
-  const relationView = (relation: ContextGraphRelation): RelationView => ({ relation, subject: end(relation.subjectId), object: end(relation.objectId), records: relation.recordNodeIds.map(recordView), drawn: relationLink(model, relation) !== undefined });
-  const conflictView = ({ index, conflict }: { index: number; conflict: ContextGraphConflict }): ConflictView => ({
-    index,
-    first: relationView(conflict.first),
-    second: relationView(conflict.second),
-    reason: conflict.reason,
-    confidence: conflict.confidence,
-    drawn: conflictLink(model, conflict) !== undefined,
-  });
-  const selectRelation = (relation: ContextGraphRelation) => {
-    const at = relationLink(model, relation);
-    if (at !== undefined) selectLink(at);
-  };
   const selectConflict = (index: number) => {
     const at = data.conflicts[index] ? conflictLink(model, data.conflicts[index]) : undefined;
     if (at !== undefined) selectLink(at);
@@ -293,23 +268,20 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
         </CosmosCanvas>
 
         <Stack gap={1.75}>
-          {pickedLink?.kind === 'conflicts' && selectedLink !== undefined ? (
-            <ConflictPanel engineId={engine.id} orgHandle={orgHandle} conflicts={conflictsOn(model, data, selectedLink).map(conflictView)} onSelectEntity={selectEntityByName} onSelectRelation={selectRelation} onClose={() => select(null)} />
-          ) : pickedRelation ? (
-            <RelationPanel
+          {selectedLink !== undefined ? (
+            <LinkDetails
               engineId={engine.id}
               orgHandle={orgHandle}
-              view={relationView(pickedRelation)}
-              conflicts={data.conflicts
-                .map((conflict, index) => ({ index, conflict }))
-                .filter(({ conflict }) => sameRelation(conflict.first, pickedRelation) || sameRelation(conflict.second, pickedRelation))
-                .map(conflictView)}
+              model={model}
+              graph={data}
+              link={selectedLink}
+              sourceName={(id) => sourcesById.get(id)?.name}
               onSelectEntity={selectEntityByName}
               onSelectRecord={(id) => {
                 const at = model.index.get(id);
                 if (at !== undefined) select(at);
               }}
-              onSelectConflict={selectConflict}
+              onSelectLink={selectLink}
               onClose={() => select(null)}
             />
           ) : selected?.kind === 'entity' ? (

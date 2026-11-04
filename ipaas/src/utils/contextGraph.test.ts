@@ -33,6 +33,7 @@ import {
   entitySize,
   exploreModel,
   factEntityNames,
+  factIs,
   factSelection,
   gridColumns,
   hexToRgba,
@@ -43,6 +44,7 @@ import {
   linkIndex,
   linkKey,
   linkSelection,
+  LINK_WIDTH,
   litLinkColors,
   litPointColors,
   neighbourhood,
@@ -58,6 +60,7 @@ import {
   searchNodes,
   sentencesCiting,
   shortLabel,
+  withLinkSelection,
   type GraphPalette,
 } from './contextGraph';
 import type { ContextEvidence, ContextGraph } from '../types/contextEngine';
@@ -247,7 +250,7 @@ describe('cosmosBuffers', () => {
     expect(Array.from(b.links)).toEqual(m.links.flatMap((l) => [l.source, l.target]));
     near(
       b.linkWidths,
-      m.links.map((l) => (l.kind === 'relates' ? 1.4 : 0.6)),
+      m.links.map((l) => LINK_WIDTH[l.kind]),
     );
     near(
       b.linkStrengths,
@@ -471,6 +474,36 @@ describe('facts on the graph', () => {
     expect(s.links.map((i) => m.links[i].label)).toEqual(['fails over to']);
     expect(s.tags).toEqual([{ link: s.links[0], text: 'fails over to', detail: 'Gateway 7 does fail over to Kandy.' }]);
     expect(s.missing).toEqual(['duty manager']);
+  });
+
+  it('adds a clicked label’s link to the answer’s part, lit, keeping the answer’s wording of a fact it already holds', () => {
+    const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all' });
+    const part = factSelection(m, GRAPH, facts);
+    const failover = part.links[0];
+    const same = withLinkSelection(part, linkSelection(m, GRAPH, failover));
+    expect(same.points.sort()).toEqual([...part.points].sort());
+    expect(same.links).toEqual(part.links);
+    expect(same.tags).toEqual([{ link: failover, text: 'fails over to', detail: 'Gateway 7 does fail over to Kandy.', lit: true }]);
+    // A relationship the answer did not use joins the part, with both of its ends, and its own label lit.
+    const vault = m.links.findIndex((l) => l.label === 'stores keys in');
+    const other = withLinkSelection(part, linkSelection(m, GRAPH, vault));
+    expect(other.links).toEqual([failover, vault]);
+    expect(other.points).toEqual(expect.arrayContaining([m.links[vault].source, m.links[vault].target]));
+    expect(other.tags.map((tag) => [tag.text, !!tag.lit])).toEqual([
+      ['fails over to', false],
+      ['stores keys in', true],
+    ]);
+    expect(other.missing).toEqual(part.missing);
+  });
+
+  it('finds a relationship among facts by its ends and relation, with kinds only when both sides know one', () => {
+    const fact = { subject: 'Gateway 7', subjectKind: 'system', relation: 'Fails over to', object: 'kandy', evidenceIds: ['e1'] };
+    expect(factIs(fact, { name: 'gateway 7' }, 'fails over to', { name: 'Kandy', kind: 'city' })).toBe(true);
+    expect(factIs(fact, { name: 'gateway 7', kind: 'system' }, 'fails over to', { name: 'kandy' })).toBe(true);
+    expect(factIs(fact, { name: 'gateway 7', kind: 'building' }, 'fails over to', { name: 'kandy' })).toBe(false);
+    // The ends swapped, or another relation, is another relationship.
+    expect(factIs(fact, { name: 'kandy' }, 'fails over to', { name: 'gateway 7' })).toBe(false);
+    expect(factIs(fact, { name: 'gateway 7' }, 'stores keys in', { name: 'kandy' })).toBe(false);
   });
 
   it('narrows to one entity or one passage', () => {
