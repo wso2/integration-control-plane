@@ -43,6 +43,7 @@ import {
   linkIndex,
   linkKey,
   linkSelection,
+  LINK_WIDTH,
   litLinkColors,
   litPointColors,
   neighbourhood,
@@ -247,7 +248,7 @@ describe('cosmosBuffers', () => {
     expect(Array.from(b.links)).toEqual(m.links.flatMap((l) => [l.source, l.target]));
     near(
       b.linkWidths,
-      m.links.map((l) => (l.kind === 'relates' ? 1.4 : 0.6)),
+      m.links.map((l) => LINK_WIDTH[l.kind]),
     );
     near(
       b.linkStrengths,

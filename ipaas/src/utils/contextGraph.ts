@@ -295,6 +295,7 @@ export interface CosmosBuffers {
   sizes: Float32Array;
   links: Float32Array;
   linkColors: Float32Array;
+  /** Each link's width in screen pixels (see `LINK_WIDTH`). */
   linkWidths: Float32Array;
   /** How hard each link pulls in the layout (see `LINK_STRENGTH`). */
   linkStrengths: Float32Array;
@@ -318,6 +319,14 @@ export interface CosmosBuffers {
  * them all into one knot around it, and fewer lines cross.
  */
 export const LINK_STRENGTH: Record<GraphLinkKind, number> = { relates: 1, conflicts: 0.8, mentions: 0.35 };
+
+/**
+ * How wide each kind of link is drawn, in screen pixels. The lines are kept
+ * thin so a selected one does not shout over the points it joins; a conflict
+ * is a little wider so it still stands out. The arrow head grows with the
+ * width, so the canvas sets a larger arrow scale to keep it easy to see.
+ */
+export const LINK_WIDTH: Record<GraphLinkKind, number> = { relates: 1, conflicts: 1.6, mentions: 0.5 };
 
 // The canvas's shape codes (its PointShape values), kept here so this module needs no WebGL.
 const CIRCLE = 0;
@@ -470,7 +479,7 @@ export function cosmosBuffers(m: GraphModel, palette: GraphPalette, { slots, spa
     links[i * 2] = link.source;
     links[i * 2 + 1] = link.target;
     linkColors.set(palette.link[link.kind], i * 4);
-    linkWidths[i] = link.kind === 'relates' ? 1.4 : link.kind === 'conflicts' ? 2.2 : 0.6;
+    linkWidths[i] = LINK_WIDTH[link.kind];
     linkStrengths[i] = LINK_STRENGTH[link.kind];
   });
   const arrows = m.links.map((link) => link.kind === 'relates');
