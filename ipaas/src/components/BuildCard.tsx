@@ -17,7 +17,9 @@
  */
 
 import { Alert, Box, Button, CircularProgress, Collapse, Divider, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ChevronDown, ChevronUp, GitCommit, List } from '@wso2/oxygen-ui-icons-react';
+import { ChevronDown, ChevronUp, List } from '@wso2/oxygen-ui-icons-react';
+import CommitSummary from './CommitSummary';
+import { CARD_HEADER_TITLE_SX } from '../constants/styles';
 import { useEffect, useRef, useState } from 'react';
 import { BUILD_STAGES } from '../constants/build';
 import { useDeploymentStatus } from '../hooks/useDeployments';
@@ -25,6 +27,7 @@ import { useBuildLogs } from '../hooks/useBuilds';
 import { useStableStepperState } from '../hooks/useStableStepperState';
 import { buildStepperSteps, failedStepPhrase, getBuildStatus, humanizeConclusion, isFailedConclusion } from '../utils/buildProgress';
 import { findCommitBySha } from '../utils/commits';
+import { isBuildLive } from '../utils/build';
 import type { Commit } from '../types/repository';
 import BuildLogViewer from './BuildLogViewer';
 import HorizontalStepper from './HorizontalStepper';
@@ -78,7 +81,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
 
   // The log panel lives inside the collapsible body, so a collapsed card is
   // never showing logs — whatever `showLogs` says. Drives the button label so
-  // an auto-collapse (build succeeded) can't leave it reading "Hide Logs".
+  // an auto-collapse (build succeeded) can't leave it reading "Hide logs".
   const logsVisible = expanded && showLogs;
 
   const workflowName = lastBuild?.buildRef ?? String(lastBuild?.id ?? '');
@@ -95,7 +98,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
     return (
       <Box sx={styles.cardSx}>
         <Typography variant="h5" component="h2" sx={styles.placeholderTitleSx(!loadingBuilds)}>
-          Latest Build
+          Latest build
         </Typography>
         {!loadingBuilds && (
           <Typography variant="body2" color="text.secondary">
@@ -128,9 +131,9 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
     statusDotColor = 'text.secondary';
   } else if (status === 'in_progress') {
     // A stage can fail before the build itself is marked complete; surface that
-    // straight away instead of reading "In Progress" until the run wraps up.
+    // straight away instead of reading "In progress" until the run wraps up.
     const failedEarly = stepperState.failedStages.size > 0;
-    statusLabel = failedEarly ? failedLabel : 'In Progress';
+    statusLabel = failedEarly ? failedLabel : 'In progress';
     statusDotColor = failedEarly ? 'error.main' : 'warning.main';
   } else if (status === 'completed' && conclusion === 'success') {
     statusLabel = 'Completed';
@@ -167,25 +170,11 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
     <Box sx={styles.cardSx}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={styles.headerRowSx(expanded)}>
         <Stack direction="row" alignItems="center" gap={1.5} sx={styles.minWidthZeroSx}>
-          <Typography variant="h5" component="h2" sx={styles.titleSx}>
-            Latest Build
+          <Typography variant="h5" component="h2" sx={CARD_HEADER_TITLE_SX}>
+            Latest build
           </Typography>
 
-          {commitSha && (
-            <Tooltip title={commitTooltip} placement="bottom">
-              <Stack direction="row" alignItems="center" gap={0.5} sx={styles.commitRowSx}>
-                <GitCommit size={14} style={{ opacity: 0.55, flexShrink: 0 }} />
-                <Typography variant="body2" color="text.secondary" sx={styles.commitShaSx}>
-                  {commitSha}
-                </Typography>
-                {commitMessage && (
-                  <Typography variant="body2" color="text.secondary" sx={styles.commitMessageSx}>
-                    {commitMessage}
-                  </Typography>
-                )}
-              </Stack>
-            </Tooltip>
-          )}
+          {commitSha && <CommitSummary sha={commitSha} message={commitMessage} tooltip={commitTooltip} />}
 
           <Stack direction="row" alignItems="center" gap={0.75} sx={styles.noShrinkSx}>
             <Box sx={styles.statusDotSx(statusDotColor)} />
@@ -210,7 +199,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
               setShowLogs(true);
             }}
             sx={styles.logsButtonSx}>
-            {logsVisible ? 'Hide Logs' : 'View Logs'}
+            {logsVisible ? 'Hide logs' : 'View logs'}
           </Button>
           <Tooltip title={expanded ? 'Collapse' : 'Expand'}>
             <IconButton size="small" aria-label={expanded ? 'Collapse build details' : 'Expand build details'} aria-expanded={expanded} onClick={toggleExpanded}>
@@ -225,11 +214,9 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
 
         <Box sx={styles.stepperWrapSx(logsVisible)}>{renderStepper()}</Box>
 
-        {logsVisible && (
-          <>
-            <BuildLogViewer logs={logs} logsLoading={queryLoading} showLogs />
-          </>
-        )}
+        <Collapse in={logsVisible} timeout={animateBody ? undefined : 0} unmountOnExit>
+          <BuildLogViewer logs={logs} logsLoading={queryLoading} showLogs live={isBuildLive(status)} />
+        </Collapse>
       </Collapse>
     </Box>
   );

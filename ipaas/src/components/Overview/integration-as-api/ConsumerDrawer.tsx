@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Drawer, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
-import { Eye, EyeOff, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, DrawerPanel, IconButton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import { CONSUMER_NAME_TAKEN, DEFAULT_API_KEY_HEADER, REGENERATE_KEY_WARNING, REVOKE_KEY_WARNING, TOKEN_MASK, TOKEN_NOT_RETRIEVABLE_NOTICE, TOKEN_ONE_TIME_WARNING } from '../../../constants/apiConsumption';
 import { useCreateConsumer, useRegenerateConsumerToken, useRevokeConsumer } from '../../../hooks/useConsumers';
@@ -28,6 +27,7 @@ import { friendlyApiError } from '../../../utils/apiSecurity';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
 import CopyButton from './CopyButton';
 import * as styles from './apiConsumption.styles';
+import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 
 type ConfirmAction = 'regenerate' | 'revoke';
 
@@ -118,117 +118,111 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
   const hasCredentials = !!consumerInView;
   const isRevoked = consumerInView?.status === 'revoked';
 
+  useUnsavedChanges(open && !hasCredentials && appName.trim() !== '');
+  const guardNavigation = useLeaveGuard();
+
+  const handleClose = () => {
+    if (!busy) guardNavigation(onClose);
+  };
+
   return (
-    <Drawer anchor="right" open={open} onClose={busy ? undefined : onClose} variant="temporary" sx={styles.rightDrawer}>
-      <Box sx={styles.drawerFrame}>
-        <Box sx={styles.drawerHeader}>
-          <Stack direction="row" alignItems="center" gap={1.25}>
-            <Typography variant="subtitle1" fontWeight={600}>
-              {hasCredentials ? consumerInView.displayName : 'New Consumer Application'}
-            </Typography>
-            <Chip label={envLabel} size="small" color="success" variant="outlined" sx={styles.envChip} />
-          </Stack>
-          <IconButton size="small" onClick={onClose} disabled={busy} aria-label="Close">
-            <X size={16} />
-          </IconButton>
-        </Box>
+    <DrawerPanel open={open} onClose={handleClose}>
+      <DrawerPanel.Header>
+        <Stack direction="row" alignItems="center" gap={1.25} sx={{ flex: 1, minWidth: 0 }}>
+          <DrawerPanel.Title sx={{ flex: '0 1 auto' }}>{hasCredentials ? consumerInView.displayName : 'New consumer application'}</DrawerPanel.Title>
+          <Chip label={envLabel} size="small" color="success" variant="outlined" sx={styles.envChip} />
+        </Stack>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-        <Box sx={styles.drawerBody}>
-          {error && (
-            <Alert severity="error" sx={styles.dialogAlert}>
-              {error}
-            </Alert>
-          )}
+      <DrawerPanel.Body>
+        {error && (
+          <Alert severity="error" sx={styles.dialogAlert}>
+            {error}
+          </Alert>
+        )}
 
-          <Typography sx={styles.fieldLabel}>
-            {/* The label sits outside the field, so the required marker is rendered here. */}
-            <span>
-              Consumer Application Name
-              {!hasCredentials && (
-                <Box component="span" sx={styles.requiredMark} aria-hidden="true">
-                  *
-                </Box>
-              )}
-            </span>
-          </Typography>
-          <TextField
-            value={hasCredentials ? consumerInView.displayName : appName}
-            onChange={(e) => setAppName(e.target.value)}
-            placeholder="e.g. my-greeting-client"
-            size="small"
-            fullWidth
-            autoFocus={!hasCredentials}
-            required={!hasCredentials}
-            disabled={hasCredentials || busy}
-            error={!hasCredentials && nameTaken}
-            helperText={!hasCredentials && nameTaken ? CONSUMER_NAME_TAKEN : undefined}
-            sx={hasCredentials ? styles.lockedField : undefined}
-          />
+        <TextField
+          labelPlacement="top"
+          label="Consumer application name"
+          value={hasCredentials ? consumerInView.displayName : appName}
+          onChange={(e) => setAppName(e.target.value)}
+          placeholder="e.g. my-greeting-client"
+          size="small"
+          fullWidth
+          autoFocus={!hasCredentials}
+          required={!hasCredentials}
+          disabled={hasCredentials || busy}
+          error={!hasCredentials && nameTaken}
+          helperText={!hasCredentials && nameTaken ? CONSUMER_NAME_TAKEN : undefined}
+          sx={hasCredentials ? styles.lockedField : undefined}
+        />
 
-          {hasCredentials && (
-            <Box sx={styles.credentialsSection}>
-              {tokenIsFresh && (
-                <Alert severity="warning" sx={styles.dialogAlert}>
-                  {TOKEN_ONE_TIME_WARNING}
-                </Alert>
-              )}
+        {hasCredentials && (
+          <Box sx={styles.credentialsSection}>
+            {tokenIsFresh && (
+              <Alert severity="warning" sx={styles.dialogAlert}>
+                {TOKEN_ONE_TIME_WARNING}
+              </Alert>
+            )}
 
-              <Typography sx={styles.fieldLabel}>Header</Typography>
+            <Typography sx={styles.fieldLabel}>Header</Typography>
+            <Box sx={styles.credField}>
+              <Typography component="span" sx={styles.credValue}>
+                {DEFAULT_API_KEY_HEADER}
+              </Typography>
+              <CopyButton value={DEFAULT_API_KEY_HEADER} label="Copy header name" />
+            </Box>
+
+            <Typography sx={styles.nextFieldLabel}>API key</Typography>
+            {token ? (
               <Box sx={styles.credField}>
                 <Typography component="span" sx={styles.credValue}>
-                  {DEFAULT_API_KEY_HEADER}
+                  {revealToken ? token : TOKEN_MASK}
                 </Typography>
-                <CopyButton value={DEFAULT_API_KEY_HEADER} label="Copy header name" />
+                <Tooltip title={revealToken ? 'Hide' : 'Reveal'}>
+                  <IconButton aria-label={revealToken ? 'Hide API key' : 'Reveal API key'} size="small" onClick={() => setRevealToken((v) => !v)} sx={styles.credIconButton}>
+                    {revealToken ? <EyeOff size={15} /> : <Eye size={15} />}
+                  </IconButton>
+                </Tooltip>
+                <CopyButton value={token} label="Copy API key" />
               </Box>
+            ) : (
+              <Alert severity="info">{TOKEN_NOT_RETRIEVABLE_NOTICE}</Alert>
+            )}
+          </Box>
+        )}
+      </DrawerPanel.Body>
 
-              <Typography sx={styles.nextFieldLabel}>API Key</Typography>
-              {token ? (
-                <Box sx={styles.credField}>
-                  <Typography component="span" sx={styles.credValue}>
-                    {revealToken ? token : TOKEN_MASK}
-                  </Typography>
-                  <Tooltip title={revealToken ? 'Hide' : 'Reveal'}>
-                    <IconButton size="small" onClick={() => setRevealToken((v) => !v)} sx={styles.credIconButton}>
-                      {revealToken ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </IconButton>
-                  </Tooltip>
-                  <CopyButton value={token} label="Copy API key" />
-                </Box>
-              ) : (
-                <Alert severity="info">{TOKEN_NOT_RETRIEVABLE_NOTICE}</Alert>
-              )}
-            </Box>
-          )}
-        </Box>
-
-        <Box sx={hasCredentials ? styles.drawerFooterSplit : styles.drawerFooter}>
-          {hasCredentials ? (
-            <>
-              {/* Disabled once revoked — regenerating is the only way back. */}
-              <Button variant="outlined" color="error" onClick={() => setConfirm('revoke')} disabled={busy || isRevoked}>
-                Revoke
+      <DrawerPanel.Footer sx={hasCredentials ? { justifyContent: 'space-between' } : undefined}>
+        {hasCredentials ? (
+          <>
+            {/* Disabled once revoked — regenerating is the only way back. */}
+            <Button variant="outlined" color="error" onClick={() => setConfirm('revoke')} disabled={busy || isRevoked}>
+              Revoke
+            </Button>
+            <Stack direction="row" gap={1}>
+              <Button variant="outlined" onClick={() => setConfirm('regenerate')} disabled={busy}>
+                Regenerate
               </Button>
-              <Stack direction="row" gap={1}>
-                <Button variant="outlined" onClick={() => setConfirm('regenerate')} disabled={busy}>
-                  Regenerate
-                </Button>
-                <Button variant="contained" onClick={onClose} disabled={busy}>
-                  Done
-                </Button>
-              </Stack>
-            </>
-          ) : (
-            <>
-              <Button variant="outlined" onClick={onClose} disabled={busy}>
-                Cancel
+              <Button variant="contained" onClick={onClose} disabled={busy}>
+                Done
               </Button>
-              <Button variant="contained" onClick={() => void handleGenerate()} disabled={!appName.trim() || nameTaken || busy} startIcon={createMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}>
-                Generate Credentials
-              </Button>
-            </>
-          )}
-        </Box>
-      </Box>
+            </Stack>
+          </>
+        ) : (
+          <>
+            <Button variant="outlined" color="inherit" onClick={handleClose} disabled={busy}>
+              Cancel
+            </Button>
+            <Button variant="contained" onClick={() => void handleGenerate()} disabled={!appName.trim() || nameTaken || busy} startIcon={createMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}>
+              Generate credentials
+            </Button>
+          </>
+        )}
+      </DrawerPanel.Footer>
 
       {confirm && (
         <ConfirmDeleteDialog
@@ -244,6 +238,6 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
           </Typography>
         </ConfirmDeleteDialog>
       )}
-    </Drawer>
+    </DrawerPanel>
   );
 }

@@ -273,10 +273,10 @@ export default function AutomationExecutions({
           <ListingTable.Head>
             <ListingTable.Row>
               <ListingTable.Cell>Status</ListingTable.Cell>
-              <ListingTable.Cell>Triggered At</ListingTable.Cell>
+              <ListingTable.Cell>Triggered at</ListingTable.Cell>
               <ListingTable.Cell>Duration</ListingTable.Cell>
               <ListingTable.Cell>Commit ID</ListingTable.Cell>
-              <ListingTable.Cell>Latest Logs</ListingTable.Cell>
+              <ListingTable.Cell>Latest logs</ListingTable.Cell>
               <ListingTable.Cell></ListingTable.Cell>
             </ListingTable.Row>
           </ListingTable.Head>
@@ -306,7 +306,7 @@ export default function AutomationExecutions({
                       </Typography>
                     ) : (
                       <Button variant="text" size="small" onClick={() => setLogsExecution(e)}>
-                        View Logs
+                        View logs
                       </Button>
                     )}
                   </ListingTable.Cell>

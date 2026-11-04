@@ -28,7 +28,7 @@ interface NotFoundProps {
 
 export default function NotFound({ message, backTo, backLabel = 'Back' }: NotFoundProps) {
   return (
-    <PageContent component="main" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: '100%', gap: 3 }}>
+    <PageContent fullWidth component="main" sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', minHeight: '100%', gap: 3 }}>
       <Typography variant="h6" component="h1">
         {message}
       </Typography>

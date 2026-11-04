@@ -20,6 +20,7 @@ import { useCallback } from 'react';
 import { useNavigate, type NavigateFunction, type NavigateOptions, type To } from 'react-router';
 import { beginNavigation } from '../utils/navigationPending';
 import { collectPreloads, preloadRoute } from '../config/preloadRoute';
+import { useLeaveGuard } from '../contexts/UnsavedChangesContext';
 
 /**
  * `useNavigate` that fetches the destination's code before changing the URL, so
@@ -30,6 +31,9 @@ import { collectPreloads, preloadRoute } from '../config/preloadRoute';
  * every existing call site keeps working. Navigations that cannot be preloaded —
  * history deltas, non-string targets, already-loaded routes, routes whose
  * `preload` is unreachable — pass straight through unchanged.
+ *
+ * While a form registered with `useUnsavedChanges` is dirty, the navigation waits
+ * for the user to confirm leaving.
  */
 /**
  * Supersession token. Module-level, not a ref: navigation is app-wide, so a
@@ -40,8 +44,9 @@ let latestNavigation = 0;
 
 export function useAppNavigate(): NavigateFunction {
   const navigate = useNavigate();
+  const guardNavigation = useLeaveGuard();
 
-  return useCallback(
+  const go = useCallback(
     (to: To | number, options?: NavigateOptions) => {
       const token = (latestNavigation += 1);
       // `navigate(-1)` and friends move through history; there is nothing to fetch.
@@ -66,5 +71,7 @@ export function useAppNavigate(): NavigateFunction {
       });
     },
     [navigate],
-  ) as NavigateFunction;
+  );
+
+  return useCallback((to: To | number, options?: NavigateOptions) => guardNavigation(() => go(to, options)), [go, guardNavigation]) as NavigateFunction;
 }

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { IconButton, InputAdornment } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { IconButton, InputAdornment, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
@@ -35,6 +34,7 @@ export default function SecretField({ label, value, onChange, required, error }:
   const [show, setShow] = useState(false);
   return (
     <TextField
+      labelPlacement="top"
       label={label}
       required={required}
       fullWidth

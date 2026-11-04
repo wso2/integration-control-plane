@@ -41,12 +41,12 @@ type View = { mode: 'list' } | { mode: 'create' } | { mode: 'edit'; row: ConfigR
  * the Configs & Secrets page, scoped to a single kind and embedded in the drawer.
  */
 export default function ConfigStep({ ctx, kind, emptyText, onNotify }: ConfigStepProps): JSX.Element {
-  const { data: mounts = [], isLoading } = useContainerConfigMounts(ctx.projectId, ctx.componentId, ctx.releaseId, ctx.containerId);
-  const { data: configMaps = [] } = useConfigMaps(ctx.projectId, ctx.envId);
-  const { data: secrets = [] } = useSecrets(ctx.projectId, ctx.envId);
+  const { data: mounts = [], isLoading } = useContainerConfigMounts(ctx.projectId, ctx.componentId, ctx.releaseId, ctx.containerId, ctx.deploymentTrackId);
+  const { data: configMaps = [] } = useConfigMaps(ctx.projectId, ctx.envId, ctx.deploymentTrackId);
+  const { data: secrets = [] } = useSecrets(ctx.projectId, ctx.envId, ctx.deploymentTrackId);
   const rows = useMemo(() => buildConfigRows(mounts, configMaps, secrets).filter((r) => r.kind === kind), [mounts, configMaps, secrets, kind]);
 
-  const del = useDeleteConfig(ctx.projectId);
+  const del = useDeleteConfig(ctx.projectId, ctx.deploymentTrackId);
   const [view, setView] = useState<View>({ mode: 'list' });
 
   const remove = (row: ConfigRow) => {
@@ -96,7 +96,7 @@ export default function ConfigStep({ ctx, kind, emptyText, onNotify }: ConfigSte
             <ListingTable.Head>
               <ListingTable.Row>
                 <ListingTable.Cell>Name</ListingTable.Cell>
-                <ListingTable.Cell>{kind === 'fileMount' ? 'Mount Path' : 'Keys'}</ListingTable.Cell>
+                <ListingTable.Cell>{kind === 'fileMount' ? 'Mount path' : 'Keys'}</ListingTable.Cell>
                 <ListingTable.Cell align="right">Actions</ListingTable.Cell>
               </ListingTable.Row>
             </ListingTable.Head>

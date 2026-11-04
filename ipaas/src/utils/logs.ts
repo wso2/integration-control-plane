@@ -45,23 +45,23 @@ export const LEVEL_COLORS: Record<string, { bg: string; text: string }> = {
 
 export const DISPLAY_FIELDS: { key: keyof LogRow; label: string }[] = [
   { key: 'timestamp', label: 'Timestamp' },
-  { key: 'level', label: 'Log Level' },
-  { key: 'gatewayCode', label: 'Gateway Code' },
-  { key: 'statusCode', label: 'Status Code' },
-  { key: 'logLine', label: 'Log Entry' },
+  { key: 'level', label: 'Log level' },
+  { key: 'gatewayCode', label: 'Gateway code' },
+  { key: 'statusCode', label: 'Status code' },
+  { key: 'logLine', label: 'Log entry' },
   { key: 'class', label: 'Class' },
-  { key: 'logFilePath', label: 'Log File Path' },
-  { key: 'appName', label: 'App Name' },
+  { key: 'logFilePath', label: 'Log file path' },
+  { key: 'appName', label: 'App name' },
   { key: 'module', label: 'Module' },
-  { key: 'serviceType', label: 'Service Type' },
+  { key: 'serviceType', label: 'Service type' },
   { key: 'app', label: 'App' },
   { key: 'deployment', label: 'Deployment' },
-  { key: 'artifactContainer', label: 'Artifact Container' },
+  { key: 'artifactContainer', label: 'Artifact container' },
   { key: 'product', label: 'Product' },
   { key: 'icpRuntimeId', label: 'Runtime ID' },
-  { key: 'logContext', label: 'Log Context' },
-  { key: 'componentVersion', label: 'Component Version' },
-  { key: 'componentVersionId', label: 'Component Version ID' },
+  { key: 'logContext', label: 'Log context' },
+  { key: 'componentVersion', label: 'Integration version' },
+  { key: 'componentVersionId', label: 'Integration version ID' },
   { key: 'componentName', label: 'Integration' },
   { key: 'containerName', label: 'Container' },
   { key: 'podName', label: 'Pod' },
@@ -93,15 +93,18 @@ export function copyLog(log: LogRow) {
   navigator.clipboard.writeText(`${log.timestamp} ${log.logLine}${metaStr}`);
 }
 
-export function downloadLogs(logs: LogRow[]) {
-  const text = logs.map((l) => `${new Date(l.timestamp).toLocaleString()} [${l.level}] ${l.logLine}`).join('\n');
-  const blob = new Blob([text], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
+/** Saves `text` as `<prefix>-<timestamp>.txt`. */
+export function downloadTextFile(text: string, prefix: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: 'text/plain' }));
   const a = document.createElement('a');
   a.href = url;
-  a.download = `logs-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
+  a.download = `${prefix}-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.txt`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function downloadLogs(logs: LogRow[]) {
+  downloadTextFile(logs.map((l) => `${new Date(l.timestamp).toLocaleString()} [${l.level}] ${l.logLine}`).join('\n'), 'logs');
 }
 
 /** Splits a raw container log into lines, optionally keeping only those matching `keyword`. */

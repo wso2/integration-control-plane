@@ -29,6 +29,7 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `BILLING_API_BASE_URL`                                                       | Billing user API. Loading the billing org activates the org's subscription.                                              |
 | `ENABLE_BILLING_FEATURE`, `BILLING_CONSOLE_URL`, `CHOREO_SAAS_OFFER_URL`     | Upgrade button and billing links                                                                                         |
 | `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_AUTH_REDIRECTION_URL` | GitHub App authorization and installation. GitHub is off without the client ID.                                          |
+| `AZURE_DEVOPS_CLIENT_ID`                                                     | Entra application client ID for Azure DevOps repository access. Azure DevOps is hidden when this is empty.               |
 | `EDITOR_CALLBACK_ORIGINS`, `EDITOR_CALLBACK_DOMAINS`                         | Comma-separated https origins and parent domains an editor's sign-in or GitHub result may be sent to. Empty allows none. |
 | `CHOREO_URL_MANAGER_URL`, `ENABLE_CUSTOM_URL_MAPPINGS_FEATURE`               | URL settings for an integration. Both are needed.                                                                        |
 | `SAMPLES_URL`, `PREBUILT_INTEGRATIONS_URL`                                   | Sample and prebuilt integration catalogs. Both default to GitHub raw.                                                    |

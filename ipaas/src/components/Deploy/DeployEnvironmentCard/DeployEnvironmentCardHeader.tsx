@@ -58,7 +58,7 @@ export default function DeployEnvironmentCardHeader({ envName, showStop, stopDis
         )}
         <Tooltip title="Refresh deployment status">
           <span>
-            <IconButton size="small" onClick={onRefresh} disabled={isRefreshing}>
+            <IconButton aria-label="Refresh deployment status" size="small" onClick={onRefresh} disabled={isRefreshing}>
               <RefreshCw size={16} />
             </IconButton>
           </span>

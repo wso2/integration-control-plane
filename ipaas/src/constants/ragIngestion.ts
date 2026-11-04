@@ -87,7 +87,7 @@ export function blankEmbedding(provider: EmbeddingProvider): EmbeddingConfig {
 // ── Step 3: chunking ────────────────────────────────────────────────────────
 
 export const CHUNKING_STRATEGIES: { value: ChunkingStrategy; label: string }[] = [
-  { value: 'recursive', label: 'Recursive (Default)' },
+  { value: 'recursive', label: 'Recursive (default)' },
   { value: 'sentence', label: 'Sentence' },
   { value: 'character', label: 'Character' },
 ];
@@ -122,7 +122,7 @@ export const DATASOURCES: DatasourceInfo[] = [
 ];
 
 export const GDRIVE_AUTH_TYPES: { value: GdriveAuthType; label: string }[] = [
-  { value: 'api_Key', label: 'API Key' },
+  { value: 'api_Key', label: 'API key' },
   { value: 'oauth', label: 'OAuth' },
 ];
 

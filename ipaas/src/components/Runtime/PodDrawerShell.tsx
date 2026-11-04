@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Box, Drawer, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Maximize2, Minimize2, X } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX, type ReactNode } from 'react';
+import { DrawerPanel, useTheme } from '@wso2/oxygen-ui';
+import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
+import { POD_DRAWER_WIDTH } from '../../constants/runtime';
 import * as styles from './PodDrawerShell.styles';
 
 interface PodDrawerShellProps {
@@ -35,39 +35,45 @@ interface PodDrawerShellProps {
  * header carries an expand toggle that takes the drawer to the full window width.
  */
 export default function PodDrawerShell({ open, onClose, onExited, title, children }: PodDrawerShellProps): JSX.Element {
+  const theme = useTheme();
   const [expanded, setExpanded] = useState(false);
+  const wasOpen = useRef(open);
+  const onExitedRef = useRef(onExited);
+  useEffect(() => {
+    onExitedRef.current = onExited;
+  });
+
+  // DrawerPanel exposes no transition callbacks, so wait out the slide-out before resetting.
+  useEffect(() => {
+    if (open) {
+      wasOpen.current = true;
+      return;
+    }
+    if (!wasOpen.current) return;
+    const timer = setTimeout(() => {
+      wasOpen.current = false;
+      setExpanded(false);
+      onExitedRef.current?.();
+    }, theme.transitions.duration.leavingScreen);
+    return () => clearTimeout(timer);
+  }, [open, theme.transitions.duration.leavingScreen]);
 
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
   };
 
-  const handleExited = () => {
-    setExpanded(false);
-    onExited?.();
-  };
-
-  const expandLabel = expanded ? 'Exit full width' : 'Expand to full width';
-
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" SlideProps={{ onExited: handleExited }} sx={styles.drawer(expanded)}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={styles.header}>
-        <Typography variant="h5" sx={styles.title}>
-          {title}
-        </Typography>
-        <Stack direction="row" alignItems="center" gap={0.5} sx={styles.headerActions}>
-          <Tooltip title={expandLabel}>
-            <IconButton size="small" aria-label={expandLabel} onClick={() => setExpanded((prev) => !prev)}>
-              {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </IconButton>
-          </Tooltip>
-          <IconButton size="small" aria-label="close" onClick={handleClose}>
-            <X size={16} />
-          </IconButton>
-        </Stack>
-      </Stack>
+    <DrawerPanel open={open} onClose={handleClose} width={POD_DRAWER_WIDTH} expanded={expanded} onExpandedChange={setExpanded}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>{title}</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.ExpandButton expandLabel="Expand to full width" collapseLabel="Exit full width" />
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={styles.body}>{children}</Box>
-    </Drawer>
+      <DrawerPanel.Body sx={styles.body}>{children}</DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

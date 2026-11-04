@@ -34,14 +34,14 @@ export function envCard(page: Page): Locator {
 export function deploymentStatus(page: Page): Locator {
   // first(): a consumer's own "Active" chip renders lower in the same card, and two matches make textContent() throw.
   return envCard(page)
-    .getByText(/^(In Progress|Active|Error|Suspended|Not Deployed)$/)
+    .getByText(/^(In progress|Active|Error|Suspended|Not deployed)$/)
     .first();
 }
 
 /** The Latest Build header, so its status is read from the build and not the first match on the page. */
 export function buildCard(page: Page): Locator {
   // Hopped from the heading: the build card is a Box, so there is no Card element to filter on.
-  return page.getByRole('heading', { name: 'Latest Build' }).locator('xpath=ancestor::*[.//button[normalize-space()="View Logs"]][1]');
+  return page.getByRole('heading', { name: 'Latest build' }).locator('xpath=ancestor::*[.//button[normalize-space()="View logs"]][1]');
 }
 
 /** Closes a modal left open over the page, which would otherwise hide the card being asserted. */
@@ -88,7 +88,7 @@ export async function waitForBuildQuiet(page: Page, quietMs = BUILD_QUIET_MS): P
 }
 
 export async function requireActiveDeployment(page: Page, name = SAMPLE): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
   const build = await waitForBuildQuiet(page);
   expect(build, `${name} build ended as ${build}`).toMatch(/^Completed/);
   await dismissStrayDialog(page);
@@ -99,7 +99,7 @@ export async function requireActiveDeployment(page: Page, name = SAMPLE): Promis
 /** Reloaded, not merely awaited: the card renders "Deploy this agent…" until a build lands and does not refetch on its own. */
 export async function waitForConfigureGate(page: Page, timeout = AGENT_GATE_TIMEOUT_MS): Promise<string> {
   const deadline = Date.now() + timeout;
-  const gate = () => envCard(page).getByRole('button', { name: 'Configure to Continue' });
+  const gate = () => envCard(page).getByRole('button', { name: 'Configure to continue' });
 
   for (;;) {
     if (
@@ -122,7 +122,7 @@ export async function waitForConfigureGate(page: Page, timeout = AGENT_GATE_TIME
 
 /** An automation's card renders no status dot, so readiness is its Schedule and Test actions. */
 export async function requireAutomationReady(page: Page): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
   const build = await waitForBuildQuiet(page);
   expect(build, `${AUTOMATION} build ended as ${build}`).toMatch(/^Completed/);
   await expect(buildCard(page).getByText('Completed', { exact: true }), `${AUTOMATION}'s build card does not report Completed`).toBeVisible({ timeout: 60_000 });
@@ -132,7 +132,7 @@ export async function requireAutomationReady(page: Page): Promise<void> {
   await expect(
     envCard(page)
       .getByRole('button', { name: 'Schedule', exact: true })
-      .or(envCard(page).getByRole('button', { name: 'Stop Schedule' })),
+      .or(envCard(page).getByRole('button', { name: 'Stop schedule' })),
     `${AUTOMATION} offers no Schedule action, so it is not deployed`,
   ).toBeEnabled({ timeout: MI_DEPLOY_TIMEOUT_MS });
   await expect(envCard(page).getByRole('button', { name: 'Test', exact: true }), `${AUTOMATION} offers no Test action, so it is not deployed`).toBeEnabled({ timeout: MI_DEPLOY_TIMEOUT_MS });
@@ -144,7 +144,7 @@ export function consumerRow(page: Page, name: string): Locator {
 
 /** Opens the create drawer, whose button is named for whether the API has consumers yet. */
 export async function openConsumerDrawer(page: Page): Promise<void> {
-  const create = envCard(page).getByRole('button', { name: /^(Consume API|New Consumer)$/ });
+  const create = envCard(page).getByRole('button', { name: /^(Consume API|New consumer)$/ });
   await expect(create).toBeVisible({ timeout: 30_000 });
   await create.click();
 }
@@ -179,15 +179,15 @@ export async function deleteAllConsumers(page: Page): Promise<string | null> {
   }
 }
 
-/** Finished runs only: a synthesised scheduled or queued row renders "--" and offers no View Logs. */
+/** Finished runs only: a synthesised scheduled or queued row renders "--" and offers no View logs. */
 export function finishedExecutions(page: Page): Locator {
-  return envCard(page).getByRole('button', { name: 'View Logs' });
+  return envCard(page).getByRole('button', { name: 'View logs' });
 }
 
 export async function waitForExecutionsPanel(page: Page): Promise<void> {
   const card = envCard(page);
   // The card renders before its executions, so counting straight after a load reports no runs.
-  const table = card.getByRole('columnheader', { name: 'Triggered At', exact: true });
+  const table = card.getByRole('columnheader', { name: 'Triggered at', exact: true });
   const empty = card.getByText('No execution data available.');
   await expect(table.or(empty).first(), 'the executions panel never rendered').toBeVisible({ timeout: 60_000 });
 }
@@ -218,8 +218,8 @@ export async function testConsoleTarget(page: Page): Promise<{ url: string; head
   const base = await page.getByText('Invoke URL', { exact: true }).locator('xpath=following::input[1]').inputValue();
   const path = (await page.locator('.opblock-summary-path').first().textContent())?.trim() ?? '';
   const url = `${base.replace(/\/$/, '')}${path}`;
-  const label = (await page.getByText(/^Security Header\S/).textContent())?.trim() ?? '';
-  const header = label.replace(/^Security Header/, '').trim();
+  const label = (await page.getByText(/^Security header\S/).textContent())?.trim() ?? '';
+  const header = label.replace(/^Security header/, '').trim();
   const key = await page.getByPlaceholder('Paste or fetch a test key').inputValue();
   return { url, header, key };
 }

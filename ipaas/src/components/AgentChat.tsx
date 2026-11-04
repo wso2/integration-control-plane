@@ -61,7 +61,10 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
 
   // The enforcing gateway URL, active auth mode and a short-lived test key, from the
   // same BFF routes the swagger console and the API security drawer use.
-  const accessRef: EndpointRef | null = useMemo(() => (candidate && environmentName ? { projectName: projectId, componentName: componentId, environmentName, endpointName: candidate.id } : null), [projectId, componentId, environmentName, candidate]);
+  const accessRef: EndpointRef | null = useMemo(
+    () => (candidate && environmentName ? { projectName: projectId, componentName: componentId, environmentName, endpointName: candidate.id, deploymentTrackId: versionId } : null),
+    [projectId, componentId, environmentName, candidate, versionId],
+  );
   const access = useEndpointTestAccess(accessRef, !!accessRef);
 
   // The endpoint's base64 OpenAPI arrives in `apimRevisionId`, so the operations come from the spec.
@@ -204,7 +207,7 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
               Use a test key
             </Button>
           }>
-          This agent is secured with OAuth. Chatting here needs a test key, which switches the endpoint to API Key authentication.
+          This agent is secured with OAuth. Chatting here needs a test key, which switches the endpoint to API key authentication.
         </Alert>
       )}
       {isPage && operationsKnown && !noEndpoint && !hasChatOperation && chatUrl && messages.length === 0 && (

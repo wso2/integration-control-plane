@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Box, Typography, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useDeleteConnection } from '../../hooks/useConnections';
 import { toConnectionType } from '../../constants/connections';

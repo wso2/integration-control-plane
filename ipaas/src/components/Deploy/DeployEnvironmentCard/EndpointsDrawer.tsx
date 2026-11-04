@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, CircularProgress, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Box, CircularProgress, DrawerPanel, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState } from 'react';
 import type { EnvEndpoint } from '../../../types/component';
 import { EndpointCard } from '../../EndpointCard';
@@ -34,22 +33,11 @@ interface EndpointsDrawerProps {
   projectId: string;
   componentId?: string;
   environmentId?: string;
+  /** The deployment track whose endpoints these are; its APIs are its own. */
+  versionId?: string;
 }
 
-const drawerSx = {
-  '& .MuiDrawer-paper': {
-    width: 440,
-    position: 'fixed',
-    top: 64,
-    height: 'calc(100% - 64px)',
-    borderLeft: '1px solid',
-    borderColor: 'divider',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-} as const;
-
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, componentId, environmentId, versionId }: EndpointsDrawerProps) {
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -65,20 +53,20 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
 
   return (
     <>
-      <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-          <Stack gap={0.25}>
-            <Typography variant="h5">Endpoints</Typography>
+      <DrawerPanel open={open} onClose={handleClose} width={440}>
+        <DrawerPanel.Header>
+          <Stack sx={{ flex: 1, minWidth: 0 }}>
+            <DrawerPanel.Title>Endpoints</DrawerPanel.Title>
             <Typography variant="caption" color="text.secondary">
               {envName}
             </Typography>
           </Stack>
-          <IconButton size="small" aria-label="close" onClick={handleClose}>
-            <X size={16} />
-          </IconButton>
-        </Stack>
+          <DrawerPanel.Actions>
+            <DrawerPanel.CloseButton />
+          </DrawerPanel.Actions>
+        </DrawerPanel.Header>
 
-        <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 2 }}>
+        <DrawerPanel.Body>
           {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
               <CircularProgress size={32} />
@@ -92,14 +80,15 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
           ) : (
             endpoints.map((ep, idx) => <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} readOnly onSettings={handleSettings} />)
           )}
-        </Box>
-      </Drawer>
+        </DrawerPanel.Body>
+      </DrawerPanel>
 
       <ApiSettingsDrawer
         open={manageDrawerOpen}
         onClose={() => setManageDrawerOpen(false)}
         componentName={componentId ?? ''}
         envName={environmentId ?? ''}
+        deploymentTrackId={versionId}
         endpoints={toEndpointOptions(endpoints)}
         activeEndpointName={selectedEndpoint?.id}
       />

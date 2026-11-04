@@ -29,6 +29,7 @@ import { hasMissingRequiredConfigs } from './configStatus';
 // Transitional: legacy ConfigureDrawer (defaults to the generic-service form
 // when `isAutomation` is absent) until its genericisation in phase 4.5.
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
+import { capitalize } from '../../../utils/string';
 
 /**
  * Shared header for the two runtime-logs integration types — **file-integration**
@@ -102,8 +103,8 @@ export default function FileEventHeader({
     <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap">
       {/* Left: env name + commit + status dot + Critical chip + Configure */}
       <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, textTransform: 'capitalize', flexShrink: 0 }}>
-          {env.name}
+        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, flexShrink: 0 }}>
+          {capitalize(env.name)}
         </Typography>
 
         {hasDeployment && deployedCommit?.sha && (

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Button, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -83,6 +82,7 @@ export default function CreateUser(): JSX.Element {
 
       <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
         <TextField
+          labelPlacement="top"
           label="Username"
           required
           value={username}
@@ -94,8 +94,9 @@ export default function CreateUser(): JSX.Element {
           error={!!usernameError}
           helperText={usernameError || ' '}
         />
-        <TextField label="Display Name" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth helperText=" " />
+        <TextField labelPlacement="top" label="Display Name" required value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth helperText=" " />
         <TextField
+          labelPlacement="top"
           label="Password"
           required
           type="password"

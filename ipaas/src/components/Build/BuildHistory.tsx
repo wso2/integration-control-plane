@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, Chip, CircularProgress, IconButton, ListingTable, Snackbar, Stack, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Button, Chip, CircularProgress, IconButton, ListingTable, Snackbar, Stack, TablePagination, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { GitCommit, Settings } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
@@ -26,7 +26,7 @@ import type { BuildRun } from '../../types/deployment';
 import { BuildDrawerType } from '../../constants/build';
 import { useBuildAutoEffects } from '../../hooks/useBuildAutoEffects';
 import { findCommitBySha, latestCommitOf } from '../../utils/commits';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import BuildRightDrawer from './BuildRightDrawer';
 import BuildStatusLabel from './BuildStatusLabel';
 
@@ -139,7 +139,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
           <Tooltip title={hasInProgress ? 'A build is already in progress' : !latestCommit ? 'No commits available' : ''}>
             <span>
               <Button variant="outlined" size="small" onClick={handleSelectCommit} disabled={isBuilding || commitsLoading || commits.length === 0}>
-                Show Commits
+                Show commits
               </Button>
             </span>
           </Tooltip>
@@ -152,14 +152,14 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
                 onClick={handleBuildLatest}
                 disabled={isBuilding || !latestCommit}
                 startIcon={isBuilding ? <CircularProgress color="inherit" size={14} /> : undefined}>
-                {isBuilding ? 'Building' : 'Build Latest'}
+                {isBuilding ? 'Building' : 'Build latest'}
               </Button>
             </span>
           </Tooltip>
 
           <Tooltip title={isBuilding ? 'A build is already in progress' : 'Build configuration'}>
             <span>
-              <IconButton size="small" onClick={handleOpenConfig} disabled={!repository || isBuilding}>
+              <IconButton aria-label="Build configuration" size="small" onClick={handleOpenConfig} disabled={!repository || isBuilding}>
                 <Settings size={18} />
               </IconButton>
             </span>
@@ -192,7 +192,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
               <ListingTable.Row>
                 <ListingTable.Cell colSpan={5} align="center" sx={{ py: 4 }}>
                   <Typography color="text.secondary" variant="body2">
-                    No builds yet. Click &ldquo;Build Latest&rdquo; to start your first build.
+                    No builds yet. Click &ldquo;Build latest&rdquo; to start your first build.
                   </Typography>
                 </ListingTable.Cell>
               </ListingTable.Row>
@@ -207,7 +207,7 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
                     </Typography>
                     {build.isTriggeredAtCreation ? (
                       <Chip
-                        label="Initial Build"
+                        label="Initial build"
                         size="small"
                         variant="outlined"
                         color="default"
@@ -252,15 +252,19 @@ export default function BuildHistory({ componentId, versionId, envId, branch, bu
                 </ListingTable.Cell>
 
                 <ListingTable.Cell>
-                  <Typography variant="body2" color="text.secondary">
-                    {build.startedAt ? formatDistanceToNow(build.startedAt) : '—'}
-                  </Typography>
+                  {build.startedAt ? (
+                    <RelativeTime time={formatDistanceToNow(build.startedAt)} dateTime={build.startedAt} tooltip={formatDateTime(build.startedAt)} />
+                  ) : (
+                    <Typography variant="body2" color="text.secondary">
+                      —
+                    </Typography>
+                  )}
                 </ListingTable.Cell>
 
                 <ListingTable.Cell align="right">
                   <ListingTable.RowActions>
                     <Button variant="text" size="small" onClick={() => handleViewDetails(build)} sx={{ textTransform: 'none', fontSize: '0.75rem' }}>
-                      View Details
+                      View details
                     </Button>
                   </ListingTable.RowActions>
                 </ListingTable.Cell>

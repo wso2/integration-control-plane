@@ -166,8 +166,8 @@ export function useGitHubReadme(gitOrganization?: string, repository?: string) {
 
 export function useProjectId(projectIdentifier: string) {
   const isProjectUuid = UUID_RE.test(projectIdentifier);
-  const { data: projectById, isLoading: loadingById } = useProject(isProjectUuid ? projectIdentifier : '');
-  const { data: allProjects = [], isLoading: loadingProjects } = useProjects();
+  const { data: projectById, isLoading: loadingById, isError: errorById, refetch: refetchById } = useProject(isProjectUuid ? projectIdentifier : '');
+  const { data: allProjects = [], isLoading: loadingProjects, isError: errorProjects, refetch: refetchProjects } = useProjects();
 
   const projectFromList = !isProjectUuid ? (allProjects.find((p) => p.handler === projectIdentifier) ?? null) : null;
   const project = isProjectUuid ? projectById : (projectFromList ?? undefined);
@@ -176,5 +176,7 @@ export function useProjectId(projectIdentifier: string) {
     projectId: project?.id ?? '',
     project,
     isLoading: !!projectIdentifier && !project && (isProjectUuid ? loadingById : loadingProjects),
+    isError: !project && (isProjectUuid ? errorById : errorProjects),
+    refetch: isProjectUuid ? refetchById : refetchProjects,
   };
 }

@@ -16,13 +16,12 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { KeyRound, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import Authorized from '../../components/Authorized';
 import EmptyListing from '../../components/EmptyListing';
-import ProjectSettingsTabs from '../../components/Settings/ProjectSettingsTabs';
+import ProjectSettingsTabs from '../components/Settings/ProjectSettingsTabs';
 import { Permissions } from '../../constants/permissions';
 import { useProjectId } from '../../hooks/useProjects';
 import { useAuthzRoles, useCreateAuthzRole, useDeleteAuthzRole, useUpdateAuthzRole } from '../hooks/useProjectAuthz';
@@ -75,9 +74,9 @@ function RoleDialog({ projectId, scopeOptions, role, existingNames, onClose, onD
           </Alert>
         )}
         <Stack gap={2} sx={{ mt: 1 }}>
-          <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} error={!!nameError && !!name} helperText={(!!name && nameError) || ' '} fullWidth autoFocus disabled={!!role} />
-          <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
-          <Autocomplete multiple freeSolo options={scopeOptions} value={selected} onChange={(_, v) => setSelected(v as string[])} renderInput={(params) => <TextField {...params} label="API Scopes" />} />
+          <TextField labelPlacement="top" label="Name" value={name} onChange={(e) => setName(e.target.value)} error={!!nameError && !!name} helperText={(!!name && nameError) || ' '} fullWidth autoFocus disabled={!!role} />
+          <TextField labelPlacement="top" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
+          <Autocomplete multiple freeSolo options={scopeOptions} value={selected} onChange={(_, v) => setSelected(v as string[])} renderInput={(params) => <TextField labelPlacement="top" {...params} label="API Scopes" />} />
         </Stack>
       </DialogContent>
       <DialogActions>

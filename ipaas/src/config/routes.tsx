@@ -20,6 +20,7 @@ import { type RouteProps, Navigate, Outlet } from 'react-router';
 import { cookiePolicyUrl, loginUrl, signupUrl } from '../paths';
 import { ScopeResolver, generateMatrixRoutes, withScope, type Matrix } from '../nav';
 import HiddenPageRedirect from '../components/HiddenPageRedirect';
+import LegacyNewProjectRedirect from '../components/LegacyNewProjectRedirect';
 import UnknownRoute from '../components/UnknownRoute';
 import Logout from '../pages/Logout';
 import { createElement } from 'react';
@@ -40,6 +41,7 @@ const OrgHomeRedirect = lazyPage(() => import('../components/OrgHomeRedirect'));
 
 const OIDCCallback = lazyPage(() => import('../pages/OIDCCallback'));
 const GitHubOAuthCallback = lazyPage(() => import('../pages/GitHubOAuthCallback'));
+const AzureDevOpsOAuthCallback = lazyPage(() => import('../pages/AzureDevOpsOAuthCallback'));
 const CookiePolicy = lazyPage(() => import('../pages/CookiePolicy'));
 const CloudEditorDeployment = lazyPage(() => import('../pages/CloudEditorDeployment'));
 const ProjectsRedirect = lazyPage(() => import('../pages/ProjectsRedirect'));
@@ -48,6 +50,8 @@ const Projects = lazyPage(() => import('../pages/Projects'));
 const Project = lazyPage(() => import('../pages/Project'));
 const Component = lazyPage(() => import('../pages/Component'));
 const CreateProject = lazyPage(() => import('../pages/CreateProject'));
+const EditProject = lazyPage(() => import('../pages/EditProject'));
+const LinkRepository = lazyPage(() => import('../pages/LinkRepository'));
 const ImportProject = lazyPage(() => import('../pages/ImportProject'));
 const CreateIntegrationOptions = lazyPage(() => import('../pages/CreateIntegrationOptions'));
 const AiIntegrationBuilderView = lazyPage(() => import('../pages/AiIntegrationBuilderView'));
@@ -57,14 +61,18 @@ const ComponentTest = lazyPage(() => import('../pages/ComponentTest'));
 const OrgCdPipelines = lazyPage(() => import('../pages/OrgCdPipelines'));
 const ProjectCdPipelines = lazyPage(() => import('../pages/ProjectCdPipelines'));
 const OrgDataPlanes = lazyPage(() => import('../pages/OrgDataPlanes'));
+const OrgDatabases = lazyPage(() => import('../pages/OrgDatabases'));
+const CreateDatabaseServer = lazyPage(() => import('../pages/CreateDatabaseServer'));
+const DatabaseServerDetail = lazyPage(() => import('../pages/DatabaseServerDetail'));
+const TemporalServerDetail = lazyPage(() => import('../pages/TemporalServerDetail'));
 const OrgPackageRegistries = lazyPage(() => import('../pages/OrgPackageRegistries'));
 const ComponentRuntime = lazyPage(() => import('../pages/ComponentRuntime'));
-const ProjectSettings = lazyPage(() => import('../pages/ProjectSettings'));
-const ProjectOverview = lazyPage(() => import('../pages/ProjectOverview'));
 const ComponentConfigs = lazyPage(() => import('../pages/ComponentConfigs'));
 const ComponentContainers = lazyPage(() => import('../pages/ComponentContainers'));
 const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChecks'));
 const ComponentScaling = lazyPage(() => import('../pages/ComponentScaling'));
+const ComponentDeploymentTracks = lazyPage(() => import('../pages/ComponentDeploymentTracks'));
+const ComponentSettings = lazyPage(() => import('../pages/ComponentSettings'));
 const CdPipelineEditor = lazyPage(() => import('../pages/CdPipelineEditor'));
 const OrgSettings = lazyPage(() => import('../pages/OrgSettings'));
 const BrowseSamples = lazyPage(() => import('../pages/BrowseSamples'));
@@ -87,6 +95,7 @@ const EditEnvironment = lazyPage(() => import('../pages/EditEnvironment'));
 const RuntimeLogsOrg = lazyPage(() => import('../pages/RuntimeLogsOrg'));
 const RuntimeLogsProject = lazyPage(() => import('../pages/RuntimeLogsProject'));
 const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegration'));
+const AgentTraces = lazyPage(() => import('../pages/AgentTraces'));
 const ApiInsights = lazyPage(() => import('../pages/ApiInsights'));
 const ComingSoon = lazyPage(() => import('../pages/ComingSoon'));
 
@@ -121,6 +130,7 @@ const routes: AppRoute[] = [
   { path: '/signin', element: <OIDCCallback /> },
   { path: '/logout', element: <Logout /> },
   { path: '/ghapp', element: <GitHubOAuthCallback /> },
+  { path: '/adoapp', element: <AzureDevOpsOAuthCallback /> },
   {
     element: <ProtectedRoute />,
     children: [
@@ -140,24 +150,32 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/admin/cd-pipelines/new', element: <CdPipelineEditor /> },
               { path: 'organizations/:orgHandler/admin/cd-pipelines/:pipelineId/edit', element: <CdPipelineEditor /> },
               { path: 'organizations/:orgHandler/admin/data-planes', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDataPlanes, ['organizations']))) },
+              { path: 'organizations/:orgHandler/platform-services', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDatabases, ['organizations']))) },
+              { path: 'organizations/:orgHandler/platform-services/new', element: createElement(RouteErrorBoundary, null, createElement(withScope(CreateDatabaseServer, ['organizations']))) },
+              { path: 'organizations/:orgHandler/platform-services/:dbServerId', element: createElement(RouteErrorBoundary, null, createElement(withScope(DatabaseServerDetail, ['organizations']))) },
+              { path: 'organizations/:orgHandler/platform-services/:dbServerId/:tab', element: createElement(RouteErrorBoundary, null, createElement(withScope(DatabaseServerDetail, ['organizations']))) },
+              { path: 'organizations/:orgHandler/platform-services/temporal/:temporalId', element: createElement(RouteErrorBoundary, null, createElement(withScope(TemporalServerDetail, ['organizations']))) },
+              { path: 'organizations/:orgHandler/platform-services/temporal/:temporalId/:tab', element: createElement(RouteErrorBoundary, null, createElement(withScope(TemporalServerDetail, ['organizations']))) },
               { path: 'organizations/:orgHandler/settings', element: createElement(withScope(OrgSettings, ['organizations'])) },
               { path: 'organizations/:orgHandler/settings/package-registries', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgPackageRegistries, ['organizations']))) },
               ...generateMatrixRoutes(MATRIX),
               { path: 'organizations/:orgHandler/projects/:projectHandler/deploy', element: createElement(withScope(ProjectDeploy, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/test', element: createElement(withScope(ProjectTest, ['projects'])) },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/runtimes', element: <ComingSoon title="Coming Soon" description="Runtime management is currently under development." /> },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/metrics', element: <ComingSoon title="Coming Soon" description="Metrics are currently under development." /> },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/runtimes', element: <ComingSoon title="Coming soon" description="Runtime management is currently under development." /> },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/metrics', element: <ComingSoon title="Coming soon" description="Metrics are currently under development." /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/runtimelogs', element: createElement(withScope(RuntimeLogsProject, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/metrics', element: <ComingSoon description="Throughput, latency and errors for every integration in the project." /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/admin/cd-pipelines', element: createElement(withScope(ProjectCdPipelines, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/devops/environments', element: createElement(withScope(Environments, ['projects'])) },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/settings', element: createElement(withScope(ProjectSettings, ['projects'])) },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/settings/project-overview', element: createElement(withScope(ProjectOverview, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(EditProject, ['projects'])) },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/link-repository', element: createElement(withScope(LinkRepository, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/redirect', element: <ProjectsRedirect /> },
-              { path: 'organizations/:orgHandler/home', element: createElement(withScope(OrgHome, ['organizations'])) },
+              { path: 'organizations/:orgHandler/overview', element: createElement(withScope(OrgHome, ['organizations'])) },
+              { path: 'organizations/:orgHandler/projects', element: createElement(withScope(Projects, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/home', element: createElement(withScope(Project, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/overview', element: createElement(withScope(Component, ['components'])) },
-              { path: 'organizations/:orgHandler/projects/new', element: createElement(withScope(CreateProject, ['organizations'])) },
+              { path: 'organizations/:orgHandler/new', element: createElement(withScope(CreateProject, ['organizations'])) },
+              { path: 'organizations/:orgHandler/projects/new', element: createElement(withScope(LegacyNewProjectRedirect, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/import', element: createElement(withScope(ImportProject, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new', element: createElement(withScope(CreateIntegrationOptions, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/ai-builder', element: createElement(withScope(AiIntegrationBuilderView, ['projects'])) },
@@ -180,7 +198,7 @@ const routes: AppRoute[] = [
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/new/import-coming-soon',
-                element: <ComingSoon title="Coming Soon" description="Importing from this Git provider is currently not available. You'll be able to import integrations from this source soon." />,
+                element: <ComingSoon title="Coming soon" description="Importing from this Git provider is currently not available. You'll be able to import integrations from this source soon." />,
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test',
@@ -196,15 +214,19 @@ const routes: AppRoute[] = [
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/api-chat',
-                element: <ComingSoon title="Coming Soon" description="API Chat is currently under development." />,
+                element: <ComingSoon title="Coming soon" description="API Chat is currently under development." />,
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/deploy',
-                element: <ComingSoon title="Coming Soon" description="Deployment management is currently under development." />,
+                element: <ComingSoon title="Coming soon" description="Deployment management is currently under development." />,
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/metrics',
                 element: <ComingSoon description="Throughput, latency and errors over time, per environment." />,
+              },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/traces',
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(AgentTraces, ['components']))),
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/runtimes',
@@ -225,6 +247,11 @@ const routes: AppRoute[] = [
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/admin/scaling',
                 element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentScaling, ['components']))),
+              },
+              { path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/settings', element: createElement(withScope(ComponentSettings, ['components'])) },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/settings/deployment-tracks',
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(ComponentDeploymentTracks, ['components']))),
               },
               // Unknown or retired pages (including the unported ones) go back to their level's home.
               { path: 'organizations/:orgHandler/*', element: <HiddenPageRedirect level="organizations" /> },

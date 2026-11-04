@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Button, IconButton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo } from 'react';
 import { ENV_KEY_RE } from '../../constants/build';
@@ -59,7 +58,7 @@ export default function BuildEnvVarsEditor({ value, onChange, onHasError }: Buil
   return (
     <Stack gap={1}>
       <Stack direction="row" alignItems="center" gap={0.75}>
-        <Typography variant="body2">Environment Variables</Typography>
+        <Typography variant="body2">Environment variables</Typography>
         <Typography variant="caption" color="text.secondary">
           (Optional)
         </Typography>
@@ -126,7 +125,7 @@ export default function BuildEnvVarsEditor({ value, onChange, onHasError }: Buil
           onClick={handleAdd}
           sx={{ textTransform: 'none', fontSize: '0.75rem', px: 0.5, py: 0.25 }}
         >
-          Add Variable
+          Add variable
         </Button>
       </Box>
     </Stack>

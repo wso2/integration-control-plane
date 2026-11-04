@@ -18,68 +18,10 @@
 
 /** Shared styles for the cloud-only API Consumption UI (Consumers subcard, consumer drawer, security drawer). */
 
-/** Sized and placed like the Build History drawer: below the top nav, full height beneath it. */
-export const rightDrawer = {
-  '& .MuiDrawer-paper': {
-    width: { xs: '100%', sm: 560 },
-    top: { xs: '56px', sm: '64px' },
-    height: 'auto',
-    bottom: 0,
-  },
-} as const;
-
-export const drawerFrame = {
-  display: 'flex',
-  flexDirection: 'column',
-  height: '100%',
-} as const;
-
-export const drawerHeader = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  px: 2,
-  py: 1.5,
-  borderBottom: '1px solid',
-  borderColor: 'divider',
-  flexShrink: 0,
-} as const;
-
-export const drawerBody = {
-  flex: 1,
-  overflow: 'auto',
-  px: 2,
-  py: 2,
-} as const;
-
-export const drawerFooter = {
-  display: 'flex',
-  justifyContent: 'flex-end',
-  gap: 1,
-  px: 3,
-  py: 2,
-  borderTop: '1px solid',
-  borderColor: 'divider',
-} as const;
-
-/** Footer with destructive/secondary actions on the left and the primary on the right. */
-export const drawerFooterSplit = {
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: 1,
-  px: 3,
-  py: 2,
-  borderTop: '1px solid',
-  borderColor: 'divider',
-} as const;
-
 export const tableHeadCell = {
   color: 'text.secondary',
   fontSize: '0.7rem',
   fontWeight: 600,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
 } as const;
 
 export const schemeCell = {
@@ -120,11 +62,6 @@ export const credentialsSection = {
 export const envChip = {
   height: 22,
   fontSize: '0.7rem',
-} as const;
-
-export const requiredMark = {
-  color: 'error.main',
-  ml: 0.25,
 } as const;
 
 export const centredRow = {

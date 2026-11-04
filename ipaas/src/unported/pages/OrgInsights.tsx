@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, PageContent, PageTitle, MenuItem, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Box, PageContent, PageTitle, MenuItem, Skeleton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { useMemo, useState, type JSX } from 'react';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useOrgInsightsEnvironments, useTopSlowestApis } from '../../hooks/useInsights';

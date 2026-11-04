@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchComponents,
   fetchComponentByHandler,
@@ -31,12 +31,13 @@ import {
   updateEndpoint,
   generateComponentEndpoints,
   createDeploymentTrack,
+  updateDeploymentTrack,
   deleteDeploymentTrack,
   checkDeploymentTrackDeletable,
 } from '../api/components';
 import { trackEvent } from '../services/tracking/tracking';
 import { pollWhileDeleting } from '../utils/deletionPolling';
-import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput } from '../types/component';
+import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput, UpdateDeploymentTrackInput } from '../types/component';
 
 export function useComponents(orgHandler: string, projectId: string) {
   return useQuery({
@@ -44,6 +45,21 @@ export function useComponents(orgHandler: string, projectId: string) {
     queryFn: () => fetchComponents(orgHandler, projectId),
     enabled: !!orgHandler && !!projectId,
     refetchInterval: pollWhileDeleting,
+  });
+}
+
+/** Several projects' integrations at once, sharing useComponents' cache. */
+export function useOrgComponents(orgHandler: string, projectIds: string[]) {
+  return useQueries({
+    queries: projectIds.map((projectId) => ({
+      queryKey: ['components', orgHandler, projectId],
+      queryFn: () => fetchComponents(orgHandler, projectId),
+      enabled: !!orgHandler,
+      refetchInterval: pollWhileDeleting,
+    })),
+    combine: (results) => ({
+      byProject: new Map(projectIds.map((id, i) => [id, results[i].data])),
+    }),
   });
 }
 
@@ -135,6 +151,14 @@ export function useCreateDeploymentTrack() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateDeploymentTrackInput) => createDeploymentTrack(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['component'] }),
+  });
+}
+
+export function useUpdateDeploymentTrack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateDeploymentTrackInput) => updateDeploymentTrack(input),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['component'] }),
   });
 }

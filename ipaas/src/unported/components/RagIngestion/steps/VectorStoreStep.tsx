@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Grid, MenuItem, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Grid, MenuItem, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { useMemo, type JSX } from 'react';
 import { blankVectorStore, ragLogoUrl, VECTOR_STORE_PROVIDERS } from '../../../../constants/ragIngestion';
 import { chromaCollectionNameError, pineconeIndexNameError, postgresTableNameError, weaviateCollectionNameError } from '../../../../utils/ragIngestion';
@@ -79,6 +78,7 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
         <>
           <SecretField label="API Key" required value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
           <TextField
+            labelPlacement="top"
             label="Index Name"
             required
             fullWidth
@@ -94,9 +94,10 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
     case 'chroma':
       return (
         <>
-          <TextField label="Host" required fullWidth size="small" value={value.host} onChange={(e) => onChange({ ...value, host: e.target.value })} sx={REQUIRED_FIELD_SX} />
-          <TextField label="Port" required fullWidth size="small" type="number" value={value.port} onChange={(e) => onChange({ ...value, port: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Host" required fullWidth size="small" value={value.host} onChange={(e) => onChange({ ...value, host: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Port" required fullWidth size="small" type="number" value={value.port} onChange={(e) => onChange({ ...value, port: e.target.value })} sx={REQUIRED_FIELD_SX} />
           <TextField
+            labelPlacement="top"
             label="Collection Name"
             required
             fullWidth
@@ -112,9 +113,10 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
     case 'weaviate':
       return (
         <>
-          <TextField label="Weaviate Cluster REST URL" required fullWidth size="small" value={value.clusterUrl} onChange={(e) => onChange({ ...value, clusterUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Weaviate Cluster REST URL" required fullWidth size="small" value={value.clusterUrl} onChange={(e) => onChange({ ...value, clusterUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
           <SecretField label="API Key" required value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
           <TextField
+            labelPlacement="top"
             label="Collection Name"
             required
             fullWidth
@@ -130,12 +132,13 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
     case 'pgvector':
       return (
         <>
-          <TextField label="Host" required fullWidth size="small" value={value.host} onChange={(e) => onChange({ ...value, host: e.target.value })} sx={REQUIRED_FIELD_SX} />
-          <TextField label="Port" required fullWidth size="small" type="number" value={value.port} onChange={(e) => onChange({ ...value, port: e.target.value })} sx={REQUIRED_FIELD_SX} />
-          <TextField label="User" required fullWidth size="small" value={value.user} onChange={(e) => onChange({ ...value, user: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Host" required fullWidth size="small" value={value.host} onChange={(e) => onChange({ ...value, host: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Port" required fullWidth size="small" type="number" value={value.port} onChange={(e) => onChange({ ...value, port: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="User" required fullWidth size="small" value={value.user} onChange={(e) => onChange({ ...value, user: e.target.value })} sx={REQUIRED_FIELD_SX} />
           <SecretField label="Password" required value={value.password} onChange={(v) => onChange({ ...value, password: v })} />
-          <TextField label="Database" required fullWidth size="small" value={value.dbName} onChange={(e) => onChange({ ...value, dbName: e.target.value })} sx={REQUIRED_FIELD_SX} />
+          <TextField labelPlacement="top" label="Database" required fullWidth size="small" value={value.dbName} onChange={(e) => onChange({ ...value, dbName: e.target.value })} sx={REQUIRED_FIELD_SX} />
           <TextField
+            labelPlacement="top"
             label="Table Name"
             required
             fullWidth
@@ -152,6 +155,7 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
       return (
         <>
           <TextField
+            labelPlacement="top"
             select
             label="Managed Database"
             required
@@ -168,6 +172,7 @@ function ProviderFields({ value, onChange, managedServers }: { value: VectorStor
             ))}
           </TextField>
           <TextField
+            labelPlacement="top"
             label="Table Name"
             required
             fullWidth

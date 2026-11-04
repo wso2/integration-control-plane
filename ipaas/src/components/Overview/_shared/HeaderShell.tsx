@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Avatar, Box, Button, Chip, CircularProgress, IconButton, InputBase, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Avatar, Box, Button, Chip, CircularProgress, IconButton, InputBase, Skeleton, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Tag, Cloud, GitCommitHorizontal, Copy, Check, Pencil, Globe, Lock } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentDetail } from '../../../types/component';
@@ -26,7 +26,7 @@ import type { Repository, Commit } from '../../../types/repository';
 import { useUpdateComponent } from '../../../hooks/useComponents';
 import { useChoreoSampleImages } from '../../../hooks/useRepository';
 import LabelDialog from '../../LabelDialog';
-import { formatDistanceToNow } from '../../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../../utils/time';
 import { getGitProviderIcon } from '../../../utils/build';
 import { buildRepoBrowseUrl } from '../../../utils/gitProviderUrl';
 import { DESCRIPTION_MAX_LENGTH, clampDescription, isAtNewlineLimit } from '../../../utils/description';
@@ -56,6 +56,11 @@ interface ComponentHeaderProps {
   /** True while `latestCommit` is still being fetched (including waiting on `repository` to resolve its branch first). */
   isLatestCommitLoading?: boolean;
 }
+
+const repoLinkSx = { color: 'text.primary', textDecoration: 'none', '&:hover': { color: 'primary.main' }, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
+
+/** The repository as `org/repo/...`: the provider icon already says which host it is. */
+const repoPathOf = (url: string): string => url.replace(/^https?:\/\/[^/]+\//, '');
 
 export default function ComponentHeader({ component, repository, latestCommit, orgHandler, projectId, module, hasSource = true, isRepositoryLoading = false, isLatestCommitLoading = false }: ComponentHeaderProps) {
   const { userId } = useAuth();
@@ -287,6 +292,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                   !nameEditing && (
                     <Tooltip title="Edit name">
                       <IconButton
+                        aria-label="Edit name"
                         className="pencil-btn"
                         size="small"
                         sx={{ p: 0.25, opacity: 0 }}
@@ -309,8 +315,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                     <Tooltip title={isExternal ? 'External' : 'Internal'}>
                       <Stack direction="row" alignItems="center" gap={0.25} sx={{ color: 'text.secondary' }}>
                         {isExternal ? <Globe size={12} /> : <Lock size={12} />}
-                        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                          {component.serviceAccessMode}
+                        <Typography variant="caption" color="text.secondary">
+                          {isExternal ? 'External' : 'Internal'}
                         </Typography>
                       </Stack>
                     </Tooltip>
@@ -347,6 +353,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                       <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5 }}>
                         <Tooltip title="Edit description">
                           <IconButton
+                            aria-label="Edit description"
                             size="small"
                             sx={{ p: 0.25, opacity: descHovered ? 1 : 0, transition: 'opacity 0.15s' }}
                             onClick={(e) => {
@@ -414,7 +421,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                   <Tag size={12} />
                   {labelList.length === 0 ? (
                     <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} onClick={() => setLabelDialogOpen(true)}>
-                      + Add Labels
+                      Add labels
                     </Typography>
                   ) : (
                     <>
@@ -428,6 +435,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                       )}
                       <Tooltip title="Edit labels">
                         <IconButton
+                          aria-label="Edit labels"
                           className="pencil-btn"
                           size="small"
                           sx={{ p: 0.25, opacity: 0 }}
@@ -454,19 +462,12 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                 </Typography>
                 {repoUrl ? (
                   <>
-                    <ProviderIcon size={12} />
-                    <Typography
-                      variant="body2"
-                      component="a"
-                      href={repoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' }, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      title={repoUrl}>
-                      {repoUrl}
+                    <ProviderIcon size={16} />
+                    <Typography variant="body2" component="a" href={repoUrl} target="_blank" rel="noopener noreferrer" sx={repoLinkSx} title={repoUrl}>
+                      {repoPathOf(repoUrl)}
                     </Typography>
                     <Tooltip title={copied ? 'Copied!' : 'Copy URL'}>
-                      <IconButton size="small" onClick={() => handleCopyRepoUrl(repoUrl)} sx={{ p: 0.25 }}>
+                      <IconButton aria-label="Copy URL" size="small" onClick={() => handleCopyRepoUrl(repoUrl)} sx={{ p: 0.25 }}>
                         {copied ? <Check size={12} /> : <Copy size={12} />}
                       </IconButton>
                     </Tooltip>
@@ -477,8 +478,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
               </Stack>
               <Stack direction="row" flexWrap="wrap" alignItems="center" gap={1}>
                 <Stack direction="row" alignItems="center" gap={1}>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 110 }}>
-                    Latest Commit on Source:
+                  <Typography variant="body2" color="text.secondary">
+                    Latest commit:
                   </Typography>
                   {latestCommit && (
                     <>
@@ -495,9 +496,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
                       {latestCommit.message}
                     </Typography>
                     <Stack direction="row" alignItems="center" gap={1} flexWrap="nowrap">
-                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                        {formatDistanceToNow(latestCommit.author.date)}
-                      </Typography>
+                      <RelativeTime time={formatDistanceToNow(latestCommit.author.date)} dateTime={latestCommit.author.date} tooltip={formatDateTime(latestCommit.author.date)} hideIcon sx={{ whiteSpace: 'nowrap' }} />
                       <Avatar src={latestCommit.author.avatarUrl} alt={latestCommit.author.name ?? 'Commit author'} sx={{ width: 16, height: 16, fontSize: 10, flexShrink: 0 }}>
                         {latestCommit.author.name?.[0]?.toUpperCase()}
                       </Avatar>

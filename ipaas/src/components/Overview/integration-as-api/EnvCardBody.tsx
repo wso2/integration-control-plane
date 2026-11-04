@@ -30,6 +30,9 @@ import ServiceInsights from './ServiceInsights';
 import SwaggerOperationsList, { type SwaggerDocument } from './SwaggerOperationsList';
 import GraphqlOperationsList from './GraphqlOperationsList';
 import { toEndpointOptions } from '../../../utils/endpoints';
+import { Rocket } from '@wso2/oxygen-ui-icons-react';
+import EnvEmptyNotice from '../../EnvEmptyNotice';
+import { ENV_CARD_INSIGHTS_ENABLED } from '../../../constants/insights';
 
 /**
  * Integration-as-API's content-only body: a deployment-in-progress spinner, the
@@ -60,7 +63,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
 
   // The enforcing API Platform gateway URL for the selected endpoint. Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
   // of the raw OpenChoreo external route.
-  const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id } : null;
+  const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id, deploymentTrackId: versionId } : null;
   const { data: apiSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint && gatewayExposureEnabled);
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
@@ -90,7 +93,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const serviceNotDeployed = !loadingDeployment && !hasDeployment;
   // Use the endpoint's apimId for insights — component.apiId is often null for generic services.
   const insightsApiId = activeEndpoint?.apimId ?? component.apiId ?? '';
-  const showInsights = !!env.critical && !!env.id && !!env.name && !!projectId;
+  const showInsights = ENV_CARD_INSIGHTS_ENABLED && !!env.critical && !!env.id && !!env.name && !!projectId;
 
   if (loadingDeployment) return <EnvCardSkeleton />;
 
@@ -122,28 +125,24 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
           )
         ))}
 
-      {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && (
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-          This component has not been deployed to this environment yet.
-        </Typography>
-      )}
+      {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && <EnvEmptyNotice icon={Rocket}>This integration has not been deployed to this environment yet.</EnvEmptyNotice>}
 
       {/* Cloud-only in-console API consumption: consumer applications and the
           exposed API's security config. Keyed by the BFF's
-          component/environment/endpoint triple — the component name is the
-          component id and the endpoint name is the endpoint id. */}
+          component/environment/endpoint triple and the deployment track, since
+          each track has its own API — the component name is the component id
+          and the endpoint name is the endpoint id. */}
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && gatewayExposureEnabled && (
-        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} endpoints={toEndpointOptions(envEndpoints)} />
+        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} deploymentTrackId={versionId} endpoints={toEndpointOptions(envEndpoints)} />
       )}
 
-      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !gatewayExposureEnabled && (
+      {/* A project-only endpoint has no consumers, so only an exposure in flight or failing is reported. */}
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !gatewayExposureEnabled && (gatewayExposureTransitioning || !!gatewayExposureFailure) && (
         <Box sx={{ mt: 2, p: 2, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
           <Typography variant="body2" color={gatewayExposureFailure ? 'error.main' : 'text.secondary'}>
             {gatewayExposureTransitioning
               ? 'API exposure is being updated. Consumer and security settings will be available when the gateway deployment is ready.'
-              : gatewayExposureFailure
-                ? gatewayExposureFailure.reason || 'API exposure could not be completed. Retry the visibility update.'
-                : 'Expose this endpoint to Public or Organization visibility to configure consumers and API security.'}
+              : gatewayExposureFailure?.reason || 'API exposure could not be completed. Retry the visibility update.'}
           </Typography>
         </Box>
       )}

@@ -45,7 +45,7 @@ export default function DraftTestDialog({ open, mode, intent, onClose, onDraft, 
   const isExistingDraft = mode === 'existingDraft';
   const isNewTest = intent === 'newTest';
 
-  const title = isNewTest ? 'Start New Test?' : 'Apply Execution?';
+  const title = isNewTest ? 'Start new test?' : 'Apply execution?';
   const description = isExistingDraft
     ? isNewTest
       ? 'A draft test already exists. Starting a new test will override the existing draft.'
@@ -63,20 +63,20 @@ export default function DraftTestDialog({ open, mode, intent, onClose, onDraft, 
       <DialogActions>
         {isExistingDraft ? (
           <>
-            <Button variant="outlined" onClick={onClose}>
+            <Button variant="outlined" color="inherit" onClick={onClose}>
               Cancel
             </Button>
             <Button variant="contained" onClick={onOverrideDraft}>
-              {isNewTest ? 'Override Draft & Start New Test' : 'Override Draft & Apply'}
+              {isNewTest ? 'Override draft & start new test' : 'Override draft & apply'}
             </Button>
           </>
         ) : (
           <>
             <Button variant="outlined" onClick={onClearAndProceed}>
-              {isNewTest ? 'Clear & Start New Test' : 'Clear & Apply'}
+              {isNewTest ? 'Clear & start new test' : 'Clear & apply'}
             </Button>
             <Button variant="contained" onClick={onDraft}>
-              {isNewTest ? 'Draft & Start New Test' : 'Draft & Apply'}
+              {isNewTest ? 'Draft & start new test' : 'Draft & apply'}
             </Button>
           </>
         )}

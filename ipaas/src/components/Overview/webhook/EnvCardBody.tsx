@@ -16,13 +16,16 @@
  * under the License.
  */
 
-import { Box, CircularProgress, Divider, Typography } from '@wso2/oxygen-ui';
+import { Box, CircularProgress, Divider } from '@wso2/oxygen-ui';
 import { useState, type ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 import ServiceInsights from '../integration-as-api/ServiceInsights';
+import { Rocket } from '@wso2/oxygen-ui-icons-react';
+import EnvEmptyNotice from '../../EnvEmptyNotice';
+import { ENV_CARD_INSIGHTS_ENABLED } from '../../../constants/insights';
 
 /**
  * Webhook body: the incoming endpoint URLs + the insights metrics (events
@@ -38,7 +41,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   const showEndpointPanel = hasDeployment && envEndpoints.length > 0;
   const notDeployed = !loadingDeployment && !hasDeployment;
   const insightsApiId = activeEndpoint?.apimId ?? component.apiId ?? '';
-  const showInsights = !!env.critical && !!env.id && !!env.name && !!projectId && !!insightsApiId;
+  const showInsights = ENV_CARD_INSIGHTS_ENABLED && !!env.critical && !!env.id && !!env.name && !!projectId && !!insightsApiId;
 
   if (loadingDeployment) return <EnvCardSkeleton />;
 
@@ -54,11 +57,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
 
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && <EndpointUrlsPanel endpoints={envEndpoints} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} />}
 
-      {notDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && (
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-          This webhook has not been deployed to this environment yet.
-        </Typography>
-      )}
+      {notDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && <EnvEmptyNotice icon={Rocket}>This webhook has not been deployed to this environment yet.</EnvEmptyNotice>}
 
       {showInsights && <ServiceInsights envName={env.name} envId={env.id} apimEnvId={env.apimEnvId} projectId={projectId} apiId={insightsApiId} />}
     </>

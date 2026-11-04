@@ -17,7 +17,7 @@
  */
 
 import { Box, PageContent } from '@wso2/oxygen-ui';
-import { Fragment, useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { Fragment, useEffect, useRef, useState, type JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponentByHandler } from '../hooks/useComponents';
@@ -28,7 +28,7 @@ import { useCommitHistory, useComponentRepository } from '../hooks/useRepository
 import { useDeploymentStatus } from '../hooks/useDeployments';
 import NotFound from '../components/NotFound';
 import IntegrationOverviewSkeleton from '../components/IntegrationOverviewSkeleton';
-import { orgHomeUrl } from '../paths';
+import { orgProjectsUrl } from '../paths';
 import { ArtifactDetail } from '../components/ArtifactDetail';
 import Environment from '../components/EnvironmentCard';
 import PromoteButton from '../components/EnvironmentCard/PromoteButton';
@@ -38,6 +38,8 @@ import { useIntegrationModule } from '../hooks/useIntegrationModule';
 import type { SelectedArtifact } from '../components/artifact-config';
 import { resourceUrl, broaden, type ComponentScope } from '../nav';
 import BuildCard from '../components/BuildCard';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { latestCommitOf } from '../utils/commits';
 import { trackEvent } from '../services/tracking/tracking';
 import { UUID_RE } from '../utils/string';
@@ -74,13 +76,11 @@ export default function Component(scope: ComponentScope): JSX.Element {
   const { data: component, isPending: pendingComponent } = useComponentByHandler(projectId, scope.component);
   const { data: environments = [] } = useEnvironments(scope.org, projectId);
   const { data: repository = null, isLoading: loadingRepository } = useComponentRepository(projectId, scope.component);
-  const { data: commits = [], isLoading: loadingCommits } = useCommitHistory(component?.id ?? '', repository?.branch ?? '');
-
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  // An integration has one implicit deployment track. Derived rather than synced via an
-  // effect: the version-scoped queries below key off it, and an effect would add a render
-  // to the waterfall before they could become enabled.
-  const versionId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  // Read from the URL rather than synced via an effect: the version-scoped queries below
+  // key off it, and an effect would add a render to the waterfall before they could enable.
+  const { track, trackId: versionId } = useSelectedTrack(component);
+  // Each track builds its own branch, so its commits are the ones to show.
+  const { data: commits = [], isLoading: loadingCommits } = useCommitHistory(component?.id ?? '', track?.branch || repository?.branch || '');
 
   const [selectedArtifact, setSelectedArtifact] = useState<SelectedArtifact | null>(null);
 
@@ -111,8 +111,10 @@ export default function Component(scope: ComponentScope): JSX.Element {
 
   // A disabled query reports isLoading false; isPending stays true until the project resolves too.
   if (loadingProject || (projectId && pendingComponent)) return <IntegrationOverviewSkeleton />;
-  if (!project) return <NotFound message="Project not found" backTo={orgHomeUrl(scope.org)} backLabel="Back to Projects" />;
-  if (!component) return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+  if (!project) return <NotFound message="Project not found" backTo={orgProjectsUrl(scope.org)} backLabel="Back to projects" />;
+  if (!component) return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
+  // A loaded integration always resolves a track; the check narrows the type for what follows.
+  if (versionId === undefined) return <IntegrationOverviewSkeleton />;
 
   const displayType = component.displayType ?? '';
   const latestCommit = latestCommitOf(commits);
@@ -149,10 +151,10 @@ export default function Component(scope: ComponentScope): JSX.Element {
         `}
       </style>
       <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-        {/* Deployment track bar */}
+        <DeploymentTrackBar component={component} />
 
         {/* <Box sx={{ flex: 1, minHeight: 0, overflowY: 'auto' }}> */}
-        <PageContent>
+        <PageContent fullWidth>
           {/* Component header */}
           {!hasCustomOverview && (
             <HeaderShell

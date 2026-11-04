@@ -22,13 +22,13 @@ import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useAuth } from '../auth';
 import { Alert, Box, Button, Card, CardContent, Typography } from '@wso2/oxygen-ui';
-import ProjectCardListSkeleton from '../components/ProjectCardListSkeleton';
+import OrgOverviewSkeleton from '../components/OrgOverview/OrgOverviewSkeleton';
 import { useCreateProject } from '../hooks/useProjects';
 import { fetchProjects as fetchProjectsApi } from '../api/projects';
 import { projectHomeUrl } from '../paths';
 import { newComponentUrl } from '../nav';
 import { DEFAULT_PROJECT_HANDLER } from '../constants/project';
-import Projects from './Projects';
+import OrgOverview from './OrgOverview';
 import { local } from '../utils/storage';
 
 function OnboardingShell({ children }: { children: React.ReactNode }) {
@@ -100,7 +100,7 @@ export default function OrgHome(): JSX.Element {
   }, [step, navigate, orgHandler]);
 
   if (step === 'checking') {
-    return <ProjectCardListSkeleton />;
+    return <OrgOverviewSkeleton />;
   }
 
   if (step === 'provisioning-error') {
@@ -127,5 +127,5 @@ export default function OrgHome(): JSX.Element {
     );
   }
 
-  return <Projects level="organizations" org={orgHandler!} />;
+  return <OrgOverview level="organizations" org={orgHandler!} />;
 }

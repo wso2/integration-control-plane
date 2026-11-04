@@ -43,13 +43,15 @@ interface ConsumersPanelProps {
   envLabel: string;
   /** Endpoint name — the BFF's `endpointName` path segment. */
   endpointName: string;
+  /** The deployment track whose API this is; each track's API has its own consumers. */
+  deploymentTrackId: string;
   /** All endpoints of this environment, for the security drawer's selector. */
   endpoints: EndpointOption[];
 }
 
 /** Cloud-only "Consumers" subcard inside the API env card. */
-export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, endpoints }: ConsumersPanelProps): JSX.Element {
-  const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName }), [componentName, envName, endpointName]);
+export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, deploymentTrackId, endpoints }: ConsumersPanelProps): JSX.Element {
+  const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName, deploymentTrackId }), [componentName, envName, endpointName, deploymentTrackId]);
 
   const { data: consumers = [], isLoading, error } = useConsumers(projectName, endpointRef);
   const { data: security } = useEndpointSecurity(endpointRef);
@@ -87,7 +89,7 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
             <>
               <Divider orientation="vertical" flexItem sx={styles.titleDivider} />
               <Typography component="span" variant="body2" color="text.secondary" sx={styles.securityModeGroup}>
-                Security Scheme:{' '}
+                Security scheme:{' '}
                 <Box component="span" sx={styles.securityModeValue}>
                   {SECURITY_MODE_LABEL[security.mode]}
                 </Box>
@@ -97,10 +99,10 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
         </Typography>
         <Stack direction="row" alignItems="center" gap={1.5}>
           <Button variant="text" size="small" startIcon={<ShieldCheck size={14} />} onClick={() => setSecurityOpen(true)} sx={styles.textAction}>
-            Configure Security
+            Configure security
           </Button>
           <Button variant="contained" size="small" startIcon={count > 0 ? <Plus size={14} /> : undefined} onClick={() => setDialogTarget('new')}>
-            {count > 0 ? 'New Consumer' : 'Consume API'}
+            {count > 0 ? 'New consumer' : 'Consume API'}
           </Button>
         </Stack>
       </Box>
@@ -137,7 +139,7 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
                 <Button variant="outlined" size="small" onClick={() => setDialogTarget(c)}>
                   Manage
                 </Button>
-                <Tooltip title="Delete Consumer">
+                <Tooltip title="Delete consumer">
                   <IconButton size="small" aria-label={`Delete ${c.displayName}`} onClick={() => setPendingDelete(c)} sx={styles.consumerDeleteButton}>
                     <Trash2 size={15} />
                   </IconButton>
@@ -154,7 +156,7 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
         </Box>
       )}
 
-      <ApiSecurityDrawer open={securityOpen} onClose={() => setSecurityOpen(false)} componentName={componentName} envName={envName} endpoints={endpoints} activeEndpointName={endpointName} />
+      <ApiSecurityDrawer open={securityOpen} onClose={() => setSecurityOpen(false)} componentName={componentName} envName={envName} deploymentTrackId={deploymentTrackId} endpoints={endpoints} activeEndpointName={endpointName} />
       <ConsumerDrawer open={dialogTarget !== null} onClose={() => setDialogTarget(null)} projectName={projectName} endpointRef={endpointRef} envLabel={envLabel} consumer={dialogTarget === 'new' ? null : dialogTarget} existingNames={existingNames} />
 
       {pendingDelete && (

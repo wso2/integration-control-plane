@@ -48,7 +48,7 @@ const INK = 'var(--oxygen-palette-text-primary, #3a3a40)';
  * "Page not found" fallback. Usable anywhere a route or resource doesn't resolve, like
  * `ComingSoon`; pass `fullScreen` when it renders outside the app shell.
  */
-export default function PageNotFound({ title = 'Page not found', description = 'The URL you’re trying to reach doesn’t exist or may have moved.', actionTo, actionLabel = 'Go to Home', fullScreen = false }: PageNotFoundProps): JSX.Element {
+export default function PageNotFound({ title = 'Page not found', description = 'The URL you’re trying to reach doesn’t exist or may have moved.', actionTo, actionLabel = 'Go to home', fullScreen = false }: PageNotFoundProps): JSX.Element {
   return (
     <Box component="main" sx={{ ...pageSx, ...(fullScreen && fullScreenSx) }}>
       <Stack alignItems="center" gap={1} sx={textStackSx}>

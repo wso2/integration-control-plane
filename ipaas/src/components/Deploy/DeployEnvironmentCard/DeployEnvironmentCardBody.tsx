@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Box, Button, Chip, Divider, IconButton, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Chip, Divider, IconButton, Skeleton, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { CalendarClock, Clock, Eye, Settings } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { DeploymentStatus } from '../../../types/deployment';
 import type { DeployEnvironmentCardBodyProps } from '../../../types/deploy';
-import { formatDistanceToNow } from '../../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../../utils/time';
 import { getDeploymentStatusColor, getDeploymentStatusLabel } from '../../../utils/deploy';
 import BuildImageCard from '../../Deploy/BuildImageCard';
 
@@ -95,15 +95,7 @@ export default function DeployEnvironmentCardBody({
     <Stack gap={2}>
       {/* Deployed time — from per-env deployedAt, not image build time. Hidden when suspended (matches Devant).
           An automation has no deployment to date: it runs on its schedule, which the status below reports. */}
-      {!flags.isAutomation && !isSuspended && deployedAt && (
-        <Stack direction="row" alignItems="center" gap={0.5}>
-          <Clock size={14} style={{ opacity: 0.6 }} />
-          <Typography variant="body2">Deployed</Typography>
-          <Typography variant="body2" fontWeight={600}>
-            {formatDistanceToNow(deployedAt)}
-          </Typography>
-        </Stack>
-      )}
+      {!flags.isAutomation && !isSuspended && deployedAt && <RelativeTime time={formatDistanceToNow(deployedAt)} dateTime={deployedAt} tooltip={formatDateTime(deployedAt)} action="Deployed" />}
 
       {/* An automation reports its schedule here; every other type reports its workload. */}
       <Stack gap={0.5}>
@@ -167,7 +159,7 @@ export default function DeployEnvironmentCardBody({
             // reference (there is no source commit / build to display).
             <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>
               <Typography variant="caption" color="text.secondary">
-                Container Image
+                Container image
               </Typography>
               <Typography variant="body2" sx={{ fontFamily: 'monospace', mt: 0.25, wordBreak: 'break-all' }}>
                 {deployment.imageUrl || '—'}
@@ -196,7 +188,7 @@ export default function DeployEnvironmentCardBody({
             {endpointCount !== undefined && endpointCount >= 0 && <Chip size="small" label={endpointCount} sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />}
           </Stack>
           <Tooltip title="View endpoints">
-            <IconButton size="small" onClick={onEndpointsClick}>
+            <IconButton aria-label="View endpoints" size="small" onClick={onEndpointsClick}>
               <Eye size={16} />
             </IconButton>
           </Tooltip>
@@ -210,7 +202,7 @@ export default function DeployEnvironmentCardBody({
           {configurablesCount !== undefined && configurablesCount >= 0 && <Chip size="small" label={configurablesCount} sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />}
         </Stack>
         <Tooltip title="Configure environment variables">
-          <IconButton size="small" onClick={onConfigClick}>
+          <IconButton aria-label="Configure environment variables" size="small" onClick={onConfigClick}>
             <Settings size={16} />
           </IconButton>
         </Tooltip>
@@ -220,9 +212,9 @@ export default function DeployEnvironmentCardBody({
       {flags.isAutomation && (
         <Stack gap={0.25}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
-            <Typography variant="body2">Job Configs</Typography>
+            <Typography variant="body2">Job configs</Typography>
             <Tooltip title="Configure job schedule">
-              <IconButton size="small" onClick={onJobConfigClick}>
+              <IconButton aria-label="Configure job schedule" size="small" onClick={onJobConfigClick}>
                 <Settings size={16} />
               </IconButton>
             </Tooltip>
@@ -241,7 +233,7 @@ export default function DeployEnvironmentCardBody({
       {/* Scale to Zero indicator — below Job Configs for automation, below Configurables for services */}
       {scaleToZeroEnabled !== undefined && (
         <Stack direction="row" alignItems="center" justifyContent="space-between">
-          <Typography variant="body2">Scale to Zero</Typography>
+          <Typography variant="body2">Scale to zero</Typography>
           <Chip size="small" label={scaleToZeroEnabled ? 'Enabled' : 'Disabled'} color={scaleToZeroEnabled ? 'success' : 'default'} variant="outlined" sx={{ height: 20, fontSize: '0.7rem' }} />
         </Stack>
       )}

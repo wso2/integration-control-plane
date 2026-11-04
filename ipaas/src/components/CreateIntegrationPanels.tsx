@@ -57,7 +57,7 @@ import { trackEvent } from '../services/tracking/tracking';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
 
 /** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
-const GET_STARTED_TABS = [{ label: 'Prebuilt Integrations' }, { label: 'Samples' }];
+const GET_STARTED_TABS = [{ label: 'Prebuilt integrations' }, { label: 'Samples' }];
 
 export interface CreateIntegrationPanelsProps {
   scope: ProjectScope;
@@ -268,10 +268,10 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
                 <Typography variant="body2" sx={SECTION_LABEL_SX}>
-                  {standalone ? 'Create an Integration on Cloud' : 'Create on Cloud'}
+                  {standalone ? 'Create an integration on Cloud' : 'Create on Cloud'}
                 </Typography>
               </Stack>
-              <Card variant="outlined" sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
+              <Card sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
                   <Box sx={{ flex: 1, minHeight: 260, overflow: 'hidden' }}>
                     <IDEMockup onOpenClick={handleOpenCloudEditor} />
@@ -289,10 +289,10 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
               </Typography>
             ) : (
               <Typography variant="body2" sx={{ ...SECTION_LABEL_SX, mb: 1.5 }}>
-                {standalone ? 'Import your own Integration' : 'Import your own'}
+                {standalone ? 'Import your own integration' : 'Import your own'}
               </Typography>
             )}
-            <Card variant="outlined" sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
+            <Card sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
               <CardContent
                 sx={{
                   display: 'flex',
@@ -335,9 +335,9 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     <CircularProgress size={22} />
                   ) : (
                     <>
-                      <Tooltip title="Import from a Public Repository" placement="top">
+                      <Tooltip title="Import from a public repository" placement="top">
                         <IconButton
-                          aria-label="Import from a Public Repository"
+                          aria-label="Import from a public repository"
                           onClick={(e) => {
                             e.stopPropagation();
                             trackEvent('component-create-import-public-url', { org: scope.org, project: scope.project });
@@ -368,14 +368,21 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip title={providerComingSoonLabel(GitProvider.AZURE_DEVOPS)} placement="top">
-                        {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
-                        <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Azure" disabled sx={PROVIDER_ICON_SX}>
+                      {window.API_CONFIG.azureDevOpsClientId && (
+                        <Tooltip title="Import from Azure DevOps" placement="top">
+                          <IconButton
+                            aria-label="Import from Azure DevOps"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (creationBlocked) return;
+                              trackEvent('component-create-import-azure-devops', { org: scope.org, project: scope.project, provider: GitProvider.AZURE_DEVOPS });
+                              navigate(importUrl, { state: { mode: GitProvider.AZURE_DEVOPS } });
+                            }}
+                            sx={PROVIDER_ICON_SX}>
                             <AzureDevOpsIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
-                        </Box>
-                      </Tooltip>
+                        </Tooltip>
+                      )}
                     </>
                   )}
                 </Box>
@@ -390,7 +397,6 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             Start quickly
           </Typography>
           <Card
-            variant="outlined"
             sx={{
               flex: 1,
               boxShadow: 'none',
@@ -481,7 +487,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {featuredSamples.map((sample) => (
-                        <SampleRowCard key={sampleKey(sample)} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
+                        <SampleRowCard
+                          key={sampleKey(sample)}
+                          sample={sample}
+                          onDeploy={() => handleQuickDeploy(sample)}
+                          isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false}
+                          deployDisabled={creationBlocked}
+                          deployDisabledTooltip={blockedTooltip}
+                        />
                       ))}
                     </Box>
                   )}

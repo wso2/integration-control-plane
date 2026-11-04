@@ -46,7 +46,7 @@ function HowToModal({ open, onClose }: { open: boolean; onClose: () => void }): 
             <Typography variant="body2" component="span">
               Generate a{' '}
               <Link href={AUTH_KEY_URL} target="_blank" rel="noopener noreferrer">
-                Tailscale Auth Key ↗
+                Tailscale auth key ↗
               </Link>
               .
             </Typography>
@@ -64,7 +64,7 @@ function HowToModal({ open, onClose }: { open: boolean; onClose: () => void }): 
               </li>
               <li>
                 <Typography variant="body2" component="span">
-                  <strong>Endpoint Name</strong> – label for the mapping (e.g., <code>Internal APIs</code>).
+                  <strong>Endpoint name</strong> – label for the mapping (e.g., <code>Internal APIs</code>).
                 </Typography>
               </li>
               <li>
@@ -79,7 +79,7 @@ function HowToModal({ open, onClose }: { open: boolean; onClose: () => void }): 
               </li>
               <li>
                 <Typography variant="body2" component="span">
-                  <strong>Target Port</strong> – the port on that device to forward traffic to (e.g., <code>8090</code>).
+                  <strong>Target port</strong> – the port on that device to forward traffic to (e.g., <code>8090</code>).
                 </Typography>
               </li>
             </Box>
@@ -91,7 +91,7 @@ function HowToModal({ open, onClose }: { open: boolean; onClose: () => void }): 
           </li>
           <li>
             <Typography variant="body2" component="span">
-              Click <strong>Save &amp; Deploy</strong>.
+              Click <strong>Save &amp; deploy</strong>.
             </Typography>
           </li>
         </Box>
@@ -101,7 +101,7 @@ function HowToModal({ open, onClose }: { open: boolean; onClose: () => void }): 
         <Typography variant="body2">
           See the full guide:{' '}
           <Link href={DOCS_URL} target="_blank" rel="noopener noreferrer">
-            WSO2 Integration Platform Tailscale VPN Documentation ↗
+            WSO2 Integration Platform Tailscale VPN documentation ↗
           </Link>
         </Typography>
       </DialogContent>

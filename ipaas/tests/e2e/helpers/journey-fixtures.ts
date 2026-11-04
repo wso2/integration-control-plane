@@ -25,7 +25,6 @@ export const AUTOMATION = 'Mi Automation';
 export const AUTOMATION_REPO_URL = 'https://github.com/Dilhasha/mi-cloud-samples';
 export const AUTOMATION_SUB_PATH = 'mi-automation';
 export const MI_TECHNOLOGY = 'WSO2 Integrator: MI';
-export const MI_SAMPLE_TECHNOLOGY = 'WSO2 MI';
 export const AGENT_TYPE = 'AI Agent';
 export const ENV = 'Development';
 
@@ -46,7 +45,7 @@ export const FOOTER_LINKS = [
   ['Privacy Policy', 'https://wso2.com/privacy-policy'],
 ] as const;
 
-export const CLOUD_SECTIONS = ['Package Registries'] as const;
+export const CLOUD_SECTIONS = ['Package registries'] as const;
 export const UNPORTED_SECTIONS = ['Access Control', 'Egress Control', 'Workflows', 'Credentials', 'On-Prem Keys', 'Application Security'] as const;
 
 /** Deleting an integration is asynchronous: the row greys out, then goes. Observed at ~3 minutes on DEV. */
