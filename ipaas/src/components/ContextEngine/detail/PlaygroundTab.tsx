@@ -43,7 +43,6 @@ interface PlaygroundTabProps {
   orgHandle: string;
 }
 
-
 interface QueryFailure {
   message: string;
   /** The engine refused this user; they may be able to grant themselves the creator's access. */
