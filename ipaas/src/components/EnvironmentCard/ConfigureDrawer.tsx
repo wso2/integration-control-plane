@@ -1055,7 +1055,10 @@ function GenericServiceConfigureDrawer({
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
-          linkedFrom={linkedFrom}
+          fieldLinks={(path) => {
+            const source = linkedFrom.get(path);
+            return source && { source };
+          }}
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>

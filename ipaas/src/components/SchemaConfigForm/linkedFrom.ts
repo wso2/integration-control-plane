@@ -19,7 +19,32 @@
 import { createContext, useContext } from 'react';
 import type { LinkedSource } from '../../utils/resourceLinks';
 
-/** Config key → the resource whose link supplies the configurable. The form takes no value for these. */
-export const LinkedFromContext = createContext<ReadonlyMap<string, LinkedSource>>(new Map());
+export type { LinkedSource };
 
-export const useLinkedFrom = (jsonPath: string): LinkedSource | undefined => useContext(LinkedFromContext).get(jsonPath);
+/** A resource key the picker offers, and the field that uses it already. */
+export interface PickerKey {
+  key: string;
+  usedBy?: string;
+}
+
+/** The choices of a field's link icon. `selected` is `first` for no own link, else `resource|key`. */
+export interface FieldLinkPicker {
+  first: 'Enter a value' | 'Via selected Link';
+  selected: string;
+  resources: { id: string; name: string; keys: PickerKey[] }[];
+  onPick: (pick: { resource: string; key: string } | null) => void;
+}
+
+/** One field's link in the form: its source, and the picker when links can change here. */
+export interface FieldLink {
+  source?: LinkedSource;
+  picker?: FieldLinkPicker;
+}
+
+export type FieldLinks = (jsonPath: string) => FieldLink | undefined;
+
+export const noFieldLinks: FieldLinks = () => undefined;
+
+export const FieldLinkContext = createContext<FieldLinks>(noFieldLinks);
+
+export const useFieldLink = (jsonPath: string): FieldLink | undefined => useContext(FieldLinkContext)(jsonPath);

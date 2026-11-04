@@ -20,10 +20,16 @@ import type { ResourceLink } from '../types/configuration';
 
 /** Where a linked configurable's value comes from in one environment: a link, or the integration's workload.yaml. */
 export interface LinkedSource {
+  /** The resource's display name. */
   resource: string;
+  key?: string;
+  /** The field's own link beats its connection's. */
+  overrides?: boolean;
   declared?: boolean;
-  /** Set when the resource has no values in the environment yet. */
+  /** The environment the resource has no values in. */
   noValuesIn?: string;
+  /** Where to add the missing values. */
+  valuesHref?: string;
 }
 
 /** Config key → the link that supplies the configurable in env: the links env's release carries. */
