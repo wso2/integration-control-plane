@@ -123,8 +123,9 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const permissions = useContextPermissions(engine.id);
   // Models come from the engine's environment; changing them is provisioning, the control plane's.
   const canEditModels = CONTEXT_ENGINE_PROVISIONING && !readOnly && !!permissions.data?.includes('engine.manage');
-  // Deleting needs the manage permission, so people without it are not offered a button that only fails.
-  const canDelete = !readOnly && !!permissions.data?.includes('engine.manage');
+  // Deleting the engine needs the manage permission, so people without it are not offered a button that only fails.
+  // Without provisioning, deleting only removes the engine from this console and needs no engine permission.
+  const canDelete = !readOnly && (!CONTEXT_ENGINE_PROVISIONING || !!permissions.data?.includes('engine.manage'));
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
   const openModels = () => {
@@ -340,7 +341,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
                   Delete engine
                 </Typography>
                 <Typography variant="body2" sx={mutedSx}>
-                  Deletes the engine and everything it holds. This can&apos;t be undone.
+                  {CONTEXT_ENGINE_PROVISIONING ? 'Deletes the engine and everything it holds. This can’t be undone.' : 'Removes the engine from this console. Its data stays in the engine’s databases.'}
                 </Typography>
               </Box>
               <Button variant="outlined" color="error" onClick={onRequestDelete} sx={{ flexShrink: 0 }}>
