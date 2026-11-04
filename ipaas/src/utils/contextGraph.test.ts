@@ -33,6 +33,7 @@ import {
   entitySize,
   exploreModel,
   factEntityNames,
+  factIs,
   factSelection,
   gridColumns,
   hexToRgba,
@@ -493,6 +494,16 @@ describe('facts on the graph', () => {
       ['stores keys in', true],
     ]);
     expect(other.missing).toEqual(part.missing);
+  });
+
+  it('finds a relationship among facts by its ends and relation, with kinds only when both sides know one', () => {
+    const fact = { subject: 'Gateway 7', subjectKind: 'system', relation: 'Fails over to', object: 'kandy', evidenceIds: ['e1'] };
+    expect(factIs(fact, { name: 'gateway 7' }, 'fails over to', { name: 'Kandy', kind: 'city' })).toBe(true);
+    expect(factIs(fact, { name: 'gateway 7', kind: 'system' }, 'fails over to', { name: 'kandy' })).toBe(true);
+    expect(factIs(fact, { name: 'gateway 7', kind: 'building' }, 'fails over to', { name: 'kandy' })).toBe(false);
+    // The ends swapped, or another relation, is another relationship.
+    expect(factIs(fact, { name: 'kandy' }, 'fails over to', { name: 'gateway 7' })).toBe(false);
+    expect(factIs(fact, { name: 'gateway 7' }, 'stores keys in', { name: 'kandy' })).toBe(false);
   });
 
   it('narrows to one entity or one passage', () => {

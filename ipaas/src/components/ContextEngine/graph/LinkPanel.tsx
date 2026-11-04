@@ -16,16 +16,17 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, ButtonBase, CircularProgress, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
 import { MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
 import { type JSX, type ReactNode } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
+import { useContextEntity } from '../../../hooks/useContextEngine';
 import { contextEngineUrl } from '../../../paths';
-import { conflictLink, conflictsOn, relationLink, relationOf, sameRelation, type GraphModel } from '../../../utils/contextGraph';
-import { EntityChip } from './EntityPanel';
+import { conflictLink, conflictsOn, factIs, relationLink, relationOf, sameRelation, sentencesCiting, type GraphModel } from '../../../utils/contextGraph';
+import { EntityChip, PassageRow } from './EntityPanel';
 import { mutedSx } from '../styles';
-import { panelLabelSx, panelSx, selectRowSx } from './graphStyles';
-import type { ContextGraph, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
+import { panelLabelSx, panelSx, selectRowSx, sentenceSx } from './graphStyles';
+import type { ContextEntityView, ContextEvidence, ContextFact, ContextGraph, ContextGraphConflict, ContextGraphRelation } from '../../../types/contextEngine';
 
 /** An entity at one end of a relationship, as the panel names it. */
 export interface LinkEnd {
@@ -65,12 +66,30 @@ export interface ConflictView {
 
 const sentenceOf = (view: RelationView): string => `${view.subject.name} ${view.relation.relation} ${view.object.name}`;
 
+/**
+ * How many relationships to ask the engine for when looking up the passages
+ * behind one: its most. The entity view lists only that many of an entity's
+ * relationships, so a busy entity can leave this one out.
+ */
+const RELATION_LOOKUP_LIMIT = 50;
+
+/** In the derivation view: the answer, the passages it was given, and its facts, so a panel can show its part in the answer. */
+export interface PanelDerivation {
+  answer?: string;
+  evidence: ContextEvidence[];
+  facts: ContextFact[];
+}
+
 interface RelationPanelProps {
   engineId: string;
   orgHandle: string;
   view: RelationView;
   /** The conflicts this relationship is one side of. */
   conflicts: ConflictView[];
+  /** The two ends to ask the engine about for the passages, the one with fewer relationships first (see `RELATION_LOOKUP_LIMIT`). */
+  ask: [LinkEnd, LinkEnd];
+  sourceName: (sourceId: string) => string | undefined;
+  derivation?: PanelDerivation;
   onSelectEntity: (name: string, kind?: string) => void;
   onSelectRecord: (id: string) => void;
   onSelectConflict: (index: number) => void;
@@ -79,14 +98,46 @@ interface RelationPanelProps {
 
 /**
  * One relationship, selected by clicking its label on the canvas: the two
- * entities it joins, the sentence it was taken from, the documents behind it,
- * and any conflict it is one side of. Each of those can be selected from here
- * when it is drawn.
+ * entities it joins, the sentence it was taken from, the passages it stands on,
+ * each of which opens, and any conflict it is one side of. In the derivation
+ * view it also says which passages the answer was given and which of the
+ * answer's sentences cite them, as the entity panel does.
+ *
+ * The passages come from the engine's view of one end of the relationship, the
+ * same call the entity panel makes. When neither end's view holds it, the
+ * documents it was taken from are listed instead, each selectable on the graph.
  */
-export function RelationPanel({ engineId, orgHandle, view, conflicts, onSelectEntity, onSelectRecord, onSelectConflict, onClose }: RelationPanelProps): JSX.Element {
+export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourceName, derivation, onSelectEntity, onSelectRecord, onSelectConflict, onClose }: RelationPanelProps): JSX.Element {
   const navigate = useAppNavigate();
   const sentence = sentenceOf(view);
   const count = view.records.length;
+  const isThis = (fact: ContextFact) => factIs(fact, view.subject, view.relation.relation, view.object);
+  // The passages this relationship stands on in one end's view, or null when that view does not hold it.
+  const behindIn = (data: ContextEntityView | undefined): ContextEvidence[] | null => {
+    const fact = data?.facts.find(isThis);
+    if (!data || !fact) return null;
+    return fact.evidenceIds.map((id) => data.evidence.find((e) => e.id === id)).filter((e): e is ContextEvidence => !!e);
+  };
+  const [first, second] = ask;
+  const near = useContextEntity(engineId, first.name, first.kind, RELATION_LOOKUP_LIMIT);
+  const fromNear = behindIn(near.data);
+  // The other end is asked only when the first one's view, read or refused, does not hold the relationship.
+  const far = useContextEntity(engineId, fromNear === null && (near.isError || !!near.data) ? second.name : null, second.kind, RELATION_LOOKUP_LIMIT);
+  const fromEngine = fromNear ?? behindIn(far.data) ?? [];
+  // In the derivation view the answer's own facts name the passages it was given for this relationship, known at once.
+  const fromAnswer = derivation
+    ? derivation.facts
+        .filter(isThis)
+        .flatMap((fact) => fact.evidenceIds)
+        .map((id) => derivation.evidence.find((e) => e.id === id))
+        .filter((e): e is ContextEvidence => !!e)
+    : [];
+  const used = new Map(derivation?.evidence.map((e, i) => [e.id, i + 1]) ?? []);
+  // Each passage once, the ones the answer was given first, in its order.
+  const passages = [...new Map([...fromAnswer, ...fromEngine].map((e) => [e.id, e])).values()].sort((a, b) => (used.get(a.id) ?? Infinity) - (used.get(b.id) ?? Infinity));
+  const looking = near.isLoading || far.isLoading;
+  const numbers = [...new Set(passages.map((e) => used.get(e.id)).filter((n): n is number => n !== undefined))];
+  const inAnswer = derivation?.answer ? [...new Set(numbers.flatMap((n) => sentencesCiting(derivation.answer, n)))] : [];
   return (
     <Box component="aside" aria-label={`Relationship: ${sentence}`} sx={panelSx(true)}>
       <PanelHeader title={view.relation.relation} caption="Relationship" color="primary.main" onClose={onClose} />
@@ -108,17 +159,55 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, onSelectEn
         Found by the language model while the graph was built, in {count} document{count === 1 ? '' : 's'} you may read.
       </Typography>
 
-      {count > 0 && (
+      {/* While the passages are read, the sentences that cite them are not known yet, unless the answer's own facts named them. */}
+      {derivation?.answer && (inAnswer.length > 0 || !looking) && (
         <Box>
-          <Typography sx={panelLabelSx}>Taken from</Typography>
-          <Stack component="ul" gap={0.5} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
-            {view.records.map((record) => (
-              <li key={record.id}>
-                <RecordRow record={record} onSelect={onSelectRecord} />
-              </li>
+          <Typography sx={panelLabelSx}>In this answer</Typography>
+          {inAnswer.length ? (
+            <Stack gap={0.75} sx={{ mt: 0.75 }}>
+              {inAnswer.map((line) => (
+                <Box key={line} component="span" sx={sentenceSx}>
+                  {line}
+                </Box>
+              ))}
+            </Stack>
+          ) : (
+            <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
+              No sentence of the answer cites a passage this relationship stands on.
+            </Typography>
+          )}
+        </Box>
+      )}
+
+      {passages.length > 0 ? (
+        <Box>
+          <Typography sx={panelLabelSx}>Found in</Typography>
+          <Stack component="ul" gap={0.75} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
+            {passages.map((ev) => (
+              <PassageRow key={ev.id} evidence={ev} engineId={engineId} orgHandle={orgHandle} sourceName={sourceName(ev.sourceId)} answerNumber={used.get(ev.id)} inDerivation={!!derivation} />
             ))}
           </Stack>
         </Box>
+      ) : looking ? (
+        <Stack direction="row" alignItems="center" gap={1}>
+          <CircularProgress size={14} />
+          <Typography variant="caption" sx={mutedSx}>
+            Reading the passages behind it…
+          </Typography>
+        </Stack>
+      ) : (
+        count > 0 && (
+          <Box>
+            <Typography sx={panelLabelSx}>Taken from</Typography>
+            <Stack component="ul" gap={0.5} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
+              {view.records.map((record) => (
+                <li key={record.id}>
+                  <RecordRow record={record} onSelect={onSelectRecord} />
+                </li>
+              ))}
+            </Stack>
+          </Box>
+        )
       )}
 
       {conflicts.length > 0 && (
@@ -243,6 +332,8 @@ interface LinkDetailsProps {
   /** The selected link: a relationship, or a conflict line. */
   link: number;
   sourceName: (sourceId: string) => string | undefined;
+  /** In the derivation view: the answer's part, for the relationship panel. */
+  derivation?: PanelDerivation;
   onSelectEntity: (name: string, kind?: string) => void;
   onSelectRecord: (id: string) => void;
   /** Select another link, such as one side of a conflict. */
@@ -255,7 +346,7 @@ interface LinkDetailsProps {
  * stands for, or the conflicts on a conflict line. The explorer and the
  * derivation view both show it, so a label works the same in both.
  */
-export function LinkDetails({ engineId, orgHandle, model, graph, link, sourceName, onSelectEntity, onSelectRecord, onSelectLink, onClose }: LinkDetailsProps): JSX.Element | null {
+export function LinkDetails({ engineId, orgHandle, model, graph, link, sourceName, derivation, onSelectEntity, onSelectRecord, onSelectLink, onClose }: LinkDetailsProps): JSX.Element | null {
   const line = model.links[link];
   // A document line has no label, so it is never selected.
   if (!line || line.kind === 'mentions') return null;
@@ -290,11 +381,18 @@ export function LinkDetails({ engineId, orgHandle, model, graph, link, sourceNam
   }
   // The relationship as the graph served it, or, when it is not found there, as the line itself names it.
   const relation = relationOf(model, graph, link) ?? { subjectId: model.nodes[line.source].key, relation: line.label ?? '', objectId: model.nodes[line.target].key, recordNodeIds: [] };
+  // The engine lists a limited number of an entity's relationships, so the end with fewer of them is asked first.
+  const degree = (id: string) => graph.relations.reduce((n, r) => n + (r.subjectId === id || r.objectId === id ? 1 : 0), 0);
+  const ends: [LinkEnd, LinkEnd] = [end(relation.subjectId), end(relation.objectId)];
   return (
     <RelationPanel
+      key={link}
       engineId={engineId}
       orgHandle={orgHandle}
       view={relationView(relation)}
+      ask={degree(relation.subjectId) <= degree(relation.objectId) ? ends : [ends[1], ends[0]]}
+      sourceName={sourceName}
+      derivation={derivation}
       conflicts={graph.conflicts
         .map((conflict, index) => ({ index, conflict }))
         .filter(({ conflict }) => sameRelation(conflict.first, relation) || sameRelation(conflict.second, relation))
