@@ -57,7 +57,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
     );
   }
 
-  // Not-found is distinct from an unsupported type — surface it rather than "Coming Soon".
+  // Not-found is distinct from an unsupported type — surface it rather than "Coming soon".
   if (!comp) {
     return (
       <PageContent fullWidth>
@@ -71,7 +71,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
   if (identity?.type === 'mcp-server' || identity?.type === 'mcp-proxy') return <McpTest {...scope} />;
   if (identity?.type === 'integration-as-api') return <TestConsole {...scope} />;
   if (identity?.type === 'ai-agent') return <AgentChatConsole {...scope} />;
-  return <ComingSoon title="Coming Soon" description="Testing tools are currently under development." />;
+  return <ComingSoon title="Coming soon" description="Testing tools are currently under development." />;
 }
 
 /**

@@ -22,7 +22,7 @@ import type { JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { artSx, descriptionSx, pageSx, textStackSx } from './ComingSoon.styles';
 
-const HEADING = 'Coming Soon';
+const HEADING = 'Coming soon';
 
 interface ComingSoonProps {
   /** Overrides the heading for states that aren't literally "coming soon". */

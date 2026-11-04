@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { httpStatusOf, isNotFoundError, isQuotaError, isUnsupportedError } from './apiErrors';
+import { apiErrorMessage, httpStatusOf, isNotFoundError, isQuotaError, isUnsupportedError } from './apiErrors';
 
 describe('httpStatusOf', () => {
   it('prefers a structured status field over the message', () => {
@@ -101,5 +101,34 @@ describe('isQuotaError', () => {
     expect(isQuotaError('402')).toBe(false);
     expect(isQuotaError(null)).toBe(false);
     expect(isQuotaError(undefined)).toBe(false);
+  });
+});
+
+describe('apiErrorMessage', () => {
+  const FALLBACK = 'Could not load traces for this agent.';
+
+  it('shows the sentence the BFF wrote', () => {
+    // The three outcomes the trace routes distinguish; each has to stay legible.
+    const cases = [
+      [503, 'Agent traces are not available in this deployment.'],
+      [403, 'You are not permitted to read agent traces.'],
+      [400, 'Traces are available only for AI agent components.'],
+    ] as const;
+    for (const [status, message] of cases) {
+      expect(apiErrorMessage(Object.assign(new Error(message), { status }), FALLBACK)).toBe(message);
+    }
+  });
+
+  it('falls back when the response carried no sentence of its own', () => {
+    // What the client produces from a body it could not read a message out of.
+    expect(apiErrorMessage(Object.assign(new Error('HTTP 502: <html>Bad Gateway</html>'), { status: 502 }), FALLBACK)).toBe(FALLBACK);
+    expect(apiErrorMessage(Object.assign(new Error('   '), { status: 500 }), FALLBACK)).toBe(FALLBACK);
+  });
+
+  it('falls back when there was no response at all', () => {
+    // A dropped connection says nothing a reader can act on.
+    expect(apiErrorMessage(new TypeError('Failed to fetch'), FALLBACK)).toBe(FALLBACK);
+    expect(apiErrorMessage(undefined, FALLBACK)).toBe(FALLBACK);
+    expect(apiErrorMessage(null, FALLBACK)).toBe(FALLBACK);
   });
 });

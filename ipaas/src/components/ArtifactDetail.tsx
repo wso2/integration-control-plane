@@ -51,6 +51,7 @@ import SearchField from './SearchField';
 import { ArtifactSource, ArtifactApiDefinition, ArtifactEndpoints, ArtifactWsdl, ArtifactValue, ArtifactCarbonArtifacts, ArtifactRuntimes, InboundEndpointParameters, AutomationExecutions } from './ArtifactTabs';
 import { ARTIFACT_ICONS, ARTIFACT_TABS, DEFAULT_ARTIFACT_TABS, ENTRY_POINT_TYPE_SET, formatArtifactTypeName, typePlural, type SelectedArtifact, type TabProps } from './artifact-config';
 import { useQueryClient } from '@tanstack/react-query';
+import { capitalize } from '../utils/string';
 
 /**
  * Normalizes state/tracing/statistics values to a boolean.
@@ -65,7 +66,7 @@ function toEnabled(value: unknown): boolean {
 function ListenerConfirmDialog({ open, action, listenerName, onConfirm, onCancel }: { open: boolean; action: 'START' | 'STOP'; listenerName: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <Dialog open={open} onClose={onCancel}>
-      <DialogTitle>{action === 'STOP' ? 'Disable Listener' : 'Enable Listener'}</DialogTitle>
+      <DialogTitle>{action === 'STOP' ? 'Disable listener' : 'Enable listener'}</DialogTitle>
       <DialogContent>
         <Typography>
           Are you sure you want to {action === 'STOP' ? 'disable' : 'enable'} the listener <strong>{listenerName}</strong>?
@@ -229,8 +230,8 @@ function SelectedTypeArtifacts({ artifacts, artifactType, envId, componentId, qu
                     const columnSize = dataColumnSize + (colIndex < extraColumns ? 1 : 0);
                     return (
                       <Grid key={col} size={{ xs: columnSize }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                          {col === 'size' ? 'Message Count' : col}
+                        <Typography variant="caption" color="text.secondary">
+                          {col === 'size' ? 'Message count' : capitalize(col)}
                         </Typography>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>
                           {(a[col] ?? '—').toString()}
@@ -411,7 +412,7 @@ export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, 
   const tabProps: TabProps = { artifact, artifactType, envId, componentId, projectId: selected.projectId };
 
   // For Automation artifacts, use packageName as the display name
-  const displayName = artifact.name?.toString() ?? (artifactType === 'Automation' && artifact.packageName ? artifact.packageName.toString() : 'Unnamed Artifact');
+  const displayName = artifact.name?.toString() ?? (artifactType === 'Automation' && artifact.packageName ? artifact.packageName.toString() : 'Unnamed artifact');
 
   const renderActiveTab = () => {
     switch (activeTab) {

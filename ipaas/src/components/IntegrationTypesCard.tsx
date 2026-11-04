@@ -37,7 +37,7 @@ export default function IntegrationTypesCard({ components }: { components: Compo
         nonIntegrationCount++;
       }
     }
-    rows = [...Object.entries(integrationCounts).map(([label, count]) => ({ label, count })), { label: 'Non Integrations', count: nonIntegrationCount }];
+    rows = [...Object.entries(integrationCounts).map(([label, count]) => ({ label, count })), { label: 'Non-integrations', count: nonIntegrationCount }];
   } else {
     const counts = components.reduce<Record<string, number>>((acc, c) => {
       const label = getDisplayLabel(c.displayType ?? '', c.componentSubType ?? null);
@@ -52,7 +52,7 @@ export default function IntegrationTypesCard({ components }: { components: Compo
       <CardContent>
         <Typography variant="h6" component="h2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
           <PlugZap size={20} aria-hidden="true" />
-          Integration Count by Type
+          Integration count by type
         </Typography>
         <Stack>
           {rows.map(({ label, count }, i) => (

@@ -82,19 +82,19 @@ export default function Build(scope: ComponentScope): JSX.Element {
   }
 
   if (component.isPrebuilt) {
-    return <ComingSoon title="Build Not Available for Prebuilt Integrations" description="Prebuilt integrations are deployed directly from a published image — there is no source build step." />;
+    return <ComingSoon title="Build not available for prebuilt integrations" description="Prebuilt integrations are deployed directly from a published image — there is no source build step." />;
   }
 
   // Proxy/converted integrations (e.g. an MCP proxy from an existing HTTP API)
   // have no source repository, so there's nothing to build.
   if (component.displayType === 'proxy' || component.displayType === 'gitProxy') {
-    return <ComingSoon title="Build Not Available" description="This integration is created from an existing API and has no source repository to build." />;
+    return <ComingSoon title="Build not available" description="This integration is created from an existing API and has no source repository to build." />;
   }
 
   // RAG-provisioned components (ingestion cronjob, retrieval/API services) are
   // deployed from a prebuilt image and have no source repository to build.
   if (RAG_NO_SOURCE_SUBTYPES.has(component.componentSubType ?? '')) {
-    return <ComingSoon title="Build Not Available" description="This integration is deployed from a prebuilt image and has no source repository to build." />;
+    return <ComingSoon title="Build not available" description="This integration is deployed from a prebuilt image and has no source repository to build." />;
   }
 
   const envId = environments[0]?.id ?? '';

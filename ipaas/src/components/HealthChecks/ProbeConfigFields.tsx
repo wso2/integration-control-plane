@@ -53,9 +53,9 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
         Select {kind} Probe Type:
       </Typography>
       <RadioGroup row value={form.type} onChange={(e) => onChange({ type: e.target.value as Exclude<ProbeType, ''> })} sx={{ mb: 2 }}>
-        <FormControlLabel value={PROBE_TYPE.HTTP_GET} control={<Radio />} label="HTTP GET Request" />
-        <FormControlLabel value={PROBE_TYPE.TCP} control={<Radio />} label="TCP Probe" />
-        <FormControlLabel value={PROBE_TYPE.EXEC} control={<Radio />} label="Execute a Command" />
+        <FormControlLabel value={PROBE_TYPE.HTTP_GET} control={<Radio />} label="HTTP GET request" />
+        <FormControlLabel value={PROBE_TYPE.TCP} control={<Radio />} label="TCP probe" />
+        <FormControlLabel value={PROBE_TYPE.EXEC} control={<Radio />} label="Execute a command" />
       </RadioGroup>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -84,7 +84,7 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
               <Stack key={i} direction="row" gap={1.5} alignItems="flex-start">
                 <TextField
                   labelPlacement="top"
-                  label="Header Key"
+                  label="Header key"
                   required
                   size="small"
                   value={h.name}
@@ -96,7 +96,7 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
                 />
                 <TextField
                   labelPlacement="top"
-                  label="Header Value"
+                  label="Header value"
                   required
                   size="small"
                   value={h.value}
@@ -113,7 +113,7 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
             ))}
           </Stack>
           <Button variant="outlined" size="small" startIcon={<Plus size={16} />} onClick={() => setHeaders([...form.httpHeaders, { name: '', value: '' }])}>
-            Add HTTP Header
+            Add HTTP header
           </Button>
         </>
       )}

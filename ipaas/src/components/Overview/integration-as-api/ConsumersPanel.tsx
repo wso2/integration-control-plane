@@ -89,7 +89,7 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
             <>
               <Divider orientation="vertical" flexItem sx={styles.titleDivider} />
               <Typography component="span" variant="body2" color="text.secondary" sx={styles.securityModeGroup}>
-                Security Scheme:{' '}
+                Security scheme:{' '}
                 <Box component="span" sx={styles.securityModeValue}>
                   {SECURITY_MODE_LABEL[security.mode]}
                 </Box>

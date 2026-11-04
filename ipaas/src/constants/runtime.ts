@@ -44,27 +44,27 @@ export const POD_DRAWER_WIDTH = 960;
  */
 export const POD_CONDITION_DEFINITIONS: Record<string, PodConditionInfo> = {
   PodScheduled: {
-    displayName: 'Pod Scheduled',
+    displayName: 'Pod scheduled',
     description: 'The container scheduler has assigned this pod to a specific node in the data plane. Until this is completed, the pod will remain in a "Pending" state waiting for node assignment.',
     order: 1,
   },
   PodReadyToStartContainers: {
-    displayName: 'Starting Pod Containers',
+    displayName: 'Starting pod containers',
     description: "This condition indicates that the container runtime has successfully created the pod sandbox and configured the pod's networking. This happens before containers actually start running.",
     order: 2,
   },
   ContainersReady: {
-    displayName: 'Readiness Checks Passed',
+    displayName: 'Readiness checks passed',
     description: 'This condition is met when the container has passed the readiness probe checks (if configured). The container is almost ready to serve external traffic.',
     order: 4,
   },
   Initialized: {
-    displayName: 'Init-Containers Completed',
+    displayName: 'Init containers completed',
     description: 'All prerequisite (init) tasks required to start the main container have completed. The main container is ready to start.',
     order: 3,
   },
   Ready: {
-    displayName: 'Pod Ready',
+    displayName: 'Pod ready',
     description: 'This pod is healthy and active, and is able to serve traffic (if applicable).',
     order: 5,
   },

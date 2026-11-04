@@ -88,8 +88,6 @@ export const menuSx = {
 export const menuSectionTitleSx = {
   fontSize: 11.5,
   fontWeight: 600,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
   color: 'text.secondary',
 } as const;
 

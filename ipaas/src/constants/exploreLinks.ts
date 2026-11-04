@@ -35,24 +35,24 @@ export const EXPLORE_GROUPS: readonly ExploreGroup[] = [
   {
     title: 'Tutorials',
     links: [
-      { label: 'Build an Automation', href: `${DOCS}get-started/build-automation` },
-      { label: 'Build an Integration as API', href: `${DOCS}get-started/build-integration-api` },
-      { label: 'Build an AI Agent', href: `${DOCS}get-started/build-ai-agent` },
-      { label: 'Build an Event-Driven Integration', href: `${DOCS}get-started/build-event-driven-integration` },
-      { label: 'Build a File-Driven Integration', href: `${DOCS}get-started/build-file-driven-integration` },
-      { label: 'Develop an MCP Server', href: `${DOCS}get-started/develop-an-mcp-server` },
+      { label: 'Build an automation', href: `${DOCS}get-started/build-automation` },
+      { label: 'Build an integration as API', href: `${DOCS}get-started/build-integration-api` },
+      { label: 'Build an AI agent', href: `${DOCS}get-started/build-ai-agent` },
+      { label: 'Build an event-driven integration', href: `${DOCS}get-started/build-event-driven-integration` },
+      { label: 'Build a file-driven integration', href: `${DOCS}get-started/build-file-driven-integration` },
+      { label: 'Develop an MCP server', href: `${DOCS}get-started/develop-an-mcp-server` },
     ],
   },
   {
     title: 'References',
     links: [
-      { label: 'Promote Across Environments', href: `${DOCS}manage/cloud/environments/promotion` },
-      { label: 'Manage Your Integrations with CI/CD', href: `${DOCS}deploy-operate/cicd/github-actions` },
-      { label: 'Observe Your Integration', href: `${DOCS}deploy-operate/observe/observability-overview` },
+      { label: 'Promote across environments', href: `${DOCS}manage/cloud/environments/promotion` },
+      { label: 'Manage your integrations with CI/CD', href: `${DOCS}deploy-operate/cicd/github-actions` },
+      { label: 'Observe your integration', href: `${DOCS}deploy-operate/observe/observability-overview` },
     ],
   },
   {
     title: 'Support',
-    links: [{ label: 'Get Support on Discord', href: 'https://discord.com/invite/wso2' }],
+    links: [{ label: 'Get support on Discord', href: 'https://discord.com/invite/wso2' }],
   },
 ];

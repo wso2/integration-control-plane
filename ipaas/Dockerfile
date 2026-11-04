@@ -41,9 +41,9 @@ FROM nginx:1.27-alpine
 
 USER root
 
-# Skip `apk update && apk upgrade`: the base image is recent enough for local-dev,
-# and the upgrade adds ~30-60s + 10-20 MB without security benefit here.
-RUN addgroup -g 10001 -S choreouser && \
+# Upgrade only the packages the CI Trivy scan flags rather than a full `apk upgrade`.
+RUN apk upgrade --no-cache libexpat && \
+    addgroup -g 10001 -S choreouser && \
     adduser -u 10001 -S choreouser -G choreouser
 
 # nginx config (inline so the source repo doesn't need to ship one).

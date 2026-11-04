@@ -20,8 +20,8 @@ import { describe, it, expect } from 'vitest';
 import { pageTitleFor, formatDocumentTitle, APP_NAME } from './documentTitle';
 
 describe('pageTitleFor', () => {
-  it('title-cases a hyphenated nav id', () => {
-    expect(pageTitleFor('health-checks')).toBe('Health Checks');
+  it('sentence-cases a hyphenated nav id', () => {
+    expect(pageTitleFor('health-checks')).toBe('Health checks');
     expect(pageTitleFor('overview')).toBe('Overview');
   });
 
@@ -30,8 +30,8 @@ describe('pageTitleFor', () => {
     expect(pageTitleFor('proj-overview')).toBe('Overview');
   });
 
-  it('uses an override where title-casing reads wrong', () => {
-    expect(pageTitleFor('configs-secrets')).toBe('Configs & Secrets');
+  it('uses an override where sentence-casing the id reads wrong', () => {
+    expect(pageTitleFor('configs-secrets')).toBe('Configs & secrets');
     expect(pageTitleFor('external-ci')).toBe('External CI');
     expect(pageTitleFor('component-settings')).toBe('Settings');
   });
@@ -44,7 +44,7 @@ describe('pageTitleFor', () => {
 
 describe('formatDocumentTitle', () => {
   it('joins the page and the app name', () => {
-    expect(formatDocumentTitle('Health Checks')).toBe(`Health Checks | ${APP_NAME}`);
+    expect(formatDocumentTitle('Health checks')).toBe(`Health checks | ${APP_NAME}`);
   });
 
   it('falls back to the app name alone', () => {

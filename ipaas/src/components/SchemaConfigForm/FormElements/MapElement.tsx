@@ -374,7 +374,7 @@ export const MapElement: React.FC<MapElementProps> = ({
       <Popover open={isPopoverOpen} anchorEl={anchorEl} onClose={handleClosePopover} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }} transformOrigin={{ horizontal: 'right', vertical: 'top' }}>
         <Paper sx={{ p: 2, minWidth: 360, maxWidth: 480 }}>
           <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-            Add Values
+            Add values
           </Typography>
           {Array.from(uniqueKeySet).map((key) => (
             <Box key={key} sx={{ mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 }}>

@@ -117,7 +117,7 @@ export default function HealthCheckCard({ healthCheck: hc, container, projectId,
 
       {hasLiveness && (
         <Box>
-          <ProbeSectionTitle title="Liveness Probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.LIVENESS)} onDelete={() => deleteProbe(PROBE_KIND.LIVENESS)} />
+          <ProbeSectionTitle title="Liveness probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.LIVENESS)} onDelete={() => deleteProbe(PROBE_KIND.LIVENESS)} />
           <ProbeDisplay probe={hc.probes.liveness_probe} showSuccess={false} />
         </Box>
       )}
@@ -126,7 +126,7 @@ export default function HealthCheckCard({ healthCheck: hc, container, projectId,
 
       {hasReadiness && (
         <Box>
-          <ProbeSectionTitle title="Readiness Probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.READINESS)} onDelete={() => deleteProbe(PROBE_KIND.READINESS)} />
+          <ProbeSectionTitle title="Readiness probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.READINESS)} onDelete={() => deleteProbe(PROBE_KIND.READINESS)} />
           <ProbeDisplay probe={hc.probes.readiness_probe} showSuccess />
         </Box>
       )}

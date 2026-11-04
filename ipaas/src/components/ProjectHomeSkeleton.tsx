@@ -46,7 +46,7 @@ export default function ProjectHomeSkeleton(): JSX.Element {
               <ListingTable.Cell>Name</ListingTable.Cell>
               <ListingTable.Cell>Description</ListingTable.Cell>
               <ListingTable.Cell sx={{ minWidth: 180, whiteSpace: 'nowrap' }}>Type</ListingTable.Cell>
-              <ListingTable.Cell>Last Updated</ListingTable.Cell>
+              <ListingTable.Cell>Last updated</ListingTable.Cell>
             </ListingTable.Row>
           </ListingTable.Head>
           <ListingTable.Body>

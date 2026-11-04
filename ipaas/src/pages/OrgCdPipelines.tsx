@@ -49,7 +49,7 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
   return (
     <PageContent fullWidth>
       <PageTitle>
-        <PageTitle.Header>Deployment Pipelines</PageTitle.Header>
+        <PageTitle.Header>Deployment pipelines</PageTitle.Header>
         <PageTitle.SubHeader>Promotion paths across environments, available to every project in this organization.</PageTitle.SubHeader>
         {!!pipelines?.length && (
           <PageTitle.Actions>
@@ -62,7 +62,7 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
 
       {!!pipelines?.length && (
         <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 5 }}>
-          <SearchField value={search} onChange={setSearch} placeholder="Search pipelines..." fullWidth />
+          <SearchField value={search} onChange={setSearch} placeholder="Search pipelines" fullWidth />
         </Stack>
       )}
 

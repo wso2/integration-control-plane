@@ -356,7 +356,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 <CheckCircle2 size={14} />
               </Box>
               <Typography variant="caption" color="success.main" fontWeight={500}>
-                Ballerina Workspace Detected
+                Ballerina workspace detected
               </Typography>
             </Stack>
           )}
@@ -372,7 +372,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
-        Import a Project
+        Import a project
       </Typography>
 
       {submitError && (
@@ -409,13 +409,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
         {isWorkspace && (
           <>
             <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-              Project Details
+              Project details
             </Typography>
             <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 2 }}>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
                   labelPlacement="top"
-                  label="Project Name"
+                  label="Project name"
                   required
                   value={displayName}
                   onChange={(e) => {
@@ -425,13 +425,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                   fullWidth
                   error={!!nameError}
                   helperText={nameError}
-                  slotProps={{ htmlInput: { 'aria-label': 'Project Name' } }}
+                  slotProps={{ htmlInput: { 'aria-label': 'Project name' } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
                   labelPlacement="top"
-                  label="Project Id"
+                  label="Project ID"
                   value={effectiveHandler}
                   onChange={(e) => onHandlerChange(e.target.value)}
                   fullWidth
@@ -439,7 +439,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                   error={!!handlerError || !!handlerTaken}
                   helperText={renderHandlerHelperText()}
                   slotProps={{
-                    htmlInput: { 'aria-label': 'Project Id' },
+                    htmlInput: { 'aria-label': 'Project ID' },
                     input: {
                       endAdornment: (
                         <InputAdornment position="end">

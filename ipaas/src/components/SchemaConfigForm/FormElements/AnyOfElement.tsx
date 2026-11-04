@@ -68,7 +68,7 @@ const getTypeLabel = (type: string | undefined, schema?: JSONSchema): string => 
     case 'array':
       return schema?.title || schema?.name || 'Array';
     default:
-      return type || 'Not Supported';
+      return type || 'Not supported';
   }
 };
 

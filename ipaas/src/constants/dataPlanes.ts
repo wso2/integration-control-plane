@@ -20,18 +20,18 @@ import type { PaletteColor } from '../config/statusColors';
 
 /** Provisioning milestones (percent complete) for a Private Data Plane. */
 export const PDP_PROVISION_STEPS: { name: string; completedAtProgress: number }[] = [
-  { name: 'Provisioning a Dedicated Cloud Account', completedAtProgress: 3 },
+  { name: 'Provisioning a dedicated cloud account', completedAtProgress: 3 },
   { name: 'Generating Infrastructure-as-Code (IaC) for the PDP', completedAtProgress: 5 },
-  { name: 'Initializing IaC State', completedAtProgress: 10 },
-  { name: 'Bootstrapping Infrastructure and Setting Up Kubernetes', completedAtProgress: 30 },
-  { name: 'Installing Vault and the Flux System', completedAtProgress: 50 },
-  { name: 'Registering the New PDP in the Choreo Control Plane', completedAtProgress: 55 },
-  { name: 'Injecting Choreo System Secrets to the Vault', completedAtProgress: 60 },
-  { name: 'Installing the Choreo System Components on the Cluster', completedAtProgress: 65 },
-  { name: 'Installing Cilium CNI and Configuring Network Policies', completedAtProgress: 70 },
-  { name: 'Verifying System Installation', completedAtProgress: 80 },
-  { name: 'Setting up Health Monitors for the PDP', completedAtProgress: 90 },
-  { name: 'Finalizing the PDP Provisioning Process', completedAtProgress: 100 },
+  { name: 'Initializing IaC state', completedAtProgress: 10 },
+  { name: 'Bootstrapping infrastructure and setting up Kubernetes', completedAtProgress: 30 },
+  { name: 'Installing Vault and the Flux system', completedAtProgress: 50 },
+  { name: 'Registering the new PDP in the Choreo control plane', completedAtProgress: 55 },
+  { name: 'Injecting Choreo system secrets to the Vault', completedAtProgress: 60 },
+  { name: 'Installing the Choreo system components on the cluster', completedAtProgress: 65 },
+  { name: 'Installing Cilium CNI and configuring network policies', completedAtProgress: 70 },
+  { name: 'Verifying system installation', completedAtProgress: 80 },
+  { name: 'Setting up health monitors for the PDP', completedAtProgress: 90 },
+  { name: 'Finalizing the PDP provisioning process', completedAtProgress: 100 },
 ];
 
 /** Show at least 1% so a freshly-started PDP doesn't read as 0%. */

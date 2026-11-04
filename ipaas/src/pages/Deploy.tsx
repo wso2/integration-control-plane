@@ -83,7 +83,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   }
 
   if (component.isPrebuilt) {
-    return <ComingSoon title="Deploy Not Available for Prebuilt Integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
+    return <ComingSoon title="Deploy not available for prebuilt integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
   }
 
   const flags = getComponentTypeFlags(component.displayType ?? '', component.componentSubType);
@@ -99,11 +99,11 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   const hideEndpoints = integrationType === 'file-integration' || integrationType === 'event-integration' || integrationType === 'ai-agent';
 
   if (flags.isProxy) {
-    return <ComingSoon title="Proxy Deploy Coming Soon" description="Deploy management for REST API Proxy components will be available in a future release." />;
+    return <ComingSoon title="Proxy deploy coming soon" description="Deploy management for REST API proxy integrations will be available in a future release." />;
   }
 
   if (!flags.isDeployable && !hideEndpoints) {
-    return <ComingSoon title="Deploy Not Yet Supported" description={`Deploy management for ${displayLabel} components is coming soon.`} />;
+    return <ComingSoon title="Deploy not yet supported" description={`Deploy management for ${displayLabel} components is coming soon.`} />;
   }
 
   return (
