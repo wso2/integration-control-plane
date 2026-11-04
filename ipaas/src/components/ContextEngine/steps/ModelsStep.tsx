@@ -57,7 +57,15 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, 
       </Typography>
 
       <Box sx={modelColumnsSx}>
-        <ModelProviderColumn<EmbeddingConfig> title="Embedding model" providers={EMBEDDING_OPTIONS} value={embedding} onChange={onEmbeddingChange} blank={(id) => blankEmbedding(id as EmbeddingProvider)} modelLabel="Embedding model" />
+        <ModelProviderColumn<EmbeddingConfig>
+          title="Embedding model"
+          purpose="Indexes your sources for search."
+          providers={EMBEDDING_OPTIONS}
+          value={embedding}
+          onChange={onEmbeddingChange}
+          blank={(id) => blankEmbedding(id as EmbeddingProvider)}
+          modelLabel="Embedding model"
+        />
         <ModelProviderColumn<LlmConfig>
           title="Language model"
           purpose={answerChoice === 'same' ? 'Builds the graph and writes answers.' : 'Builds the graph.'}
