@@ -83,10 +83,11 @@ function toTaskExecution(e: BffExecution): TaskExecution {
 // Previously we used to send `projectName` param, now removed because it's not used in ipaas-service.
 //
 // An empty cronExpression means no schedule: the BFF owns the never-fires expression in both directions.
-export const fetchExecutionConfigs = (componentId: string, _releaseId: string, envId = ''): Promise<ExecutionConfigs | null> => {
+// releaseId names the deployment track: the schedule read is that of the track the release is deployed on.
+export const fetchExecutionConfigs = (componentId: string, releaseId: string, envId = ''): Promise<ExecutionConfigs | null> => {
   if (!envId) return Promise.resolve(null);
   return bff
-    .get<BffSchedule>(`/components/${seg(componentId)}/schedules/${seg(envId)}`)
+    .get<BffSchedule>(`/components/${seg(componentId)}/schedules/${seg(envId)}${q({ releaseId })}`)
     .then((s) => {
       if (!s.cronExpression) return null;
       return {
@@ -119,9 +120,10 @@ interface BffExecutionHistoryPage {
   nextCursor?: string;
 }
 
-export const fetchTaskExecutions = async (_releaseId: string, componentId = '', envId = '', projectId = ''): Promise<TaskExecution[]> => {
+// A release belongs to one deployment track, so reading by release lists that track's runs only.
+export const fetchTaskExecutions = async (releaseId: string, componentId = '', envId = '', projectId = ''): Promise<TaskExecution[]> => {
   if (!componentId || !envId) return [];
-  const base = `/components/${seg(componentId)}/environments/${seg(envId)}/executions/history`;
+  const base = releaseId ? `/releases/${seg(releaseId)}/executions/history` : `/components/${seg(componentId)}/environments/${seg(envId)}/executions/history`;
 
   const all: TaskExecution[] = [];
   let before: string | undefined;
@@ -296,7 +298,8 @@ export const fetchTaskExecutionCount = (releaseId: string, componentId = '', env
 export const updateJobConfigs = (input: UpdateJobConfigsInput): Promise<boolean> => bff.put<{ success?: boolean }>(`/components/${seg(input.componentId)}/job-configs`, input).then((r) => r?.success ?? true);
 
 // Empty cron = stop firing; the BFF substitutes the never-fires expression and leaves deployment state alone.
-export const stopSchedule = (input: StopScheduleInput): Promise<void> => bff.post<void>(`/components/${seg(input.componentId)}/schedules`, { environment: input.envId, cronExpression: '' }).then(() => undefined);
+// releaseId names the deployment track whose schedule stops.
+export const stopSchedule = (input: StopScheduleInput): Promise<void> => bff.post<void>(`/components/${seg(input.componentId)}/schedules${q({ releaseId: input.releaseId })}`, { environment: input.envId, cronExpression: '' }).then(() => undefined);
 
 // MI artifact trigger — no API Manager / MI runtime on the OpenChoreo stack.
 export const triggerTask = (_input: TriggerTaskInput): Promise<{ status: string; message: string; successCount: number; failedCount: number; details: string[] }> =>

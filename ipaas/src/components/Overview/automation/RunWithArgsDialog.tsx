@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
-import { Plus, Trash2, X } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, DrawerPanel, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState } from 'react';
 import { useTriggerComponent } from '../../../hooks/useExecutions';
+import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 import FormFieldTile from '../../AutomationTest/FormFieldTile';
-import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, RuntimeArgument, TriggerArgument } from '../../../types/executions';
-import { buildExecutionArgumentsFromForm, parseRuntimeArgumentsToFormFields, validatePositionalOrder, validateRequiredFields } from '../../../utils/runtimeArguments';
+import type { DynamicFormData, DynamicFormFieldValue, RuntimeArgument, TriggerArgument } from '../../../types/executions';
+import { buildExecutionArgumentsFromForm, hasAnyFormData, parseRuntimeArgumentsToFormFields, validatePositionalOrder, validateRequiredFields } from '../../../utils/runtimeArguments';
 
 export interface RunWithArgsDialogProps {
   open: boolean;
@@ -36,23 +36,29 @@ export interface RunWithArgsDialogProps {
   releaseId: string;
   /** Arguments the program declares, in the order it reads them. Each gets a row labelled with its name. */
   runtimeArguments?: RuntimeArgument[];
+  /** The declared arguments could not be read, so the rows are free-form and the user must know the order. */
+  argumentsUnavailable?: boolean;
 }
 
 const isFilled = (value: string): boolean => value.trim() !== '';
 
 const NO_ARGUMENTS: RuntimeArgument[] = [];
 
+const previewSx = { bgcolor: 'action.hover', borderRadius: 1, px: 1.5, py: 1, fontSize: '0.75rem', wordBreak: 'break-all' } as const;
+
 /**
  * Declared arguments render as the Test page's fields and serialize the same way. Added
  * rows are free-form values passed after them; since arguments are positional, they can
- * only be used once every declared argument before them has a value.
+ * only be used once every declared argument before them has a value. A declared argument
+ * that takes a list already collects every extra value, so it gets no added rows.
  */
-export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHandler, projectId, componentId, releaseId, runtimeArguments = NO_ARGUMENTS }: RunWithArgsDialogProps) {
+export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHandler, projectId, componentId, releaseId, runtimeArguments = NO_ARGUMENTS, argumentsUnavailable }: RunWithArgsDialogProps) {
   const initialExtra = runtimeArguments.length > 0 ? [] : [''];
   const formFields = useMemo(() => parseRuntimeArgumentsToFormFields(runtimeArguments), [runtimeArguments]);
+  const takesList = runtimeArguments.some((arg) => arg.repeat);
   const [formData, setFormData] = useState<DynamicFormData>({});
   const [args, setArgs] = useState<string[]>(initialExtra);
-  const [errors, setErrors] = useState<DynamicFormValidationErrors>({});
+  const [showErrors, setShowErrors] = useState(false);
   const [runError, setRunError] = useState<string | null>(null);
   const trigger = useTriggerComponent();
 
@@ -66,23 +72,18 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
 
   const handleFieldChange = (fieldId: string, value: DynamicFormFieldValue) => {
     setFormData((prev) => ({ ...prev, [fieldId]: value }));
-    setErrors((prev) => {
-      if (!(fieldId in prev)) return prev;
-      const next = { ...prev };
-      delete next[fieldId];
-      return next;
-    });
   };
 
   const extraFilled = args.some(isFilled);
   const gaps = validatePositionalOrder(runtimeArguments, formData, extraFilled);
+  // Derived from the current values, so an error clears as soon as its cause does.
+  const errors = { ...gaps, ...validateRequiredFields(formFields, formData) };
   const execArgs: TriggerArgument[] = [...buildExecutionArgumentsFromForm(runtimeArguments, formData), ...args.filter(isFilled).map((value) => ({ argument_name: '', argument_value: value }))];
 
   const handleRun = () => {
     setRunError(null);
-    const found = { ...gaps, ...validateRequiredFields(formFields, formData) };
-    setErrors(found);
-    if (Object.keys(found).length > 0) return;
+    setShowErrors(true);
+    if (Object.keys(errors).length > 0) return;
 
     trigger.mutate(
       { orgHandler, projectId, componentId, releaseId, args: execArgs },
@@ -101,51 +102,42 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
     (document.activeElement as HTMLElement)?.blur();
     setFormData({});
     setArgs(initialExtra);
-    setErrors({});
+    setShowErrors(false);
     setRunError(null);
     onClose();
   };
+
+  useUnsavedChanges(open && (hasAnyFormData(formData) || extraFilled));
+  const guardNavigation = useLeaveGuard();
+  const requestClose = () => guardNavigation(handleClose);
 
   // With a gap, the values would land on the wrong parameters, so no preview is shown.
   const hasGap = Object.keys(gaps).length > 0;
   const previewJson = JSON.stringify(execArgs.map((a) => a.argument_value));
   const removable = runtimeArguments.length > 0 || args.length > 1;
 
-  const drawerSx = {
-    '& .MuiDrawer-paper': {
-      width: 440,
-      position: 'fixed',
-      top: 64,
-      height: 'calc(100% - 64px)',
-      borderLeft: '1px solid',
-      borderColor: 'divider',
-      display: 'flex',
-      flexDirection: 'column',
-    },
-  };
-
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="h5">Runtime Arguments</Typography>
-        <IconButton size="small" aria-label="close" onClick={handleClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={requestClose} width={440}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Runtime arguments</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 2 }}>
+      <DrawerPanel.Body>
         <Stack gap={1.5}>
+          {argumentsUnavailable && <Alert severity="warning">Couldn&apos;t read this automation&apos;s arguments. Enter them manually, in order.</Alert>}
+
           <Box>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
               Arguments
             </Typography>
-            <Box sx={{ bgcolor: 'action.hover', borderRadius: 1, px: 1.5, py: 1, fontFamily: hasGap ? undefined : 'monospace', fontSize: '0.75rem', wordBreak: 'break-all', color: hasGap ? 'text.secondary' : undefined }}>
-              {hasGap ? 'Fill the arguments in order to see what is passed.' : previewJson}
-            </Box>
+            <Box sx={{ ...previewSx, fontFamily: hasGap ? undefined : 'monospace', color: hasGap ? 'text.secondary' : undefined }}>{hasGap ? 'Fill the arguments in order to see what is passed.' : previewJson}</Box>
           </Box>
 
           {formFields.map((field) => (
-            <FormFieldTile key={field.id} field={field} value={formData[field.id]} onChange={(value) => handleFieldChange(field.id, value)} error={!!errors[field.id]} helperText={errors[field.id]} />
+            <FormFieldTile key={field.id} field={field} value={formData[field.id]} onChange={(value) => handleFieldChange(field.id, value)} error={showErrors && !!errors[field.id]} helperText={errors[field.id]} />
           ))}
 
           {args.map((arg, index) => (
@@ -163,11 +155,13 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
           ))}
         </Stack>
 
-        <Button variant="text" size="small" startIcon={<Plus size={14} />} onClick={handleAddArg} sx={{ mt: 1.5, px: 0 }}>
-          Add Argument
-        </Button>
+        {!takesList && (
+          <Button variant="text" size="small" startIcon={<Plus size={14} />} onClick={handleAddArg} sx={{ mt: 1.5, px: 0 }}>
+            Add argument
+          </Button>
+        )}
         {/* Past its declared arguments, a program only reads options; extra values fail the run. */}
-        {runtimeArguments.length > 0 && !runtimeArguments.some((arg) => arg.repeat) && (
+        {runtimeArguments.length > 0 && !takesList && (
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
             The program declares only the arguments above. Add values only for options it reads, such as --name=value.
           </Typography>
@@ -178,14 +172,16 @@ export default function RunWithArgsDialog({ open, onClose, onRunSuccess, orgHand
             {runError}
           </Alert>
         )}
-      </Box>
+      </DrawerPanel.Body>
 
-      <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Button onClick={handleClose}>Cancel</Button>
+      <DrawerPanel.Footer>
+        <Button variant="outlined" color="inherit" onClick={requestClose}>
+          Cancel
+        </Button>
         <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {trigger.isPending ? 'Executing…' : 'Execute'}
         </Button>
-      </Stack>
-    </Drawer>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

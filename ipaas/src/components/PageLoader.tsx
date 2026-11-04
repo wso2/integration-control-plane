@@ -16,22 +16,22 @@
  * under the License.
  */
 
-import { LinearProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import * as styles from './PageLoader.styles';
 
 interface PageLoaderProps {
-  /** Shown under the bar. Omit for a bare loader. */
+  /** Shown under the spinner. Omit for a bare loader. */
   label?: string;
   /** Fills the window rather than the page area — for routes rendered outside the app shell. */
   viewport?: boolean;
 }
 
-/** A page's loading state: a short indeterminate bar centred in the area it fills. */
+/** A page's loading state: a spinner centred in the area it fills. */
 export default function PageLoader({ label, viewport = false }: PageLoaderProps): JSX.Element {
   return (
     <Stack sx={styles.frame(viewport)}>
-      <LinearProgress color="primary" aria-label={label ?? 'Loading'} sx={styles.bar} />
+      <CircularProgress color="primary" size={32} aria-label={label ?? 'Loading'} />
       {label && (
         <Typography variant="body2" color="text.secondary">
           {label}

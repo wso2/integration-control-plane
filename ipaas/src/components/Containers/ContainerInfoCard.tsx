@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Slider, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, Clock, Copy, Pencil } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Slider, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { Check, Copy, Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import ResourceRangeSlider from '../common/ResourceRangeSlider';
 import ContainerEditForm from './ContainerEditForm';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import { CPU_MAX, CPU_MIN, MEMORY_MAX, MEMORY_MIN, containerImageName, isMainContainer, milliToCpu } from '../../utils/containers';
 import type { ReleaseContainer } from '../../types/devopsConfigs';
 
@@ -30,6 +30,8 @@ interface ContainerInfoCardProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   isPaidOrPdpUser: boolean;
   canManage: boolean;
   onSaved: (message: string) => void;
@@ -40,7 +42,7 @@ const cardSx = { p: 3, mb: 2 } as const;
 const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, isPaidOrPdpUser, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
+export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   if (isEditOpen) {
@@ -50,6 +52,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
         projectId={projectId}
         componentId={componentId}
         releaseId={releaseId}
+        deploymentTrackId={deploymentTrackId}
         isPaidOrPdpUser={isPaidOrPdpUser}
         onClose={() => setIsEditOpen(false)}
         onSaved={(m) => {
@@ -63,7 +66,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
 
   const imageName = containerImageName(c);
   const main = isMainContainer(c);
-  const policyLabel = c.image_pull_policy === 'Always' ? 'Always' : 'If Not Present';
+  const policyLabel = c.image_pull_policy === 'Always' ? 'Always' : 'If not present';
 
   return (
     <Paper variant="outlined" sx={cardSx}>
@@ -72,7 +75,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
           <Typography variant="h6" fontWeight={700}>
             {c.name}
           </Typography>
-          <Chip size="small" variant="outlined" color={main ? 'success' : 'default'} label={main ? 'Main Container' : 'Init Container'} />
+          <Chip size="small" variant="outlined" color={main ? 'success' : 'default'} label={main ? 'Main container' : 'Init container'} />
         </Stack>
         {canManage && (
           <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => setIsEditOpen(true)}>
@@ -81,11 +84,13 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
         )}
       </Stack>
 
-      <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 2.5, color: 'text.secondary' }}>
-        <Typography variant="body2">Last Updated:</Typography>
-        <Clock size={14} />
-        <Typography variant="body2">{c.UpdatedAt ? formatDistanceToNow(c.UpdatedAt) : '-'}</Typography>
-      </Stack>
+      {c.UpdatedAt ? (
+        <RelativeTime time={formatDistanceToNow(c.UpdatedAt)} dateTime={c.UpdatedAt} tooltip={formatDateTime(c.UpdatedAt)} action="Last updated" sx={{ mb: 2.5 }} />
+      ) : (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5 }}>
+          Last updated —
+        </Typography>
+      )}
 
       <Grid container spacing={4}>
         <Grid size={{ xs: 12, md: 5 }}>
@@ -97,7 +102,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
             </Alert>
           )}
           <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mt: 1.5 }}>
-            <Chip size="small" variant="outlined" label={`Image Pull Policy: ${policyLabel}`} sx={{ borderColor: 'divider', color: 'text.secondary' }} />
+            <Chip size="small" variant="outlined" label={`Image pull policy: ${policyLabel}`} sx={{ borderColor: 'divider', color: 'text.secondary' }} />
             {c.ports?.map((p) => (
               <Chip key={`${p.protocol}-${p.port}`} size="small" variant="outlined" label={`${p.protocol}: ${p.port}`} sx={{ borderColor: 'divider', color: 'text.secondary' }} />
             ))}
@@ -120,10 +125,10 @@ function ResourceBars({ container: c }: { container: ReleaseContainer }): JSX.El
     return (
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 6 }}>
-          <ResourceRangeSlider label="CPU Request / Limit" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={0.01} request={milliToCpu(c.cpu ?? 0)} limit={milliToCpu(c.cpu_limit ?? 0)} viewMode format={cpuFmt} />
+          <ResourceRangeSlider label="CPU request / limit" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={0.01} request={milliToCpu(c.cpu ?? 0)} limit={milliToCpu(c.cpu_limit ?? 0)} viewMode format={cpuFmt} />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          <ResourceRangeSlider label="Memory Request / Limit" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={1} request={c.memory ?? 0} limit={c.memory_limit ?? 0} viewMode format={memFmt} />
+          <ResourceRangeSlider label="Memory request / limit" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={1} request={c.memory ?? 0} limit={c.memory_limit ?? 0} viewMode format={memFmt} />
         </Grid>
       </Grid>
     );
@@ -131,10 +136,10 @@ function ResourceBars({ container: c }: { container: ReleaseContainer }): JSX.El
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 6 }}>
-        <ReadonlySingle label="CPU Request" unit="CPU" min={CPU_MIN} max={CPU_MAX} value={milliToCpu(c.cpu ?? 0)} format={cpuFmt} />
+        <ReadonlySingle label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} value={milliToCpu(c.cpu ?? 0)} format={cpuFmt} />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
-        <ReadonlySingle label="Memory Request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} value={c.memory ?? 0} format={memFmt} />
+        <ReadonlySingle label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} value={c.memory ?? 0} format={memFmt} />
       </Grid>
       <Grid size={{ xs: 12 }}>
         <Alert severity="warning">Resource limits are disabled for this container. Containers without resource limits can freely use up resources and can negatively impact the performance of other integrations.</Alert>

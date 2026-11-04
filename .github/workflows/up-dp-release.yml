@@ -1,0 +1,182 @@
+# --------------------------------------------------------------------
+# Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+#
+# WSO2 LLC. licenses this file to you under the Apache License,
+# Version 2.0 (the "License"); you may not use this file except
+# in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+# --------------------------------------------------------------------
+
+# Releases the UP-DP image to GHCR: the data plane pulls a User Portal's
+# image from GHCR. UP-DP lives in user-portal/, so every run step starts there.
+name: UP-DP Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      next_dev_version:
+        description: 'Next development version (with -SNAPSHOT suffix, e.g. 0.2.0-SNAPSHOT)'
+        required: true
+        type: string
+
+env:
+  DOCKER_REGISTRY: ghcr.io/${{ github.repository_owner }}/integration-control-plane
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+      pull-requests: write
+    defaults:
+      run:
+        working-directory: user-portal
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set Docker registry
+        run: |
+          OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          echo "DOCKER_REGISTRY=ghcr.io/${OWNER}/integration-control-plane" >> $GITHUB_ENV
+
+      - name: Determine version from VERSION file
+        id: version
+        run: |
+          VERSION=$(tr -d '[:space:]' < up-dp/VERSION | sed 's/-SNAPSHOT//')
+          if [ -z "${VERSION}" ]; then
+            echo "Error: VERSION is empty or contains only whitespace. Check up-dp/VERSION."
+            exit 1
+          fi
+          echo "Releasing UP-DP version: ${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Validate release tag is available
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          if git ls-remote --exit-code --tags origin "refs/tags/up-dp/v${VERSION}" >/dev/null 2>&1; then
+            echo "Release tag up-dp/v${VERSION} already exists"
+            exit 1
+          fi
+
+      - name: Set version
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          echo "${VERSION}" > up-dp/VERSION
+          (cd up-dp/web && npm version "${VERSION}" --no-git-tag-version --allow-same-version >/dev/null)
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: user-portal/go.mod
+
+      - name: Run tests
+        run: make test
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container
+
+      - name: Build Docker image for testing
+        run: |
+          docker buildx build -f up-dp/Dockerfile \
+            --tag ${{ env.DOCKER_REGISTRY }}/up-dp:${{ steps.version.outputs.version }} \
+            --load \
+            .
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        run: |
+          docker buildx build -f up-dp/Dockerfile \
+            --platform linux/amd64 \
+            --tag ${{ env.DOCKER_REGISTRY }}/up-dp:${{ steps.version.outputs.version }} \
+            --push \
+            .
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            git commit -am "Release UP-DP version ${{ steps.version.outputs.version }}"
+          fi
+          git tag -a up-dp/v${{ steps.version.outputs.version }} -m "UP-DP ${{ steps.version.outputs.version }}"
+          git push origin up-dp/v${{ steps.version.outputs.version }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: up-dp/v${{ steps.version.outputs.version }}
+          name: UP-DP ${{ steps.version.outputs.version }}
+          body: |
+            ## UP-DP Release ${{ steps.version.outputs.version }}
+
+            ### Docker Image
+            ```bash
+            docker pull ${{ env.DOCKER_REGISTRY }}/up-dp:${{ steps.version.outputs.version }}
+            ```
+
+            ### Supported Platforms
+            - `linux/amd64`
+          draft: true
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set next dev version
+        env:
+          NEXT_DEV_VERSION: ${{ inputs.next_dev_version }}
+        run: |
+          if [ -z "${NEXT_DEV_VERSION}" ]; then
+            echo "Error: next_dev_version input is required"
+            exit 1
+          fi
+          if [[ "${NEXT_DEV_VERSION}" != *-SNAPSHOT ]]; then
+            echo "Error: next_dev_version must end with -SNAPSHOT (e.g. 0.2.0-SNAPSHOT)"
+            exit 1
+          fi
+          echo "Setting UP-DP to next dev version: ${NEXT_DEV_VERSION}"
+          echo "${NEXT_DEV_VERSION}" > up-dp/VERSION
+          (cd up-dp/web && npm version "${NEXT_DEV_VERSION}" --no-git-tag-version --allow-same-version >/dev/null)
+
+      - name: Commit version bump
+        run: |
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            git commit -am "Bump UP-DP to next dev version"
+          else
+            echo "No changes to commit"
+          fi
+
+      - name: Create PR for version bump
+        id: create-pr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "Bump UP-DP to next dev version"
+          title: "chore: Bump UP-DP to next dev version"
+          body: |
+            Automated version bump after release `up-dp/v${{ steps.version.outputs.version }}`
+
+            This PR bumps UP-DP to the next development version `${{ inputs.next_dev_version }}`.
+          branch: version-bump-${{ github.run_id }}
+          base: ${{ github.ref_name }}
+          delete-branch: true
+          labels: |
+            automated
+            version-bump

@@ -44,5 +44,6 @@ export const Permissions = {
   USER_VIEW: 'user_mgt:view',
 } as const;
 
+export const PROJECT_EDIT_PERMISSIONS = [Permissions.PROJECT_MANAGE, Permissions.PROJECT_EDIT];
 export const ALL_ROLE_MODIFY_PERMISSIONS = [Permissions.USER_MANAGE_USERS, Permissions.USER_MANAGE_GROUPS, Permissions.USER_MANAGE_ROLES, Permissions.USER_UPDATE_GROUP_ROLES] as const;
 export const ALL_USER_MGT_PERMISSIONS = [Permissions.USER_MANAGE_USERS, Permissions.USER_UPDATE_USERS, Permissions.USER_MANAGE_GROUPS, Permissions.USER_MANAGE_ROLES, Permissions.USER_UPDATE_GROUP_ROLES, Permissions.USER_VIEW] as const;

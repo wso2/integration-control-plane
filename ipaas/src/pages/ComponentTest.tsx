@@ -17,7 +17,7 @@
  */
 
 import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import { useEffect, type JSX } from 'react';
 import AgentChatConsole from './AgentChatConsole';
 import AutomationTest from './AutomationTest';
 import ComingSoon from './ComingSoon';
@@ -27,6 +27,7 @@ import { useComponentByHandler } from '../hooks/useComponents';
 import { useIntegrationIdentity } from '../hooks/useIntegrationIdentity';
 import { useProjectId } from '../hooks/useProjects';
 import { Navigate } from 'react-router';
+import { trackEvent } from '../services/tracking/tracking';
 import type { ComponentScope } from '../nav';
 import { componentUrl } from '../paths';
 
@@ -40,9 +41,15 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
   const { data: comp, isLoading } = useComponentByHandler(projectId, scope.component);
   const identity = useIntegrationIdentity(comp ?? undefined);
 
+  // Keyed on the id so a background refetch (a new object for the same integration) doesn't re-fire.
+  const compId = comp?.id;
+  useEffect(() => {
+    if (compId) trackEvent('component-test');
+  }, [compId]);
+
   if (isLoading) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>
@@ -50,10 +57,10 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
     );
   }
 
-  // Not-found is distinct from an unsupported type — surface it rather than "Coming Soon".
+  // Not-found is distinct from an unsupported type — surface it rather than "Coming soon".
   if (!comp) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography>Integration not found</Typography>
       </PageContent>
     );
@@ -64,7 +71,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
   if (identity?.type === 'mcp-server' || identity?.type === 'mcp-proxy') return <McpTest {...scope} />;
   if (identity?.type === 'integration-as-api') return <TestConsole {...scope} />;
   if (identity?.type === 'ai-agent') return <AgentChatConsole {...scope} />;
-  return <ComingSoon title="Coming Soon" description="Testing tools are currently under development." />;
+  return <ComingSoon title="Coming soon" description="Testing tools are currently under development." />;
 }
 
 /**
@@ -76,9 +83,16 @@ export function AgentChatTestRoute(scope: ComponentScope): JSX.Element {
   const { data: comp, isPending } = useComponentByHandler(projectId, scope.component);
   const identity = useIntegrationIdentity(comp ?? undefined);
 
+  // Only the confirmed-agent case renders the chat; a type mismatch redirects to `test`, which
+  // fires this same event itself, so tracking here too would double-count.
+  const agentId = comp && identity?.type === 'ai-agent' ? comp.id : undefined;
+  useEffect(() => {
+    if (agentId) trackEvent('component-test');
+  }, [agentId]);
+
   if (projectId && isPending) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>

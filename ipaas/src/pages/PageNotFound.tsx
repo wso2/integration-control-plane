@@ -21,6 +21,7 @@ import type { JSX } from 'react';
 import { Link } from 'react-router';
 import { orgHomeUrl } from '../paths';
 import { actionSx, artSx, fullScreenSx, pageSx, textStackSx } from './PageNotFound.styles';
+import { local } from '../utils/storage';
 
 interface PageNotFoundProps {
   title?: string;
@@ -34,7 +35,7 @@ interface PageNotFoundProps {
 
 /** The organization the session is scoped to, as recorded at sign-in. */
 function homeUrl(): string {
-  const org = localStorage.getItem('org_handle');
+  const org = local.get('org_handle');
   return org && org !== 'default' ? orgHomeUrl(org) : '/';
 }
 
@@ -47,7 +48,7 @@ const INK = 'var(--oxygen-palette-text-primary, #3a3a40)';
  * "Page not found" fallback. Usable anywhere a route or resource doesn't resolve, like
  * `ComingSoon`; pass `fullScreen` when it renders outside the app shell.
  */
-export default function PageNotFound({ title = 'Page not found', description = 'The URL you’re trying to reach doesn’t exist or may have moved.', actionTo, actionLabel = 'Go to Home', fullScreen = false }: PageNotFoundProps): JSX.Element {
+export default function PageNotFound({ title = 'Page not found', description = 'The URL you’re trying to reach doesn’t exist or may have moved.', actionTo, actionLabel = 'Go to home', fullScreen = false }: PageNotFoundProps): JSX.Element {
   return (
     <Box component="main" sx={{ ...pageSx, ...(fullScreen && fullScreenSx) }}>
       <Stack alignItems="center" gap={1} sx={textStackSx}>

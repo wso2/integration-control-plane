@@ -174,7 +174,7 @@ export default function CookiePolicy(): JSX.Element {
               <Table size="small">
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 'bold' }}>Cookie Name</TableCell>
+                    <TableCell sx={{ fontWeight: 'bold' }}>Cookie name</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Purpose</TableCell>
                     <TableCell sx={{ fontWeight: 'bold' }}>Retention</TableCell>
                   </TableRow>

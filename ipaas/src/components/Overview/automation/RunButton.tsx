@@ -24,13 +24,15 @@ interface RunButtonProps {
   envCritical?: boolean | null;
   disabled?: boolean;
   pending?: boolean;
+  /** Shows progress without disabling, for work the other action does not wait on. */
+  loading?: boolean;
   onRun: () => void;
   onRunWithArgs: () => void;
 }
 
 type SelectedAction = 'run' | 'runWithArgs';
 
-export default function RunButton({ envCritical, disabled, pending, onRun, onRunWithArgs }: RunButtonProps) {
+export default function RunButton({ envCritical, disabled, pending, loading, onRun, onRunWithArgs }: RunButtonProps) {
   const [splitOpen, setSplitOpen] = useState(false);
   const [selectedAction, setSelectedAction] = useState<SelectedAction>('run');
   const anchorRef = useRef<HTMLDivElement>(null);
@@ -57,8 +59,8 @@ export default function RunButton({ envCritical, disabled, pending, onRun, onRun
   return (
     <>
       <ButtonGroup variant="contained" size="small" ref={anchorRef} disabled={disabled || pending}>
-        <Button startIcon={pending ? <CircularProgress color="inherit" size={14} /> : <Play size={14} />} aria-label={selectedAction === 'runWithArgs' ? `${label} with Arguments` : label} onClick={handlePrimaryClick}>
-          {selectedAction === 'runWithArgs' ? `${label} with Arguments` : label}
+        <Button startIcon={pending || loading ? <CircularProgress color="inherit" size={14} /> : <Play size={14} />} aria-label={selectedAction === 'runWithArgs' ? `${label} with arguments` : label} onClick={handlePrimaryClick}>
+          {selectedAction === 'runWithArgs' ? `${label} with arguments` : label}
         </Button>
         <Button size="small" sx={{ px: 0.5 }} aria-label="More run options" aria-expanded={splitOpen} aria-haspopup="menu" aria-controls="menu-run-options" onClick={() => setSplitOpen((prev) => !prev)}>
           <ChevronDown size={14} />
@@ -72,7 +74,7 @@ export default function RunButton({ envCritical, disabled, pending, onRun, onRun
               <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
                 <MenuList id="menu-run-options" dense sx={{ minWidth: 120 }}>
                   <MenuItem onClick={() => handleMenuSelect('run')}>{label}</MenuItem>
-                  <MenuItem onClick={() => handleMenuSelect('runWithArgs')}>{label} with Arguments</MenuItem>
+                  <MenuItem onClick={() => handleMenuSelect('runWithArgs')}>{label} with arguments</MenuItem>
                 </MenuList>
               </ClickAwayListener>
             </Paper>

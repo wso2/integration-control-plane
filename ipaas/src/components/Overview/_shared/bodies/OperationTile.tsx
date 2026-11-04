@@ -16,10 +16,9 @@
  * under the License.
  */
 
-import { Box, Button, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, DrawerPanel, Typography } from '@wso2/oxygen-ui';
 import { useState, type ReactNode } from 'react';
-import { OPERATION_DRAWER_BODY_SX, OPERATION_DRAWER_HEADER_SX, OPERATION_TILE_LABEL_SX, VIEW_DETAILS_BUTTON_SX, operationBadgeSx, operationDrawerPaperSx, operationTileSx } from './styles';
+import { OPERATION_TILE_LABEL_SX, VIEW_DETAILS_BUTTON_SX, operationBadgeSx, operationTileSx } from './styles';
 
 /**
  * Colour configuration for an operation tile + its drawer header. Each consumer
@@ -33,9 +32,7 @@ export interface OperationTileColors {
   badgeBg: string;
   /** Badge text colour (default white). */
   badgeText?: string;
-  /** Tile / header border colour (defaults to `badgeBg`, matching the API method tiles). */
-  border?: string;
-  /** Optional tile / header background. */
+  /** Tile / header background; defaults to a light wash of `badgeBg`. */
   cardBg?: string;
 }
 
@@ -55,7 +52,7 @@ interface OperationTileProps {
 
 /**
  * Generic operation row used across Overview env-card bodies: a coloured type
- * badge, the operation path / name, and a "View Details" action that opens a
+ * badge, the operation path / name, and a "View details" action that opens a
  * right drawer. The reusable counterpart of devant's `OperationViews/OperationTile`
  * — Integration as API and MCP Server share this, differing only in `colors`
  * and `drawerContent`.
@@ -68,20 +65,20 @@ export default function OperationTile({ badgeLabel, label, colors, drawerContent
       <Box sx={operationTileSx(colors)}>
         <Box sx={operationBadgeSx(colors, 72)}>{badgeLabel}</Box>
         <Typography sx={OPERATION_TILE_LABEL_SX}>{label}</Typography>
-        <Button variant="text" size="small" onClick={() => setOpen(true)} sx={VIEW_DETAILS_BUTTON_SX}>
-          View Details
+        <Button variant="text" color="inherit" size="small" onClick={() => setOpen(true)} sx={VIEW_DETAILS_BUTTON_SX}>
+          View details
         </Button>
       </Box>
 
-      <Drawer anchor="right" open={open} onClose={() => setOpen(false)} variant="temporary" sx={operationDrawerPaperSx(drawerWidth)}>
-        <Stack direction="row" alignItems="center" justifyContent="space-between" sx={OPERATION_DRAWER_HEADER_SX}>
-          <Typography variant="h5">{drawerTitle}</Typography>
-          <IconButton size="small" onClick={() => setOpen(false)} aria-label="Close">
-            <X size={18} />
-          </IconButton>
-        </Stack>
-        <Box sx={OPERATION_DRAWER_BODY_SX}>{open && drawerContent}</Box>
-      </Drawer>
+      <DrawerPanel open={open} onClose={() => setOpen(false)} width={drawerWidth}>
+        <DrawerPanel.Header>
+          <DrawerPanel.Title>{drawerTitle}</DrawerPanel.Title>
+          <DrawerPanel.Actions>
+            <DrawerPanel.CloseButton />
+          </DrawerPanel.Actions>
+        </DrawerPanel.Header>
+        <DrawerPanel.Body>{open && drawerContent}</DrawerPanel.Body>
+      </DrawerPanel>
     </>
   );
 }

@@ -27,9 +27,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  Drawer,
+  DrawerPanel,
   Grid,
-  IconButton,
   List,
   ListItemButton,
   ListItemIcon,
@@ -42,7 +41,7 @@ import {
   Tabs,
   Typography,
 } from '@wso2/oxygen-ui';
-import { ChevronRight, Maximize2, X } from '@wso2/oxygen-ui-icons-react';
+import { ChevronRight } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState } from 'react';
 import { useArtifactTypes, useArtifacts, ARTIFACT_QUERY_MAP } from '../hooks/useArtifacts';
 import type { Artifact } from '../types/artifact';
@@ -52,6 +51,7 @@ import SearchField from './SearchField';
 import { ArtifactSource, ArtifactApiDefinition, ArtifactEndpoints, ArtifactWsdl, ArtifactValue, ArtifactCarbonArtifacts, ArtifactRuntimes, InboundEndpointParameters, AutomationExecutions } from './ArtifactTabs';
 import { ARTIFACT_ICONS, ARTIFACT_TABS, DEFAULT_ARTIFACT_TABS, ENTRY_POINT_TYPE_SET, formatArtifactTypeName, typePlural, type SelectedArtifact, type TabProps } from './artifact-config';
 import { useQueryClient } from '@tanstack/react-query';
+import { capitalize } from '../utils/string';
 
 /**
  * Normalizes state/tracing/statistics values to a boolean.
@@ -66,14 +66,14 @@ function toEnabled(value: unknown): boolean {
 function ListenerConfirmDialog({ open, action, listenerName, onConfirm, onCancel }: { open: boolean; action: 'START' | 'STOP'; listenerName: string; onConfirm: () => void; onCancel: () => void }) {
   return (
     <Dialog open={open} onClose={onCancel}>
-      <DialogTitle>{action === 'STOP' ? 'Disable Listener' : 'Enable Listener'}</DialogTitle>
+      <DialogTitle>{action === 'STOP' ? 'Disable listener' : 'Enable listener'}</DialogTitle>
       <DialogContent>
         <Typography>
           Are you sure you want to {action === 'STOP' ? 'disable' : 'enable'} the listener <strong>{listenerName}</strong>?
         </Typography>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onCancel} variant="text">
+        <Button onClick={onCancel} variant="outlined" color="inherit">
           Cancel
         </Button>
         <Button onClick={onConfirm} variant="contained" color={action === 'STOP' ? 'error' : 'primary'}>
@@ -222,7 +222,7 @@ function SelectedTypeArtifacts({ artifacts, artifactType, envId, componentId, qu
           const showTracing = ['Endpoint', 'InboundEndpoint', 'MessageProcessor', 'Sequence'].includes(artifactType);
 
           return (
-            <Card key={i} variant="outlined" sx={{ cursor: 'pointer', width: '100%', '&:hover': { boxShadow: 1 } }} onClick={() => onSelect(a)}>
+            <Card key={i} sx={{ cursor: 'pointer', width: '100%', '&:hover': { boxShadow: 1 } }} onClick={() => onSelect(a)}>
               <CardContent sx={{ display: 'flex', alignItems: 'center', py: 1.5, '&:last-child': { pb: 1.5 } }}>
                 <Grid container spacing={2} sx={{ flex: 1 }}>
                   {columns.map((col, colIndex) => {
@@ -230,8 +230,8 @@ function SelectedTypeArtifacts({ artifacts, artifactType, envId, componentId, qu
                     const columnSize = dataColumnSize + (colIndex < extraColumns ? 1 : 0);
                     return (
                       <Grid key={col} size={{ xs: columnSize }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                          {col === 'size' ? 'Message Count' : col}
+                        <Typography variant="caption" color="text.secondary">
+                          {col === 'size' ? 'Message count' : capitalize(col)}
                         </Typography>
                         <Typography variant="body2" sx={{ fontWeight: 500 }}>
                           {(a[col] ?? '—').toString()}
@@ -386,8 +386,8 @@ export function ArtifactTypeSelector({ envId, componentId, onSelectArtifact }: {
   );
 }
 
-const drawerSx = { '& .MuiDrawer-paper': { width: '60%', maxWidth: 700, minWidth: 400, position: 'fixed', top: 64, height: 'calc(100% - 64px)', borderLeft: '1px solid', borderColor: 'divider' } };
-const headerSx = { px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' };
+// A persistent panel has no backdrop, so it starts below the app header instead of covering it.
+const belowHeaderSx = { '& .MuiDrawer-paper': { top: 64, height: 'calc(100% - 64px)' } } as const;
 
 export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, componentHandler }: { selected: SelectedArtifact | null; onClose: () => void; orgHandler: string; projectHandler: string; componentHandler: string }) {
   const [activeTabIndex, setActiveTabIndex] = useState(0);
@@ -412,7 +412,7 @@ export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, 
   const tabProps: TabProps = { artifact, artifactType, envId, componentId, projectId: selected.projectId };
 
   // For Automation artifacts, use packageName as the display name
-  const displayName = artifact.name?.toString() ?? (artifactType === 'Automation' && artifact.packageName ? artifact.packageName.toString() : 'Unnamed Artifact');
+  const displayName = artifact.name?.toString() ?? (artifactType === 'Automation' && artifact.packageName ? artifact.packageName.toString() : 'Unnamed artifact');
 
   const renderActiveTab = () => {
     switch (activeTab) {
@@ -440,21 +440,14 @@ export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, 
   };
 
   return (
-    <Drawer anchor="right" open onClose={onClose} variant="persistent" sx={drawerSx}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={headerSx}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-          {displayName}
-        </Typography>
-        <Stack direction="row" gap={0.5}>
-          <IconButton size="small" aria-label="maximize" disabled>
-            <Maximize2 size={16} />
-          </IconButton>
-          <IconButton size="small" aria-label="close" onClick={onClose}>
-            <X size={16} />
-          </IconButton>
-        </Stack>
-      </Stack>
-      <Box sx={{ px: 2 }}>
+    <DrawerPanel open onClose={onClose} variant="persistent" width="min(700px, max(400px, 60%))" sx={belowHeaderSx}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>{displayName}</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
+      <DrawerPanel.Body sx={{ pt: 0 }}>
         {tabs.length > 0 && (
           <>
             <Tabs value={validTabIndex} onChange={(_, v) => setActiveTabIndex(v)} sx={{ mb: 2 }}>
@@ -465,7 +458,7 @@ export function ArtifactDetail({ selected, onClose, orgHandler, projectHandler, 
             {renderActiveTab()}
           </>
         )}
-      </Box>
-    </Drawer>
+      </DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

@@ -27,6 +27,8 @@ import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import { Permissions } from '../constants/permissions';
 import { useComponentPodMetrics, useComponentPods, useReleaseDetails, useRedeployRelease } from '../hooks/useRuntime';
 import { DeploymentStatus } from '../types/deployment';
@@ -38,11 +40,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
   const { projectId, isLoading: loadingProject } = useProjectId(project);
   const { data: comp, isLoading: loadingComponent } = useComponentByHandler(projectId, component);
 
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  const [trackId, setTrackId] = useState('');
-  useEffect(() => {
-    if (tracks.length) setTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [tracks]);
+  const { trackId } = useSelectedTrack(comp);
 
   const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError } = useEnvironments(orgUuid ?? '', projectId);
   const [envId, setEnvId] = useState('');
@@ -84,7 +82,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   if (isLoading) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
           <CircularProgress />
         </Box>
@@ -94,7 +92,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   if (!comp) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography color="error">Integration not found.</Typography>
       </PageContent>
     );
@@ -102,7 +100,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   if (environmentsError) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography color="error">Failed to load environments. Please try again.</Typography>
       </PageContent>
     );
@@ -110,7 +108,8 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-      <PageContent>
+      <DeploymentTrackBar component={comp} />
+      <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Runtime
         </Typography>
@@ -146,7 +145,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
               replicasControl={<Chip variant="outlined" label={`Replicas ${replicaCount}`} />}
             />
             <Box sx={{ mt: 4 }}>
-              <ResourceUsageCards usage={usage} usageUnavailable={usageUnavailable} />
+              <ResourceUsageCards usage={usage} usageUnavailable={usageUnavailable} unavailableReason={metrics.data?.metricsUnavailableReason} />
             </Box>
           </>
         )}

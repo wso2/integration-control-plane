@@ -16,8 +16,6 @@
  * under the License.
  */
 
-import { BAR_HEIGHT } from './NavigationProgress.styles';
-
 export const frame = (viewport: boolean) =>
   ({
     display: 'flex',
@@ -32,11 +30,3 @@ export const frame = (viewport: boolean) =>
     flex: viewport ? undefined : 1,
     ...(viewport ? { bgcolor: 'background.default' } : {}),
   }) as const;
-
-export const bar = {
-  width: 160,
-  maxWidth: '55%',
-  height: BAR_HEIGHT,
-  // Pixels, not theme units: a spacing-scale radius rounds a 3px bar into a lozenge.
-  borderRadius: `${BAR_HEIGHT}px`,
-} as const;

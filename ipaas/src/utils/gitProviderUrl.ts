@@ -43,6 +43,15 @@ export function buildRepoUrl(provider: GitProvider, org: string, repo: string, s
 }
 
 /**
+ * Azure DevOps clone URL for the create-component payload. A repository lives
+ * under a project, which `buildRepoUrl` has no slot for. Names may hold spaces
+ * and other reserved characters, so each segment is encoded.
+ */
+export function buildAzureDevOpsRepoUrl(org: string, project: string, repo: string): string {
+  return `${gitProviderBase.azure}/${encodeURIComponent(org)}/${encodeURIComponent(project)}/_git/${encodeURIComponent(repo)}`;
+}
+
+/**
  * Browsable URL to a component's source at its branch and sub-path, unlike
  * `buildRepoUrl` above which builds the bare clone URL. Segments are trimmed
  * because the cloud BFF derives them by splitting the stored clone URL, so a
@@ -70,7 +79,7 @@ export function buildRepoBrowseUrl(repo: Repository): string {
     case 'azure_devops': {
       // Azure resolves `path` against the repo root, so it always needs a leading slash.
       const azurePath = `/${subPath}`;
-      return `${gitProviderBase.azure}/${organizationApp}/${projectApp}/_git/${nameApp}?path=${encodeURIComponent(azurePath)}&version=GB${encodedBranch}`;
+      return `${buildAzureDevOpsRepoUrl(organizationApp, trimSlashes(projectApp || ''), nameApp)}?path=${encodeURIComponent(azurePath)}&version=GB${encodedBranch}`;
     }
     default:
       return `${gitProviderBase.github}/${organizationApp}/${nameApp}`;

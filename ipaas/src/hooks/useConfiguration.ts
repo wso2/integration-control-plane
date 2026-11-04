@@ -47,12 +47,12 @@ export function useCertificateMappings(projectId: string, componentId: string, e
   });
 }
 
-export function useSchemaConfig(projectId: string, componentId: string, envId: string, deploymentTrackId: string, commitHash?: string) {
+export function useSchemaConfig(projectId: string, componentId: string, envId: string, deploymentTrackId: string, commitHash?: string, enabled = true) {
   return useQuery({
     queryKey: ['schemaConfig', projectId, componentId, envId, deploymentTrackId, commitHash],
     queryFn: () => fetchSchemaConfig(projectId, componentId, envId, deploymentTrackId, commitHash),
     // Don't wait for commitHash: a deploy that fails before producing a commit still has a schema to show.
-    enabled: !!projectId && !!componentId && !!envId && !!deploymentTrackId,
+    enabled: enabled && !!projectId && !!componentId && !!envId && !!deploymentTrackId,
     retry: false,
   });
 }

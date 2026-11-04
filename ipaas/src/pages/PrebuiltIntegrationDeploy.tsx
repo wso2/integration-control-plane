@@ -63,12 +63,12 @@ export default function PrebuiltIntegrationDeploy(scope: ProjectScope): JSX.Elem
 
   if (!integration) {
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Alert severity="error" sx={{ maxWidth: 480 }}>
           Integration not found. Please go back and try again.
         </Alert>
         <Button sx={{ mt: 2 }} onClick={() => navigate(prebuiltIntegrationsUrl(scope.org, scope.project))}>
-          Back to Browse
+          Back to prebuilt integrations
         </Button>
       </PageContent>
     );
@@ -76,7 +76,7 @@ export default function PrebuiltIntegrationDeploy(scope: ProjectScope): JSX.Elem
 
   if (error) {
     return (
-      <PageContent sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <Alert severity={errorSeverity} sx={{ maxWidth: 480, width: '100%', mb: 3 }}>
           {error}
         </Alert>
@@ -95,7 +95,7 @@ export default function PrebuiltIntegrationDeploy(scope: ProjectScope): JSX.Elem
   }
 
   return (
-    <PageContent sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+    <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
       <Typography variant="h2" sx={{ mb: 1 }}>
         Deploying {integration.displayName}…
       </Typography>

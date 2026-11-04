@@ -27,6 +27,7 @@ import NatsIcon from '../assets/icons/NatsIcon';
 import S3Icon from '../assets/icons/S3Icon';
 import type { ReactNode } from 'react';
 import type { IntegrationTypeOption } from '../types/import';
+import { TECHNOLOGY_LABELS } from './integrations';
 
 export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
   {
@@ -35,8 +36,8 @@ export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
     description: 'Run integrations on a schedule or as a recurring task',
     docLink: 'https://wso2.com/integration-platform/docs/get-started/build-automation',
     icons: [
-      { icon: <Clock size={16} />, label: 'One Time Task' },
-      { icon: <Repeat size={16} />, label: 'Recurring Task' },
+      { icon: <Clock size={16} />, label: 'One-time task' },
+      { icon: <Repeat size={16} />, label: 'Recurring task' },
     ],
   },
   {
@@ -92,12 +93,12 @@ export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
 export const TECH_OPTIONS: { id: 'MI' | 'BI'; label: string; icon: ReactNode }[] = [
   {
     id: 'BI',
-    label: 'WSO2 Integrator',
+    label: TECHNOLOGY_LABELS.BI,
     icon: <IntegratorIcon width={20} height={20} />,
   },
   {
     id: 'MI',
-    label: 'WSO2 Integrator: MI',
+    label: TECHNOLOGY_LABELS.MI,
     icon: <IntegratorIcon width={20} height={20} />,
   },
 ];

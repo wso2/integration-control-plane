@@ -57,3 +57,21 @@ export function isUnsupportedError(error: unknown): boolean {
 export function isQuotaError(error: unknown): boolean {
   return httpStatusOf(error) === 402;
 }
+
+/**
+ * The sentence to show for a failed API call.
+ *
+ * The BFF writes a user-facing sentence for each outcome it distinguishes, and
+ * `BffError.message` carries it unchanged. Those sentences are the only thing
+ * telling one failure from another — a feature switched off in this deployment,
+ * a missing permission and a wrong component type otherwise read alike.
+ *
+ * Anything without a response behind it — a dropped connection, a gateway page —
+ * has no sentence worth showing, so the caller's own wording stands.
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  if (Number.isNaN(httpStatusOf(error))) return fallback;
+  const message = messageOf(error).trim();
+  // The shape the client falls back to when the body carried no sentence.
+  return !message || /^HTTP \d{3}:/.test(message) ? fallback : message;
+}

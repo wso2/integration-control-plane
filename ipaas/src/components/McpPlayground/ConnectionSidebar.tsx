@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, IconButton, InputAdornment, MenuItem, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Button, CircularProgress, IconButton, InputAdornment, MenuItem, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Copy, Eye, EyeOff, Plug, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import type { McpConnectionStatus, McpSwitcher } from '../../types/mcp';
@@ -56,7 +55,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
       {endpointSwitcher && (
         <Tooltip title={connected || connecting ? 'Disconnect to select a different endpoint.' : ''}>
           <Box component="span" sx={{ display: 'block' }}>
-            <TextField select label="Endpoint" size="small" fullWidth value={endpointSwitcher.value} onChange={(e) => endpointSwitcher.onChange(e.target.value)} disabled={connected || connecting}>
+            <TextField labelPlacement="top" select label="Endpoint" size="small" fullWidth value={endpointSwitcher.value} onChange={(e) => endpointSwitcher.onChange(e.target.value)} disabled={connected || connecting}>
               {endpointSwitcher.options.map((o) => (
                 <MenuItem key={o.value} value={o.value}>
                   {o.label}
@@ -68,6 +67,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
       )}
 
       <TextField
+        labelPlacement="top"
         label="URL"
         size="small"
         fullWidth
@@ -88,6 +88,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
       />
 
       <TextField
+        labelPlacement="top"
         label="Token"
         size="small"
         fullWidth
@@ -114,7 +115,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
 
       {onGetTestKey && (
         <Button variant="outlined" size="small" onClick={onGetTestKey} disabled={isTokenFetching}>
-          Get Test Key
+          Get test key
         </Button>
       )}
 

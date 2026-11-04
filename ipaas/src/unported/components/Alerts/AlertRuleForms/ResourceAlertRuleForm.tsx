@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Collapse, Grid, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Autocomplete, Box, Collapse, Grid, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { type JSX, useEffect, useState } from 'react';
 import { ALERT_CREATE_NEW_RULE_ADVANCED_TITLE, ALERT_RULE_THRESHOLD_MAX, ALERT_RULE_THRESHOLD_MIN, AlertComponentType, AlertTypeConstants, AlertTypes, type AlertRulePeriodOption, type AlertRulePeriod } from '../../../../constants/alerts';
@@ -114,12 +113,12 @@ export default function ResourceAlertRuleForm(props: AlertRuleFormProps): JSX.El
               setMetric(v);
               setIsAlertRuleHalfConfigured(true);
             }}
-            renderInput={(params) => <TextField {...params} required label="Metric" size="small" />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} required label="Metric" size="small" />}
             isOptionEqualToValue={(o, v) => o.value === v.value}
           />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-          <TextField required label={`Threshold ${getResourceThresholdUnit(metric?.value)}`} size="small" fullWidth value={threshold ?? ''} onChange={handleThresholdChange} error={!!errorThreshold} helperText={errorThreshold} />
+          <TextField labelPlacement="top" required label={`Threshold ${getResourceThresholdUnit(metric?.value)}`} size="small" fullWidth value={threshold ?? ''} onChange={handleThresholdChange} error={!!errorThreshold} helperText={errorThreshold} />
         </Grid>
       </Grid>
       <Grid container spacing={3} sx={{ mt: -1 }}>
@@ -159,7 +158,7 @@ export default function ResourceAlertRuleForm(props: AlertRuleFormProps): JSX.El
                     setIsAlertRuleHalfConfigured(true);
                   }
                 }}
-                renderInput={(params) => <TextField {...params} label="Period" size="small" />}
+                renderInput={(params) => <TextField labelPlacement="top" {...params} label="Period" size="small" />}
                 isOptionEqualToValue={(o, v) => o.value === v.value}
               />
             </Grid>

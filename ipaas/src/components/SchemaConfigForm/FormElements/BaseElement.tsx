@@ -17,8 +17,7 @@
  */
 
 import { useEffect, useMemo, useState, type Dispatch, type MouseEvent, type SetStateAction } from 'react';
-import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../common/TextField';
+import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack, Switch, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff, Link2, Link2Off, Lock, Pencil, Unlock } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
 import { type LinkingInfo, isNumberType, typeDisplayName } from '../schemaUtils';
@@ -70,6 +69,9 @@ export function BaseElement({
   setSensitiveMap,
 }: BaseElementProps) {
   const numberRegex = /^-?\d+(\.\d+)?$/;
+  // The Optional section already labels its fields, so only optional fields nested in the Required section get the suffix.
+  const isOptional = !isRequired && isRequiredAtRequiredLevel;
+  const labelText = isOptional ? `${title} (Optional)` : title;
   const [showContent, setShowContent] = useState(false);
   const [isEdited, setIsEdited] = useState(false);
   const [error, setError] = useState('');
@@ -211,7 +213,7 @@ export function BaseElement({
   const selectedGroup = configGroups?.find((g) => g.groupUuid === selectedGroupId) ?? null;
   const sensitiveAdornment = (
     <Tooltip title={isSensitive ? 'Mark as non-sensitive (stored in database)' : 'Mark as sensitive (stored in Key Vault)'}>
-      <IconButton size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
+      <IconButton aria-label={isSensitive ? 'Mark as non-sensitive' : 'Mark as sensitive'} size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
         {isSensitive ? <Lock size={14} /> : <Unlock size={14} />}
       </IconButton>
     </Tooltip>
@@ -220,20 +222,21 @@ export function BaseElement({
   const linkAdornment = allowLinking && (
     <>
       <Tooltip title={linked ? 'Linked to config group' : 'Link to config group'}>
-        <IconButton size="small" onClick={linked ? handleUnlink : handleLinkOpen} sx={{ p: 0.25 }}>
+        <IconButton aria-label={linked ? 'Unlink config group' : 'Link to config group'} size="small" onClick={linked ? handleUnlink : handleLinkOpen} sx={{ p: 0.25 }}>
           {linked ? <Link2Off size={14} /> : <Link2 size={14} />}
         </IconButton>
       </Tooltip>
       <Popover open={Boolean(linkAnchorEl)} anchorEl={linkAnchorEl} onClose={() => setLinkAnchorEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <Box sx={{ p: 2, minWidth: 280 }}>
           <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-            Link Configuration Group
+            Link configuration group
           </Typography>
           <TextField
+            labelPlacement="top"
             select
             fullWidth
             size="small"
-            label="Config Group"
+            label="Config group"
             value={selectedGroupId}
             onChange={(e) => {
               setSelectedGroupId(e.target.value);
@@ -246,7 +249,7 @@ export function BaseElement({
               </MenuItem>
             ))}
           </TextField>
-          <TextField select fullWidth size="small" label="Config Key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
+          <TextField labelPlacement="top" select fullWidth size="small" label="Config key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
             {(selectedGroup?.configurations || []).map((c) => (
               <MenuItem key={c.keyUuid} value={c.keyUuid}>
                 {c.key}
@@ -254,7 +257,7 @@ export function BaseElement({
             ))}
           </TextField>
           <Stack direction="row" justifyContent="flex-end" gap={1}>
-            <Button size="small" onClick={() => setLinkAnchorEl(null)}>
+            <Button size="small" variant="outlined" color="inherit" onClick={() => setLinkAnchorEl(null)}>
               Cancel
             </Button>
             <Button size="small" variant="contained" disabled={!selectedGroupId || !selectedKeyId} onClick={handleLinkSave}>
@@ -272,15 +275,9 @@ export function BaseElement({
         {!isSkipLabel && (
           <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              {title}
+              {labelText}
             </Typography>
-            {isRequired && (
-              <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-                *
-              </Typography>
-            )}
             <Chip label={typeDisplayName(type)} size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
-            {!isRequired && isRequiredAtRequiredLevel && <Chip label="optional" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />}
           </Stack>
         )}
         <TextField
@@ -291,7 +288,7 @@ export function BaseElement({
           onChange={(e) => handleChange(e.target.value)}
           disabled={!!linked}
           error={isEdited && !linked && validationMap.get(jsonPath) === false}
-          helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : undefined}
+          helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
           inputProps={{ 'aria-required': Boolean(isRequired) }}
           InputProps={{ endAdornment: linkAdornment ? <InputAdornment position="end">{linkAdornment}</InputAdornment> : undefined }}>
           <MenuItem value="">
@@ -313,12 +310,7 @@ export function BaseElement({
         <Stack direction="row" alignItems="center" gap={1}>
           {!isSkipLabel && (
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              {title}
-            </Typography>
-          )}
-          {!isSkipLabel && isRequired && (
-            <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-              *
+              {labelText}
             </Typography>
           )}
           <Chip label="boolean" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
@@ -344,12 +336,13 @@ export function BaseElement({
         <Popover open={Boolean(secretAnchorEl)} anchorEl={secretAnchorEl} onClose={() => setSecretAnchorEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }}>
           <Box sx={{ p: 2, minWidth: 320 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Update Secret Content
+              Update secret content
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
               Updating the value removes the previous value permanently and cannot be restored.
             </Typography>
             <TextField
+              labelPlacement="top"
               fullWidth
               size="small"
               label={!isSkipLabel ? title : ''}
@@ -362,15 +355,17 @@ export function BaseElement({
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                      {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </IconButton>
+                    <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                      <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                        {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </IconButton>
+                    </Tooltip>
                   </InputAdornment>
                 ),
               }}
             />
             <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ mt: 1.5 }}>
-              <Button size="small" onClick={() => setSecretAnchorEl(null)}>
+              <Button size="small" variant="outlined" color="inherit" onClick={() => setSecretAnchorEl(null)}>
                 Cancel
               </Button>
               <Button size="small" variant="contained" disabled={!secretValue} onClick={handleSecretSave}>
@@ -386,38 +381,37 @@ export function BaseElement({
               <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
                 {!isSkipLabel && (
                   <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                    {title}
-                  </Typography>
-                )}
-                {!isSkipLabel && isRequired && (
-                  <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-                    *
+                    {labelText}
                   </Typography>
                 )}
                 <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
               </Stack>
               <Button size="small" variant="text" startIcon={<Pencil size={13} />} onClick={(e) => setSecretAnchorEl(e.currentTarget as HTMLButtonElement)} sx={{ textTransform: 'none' }}>
-                Update Secret Content
+                Update secret content
               </Button>
             </>
           ) : (
             <TextField
+              labelPlacement="top"
               fullWidth
               size="small"
               label={!isSkipLabel ? title : undefined}
+              optional={isOptional}
               type={showContent ? 'text' : 'password'}
               value={String(valueMap.get(jsonPath) ?? '')}
               onChange={(e) => handleChange(e.target.value)}
               error={isEdited && !linked && validationMap.get(jsonPath) === false}
-              helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : undefined}
+              helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
               inputProps={{ 'aria-required': Boolean(isRequired) }}
               InputProps={{
                 readOnly: !!linked,
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                      {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </IconButton>
+                    <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                      <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                        {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </IconButton>
+                    </Tooltip>
                     {linkAdornment}
                   </InputAdornment>
                 ),
@@ -436,23 +430,18 @@ export function BaseElement({
         <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
           {!isSkipLabel && (
             <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-              {title}
-            </Typography>
-          )}
-          {!isSkipLabel && isRequired && (
-            <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-              *
+              {labelText}
             </Typography>
           )}
           <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
           <Tooltip title="Mark as non-sensitive (stored in database)">
-            <IconButton size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
+            <IconButton aria-label="Mark as non-sensitive" size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
               <Lock size={14} />
             </IconButton>
           </Tooltip>
         </Stack>
         <Button size="small" variant="text" startIcon={<Pencil size={13} />} onClick={() => setShowSensitiveInput(true)} sx={{ textTransform: 'none' }}>
-          Update Sensitive Content
+          Update sensitive content
         </Button>
       </Box>
     );
@@ -463,15 +452,9 @@ export function BaseElement({
       {!isSkipLabel && (
         <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-            {title}
+            {labelText}
           </Typography>
-          {isRequired && (
-            <Typography component="span" variant="body2" sx={{ color: 'error.main', lineHeight: 1, fontFamily: 'monospace' }}>
-              *
-            </Typography>
-          )}
           <Chip label={isSensitive ? 'secret' : typeDisplayName(type)} size="small" variant="outlined" color={isSensitive ? 'info' : 'default'} sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
-          {!isRequired && isRequiredAtRequiredLevel && <Chip label="optional" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />}
         </Stack>
       )}
       <TextField
@@ -482,7 +465,7 @@ export function BaseElement({
         onChange={(e) => handleChange(e.target.value)}
         placeholder="Enter a value"
         error={isEdited && !linked && validationMap.get(jsonPath) === false}
-        helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : undefined}
+        helperText={isEdited && !linked && validationMap.get(jsonPath) === false ? error : ' '}
         inputProps={{ 'aria-required': Boolean(isRequired) }}
         InputProps={{
           readOnly: !!linked,
@@ -490,9 +473,11 @@ export function BaseElement({
             <InputAdornment position="end">
               {sensitiveAdornment}
               {isSensitive && (
-                <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                  {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                </IconButton>
+                <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                  <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                    {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </IconButton>
+                </Tooltip>
               )}
               {linkAdornment}
             </InputAdornment>

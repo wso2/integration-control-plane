@@ -46,7 +46,7 @@ export default function ConfirmDeleteDialog({ title, children, onConfirm, onClos
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>{children}</DialogContent>
       <DialogActions>
-        <Button onClick={onClose} disabled={isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={isPending}>
           Cancel
         </Button>
         <Button variant="contained" color="error" onClick={onConfirm} disabled={confirmDisabled || isPending} startIcon={isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

@@ -43,15 +43,15 @@ export function useTaskExecutions(releaseId: string, componentId = '', envId = '
 }
 
 /**
- * The automation's runtime-argument schema, keyed by the deployed commit. An empty
- * array means "no declared args" — the Test page then shows a trigger-only form.
- * `retry: false` so a 404 (no schema for this component) surfaces promptly to the
- * caller, which treats it the same as an empty schema.
+ * The automation's runtime-argument schema, read from its source at the deployed commit.
+ * An empty array means "no declared args" — the Test page then shows a trigger-only form.
+ * `retry: false` so a failure (404: unknown integration; 502: the source could not be
+ * read) surfaces promptly, and the caller offers free-form arguments instead.
  */
-export function useRuntimeArguments(componentId: string, deploymentTrackId: string, commitHash: string | undefined, enabled = true) {
+export function useRuntimeArguments(componentId: string, deploymentTrackId: string | undefined, commitHash: string | undefined, enabled = true) {
   return useQuery<RuntimeArgument[]>({
     queryKey: ['runtimeArguments', componentId, deploymentTrackId, commitHash],
-    // Undeployed, there is no commit to read the arguments at, so there is nothing to fetch.
+    // Without a track or a deployed commit there is nothing to read the arguments at.
     queryFn: enabled && componentId && deploymentTrackId && commitHash ? () => fetchRuntimeArguments(componentId, deploymentTrackId, commitHash) : skipToken,
     retry: false,
     staleTime: 5 * 60 * 1000,

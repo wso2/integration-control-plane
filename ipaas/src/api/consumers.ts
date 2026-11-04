@@ -38,12 +38,15 @@ import type {
 } from '../types/consumers';
 import { normalizeConsumerStatus } from '../utils/apiConsumption';
 import { userFacingError } from '../utils/apiSecurity';
-import { bff, items, seg, type ListResponse } from './_client';
+import { bff, items, q, seg, type ListResponse } from './_client';
 
 /** List routes return a bare array; other BFF routes use `{ items: [] }`. Accept both. */
 const asList = <T>(r: T[] | ListResponse<T> | null | undefined): T[] => (Array.isArray(r) ? r : items(r));
 
 const endpointPath = ({ componentName, environmentName, endpointName }: EndpointRef): string => `/components/${seg(componentName)}/environments/${seg(environmentName)}/endpoints/${seg(endpointName)}`;
+
+/** `path` under the endpoint, addressed to the API of the ref's deployment track. */
+const endpointUrl = (ref: EndpointRef, path: string): string => `${endpointPath(ref)}${path}${q({ deploymentTrackId: ref.deploymentTrackId })}`;
 
 /** No "get exposure" route exists, so the handle is derived. Prefer `exposeEndpoint`'s when known. */
 const deriveRestApiId = (ref: EndpointRef): string => `${ref.componentName}-${ref.endpointName}`;
@@ -52,22 +55,22 @@ const deriveRestApiId = (ref: EndpointRef): string => `${ref.componentName}-${re
 // Exposure
 // ---------------------------------------------------------------------------
 
-export const exposeEndpoint = (ref: EndpointRef): Promise<ApiExposure> => bff.post<ApiExposure>(`${endpointPath(ref)}/expose`);
+export const exposeEndpoint = (ref: EndpointRef): Promise<ApiExposure> => bff.post<ApiExposure>(endpointUrl(ref, '/expose'));
 
-export const unexposeEndpoint = (ref: EndpointRef): Promise<void> => bff.delete<void>(`${endpointPath(ref)}/expose`);
+export const unexposeEndpoint = (ref: EndpointRef): Promise<void> => bff.delete<void>(endpointUrl(ref, '/expose'));
 
 // ---------------------------------------------------------------------------
 // Endpoint security — API keys
 // ---------------------------------------------------------------------------
 
-export const listEndpointApiKeys = (ref: EndpointRef): Promise<ApiKeySummary[]> => bff.get<ApiKeySummary[] | ListResponse<ApiKeySummary>>(`${endpointPath(ref)}/api-keys`).then(asList);
+export const listEndpointApiKeys = (ref: EndpointRef): Promise<ApiKeySummary[]> => bff.get<ApiKeySummary[] | ListResponse<ApiKeySummary>>(endpointUrl(ref, '/api-keys')).then(asList);
 
-export const createEndpointApiKey = (ref: EndpointRef, input: CreateApiKeyInput): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(`${endpointPath(ref)}/api-keys`, input);
+export const createEndpointApiKey = (ref: EndpointRef, input: CreateApiKeyInput): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(endpointUrl(ref, '/api-keys'), input);
 
-export const revokeEndpointApiKey = (ref: EndpointRef, keyName: string): Promise<void> => bff.delete<void>(`${endpointPath(ref)}/api-keys/${seg(keyName)}`);
+export const revokeEndpointApiKey = (ref: EndpointRef, keyName: string): Promise<void> => bff.delete<void>(endpointUrl(ref, `/api-keys/${seg(keyName)}`));
 
 /** One-click 1h credential. Also forces `api-key-auth` on (no-op when already on). */
-export const createEndpointTestKey = (ref: EndpointRef): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(`${endpointPath(ref)}/test-key`);
+export const createEndpointTestKey = (ref: EndpointRef): Promise<ApiKeyResult> => bff.post<ApiKeyResult>(endpointUrl(ref, '/test-key'));
 
 // ---------------------------------------------------------------------------
 // Endpoint security — enforcement policies
@@ -83,24 +86,24 @@ const toggled =
   (r: AuthToggleResponse | null | undefined): boolean =>
     r?.enabled ?? requested;
 
-export const setEndpointApiKeyAuth = (ref: EndpointRef, enabled: boolean, options?: ApiKeyAuthOptions): Promise<boolean> => bff.put<AuthToggleResponse>(`${endpointPath(ref)}/security/api-key`, { enabled, ...options }).then(toggled(enabled));
+export const setEndpointApiKeyAuth = (ref: EndpointRef, enabled: boolean, options?: ApiKeyAuthOptions): Promise<boolean> => bff.put<AuthToggleResponse>(endpointUrl(ref, '/security/api-key'), { enabled, ...options }).then(toggled(enabled));
 
-export const setEndpointJwtAuth = (ref: EndpointRef, enabled: boolean): Promise<boolean> => bff.put<AuthToggleResponse>(`${endpointPath(ref)}/security/jwt`, { enabled }).then(toggled(enabled));
+export const setEndpointJwtAuth = (ref: EndpointRef, enabled: boolean): Promise<boolean> => bff.put<AuthToggleResponse>(endpointUrl(ref, '/security/jwt'), { enabled }).then(toggled(enabled));
 
 /** Read the single active auth mode (+ options) of the exposed API. */
-export const getEndpointSecurity = (ref: EndpointRef): Promise<SecurityConfig> => bff.get<SecurityConfig>(`${endpointPath(ref)}/security`);
+export const getEndpointSecurity = (ref: EndpointRef): Promise<SecurityConfig> => bff.get<SecurityConfig>(endpointUrl(ref, '/security'));
 
 /** Set the single active auth mode. The BFF clears the other mode + redeploys. */
-export const setEndpointSecurity = (ref: EndpointRef, cfg: SecurityConfig): Promise<SecurityConfig> => bff.put<SecurityConfig>(`${endpointPath(ref)}/security`, cfg);
+export const setEndpointSecurity = (ref: EndpointRef, cfg: SecurityConfig): Promise<SecurityConfig> => bff.put<SecurityConfig>(endpointUrl(ref, '/security'), cfg);
 
 // ---------------------------------------------------------------------------
 // Endpoint policies — CORS and rate limiting, written independently of /security
 // ---------------------------------------------------------------------------
 
-export const getEndpointPolicies = (ref: EndpointRef): Promise<EndpointPolicyConfig> => bff.get<EndpointPolicyConfig>(`${endpointPath(ref)}/policies`);
+export const getEndpointPolicies = (ref: EndpointRef): Promise<EndpointPolicyConfig> => bff.get<EndpointPolicyConfig>(endpointUrl(ref, '/policies'));
 
 /** Replaces both policies and redeploys. */
-export const setEndpointPolicies = (ref: EndpointRef, cfg: EndpointPolicyConfig): Promise<EndpointPolicyConfig> => bff.put<EndpointPolicyConfig>(`${endpointPath(ref)}/policies`, cfg);
+export const setEndpointPolicies = (ref: EndpointRef, cfg: EndpointPolicyConfig): Promise<EndpointPolicyConfig> => bff.put<EndpointPolicyConfig>(endpointUrl(ref, '/policies'), cfg);
 
 // ---------------------------------------------------------------------------
 // Consumer applications
@@ -119,7 +122,11 @@ const deleteApplication = (applicationId: string): Promise<void> => bff.delete<v
 
 const ENDPOINT_TAG_PREFIX = 'endpoint:';
 
-const endpointTag = (ref: EndpointRef): string => `${ENDPOINT_TAG_PREFIX}${ref.componentName}/${ref.environmentName}/${ref.endpointName}`;
+/** Applications created before tracks carry this tag, with no track in it. */
+const untrackedEndpointTag = (ref: EndpointRef): string => `${ENDPOINT_TAG_PREFIX}${ref.componentName}/${ref.environmentName}/${ref.endpointName}`;
+
+// Each track's API has its own consumers, so the tag names the track.
+const endpointTag = (ref: EndpointRef): string => (ref.deploymentTrackId ? `${untrackedEndpointTag(ref)}@${ref.deploymentTrackId}` : untrackedEndpointTag(ref));
 
 /** Keys minted here carry the application id as `displayName`; older keys group under their own name. */
 function groupKeysByConsumer(keys: ApiKeySummary[]): Map<string, ApiKeySummary[]> {
@@ -160,7 +167,9 @@ export async function fetchConsumers(ref: EndpointRef, projectName?: string): Pr
 
   const groups = groupKeysByConsumer(keys);
   const tag = endpointTag(ref);
-  const ofThisEndpoint = applications.filter((app) => app.description === tag);
+  const untrackedTag = untrackedEndpointTag(ref);
+  // An application tagged before tracks belongs to the track whose API holds its keys.
+  const ofThisEndpoint = applications.filter((app) => app.description === tag || (app.description === untrackedTag && groups.has(app.id)));
 
   const rows = ofThisEndpoint.map((app) => toConsumer({ id: app.id, displayName: app.displayName || app.id, application: app }, groups.get(app.id) ?? [], restApiId));
   const claimed = new Set(ofThisEndpoint.map((app) => app.id));
@@ -175,8 +184,8 @@ export async function fetchConsumers(ref: EndpointRef, projectName?: string): Pr
 }
 
 export async function createConsumer(input: CreateConsumerInput): Promise<Consumer> {
-  const { appName, projectName, componentName, environmentName, endpointName } = input;
-  const ref: EndpointRef = { componentName, environmentName, endpointName };
+  const { appName, projectName, componentName, environmentName, endpointName, deploymentTrackId } = input;
+  const ref: EndpointRef = { componentName, environmentName, endpointName, deploymentTrackId };
 
   // Application first so the key can be minted under its id; rolled back on failure.
   const application = await createApplication({ displayName: appName, projectName, description: endpointTag(ref) });

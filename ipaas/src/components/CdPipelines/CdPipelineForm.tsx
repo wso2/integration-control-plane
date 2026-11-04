@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, PageContent, PageTitle, Stack } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Button, CircularProgress, PageContent, PageTitle, Stack, TextField } from '@wso2/oxygen-ui';
 import BusyFields from '../common/BusyFields';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
@@ -26,10 +25,8 @@ import { useCreateDeploymentPipeline, useUpdateDeploymentPipeline } from '../../
 import type { CreateDeploymentPipelineRequest, DeploymentPipeline, EnvTemplate } from '../../types/deploymentPipeline';
 import { buildPromotionTree, flattenPromotionTree, validatePipelineName } from '../../utils/deploymentPipeline';
 import { orgCdPipelinesUrl } from '../../nav';
+import { useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import PromotionChainBuilder from './PromotionChainBuilder';
-
-/** Red `*` on the required-field label. */
-const REQUIRED_SX = { '& .MuiFormLabel-asterisk': { color: 'error.main' } } as const;
 
 interface CdPipelineFormProps {
   orgHandler: string;
@@ -54,14 +51,17 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
   const [name, setName] = useState(existing ? existing.name : '');
   const [nameTouched, setNameTouched] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [chain, setChain] = useState<EnvTemplate[]>(() =>
+  const [initialChain] = useState<EnvTemplate[]>(() =>
     existing
       ? flattenPromotionTree(existing.promotion_tree)
           .map((e) => envTemplates.find((t) => t.id === e.envTemplateId))
           .filter((t): t is EnvTemplate => t != null)
       : [],
   );
+  const [chain, setChain] = useState<EnvTemplate[]>(initialChain);
   const [error, setError] = useState('');
+  const chainChanged = chain.length !== initialChain.length || chain.some((t, i) => t.id !== initialChain[i].id);
+  const allowLeave = useUnsavedChanges(name !== (existing ? existing.name : '') || chainChanged);
 
   const nameError = useMemo(() => validatePipelineName(name, existingPipelines, existing?.id), [name, existingPipelines, existing]);
   // Once a save is in flight, suppress the field error: a successful create adds
@@ -78,7 +78,10 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
     setSubmitted(true);
     const input: CreateDeploymentPipelineRequest = { name: name.trim(), promotion_tree: buildPromotionTree(chain) };
     const handlers = {
-      onSuccess: () => navigate(backUrl),
+      onSuccess: () => {
+        allowLeave();
+        navigate(backUrl);
+      },
       onError: (e: Error) => {
         setSubmitted(false);
         setError(e.message || 'Failed to save pipeline.');
@@ -89,19 +92,19 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 1, textTransform: 'none' }}>
-        Back
+        Back to deployment pipelines
       </Button>
       <PageTitle>
-        <PageTitle.Header>{existing ? 'Edit Deployment Pipeline' : 'Create Deployment Pipeline'}</PageTitle.Header>
+        <PageTitle.Header>{existing ? 'Edit deployment pipeline' : 'Create deployment pipeline'}</PageTitle.Header>
       </PageTitle>
 
       <Stack gap={3} sx={{ maxWidth: 640, mt: 1 }}>
         <BusyFields busy={saving}>
           {/* BusyFields is one child of the outer Stack, so its fields need their own gap. */}
           <Stack gap={3}>
-            <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setNameTouched(true)} fullWidth required error={showNameError} helperText={showNameError ? nameError : ' '} sx={REQUIRED_SX} />
+            <TextField labelPlacement="top" label="Name" value={name} onChange={(e) => setName(e.target.value)} onBlur={() => setNameTouched(true)} fullWidth required error={showNameError} helperText={showNameError ? nameError : ' '} />
 
             <PromotionChainBuilder envTemplates={envTemplates} value={chain} onChange={setChain} disabled={saving} />
 
@@ -111,9 +114,16 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
 
         <Stack direction="row" gap={1} sx={{ mt: 2 }}>
           <Button variant="contained" onClick={handleSave} disabled={!canSave} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {saving ? 'Saving…' : existing ? 'Save Changes' : 'Create Pipeline'}
+            {saving ? 'Saving…' : existing ? 'Save changes' : 'Create pipeline'}
           </Button>
-          <Button variant="outlined" onClick={() => navigate(backUrl)} disabled={saving}>
+          <Button
+            variant="outlined"
+            color="inherit"
+            onClick={() => {
+              allowLeave();
+              navigate(backUrl);
+            }}
+            disabled={saving}>
             Cancel
           </Button>
         </Stack>

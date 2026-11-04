@@ -29,6 +29,7 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `BILLING_API_BASE_URL`                                                       | Billing user API. Loading the billing org activates the org's subscription.                                              |
 | `ENABLE_BILLING_FEATURE`, `BILLING_CONSOLE_URL`, `CHOREO_SAAS_OFFER_URL`     | Upgrade button and billing links                                                                                         |
 | `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_AUTH_REDIRECTION_URL` | GitHub App authorization and installation. GitHub is off without the client ID.                                          |
+| `AZURE_DEVOPS_CLIENT_ID`                                                     | Entra application client ID for Azure DevOps repository access. Azure DevOps is hidden when this is empty.               |
 | `EDITOR_CALLBACK_ORIGINS`, `EDITOR_CALLBACK_DOMAINS`                         | Comma-separated https origins and parent domains an editor's sign-in or GitHub result may be sent to. Empty allows none. |
 | `CHOREO_URL_MANAGER_URL`, `ENABLE_CUSTOM_URL_MAPPINGS_FEATURE`               | URL settings for an integration. Both are needed.                                                                        |
 | `SAMPLES_URL`, `PREBUILT_INTEGRATIONS_URL`                                   | Sample and prebuilt integration catalogs. Both default to GitHub raw.                                                    |
@@ -36,6 +37,8 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `INTEGRATION_BUILDER_*`                                                      | AI Integration Builder: copilot base URL, model, max tokens, connectors GraphQL URL                                      |
 | `AI_COPILOT_URL_SUFFIX`                                                      | Copilot path on the system APIs gateway                                                                                  |
 | `MOESIF_APP_URL`                                                             | API Insights. See below.                                                                                                 |
+| `TRACKING_ENV`                                                               | Analytics tier: `dev`, `stage`, `prod` or `off`. Picks the GTM container and CookiePro script. Defaults to `dev`.        |
+| `MOESIF_APP_API_KEY`                                                         | Moesif app key for product-usage events, set per deployment. Not API Insights. Unset disables Moesif tracking.           |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
 

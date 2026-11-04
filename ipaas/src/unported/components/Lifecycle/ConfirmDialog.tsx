@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, InputAdornment } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, InputAdornment, TextField } from '@wso2/oxygen-ui';
 import { Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { ACTION_LABEL, ACTION_PENDING_LABEL, CONFIRM_TEXT, isDestructiveAction, PUBLISH_ACTIONS } from '../../constants/lifecycle';
@@ -43,6 +42,7 @@ export default function ConfirmDialog({ action, displayName, onDisplayNameChange
         <DialogContentText>{CONFIRM_TEXT[action] ?? `Are you sure you want to ${label.toLowerCase()} this API?`}</DialogContentText>
         {isPublish && onDisplayNameChange !== undefined && (
           <TextField
+            labelPlacement="top"
             label="Display Name"
             value={displayName ?? ''}
             onChange={(e) => onDisplayNameChange(e.target.value)}

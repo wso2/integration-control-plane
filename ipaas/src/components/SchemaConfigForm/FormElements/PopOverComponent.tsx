@@ -87,7 +87,7 @@ export function PopOverComponent({
     <Popover open={open} anchorEl={anchorEl} onClose={onClose} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }} transformOrigin={{ horizontal: 'right', vertical: 'top' }}>
       <Paper sx={{ p: 2, minWidth: 320, maxWidth: 420 }}>
         <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-          Add Values
+          Add values
         </Typography>
         {Array.from(uniqueKeySet)
           .sort()
@@ -232,7 +232,7 @@ export function PopOverComponent({
         </Box>
 
         <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ mt: 1.5 }}>
-          <Button size="small" onClick={onClose}>
+          <Button size="small" variant="outlined" color="inherit" onClick={onClose}>
             Cancel
           </Button>
           <Button size="small" variant="contained" disabled={isDisableSaveBtn} onClick={onValueAdd}>

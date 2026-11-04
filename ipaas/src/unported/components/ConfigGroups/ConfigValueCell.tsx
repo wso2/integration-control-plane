@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Button, IconButton, InputAdornment, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Button, IconButton, InputAdornment, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Check, Eye, EyeOff, Paperclip } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState, type JSX } from 'react';
 import { CONFIG_FILE_MAX_KB } from '../../constants/configGroups';

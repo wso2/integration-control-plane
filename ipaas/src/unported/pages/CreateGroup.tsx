@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Button, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -62,8 +61,8 @@ export default function CreateGroup(): JSX.Element {
       )}
 
       <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
-        <TextField label="Name" required value={groupName} onChange={(e) => setGroupName(e.target.value)} fullWidth />
-        <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Name" required value={groupName} onChange={(e) => setGroupName(e.target.value)} fullWidth />
+        <TextField labelPlacement="top" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth />
       </Stack>
 
       <Stack direction="row" gap={2}>

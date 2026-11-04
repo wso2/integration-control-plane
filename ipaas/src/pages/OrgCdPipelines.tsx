@@ -47,18 +47,22 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
-        <PageTitle.Header>Deployment Pipelines</PageTitle.Header>
+        <PageTitle.Header>Deployment pipelines</PageTitle.Header>
         <PageTitle.SubHeader>Promotion paths across environments, available to every project in this organization.</PageTitle.SubHeader>
+        {!!pipelines?.length && (
+          <PageTitle.Actions>
+            <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+              Create pipeline
+            </Button>
+          </PageTitle.Actions>
+        )}
       </PageTitle>
 
       {!!pipelines?.length && (
         <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 5 }}>
-          <SearchField value={search} onChange={setSearch} placeholder="Search pipelines..." fullWidth />
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(cdPipelineEditorUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
-            Create Pipeline
-          </Button>
+          <SearchField value={search} onChange={setSearch} placeholder="Search pipelines" fullWidth />
         </Stack>
       )}
 
@@ -83,7 +87,7 @@ export default function OrgCdPipelines(scope: OrgScope): JSX.Element {
           Failed to load deployment pipelines.
         </Alert>
       ) : !pipelines?.length ? (
-        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Create Pipeline" onAction={() => navigate(cdPipelineEditorUrl(scope))} />
+        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Create pipeline" onAction={() => navigate(cdPipelineEditorUrl(scope))} />
       ) : !filteredPipelines?.length ? (
         <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines found" description="Try adjusting your search" showAction={false} />
       ) : (

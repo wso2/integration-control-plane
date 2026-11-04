@@ -174,7 +174,7 @@ export function buildStorageState(token: string, claims: TokenClaims, origin: st
           { name: PARKED_SESSION_KEY, value: JSON.stringify([{ name: sdkSessionKey(claims.clientId), value: sdkSession(token, claims) }]) },
           { name: SDK_SESSION_ACTIVE_KEY, value: 'true' },
           // Acceptance is per user and org; without it ProjectsRedirect blocks on its dialog.
-          { name: `tos_accepted:${claims.sub}:${claims.ouHandle}`, value: 'true' },
+          { name: `icp:tos_accepted:${claims.sub}:${claims.ouHandle}`, value: 'true' },
         ],
       },
     ],

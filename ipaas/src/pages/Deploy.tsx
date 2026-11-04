@@ -26,6 +26,8 @@ import { useOrgs } from '../hooks/useOrg';
 import { useProjectId } from '../hooks/useProjects';
 import { UUID_RE } from '../utils/string';
 import BuildArea from '../components/Deploy/BuildArea';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import ComingSoon from './ComingSoon';
 import DeployEnvironmentCard from '../components/Deploy/DeployEnvironmentCard/DeployEnvironmentCard';
 import type { ComponentScope } from '../nav';
@@ -40,8 +42,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
 
   const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
   const componentId = component?.id ?? '';
-  const deploymentTrack = component?.deploymentTracks?.[0];
-  const versionId = deploymentTrack?.id ?? '';
+  const { track: deploymentTrack, trackId: versionId } = useSelectedTrack(component);
   const autoDeployEnabled = deploymentTrack?.autoDeployEnabled ?? false;
   const branch = deploymentTrack?.branch ?? '';
 
@@ -58,7 +59,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
 
   if (isLoading) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
@@ -66,14 +67,23 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
 
   if (!component) {
     return (
-      <PageContent>
+      <PageContent fullWidth>
         <Typography color="error">Failed to load component information.</Typography>
       </PageContent>
     );
   }
 
+  // A loaded integration always resolves a track; the check narrows the type for what follows.
+  if (versionId === undefined) {
+    return (
+      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+        <CircularProgress />
+      </PageContent>
+    );
+  }
+
   if (component.isPrebuilt) {
-    return <ComingSoon title="Deploy Not Available for Prebuilt Integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
+    return <ComingSoon title="Deploy not available for prebuilt integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
   }
 
   const flags = getComponentTypeFlags(component.displayType ?? '', component.componentSubType);
@@ -89,71 +99,78 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   const hideEndpoints = integrationType === 'file-integration' || integrationType === 'event-integration' || integrationType === 'ai-agent';
 
   if (flags.isProxy) {
-    return <ComingSoon title="Proxy Deploy Coming Soon" description="Deploy management for REST API Proxy components will be available in a future release." />;
+    return <ComingSoon title="Proxy deploy coming soon" description="Deploy management for REST API proxy integrations will be available in a future release." />;
   }
 
   if (!flags.isDeployable && !hideEndpoints) {
-    return <ComingSoon title="Deploy Not Yet Supported" description={`Deploy management for ${displayLabel} components is coming soon.`} />;
+    return <ComingSoon title="Deploy not yet supported" description={`Deploy management for ${displayLabel} components is coming soon.`} />;
   }
 
   return (
-    <PageContent>
-      <Typography variant="h1" sx={{ mb: 4 }}>
-        Deploy
-      </Typography>
-      <Box sx={{ display: 'flex', alignItems: 'flex-start', minWidth: 'max-content' }}>
-        {/* Left panel — build artifact selection + deploy trigger */}
-        <Box sx={{ flexShrink: 0 }}>
-          <BuildArea
-            componentId={componentId}
-            versionId={versionId}
-            orgHandler={scope.org}
-            orgUuid={orgUuid}
-            projectId={projectId}
-            deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''}
-            flags={flags}
-            branch={branch}
-            commits={commits}
-            firstEnvId={environments[0]?.id ?? ''}
-            firstEnvTemplateId={environments[0]?.templateId ?? environments[0]?.id ?? ''}
-            autoDeployEnabled={autoDeployEnabled}
-            componentName={component.name}
-            projectHandler={project?.handler ?? ''}
-            displayType={component.displayType}
-            hideEndpoints={hideEndpoints}
-          />
-        </Box>
+    <>
+      <DeploymentTrackBar component={component} />
+      <PageContent fullWidth>
+        <Typography variant="h1" sx={{ mb: 4 }}>
+          Deploy
+        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'flex-start', minWidth: 'max-content' }}>
+          {/* Left panel — build artifact selection + deploy trigger */}
+          <Box sx={{ flexShrink: 0 }}>
+            <BuildArea
+              key={versionId}
+              componentId={componentId}
+              versionId={versionId}
+              orgHandler={scope.org}
+              orgUuid={orgUuid}
+              projectId={projectId}
+              deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''}
+              flags={flags}
+              branch={branch}
+              commits={commits}
+              firstEnvId={environments[0]?.id ?? ''}
+              firstEnvTemplateId={environments[0]?.templateId ?? environments[0]?.id ?? ''}
+              autoDeployEnabled={autoDeployEnabled}
+              componentName={component.name}
+              projectHandler={project?.handler ?? ''}
+              displayType={component.displayType}
+              hideEndpoints={hideEndpoints}
+            />
+          </Box>
 
-        {/* Environment cards — each preceded by a horizontal connector line */}
-        {environments.map((env, index) => {
-          const nextEnv = index < environments.length - 1 ? environments[index + 1] : undefined;
-          return (
-            <Box key={env.id} sx={{ display: 'flex', alignItems: 'flex-start', flexShrink: 0 }}>
-              <Box sx={{ width: 40, height: '1px', bgcolor: 'divider', mt: '112px', flexShrink: 0 }} />
-              <Box sx={{ width: 320 }}>
-                <DeployEnvironmentCard
-                  orgHandler={scope.org}
-                  orgUuid={orgUuid}
-                  projectId={projectId}
-                  componentId={componentId}
-                  versionId={versionId}
-                  deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''}
-                  flags={flags}
-                  hideEndpoints={hideEndpoints}
-                  env={env}
-                  branch={branch}
-                  componentName={component.name}
-                  projectHandler={project?.handler ?? ''}
-                  nextEnvId={nextEnv?.id}
-                  isPromotionTarget={env.id === promotingToEnvId}
-                  onPromoteStarted={nextEnv ? () => setPromotingToEnvId(nextEnv.id) : undefined}
-                  onPromoteSettled={nextEnv ? () => setPromotingToEnvId(null) : undefined}
-                />
+          {/* Environment cards — each preceded by a horizontal connector line */}
+          {environments.map((env, index) => {
+            const nextEnv = index < environments.length - 1 ? environments[index + 1] : undefined;
+            return (
+              // Keyed on the track as well: a card's in-flight stop or redeploy and its open
+              // drawers belong to the track it was showing, not the one switched to.
+              <Box key={`${versionId}:${env.id}`} sx={{ display: 'flex', alignItems: 'flex-start', flexShrink: 0 }}>
+                <Box sx={{ width: 40, height: '1px', bgcolor: 'divider', mt: '112px', flexShrink: 0 }} />
+                <Box sx={{ width: 320 }}>
+                  <DeployEnvironmentCard
+                    orgHandler={scope.org}
+                    orgUuid={orgUuid}
+                    projectId={projectId}
+                    componentId={componentId}
+                    versionId={versionId}
+                    deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''}
+                    flags={flags}
+                    hideEndpoints={hideEndpoints}
+                    displayType={component.displayType}
+                    env={env}
+                    branch={branch}
+                    componentName={component.name}
+                    projectHandler={project?.handler ?? ''}
+                    nextEnvId={nextEnv?.id}
+                    isPromotionTarget={env.id === promotingToEnvId}
+                    onPromoteStarted={nextEnv ? () => setPromotingToEnvId(nextEnv.id) : undefined}
+                    onPromoteSettled={nextEnv ? () => setPromotingToEnvId(null) : undefined}
+                  />
+                </Box>
               </Box>
-            </Box>
-          );
-        })}
-      </Box>
-    </PageContent>
+            );
+          })}
+        </Box>
+      </PageContent>
+    </>
   );
 }

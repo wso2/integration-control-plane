@@ -31,7 +31,7 @@ const MCP_TOOL_COLORS: OperationTileColors = { badgeBg: 'primary.main', badgeTex
 /**
  * A single MCP tool row, rendered with the shared {@link OperationTile} (same
  * style as the Integration as API method tiles): a TOOL badge + the tool name,
- * with a "View Details" drawer showing the tool's parameters and schema.
+ * with a "View details" drawer showing the tool's parameters and schema.
  */
 export default function McpToolTile({ tool }: { tool: McpTool }): ReactNode {
   return <OperationTile badgeLabel="TOOL" label={tool.name} colors={MCP_TOOL_COLORS} drawerContent={<McpToolDrawer tool={tool} colors={MCP_TOOL_COLORS} />} drawerWidth={480} />;

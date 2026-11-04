@@ -31,6 +31,11 @@ export function clampDescription(value: string): string {
     .slice(0, DESCRIPTION_MAX_LENGTH);
 }
 
+/** A one-line description: line breaks (and the spaces around them) become one space. */
+export function toSingleLineDescription(value: string): string {
+  return value.replace(/[^\S\r\n]*(\r\n?|\n)\s*/g, ' ').slice(0, DESCRIPTION_MAX_LENGTH);
+}
+
 /** Callers suppress the keystroke rather than let clampDescription rewrite it into a stray space. */
 export function isAtNewlineLimit(value: string): boolean {
   return (value.match(/\n/g)?.length ?? 0) >= DESCRIPTION_MAX_NEWLINES;

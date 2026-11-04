@@ -95,7 +95,7 @@ How it works:
 2. **Freeze.** The workflow freezes deployments and waits until the environment is in sync with the commit, so nothing changes under the tests.
 3. **Run.** It finds every suite (each one a suspended CronJob in the `tests` namespace) and runs them all in parallel as Jobs. `ipaas-e2e` is one of them.
 4. **Sign in with a token.** The `ipaas-e2e` Job runs in token mode. It fetches a token for the console's client from `monitoring-token-provider`, so no GitHub credentials ever reach the cluster.
-5. **Report.** Playwright writes its report, traces and videos to `/artifacts`, and an uploader ships them to S3. When every suite has finished, deployments resume and a summary with a row per suite is posted to Google Chat.
+5. **Report.** Playwright writes its report, a JUnit file (`junit/junit.xml`), traces and videos to `/artifacts`, and an uploader ships them to S3. When every suite has finished, deployments resume and a summary with a row per suite is posted to Google Chat.
 
 > [!IMPORTANT]
 > The Job has a two-hour deadline. Group 08b only removes projects older than two hours, so it can never delete the project of a run that is still going.

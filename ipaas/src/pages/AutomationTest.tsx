@@ -38,14 +38,16 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useExecutionArguments, useRuntimeArguments, useTaskExecutionCount, useTaskExecutions, useTriggerComponent } from '../hooks/useExecutions';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validatePositionalOrder, validateRequiredFields } from '../utils/runtimeArguments';
-import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
+import { httpStatusOf, isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { isTerminalStatus } from '../utils/executionStatus';
 import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, TaskExecution } from '../types/executions';
 import type { ComponentScope } from '../nav';
 
 /**
- * Automation "Test" page — mirrors Devant's "Test Your Automation" console layout:
+ * Automation "Test" page — mirrors Devant's "Test your automation" console layout:
  * a summary header, then a two-panel body with the runtime-arguments form on the
  * left and the live argument preview, run stepper, and execution logs on the right.
  * Form state is held here so the preview and stepper stay in sync with the form.
@@ -58,9 +60,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
 
   // Derived rather than synced via an effect — an effect+render round trip here would delay
   // useComponentDeployment/useRuntimeArguments/useTaskExecutions below from becoming enabled.
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  // An integration has one implicit deployment track.
-  const trackId = tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '';
+  const { tracks, trackId } = useSelectedTrack(comp);
 
   const { data: environments = [] } = useEnvironments(org, projectId);
   const [envIdState, setEnvId] = useState('');
@@ -108,6 +108,8 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   }, [currentRunId, execution, isTerminal]);
 
   const hasUnsavedChanges = !formDataEqual(formData, committedFormData);
+  // Once a run is started its arguments have been sent, so only input not yet run is at risk.
+  useUnsavedChanges(hasUnsavedChanges && currentRunId === null);
 
   // Reset the form + run state. Keeps any saved draft unless `clearDraft` is set.
   const resetTest = (opts?: { clearDraft?: boolean }) => {
@@ -256,7 +258,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
    *  environment selector lives in the sticky track bar below, which shares PageTitle's box. */
   const pageTitle = (
     <PageTitle>
-      <PageTitle.Header>Test Your Automation</PageTitle.Header>
+      <PageTitle.Header>Test your automation</PageTitle.Header>
     </PageTitle>
   );
 
@@ -270,7 +272,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
 
   // No runtime arguments → the executions view: a "Total Executions" summary with a
   // direct Test trigger, plus the executions table. Mirrors Devant's no-args layout.
-  const renderExecutionsView = (): JSX.Element => (
+  const renderExecutionsView = (resolvedTrackId: string): JSX.Element => (
     <Box>
       {pageTitle}
       <Card sx={{ mb: 4 }}>
@@ -281,7 +283,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
             </Box>
             <Box>
               <Typography variant="body2" color="text.secondary">
-                Total Executions{' '}
+                Total executions{' '}
                 <Typography component="span" variant="caption" color="text.secondary">
                   (Last 30 days)
                 </Typography>
@@ -318,7 +320,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
         releaseId={releaseId}
         projectId={projectId}
         componentId={comp?.id ?? ''}
-        deploymentTrackId={trackId}
+        deploymentTrackId={resolvedTrackId}
         environmentId={envId}
         orgHandler={org}
         projectHandler={project}
@@ -330,8 +332,8 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     </Box>
   );
 
-  // Runtime arguments present → the "Test Your Automation" form view (two panels).
-  const renderFormView = (): JSX.Element => (
+  // Runtime arguments present → the "Test your automation" form view (two panels).
+  const renderFormView = (resolvedTrackId: string): JSX.Element => (
     <Box>
       {pageTitle}
       <FormExecutionSummary
@@ -376,7 +378,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
             <TestStepper hasTriggered={!!currentRunId} status={execution?.status} />
             <ExecutionLogsPanel
               componentId={comp?.id ?? ''}
-              deploymentTrackId={trackId}
+              deploymentTrackId={resolvedTrackId}
               environmentId={envId}
               executionId={execution?.id ?? ''}
               run={execution ?? undefined}
@@ -402,12 +404,16 @@ export default function AutomationTest({ org, project, component }: ComponentSco
         </Box>
       );
     if (!comp) return renderNotice(<Alert severity="error">Integration not found.</Alert>);
+    // A loaded integration always resolves a track; the check narrows the type for what follows.
+    if (trackId === undefined) return renderNotice(<CircularProgress />);
     if (!deployment || !releaseId) return renderNotice(<NotDeployedAlert status={deployment?.deploymentStatusV2} />);
+    // 424: the platform cannot read the source at all, so retrying will not help.
+    if (hardArgsError && httpStatusOf(argsErr) === 424) return renderNotice(<Alert severity="warning">This automation&apos;s runtime arguments cannot be read from its source. Run it with arguments from its environment card, entering them in order.</Alert>);
     if (hardArgsError) return renderNotice(<Alert severity="error">Could not load this automation&apos;s runtime arguments. Retry in a moment; if it persists, the automation can still be triggered from its environment card.</Alert>);
     // Deployed but not usable yet — say so instead of offering a Run button with
     // no workload behind it.
     if (deployment.deploymentStatusV2 !== 'ACTIVE') return renderNotice(<NotDeployedAlert status={deployment.deploymentStatusV2} />);
-    return hasArgs ? renderFormView() : renderExecutionsView();
+    return hasArgs ? renderFormView(trackId) : renderExecutionsView(trackId);
   };
 
   return (
@@ -415,7 +421,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
       {tracks.length > 0 && (
         // Pin the track bar to the top of the scroll area so it stays visible as the page scrolls.
         <Box sx={{ position: 'sticky', top: 0, zIndex: (theme) => theme.zIndex.appBar }}>
-          <DeploymentTrackBar extra={envSelect} />
+          <DeploymentTrackBar component={comp} extra={envSelect} />
         </Box>
       )}
       {/* Plain padded container (not PageContent) so the page uses the single outer scroller — the

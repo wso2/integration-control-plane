@@ -16,16 +16,11 @@
  * under the License.
  */
 
-/** Tinted square behind the glyph. `external` mutes it so a foreign component reads as inactive. */
-export const iconBox = (size: number, external: boolean) =>
+/** `external` mutes the badge so a foreign integration reads as inactive. */
+export const badge = (size: number, external: boolean) =>
   ({
     width: size,
     height: size,
-    borderRadius: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     flexShrink: 0,
-    bgcolor: 'action.selected',
-    color: external ? 'text.disabled' : 'primary.main',
+    ...(external && { bgcolor: 'action.selected', color: 'text.disabled' }),
   }) as const;
