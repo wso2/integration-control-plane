@@ -141,14 +141,14 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
         {sourceHandler ? `Back to ${sourceName || 'integration'}` : 'Back to create integration'}
       </Button>
       <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1 }}>
-        <Typography variant="h1">Generate MCP Server</Typography>
+        <Typography variant="h1">Generate MCP server</Typography>
       </Stack>
       <Typography color="text.secondary" sx={{ mb: 4 }}>
         Expose this Integration as API&apos;s operations as MCP tools.
       </Typography>
 
       {!apimId && !loadingSource ? (
-        <Alert severity="info">No source API was provided. Open an Integration as API and use its Generate MCP Server action.</Alert>
+        <Alert severity="info">No source API was provided. Open an Integration as API and use its Generate MCP server action.</Alert>
       ) : (
         <Stack gap={ROW_GAP} sx={{ maxWidth: 760 }}>
           {/* Identity — Integration Name + Integration Id, two columns */}
@@ -157,7 +157,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
               labelPlacement="top"
               required
               size="small"
-              label="Integration Name"
+              label="Integration name"
               value={displayName}
               onChange={(e) => {
                 setDisplayName(e.target.value);
@@ -171,7 +171,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
               labelPlacement="top"
               required
               size="small"
-              label="Integration Id"
+              label="Integration ID"
               value={name}
               onChange={(e) => {
                 setNameEdited(true);
@@ -200,14 +200,14 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
               error={!!version && !versionValid}
               helperText={version && !versionValid ? 'e.g. 1.0 or 1.0.0' : ' '}
             />
-            <TextField labelPlacement="top" size="small" label="Base Path" value={basePath} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX, '& input': { fontFamily: 'monospace' } }} helperText=" " />
+            <TextField labelPlacement="top" size="small" label="Base path" value={basePath} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX, '& input': { fontFamily: 'monospace' } }} helperText=" " />
           </Stack>
 
           {/* Source Integration as API (disabled) + its API version (selectable) — one row */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
             <TextField labelPlacement="top" size="small" label="Integration as API" value={loadingSource && !sourceName ? 'Loading…' : sourceName || '—'} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
             {versions.length > 0 ? (
-              <TextField labelPlacement="top" select size="small" label="Source API Version" value={selectedApiId} onChange={(e) => setSelectedApiId(e.target.value)} sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" ">
+              <TextField labelPlacement="top" select size="small" label="Source API version" value={selectedApiId} onChange={(e) => setSelectedApiId(e.target.value)} sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" ">
                 {versions.map((v) => (
                   <MenuItem key={v.id} value={v.id}>
                     {v.apiVersion}
@@ -216,7 +216,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
                 ))}
               </TextField>
             ) : (
-              <TextField labelPlacement="top" size="small" label="Source API Version" value={loadingApi || loadingSource ? 'Loading…' : sourceApiVersion || '—'} disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
+              <TextField labelPlacement="top" size="small" label="Source API version" value={loadingApi || loadingSource ? 'Loading…' : sourceApiVersion || '—'} disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
             )}
           </Stack>
 

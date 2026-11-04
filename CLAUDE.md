@@ -8,3 +8,4 @@ Instructions for this repository live in `AGENTS.md` files, shared by every codi
 @ipaas/src/auth/AGENTS.md
 @ipaas/src/unported/AGENTS.md
 @ipaas/tests/e2e/AGENTS.md
+@user-portal/AGENTS.md

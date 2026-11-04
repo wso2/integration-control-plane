@@ -95,7 +95,7 @@ export default function ResourceUsageCards({ usage, usageUnavailable, showPercen
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 6 }}>
         <UsageCard
-          title="CPU Usage"
+          title="CPU usage"
           detail={usageUnavailable ? `${formatVcpu(usage.cpu.limits)} vCPU allocated` : `${formatVcpu(usage.cpu.used)} of ${formatVcpu(usage.cpu.limits)} total allocated vCPU used`}
           usagePercent={cpu?.percent ?? usage.cpu.usagePercent}
           // A reading is itself a usage source, so the card has a figure to show without the aggregate.
@@ -106,7 +106,7 @@ export default function ResourceUsageCards({ usage, usageUnavailable, showPercen
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
         <UsageCard
-          title="Memory Usage"
+          title="Memory usage"
           detail={usageUnavailable ? `${formatBytes(usage.memory.limits)} allocated` : `${formatBytes(usage.memory.used)} of ${formatBytes(usage.memory.limits)} total allocated memory used`}
           usagePercent={memory?.percent ?? usage.memory.usagePercent}
           unavailable={usageUnavailable && !memory}

@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, CircularProgress, Divider, IconButton, MenuItem, Select, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Download } from '@wso2/oxygen-ui-icons-react';
+import { Download, Rocket } from '@wso2/oxygen-ui-icons-react';
 import EndpointPanelLayout from '../Overview/_shared/EndpointPanelLayout';
 import { useState, useMemo } from 'react';
 import AutomationExecutions from '../AutomationExecutions';
@@ -30,6 +30,8 @@ import type { EnvEndpoint } from '../../types/component';
 import { trimEndpointName, envCardUrlRows } from '../../utils/endpoints';
 import EndpointUrlRows from '../Overview/_shared/EndpointUrlRows';
 import DeploymentNotice from '../DeploymentNotice';
+import EnvEmptyNotice from '../EnvEmptyNotice';
+import { ENV_CARD_INSIGHTS_ENABLED } from '../../constants/insights';
 
 interface EndpointUrlsPanelProps {
   endpoints: EnvEndpoint[];
@@ -78,7 +80,7 @@ function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, componentId, depl
       urls={<EndpointUrlRows options={urlOptions} />}
       download={
         <Tooltip title="Download API specification">
-          <IconButton size="small" onClick={() => void handleDownload()}>
+          <IconButton aria-label="Download API specification" size="small" onClick={() => void handleDownload()}>
             <Download size={16} />
           </IconButton>
         </Tooltip>
@@ -148,7 +150,7 @@ export default function EnvironmentCardBody({
   prevEnvName,
   notification,
 }: EnvironmentCardBodyProps) {
-  const showAutomationInsights = isAutomation && envCritical && !!releaseId;
+  const showAutomationInsights = ENV_CARD_INSIGHTS_ENABLED && isAutomation && envCritical && !!releaseId;
   const serviceNotDeployed = isGenericService && !loadingEnvDeployment && !hasDeployment;
 
   // Endpoint selection drives the swagger fetch
@@ -182,7 +184,7 @@ export default function EnvironmentCardBody({
 
   // Use the endpoint's apimId for insights — component.apiId is often null for generic services
   const insightsApiId = activeEndpoint?.apimId ?? apiId ?? '';
-  const showServiceInsights = !isAutomation && envCritical && !!envId && !!envName && !!projectId;
+  const showServiceInsights = ENV_CARD_INSIGHTS_ENABLED && !isAutomation && envCritical && !!envId && !!envName && !!projectId;
 
   return (
     <>
@@ -226,12 +228,7 @@ export default function EnvironmentCardBody({
               </Box>
             ))}
 
-      {/* Generic service: not deployed yet */}
-      {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && (
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-          This component has not been deployed to this environment yet.
-        </Typography>
-      )}
+      {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && <EnvEmptyNotice icon={Rocket}>This integration has not been deployed to this environment yet.</EnvEmptyNotice>}
 
       {isAutomation && !loadingEnvDeployment && hasDeployment && (
         <AutomationExecutions

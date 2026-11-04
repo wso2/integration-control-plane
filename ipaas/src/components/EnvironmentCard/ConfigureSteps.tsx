@@ -19,6 +19,7 @@
 import { Alert, Box, Button, CircularProgress, Radio, Stack, Typography } from '@wso2/oxygen-ui';
 import { Building2, EyeOff, Globe } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import { useUpdateEndpoint } from '../../hooks/useComponents';
 import type { EndpointExposure, EnvEndpoint } from '../../types/component';
 import { friendlyApiError } from '../../utils/apiSecurity';
@@ -97,13 +98,18 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
   const [exposure, setExposure] = useState<EndpointExposure>(seededExposure);
   const [saveError, setSaveError] = useState<string | null>(null);
   const updateEp = useUpdateEndpoint();
+  const allowLeave = useUnsavedChanges(exposure !== seededExposure);
+  const guardNavigation = useLeaveGuard();
 
   const handleSave = () => {
     setSaveError(null);
     updateEp.mutate(
       { componentId, projectId, environmentId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: exposureLabels(exposure) },
       {
-        onSuccess: onBack,
+        onSuccess: () => {
+          allowLeave();
+          onBack();
+        },
         onError: (err) => setSaveError(friendlyApiError(err, 'Could not update the endpoint visibility.')),
       },
     );
@@ -134,7 +140,7 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
 
       {/* Gateway exposure: one host at a time, or none */}
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-        Network Visibility
+        Network visibility
       </Typography>
       <Stack gap={1} sx={{ mb: 1.5 }} role="radiogroup" aria-label="Network visibility">
         {EXPOSURE_OPTS.map(({ value, label, Icon, description }) => {
@@ -184,7 +190,7 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
       )}
 
       <Stack direction="row" justifyContent="flex-end" gap={1}>
-        <Button variant="outlined" color="inherit" onClick={onBack}>
+        <Button variant="outlined" color="inherit" onClick={() => guardNavigation(onBack)}>
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>

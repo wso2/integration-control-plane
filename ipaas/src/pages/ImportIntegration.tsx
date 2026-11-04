@@ -857,7 +857,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                 <Stack sx={{ flex: 1, justifyContent: 'center' }}>
                   <Tooltip title="Re-validate technology detection for the selected path" placement="top">
                     <span>
-                      <IconButton size="small" disabled={isValidating} onClick={handleRevalidate} sx={{ color: 'primary.main' }}>
+                      <IconButton aria-label="Re-validate technology detection" size="small" disabled={isValidating} onClick={handleRevalidate} sx={{ color: 'primary.main' }}>
                         {isValidating ? <CircularProgress size={14} /> : <RefreshCw size={14} />}
                       </IconButton>
                     </span>
@@ -881,7 +881,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           Back to create integration
         </Button>
         <Typography variant="h1" sx={{ mb: 0.5 }}>
-          Import an Integration
+          Import an integration
         </Typography>
         <Typography color="text.secondary" sx={{ mb: 4 }}>
           Connect your GitHub repository to start building.
@@ -933,7 +933,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       </Button>
 
       <Typography variant="h1" sx={{ mb: 0.5 }}>
-        Import an Integration
+        Import an integration
       </Typography>
       <Typography color="text.secondary" sx={{ mb: 4 }}>
         {isPublicRepo
@@ -955,7 +955,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
             <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 labelPlacement="top"
-                label="Integration Name"
+                label="Integration name"
                 required
                 value={displayName}
                 onChange={(e) => {
@@ -971,7 +971,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
             <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 labelPlacement="top"
-                label="Integration Id"
+                label="Integration ID"
                 value={effectiveHandler}
                 fullWidth
                 disabled
@@ -1021,7 +1021,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           {/* Integration Type */}
           <Box sx={{ mb: 5 }}>
             <Typography variant="h5" sx={{ mb: 2, mt: 3 }}>
-              Integration Type
+              Integration type
             </Typography>
             <IntegrationTypeSelector
               selected={selectedIntegrationType}

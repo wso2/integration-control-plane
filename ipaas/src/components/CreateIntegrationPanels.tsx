@@ -57,7 +57,7 @@ import { trackEvent } from '../services/tracking/tracking';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
 
 /** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
-const GET_STARTED_TABS = [{ label: 'Prebuilt Integrations' }, { label: 'Samples' }];
+const GET_STARTED_TABS = [{ label: 'Prebuilt integrations' }, { label: 'Samples' }];
 
 export interface CreateIntegrationPanelsProps {
   scope: ProjectScope;
@@ -268,7 +268,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
                 <Typography variant="body2" sx={SECTION_LABEL_SX}>
-                  {standalone ? 'Create an Integration on Cloud' : 'Create on Cloud'}
+                  {standalone ? 'Create an integration on Cloud' : 'Create on Cloud'}
                 </Typography>
               </Stack>
               <Card sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
@@ -289,7 +289,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
               </Typography>
             ) : (
               <Typography variant="body2" sx={{ ...SECTION_LABEL_SX, mb: 1.5 }}>
-                {standalone ? 'Import your own Integration' : 'Import your own'}
+                {standalone ? 'Import your own integration' : 'Import your own'}
               </Typography>
             )}
             <Card sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>

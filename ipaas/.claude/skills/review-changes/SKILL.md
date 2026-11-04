@@ -37,6 +37,7 @@ Read each changed hunk with enough surrounding code to understand it — open th
 | **Comments**        | Keep only comments that explain a non-obvious _why_, in one line. Flag comments that restate the code, narrate the change ("now we…", "fixed…"), or reference tickets, sessions or old behaviour.                            |
 | **Tests**           | New logic in `utils/` or `api/` has a `*.test.ts`; changed behaviour has its tests updated; e2e changes follow `tests/e2e/AGENTS.md`.                                                                                        |
 | **Wording**         | UI copy, comments and docs say **Integration**, not "Component", for the third level.                                                                                                                                        |
+| **Oxygen UI**       | Follows the library guidelines (`ipaas/AGENTS.md`, "Oxygen UI guidelines"): sentence-case UI text, search placeholders that name what is searched, the lightest fitting container, toolbar order, labelled icon buttons.     |
 | **Safety**          | No tokens, secrets or real credentials in code, config, logs or tests; no `.env*` or `.auth/` files in the change.                                                                                                           |
 | **Formatting**      | Only changed lines reformatted — whole-file reformatting of an untouched upstream file buries the real diff.                                                                                                                 |
 

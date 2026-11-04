@@ -28,6 +28,7 @@ import CorsSection from '../../Policies/CorsSection';
 import RateLimitingSection from '../../Policies/RateLimitingSection';
 import { useEndpointDrawer } from './useEndpointDrawer';
 import * as styles from './apiConsumption.styles';
+import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 
 /** The gateway has a request timeout, but platform-api does not expose it for the BFF to set. */
 const TIMEOUT_UNAVAILABLE = 'Endpoint timeout is not configurable from here yet';
@@ -47,7 +48,7 @@ interface ApiSettingsDrawerProps {
   deploymentTrackId?: string;
 }
 
-/** Cloud-only "API Settings" drawer: CORS and rate limiting. Authentication lives in ApiSecurityDrawer. */
+/** Cloud-only "API settings" drawer: CORS and rate limiting. Authentication lives in ApiSecurityDrawer. */
 export default function ApiSettingsDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSettingsDrawerProps): JSX.Element {
   const [cors, setCors] = useState<CorsConfig | null>(null);
   const [rateLimit, setRateLimit] = useState<RateLimitConfig | null>(null);
@@ -99,15 +100,20 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
     }
   };
 
-  const handleCancel = () => {
-    setError(null);
-    onClose();
-  };
+  const seeded = useMemo(() => (policies ? policyToConfig(policies) : null), [policies]);
+  useUnsavedChanges(open && !!seeded && !!cors && !!rateLimit && JSON.stringify({ cors, rateLimit }) !== JSON.stringify(seeded));
+  const guardNavigation = useLeaveGuard();
+
+  const handleCancel = () =>
+    guardNavigation(() => {
+      setError(null);
+      onClose();
+    });
 
   return (
     <DrawerPanel open={open} onClose={handleCancel}>
       <DrawerPanel.Header>
-        <DrawerPanel.Title>API Settings</DrawerPanel.Title>
+        <DrawerPanel.Title>API settings</DrawerPanel.Title>
         <DrawerPanel.Actions>
           <DrawerPanel.CloseButton />
         </DrawerPanel.Actions>
@@ -126,7 +132,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
               <Typography variant="body2" fontWeight={500}>
                 Endpoints:
               </Typography>
-              <Select size="small" value={selectedIdx} onChange={(e) => selectEndpoint(Number(e.target.value))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
+              <Select size="small" value={selectedIdx} onChange={(e) => guardNavigation(() => selectEndpoint(Number(e.target.value)))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
                 {endpoints.map((ep, i) => (
                   <MenuItem key={ep.name} value={i}>
                     {ep.displayName}
@@ -155,7 +161,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
 
                   <Box>
                     <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
-                      Rate Limiting
+                      Rate limiting
                     </Typography>
                     <RateLimitingSection value={rateLimit} onChange={setRateLimit} disabled={saving || readOnly} description="Limit how many requests the gateway accepts for this endpoint." apiLevelLabel="Whole endpoint" operations={operations} />
                   </Box>

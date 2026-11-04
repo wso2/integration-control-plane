@@ -196,7 +196,7 @@ describe('buildStepperSteps', () => {
     const state = getBuildStatus('in_progress', '', logs(stage('completed', ['success']), stage('in_progress', [null]), stage(null)));
     expect(buildStepperSteps(state)).toEqual([
       { id: 'init', label: 'Initialization', status: 'success' },
-      { id: 'build', label: 'Build Source & Test', status: 'inProgress' },
+      { id: 'build', label: 'Build source & test', status: 'inProgress' },
       { id: 'deploy', label: 'Finalization', status: 'notStarted' },
     ]);
   });

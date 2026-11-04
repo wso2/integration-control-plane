@@ -69,17 +69,17 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
   const runtimeLogsUrl = `${componentUrl(scope.orgHandler, scope.projectHandler, scope.componentHandler)}/logs`;
 
   return (
-    <PodDrawerShell open={open} onClose={onClose} onExited={onExited} title={`Real-Time Logs for Pod: ${podName}`}>
+    <PodDrawerShell open={open} onClose={onClose} onExited={onExited} title={`Real-time logs for pod: ${podName}`}>
       <Alert severity="info" sx={styles.banner}>
         To view aggregated and historical logs from all running instances, see{' '}
         <Link component={RouterLink} to={runtimeLogsUrl} onClick={onClose}>
-          Runtime Logs.
+          Runtime logs.
         </Link>
       </Alert>
 
       <Stack direction="row" alignItems="center" flexWrap="wrap" gap={3} sx={styles.actions}>
         <Stack direction="row" alignItems="center" gap={1}>
-          <Typography variant="body2">Since Seconds</Typography>
+          <Typography variant="body2">Since seconds</Typography>
           <Tooltip title={POD_LOGS_TOOLTIPS.sinceSeconds}>
             <Box component="span" tabIndex={0} role="note" aria-label={POD_LOGS_TOOLTIPS.sinceSeconds} sx={styles.helpIcon}>
               <HelpCircle size={13} />
@@ -102,7 +102,7 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
         )}
 
         <Stack direction="row" alignItems="center" gap={1}>
-          <Typography variant="body2">Show Previous Logs</Typography>
+          <Typography variant="body2">Show previous logs</Typography>
           <Tooltip title={POD_LOGS_TOOLTIPS.previousLogs}>
             <Box component="span" tabIndex={0} role="note" aria-label={POD_LOGS_TOOLTIPS.previousLogs} sx={styles.helpIcon}>
               <HelpCircle size={13} />

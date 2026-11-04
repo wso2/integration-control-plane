@@ -55,11 +55,11 @@ export function urlSettingsEnabled(): boolean {
 // standalone page; it is intentionally NOT a section here.
 export const COMPONENT_SETTINGS_SECTIONS: readonly ComponentSettingsSectionDef[] = [
   // Deployment Tracks: source-built integrations only (not BYOI proxies like Tailscale, not API/MCP proxies).
-  { id: 'deployment-tracks', label: 'Deployment Tracks', path: 'deployment-tracks', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => !isProxy(i) && !isByoi(i), routed: true },
+  { id: 'deployment-tracks', label: 'Deployment tracks', path: 'deployment-tracks', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => !isProxy(i) && !isByoi(i), routed: true },
   // Proxy Versions: proxy components (e.g. MCP proxy).
-  { id: 'proxy-versions', label: 'Proxy Versions', path: 'proxy-versions', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => isProxy(i), routed: false },
+  { id: 'proxy-versions', label: 'Proxy versions', path: 'proxy-versions', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => isProxy(i), routed: false },
   // URL Settings (custom domains): endpoint-exposing types, gated by the custom-URL feature flag + URL-manager service config.
-  { id: 'url-settings', label: 'URL Settings', path: 'url-settings', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => urlSettingsEnabled() && !!i && URL_SETTINGS_TYPES.has(i.type), routed: false },
+  { id: 'url-settings', label: 'URL settings', path: 'url-settings', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => urlSettingsEnabled() && !!i && URL_SETTINGS_TYPES.has(i.type), routed: false },
 ];
 
 /** Sections that are routed, applicable to the integration type AND visible to the user. */

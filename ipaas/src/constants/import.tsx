@@ -35,8 +35,8 @@ export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
     description: 'Run integrations on a schedule or as a recurring task',
     docLink: 'https://wso2.com/integration-platform/docs/get-started/build-automation',
     icons: [
-      { icon: <Clock size={16} />, label: 'One Time Task' },
-      { icon: <Repeat size={16} />, label: 'Recurring Task' },
+      { icon: <Clock size={16} />, label: 'One-time task' },
+      { icon: <Repeat size={16} />, label: 'Recurring task' },
     ],
   },
   {

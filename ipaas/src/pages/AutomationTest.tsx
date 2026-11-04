@@ -47,7 +47,7 @@ import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationError
 import type { ComponentScope } from '../nav';
 
 /**
- * Automation "Test" page — mirrors Devant's "Test Your Automation" console layout:
+ * Automation "Test" page — mirrors Devant's "Test your automation" console layout:
  * a summary header, then a two-panel body with the runtime-arguments form on the
  * left and the live argument preview, run stepper, and execution logs on the right.
  * Form state is held here so the preview and stepper stay in sync with the form.
@@ -258,7 +258,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
    *  environment selector lives in the sticky track bar below, which shares PageTitle's box. */
   const pageTitle = (
     <PageTitle>
-      <PageTitle.Header>Test Your Automation</PageTitle.Header>
+      <PageTitle.Header>Test your automation</PageTitle.Header>
     </PageTitle>
   );
 
@@ -283,7 +283,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
             </Box>
             <Box>
               <Typography variant="body2" color="text.secondary">
-                Total Executions{' '}
+                Total executions{' '}
                 <Typography component="span" variant="caption" color="text.secondary">
                   (Last 30 days)
                 </Typography>
@@ -332,7 +332,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     </Box>
   );
 
-  // Runtime arguments present → the "Test Your Automation" form view (two panels).
+  // Runtime arguments present → the "Test your automation" form view (two panels).
   const renderFormView = (resolvedTrackId: string): JSX.Element => (
     <Box>
       {pageTitle}

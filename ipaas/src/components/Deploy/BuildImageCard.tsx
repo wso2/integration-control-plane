@@ -80,14 +80,14 @@ export default function BuildImageCard({ image, isLatest, variant = 'detail', is
       }}>
       {/* ── Build ID row — Edit button (header-right) + selectable check ── */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 0.25 }}>
-        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
           Build ID
         </Typography>
 
         <Stack direction="row" gap={0.25} alignItems="center">
           {variant === 'detail' && !hideEdit && !isPendingBuild && (
             <Tooltip title="Change image">
-              <IconButton size="small" onClick={handleEdit} sx={{ p: 0.25 }}>
+              <IconButton aria-label="Change image" size="small" onClick={handleEdit} sx={{ p: 0.25 }}>
                 <Edit size={12} />
               </IconButton>
             </Tooltip>
@@ -103,7 +103,7 @@ export default function BuildImageCard({ image, isLatest, variant = 'detail', is
         </Typography>
         {variant === 'detail' && !isPendingBuild && (
           <Tooltip title={copied ? 'Copied!' : 'Copy build ID'}>
-            <IconButton size="small" onClick={handleCopy} sx={{ p: 0.25 }}>
+            <IconButton aria-label="Copy build ID" size="small" onClick={handleCopy} sx={{ p: 0.25 }}>
               {copied ? <Check size={12} /> : <Copy size={12} />}
             </IconButton>
           </Tooltip>
@@ -123,8 +123,8 @@ export default function BuildImageCard({ image, isLatest, variant = 'detail', is
       <Divider sx={{ mb: 1.5 }} />
 
       {/* ── Commit Details ── */}
-      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75 }}>
-        Commit Details
+      <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600, display: 'block', mb: 0.75 }}>
+        Commit details
       </Typography>
 
       <Tooltip title={image.commitMessage} placement="bottom-start">

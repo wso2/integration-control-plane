@@ -33,6 +33,9 @@ import GraphqlOperationsList from './GraphqlOperationsList';
 import { gatewayExposureState, toEndpointOptions } from '../../../utils/endpoints';
 import { friendlyApiError } from '../../../utils/apiSecurity';
 import { isProxyReconciliationActive, proxyReconciliationNotice } from '../../../utils/proxyReconciliation';
+import { Rocket } from '@wso2/oxygen-ui-icons-react';
+import EnvEmptyNotice from '../../EnvEmptyNotice';
+import { ENV_CARD_INSIGHTS_ENABLED } from '../../../constants/insights';
 
 /**
  * Integration-as-API's content-only body: a deployment-in-progress spinner, the
@@ -104,7 +107,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   const serviceNotDeployed = !loadingDeployment && !hasDeployment;
   // Use the endpoint's apimId for insights — component.apiId is often null for generic services.
   const insightsApiId = activeEndpoint?.apimId ?? component.apiId ?? '';
-  const showInsights = !!env.critical && !!env.id && !!env.name && !!projectId;
+  const showInsights = ENV_CARD_INSIGHTS_ENABLED && !!env.critical && !!env.id && !!env.name && !!projectId;
 
   if (loadingDeployment) return <EnvCardSkeleton />;
 
@@ -136,11 +139,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
           )
         ))}
 
-      {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && (
-        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
-          This integration has not been deployed to this environment yet.
-        </Typography>
-      )}
+      {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && <EnvEmptyNotice icon={Rocket}>This integration has not been deployed to this environment yet.</EnvEmptyNotice>}
 
       {/* Cloud-only in-console API consumption: consumer applications and the
           exposed API's security config. Keyed by the BFF's

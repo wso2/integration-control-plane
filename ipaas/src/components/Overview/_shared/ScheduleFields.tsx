@@ -108,7 +108,7 @@ export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX
           <Stack gap={2} sx={{ mt: 1.5 }}>
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                In Time Zone
+                In time zone
               </Typography>
               <Autocomplete
                 options={TIMEZONE_OPTIONS}
@@ -125,7 +125,7 @@ export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX
               </Typography>
               <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout || ' '} />
             </Box>
-            <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow Overlapping Executions" />
+            <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow overlapping executions" />
           </Stack>
         </Collapse>
       </Box>

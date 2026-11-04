@@ -175,6 +175,10 @@ export function editProjectUrl(scope: { org: string; project: string }): string 
   return `/organizations/${scope.org}/projects/${scope.project}/edit`;
 }
 
+export function linkRepositoryUrl(scope: { org: string; project: string }): string {
+  return `/organizations/${scope.org}/projects/${scope.project}/link-repository`;
+}
+
 export function importProjectUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/projects/import`;
 }
@@ -189,6 +193,24 @@ export function editEnvironmentUrl(scope: { org: string }, envId: string): strin
 
 export function orgCdPipelinesUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/admin/cd-pipelines`;
+}
+
+export function orgDatabasesUrl(scope: { org: string }): string {
+  return `/organizations/${scope.org}/platform-services`;
+}
+
+export function newDatabaseUrl(scope: { org: string }): string {
+  return `${orgDatabasesUrl(scope)}/new`;
+}
+
+/** A database's detail page, on one of its tabs. */
+export function databaseUrl(scope: { org: string }, serverId: string, tab = 'overview'): string {
+  return `${orgDatabasesUrl(scope)}/${encodeURIComponent(serverId)}/${tab}`;
+}
+
+/** A Temporal server's detail page, on one of its tabs. */
+export function temporalUrl(scope: { org: string }, serverId: string, tab = 'overview'): string {
+  return `${orgDatabasesUrl(scope)}/temporal/${encodeURIComponent(serverId)}/${tab}`;
 }
 
 /** The org Settings landing route — redirects to the first section the user can access. */
@@ -264,7 +286,8 @@ export interface NavEntry {
 
 const NAV: Record<Level, NavEntry[]> = {
   organizations: [
-    { key: 'overview', navId: 'overview', segment: 'home' },
+    { key: 'overview', navId: 'org-overview', segment: 'overview' },
+    { key: 'projects', navId: 'org-projects', segment: 'projects' },
     { key: 'build', navId: 'build', segment: 'build' },
     { key: 'deploy', navId: 'org-deploy', segment: 'deploy' },
     { key: 'test', navId: 'org-test', segment: 'test' },
@@ -273,6 +296,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
     { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
+    { key: 'platform-services', navId: 'org-platform-services', segment: 'platform-services' },
     { key: 'settings', navId: 'org-settings', segment: 'settings' },
   ],
   projects: [
@@ -294,6 +318,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'agent-chat', navId: 'agent-chat', segment: 'test/agent-chat', parent: 'test' },
     { key: 'logs', navId: 'logs', segment: 'logs', parent: 'observability' },
     { key: 'metrics', navId: 'metrics', segment: 'metrics', parent: 'observability' },
+    { key: 'traces', navId: 'traces', segment: 'traces', parent: 'observability' },
     { key: 'runtime', navId: 'runtime', segment: 'runtimes', parent: 'operate' },
     { key: 'containers', navId: 'containers', segment: 'admin/containers', parent: 'operate' },
     { key: 'configs-secrets', navId: 'configs-secrets', segment: 'admin/configs', parent: 'operate' },
@@ -377,10 +402,12 @@ function toOrgScope(scope: Scope): Scope {
 const CROSS_SCOPE_NAV_URL: Partial<Record<Level, Record<string, (scope: Scope) => string>>> = {
   projects: {
     'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
+    'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
   components: {
     'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
     'proj-cd-pipelines': (scope) => buildUrl(broaden(scope)!, 'admin/cd-pipelines'),
+    'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
 };
 

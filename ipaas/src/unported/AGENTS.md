@@ -1,6 +1,8 @@
 # AGENTS.md — src/unported
 
-Features whose UI exists but whose backend calls the BFF (`ipaas-service`) does not serve yet. Examples are access control, delivery insights, RAG, governance, databases and the Copilot. The code is kept so it can be ported, not run.
+Features whose UI exists but whose backend calls the BFF (`ipaas-service`) does not serve yet. Examples are access control, delivery insights, RAG, governance, vector databases, message brokers and the Copilot. The code is kept so it can be ported, not run.
+
+The `Databases` pages and components here are not the live Databases feature. The live one is in `src/pages/*Database*` and `src/components/Databases/`, built on `src/types/databases.ts`. The Vector Database and Message Broker pages reuse nearly every component in this copy, which is shaped for the old platform-services API. It stays here, unchanged, for them.
 
 ## How it is isolated
 
