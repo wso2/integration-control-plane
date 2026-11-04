@@ -30,7 +30,7 @@ interface SettingsTabsProps {
 }
 
 /**
- * Presentational "Settings" header (title + tab bar) shared by the Org, Project,
+ * Presentational "Manage" header (title + tab bar) shared by the Org, Project,
  * and Integration settings shells. Each scope-specific wrapper resolves its own
  * visible sections + navigation; this owns only the chrome.
  */
@@ -39,7 +39,7 @@ export default function SettingsTabs({ active, sections, onSelect }: SettingsTab
   return (
     <>
       <PageTitle>
-        <PageTitle.Header>Settings</PageTitle.Header>
+        <PageTitle.Header>Manage</PageTitle.Header>
       </PageTitle>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeIndex < 0 ? false : activeIndex} onChange={(_, v) => onSelect(sections[v].path)} variant="scrollable" scrollButtons="auto">

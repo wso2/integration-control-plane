@@ -25,6 +25,9 @@ export const CARD_HOVER_SX = {
   },
 } as const;
 
+// Tall enough for PrebuiltCard's padded app-icon row, so both Start quickly tabs list cards of one height.
+export const START_QUICKLY_CARD_MIN_HEIGHT = 90;
+
 type PrimaryTheme = { palette: { primary: { main: string } } };
 
 export const primaryTint = (percent: number) => (t: PrimaryTheme) => `color-mix(in srgb, ${t.palette.primary.main} ${percent}%, transparent)`;

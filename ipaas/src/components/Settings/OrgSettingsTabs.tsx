@@ -23,7 +23,7 @@ import { SETTINGS_SECTIONS, isSettingsSectionVisible } from '../../constants/org
 import { orgSettingsSectionUrl, useScope } from '../../nav';
 import SettingsTabs from './SettingsTabs';
 
-/** The org Settings header — resolves the visible sections and delegates chrome to `SettingsTabs`. */
+/** The org Manage header — resolves the visible sections and delegates chrome to `SettingsTabs`. */
 export default function OrgSettingsTabs({ active }: { active: string }): JSX.Element {
   const scope = useScope();
   const navigate = useAppNavigate();

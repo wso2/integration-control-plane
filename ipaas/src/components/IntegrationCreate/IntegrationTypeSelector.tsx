@@ -22,6 +22,14 @@ import type { JSX, KeyboardEvent, MouseEvent } from 'react';
 import type { IntegrationType } from '../../types/import';
 import { INTEGRATION_TYPES } from '../../constants/import';
 
+// Four columns from lg, but a new row starts after every third card, so the fourth stays empty.
+const GRID_SX = {
+  display: 'grid',
+  gap: 2,
+  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
+  '& > :nth-of-type(3n + 1)': { gridColumnStart: { lg: 1 } },
+} as const;
+
 interface IntegrationTypeSelectorProps {
   selected: IntegrationType | null;
   onSelect: (type: IntegrationType) => void;
@@ -30,7 +38,7 @@ interface IntegrationTypeSelectorProps {
 
 export default function IntegrationTypeSelector({ selected, onSelect, excludedTypes = [] }: IntegrationTypeSelectorProps): JSX.Element {
   return (
-    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+    <Box sx={GRID_SX}>
       {INTEGRATION_TYPES.filter((opt) => !excludedTypes.includes(opt.id)).map((opt) => {
         const isActive = selected === opt.id;
         return (
@@ -47,8 +55,6 @@ export default function IntegrationTypeSelector({ selected, onSelect, excludedTy
               }
             }}
             sx={{
-              width: '25%',
-              minWidth: 180,
               border: 2,
               borderColor: isActive ? 'primary.main' : 'divider',
               bgcolor: isActive ? 'primary.50' : 'background.paper',

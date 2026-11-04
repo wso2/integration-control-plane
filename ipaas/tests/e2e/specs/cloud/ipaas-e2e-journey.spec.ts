@@ -965,9 +965,8 @@ test.describe('07 page availability @smoke', () => {
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
     await openNavGroup(page, 'Observe', 'Runtime logs');
-    await expectNavItems(page, ['Runtime logs', 'Metrics']);
-    await openNavGroup(page, 'Infrastructure', 'Environments');
-    await expectNavItems(page, ['Environments', 'Pipelines', 'Settings']);
+    await expectNavItems(page, ['Runtime logs', 'Metrics', 'Platform Services', 'Manage']);
+    await expect(page.getByRole('button', { name: 'Infrastructure', exact: true })).toHaveCount(0);
   });
 
   test('TC_IP_NAV_002 the project scope offers its pages', async () => {
@@ -976,11 +975,9 @@ test.describe('07 page availability @smoke', () => {
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
     await openNavGroup(page, 'Observe', 'Runtime logs');
-    await expectNavItems(page, ['Runtime logs', 'Metrics']);
-    await openNavGroup(page, 'Infrastructure', 'Environments');
-    await expectNavItems(page, ['Environments', 'Pipelines']);
-    // Projects have no Settings page: editing is on the overview and deletion on the project list's card.
-    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0);
+    await expectNavItems(page, ['Runtime logs', 'Metrics', 'Platform Services']);
+    await expect(page.getByRole('button', { name: 'Manage', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Infrastructure', exact: true })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await expect(page.getByRole('heading', { name: activeProject() })).toBeVisible({ timeout: 30_000 });
@@ -1006,8 +1003,7 @@ test.describe('07 page availability @smoke', () => {
 
     await openNavGroup(page, 'Operate', 'Runtime');
     await expectNavItems(page, ['Runtime', 'Containers', 'Configs & secrets']);
-    await openNavGroup(page, 'Infrastructure', 'Environments');
-    await expectNavItems(page, ['Environments', 'Pipelines']);
+    await expect(page.getByRole('button', { name: 'Infrastructure', exact: true })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await expect(page.getByRole('heading', { name: SAMPLE })).toBeVisible({ timeout: 30_000 });

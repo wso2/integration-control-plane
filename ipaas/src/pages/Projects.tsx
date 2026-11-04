@@ -130,7 +130,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
         </PageTitle.Actions>
       </PageTitle>
 
-      <SearchField value={query} onChange={setQuery} placeholder="Search projects" fullWidth sx={styles.searchSx} />
+      <SearchField value={query} onChange={setQuery} placeholder="Search projects" width="standard" sx={styles.searchSx} />
 
       {alert && (
         <Alert severity="success" onClose={() => setAlert(null)} sx={{ mb: 3 }}>

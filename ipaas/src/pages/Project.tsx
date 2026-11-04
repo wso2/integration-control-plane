@@ -55,7 +55,7 @@ import {
 } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX } from '../constants/styles';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
-import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, SlidersHorizontal, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
 import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
@@ -101,7 +101,12 @@ const linkRepoButtonSx = { mt: 1, px: 0, minWidth: 0, textTransform: 'none', fon
 const projectAvatarSx = { width: 58, height: 58, flexShrink: 0 } as const;
 // Keeps each integration row at 16px padding around a 32px name cell.
 const NAME_ICON_SIZE = 32;
-const integrationSearchSx = { flex: 1 } as const;
+// Standard search width (SearchField's `standard`), stretched only when the label filter and its chips share the field.
+const integrationSearchSx = { width: '100%', maxWidth: 400 } as const;
+const integrationSearchWithLabelsSx = { flex: 1 } as const;
+// Opens leftward from the filter icon, which sits at the field's right edge.
+const LABEL_MENU_ANCHOR = { vertical: 'bottom', horizontal: 'right' } as const;
+const LABEL_MENU_TRANSFORM = { vertical: 'top', horizontal: 'right' } as const;
 const descriptionSx = { maxWidth: 260 } as const;
 const INTEGRATIONS_HEADING_ID = 'project-integrations-heading';
 const overviewGridSx = { display: 'grid', columnGap: 4, rowGap: 2, gridTemplateColumns: { xs: '1fr', md: '3fr 1fr' } } as const;
@@ -374,7 +379,7 @@ function IntegrationsTable({
           placeholder="Search integrations"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          sx={integrationSearchSx}
+          sx={allLabels.length > 0 ? integrationSearchWithLabelsSx : integrationSearchSx}
           slotProps={{
             htmlInput: { 'aria-label': 'Search integrations' },
             input: {
@@ -411,7 +416,7 @@ function IntegrationsTable({
           </Tooltip>
         </Authorized>
       </Stack>
-      <Menu anchorEl={labelAnchor} open={Boolean(labelAnchor)} onClose={() => setLabelAnchor(null)} slotProps={{ paper: { sx: { minWidth: 180, maxHeight: 320 } } }}>
+      <Menu anchorEl={labelAnchor} open={Boolean(labelAnchor)} onClose={() => setLabelAnchor(null)} anchorOrigin={LABEL_MENU_ANCHOR} transformOrigin={LABEL_MENU_TRANSFORM} slotProps={{ paper: { sx: { minWidth: 180, maxHeight: 320 } } }}>
         {allLabels.map((label) => (
           <MenuItem key={label} onClick={() => handleToggleLabel(label)} dense>
             <Checkbox size="small" checked={selectedLabels.includes(label)} sx={{ p: 0, mr: 1 }} />
@@ -975,8 +980,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
           </Stack>
           <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
             <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
-              <Button variant="outlined" size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
-                Edit project
+              <Button variant="outlined" size="small" startIcon={<SlidersHorizontal size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
+                Manage project
               </Button>
             </Authorized>
             {openInCloudComponent && projectRepoUrl && (

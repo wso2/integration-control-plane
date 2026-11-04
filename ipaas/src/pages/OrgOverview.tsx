@@ -29,7 +29,7 @@ import { useAccessControl } from '../contexts/AccessControlContext';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useOrgComponents } from '../hooks/useComponents';
 import { useProjects } from '../hooks/useProjects';
-import { newComponentUrl, newProjectUrl, type OrgScope } from '../nav';
+import { newComponentUrl, newDatabaseUrl, newProjectUrl, type OrgScope } from '../nav';
 import { orgProjectsUrl, projectHomeUrl } from '../paths';
 import type { Project } from '../types/project';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
@@ -211,7 +211,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           disabledReason={createDeniedReason}
         />
         <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" disabledReason="Coming soon" />
-        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" disabledReason="Coming soon" />
+        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" onAction={() => navigate(newDatabaseUrl(scope))} />
       </Box>
 
       <Card>

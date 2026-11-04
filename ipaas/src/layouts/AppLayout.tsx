@@ -55,14 +55,12 @@ import {
   ChartColumn,
   ChevronDown,
   ChevronRight,
-  Cog,
   Database,
   FileLock,
   FlaskConical,
   Gauge,
   Hammer,
   HeartPulse,
-  Layers,
   Box as BoxIcon,
   LayoutDashboard,
   LogOut,
@@ -71,10 +69,9 @@ import {
   Plus,
   Rocket,
   Server,
-  Settings2,
   SlidersHorizontal,
   Waypoints,
-  Workflow,
+  Wrench,
   X,
 } from '@wso2/oxygen-ui-icons-react';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
@@ -123,8 +120,6 @@ import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
 import { expandedMenusFrom } from '../utils/sidebar';
-
-const trialBadgeSx = { mx: 0.75 } as const;
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
@@ -652,7 +647,7 @@ export default function AppLayout(): JSX.Element {
           <Header.Actions>
             {billingTrial && (
               // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
-              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} sx={trialBadgeSx} />
+              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} />
             )}
             <ColorSchemeToggle />
             <UserMenu>
@@ -755,32 +750,12 @@ export default function AppLayout(): JSX.Element {
                         </Sidebar.ItemIcon>
                         <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                       </Sidebar.Item>
-                      {/* Environments come before the pipelines that promote across them. */}
-                      <Sidebar.Item id="org-admin">
-                        <Sidebar.ItemIcon>
-                          <Settings2 size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                        <Sidebar.Item id="org-environments">
-                          <Sidebar.ItemIcon>
-                            <Layers size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                        <Sidebar.Item id="org-cd-pipelines">
-                          <Sidebar.ItemIcon>
-                            <Workflow size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                      </Sidebar.Item>
-
-                      {/* Settings carries Package Registries. */}
+                      {/* Manage carries Package Registries. */}
                       <Sidebar.Item id="org-settings">
                         <Sidebar.ItemIcon>
-                          <Cog size={20} />
+                          <SlidersHorizontal size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                        <Sidebar.ItemLabel>Manage</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     </Sidebar.Category>,
                   ]
@@ -874,11 +849,9 @@ export default function AppLayout(): JSX.Element {
                             )}
                           </Sidebar.Item>
 
-                          {/* Day-2 operations on a running integration. Sits beside Observe rather than
-                              under Infrastructure, which holds the environments and the pipeline. */}
                           <Sidebar.Item id="operate">
                             <Sidebar.ItemIcon>
-                              <SlidersHorizontal size={20} />
+                              <Wrench size={20} />
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Operate</Sidebar.ItemLabel>
                             <Sidebar.Item id="runtime">
@@ -926,34 +899,12 @@ export default function AppLayout(): JSX.Element {
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                           </Sidebar.Item>
-                          <Sidebar.Item id="admin">
-                            <Sidebar.ItemIcon>
-                              <Settings2 size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                            {/* Neither page exists at integration level — these link up, and lead the group.
-                              Rendered as separate children: a fragment hides them from the Sidebar's
-                              child scan, which is what decides sub-item indentation. */}
-                            <Sidebar.Item id="org-environments">
-                              <Sidebar.ItemIcon>
-                                <Layers size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-cd-pipelines">
-                              <Sidebar.ItemIcon>
-                                <Workflow size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          </Sidebar.Item>
-
                           {hasSettings && (
                             <Sidebar.Item id="component-settings">
                               <Sidebar.ItemIcon>
-                                <Cog size={20} />
+                                <SlidersHorizontal size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Manage</Sidebar.ItemLabel>
                             </Sidebar.Item>
                           )}
                         </Sidebar.Category>,
@@ -1019,25 +970,6 @@ export default function AppLayout(): JSX.Element {
                             <Database size={20} />
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                        {/* Environments link up to the org page; the pipeline is this project's own. */}
-                        <Sidebar.Item id="proj-admin">
-                          <Sidebar.ItemIcon>
-                            <Settings2 size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                          <Sidebar.Item id="org-environments">
-                            <Sidebar.ItemIcon>
-                              <Layers size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="proj-cd-pipelines">
-                            <Sidebar.ItemIcon>
-                              <Workflow size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                          </Sidebar.Item>
                         </Sidebar.Item>
                       </Sidebar.Category>,
                     ]}

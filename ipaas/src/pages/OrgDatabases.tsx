@@ -82,7 +82,7 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={headerSx}>
         <PageTitle>
           <PageTitle.Header>Platform Services</PageTitle.Header>

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Grid, PageContent, PageTitle, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Workflow } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import SelectableCard from '../components/Databases/SelectableCard';
@@ -99,7 +99,7 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
   const typeAndName = (
     <>
       <Typography variant="subtitle2" sx={sectionHeadingSx}>
-        Select Service Type
+        Select service type
       </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {PLATFORM_SERVICE_TYPES.map((type) => (
@@ -184,15 +184,15 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
   );
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgDatabasesUrl(scope))} sx={{ mb: 2 }}>
         Back to Platform Services
       </Button>
 
       <Box sx={{ maxWidth: 900 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-          Create Service
-        </Typography>
+        <PageTitle>
+          <PageTitle.Header>Create service</PageTitle.Header>
+        </PageTitle>
 
         {createError && (
           <Alert severity="error" onClose={() => create.reset()} sx={{ mb: 3 }}>
@@ -207,11 +207,11 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
         {kind && <Box sx={{ mt: 4 }}>{planSection}</Box>}
 
         <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
+          <Button variant="outlined" color="inherit" disabled={create.isPending} onClick={() => navigate(orgDatabasesUrl(scope))}>
+            Cancel
+          </Button>
           <Button variant="contained" disabled={!canCreate} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
             {create.isPending ? 'Creating…' : 'Create'}
-          </Button>
-          <Button variant="outlined" disabled={create.isPending} onClick={() => navigate(orgDatabasesUrl(scope))}>
-            Cancel
           </Button>
         </Stack>
       </Box>
