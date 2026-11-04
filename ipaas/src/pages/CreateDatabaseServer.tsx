@@ -16,10 +16,9 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Workflow } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import TextField from '../components/common/TextField';
 import SelectableCard from '../components/Databases/SelectableCard';
 import PlanCard from '../components/Databases/PlanCard';
 import TemporalPlanCard from '../components/Temporal/TemporalPlanCard';
@@ -111,6 +110,7 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
       </Grid>
       {kind && (
         <TextField
+          labelPlacement="top"
           label="Name"
           required
           fullWidth
