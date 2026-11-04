@@ -65,7 +65,7 @@ export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
     const notes: string[] = [];
     if (!l.linked) notes.push(l.sourceDefined ? 'declared in workload.yaml' : 'unlinked · until next release');
     else if (!l.connection) notes.push('linked from WSO2 Cloud', ...(pending ? ['next release'] : []));
-    else if (e?.inRelease && e.connection && e.connection !== l.connection) notes.push(`through ${e.connection}`, pending ? `now uses ${l.connection}; next release` : `link now uses ${l.connection}`);
+    else if (e?.inRelease && e.connection && e.connection !== l.connection) notes.push(`through ${e.connection}`, `link now uses ${l.connection}`);
     else notes.push(`through ${l.connection}`, ...(pending ? ['next release'] : []));
     if (l.sourceDefined && l.linked) notes.push('overridden by workload.yaml');
     else if (l.namesFromWso2Cloud && l.connection) notes.push('names overridden on WSO2 Cloud');

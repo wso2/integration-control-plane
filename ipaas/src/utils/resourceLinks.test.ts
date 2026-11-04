@@ -91,9 +91,9 @@ describe('linkRows', () => {
     expect(linkRows([renamed], 'production')[0].notes).toEqual(['linked from WSO2 Cloud', 'next release']);
   });
 
-  it("names the release's connection while the link is ahead of it, and that the next release gets the link's", () => {
-    expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'now uses wso2.sfdemo.sfCrm; next release'], noValues: false, canUnlink: true }]);
-    expect(linkRows([ahead], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'now uses wso2.sfdemo.sfCrm; next release']);
+  it("names the release's connection while the link is ahead of it, without calling the environment unlinked", () => {
+    expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'link now uses wso2.sfdemo.sfCrm'], noValues: false, canUnlink: true }]);
+    expect(linkRows([ahead], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'link now uses wso2.sfdemo.sfCrm']);
   });
 
   it("names the release's connection after a rollback to a build before a Change link", () => {
