@@ -1237,6 +1237,21 @@ describe('uploadSourceTitle', () => {
     expect(uploadSourceTitle(of('queued', 'indexing', 'searchable'), 'Docs')).toBe('3 files sent to “Docs” · indexing');
   });
 
+  it('does not count a file the engine never received as sent', () => {
+    expect(uploadSourceTitle([{ status: 'failed' }, { status: 'uploading' }, { status: 'queued', jobId: 'job_1' }], 'Docs')).toBe('Uploading 3 files to “Docs” · 1 of 3 sent');
+    expect(uploadSourceTitle([{ status: 'failed' }, { status: 'queued', jobId: 'job_1' }, { status: 'indexing', jobId: 'job_2' }], 'Docs')).toBe('2 files sent to “Docs” · indexing · 1 failed');
+    // A file the engine took and then failed on was sent.
+    expect(
+      uploadSourceTitle(
+        [
+          { status: 'failed', jobId: 'job_0' },
+          { status: 'queued', jobId: 'job_1' },
+        ],
+        'Docs',
+      ),
+    ).toBe('2 files sent to “Docs” · indexing');
+  });
+
   it('says how many failed once nothing is running', () => {
     expect(uploadSourceTitle(of('searchable', 'failed'), 'Docs')).toBe('2 files uploaded to “Docs” · 1 failed');
     expect(uploadSourceTitle(of('searchable'), 'Docs')).toBe('1 file uploaded to “Docs”');

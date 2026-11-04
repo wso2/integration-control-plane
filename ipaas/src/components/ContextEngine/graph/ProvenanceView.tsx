@@ -396,13 +396,13 @@ function DerivationSteps({
     },
     {
       title: 'Access check',
-      body: trace?.suppressed ? `${trace.suppressed} withheld by the access check.` : 'Every passage passed the access check.',
+      body: trace?.suppressed ? `${trace.suppressed} withheld by the access check.` : trace ? 'Every passage passed the access check.' : 'Every passage shown passed the access check.',
     },
     result.answer
       ? {
           title: 'Answer',
           lit: true,
-          body: `${modelName ?? 'The language model'} wrote ${summary.sentences} sentence${summary.sentences === 1 ? '' : 's'} from the ${result.evidence.length} passage${result.evidence.length === 1 ? '' : 's'} it was given. Citations checked: ${citations.join(', ') || 'none'}.${uncited.length ? ` ${uncited.length === 1 ? 'Passage' : 'Passages'} ${uncited.join(', ')} ${uncited.length === 1 ? 'was' : 'were'} given but not cited.` : ''}`,
+          body: `${modelName ?? 'The language model'} wrote ${summary.sentences} sentence${summary.sentences === 1 ? '' : 's'} from the ${result.evidence.length} passage${result.evidence.length === 1 ? '' : 's'} it was given. Citations checked: ${citations.join(', ') || 'none'}${uncited.length ? `; ${uncited.map((n) => `passage ${n}`).join(', ')} given, not cited` : ''}.`,
         }
       : { title: 'Answer', body: result.answerWithheld ? 'Hidden: a passage it was written from is out of your reach now.' : result.insufficientEvidence ? 'None: the passages did not answer the question.' : 'Passages only: no answer was written.' },
     {

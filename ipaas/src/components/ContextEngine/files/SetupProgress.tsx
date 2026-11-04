@@ -104,14 +104,9 @@ export default function SetupProgress({ engineId, engineName, sourceCount, roleC
   return (
     <Box sx={setupCardSx}>
       <Stack direction="row" alignItems="center" gap={1.5}>
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Setting up {engineName}
-          </Typography>
-          <Typography variant="body2" sx={mutedSx}>
-            Uploading your files.
-          </Typography>
-        </Box>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          Setting up {engineName}
+        </Typography>
       </Stack>
       <Box sx={{ mt: 2 }}>
         <Step tone="done" aside={engineId}>

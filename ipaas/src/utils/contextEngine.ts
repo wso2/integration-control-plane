@@ -1055,16 +1055,18 @@ export function uploadIsSlow(entry: Pick<UploadEntry, 'uploadedAt'>, now: number
 
 /**
  * The setup card's line for one upload source. A file counts once the engine has it: indexing can
- * take far longer than the upload, so while it runs the line says the files are sent.
+ * take far longer than the upload, so while it runs the line says the files are sent. A failed row
+ * without a job never reached the engine, so it is not sent.
  */
-export function uploadSourceTitle(entries: Pick<UploadEntry, 'status'>[], sourceName: string): string {
+export function uploadSourceTitle(entries: Pick<UploadEntry, 'status' | 'jobId'>[], sourceName: string): string {
   const files = plural(entries.length, 'file');
-  if (!entries.some(isUploadActive)) {
-    const failed = entries.filter((e) => e.status === 'failed').length;
-    return `${files} uploaded to “${sourceName}”${failed ? ` · ${failed} failed` : ''}`;
-  }
-  const sent = entries.filter((e) => e.status !== 'uploading').length;
-  return sent < entries.length ? `Uploading ${files} to “${sourceName}” · ${sent} of ${entries.length} sent` : `${files} sent to “${sourceName}” · indexing`;
+  const failed = entries.filter((e) => e.status === 'failed').length;
+  if (!entries.some(isUploadActive)) return `${files} uploaded to “${sourceName}”${failed ? ` · ${failed} failed` : ''}`;
+  const uploading = entries.filter((e) => e.status === 'uploading').length;
+  const notSent = entries.filter((e) => e.status === 'failed' && !e.jobId).length;
+  const sent = entries.length - uploading - notSent;
+  if (uploading) return `Uploading ${files} to “${sourceName}” · ${sent} of ${entries.length} sent`;
+  return `${plural(sent, 'file')} sent to “${sourceName}” · indexing${notSent ? ` · ${notSent} failed` : ''}`;
 }
 
 /** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */
@@ -1184,7 +1186,7 @@ export function suggestedQuestions(engine: Pick<ContextEngineDetail, 'sources'>)
 }
 
 /** What a failed deletion means for the engine, whatever stopped it. */
-export const DELETION_FAILURE_TEXT = 'Deletion did not finish. Your data is kept. Delete again to continue.';
+export const DELETION_FAILURE_TEXT = 'Deletion did not finish. Your data is kept. Retry to continue.';
 
 // ── Editing models on a running engine ──────────────────────────────────────
 
