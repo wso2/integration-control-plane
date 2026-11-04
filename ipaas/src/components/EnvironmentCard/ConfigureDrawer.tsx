@@ -26,8 +26,7 @@ import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings, useFormLinks } from '../../hooks/useConfiguration';
-import { LinkRows } from './LinkRows';
-import { LinkSuggestions } from './LinkSuggestions';
+import { FormLinks } from './FormLinks';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
@@ -738,6 +737,7 @@ function GenericServiceConfigureDrawer({
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
   hideEndpoints = false,
+  buildId,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
   // File/event integrations have no endpoints (devant: they open the
@@ -1042,8 +1042,7 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
-        <LinkRows projectId={projectId} componentId={componentId} env={schemaEnvId} links={links} />
-        <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} actions={['Link', 'Link through']} />
+        <FormLinks projectId={projectId} componentId={componentId} env={schemaEnvId} open={open} links={links} build={buildId} />
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}

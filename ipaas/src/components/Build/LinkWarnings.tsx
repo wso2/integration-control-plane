@@ -37,23 +37,12 @@ const noLinks: ResourceLink[] = [];
 /** Where a build and the integration's links disagree: Change link for a connection the build doesn't read, Deploy for names not applied yet. */
 export function LinkWarnings({ projectId, componentId, versionId, build, firstEnvId, deploymentPipelineId }: LinkWarningsProps) {
   const { data: warnings = [] } = useLinkWarnings(projectId, componentId, build, true);
-  const { data: links = noLinks } = useResourceLinks(projectId, componentId, true);
   const deploy = useDeployDeploymentTrack();
-  const notInBuild = warnings.filter((w) => w.reason === 'not_in_build');
   const notApplied = warnings.filter((w) => w.reason === 'not_applied');
 
   return (
     <>
-      {notInBuild.length > 0 && (
-        <Alert severity="warning" sx={alertSx}>
-          {notInBuild.map((w) => (
-            <Typography key={w.resourceType} variant="body2">
-              {w.resourceType}: this build has no {w.connection.slice(w.connection.lastIndexOf('.') + 1)}
-            </Typography>
-          ))}
-        </Alert>
-      )}
-      <LinkSuggestions projectId={projectId} componentId={componentId} open links={links} build={build} actions={['Change link']} bare />
+      <BuildChangeLink projectId={projectId} componentId={componentId} build={build} />
       {notApplied.length > 0 && (
         <Alert
           severity="warning"
@@ -76,6 +65,28 @@ export function LinkWarnings({ projectId, componentId, versionId, build, firstEn
           {deploy.error instanceof Error ? deploy.error.message : 'Failed to deploy the build'}
         </Alert>
       )}
+    </>
+  );
+}
+
+/** The links whose connection a build doesn't have, with Change link to one of that build's connections. */
+export function BuildChangeLink({ projectId, componentId, build }: { projectId: string; componentId: string; build: string }) {
+  const { data: warnings = [] } = useLinkWarnings(projectId, componentId, build, true);
+  const { data: links = noLinks } = useResourceLinks(projectId, componentId, true);
+  const notInBuild = warnings.filter((w) => w.reason === 'not_in_build');
+
+  return (
+    <>
+      {notInBuild.length > 0 && (
+        <Alert severity="warning" sx={alertSx}>
+          {notInBuild.map((w) => (
+            <Typography key={w.resourceType} variant="body2">
+              {w.resourceType}: this build has no {w.connection.slice(w.connection.lastIndexOf('.') + 1)}
+            </Typography>
+          ))}
+        </Alert>
+      )}
+      <LinkSuggestions projectId={projectId} componentId={componentId} open links={links} build={build} actions={['Change link']} bare />
     </>
   );
 }
