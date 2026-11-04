@@ -309,7 +309,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'deploy', navId: 'org-deploy', segment: 'deploy' },
     { key: 'test', navId: 'org-test', segment: 'test' },
     { key: 'insights', navId: 'org-insights', segment: 'insights' },
-    { key: 'voice-agents', navId: 'org-voice-agents', segment: 'voice-agents' },
+    { key: 'voice-agents', navId: 'org-voice-agents', segment: 'voice-agents', parent: 'org-ai-services' },
     { key: 'logs', navId: 'org-logs', segment: 'logs', parent: 'org-observability' },
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },

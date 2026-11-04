@@ -17,7 +17,7 @@
  */
 
 import { Alert, Divider, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import { AudioLines } from '@wso2/oxygen-ui-icons-react';
+import { Mic } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
@@ -37,7 +37,7 @@ export default function EnvCardBody({ component, versionId, releaseId, hasDeploy
       <>
         <Divider sx={{ my: 2 }} />
         <Stack alignItems="center" gap={1} sx={{ py: 4 }}>
-          <AudioLines size={24} style={{ opacity: 0.4 }} />
+          <Mic size={24} style={{ opacity: 0.4 }} />
           <Typography variant="body2" color="text.secondary">
             This voice agent is not deployed in this environment.
           </Typography>

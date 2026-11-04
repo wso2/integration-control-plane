@@ -17,7 +17,7 @@
  */
 
 import { Alert, Button, Link, ListingTable, Menu, MenuItem, PageContent, PageTitle, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import { AudioLines, Plus } from '@wso2/oxygen-ui-icons-react';
+import { Mic, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type MouseEvent } from 'react';
 import { Link as RouterLink } from 'react-router';
 import EmptyListing from '../components/EmptyListing';
@@ -68,7 +68,7 @@ export default function VoiceAgents(scope: OrgScope): JSX.Element {
           Could not load the projects.
         </Alert>
       ) : projects.length === 0 ? (
-        <EmptyListing icon={<AudioLines size={48} />} title="No projects" description="Create a project first; voice agents live in a project." />
+        <EmptyListing icon={<Mic size={48} />} title="No projects" description="Create a project first; voice agents live in a project." />
       ) : (
         <VoiceAgentList org={scope.org} projects={projects} />
       )}
@@ -119,7 +119,7 @@ function VoiceAgentList({ org, projects }: { org: string; projects: Project[] })
         Could not load the voice agents.
       </Alert>
     );
-  if (rows.length === 0) return <EmptyListing icon={<AudioLines size={48} />} title="No voice agents" description="Create a voice agent to let callers talk to one of your agents." />;
+  if (rows.length === 0) return <EmptyListing icon={<Mic size={48} />} title="No voice agents" description="Create a voice agent to let callers talk to one of your agents." />;
 
   const needle = query.trim().toLowerCase();
   const visible = needle ? rows.filter((r) => `${r.component.displayName} ${r.component.handler} ${r.project.name}`.toLowerCase().includes(needle)) : rows;

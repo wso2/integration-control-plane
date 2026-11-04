@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, Card, CardContent, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowRight, AudioLines, GitHub, Plus, GitBranch } from '@wso2/oxygen-ui-icons-react';
+import { ArrowRight, Mic, GitHub, Plus, GitBranch } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useDeploySample } from '../hooks/useDeploySample';
@@ -390,7 +390,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
           <Box sx={{ flex: '0 0 auto' }}>
             <Card sx={{ boxShadow: 'none', ...(creationBlocked ? { pointerEvents: 'none', opacity: 0.5 } : {}) }}>
               <CardContent sx={VOICE_AGENT_CARD_SX}>
-                <AudioLines size={18} />
+                <Mic size={18} />
                 <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Typography variant="body1" sx={{ fontWeight: 500 }}>
                     Voice agent
