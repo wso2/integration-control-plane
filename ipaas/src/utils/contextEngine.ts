@@ -1191,7 +1191,7 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
           title: 'Index your sources',
           description: uploadOnly ? (progress ? `${progressHeadline(progress)}.` : 'Files become searchable after upload.') : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
         },
-    { id: 'ask', title: 'Ask it something' },
+    { id: 'ask', title: 'Ask it something', description: 'Try a question in the Playground.' },
     { id: 'publish', title: 'Connect an agent', description: 'Call it from agents over REST or MCP.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
   ];

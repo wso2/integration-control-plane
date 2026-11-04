@@ -18,21 +18,25 @@
 
 import { Box, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { surfaceHeaderSx } from '../styles';
+import { mutedSx, surfaceHeaderSx } from '../styles';
 
 interface SurfaceHeaderProps {
   title: string;
+  description: string;
 }
 
 /**
  * Title of the API and MCP tabs. Whether the engine serves each surface is a deployment setting
  * the control plane provisions, so there is nothing to toggle here.
  */
-export default function SurfaceHeader({ title }: SurfaceHeaderProps): JSX.Element {
+export default function SurfaceHeader({ title, description }: SurfaceHeaderProps): JSX.Element {
   return (
     <Box sx={surfaceHeaderSx}>
       <Typography variant="h6" sx={{ fontWeight: 600 }}>
         {title}
+      </Typography>
+      <Typography variant="body2" sx={mutedSx}>
+        {description}
       </Typography>
     </Box>
   );

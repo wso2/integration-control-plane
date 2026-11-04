@@ -44,7 +44,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <SurfaceHeader title="REST API" />
+      <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
 
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Endpoints
