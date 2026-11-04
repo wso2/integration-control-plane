@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, /* Button, */ Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { EyeOff, Info, KeyRound, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { CONTEXT_ENGINE_PROVISIONING, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
@@ -33,7 +33,7 @@ import FilesDrawer from '../files/FilesDrawer';
 import EditSourceDrawer from './EditSourceDrawer';
 import EditModelsDrawer from './EditModelsDrawer';
 import SourceDrawer from '../SourceDrawer';
-import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
+import { deleteCardSx, mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
 import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
@@ -46,6 +46,8 @@ interface OverviewTabProps {
   openFilesSourceId?: string;
   /** The engine is being deleted: show what it holds, offer nothing that changes it. */
   readOnly?: boolean;
+  /** Ask to delete the engine. The page owns the confirmation dialog. */
+  onRequestDelete?: () => void;
 }
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }): JSX.Element {
@@ -62,6 +64,14 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
   );
 }
 
+function LockedChip({ title }: { title: string }): JSX.Element {
+  return (
+    <Tooltip title={title}>
+      <Chip size="small" variant="outlined" icon={<Lock size={12} />} label="Locked" sx={{ height: 22 }} />
+    </Tooltip>
+  );
+}
+
 const providerName = (kind: 'embedding' | 'llm', id: string | undefined): string => {
   if (!id) return '—';
   const list: { id: string; name: string }[] = kind === 'embedding' ? EMBEDDING_PROVIDERS : LLM_PROVIDERS;
@@ -75,11 +85,7 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
         <Typography variant="body2" sx={mutedSx}>
           {label}
         </Typography>
-        {locked && (
-          <Tooltip title="Fixed while the engine holds indexed items: their vectors only match this model.">
-            <Chip size="small" variant="outlined" icon={<Lock size={12} />} label="Locked" sx={{ height: 22 }} />
-          </Tooltip>
-        )}
+        {locked && <LockedChip title="Fixed while the engine holds indexed items: their vectors only match this model." />}
       </Stack>
       <Box sx={{ textAlign: 'right' }}>
         <Typography variant="body2" sx={{ fontWeight: 500 }}>
@@ -99,7 +105,7 @@ const canSeeModels = (actions: string[] | undefined): boolean => !actions || act
 const SOURCES_CARD_ID = 'context-engine-sources';
 
 /** Overview — first-run checklist, source progress, access, models, storage and exposure, each linking to its tab. */
-export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTab, openFilesSourceId, readOnly = false }: OverviewTabProps): JSX.Element {
+export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTab, openFilesSourceId, readOnly = false, onRequestDelete }: OverviewTabProps): JSX.Element {
   const [filesSource, setFilesSource] = useState<ContextSource | null>(() => engine.sources.find((s) => s.id === openFilesSourceId && s.type === 'upload') ?? null);
   const [filesOpen, setFilesOpen] = useState(!!openFilesSourceId);
   const openFiles = (source: ContextSource) => {
@@ -117,6 +123,9 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const permissions = useContextPermissions(engine.id);
   // Models come from the engine's environment; changing them is provisioning, the control plane's.
   const canEditModels = CONTEXT_ENGINE_PROVISIONING && !readOnly && !!permissions.data?.includes('engine.manage');
+  // Deleting the engine needs the manage permission, so people without it are not offered a button that only fails.
+  // Without provisioning, deleting only removes the engine from this console and needs no engine permission.
+  const canDelete = !readOnly && (!CONTEXT_ENGINE_PROVISIONING || !!permissions.data?.includes('engine.manage'));
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
   const openModels = () => {
@@ -279,7 +288,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card title="Storage">
+          <Card title="Storage" action={<LockedChip title="Storage is fixed once the engine is created." />}>
             {STORAGE_BACKENDS.map((b) => {
               const sum = engine.storage?.[b.kind];
               return (
@@ -323,6 +332,24 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             </Box>
           </Card>
         </Grid>
+
+        {onRequestDelete && canDelete && (
+          <Grid size={{ xs: 12 }}>
+            <Box sx={deleteCardSx}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  Delete engine
+                </Typography>
+                <Typography variant="body2" sx={mutedSx}>
+                  {CONTEXT_ENGINE_PROVISIONING ? 'Deletes the engine and everything it holds. This can’t be undone.' : 'Removes the engine from this console. Its data stays in the engine’s databases.'}
+                </Typography>
+              </Box>
+              <Button variant="outlined" color="error" onClick={onRequestDelete} sx={{ flexShrink: 0 }}>
+                Delete engine
+              </Button>
+            </Box>
+          </Grid>
+        )}
       </Grid>
 
       {modelsSession > 0 && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={engine.models} open={modelsOpen} onClose={() => setModelsOpen(false)} />}
