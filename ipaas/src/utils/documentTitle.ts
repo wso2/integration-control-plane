@@ -22,8 +22,8 @@ export const APP_NAME = 'WSO2 Integration Platform';
 /** Nav ids whose page name is not simply the id in sentence case. */
 const TITLE_OVERRIDES: Record<string, string> = {
   'configs-secrets': 'Configs & secrets',
-  'org-settings': 'Manage',
-  'component-settings': 'Manage',
+  'org-settings': 'Configure',
+  'component-settings': 'Configure',
   'org-audit-logs': 'Audit logs',
   'org-data-planes': 'Data planes',
   'org-genai-services': 'GenAI services',

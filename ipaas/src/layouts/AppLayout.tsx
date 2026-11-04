@@ -750,12 +750,12 @@ export default function AppLayout(): JSX.Element {
                         </Sidebar.ItemIcon>
                         <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                       </Sidebar.Item>
-                      {/* Manage carries Package Registries. */}
+                      {/* Configure carries Package Registries. */}
                       <Sidebar.Item id="org-settings">
                         <Sidebar.ItemIcon>
                           <SlidersHorizontal size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Manage</Sidebar.ItemLabel>
+                        <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     </Sidebar.Category>,
                   ]
@@ -904,7 +904,7 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemIcon>
                                 <SlidersHorizontal size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Manage</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
                             </Sidebar.Item>
                           )}
                         </Sidebar.Category>,

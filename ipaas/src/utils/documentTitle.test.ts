@@ -33,8 +33,8 @@ describe('pageTitleFor', () => {
   it('uses an override where sentence-casing the id reads wrong', () => {
     expect(pageTitleFor('configs-secrets')).toBe('Configs & secrets');
     expect(pageTitleFor('external-ci')).toBe('External CI');
-    expect(pageTitleFor('org-settings')).toBe('Manage');
-    expect(pageTitleFor('component-settings')).toBe('Manage');
+    expect(pageTitleFor('org-settings')).toBe('Configure');
+    expect(pageTitleFor('component-settings')).toBe('Configure');
   });
 
   it('returns empty for an unknown nav id', () => {

@@ -21,7 +21,7 @@ import { GitBranch, Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import Authorized from '../../components/Authorized';
 import EmptyListing from '../../components/EmptyListing';
-import OrgSettingsTabs from '../../components/Settings/OrgSettingsTabs';
+import OrgSettingsTabs from '../../components/Settings/OrgConfigureTabs';
 import ConfigureWorkflowDialog from '../components/Settings/Workflows/ConfigureWorkflowDialog';
 import { Permissions } from '../../constants/permissions';
 import { useUpdateWorkflowConfig, useWorkflowConfigs, useWorkflowDefinitions } from '../hooks/useWorkflows';

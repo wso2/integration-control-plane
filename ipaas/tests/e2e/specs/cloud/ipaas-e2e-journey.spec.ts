@@ -965,7 +965,7 @@ test.describe('07 page availability @smoke', () => {
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
     await openNavGroup(page, 'Observe', 'Runtime logs');
-    await expectNavItems(page, ['Runtime logs', 'Metrics', 'Platform Services', 'Manage']);
+    await expectNavItems(page, ['Runtime logs', 'Metrics', 'Platform Services', 'Configure']);
     for (const retired of ['Infrastructure', 'Environments', 'Pipelines']) {
       await expect(page.getByRole('button', { name: retired, exact: true })).toHaveCount(0);
     }
@@ -978,7 +978,7 @@ test.describe('07 page availability @smoke', () => {
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
     await openNavGroup(page, 'Observe', 'Runtime logs');
     await expectNavItems(page, ['Runtime logs', 'Metrics', 'Platform Services']);
-    await expect(page.getByRole('button', { name: 'Manage', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Configure', exact: true })).toHaveCount(0);
     for (const retired of ['Infrastructure', 'Environments', 'Pipelines']) {
       await expect(page.getByRole('button', { name: retired, exact: true })).toHaveCount(0);
     }

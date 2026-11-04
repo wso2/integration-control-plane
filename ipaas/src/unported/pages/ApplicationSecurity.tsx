@@ -20,7 +20,7 @@ import { Box, PageContent, Tab, Tabs } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
-import OrgSettingsTabs from '../../components/Settings/OrgSettingsTabs';
+import OrgSettingsTabs from '../../components/Settings/OrgConfigureTabs';
 import IdentityProvidersTab from '../components/Settings/AppSecurity/IdentityProvidersTab';
 import RoleManagementTab from '../components/Settings/AppSecurity/RoleManagementTab';
 import StsTab from '../components/Settings/AppSecurity/StsTab';
