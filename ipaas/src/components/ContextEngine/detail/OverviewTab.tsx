@@ -21,7 +21,7 @@ import { EyeOff, Info, KeyRound, Lock /* , Play, RefreshCw */ } from '@wso2/oxyg
 import { useState, type JSX, type ReactNode } from 'react';
 import { CONTEXT_ENGINE_PROVISIONING, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
-import { EVERYONE_VISIBILITY, STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { checkStagedFile, connectorFor, effectiveVisibility, engineMessage, getStartedSteps, modelKeysLabel, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
@@ -70,7 +70,6 @@ function LockedChip({ title }: { title: string }): JSX.Element {
     </Tooltip>
   );
 }
-
 
 function ModelRow({ label, provider, model, locked = false }: { label: string; provider: string; model: string | undefined; locked?: boolean }): JSX.Element {
   return (
