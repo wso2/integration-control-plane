@@ -49,10 +49,11 @@ const developmentReflects = (links: ResourceLink[] | undefined, type: string, li
   return linked ? !!l?.linked && !!e?.inRelease && (!l.connection || e.connection === l.connection) : !e?.inRelease;
 };
 
-/** One link as a Configure form row: what it delivers in env, and whether it can be unlinked. */
+/** One link as a Configure form row: what it delivers in env, whether the resource has no values there, and whether it can be unlinked. */
 export interface LinkRow {
   resourceType: string;
   notes: string[];
+  noValues: boolean;
   canUnlink: boolean;
 }
 
@@ -68,6 +69,5 @@ export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
     else notes.push(`through ${l.connection}`, ...(pending ? ['next release'] : []));
     if (l.sourceDefined && l.linked) notes.push('overridden by workload.yaml');
     else if (l.namesFromWso2Cloud && l.connection) notes.push('names overridden on WSO2 Cloud');
-    if (e && !e.hasValues) notes.push(`no values in ${env}`);
-    return [{ resourceType: l.resourceType, notes, canUnlink: !!l.connection }];
+    return [{ resourceType: l.resourceType, notes, noValues: !!e && !e.hasValues, canUnlink: !!l.connection }];
   });

@@ -39,7 +39,7 @@ export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) 
   const [target, setTarget] = useState<string | null>(null);
   const rows = linkRows(links, env);
   if (rows.length === 0) return null;
-  const noValues = rows.some((r) => r.notes.includes(`no values in ${env}`));
+  const noValues = rows.some((r) => r.noValues);
 
   return (
     <Box sx={boxSx}>

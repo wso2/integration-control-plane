@@ -72,13 +72,13 @@ describe('linkedConfigurables', () => {
 });
 
 describe('linkRows', () => {
-  it('says what each link delivers in the environment', () => {
+  it('says what each link delivers in the environment, and where the resource has no values without a note of its own', () => {
     expect(linkRows([sales, support], 'production')).toEqual([
-      { resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'no values in production'], canUnlink: true },
-      { resourceType: 'support', notes: ['unlinked · until next release'], canUnlink: false },
+      { resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales'], noValues: true, canUnlink: true },
+      { resourceType: 'support', notes: ['unlinked · until next release'], noValues: false, canUnlink: false },
     ]);
-    expect(linkRows([sales, support], 'staging')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'next release'], canUnlink: true }]);
-    expect(linkRows([cloudLink], 'development')).toEqual([{ resourceType: 'orders-db', notes: ['linked from WSO2 Cloud'], canUnlink: false }]);
+    expect(linkRows([sales, support], 'staging')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'next release'], noValues: false, canUnlink: true }]);
+    expect(linkRows([cloudLink], 'development')).toEqual([{ resourceType: 'orders-db', notes: ['linked from WSO2 Cloud'], noValues: false, canUnlink: false }]);
   });
 
   it('says where a link made on WSO2 Cloud waits for the next release', () => {
@@ -92,7 +92,7 @@ describe('linkRows', () => {
   });
 
   it("names the release's connection while the link is ahead of it, and that the next release gets the link's", () => {
-    expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'now uses wso2.sfdemo.sfCrm; next release'], canUnlink: true }]);
+    expect(linkRows([ahead], 'development')).toEqual([{ resourceType: 'salesforce-crm', notes: ['through wso2.sfdemo.sfSales', 'now uses wso2.sfdemo.sfCrm; next release'], noValues: false, canUnlink: true }]);
     expect(linkRows([ahead], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'now uses wso2.sfdemo.sfCrm; next release']);
   });
 
@@ -108,17 +108,17 @@ describe('linkRows', () => {
 
   it('says where names set on WSO2 Cloud override the connection, and offers to unlink only the connection', () => {
     const both: ResourceLink = { ...sales, namesFromWso2Cloud: true };
-    expect(linkRows([both], 'development')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'names overridden on WSO2 Cloud'], canUnlink: true }]);
+    expect(linkRows([both], 'development')).toEqual([{ resourceType: 'salesforce-sales', notes: ['through wso2.sfdemo.sfSales', 'names overridden on WSO2 Cloud'], noValues: false, canUnlink: true }]);
   });
 
   it('says where workload.yaml overrides the link, and never waits for a release', () => {
-    expect(linkRows([fromSource], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['through wso2.sfdemo.sfDesk', 'overridden by workload.yaml'], canUnlink: true }]);
-    expect(linkRows([fromSource], 'production')[0].notes).toEqual(['through wso2.sfdemo.sfDesk', 'overridden by workload.yaml', 'no values in production']);
+    expect(linkRows([fromSource], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['through wso2.sfdemo.sfDesk', 'overridden by workload.yaml'], noValues: false, canUnlink: true }]);
+    expect(linkRows([fromSource], 'production')[0]).toMatchObject({ notes: ['through wso2.sfdemo.sfDesk', 'overridden by workload.yaml'], noValues: true });
   });
 
   it('lists a workload.yaml declaration, with nothing to unlink', () => {
     const declaration: ResourceLink = { resourceType: 'salesforce-desk', linked: false, sourceDefined: true, environments: [env('development', true, true), env('production', false, false)] };
-    expect(linkRows([declaration], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml'], canUnlink: false }]);
-    expect(linkRows([declaration], 'production')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml', 'no values in production'], canUnlink: false }]);
+    expect(linkRows([declaration], 'development')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml'], noValues: false, canUnlink: false }]);
+    expect(linkRows([declaration], 'production')).toEqual([{ resourceType: 'salesforce-desk', notes: ['declared in workload.yaml'], noValues: true, canUnlink: false }]);
   });
 });
