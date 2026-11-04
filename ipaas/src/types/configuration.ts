@@ -28,6 +28,8 @@ export interface SchemaConfigItem {
   valueType?: string;
   isRequired?: boolean;
   isSensitive?: boolean;
+  /** Saved: a secret's value comes back empty, so this says it has one. */
+  isSet?: boolean;
   configGroupId?: string;
   configKeyId?: string;
   isDynamic?: boolean;

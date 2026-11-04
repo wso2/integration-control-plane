@@ -27,6 +27,7 @@ import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings, useFormLinks } from '../../hooks/useConfiguration';
 import { FormLinks } from './FormLinks';
+import { savedValue } from '../../utils/savedConfig';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
@@ -339,8 +340,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       const initSensitive = new Map<string, boolean>();
       const initLinking = new Map<string, LinkingInfo>();
       for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+        const val = savedValue(cfg);
+        if (val !== undefined) initValues.set(cfg.key, val);
         if (cfg.isSensitive) initSensitive.set(cfg.key, true);
         if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
           initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -363,8 +364,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -440,8 +441,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -803,8 +804,8 @@ function GenericServiceConfigureDrawer({
       const initSensitive = new Map<string, boolean>();
       const initLinking = new Map<string, LinkingInfo>();
       for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+        const val = savedValue(cfg);
+        if (val !== undefined) initValues.set(cfg.key, val);
         if (cfg.isSensitive) initSensitive.set(cfg.key, true);
         if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
           initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -828,8 +829,8 @@ function GenericServiceConfigureDrawer({
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -901,8 +902,8 @@ function GenericServiceConfigureDrawer({
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });

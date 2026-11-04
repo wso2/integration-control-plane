@@ -21,6 +21,7 @@ import { getRequiredPathsAtLevel } from '../../SchemaConfigForm/schemaUtils';
 import { useResourceLinks } from '../../../hooks/useConfiguration';
 import type { ResourceLink, SchemaConfigData } from '../../../types/configuration';
 import { linkedConfigurables } from '../../../utils/resourceLinks';
+import { savedValue } from '../../../utils/savedConfig';
 
 /**
  * True when the schema declares required configuration keys that have no value
@@ -38,7 +39,7 @@ export function hasMissingRequiredConfigs(schemaConfig: SchemaConfigData | null 
     const schema = JSON.parse(atob(schemaConfig.jsonSchema));
     const allRequired = getRequiredPathsAtLevel(schema).filter((p) => !p.includes('[*]') && !p.includes('.*'));
     if (allRequired.length === 0) return false;
-    const filledKeys = new Set([...(schemaConfig.configurations ?? []).filter((c) => c.values?.[0]?.value).map((c) => c.key), ...Array.from(linkedConfigurables(links, env)).flatMap(([key, source]) => (source.noValuesIn ? [] : [key]))]);
+    const filledKeys = new Set([...(schemaConfig.configurations ?? []).filter((c) => savedValue(c) !== undefined).map((c) => c.key), ...Array.from(linkedConfigurables(links, env)).flatMap(([key, source]) => (source.noValuesIn ? [] : [key]))]);
     return allRequired.some((k) => !filledKeys.has(k));
   } catch {
     return false;

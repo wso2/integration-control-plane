@@ -66,6 +66,12 @@ describe('hasMissingRequiredConfigs', () => {
     expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [value('wso2.sftask.sfSalesAuthClientId', 'id')] }, [partial], 'development')).toBe(false);
   });
 
+  it('counts a saved secret as set, though its value comes back empty', () => {
+    const secret = { key: 'wso2.sftask.sfSalesAuthClientId', values: [{ value: '' }], isSensitive: true, isSet: true };
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [value('wso2.sftask.sfSalesBaseUrl', 'http://sf'), secret] })).toBe(false);
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [value('wso2.sftask.sfSalesBaseUrl', 'http://sf'), { ...secret, isSet: false }] })).toBe(true);
+  });
+
   it('ignores a link that supplies no configurable', () => {
     expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, [link({})], 'development')).toBe(true);
   });
