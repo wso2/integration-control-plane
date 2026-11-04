@@ -78,15 +78,14 @@ const GOOGLE_AUTH = [
       { value: 'bearer', label: 'Access token' },
       { value: 'service_account', label: 'Service account' },
     ],
-    helper: 'OAuth2 flow used to connect.',
   }),
   F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
   F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
   F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.' }),
   F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
-  F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'Path to the service account private key in PEM form.' }),
-  O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional user to impersonate under domain-wide delegation.' }),
+  F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'PEM file path.' }),
+  O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional. Needs domain-wide delegation.' }),
 ];
 
 /**
@@ -98,7 +97,7 @@ export const RML_MAPPING = G(
   { label: 'RML Mapping', collapsed: true },
   O('rmlMapping', 'Mapping file', 'file', {
     accept: '.rml.ttl,.ttl',
-    helper: 'Optional. Upload an .rml.ttl to control how your records are turned into a graph. Leave it empty and AI builds the graph for you.',
+    helper: 'Optional. Leave empty to let AI build the graph.',
   }),
 );
 
@@ -129,10 +128,10 @@ const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[]
   ),
   ...G(
     'Data to sync',
-    F('tableName', 'Table', 'text', { helper: 'Each row becomes one record.' }),
-    F('primaryKey', 'Primary Key', 'text', { helper: 'Column that uniquely identifies each row.' }),
-    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated columns to ingest. Empty ingests every column.' }),
-    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: "Column holding each row's last-updated time (epoch ms). Recommended for clean re-syncs." }),
+    F('tableName', 'Table', 'text'),
+    F('primaryKey', 'Primary Key', 'text'),
+    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated. Leave empty for all columns.' }),
+    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Last-updated time in epoch ms. Recommended.' }),
   ),
   ...G(
     { label: 'Sync options', collapsed: true },
@@ -202,7 +201,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'gdrive',
     name: 'Google Drive',
-    description: 'A Drive folder subtree, backfilled and kept in sync by the Changes API.',
+    description: 'Files in a Drive folder and its subfolders.',
     category: 'cloud-storage',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}gdrive.svg`,
@@ -211,7 +210,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
     fields: [
       ...G('Connection', ...GOOGLE_AUTH),
-      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'The Drive folder to sync; its whole subtree is backfilled.' })),
+      ...G('Data to sync', F('folderId', 'Folder ID', 'text', { helper: 'Subfolders are included.' })),
     ],
     summaryKeys: ['folderId'],
   },
@@ -363,7 +362,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'google-calendar',
     name: 'Google Calendar',
-    description: 'Events of one calendar, backfilled and kept in sync by incremental sync.',
+    description: 'Events from one calendar, kept in sync.',
     category: 'collaboration',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}google-calendar.svg`,
@@ -374,7 +373,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...G('Connection', ...GOOGLE_AUTH),
       ...G(
         'Data to sync',
-        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '"primary" for the connected account’s own calendar, or a calendar ID (an email-shaped address, including group and holiday calendars).' }),
+        F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '"primary" for the connected account’s calendar, or another calendar’s ID.' }),
         F('eventTypes', 'Event Types', 'text', { defaultValue: 'default, outOfOffice', helper: 'Comma-separated. Any of: default, outOfOffice, focusTime, workingLocation, birthday, fromGmail.' }),
         F('includePrivateEvents', 'Private Events', 'select', {
           defaultValue: 'false',
@@ -382,7 +381,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
             { value: 'false', label: 'Exclude' },
             { value: 'true', label: 'Include' },
           ],
-          helper: 'Private and confidential events. When excluded, an event made private later is removed from the engine.',
+          helper: 'When excluded, an event made private later is removed.',
         }),
       ),
       ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.' })),
@@ -416,7 +415,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'postgresql',
     name: 'PostgreSQL',
-    description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.',
+    description: 'Rows of a table, kept in sync.',
     category: 'databases',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}postgresql.svg`,
@@ -425,15 +424,15 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...DATABASE_FIELDS('5432', 'public'),
       ...G(
         { label: 'Sync options', collapsed: true },
-        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional logical replication slot name; a default is used when empty.' }),
-        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Optional publication name; a default is used when empty.' }),
+        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Leave empty for the default.' }),
+        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Leave empty for the default.' }),
       ),
     ],
     summaryKeys: ['host', 'database'],
     isStructuredData: true,
   },
-  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
-  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, logoDark: `${CONNECTOR_LOGO_BASE}mysql-dark.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, kept in sync.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
   {
     id: 'mongodb',
     name: 'MongoDB',
@@ -490,7 +489,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   {
     id: 'salesforce',
     name: 'Salesforce',
-    description: 'Records of an object, synced by SOQL backfill and Change Data Capture.',
+    description: 'Records of a Salesforce object, kept in sync.',
     category: 'saas',
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}salesforce.svg`,
@@ -500,7 +499,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     fields: [
       ...G(
         'Connection',
-        F('baseUrl', 'Instance URL', 'url', { placeholder: 'https://your-domain.my.salesforce.com', helper: 'Your My Domain URL; the OAuth token endpoint is derived from it.' }),
+        F('baseUrl', 'Instance URL', 'url', { placeholder: 'https://your-domain.my.salesforce.com', helper: 'Your My Domain URL.' }),
         F('authType', 'Authentication', 'select', {
           defaultValue: 'client_credentials',
           options: [
@@ -508,18 +507,13 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
             { value: 'refresh_token', label: 'Refresh token' },
             { value: 'bearer', label: 'Access token' },
           ],
-          helper: 'OAuth2 flow used to connect.',
         }),
         F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token') }),
         F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token') }),
         F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'A pre-obtained token used directly; it is not refreshed, so it stops working when it expires.' }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.' }),
       ),
-      ...G(
-        'Data to sync',
-        F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'The SObject to sync. It must have Change Data Capture enabled.' }),
-        F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated business fields to ingest as content.' }),
-      ),
+      ...G('Data to sync', F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'Must have Change Data Capture enabled.' }), F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated.' })),
       ...G({ label: 'Sync options', collapsed: true }, O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' })),
     ],
     summaryKeys: ['baseUrl', 'sobject'],
@@ -574,7 +568,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   },
   { id: 'sitemap', name: 'Sitemap', description: 'Every page listed in a sitemap.xml.', category: 'web-files', icon: 'globe', fields: [F('sitemapUrl', 'Sitemap URL', 'url', { placeholder: 'https://example.com/sitemap.xml' })], summaryKeys: ['sitemapUrl'] },
   { id: 'rss', name: 'RSS Feed', description: 'Articles from a feed.', category: 'web-files', icon: 'rss', fields: [F('feedUrl', 'Feed URL', 'url')], summaryKeys: ['feedUrl'] },
-  { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, catalogHidden: true },
+  { id: 'upload', name: 'File Upload', description: 'Files you upload.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, catalogHidden: true },
 ];
 
 export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntries(SOURCE_CONNECTORS.map((c) => [c.id, c]));
@@ -663,7 +657,7 @@ export const CONTEXT_ENGINE_LOCAL_KEY = 'contextEngine:local';
 export const CONTEXT_ENGINE_NAME_MAX = 120;
 export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Shown under the description field: people browsing engines and AI agents connected over MCP both read it. */
-export const CONTEXT_ENGINE_DESCRIPTION_HINT = 'Tells people and AI agents what this engine contains, so they know when to search it.';
+export const CONTEXT_ENGINE_DESCRIPTION_HINT = 'Agents read this to decide when to search the engine.';
 
 /** Engine actions a querying role receives — read context, open evidence, see the trace. */
 export const CONTEXT_QUERY_ACTIONS = ['context.read', 'evidence.read', 'trace.read'] as const;
@@ -698,7 +692,7 @@ export interface ContextMcpToolInfo {
 
 /** The tools the engine's MCP endpoint offers for this engine, as its MCP contract (`contracts/mcp/`) describes them. */
 export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
-  { name: 'get_context', description: 'Returns the passages the caller may read that best answer a question, each with its source, version and link.' },
+  { name: 'get_context', description: 'Returns passages the caller may read that answer a question.' },
   { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage.' },
 ];
 
@@ -807,11 +801,11 @@ export const UPLOAD_POLL_MS = 3000;
 /** How often the "14 min so far" texts are refreshed. */
 export const ELAPSED_TICK_MS = 30_000;
 
-/** After this long on the engine, a file's row says that big files take long, so the wait does not look like a hang. */
+/** After this long on the engine, a file's row says that large files take long, so the wait does not look like a hang. */
 export const UPLOAD_SLOW_AFTER_MS = 2 * 60_000;
 
 /** The engine reads every file with its language model, so the time grows with the file. Seen: 3.4 MB of JSON took 58 minutes. */
-export const UPLOAD_SLOW_NOTE = 'Big files take long: a 3 MB file can take about an hour.';
+export const UPLOAD_SLOW_NOTE = 'Large files can take an hour or more.';
 /** Status reads in flight at once from one browser, so a restored list of files does not flood the engine. */
 export const UPLOAD_CHECK_CONCURRENCY = 4;
 

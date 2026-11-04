@@ -53,11 +53,7 @@ export default function RecentQuestions({ questions, selectedId, openingId, onOp
           </Button>
         )}
       </Stack>
-      {questions.length === 0 ? (
-        <Typography variant="body2" sx={{ ...mutedSx, px: 1.5, mt: 1.5 }}>
-          Questions you ask appear here so you can open them again.
-        </Typography>
-      ) : (
+      {questions.length > 0 && (
         <Stack gap={0.25} sx={{ mt: 1.25 }} component="ul" style={{ listStyle: 'none', margin: '10px 0 0', padding: 0 }}>
           {questions.map((q) => (
             <li key={q.queryId}>
@@ -93,7 +89,7 @@ export default function RecentQuestions({ questions, selectedId, openingId, onOp
         </Stack>
       )}
       <Typography variant="caption" component="p" sx={{ ...mutedSx, mx: 1.5, mt: 1.5, pt: 1.5, borderTop: '1px solid', borderColor: 'divider', lineHeight: 1.5 }}>
-        Only you can see your questions, and this list is kept in this browser. Opening one checks every passage again, and hides an answer whose sources you can no longer read.
+        Only you see this list. It is kept in this browser.
       </Typography>
     </Box>
   );

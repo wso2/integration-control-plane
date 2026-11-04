@@ -29,6 +29,9 @@ export const wrapSx = { overflowWrap: 'break-word' } as const;
 /** Step section heading — smaller than the page title. */
 export const stepHeadingSx = { fontWeight: 600, mb: 0.5 } as const;
 
+/** A step heading with no hint under it. */
+export const stepHeadingAloneSx = { ...stepHeadingSx, mb: 2 } as const;
+
 /** One-line explanation under a step heading. */
 export const stepHintSx = { color: 'text.secondary', mb: 2.5 } as const;
 

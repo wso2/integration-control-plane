@@ -91,23 +91,13 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
               {sourceTypeName(source.type)}
             </Typography>
             <Typography variant="body2" sx={mutedSx}>
-              Connection settings are kept by the engine and cannot be changed here yet.
+              Connection settings can&apos;t be edited.
             </Typography>
           </Box>
         </Box>
 
         <Stack sx={fieldStackSx}>
-          <TextField
-            label="Source Name"
-            required
-            fullWidth
-            size="small"
-            value={name}
-            error={!!nameError && name.trim() !== ''}
-            helperText={name.trim() !== '' ? nameError || undefined : 'How this source appears in the engine.'}
-            onChange={(e) => setName(e.target.value)}
-            sx={REQUIRED_FIELD_SX}
-          />
+          <TextField label="Source Name" required fullWidth size="small" value={name} error={!!nameError && name.trim() !== ''} helperText={(name.trim() !== '' && nameError) || undefined} onChange={(e) => setName(e.target.value)} sx={REQUIRED_FIELD_SX} />
         </Stack>
 
         {ROLE_VISIBILITY_ENABLED &&

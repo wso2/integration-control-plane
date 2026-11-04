@@ -35,14 +35,12 @@ import {
   splitSentences,
   askedQuestionMeta,
   citedNumbers,
-  deletionFailureText,
   evidencePart,
   evidencePlace,
   evidenceVersionLabel,
   versionFromLabel,
   isSameModel,
   modelDraftError,
-  modelKeysLabel,
   passageLines,
   toModelInput,
   describeVisibility,
@@ -128,11 +126,12 @@ import {
   toCreateInput,
   toSourceRegistration,
   queuedUploadText,
+  uploadSourceTitle,
   uploadIsSlow,
 } from './contextEngine';
 import { blankLlm, blankSource, CONTEXT_EMBEDDING_PROVIDERS, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_MODES, defaultStorage, isConnectorEnabled, LLM_PROVIDERS, SOURCE_CONNECTORS } from '../constants/contextEngine';
 import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
-import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
+import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress, UploadFileStatus } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
 import type { EmbeddingConfig } from '../types/ragIngestion';
@@ -932,7 +931,7 @@ describe('source progress', () => {
     // Inside the store's write the engine has no position: one file alone gets no number.
     const writing = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [{ ...mapping, phase: 'indexing', done: null }], bytes: { delivered: 1000, finished: 0 } } });
     expect(sourceProgressValue(writing)).toBeNull();
-    expect(sourceProgressDetail(writing)).toMatch(/osgi_extraction.json: writing 3,129 items to the knowledge store$/);
+    expect(sourceProgressDetail(writing)).toMatch(/osgi_extraction.json: indexing 3,129 items$/);
     // Many files: finished bytes plus the running file's share, over everything delivered.
     const batch = progress({ processing: { total: 4, succeeded: 2, running: 1, queued: 1, percent: 50, inProgress: [{ ...mapping, done: 3129 }], bytes: { delivered: 4000, finished: 2000 } } });
     expect(sourceProgressValue(batch)).toBe(75);
@@ -957,7 +956,7 @@ describe('source progress', () => {
   });
 
   it('describes counts, failures and stored records', () => {
-    expect(sourceProgressDetail(progress())).toMatch(/No sync has started yet/);
+    expect(sourceProgressDetail(progress())).toBe('No sync yet.');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' } }))).toBe('Nothing delivered yet · 0 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' }, processing: { total: 12, succeeded: 12, percent: 100 }, records: { active: 12 } }))).toBe('12 of 12 items processed so far · 12 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1200, queued: 658, succeeded: 540, failed: 2, percent: 45.2 }, records: { active: 538, quarantined: 1 } }))).toBe(
@@ -1130,6 +1129,7 @@ describe('file uploads', () => {
   it('maps record status to a file status', () => {
     expect(uploadStatusFromRecord(record({ indexState: 'indexed' }))).toEqual({ status: 'searchable' });
     expect(uploadStatusFromRecord(record({ indexState: 'pending' }))).toEqual({ status: 'indexing' });
+    expect(uploadStatusFromRecord(record({ indexState: 'reconcile_required' }))).toEqual({ status: 'indexing' });
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
     // The engine's model failure codes say what to fix, so the file shows that instead of a code.
@@ -1142,13 +1142,13 @@ describe('file uploads', () => {
     withRoleVisibility(() =>
       expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
         status: 'held',
-        detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
+        detail: 'Nobody can see this file. Change who can see it.',
       }),
     );
     // Changing who can see a file is hidden while roles are turned off, so the message does not point to it.
     expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
       status: 'held',
-      detail: "The source has no rule for this file's roles yet, so nobody can see it.",
+      detail: 'Nobody can see this file.',
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
     expect(summarizeUploads([])).toBe('No files uploaded from this browser');
@@ -1321,11 +1321,6 @@ describe('provenance and evidence', () => {
     expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
   });
-
-  it('explains a failed deletion', () => {
-    expect(deletionFailureText('residue_found')).toMatch(/still searchable/);
-    expect(deletionFailureText(undefined)).toMatch(/continues where the last attempt stopped/);
-  });
 });
 
 describe('editing models on a running engine', () => {
@@ -1349,12 +1344,6 @@ describe('editing models on a running engine', () => {
     expect(modelDraftError({ ...draft, provider: 'azure_openai', model: 'dep', apiKey: 'k' }, null)).toBe('Enter the base URL and API version');
     expect(modelDraftError({ ...draft, model: ' ' }, current)).toBe('Choose a model');
   });
-
-  it('says how the keys are held', () => {
-    expect(modelKeysLabel({ embedding: { provider: 'openai', model: 'e', keyKind: 'encrypted' }, llm: current })).toBe('Keys encrypted by the engine');
-    expect(modelKeysLabel({ embedding: { provider: 'azure_openai', model: 'e', keyKind: 'reference' }, llm: null })).toBe('Keys from secret references');
-    expect(modelKeysLabel({ embedding: null, llm: null })).toBe('');
-  });
 });
 
 describe('upload and processing time texts', () => {
@@ -1364,7 +1353,7 @@ describe('upload and processing time texts', () => {
   it('says what the engine is doing with a queued file and for how long', () => {
     expect(queuedUploadText({ uploadedAt, running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph · 14 min so far');
     expect(queuedUploadText({ uploadedAt }, at(0))).toBe('Uploaded · waiting for the engine to start on it · under a minute so far');
-    expect(queuedUploadText({ uploadedAt, retrying: true, running: true }, at(14))).toBe('Running again on the engine from the file it already has · nothing was uploaded.');
+    expect(queuedUploadText({ uploadedAt, retrying: true, running: true }, at(14))).toBe('Running again from the stored file.');
     // A row remembered without a usable time still says what is happening.
     expect(queuedUploadText({ uploadedAt: 'bad', running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph');
   });
@@ -1373,5 +1362,37 @@ describe('upload and processing time texts', () => {
     expect(uploadIsSlow({ uploadedAt }, at(1))).toBe(false);
     expect(uploadIsSlow({ uploadedAt }, at(2))).toBe(true);
     expect(uploadIsSlow({ uploadedAt: 'bad' }, at(60))).toBe(false);
+  });
+});
+
+describe('uploadSourceTitle', () => {
+  const of = (...statuses: UploadFileStatus[]) => statuses.map((status) => ({ status }));
+
+  it('counts the files the engine has while the rest upload', () => {
+    expect(uploadSourceTitle(of('queued', 'uploading', 'uploading'), 'Docs')).toBe('Uploading 3 files to “Docs” · 1 of 3 sent');
+  });
+
+  it('says the files are sent once the engine has them all, while it still indexes them', () => {
+    expect(uploadSourceTitle(of('queued', 'indexing', 'searchable'), 'Docs')).toBe('3 files sent to “Docs” · indexing');
+  });
+
+  it('does not count a file the engine never received as sent', () => {
+    expect(uploadSourceTitle([{ status: 'failed' }, { status: 'uploading' }, { status: 'queued', jobId: 'job_1' }], 'Docs')).toBe('Uploading 3 files to “Docs” · 1 of 3 sent');
+    expect(uploadSourceTitle([{ status: 'failed' }, { status: 'queued', jobId: 'job_1' }, { status: 'indexing', jobId: 'job_2' }], 'Docs')).toBe('2 files sent to “Docs” · indexing · 1 failed');
+    // A file the engine took and then failed on was sent.
+    expect(
+      uploadSourceTitle(
+        [
+          { status: 'failed', jobId: 'job_0' },
+          { status: 'queued', jobId: 'job_1' },
+        ],
+        'Docs',
+      ),
+    ).toBe('2 files sent to “Docs” · indexing');
+  });
+
+  it('says how many failed once nothing is running', () => {
+    expect(uploadSourceTitle(of('searchable', 'failed'), 'Docs')).toBe('2 files uploaded to “Docs” · 1 failed');
+    expect(uploadSourceTitle(of('searchable'), 'Docs')).toBe('1 file uploaded to “Docs”');
   });
 });

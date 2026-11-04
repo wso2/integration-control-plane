@@ -42,9 +42,11 @@ export default function GetStartedChecklist({ steps, onAction }: GetStartedCheck
             <Typography variant="body2" sx={{ fontWeight: step.state === 'current' ? 600 : 500 }}>
               {step.title}
             </Typography>
-            <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
-              {step.description}
-            </Typography>
+            {step.description && (
+              <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                {step.description}
+              </Typography>
+            )}
             {step.state === 'current' && (
               <Button size="small" variant={step.id === 'index' && !step.action ? 'outlined' : 'contained'} onClick={() => onAction(step.id)} sx={{ mt: 1 }}>
                 {step.action ?? ACTION_LABEL[step.id]}

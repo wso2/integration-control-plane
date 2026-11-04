@@ -22,7 +22,7 @@ import { blankLlm, CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, EMBEDDING_LOGO_D
 import { blankEmbedding } from '../../../constants/ragIngestion';
 import { canShareApiKey, type AnswerChoice } from '../../../utils/contextEngine';
 import ModelProviderColumn from './ModelProviderColumn';
-import { modelColumnsSx, stepHeadingSx, stepHintSx } from '../styles';
+import { modelColumnsSx, stepHeadingAloneSx } from '../styles';
 import type { LlmConfig, LlmProvider } from '../../../types/contextEngine';
 import type { EmbeddingConfig, EmbeddingProvider } from '../../../types/ragIngestion';
 
@@ -52,26 +52,15 @@ const ANSWER_CHOICES: { value: AnswerChoice; label: string }[] = [
 export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, answerLlm, onEmbeddingChange, onLlmChange, onShareApiKeyChange, onAnswerChoiceChange, onAnswerLlmChange }: ModelsStepProps): JSX.Element {
   return (
     <>
-      <Typography variant="subtitle2" sx={stepHeadingSx}>
+      <Typography variant="subtitle2" sx={stepHeadingAloneSx}>
         Configure Models
-      </Typography>
-      <Typography variant="body2" sx={stepHintSx}>
-        The embedding model indexes your sources for search; the language model builds the graph during ingestion and, unless you choose a separate answer model, answers questions.
       </Typography>
 
       <Box sx={modelColumnsSx}>
-        <ModelProviderColumn<EmbeddingConfig>
-          title="Embedding model"
-          purpose="Turns documents into vectors for retrieval."
-          providers={EMBEDDING_OPTIONS}
-          value={embedding}
-          onChange={onEmbeddingChange}
-          blank={(id) => blankEmbedding(id as EmbeddingProvider)}
-          modelLabel="Embedding model"
-        />
+        <ModelProviderColumn<EmbeddingConfig> title="Embedding model" providers={EMBEDDING_OPTIONS} value={embedding} onChange={onEmbeddingChange} blank={(id) => blankEmbedding(id as EmbeddingProvider)} modelLabel="Embedding model" />
         <ModelProviderColumn<LlmConfig>
           title="Language model"
-          purpose={answerChoice === 'same' ? 'Builds the graph during ingestion and writes answers from retrieved evidence.' : 'Builds the graph during ingestion.'}
+          purpose={answerChoice === 'same' ? 'Builds the graph and writes answers.' : 'Builds the graph.'}
           providers={LLM_OPTIONS}
           value={llm}
           onChange={onLlmChange}

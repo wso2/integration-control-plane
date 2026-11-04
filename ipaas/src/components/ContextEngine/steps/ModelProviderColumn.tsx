@@ -56,7 +56,7 @@ interface ShareKeyOption {
 
 interface ModelProviderColumnProps<T extends ModelLike> {
   title: string;
-  purpose: string;
+  purpose?: string;
   providers: ProviderOption[];
   value: T | null;
   onChange: (value: T) => void;
@@ -86,9 +86,11 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           {title}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {purpose}
-        </Typography>
+        {purpose && (
+          <Typography variant="body2" color="text.secondary">
+            {purpose}
+          </Typography>
+        )}
       </Box>
 
       {choice}

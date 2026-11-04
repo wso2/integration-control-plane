@@ -63,7 +63,6 @@ import type {
   ContextSourceConfig,
   CreateContextEngineInput,
   AskedQuestion,
-  ContextEngineModels,
   ContextEngineSummary,
   ContextEngineTabKey,
   ContextModelInput,
@@ -681,8 +680,8 @@ function processingValue(p: SourceProgress): number | null {
 }
 
 /**
- * What a running delivery is doing, in words: "mapping items 1,200 of 3,129", "writing to the
- * knowledge store", and inside that write the provider's own steps: "reading the text 1.2 MB of
+ * What a running delivery is doing, in words: "mapping items 1,200 of 3,129", "indexing",
+ * and inside that step the provider's own steps: "reading the text 1.2 MB of
  * 2.9 MB" (the model's read, in bytes; no total for a PDF, whose text is shorter than the file),
  * "merging nodes 8,000 of 15,904", "merging edges 20,000 of 48,375", "embedding 1,200 of 17,660".
  */
@@ -695,7 +694,7 @@ export function recordPhaseText(item: RecordProgress): string {
     case 'mapping':
       return item.done !== null && item.total !== null ? `mapping items ${count(item.done)} of ${count(item.total)}` : 'mapping items';
     case 'indexing':
-      return item.total !== null ? `writing ${count(item.total)} items to the knowledge store` : 'writing to the knowledge store';
+      return item.total !== null ? `indexing ${count(item.total)} items` : 'indexing';
     case 'extracting':
       if (item.done === null) return 'reading the text';
       return item.total !== null ? `reading the text ${formatBytes(item.done)} of ${formatBytes(item.total)}` : `reading the text, ${formatBytes(item.done)} so far`;
@@ -713,7 +712,7 @@ export function recordPhaseText(item: RecordProgress): string {
 /** Item counts under a source's bar, e.g. "540 of 1,200 items processed · 2 failed · 538 records stored" ("so far" while still reading). */
 export function sourceProgressDetail(p: SourceProgress): string {
   const status = sourceProgressStatus(p);
-  if (status === 'waiting') return 'No sync has started yet. Items appear here once the connector delivers them.';
+  if (status === 'waiting') return 'No sync yet.';
   // The item counts would still show the deletes as processed work, which reads as if content were stored.
   if (status === 'empty') return p.records.deleted > 0 ? 'All records were deleted. Nothing is stored.' : 'Nothing is stored. The latest sync delivered nothing.';
   const { total, succeeded, failed } = p.processing;
@@ -1046,10 +1045,7 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
   if (record.state === 'quarantined') {
     return {
       status: 'held',
-      detail:
-        record.quarantineReason === 'unmapped_audience'
-          ? `The source has no rule for this file's roles yet, so nobody can see it.${ROLE_VISIBILITY_ENABLED ? ' Someone who manages the source can fix it by changing who can see the file.' : ''}`
-          : `Held back: ${record.quarantineReason ?? 'unknown reason'}.`,
+      detail: record.quarantineReason === 'unmapped_audience' ? `Nobody can see this file.${ROLE_VISIBILITY_ENABLED ? ' Change who can see it.' : ''}` : `Held back: ${record.quarantineReason ?? 'unknown reason'}.`,
     };
   }
   if (record.state === 'deleted') return { status: 'failed', detail: 'This file was removed from the engine.' };
@@ -1057,16 +1053,15 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
     case 'indexed':
       return { status: 'searchable' };
     case 'pending':
-      return { status: 'indexing' };
     case 'reconcile_required':
-      return { status: 'indexing', detail: 'The engine is repairing its index entry for this file.' };
+      return { status: 'indexing' };
     case 'failed':
       if (record.indexError === 'extraction_unsupported') {
         return { status: 'unreadable', detail: "Stored, but the engine can't read this file type yet. Upload a text or Markdown export to make it searchable." };
       }
       return { status: 'failed', detail: INDEX_FAILURE_DETAIL[record.indexError ?? ''] ?? `Indexing failed${record.indexError ? `: ${record.indexError}` : ''}.` };
     case 'not_indexed':
-      return { status: 'stored', detail: 'The engine is running without its knowledge backend, so nothing is searchable yet.' };
+      return { status: 'stored', detail: 'Search is unavailable on this engine.' };
     default:
       return { status: 'indexing' };
   }
@@ -1078,7 +1073,7 @@ export function isUploadActive(entry: Pick<UploadEntry, 'status'>): boolean {
 
 /** The caption under a queued file's bar: what the engine is doing with it, and for how long. */
 export function queuedUploadText(entry: Pick<UploadEntry, 'retrying' | 'running' | 'uploadedAt'>, now: number): string {
-  if (entry.retrying) return 'Running again on the engine from the file it already has · nothing was uploaded.';
+  if (entry.retrying) return 'Running again from the stored file.';
   const elapsed = formatElapsed(entry.uploadedAt, now);
   const soFar = elapsed ? ` · ${elapsed} so far` : '';
   return entry.running ? `Uploaded · the engine is reading it with its language model and adding it to the graph${soFar}` : `Uploaded · waiting for the engine to start on it${soFar}`;
@@ -1088,6 +1083,22 @@ export function queuedUploadText(entry: Pick<UploadEntry, 'retrying' | 'running'
 export function uploadIsSlow(entry: Pick<UploadEntry, 'uploadedAt'>, now: number): boolean {
   const start = Date.parse(entry.uploadedAt);
   return !Number.isNaN(start) && now - start >= UPLOAD_SLOW_AFTER_MS;
+}
+
+/**
+ * The setup card's line for one upload source. A file counts once the engine has it: indexing can
+ * take far longer than the upload, so while it runs the line says the files are sent. A failed row
+ * without a job never reached the engine, so it is not sent.
+ */
+export function uploadSourceTitle(entries: Pick<UploadEntry, 'status' | 'jobId'>[], sourceName: string): string {
+  const files = plural(entries.length, 'file');
+  const failed = entries.filter((e) => e.status === 'failed').length;
+  if (!entries.some(isUploadActive)) return `${files} uploaded to “${sourceName}”${failed ? ` · ${failed} failed` : ''}`;
+  const uploading = entries.filter((e) => e.status === 'uploading').length;
+  const notSent = entries.filter((e) => e.status === 'failed' && !e.jobId).length;
+  const sent = entries.length - uploading - notSent;
+  if (uploading) return `Uploading ${files} to “${sourceName}” · ${sent} of ${entries.length} sent`;
+  return `${plural(sent, 'file')} sent to “${sourceName}” · indexing${notSent ? ` · ${notSent} failed` : ''}`;
 }
 
 /** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */
@@ -1174,13 +1185,13 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
   const uploadOnly = n > 0 && engine.sources.every((s) => s.type === 'upload');
   const defs: Omit<GetStartedStep, 'state'>[] = [
     uploadFirst && !done.index
-      ? { id: 'index', title: 'Upload your first files', description: 'Files become searchable moments after they upload. Nothing else to set up.', action: 'Upload files' }
+      ? { id: 'index', title: 'Upload your first files', description: 'Files become searchable after upload.', action: 'Upload files' }
       : {
           id: 'index',
           title: 'Index your sources',
           description: uploadOnly ? (progress ? `${progressHeadline(progress)}.` : 'Files become searchable after upload.') : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
         },
-    { id: 'ask', title: 'Ask it something', description: 'Try the Playground and check the cited passages.' },
+    { id: 'ask', title: 'Ask it something' },
     { id: 'publish', title: 'Connect an agent', description: 'Call it from agents over REST or MCP.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
   ];
@@ -1216,11 +1227,8 @@ export function suggestedQuestions(engine: Pick<ContextEngineDetail, 'sources'>)
   return out.slice(0, 4);
 }
 
-/** Why an engine's deletion job failed, in words, from its error code. */
-export function deletionFailureText(code: string | undefined): string {
-  const lead = code === 'residue_found' ? 'A removed item was still searchable, so the engine kept this engine and its data.' : 'The engine kept this engine and its data.';
-  return `${lead} Deleting again continues where the last attempt stopped.`;
-}
+/** What a failed deletion means for the engine, whatever stopped it. */
+export const DELETION_FAILURE_TEXT = 'Deletion did not finish. Your data is kept. Retry to continue.';
 
 // ── Editing models on a running engine ──────────────────────────────────────
 
@@ -1250,15 +1258,6 @@ export function toModelInput(draft: ModelDraft): ContextModelInput {
     ...(draft.keyMode === 'key' && nonEmpty(draft.apiKey) ? { apiKey: draft.apiKey } : {}),
     ...(draft.keyMode === 'ref' && nonEmpty(draft.apiKeyRef) ? { apiKeyRef: draft.apiKeyRef.trim() } : {}),
   };
-}
-
-/** How the engine holds an engine's model keys, for the Models card. */
-export function modelKeysLabel(models: Pick<ContextEngineModels, 'embedding' | 'llm'>): string {
-  const kinds = new Set([models.embedding?.keyKind, models.llm?.keyKind].filter(Boolean));
-  if (kinds.size === 0) return '';
-  if (kinds.size === 1 && kinds.has('encrypted')) return 'Keys encrypted by the engine';
-  if (kinds.size === 1 && kinds.has('reference')) return 'Keys from secret references';
-  return `Embedding key ${models.embedding?.keyKind === 'reference' ? 'from a reference' : 'encrypted'} · language model key ${models.llm?.keyKind === 'reference' ? 'from a reference' : 'encrypted'}`;
 }
 
 /** The absolute form of an in-app path, for links people paste elsewhere. */
