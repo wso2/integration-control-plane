@@ -16,10 +16,9 @@
  * under the License.
  */
 
-import { Alert, Typography } from '@wso2/oxygen-ui';
+import { Alert, TextField, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
-import TextField from '../common/TextField';
 import { useDeleteDatabaseServer } from '../../hooks/useDatabases';
 import type { DatabaseServer } from '../../types/databases';
 
