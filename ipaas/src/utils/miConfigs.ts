@@ -17,7 +17,7 @@
  */
 
 import type { EnvGroup, MiConfig, MiConfigDraft, MiConfigSavePlan, MiConfigWrite } from '../types/envGroups';
-import { keyInOtherGroupError, validateConfigKey } from './devopsConfigs';
+import { isBallerinaConfigKey, keyInOtherGroupError, validateConfigKey } from './devopsConfigs';
 
 /**
  * MI reads `${configs.x}` from environment variables, so its configuration is a
@@ -66,13 +66,17 @@ export function toMiConfig(groups: EnvGroup[], envVarValues: Record<string, stri
     .filter((g) => !isMiManagedGroup(g))
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach((g) => g.keys.filter((key) => !(key in otherGroupKeys)).forEach((key) => (otherGroupKeys[key] = g.name)));
+  const secretsGroupIsPlain = groups.some((g) => g.name === MI_SECRETS_GROUP && !g.sensitive);
+  // With `mi-secrets` left alone, its Secrets section is hidden, so the old per-secret
+  // groups can't be edited here either: their keys are taken, like another group's.
+  if (secretsGroupIsPlain) legacySecrets.filter((key) => !(key in otherGroupKeys)).forEach((key) => (otherGroupKeys[key] = miSecretGroup(key)));
   return {
     envVars,
     secrets,
     legacySecrets,
     shadowedLegacySecrets,
     envVarsGroupIsSecret: groups.some((g) => g.name === MI_ENV_VARS_GROUP && g.sensitive),
-    secretsGroupIsPlain: groups.some((g) => g.name === MI_SECRETS_GROUP && !g.sensitive),
+    secretsGroupIsPlain,
     otherGroupKeys,
   };
 }
@@ -86,7 +90,8 @@ export const miConfigCount = (config: MiConfig): number => config.envVars.length
  * that already exist, whose value may stay blank (unchanged). `stored` is the
  * configuration the draft was made from: a key another env-var group sets
  * (`MiConfig.otherGroupKeys`) is rejected unless the MI group it is written to
- * already has it, as the BFF does.
+ * already has it, as the BFF does. A reserved Ballerina key it already has is let
+ * through the same way.
  */
 export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: string[], stored?: Pick<MiConfig, 'envVars' | 'secrets' | 'legacySecrets' | 'otherGroupKeys'>): Map<string, string> {
   const errors = new Map<string, string>();
@@ -98,9 +103,11 @@ export function validateMiConfigDraft(draft: MiConfigDraft, storedSecrets: strin
   // is typing in may be the earlier one (an env var clashing with a stored secret).
   const uses = new Map<string, number>();
   [...draft.envVars, ...draft.secrets].forEach(({ key }) => uses.set(key, (uses.get(key) ?? 0) + 1));
-  // `written` is false for a key no write sends (a stored secret kept in its old group).
+  // `written` is false for a key its group already has, or no write sends (a stored secret
+  // kept in its old group). Such a key is let through the reserved-name and other-group
+  // checks, so a key saved before them doesn't block every later save.
   const check = (id: string, key: string, written: boolean) => {
-    const keyErr = validateConfigKey(key) || (written ? keyInOtherGroupError(key, otherGroupKeys) : '');
+    const keyErr = written ? validateConfigKey(key) || keyInOtherGroupError(key, otherGroupKeys) : isBallerinaConfigKey(key) ? '' : validateConfigKey(key);
     if (keyErr) errors.set(id, keyErr);
     else if ((uses.get(key) ?? 0) > 1) errors.set(id, `'${key}' is defined more than once.`);
   };

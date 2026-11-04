@@ -49,6 +49,12 @@ describe('toMiConfig', () => {
     expect(toMiConfig(groups, {})).toMatchObject({ secrets: [], secretsGroupIsPlain: true });
   });
 
+  it('treats old per-secret keys as taken when the mi-secrets group is plain', () => {
+    // The Secrets section is hidden then, so an env var with such a key must not slip through.
+    const groups = [group(MI_SECRETS_GROUP, false, ['PLAIN']), group(miSecretGroup('TOKEN'), true, ['TOKEN'])];
+    expect(toMiConfig(groups, {})).toMatchObject({ secrets: ['TOKEN'], legacySecrets: ['TOKEN'], otherGroupKeys: { PLAIN: MI_SECRETS_GROUP, TOKEN: miSecretGroup('TOKEN') } });
+  });
+
   it('reads a key in both mi-secrets and its old group from mi-secrets only', () => {
     const groups = [group(MI_SECRETS_GROUP, true, ['TOKEN']), group(miSecretGroup('TOKEN'), true, ['TOKEN'])];
     expect(toMiConfig(groups, {})).toMatchObject({ secrets: ['TOKEN'], legacySecrets: [], shadowedLegacySecrets: ['TOKEN'] });
@@ -114,6 +120,23 @@ describe('validateMiConfigDraft', () => {
     const errors = validateMiConfigDraft({ envVars: [{ key: 'BAL_CONFIG_FILES', value: 'x' }], secrets: [{ key: 'BAL_CONFIG_VAR_X', value: 's' }] }, []);
     expect(errors.get('env:0')).toMatch(/reserved for Ballerina/);
     expect(errors.get('secret:0')).toMatch(/reserved for Ballerina/);
+  });
+
+  it('lets through a reserved Ballerina key the MI group it is written to already has', () => {
+    // Saved before the check: rejecting it would block every save until it is removed.
+    const stored = cfg({ envVars: [{ key: 'BAL_CONFIG_FILES', value: 'x' }], secrets: ['BAL_CONFIG_VAR_X'] });
+    const draft = { envVars: [{ key: 'BAL_CONFIG_FILES', value: 'changed' }], secrets: [{ key: 'BAL_CONFIG_VAR_X', value: '' }] };
+    expect(validateMiConfigDraft(draft, ['BAL_CONFIG_VAR_X'], stored).size).toBe(0);
+    // Moving between the groups writes it to one that lacks it, so it is rejected.
+    const moved = validateMiConfigDraft({ envVars: [{ key: 'BAL_CONFIG_VAR_X', value: 'v' }], secrets: [] }, ['BAL_CONFIG_VAR_X'], stored);
+    expect(moved.get('env:0')).toMatch(/reserved for Ballerina/);
+  });
+
+  it('rejects an env var with the key of an old per-secret group while mi-secrets is plain', () => {
+    const stored = toMiConfig([group(MI_SECRETS_GROUP, false, ['PLAIN']), group(miSecretGroup('TOKEN'), true, ['TOKEN'])], {});
+    // The drawer leaves the hidden secrets out of the draft.
+    const errors = validateMiConfigDraft({ envVars: [{ key: 'TOKEN', value: 'x' }], secrets: [] }, ['TOKEN'], stored);
+    expect(errors.get('env:0')).toBe(`"TOKEN" is already set by the "${miSecretGroup('TOKEN')}" config.`);
   });
 
   it('rejects a key another config sets', () => {

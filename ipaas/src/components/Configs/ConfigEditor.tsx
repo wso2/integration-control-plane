@@ -167,6 +167,7 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
     }
     setRows((prev) => [...prev, { key: draftKey.trim(), value: draftValue }]);
     setDraftKey('');
+    setImportNotice('');
     setDraftValue('');
     setDraftError('');
   };
@@ -359,6 +360,8 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
                   onChange={(e) => {
                     setDraftKey(e.target.value);
                     setDraftError('');
+                    // The notice is about the last import; typing a new variable moves on from it.
+                    setImportNotice('');
                   }}
                   onKeyDown={addOnEnter}
                   error={!!draftMessage}
