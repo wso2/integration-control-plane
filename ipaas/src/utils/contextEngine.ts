@@ -24,7 +24,6 @@ import {
   EVERYONE_VISIBILITY,
   OWNER_GRANT_PREFIX,
   defaultStorage,
-  isConnectorEnabled,
   LLM_PROVIDERS,
   MCP_CLIENTS,
   RML_MAPPING,
@@ -47,6 +46,7 @@ import { isEmbeddingValid } from './ragIngestion';
 import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type {
   AudienceRule,
+  ContextEngineDetail,
   ContextEngineDraft,
   ContextEngineForm,
   ContextEngineProgress,
