@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/assets/images/logo/favicon-orange/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/images/logo/favicon-orange/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/images/logo/favicon-orange/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/assets/images/logo/favicon-orange/apple-touch-icon.png" />
+    <link rel="manifest" href="/assets/images/logo/site.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Portal</title>
+    <script>
+      // The saved light or dark choice
+      (function () {
+        try {
+          var mode = localStorage.getItem('mui-mode') || 'system';
+          var dark = mode === 'dark' || (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var scheme = dark ? localStorage.getItem('mui-color-scheme-dark') || 'dark' : localStorage.getItem('mui-color-scheme-light') || 'light';
+          document.documentElement.setAttribute('data-color-scheme', scheme);
+        } catch (e) {}
+      })();
+    </script>
+    <style>
+      html {
+        background-color: #f5f5f5;
+      }
+      html[data-color-scheme='dark'] {
+        background-color: #000000;
+        color-scheme: dark;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script vite-ignore src="/config.js"></script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

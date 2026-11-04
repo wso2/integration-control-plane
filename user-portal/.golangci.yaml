@@ -1,0 +1,11 @@
+# Discovered automatically by `golangci-lint run`, so a local `make lint` and CI
+# apply the same rules.
+version: "2"
+
+linters:
+  default: standard
+
+issues:
+  # Report every occurrence: the defaults cap duplicates at 3 and hide the rest.
+  max-issues-per-linter: 0
+  max-same-issues: 0
