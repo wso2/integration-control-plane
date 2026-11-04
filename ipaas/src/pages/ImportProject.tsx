@@ -34,6 +34,7 @@ import WorkspaceModuleTable from '../components/ProjectCreate/WorkspaceModuleTab
 import { FREE_COMPONENT_LIMIT } from '../constants/project';
 import { useProjectHandler } from '../hooks/useProjectHandler';
 import { resourceUrl, narrow, type OrgScope } from '../nav';
+import { orgProjectsUrl } from '../paths';
 import { toHandler } from '../utils/string';
 import { validateProjectName, validateProjectHandler, normalizeProjectError } from '../utils/projectValidation';
 import { buildRepoUrl } from '../utils/gitProviderUrl';
@@ -87,7 +88,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, handlerTaken: isHandlerTaken, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createMonoRepoProject = useCreateMonoRepoProject();
   const createComponent = useCreateComponent();
-  const orgHomeUrl = resourceUrl(scope, 'overview');
+  const projectsUrl = orgProjectsUrl(scope.org);
   // The provider choice and the auto-selected GitHub org are not input the user would lose.
   const allowLeave = useUnsavedChanges(displayName !== '' || description !== '' || effectiveHandler !== '' || repoUrl !== '' || selectedRepo !== '');
 
@@ -184,7 +185,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgHomeUrl)} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(projectsUrl)} sx={{ mb: 2 }}>
         Back to projects
       </Button>
 
@@ -296,7 +297,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           color="inherit"
           onClick={() => {
             allowLeave();
-            navigate(orgHomeUrl);
+            navigate(projectsUrl);
           }}
           disabled={isImporting}>
           Cancel

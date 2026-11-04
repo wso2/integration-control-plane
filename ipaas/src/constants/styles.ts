@@ -94,3 +94,6 @@ export const CARD_TABLE_SX = {
 
 /** The shared minimum width lines up the commit that follows each card title. */
 export const CARD_HEADER_TITLE_SX = { fontWeight: 600, flexShrink: 0, minWidth: '7em' } as const;
+
+// Oxygen 0.20's SearchBar `width="standard"`; pass the prop through once the console is on 0.20.
+export const SEARCH_STANDARD_WIDTH_SX = { width: '100%', maxWidth: 400 } as const;

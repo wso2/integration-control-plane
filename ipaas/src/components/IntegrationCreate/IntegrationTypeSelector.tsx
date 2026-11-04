@@ -22,12 +22,12 @@ import type { JSX, KeyboardEvent, MouseEvent } from 'react';
 import type { IntegrationType } from '../../types/import';
 import { INTEGRATION_TYPES } from '../../constants/import';
 
-// Four columns from lg, but a new row starts after every third card, so the fourth stays empty.
+// Three cards a row from lg, each as wide as one column of a four-column grid with 16px gaps.
 const GRID_SX = {
   display: 'grid',
   gap: 2,
-  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' },
-  '& > :nth-of-type(3n + 1)': { gridColumnStart: { lg: 1 } },
+  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' },
+  maxWidth: { lg: 'calc(75% - 4px)' },
 } as const;
 
 interface IntegrationTypeSelectorProps {

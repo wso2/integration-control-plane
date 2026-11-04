@@ -17,6 +17,7 @@
  */
 
 import { SearchBar } from '@wso2/oxygen-ui';
+import { SEARCH_STANDARD_WIDTH_SX } from '../constants/styles';
 
 type SearchFieldProps = {
   value: string;
@@ -30,10 +31,7 @@ type SearchFieldProps = {
   sx?: object;
 };
 
-// Oxygen 0.20's SearchBar `width="standard"`; pass the prop through once the console is on 0.20.
-const STANDARD_WIDTH_SX = { width: '100%', maxWidth: 400 } as const;
-
 export default function SearchField({ value, onChange, placeholder, size = 'small', fullWidth, width = 'auto', sx }: SearchFieldProps) {
-  const widthSx = width === 'standard' && !fullWidth ? { ...STANDARD_WIDTH_SX, ...sx } : sx;
+  const widthSx = width === 'standard' && !fullWidth ? { ...SEARCH_STANDARD_WIDTH_SX, ...sx } : sx;
   return <SearchBar value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} size={size} fullWidth={fullWidth} sx={widthSx} />;
 }

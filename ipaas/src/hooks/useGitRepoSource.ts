@@ -38,6 +38,8 @@ export function useGitRepoSource() {
   const [urlError, setUrlError] = useState('');
   const [parsedOrg, setParsedOrg] = useState('');
   const [parsedRepo, setParsedRepo] = useState('');
+  // The URL the debounce last parsed; until it catches up, parsedOrg/parsedRepo describe an older URL.
+  const [parsedUrl, setParsedUrl] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
   const [subPath, setSubPath] = useState('/');
   const [isWorkspace, setIsWorkspace] = useState(false);
@@ -51,7 +53,7 @@ export function useGitRepoSource() {
   const activeOrg = isPublicRepo ? parsedOrg : selectedOrg;
   const activeRepo = isPublicRepo ? parsedRepo : selectedRepo;
   const showBranchAndSubPath = !!(activeOrg && activeRepo);
-  const pathReady = !!(activeOrg && activeRepo && selectedBranch);
+  const pathReady = !!(activeOrg && activeRepo && selectedBranch) && (!isPublicRepo || parsedUrl === repoUrl);
 
   const reposEnabled = !isPublicRepo && authStatus === 'done';
   const { data: userRepos, isLoading: isReposLoading, isError: isReposError, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled);
@@ -105,6 +107,7 @@ export function useGitRepoSource() {
   useEffect(() => {
     if (!isPublicRepo) return;
     const id = setTimeout(() => {
+      setParsedUrl(repoUrl);
       if (!repoUrl) {
         setUrlError('');
         setParsedOrg('');
@@ -158,6 +161,7 @@ export function useGitRepoSource() {
     setUrlError('');
     setParsedOrg('');
     setParsedRepo('');
+    setParsedUrl('');
     setSelectedBranch('');
     setSubPath('/');
     setIsWorkspace(false);

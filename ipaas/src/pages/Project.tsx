@@ -53,7 +53,7 @@ import {
   TextField,
   RelativeTime,
 } from '@wso2/oxygen-ui';
-import { CARD_TABLE_SX } from '../constants/styles';
+import { CARD_TABLE_SX, SEARCH_STANDARD_WIDTH_SX } from '../constants/styles';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
 import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, SlidersHorizontal, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
@@ -102,7 +102,6 @@ const projectAvatarSx = { width: 58, height: 58, flexShrink: 0 } as const;
 // Keeps each integration row at 16px padding around a 32px name cell.
 const NAME_ICON_SIZE = 32;
 // Standard search width (SearchField's `standard`), stretched only when the label filter and its chips share the field.
-const integrationSearchSx = { width: '100%', maxWidth: 400 } as const;
 const integrationSearchWithLabelsSx = { flex: 1 } as const;
 // Opens leftward from the filter icon, which sits at the field's right edge.
 const LABEL_MENU_ANCHOR = { vertical: 'bottom', horizontal: 'right' } as const;
@@ -379,7 +378,7 @@ function IntegrationsTable({
           placeholder="Search integrations"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          sx={allLabels.length > 0 ? integrationSearchWithLabelsSx : integrationSearchSx}
+          sx={allLabels.length > 0 ? integrationSearchWithLabelsSx : SEARCH_STANDARD_WIDTH_SX}
           slotProps={{
             htmlInput: { 'aria-label': 'Search integrations' },
             input: {
