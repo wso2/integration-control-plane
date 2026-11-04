@@ -22,11 +22,12 @@ import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { changeUploadVisibility, checkUpload, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
 import { useContextEngineProgress, useUploadAudience } from '../../../hooks/useContextEngine';
 import { useNow } from '../../../hooks/useNow';
-import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
+import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
 import {
   checkStagedFile,
   contentTypeForFile,
   describeUploadAudience,
+  effectiveVisibility,
   engineMessage,
   formatBytes,
   isUploadActive,
@@ -133,11 +134,13 @@ function UploadRow({
                     <Upload size={16} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Change who can see it">
-                  <IconButton size="small" aria-label={`Change who can see ${entry.name}`} onClick={() => setSharing(entry.visibility ?? EVERYONE_VISIBILITY)}>
-                    <Users size={16} />
-                  </IconButton>
-                </Tooltip>
+                {ROLE_VISIBILITY_ENABLED && (
+                  <Tooltip title="Change who can see it">
+                    <IconButton size="small" aria-label={`Change who can see ${entry.name}`} onClick={() => setSharing(entry.visibility ?? EVERYONE_VISIBILITY)}>
+                      <Users size={16} />
+                    </IconButton>
+                  </Tooltip>
+                )}
               </>
             )}
             <Tooltip title="Remove from the engine">
@@ -243,10 +246,11 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
       return content && !checkStagedFile(m, existingNames).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
     });
 
+  const sendAs = effectiveVisibility(visibility);
   const upload = () => {
     const files = toUploads(staged);
-    if (!files.length || visibilityError(visibility)) return;
-    startUploads(engineId, source.id, files, visibility, visibilityTags(visibility, everyone));
+    if (!files.length || visibilityError(sendAs)) return;
+    startUploads(engineId, source.id, files, sendAs, visibilityTags(sendAs, everyone));
     staged.forEach((m) => dropStagedFile(m.id));
     setStaged([]);
   };
@@ -331,9 +335,11 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 setStaged((s) => s.filter((f) => f.id !== id));
               }}
             />
-            <Box sx={{ mt: 2 }}>
-              <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
-            </Box>
+            {ROLE_VISIBILITY_ENABLED && (
+              <Box sx={{ mt: 2 }}>
+                <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
+              </Box>
+            )}
             <Stack direction="row" justifyContent="flex-end" gap={1.5} sx={{ mt: 2 }}>
               <Button
                 variant="outlined"
@@ -343,7 +349,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 }}>
                 Clear
               </Button>
-              <Button variant="contained" startIcon={<Upload size={16} />} disabled={sum.ready === 0 || !!visibilityError(visibility)} onClick={upload}>
+              <Button variant="contained" startIcon={<Upload size={16} />} disabled={sum.ready === 0 || !!visibilityError(sendAs)} onClick={upload}>
                 Upload {sum.ready} file{sum.ready === 1 ? '' : 's'}
               </Button>
             </Stack>

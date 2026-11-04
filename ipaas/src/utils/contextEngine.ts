@@ -23,6 +23,7 @@ import {
   CONTEXT_QUERY_ACTIONS,
   DELETION_POLL_MS,
   EVERYONE_VISIBILITY,
+  ROLE_VISIBILITY_ENABLED,
   OWNER_GRANT_PREFIX,
   defaultStorage,
   LLM_PROVIDERS,
@@ -181,14 +182,14 @@ export function audienceError(rules: AudienceRule[] | undefined): string {
 export function stagedBlocker(source: ContextSourceConfig): string {
   const staged = source.staged ?? [];
   if (staged.length === 0) return '';
-  if (visibilityError(source.stagedVisibility)) return 'Choose who can see the files';
+  if (visibilityError(effectiveVisibility(source.stagedVisibility))) return 'Choose who can see the files';
   const missing = staged.filter((f) => !hasStagedFile(f.id)).length;
   return missing > 0 ? `Re-add ${plural(missing, 'file')}` : '';
 }
 
 /** Whether one source names a known connector, has a name, passes every field check, has a usable visibility choice and its staged files are ready. */
 export function isSourceValid(source: ContextSourceConfig): boolean {
-  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && visibilityError(source.stagedVisibility) === '' && stagedBlocker(source) === '';
+  return !!connectorFor(source.type) && nonEmpty(source.name) && invalidSourceFields(source).length === 0 && visibilityError(effectiveVisibility(source.stagedVisibility)) === '' && stagedBlocker(source) === '';
 }
 
 /** Short reason a source is incomplete, for its status chip; empty when it is complete. */
@@ -197,7 +198,7 @@ export function sourceIncompleteReason(source: ContextSourceConfig): string {
   if (!nonEmpty(source.name)) return 'Name missing';
   const first = invalidSourceFields(source)[0];
   if (first) return (source.values[first.key] ?? '').trim() ? `${first.label} invalid` : `${first.label} missing`;
-  if (visibilityError(source.stagedVisibility)) return 'Choose who can see this content';
+  if (visibilityError(effectiveVisibility(source.stagedVisibility))) return 'Choose who can see this content';
   return stagedBlocker(source);
 }
 
@@ -905,6 +906,11 @@ export function everyoneRoles(orgRoles: string[] | undefined, queryRoles: string
   return orgRoles && orgRoles.length > 0 ? uniqueTrimmed([...orgRoles, ...queryRoles]) : uniqueTrimmed([...queryRoles, ...myGroups]);
 }
 
+/** The visibility a choice takes effect as: the choice itself, or everyone who can query while choosing roles is turned off. */
+export function effectiveVisibility(visibility: FileVisibility | undefined, roleVisibility: boolean = ROLE_VISIBILITY_ENABLED): FileVisibility {
+  return roleVisibility && visibility ? visibility : EVERYONE_VISIBILITY;
+}
+
 /** The audience tags a file is sent with: the chosen roles, or every role for everyone who can query. */
 export function visibilityTags(visibility: FileVisibility | undefined, everyone: string[]): string[] {
   return visibility?.kind === 'roles' ? uniqueTrimmed(visibility.roles) : uniqueTrimmed(everyone);
@@ -922,7 +928,7 @@ export function uploadSourceRules(roles: string[]): AudienceRule[] {
  * visibility names, or all of them for "everyone who can query".
  */
 export function withSourceVisibilityRules(sources: ContextSourceConfig[], everyone: string[]): ContextSourceConfig[] {
-  return sources.map((s) => ({ ...s, audience: uploadSourceRules(s.type === 'upload' ? everyone : visibilityTags(s.stagedVisibility, everyone)) }));
+  return sources.map((s) => ({ ...s, audience: uploadSourceRules(s.type === 'upload' ? everyone : visibilityTags(effectiveVisibility(s.stagedVisibility), everyone)) }));
 }
 
 /** Why a visibility choice cannot be used, or '' when it can: "only some roles" needs at least one. */
@@ -945,7 +951,7 @@ export function describeUploadAudience(entry: Pick<UploadedFile, 'visibility' | 
 
 /** Who a source's content reaches, for the wizard's rows: every source states it as a visibility choice now. */
 export function summarizeSourceVisibility(source: ContextSourceConfig, roleNames: Record<string, string> = {}): string {
-  return describeVisibility(source.stagedVisibility, roleNames);
+  return describeVisibility(effectiveVisibility(source.stagedVisibility), roleNames);
 }
 
 /**
@@ -977,13 +983,13 @@ export interface SharingMismatches {
 
 /** The roles a source shares content with: the roles its visibility names, or everyone who can query. */
 function sourceSharedRoles(source: ContextSourceConfig, everyone: string[]): string[] {
-  return visibilityTags(source.stagedVisibility, everyone);
+  return visibilityTags(effectiveVisibility(source.stagedVisibility), everyone);
 }
 
 export function sharingMismatches(sources: ContextSourceConfig[], queryRoles: string[], everyone: string[], myGroups: string[] = []): SharingMismatches {
   const shared = new Set(sources.flatMap((s) => sourceSharedRoles(s, everyone)));
   // "Everyone who can query" names every role on purpose, so only an explicit "only some roles" choice can name a role that cannot query.
-  const named = new Set(sources.filter((s) => s.stagedVisibility?.kind === 'roles').flatMap((s) => sourceSharedRoles(s, everyone)));
+  const named = new Set(sources.filter((s) => effectiveVisibility(s.stagedVisibility).kind === 'roles').flatMap((s) => sourceSharedRoles(s, everyone)));
   return {
     seeNothing: queryRoles.filter((r) => !shared.has(r)),
     cannotQuery: [...named].filter((r) => !queryRoles.includes(r)),
@@ -1010,7 +1016,7 @@ export function uploadStatusFromRecord(record: ContextRecordStatus): { status: U
       status: 'held',
       detail:
         record.quarantineReason === 'unmapped_audience'
-          ? "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file."
+          ? `The source has no rule for this file's roles yet, so nobody can see it.${ROLE_VISIBILITY_ENABLED ? ' Someone who manages the source can fix it by changing who can see the file.' : ''}`
           : `Held back: ${record.quarantineReason ?? 'unknown reason'}.`,
     };
   }
