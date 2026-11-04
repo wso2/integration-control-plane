@@ -95,7 +95,7 @@ const EditEnvironment = lazyPage(() => import('../pages/EditEnvironment'));
 const RuntimeLogsOrg = lazyPage(() => import('../pages/RuntimeLogsOrg'));
 const RuntimeLogsProject = lazyPage(() => import('../pages/RuntimeLogsProject'));
 const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegration'));
-const AgentTraces = lazyPage(() => import('../pages/AgentTraces'));
+const Traces = lazyPage(() => import('../pages/Traces'));
 const ApiInsights = lazyPage(() => import('../pages/ApiInsights'));
 const ComingSoon = lazyPage(() => import('../pages/ComingSoon'));
 
@@ -226,7 +226,7 @@ const routes: AppRoute[] = [
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/traces',
-                element: createElement(RouteErrorBoundary, null, createElement(withScope(AgentTraces, ['components']))),
+                element: createElement(RouteErrorBoundary, null, createElement(withScope(Traces, ['components']))),
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/runtimes',
