@@ -17,11 +17,12 @@
  */
 
 import { useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@wso2/oxygen-ui';
 import { Unlink } from '@wso2/oxygen-ui-icons-react';
 import { useDeleteResourceLink } from '../../hooks/useConfiguration';
 import type { ResourceLink } from '../../types/configuration';
 import { linkRows } from '../../utils/resourceLinks';
+import { ResourceRow } from './ResourceRow';
 
 interface LinkRowsProps {
   projectId: string;
@@ -31,7 +32,6 @@ interface LinkRowsProps {
 }
 
 const boxSx = { mb: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
-const rowSx = { py: 0.75, borderTop: '1px solid', borderColor: 'divider' } as const;
 
 /** The integration's links as this environment gets them, each with Unlink. */
 export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) {
@@ -52,19 +52,21 @@ export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) 
         </Typography>
       )}
       {rows.map((r) => (
-        <Stack key={r.resourceType} direction="row" alignItems="center" gap={1} sx={rowSx}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography variant="body2">{r.resourceType}</Typography>
-            <Typography variant="caption" color="text.secondary">
-              {r.notes.join(' · ')}
-            </Typography>
-          </Box>
-          {r.canUnlink && (
-            <Button size="small" variant="outlined" color="error" aria-label={`Unlink ${r.resourceType}`} startIcon={<Unlink size={14} />} disabled={unlink.isPending} onClick={() => setTarget(r.resourceType)}>
-              Unlink
-            </Button>
-          )}
-        </Stack>
+        <ResourceRow
+          key={r.resourceType}
+          name={r.name}
+          package={r.package}
+          connection={r.connection}
+          notes={r.notes}
+          label={r.unlinked ? 'Unlinked in next release' : undefined}
+          action={
+            r.canUnlink && (
+              <Button size="small" variant="outlined" color="error" aria-label={`Unlink ${r.resourceType}`} startIcon={<Unlink size={14} />} disabled={unlink.isPending} onClick={() => setTarget(r.resourceType)}>
+                Unlink
+              </Button>
+            )
+          }
+        />
       ))}
       {unlink.isError && (
         <Alert
@@ -79,7 +81,7 @@ export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) 
         </Alert>
       )}
       <Dialog open={!!target} onClose={() => setTarget(null)}>
-        <DialogTitle>Unlink {target}</DialogTitle>
+        <DialogTitle>Unlink {rows.find((r) => r.resourceType === target)?.name ?? target}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">{links.find((l) => l.resourceType === target)?.namesFromWso2Cloud ? 'The link set on WSO2 Cloud stays.' : 'To revoke access, also change the credentials on WSO2 Cloud.'}</Typography>
         </DialogContent>

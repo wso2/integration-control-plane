@@ -38,6 +38,7 @@ vi.mock('@wso2/oxygen-ui', () => {
     Box: Plain,
     Stack: Plain,
     Typography: Plain,
+    Chip: ({ label }: { label: string }) => <span>{label}</span>,
     CircularProgress: () => <span />,
     Button: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
     Dialog: Hidden,
@@ -77,6 +78,20 @@ describe('LinkRows', () => {
     const retry = [...container.querySelectorAll('button')].find((b) => b.textContent === 'Try again');
     await act(async () => retry?.click());
     expect(mutate).toHaveBeenCalledWith(variables);
+  });
+
+  it('shows a link only the release still delivers with a label, its display name and package, and no Unlink', async () => {
+    unlink.current = { mutate: vi.fn(), isPending: false, isError: false };
+    const removed: ResourceLink = {
+      resourceType: 'github-acme',
+      displayName: 'GitHub Acme',
+      package: 'ballerinax/github',
+      linked: false,
+      environments: [{ name: 'development', state: 'in_release', inRelease: true, hasValues: true, configurables: {}, connection: 'acme.ghdemo.github' }],
+    };
+    await act(async () => root.render(<LinkRows projectId="default" componentId="ghdemo" env="development" links={[removed]} />));
+    expect(container.textContent).toContain('GitHub Acmeballerinax/githubUnlinked in next releaseacme.ghdemo.github');
+    expect(container.querySelectorAll('button')).toHaveLength(0);
   });
 
   it('offers no retry while nothing failed', async () => {

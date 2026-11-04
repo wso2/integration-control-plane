@@ -49,10 +49,18 @@ const developmentReflects = (links: ResourceLink[] | undefined, type: string, li
   return linked ? !!l?.linked && !!e?.inRelease && (!l.connection || e.connection === l.connection) : !e?.inRelease;
 };
 
-/** One link as a Configure form row: what it delivers in env, whether the resource has no values there, and whether it can be unlinked. */
+/**
+ * One link as a Configure form row: the connection env's release follows (the link's, unless the release has another),
+ * what else to say, whether only the release still delivers it, whether the resource has no values there, and whether
+ * it can be unlinked.
+ */
 export interface LinkRow {
   resourceType: string;
+  name: string;
+  package?: string;
+  connection?: string;
   notes: string[];
+  unlinked: boolean;
   noValues: boolean;
   canUnlink: boolean;
 }
@@ -63,12 +71,25 @@ export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
     if (!l.linked && !l.sourceDefined && !e?.inRelease) return [];
     // Where the release carries the resource, under whatever names, the environment is linked.
     const pending = l.linked && !l.sourceDefined && !!e && !e.inRelease;
+    const releaseConnection = e?.inRelease ? e.connection : undefined;
+    const otherConnection = l.linked && !!l.connection && !!releaseConnection && releaseConnection !== l.connection;
     const notes: string[] = [];
-    if (!l.linked) notes.push(l.sourceDefined ? 'declared in workload.yaml' : 'unlinked · until next release');
-    else if (!l.connection) notes.push('linked from WSO2 Cloud', ...(pending ? ['next release'] : []));
-    else if (e?.inRelease && e.connection && e.connection !== l.connection) notes.push(`through ${e.connection}`, `link now uses ${l.connection}`);
-    else notes.push(`through ${l.connection}`, ...(pending ? ['next release'] : []));
+    if (!l.linked && l.sourceDefined) notes.push('declared in workload.yaml');
+    else if (l.linked && !l.connection) notes.push('linked from WSO2 Cloud');
+    else if (otherConnection) notes.push(`link now uses ${l.connection}`);
+    if (pending) notes.push('next release');
     if (l.sourceDefined && l.linked) notes.push('overridden by workload.yaml');
     else if (l.namesFromWso2Cloud && l.connection) notes.push('names overridden on WSO2 Cloud');
-    return [{ resourceType: l.resourceType, notes, noValues: !!e && !e.hasValues, canUnlink: !!l.connection }];
+    return [
+      {
+        resourceType: l.resourceType,
+        name: l.displayName || l.resourceType,
+        ...(l.package && { package: l.package }),
+        connection: l.linked && !otherConnection ? l.connection : releaseConnection,
+        notes,
+        unlinked: !l.linked && !l.sourceDefined,
+        noValues: !!e && !e.hasValues,
+        canUnlink: !!l.connection,
+      },
+    ];
   });

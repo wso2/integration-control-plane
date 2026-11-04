@@ -139,6 +139,9 @@ export interface PostConfigMgtInput {
  */
 export interface ResourceLink {
   resourceType: string;
+  displayName?: string;
+  /** The Ballerina package the resource's preset is for. */
+  package?: string;
   connection?: string;
   namesFromWso2Cloud?: true;
   sourceDefined?: true;
