@@ -37,12 +37,16 @@ import {
   factEntityNames,
   factSelection,
   labelled,
+  linkIndex,
+  linkKey,
+  linkSelection,
   litLinkColors,
   litPointColors,
   ordinal,
   queryConflictLink,
   sentencesCiting,
   shortLabel,
+  withLinkSelection,
   type FactFocus,
 } from '../../../utils/contextGraph';
 import { EvidencePlace } from '../detail/EvidenceCard';
@@ -50,6 +54,7 @@ import { mutedSx } from '../styles';
 import CosmosCanvas from './CosmosCanvas';
 import EntityPanel, { EntityChip } from './EntityPanel';
 import { GRAPH_ENTITY_LIMIT } from './GraphExplorer';
+import { LinkDetails } from './LinkPanel';
 import { useGraphTheme } from './graphTheme';
 import { canvasNoteSx, GRAPH_HEIGHT, legendDotSx, legendSx, nodeLabelSx, panelLabelSx, panelSx, sentenceSx } from './graphStyles';
 import type { ContextEngineDetail, ContextEvidence, ContextFact, ContextQueryConflict, ContextQueryResult, ContextQueryTrace } from '../../../types/contextEngine';
@@ -68,8 +73,8 @@ interface ProvenanceViewProps {
   onSelectKey: (key: string | null) => void;
   onBackToAnswer: () => void;
   onExit: () => void;
-  /** Open the explorer on an entity, by the id the graph gave it. */
-  onExploreEntity: (id: string) => void;
+  /** Open the explorer on a node, an entity or a document, by the key the graph gave it. */
+  onExploreNode: (key: string) => void;
 }
 
 /**
@@ -80,7 +85,7 @@ interface ProvenanceViewProps {
  * answer was written from. The query is reopened, so every passage is checked
  * again; the trace, when the reader may read it, adds the counts.
  */
-export default function ProvenanceView({ engine, orgHandle, queryId, initialKey, onSelectKey, onBackToAnswer, onExit, onExploreEntity }: ProvenanceViewProps): JSX.Element {
+export default function ProvenanceView({ engine, orgHandle, queryId, initialKey, onSelectKey, onBackToAnswer, onExit, onExploreNode }: ProvenanceViewProps): JSX.Element {
   const { colors, palette } = useGraphTheme();
   const result = useContextQueryResult(engine.id, queryId);
   const permissions = useContextPermissions(engine.id);
@@ -116,16 +121,26 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, facts, focus, conflicts) : null), [model, served, facts, focus, conflicts]);
   // A chosen entity or passage narrows the lit part; one with no fact on the graph shows the whole answer's part.
   const lit = part && part.points.length ? part : whole;
-  const pointColors = useMemo(() => (model && lit ? litPointColors(model, palette, lit, palette.lit) : null), [model, palette, lit]);
-  const linkColors = useMemo(() => (model && lit ? litLinkColors(model, palette, lit, palette.lit) : null), [model, palette, lit]);
+  // A clicked label selects its link, as in the explorer: what the link joins is added to the lit part, its
+  // label is drawn lit, and its panel opens. The key is the explorer's link key, so it can sit in the URL too.
+  const selectedLink = selectedKey && model ? linkIndex(model, selectedKey) : undefined;
+  const pick = useMemo(() => (model && served && selectedLink !== undefined ? linkSelection(model, served, selectedLink) : null), [model, served, selectedLink]);
+  const shown = useMemo(() => (lit && pick ? withLinkSelection(lit, pick) : lit), [lit, pick]);
+  const pointColors = useMemo(() => (model && shown ? litPointColors(model, palette, shown, palette.lit) : null), [model, palette, shown]);
+  const linkColors = useMemo(() => (model && shown ? litLinkColors(model, palette, shown, palette.lit) : null), [model, palette, shown]);
   const selectedIndex = focus.entity && model && served ? (entityIndex(model, served, focus.entity, focus.entityKind) ?? null) : null;
-  const labels = useMemo(() => (model && lit ? labelled(model, lit, selectedIndex, hovered, 0, 40) : []), [model, lit, selectedIndex, hovered]);
+  const labels = useMemo(() => (model && shown ? labelled(model, shown, selectedIndex, hovered, 0, 40) : []), [model, shown, selectedIndex, hovered]);
 
   const select = (key: string | null) => {
     setSelectedKey(key);
     onSelectKey(key);
   };
   const selectEntity = (name: string, kind?: string) => select(kind ? `e:${name}${KIND_SEPARATOR}${kind}` : `e:${name}`);
+  // A relationship or a conflict line; a document line has no label to click.
+  const selectLink = (link: number) => {
+    const key = model ? linkKey(model, link) : undefined;
+    if (key) select(key);
+  };
 
   useEffect(() => {
     if (!selectedKey) return;
@@ -210,27 +225,28 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
                 Reading the graph you can see…
               </Typography>
             </Stack>
-          ) : model && buffers && lit ? (
+          ) : model && buffers && lit && shown ? (
             <CosmosCanvas
               buffers={buffers}
               layoutKey={engine.id}
               pointColors={pointColors}
               linkColors={linkColors}
-              selection={lit}
+              selection={shown}
               focused={selectedIndex}
-              frame={lit.points}
+              frame={pick?.points ?? lit.points}
               fitTo={whole?.points ?? null}
               labels={labels}
               renderLabel={(i) => (
-                <Box sx={nodeLabelSx(i === selectedIndex, lit.points.includes(i))} title={model.nodes[i].label}>
+                <Box sx={nodeLabelSx(i === selectedIndex, shown.points.includes(i))} title={model.nodes[i].label}>
                   {shortLabel(model.nodes[i].label)}
                 </Box>
               )}
-              linkTags={lit.tags}
+              linkTags={shown.tags}
               onSelect={(i) => {
                 if (i === null) select(null);
                 else if (model.nodes[i].kind === 'entity') selectEntity(model.nodes[i].label, served?.entities.find((e) => e.id === model.nodes[i].key)?.kind);
               }}
+              onSelectLink={selectLink}
               onHover={setHovered}
               accent={colors.accent}
               height={GRAPH_HEIGHT}
@@ -252,7 +268,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
                     <Box sx={legendDotSx(colors.muted)} />
                     Rest of the graph
                   </Stack>
-                  <span>{selectedKey ? 'Esc or click the background to see the whole answer' : 'Click an entity to see its part'}</span>
+                  <span>{selectedKey ? 'Esc or click the background to see the whole answer' : 'Click an entity to see its part, or a label to see its relationship'}</span>
                 </Box>
               </Box>
             </CosmosCanvas>
@@ -266,7 +282,22 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
           )}
         </Box>
 
-        {chosenPassage > 0 ? (
+        {selectedLink !== undefined && model && served ? (
+          <LinkDetails
+            engineId={engine.id}
+            orgHandle={orgHandle}
+            model={model}
+            graph={served}
+            link={selectedLink}
+            sourceName={(id) => engine.sources.find((s) => s.id === id)?.name}
+            derivation={{ answer: data.answerWithheld ? undefined : data.answer, evidence: data.evidence, facts: [...facts, ...conflicts.flatMap((c) => [c.first, c.second])] }}
+            onSelectEntity={selectEntity}
+            // A document has no part of its own in an answer, so it opens in the explorer.
+            onSelectRecord={onExploreNode}
+            onSelectLink={selectLink}
+            onClose={() => select(null)}
+          />
+        ) : chosenPassage > 0 ? (
           <PassagePanel
             result={data}
             n={chosenPassage}
@@ -288,7 +319,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             derivation={{ answer: data.answerWithheld ? undefined : data.answer, evidence: data.evidence }}
             onSelectEntity={selectEntity}
             onClose={() => select(null)}
-            onExplore={exploreId ? () => onExploreEntity(exploreId) : undefined}
+            onExplore={exploreId ? () => onExploreNode(exploreId) : undefined}
           />
         ) : selectedKey === 'answer' ? (
           <AnswerPanel result={data} onSelectPassage={selectPassage} onClose={() => select(null)} />

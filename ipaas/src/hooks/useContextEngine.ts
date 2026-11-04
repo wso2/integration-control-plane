@@ -224,12 +224,13 @@ export function useContextGraph(engineId: string, limit: number, enabled = true,
 /**
  * One entity's passages and relationships; a 404 means nothing the reader may read
  * names it. `kind` picks one entity when the same name is more than one; without it
- * the engine opens the kind named most.
+ * the engine opens the kind named most. `limit` caps the passages and the
+ * relationships the engine lists, at most 50.
  */
-export function useContextEntity(engineId: string, name: string | null, kind?: string) {
+export function useContextEntity(engineId: string, name: string | null, kind?: string, limit = 10) {
   return useQuery({
-    queryKey: [ROOT_KEY, 'entity', engineId, name, kind ?? null],
-    queryFn: () => getContextEntity(engineId, name as string, 10, kind),
+    queryKey: [ROOT_KEY, 'entity', engineId, name, kind ?? null, limit],
+    queryFn: () => getContextEntity(engineId, name as string, limit, kind),
     enabled: isContextEngineEnabled() && !!engineId && !!name,
     retry: false,
     staleTime: 60_000,
