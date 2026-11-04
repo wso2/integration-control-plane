@@ -31,7 +31,7 @@ export const URL_DEBOUNCE_MS = 600;
 export const FREE_COMPONENT_LIMIT = 5;
 
 // Fixed segments that share the project-handle slot in /organizations/:org/projects/:project (config/routes.tsx).
-export const DENIED_HANDLERS = new Set(['redirect']);
+export const DENIED_HANDLERS = new Set(['import', 'redirect']);
 
 /** Handler of the project auto-provisioned for every fresh org during onboarding (see OrgHome.tsx). */
 export const DEFAULT_PROJECT_HANDLER = 'default';

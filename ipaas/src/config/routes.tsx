@@ -20,6 +20,7 @@ import { type RouteProps, Navigate, Outlet } from 'react-router';
 import { cookiePolicyUrl, loginUrl, signupUrl } from '../paths';
 import { ScopeResolver, generateMatrixRoutes, withScope, type Matrix } from '../nav';
 import HiddenPageRedirect from '../components/HiddenPageRedirect';
+import LegacyImportProjectRedirect from '../components/LegacyImportProjectRedirect';
 import LegacyNewProjectRedirect from '../components/LegacyNewProjectRedirect';
 import UnknownRoute from '../components/UnknownRoute';
 import Logout from '../pages/Logout';
@@ -164,6 +165,8 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/create-project', element: createElement(withScope(CreateProject, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/new', element: createElement(withScope(LegacyNewProjectRedirect, ['organizations'])) },
               { path: 'organizations/:orgHandler/import-project', element: createElement(withScope(ImportProject, ['organizations'])) },
+              { path: 'organizations/:orgHandler/new', element: createElement(withScope(LegacyNewProjectRedirect, ['organizations'])) },
+              { path: 'organizations/:orgHandler/projects/import', element: createElement(withScope(LegacyImportProjectRedirect, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new', element: createElement(withScope(CreateIntegrationOptions, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/ai-builder', element: createElement(withScope(AiIntegrationBuilderView, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/import', element: createElement(withScope(ImportIntegration, ['projects'])) },

@@ -78,7 +78,11 @@ export default function RepoSourceFields({ source, directoryHint }: RepoSourceFi
             label="Repository URL"
             required
             value={repoUrl}
-            onChange={(e) => setRepoUrl(e.target.value)}
+            onChange={(e) => {
+              setRepoUrl(e.target.value);
+              // The URL is parsed after a debounce; until then the old repository's branch must not stay selectable.
+              setSelectedBranch('');
+            }}
             fullWidth
             error={!!urlError}
             placeholder={PUBLIC_REPO_URL_PLACEHOLDER}
