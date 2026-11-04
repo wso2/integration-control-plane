@@ -1002,11 +1002,13 @@ describe('file uploads', () => {
     expect(evidenceBackTarget(undefined, undefined)).toEqual({ tab: 'overview', label: 'Back to the context engine' });
   });
 
-  it('treats only unreachable or server errors as transient status reads', () => {
+  it('treats only unreachable, timed out, rate limited or server errors as transient status reads', () => {
     expect(isTransientReadError(new TypeError('Failed to fetch'))).toBe(true);
     expect(isTransientReadError(new Error('Maximum update depth exceeded'))).toBe(true);
     expect(isTransientReadError(new HttpError(503, 'HTTP 503: unavailable'))).toBe(true);
     expect(isTransientReadError(new HttpError(0, 'HTTP 0: '))).toBe(true);
+    expect(isTransientReadError(new HttpError(408, 'HTTP 408: timeout'))).toBe(true);
+    expect(isTransientReadError(new HttpError(429, 'HTTP 429: slow down'))).toBe(true);
     expect(isTransientReadError(new HttpError(404, 'HTTP 404: not found'))).toBe(false);
     expect(isTransientReadError(new HttpError(403, 'HTTP 403: forbidden'))).toBe(false);
     expect(isTransientReadError(new HttpError(400, 'HTTP 400: bad request'))).toBe(false);

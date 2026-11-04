@@ -414,8 +414,11 @@ export interface UploadEntry extends UploadedFile {
   retrying?: boolean;
   /** The engine's worker has started on the file, so the wait is the work itself, not the queue. */
   running?: boolean;
-  /** The last status read did not reach the engine: `status` is the last one read and another read is scheduled. */
-  check?: 'retrying';
+  /**
+   * The last status read did not reach the engine, so `status` is the last one read: another read is
+   * scheduled (`retrying`), or the reads stopped until the user checks again (`stopped`).
+   */
+  check?: 'retrying' | 'stopped';
 }
 
 export interface IngestFileInput {
@@ -835,6 +838,10 @@ export interface PlaygroundConversation {
   turns: PlaygroundTurn[];
   /** The mode the user chose; unset until they choose one, so the tab picks its own default. */
   mode?: ContextQueryMode;
+  /** The question on its way to the engine; `token` tells its answer from a later question's. */
+  pending?: { question: string; mode: ContextQueryMode; token: number };
+  /** The last question's failure, until it is dismissed or another question is asked. */
+  failure?: { error: unknown; mode: ContextQueryMode };
 }
 
 /** Router state a passage page is opened with, so its Back returns to where the reader came from. */

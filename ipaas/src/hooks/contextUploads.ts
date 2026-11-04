@@ -40,14 +40,16 @@ import {
   CONTEXT_JOB_TERMINAL_STATES,
   UPLOAD_CHECK_BACKOFF_MS,
   UPLOAD_CHECK_CONCURRENCY,
+  UPLOAD_CHECK_GIVE_UP_MS,
   UPLOAD_CHECK_RETRY_DETAIL,
+  UPLOAD_CHECK_STOPPED_DETAIL,
   UPLOAD_CHECK_STEADY_MS,
   UPLOAD_CONCURRENCY,
   UPLOAD_POLL_MS,
 } from '../constants/contextEngine';
 import { engineMessage, isTransientReadError, isUploadActive, unchangedDelivery, uploadSourceRules, uploadStatusFromRecord } from '../utils/contextEngine';
 import { HttpError } from '../types/http';
-import type { AudienceRule, ContextJob, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
+import type { AudienceRule, ContextJob, ContextRecordStatus, FileVisibility, UploadedFile, UploadEntry } from '../types/contextEngine';
 
 export interface FileToUpload {
   content: Blob;
@@ -71,6 +73,13 @@ const checkQueue: (() => void)[] = [];
 let checksActive = 0;
 /** Status reads that failed to reach the engine in a row, per file, for the backoff. */
 const checkAttempts = new Map<string, number>();
+/** When a file's status reads started failing to reach the engine, so the retries stop in time. */
+const checkFailingSince = new Map<string, number>();
+
+function resetCheck(key: string): void {
+  checkAttempts.delete(key);
+  checkFailingSince.delete(key);
+}
 /** Bumped when a file is sent again, so a read started for the previous upload cannot touch the new one. */
 const generations = new Map<string, number>();
 let notifyTimer: number | undefined;
@@ -139,7 +148,7 @@ function patchEntry(sourceId: string, recordId: string, patch: Partial<UploadEnt
 /** Start a new attempt for a file: pending reads and timers for the earlier one must not touch it. */
 function newAttempt(key: string): void {
   clearTimer(key);
-  checkAttempts.delete(key);
+  resetCheck(key);
   generations.set(key, (generations.get(key) ?? 0) + 1);
 }
 
@@ -183,12 +192,19 @@ function trackCheck(key: string, run: () => Promise<void>): Promise<void> {
 
 /**
  * The engine could not be reached for this file. Its last status stays, the row says
- * so, and the status is read again after 3 s, 6 s, 12 s, then every 30 s.
+ * so, and the status is read again after 3 s, 6 s, 12 s, then every 30 s. After
+ * UPLOAD_CHECK_GIVE_UP_MS the reads stop and the row waits for "Check again".
  */
 function checkLater(sourceId: string, recordId: string, again: () => Promise<void>): void {
   const key = entryKey(sourceId, recordId);
   const attempt = checkAttempts.get(key) ?? 0;
   checkAttempts.set(key, attempt + 1);
+  const since = checkFailingSince.get(key) ?? Date.now();
+  checkFailingSince.set(key, since);
+  if (Date.now() - since >= UPLOAD_CHECK_GIVE_UP_MS) {
+    patchEntry(sourceId, recordId, { check: 'stopped', detail: UPLOAD_CHECK_STOPPED_DETAIL });
+    return;
+  }
   patchEntry(sourceId, recordId, { check: 'retrying', detail: UPLOAD_CHECK_RETRY_DETAIL });
   timers.set(
     key,
@@ -225,17 +241,9 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
   const key = entryKey(sourceId, recordId);
   const generation = generations.get(key);
   clearTimer(key);
+  let record: ContextRecordStatus;
   try {
-    const record = await queueCheck(() => getContextRecordStatus(sourceId, recordId));
-    if (generations.get(key) !== generation) return;
-    const { status, detail } = uploadStatusFromRecord(record);
-    checkAttempts.delete(key);
-    patchEntry(sourceId, recordId, { status, detail, forbidden: false, check: undefined, version: record.currentVersion, progress: 100 });
-    if (status === 'indexing')
-      timers.set(
-        key,
-        window.setTimeout(() => void trackCheck(key, () => watchRecord(engineId, sourceId, recordId)), UPLOAD_POLL_MS),
-      );
+    record = await queueCheck(() => getContextRecordStatus(sourceId, recordId));
   } catch (err) {
     if (generations.get(key) !== generation) return;
     if (err instanceof HttpError && err.status === 404) {
@@ -260,7 +268,17 @@ async function watchRecord(engineId: string, sourceId: string, recordId: string,
       detail: err instanceof HttpError && err.status === 403 ? 'Seeing this file needs upload access to the source.' : engineMessage(err, "Couldn't read the file's status."),
       forbidden: err instanceof HttpError && err.status === 403,
     });
+    return;
   }
+  if (generations.get(key) !== generation) return;
+  const { status, detail } = uploadStatusFromRecord(record);
+  resetCheck(key);
+  patchEntry(sourceId, recordId, { status, detail, forbidden: false, check: undefined, version: record.currentVersion, progress: 100 });
+  if (status === 'indexing')
+    timers.set(
+      key,
+      window.setTimeout(() => void trackCheck(key, () => watchRecord(engineId, sourceId, recordId)), UPLOAD_POLL_MS),
+    );
 }
 
 /** Follow the engine's job for an upload, then the record it produced. */
@@ -268,24 +286,9 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
   const key = entryKey(sourceId, recordId);
   const generation = generations.get(key);
   clearTimer(key);
+  let job: ContextJob;
   try {
-    const job = await queueCheck(() => getContextJob(jobId));
-    if (generations.get(key) !== generation) return;
-    checkAttempts.delete(key);
-    if (!CONTEXT_JOB_TERMINAL_STATES.has(job.state)) {
-      patchEntry(sourceId, recordId, { status: 'queued', progress: 100, running: job.state === 'running', check: undefined });
-      timers.set(
-        key,
-        window.setTimeout(() => void trackCheck(key, () => watchJob(engineId, sourceId, recordId, jobId)), UPLOAD_POLL_MS),
-      );
-      return;
-    }
-    if (job.state === 'failed') {
-      patchEntry(sourceId, recordId, { status: 'failed', retrying: false, check: undefined, detail: job.error?.message ?? 'The engine could not apply this file.' });
-      return;
-    }
-    pendingBytes.delete(key);
-    await watchRecord(engineId, sourceId, recordId, true);
+    job = await queueCheck(() => getContextJob(jobId));
   } catch (err) {
     if (generations.get(key) !== generation) return;
     if (isTransientReadError(err)) {
@@ -293,7 +296,24 @@ async function watchJob(engineId: string, sourceId: string, recordId: string, jo
       return;
     }
     patchEntry(sourceId, recordId, { status: 'failed', detail: engineMessage(err, "Couldn't follow the upload.") });
+    return;
   }
+  if (generations.get(key) !== generation) return;
+  resetCheck(key);
+  if (!CONTEXT_JOB_TERMINAL_STATES.has(job.state)) {
+    patchEntry(sourceId, recordId, { status: 'queued', progress: 100, running: job.state === 'running', check: undefined });
+    timers.set(
+      key,
+      window.setTimeout(() => void trackCheck(key, () => watchJob(engineId, sourceId, recordId, jobId)), UPLOAD_POLL_MS),
+    );
+    return;
+  }
+  if (job.state === 'failed') {
+    patchEntry(sourceId, recordId, { status: 'failed', retrying: false, check: undefined, detail: job.error?.message ?? 'The engine could not apply this file.' });
+    return;
+  }
+  pendingBytes.delete(key);
+  await watchRecord(engineId, sourceId, recordId, true);
 }
 
 function pump(engineId: string, sourceId: string): void {
@@ -527,7 +547,7 @@ export async function changeUploadVisibility(engineId: string, sourceId: string,
 /** Read a file's status now, e.g. after the engine was out of reach; the backoff starts over. */
 export function checkUpload(engineId: string, sourceId: string, recordId: string): void {
   const key = entryKey(sourceId, recordId);
-  checkAttempts.delete(key);
+  resetCheck(key);
   clearTimer(key);
   void follow(engineId, sourceId, recordId);
 }
