@@ -241,8 +241,9 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     );
   };
 
-  // A 404 means "no schema" and a not-implemented stub means the product has no
-  // runtime-arguments API at all. Neither is a failure — both mean trigger-only.
+  // A 404 means the integration is gone from under the page, and a not-implemented stub
+  // means a build with no runtime-arguments API. Neither is the form's failure — both
+  // fall back to trigger-only.
   const argsUnavailable = argsError && (isNotFoundError(argsErr) || isUnsupportedError(argsErr));
   const hardArgsError = argsError && !argsUnavailable;
   const hasFormData = hasAnyFormData(formData);

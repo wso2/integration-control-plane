@@ -45,8 +45,9 @@ export function useTaskExecutions(releaseId: string, componentId = '', envId = '
 /**
  * The automation's runtime-argument schema, read from its source at the deployed commit.
  * An empty array means "no declared args" — the Test page then shows a trigger-only form.
- * `retry: false` so a failure (404: unknown integration; 502: the source could not be
- * read) surfaces promptly, and the caller offers free-form arguments instead.
+ * `retry: false` so a failure (404: unknown integration; 502 or 424: the source could
+ * not be read, retryable or not) surfaces promptly, and the caller offers free-form
+ * arguments instead.
  */
 export function useRuntimeArguments(componentId: string, deploymentTrackId: string | undefined, commitHash: string | undefined, enabled = true) {
   return useQuery<RuntimeArgument[]>({

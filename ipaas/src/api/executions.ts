@@ -285,8 +285,8 @@ export const fetchExecutionLogs = async (componentId: string, _deploymentTrackId
 };
 
 // GET /components/{name}/runtime-arguments?commit= — the BFF reads the parameters of the
-// Ballerina `main` at the deployed commit. An empty list means the run takes no arguments
-// or its source cannot be read; either way it runs without a form.
+// Ballerina `main` at the deployed commit (a full SHA). An empty list means the run takes
+// no arguments; a source it cannot read answers 502 (retryable) or 424 (not).
 export const fetchRuntimeArguments = (componentId: string, _deploymentTrackId: string, commitHash: string): Promise<RuntimeArgument[]> => bff.get<RuntimeArgument[]>(`/components/${seg(componentId)}/runtime-arguments${q({ commit: commitHash })}`);
 
 // No dedicated count endpoint; approximate from the listed job runs.
