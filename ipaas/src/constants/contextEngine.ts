@@ -32,7 +32,7 @@ import type {
   StorageKind,
   UploadFileStatus,
 } from '../types/contextEngine';
-import type { EmbeddingProvider } from '../types/ragIngestion';
+import type { EmbeddingProviderInfo } from './ragIngestion';
 
 const GENAI_LOGO_BASE = 'assets/images/genai/';
 
@@ -608,7 +608,7 @@ export function blankSource(connectorId: string): ContextSourceConfig {
   return { type: connector.id, name: connector.name, values: Object.fromEntries(connector.fields.map((f) => [f.key, f.defaultValue ?? ''])), audience: [], stagedVisibility: EVERYONE_VISIBILITY };
 }
 
-// ── Step 3: LLM providers (embedding providers are shared with RAG) ─────────
+// ── Models step: embedding and language model providers ─────────────────────
 
 export interface LlmProviderInfo {
   id: LlmProvider;
@@ -617,7 +617,7 @@ export interface LlmProviderInfo {
   logo: string;
   /** Light variant of a dark logo, for the dark theme. */
   logoDark?: string;
-  /** Selectable model ids. Empty means the provider takes a free-text deployment id (Azure). */
+  /** Selectable model ids. Empty means the provider takes a free-text model id. */
   models: string[];
 }
 
@@ -628,11 +628,15 @@ export interface LlmProviderInfo {
 export const EMBEDDING_LOGO_DARK: Readonly<Record<string, string>> = { openai: `${GENAI_LOGO_BASE}openai-dark.svg`, mistral: `${GENAI_LOGO_BASE}mistral-dark.svg` };
 
 export const LLM_PROVIDERS: LlmProviderInfo[] = [
-  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, logoDark: `${GENAI_LOGO_BASE}openai-dark.svg`, models: ['gpt-4.1', 'gpt-4.1-mini', 'gpt-4o', 'gpt-4o-mini'] },
-  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, logoDark: `${GENAI_LOGO_BASE}anthropic-dark.svg`, models: ['claude-sonnet-4-6', 'claude-haiku-4-5'] },
-  { id: 'azure_openai', name: 'Azure OpenAI', logo: `${GENAI_LOGO_BASE}azure-openai.svg`, models: [] },
-  { id: 'mistral', name: 'Mistral AI', logo: `${GENAI_LOGO_BASE}mistral.svg`, logoDark: `${GENAI_LOGO_BASE}mistral-dark.svg`, models: ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'] },
+  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, logoDark: `${GENAI_LOGO_BASE}openai-dark.svg`, models: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra'] },
+  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, logoDark: `${GENAI_LOGO_BASE}anthropic-dark.svg`, models: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
 ];
+
+/** Embedding providers a context engine offers. RAG ingestion keeps its own, longer list. */
+export const CONTEXT_EMBEDDING_PROVIDERS: EmbeddingProviderInfo[] = [{ id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] }];
+
+/** Display names for providers an engine may still run but the console no longer offers. */
+export const RETIRED_MODEL_PROVIDER_NAMES: Record<string, string> = { azure_openai: 'Azure OpenAI', mistral: 'Mistral AI' };
 
 export const LLM_AZURE_DEFAULT_API_VERSION = '2024-06-01';
 
@@ -670,7 +674,6 @@ export const CONTEXT_OWNER_ACTIONS = ['context.read', 'evidence.read', 'trace.re
 /** The creator's grant is keyed `owner-<principalId>`. */
 export const OWNER_GRANT_PREFIX = 'owner-';
 
-
 /** Grants created for an org role are keyed `role-<handle>` so they can be told apart from ad-hoc grants. */
 export const ROLE_GRANT_PREFIX = 'role-';
 
@@ -698,14 +701,6 @@ export const CONTEXT_MCP_TOOLS: ContextMcpToolInfo[] = [
   { name: 'get_context', description: 'Returns the passages the caller may read that best answer a question, each with its source, version and link.' },
   { name: 'get_answer', description: 'Answers a question from those passages, with each [n] citing the nth passage.' },
 ];
-
-// ── Recommended models ──────────────────────────────────────────────────────
-
-/** One-click default pair: one provider, one key, good quality at low cost. */
-export const RECOMMENDED_MODELS: { embedding: { provider: EmbeddingProvider; model: string }; llm: { provider: LlmProvider; model: string } } = {
-  embedding: { provider: 'openai', model: 'text-embedding-3-small' },
-  llm: { provider: 'openai', model: 'gpt-4.1' },
-};
 
 // ── Source progress ─────────────────────────────────────────────────────────
 
@@ -749,7 +744,6 @@ export const MCP_CLIENTS: { id: McpClientId; label: string; path: string }[] = [
 export const CONTEXT_ENGINE_DRAFT_KEY_PREFIX = 'contextEngine:draft:';
 /** Local-storage key prefix marking that the user has asked an engine something, suffixed by engine id. */
 export const CONTEXT_ENGINE_ASKED_KEY_PREFIX = 'contextEngine:asked:';
-
 
 /** localStorage key of the files this browser uploaded to a source, until the engine can list a source's records. */
 export const CONTEXT_ENGINE_FILES_KEY_PREFIX = 'contextEngine:files:';

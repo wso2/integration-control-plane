@@ -17,7 +17,9 @@
  */
 
 import {
+  blankLlm,
   CONNECTOR_BY_ID,
+  CONTEXT_EMBEDDING_PROVIDERS,
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
   CONTEXT_QUERY_ACTIONS,
@@ -31,6 +33,7 @@ import {
   RML_MAPPING,
   PLAYGROUND_SUGGESTIONS,
   PROGRESS_POLL_ACTIVE_MS,
+  RETIRED_MODEL_PROVIDER_NAMES,
   ROLE_GRANT_PREFIX,
   STORAGE_BACKEND_BY_KIND,
   STORAGE_BACKENDS,
@@ -46,7 +49,6 @@ import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
 import { formatDistanceToNow, formatElapsed } from './time';
 import { isEmbeddingValid } from './ragIngestion';
-import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type {
   AudienceRule,
   ContextEngineDetail,
@@ -244,6 +246,17 @@ export function isModelsStepValid(embedding: EmbeddingConfig | null, llm: LlmCon
   return isEmbeddingValid(embedding) && isLlmValid(llm);
 }
 
+/** A provider's display name for either kind of model, including providers the console no longer offers; the id itself when nothing names it. */
+export function modelProviderName(kind: 'embedding' | 'llm', id: string): string {
+  const offered: readonly { id: string; name: string }[] = kind === 'embedding' ? CONTEXT_EMBEDDING_PROVIDERS : LLM_PROVIDERS;
+  return offered.find((p) => p.id === id)?.name ?? RETIRED_MODEL_PROVIDER_NAMES[id] ?? id;
+}
+
+/** Whether a model id is typed in rather than picked: the provider lists none, or the id is not among them. */
+export function isCustomModel(model: string, models: readonly string[]): boolean {
+  return models.length === 0 || (model !== '' && !models.includes(model));
+}
+
 /** The embedding key can stand in for the LLM key only when both use the same provider. */
 export function canShareApiKey(embedding: EmbeddingConfig | null, llm: LlmConfig | null): boolean {
   return !!embedding && !!llm && embedding.provider === llm.provider;
@@ -254,6 +267,21 @@ export function effectiveLlm(form: Pick<ContextEngineForm, 'embedding' | 'llm' |
   if (!form.llm) return null;
   if (form.shareApiKey && form.embedding && canShareApiKey(form.embedding, form.llm)) return { ...form.llm, apiKey: form.embedding.apiKey };
   return form.llm;
+}
+
+/** Who writes answers: the language model, a model of its own, or nobody. */
+export type AnswerChoice = 'same' | 'different' | 'off';
+
+export function answerChoice(form: Pick<ContextEngineForm, 'answersEnabled' | 'answerLlm'>): AnswerChoice {
+  if (!form.answersEnabled) return 'off';
+  return form.answerLlm ? 'different' : 'same';
+}
+
+/** The form fields for an answer choice. A different model keeps the one already chosen, or starts on the language model's provider. */
+export function applyAnswerChoice(choice: AnswerChoice, form: Pick<ContextEngineForm, 'llm' | 'answerLlm'>): Pick<ContextEngineForm, 'answersEnabled' | 'answerLlm'> {
+  if (choice === 'off') return { answersEnabled: false, answerLlm: null };
+  if (choice === 'same') return { answersEnabled: true, answerLlm: null };
+  return { answersEnabled: true, answerLlm: form.answerLlm ?? blankLlm(form.llm?.provider ?? LLM_PROVIDERS[0].id) };
 }
 
 /** Why the Models step cannot proceed, or null. */
@@ -278,12 +306,18 @@ export function engineDescriptionError(description: string): string {
   return description.length > CONTEXT_ENGINE_DESCRIPTION_MAX ? `Description must be at most ${CONTEXT_ENGINE_DESCRIPTION_MAX} characters.` : '';
 }
 
+/** Why the Name step cannot proceed, or null. */
+export function nameStepBlocker(name: string, description: string): string | null {
+  if (!nonEmpty(name)) return 'Enter a name for the engine';
+  return engineNameError(name) || engineDescriptionError(description) || null;
+}
+
 export function isNameStepValid(name: string, description: string): boolean {
-  return nonEmpty(name) && !engineNameError(name) && !engineDescriptionError(description);
+  return nameStepBlocker(name, description) === null;
 }
 
 export function isFormComplete(form: ContextEngineForm): boolean {
-  return isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null && isNameStepValid(form.name, form.description);
+  return isNameStepValid(form.name, form.description) && isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null;
 }
 
 /** The wizard form as a create request. Throws when a required section is missing — call after {@link isFormComplete}. */
@@ -365,12 +399,13 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
       form: {
         sources: f.sources.map(sanitizeSourceConfig),
         roles: f.roles,
-        embedding: sanitizeModel(f.embedding, EMBEDDING_PROVIDERS),
+        embedding: sanitizeModel(f.embedding, CONTEXT_EMBEDDING_PROVIDERS),
         llm: sanitizeModel(f.llm, LLM_PROVIDERS),
         shareApiKey: !!f.shareApiKey,
         // Drafts saved before the answers switch existed offered answers with the language model.
         answersEnabled: f.answersEnabled !== false,
-        answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS),
+        // A separate answer model on a provider no longer offered stays separate, with a model to choose.
+        answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS) ?? (f.answerLlm ? blankLlm(LLM_PROVIDERS[0].id) : null),
         storage: sanitizeStorage(f.storage),
         name: f.name,
         description: typeof f.description === 'string' ? f.description : '',
