@@ -785,6 +785,24 @@ export function linkSelection(m: GraphModel, graph: ContextGraph, link: number):
   return { points: [...points], links: chosen, tags: chosen.filter((i) => !!m.links[i].label).map((i) => linkTag(m, i, true)) };
 }
 
+/**
+ * An answer's lit part with a clicked label's link added to it, for the
+ * derivation view. What the link selects (see `linkSelection`) joins the part,
+ * so the answer stays lit around it, and the tags of the selected links are
+ * drawn lit. A tag the part already has keeps its text, which is the answer's
+ * own wording of the fact.
+ */
+export function withLinkSelection(part: FactSelection, pick: LinkSelection): FactSelection {
+  const chosen = new Set(pick.links);
+  const had = new Set(part.tags.map((tag) => tag.link));
+  return {
+    ...part,
+    points: [...new Set([...part.points, ...pick.points])],
+    links: [...new Set([...part.links, ...pick.links])],
+    tags: [...part.tags.map((tag) => (chosen.has(tag.link) ? { ...tag, lit: true } : tag)), ...pick.tags.filter((tag) => !had.has(tag.link))],
+  };
+}
+
 /** Narrows the facts lit: those naming one entity, or those standing on one passage. */
 export interface FactFocus {
   entity?: string;

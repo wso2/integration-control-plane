@@ -59,6 +59,7 @@ import {
   searchNodes,
   sentencesCiting,
   shortLabel,
+  withLinkSelection,
   type GraphPalette,
 } from './contextGraph';
 import type { ContextEvidence, ContextGraph } from '../types/contextEngine';
@@ -472,6 +473,26 @@ describe('facts on the graph', () => {
     expect(s.links.map((i) => m.links[i].label)).toEqual(['fails over to']);
     expect(s.tags).toEqual([{ link: s.links[0], text: 'fails over to', detail: 'Gateway 7 does fail over to Kandy.' }]);
     expect(s.missing).toEqual(['duty manager']);
+  });
+
+  it('adds a clicked label’s link to the answer’s part, lit, keeping the answer’s wording of a fact it already holds', () => {
+    const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all' });
+    const part = factSelection(m, GRAPH, facts);
+    const failover = part.links[0];
+    const same = withLinkSelection(part, linkSelection(m, GRAPH, failover));
+    expect(same.points.sort()).toEqual([...part.points].sort());
+    expect(same.links).toEqual(part.links);
+    expect(same.tags).toEqual([{ link: failover, text: 'fails over to', detail: 'Gateway 7 does fail over to Kandy.', lit: true }]);
+    // A relationship the answer did not use joins the part, with both of its ends, and its own label lit.
+    const vault = m.links.findIndex((l) => l.label === 'stores keys in');
+    const other = withLinkSelection(part, linkSelection(m, GRAPH, vault));
+    expect(other.links).toEqual([failover, vault]);
+    expect(other.points).toEqual(expect.arrayContaining([m.links[vault].source, m.links[vault].target]));
+    expect(other.tags.map((tag) => [tag.text, !!tag.lit])).toEqual([
+      ['fails over to', false],
+      ['stores keys in', true],
+    ]);
+    expect(other.missing).toEqual(part.missing);
   });
 
   it('narrows to one entity or one passage', () => {
