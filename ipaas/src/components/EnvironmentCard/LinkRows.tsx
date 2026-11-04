@@ -67,7 +67,14 @@ export function LinkRows({ projectId, componentId, env, links }: LinkRowsProps) 
         </Stack>
       ))}
       {unlink.isError && (
-        <Alert severity="error" sx={{ mt: 1 }}>
+        <Alert
+          severity="error"
+          sx={{ mt: 1 }}
+          action={
+            <Button size="small" color="inherit" onClick={() => unlink.mutate(unlink.variables)}>
+              Try again
+            </Button>
+          }>
           {unlink.error instanceof Error ? unlink.error.message : 'Failed to unlink the resource'}
         </Alert>
       )}
