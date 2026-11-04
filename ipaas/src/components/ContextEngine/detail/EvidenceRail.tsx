@@ -30,7 +30,7 @@ interface RailCardProps {
   n: number;
   source?: ContextSource;
   cited: boolean;
-  /** Its mark in the answer is hovered or focused. */
+  /** Its mark in the answer, or beside a graph fact, is hovered or focused. */
   active: boolean;
   pinned: boolean;
   /** Another passage is pinned, so this one steps back. */
@@ -105,8 +105,8 @@ interface EvidenceRailProps {
   /** The passages the model was given, in prompt order: `[n]` is `evidence[n - 1]`. */
   evidence: ContextEvidence[];
   sources: ContextSource[];
-  /** Evidence numbers the answer cites. */
-  cited: Set<number>;
+  /** Evidence numbers the answer cites; absent beside graph facts, where every passage was returned and none is cited. */
+  cited?: Set<number>;
   active: number | null;
   pinned: number | null;
   hrefFor: (evidence: ContextEvidence) => string;
@@ -121,11 +121,12 @@ interface EvidenceRailProps {
  * The passages beside an answer: the cited ones first, lit together with the
  * sentence that cites them, and the ones the model was given but did not cite
  * folded underneath. Those still count: the answer may draw on them, and the
- * engine checks all of them before showing the answer again.
+ * engine checks all of them before showing the answer again. Beside graph
+ * facts, with no answer, every passage is listed in the order it came back.
  */
 export default function EvidenceRail({ evidence, sources, cited, active, pinned, hrefFor, onHover, onPin, onOpen, graphHrefFor }: EvidenceRailProps): JSX.Element {
   const byId = new Map(sources.map((s) => [s.id, s]));
-  const uncited = evidence.map((_, i) => i + 1).filter((n) => !cited.has(n));
+  const uncited = cited ? evidence.map((_, i) => i + 1).filter((n) => !cited.has(n)) : [];
   const [showUncited, setShowUncited] = useState(false);
   // Pinning an uncited passage from the answer cannot happen, but hovering its card can; keep it reachable.
   const open = showUncited || (pinned !== null && uncited.includes(pinned));
@@ -138,7 +139,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
         evidence={ev}
         n={n}
         source={byId.get(ev.sourceId)}
-        cited={cited.has(n)}
+        cited={!cited || cited.has(n)}
         active={active === n}
         pinned={pinned === n}
         dimmed={pinned !== null && pinned !== n}
@@ -158,7 +159,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
           Evidence
         </Typography>
         <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-          Cited in the answer
+          {cited ? 'Cited in the answer' : 'In rank order'}
           {graphHrefFor && (
             <>
               <span aria-hidden>·</span>
@@ -171,7 +172,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
       </Stack>
       {evidence
         .map((_, i) => i + 1)
-        .filter((n) => cited.has(n))
+        .filter((n) => !cited || cited.has(n))
         .map(renderCard)}
       {uncited.length > 0 && (
         <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 0.5, mt: 0.5 }}>

@@ -61,6 +61,8 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
 
   // The rail names only the passage, so its click releases a pin made from any sentence; a mark releases its own sentence and re-pins another.
   const togglePin = (focus: CitationFocus) => setPinned((prev) => (prev && prev.n === focus.n && (focus.sentence === undefined || prev.sentence === focus.sentence) ? null : focus));
+  // With no graph facts the graph would light nothing, so the rail offers no way there.
+  const graphHrefFor = facts.length ? derivationHref : undefined;
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
@@ -78,7 +80,7 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
         onHover={(n) => setActive(n === null ? null : { n })}
         onPin={(n) => togglePin({ n })}
         onOpen={onOpen}
-        graphHrefFor={derivationHref}
+        graphHrefFor={graphHrefFor}
       />
     </Box>
   );
