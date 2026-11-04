@@ -80,7 +80,7 @@ function StatusIcon({ status, inProgress, failedReason }: { status: string; inPr
   const val = status?.toLowerCase();
   if (val === 'succeeded' || val === 'success') return <CheckCircle2 size={18} color="green" />;
   if (val === 'failed' || val === 'failure') {
-    const icon = <XCircle size={18} color="red" role="img" aria-label={failedReason || 'Failed'} />;
+    const icon = <XCircle size={18} color="red" role="img" aria-label={failedReason ? `Failed: ${failedReason}` : 'Failed'} />;
     if (!failedReason) return icon;
     // The span gives the tooltip an element it can hold a ref to, and keyboard
     // users a stop that opens it.
@@ -131,10 +131,13 @@ export default function AutomationExecutions({
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [selectedExecution, setSelectedExecution] = useState<TaskExecution | null>(null);
+  // Hold the id, not the row: polling replaces the rows, and the open drawer
+  // must show the latest one (a failure reason can arrive while it is open).
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [logsExecution, setLogsExecution] = useState<TaskExecution | null>(null);
 
   const { data: executions = [], isLoading, isError } = useTaskExecutions(releaseId, componentId, environmentId, projectId);
+  const selectedExecution = executions.find((e) => e.id === selectedExecutionId) ?? null;
   const { data: scheduleConfig } = useExecutionConfigs(componentId, releaseId, environmentId);
   const cronExpression = scheduleConfig?.cronjobFrequency ?? '';
   const cronTimezone = scheduleConfig?.cronjobTimezone ?? '';
@@ -312,7 +315,7 @@ export default function AutomationExecutions({
                   </ListingTable.Cell>
                   <ListingTable.Cell>
                     {!e.id.startsWith(QUEUED_SENTINEL) && (
-                      <IconButton size="small" aria-label="View execution details" onClick={() => setSelectedExecution(e)}>
+                      <IconButton size="small" aria-label="View execution details" onClick={() => setSelectedExecutionId(e.id)}>
                         <ChevronRight size={16} />
                       </IconButton>
                     )}
@@ -340,7 +343,7 @@ export default function AutomationExecutions({
       <ExecutionDrawer
         open={!!selectedExecution}
         execution={selectedExecution}
-        onClose={() => setSelectedExecution(null)}
+        onClose={() => setSelectedExecutionId(null)}
         onRunSuccess={onRunSuccess}
         orgHandler={orgHandler}
         projectHandler={projectHandler}
