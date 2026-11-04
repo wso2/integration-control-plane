@@ -1,0 +1,158 @@
+/**
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import { Alert, Button, Link, ListingTable, Menu, MenuItem, PageContent, PageTitle, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
+import { AudioLines, Plus } from '@wso2/oxygen-ui-icons-react';
+import { useState, type JSX, type MouseEvent } from 'react';
+import { Link as RouterLink } from 'react-router';
+import EmptyListing from '../components/EmptyListing';
+import SearchField from '../components/SearchField';
+import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useActiveProjects } from '../hooks/useProjects';
+import { useOrgVoiceAgents } from '../hooks/useVoiceAgents';
+import type { OrgScope } from '../nav';
+import { componentOverviewUrl, createVoiceAgentUrl } from '../paths';
+import type { Project } from '../types/project';
+
+const SEARCH_SX = { mb: 2, maxWidth: 360 } as const;
+
+function VoiceAgentsSkeleton(): JSX.Element {
+  return (
+    <Stack gap={1}>
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} variant="rounded" height={48} />
+      ))}
+    </Stack>
+  );
+}
+
+export default function VoiceAgents(scope: OrgScope): JSX.Element {
+  const { data: projects, isLoading, isError, refetch } = useActiveProjects();
+
+  return (
+    <PageContent sx={{ pt: 5 }}>
+      <PageTitle>
+        <PageTitle.Header>Voice agents</PageTitle.Header>
+        <PageTitle.SubHeader>Let callers talk to your agents. Each voice agent turns speech into text for an agent and speaks its answers back.</PageTitle.SubHeader>
+        {projects && projects.length > 0 && (
+          <PageTitle.Actions>
+            <CreateVoiceAgentButton org={scope.org} projects={projects} />
+          </PageTitle.Actions>
+        )}
+      </PageTitle>
+      {isLoading ? (
+        <VoiceAgentsSkeleton />
+      ) : isError || !projects ? (
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => refetch()}>
+              Retry
+            </Button>
+          }>
+          Could not load the projects.
+        </Alert>
+      ) : projects.length === 0 ? (
+        <EmptyListing icon={<AudioLines size={48} />} title="No projects" description="Create a project first; voice agents live in a project." />
+      ) : (
+        <VoiceAgentList org={scope.org} projects={projects} />
+      )}
+    </PageContent>
+  );
+}
+
+function CreateVoiceAgentButton({ org, projects }: { org: string; projects: Project[] }): JSX.Element {
+  const navigate = useAppNavigate();
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const onClick = (e: MouseEvent<HTMLElement>) => {
+    if (projects.length === 1) navigate(createVoiceAgentUrl(org, projects[0].handler));
+    else setAnchor(e.currentTarget);
+  };
+  return (
+    <>
+      <Button variant="contained" startIcon={<Plus size={16} />} onClick={onClick} aria-haspopup={projects.length > 1 ? 'menu' : undefined}>
+        Create voice agent
+      </Button>
+      <Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)}>
+        <MenuItem disabled>
+          <Typography variant="caption">Create in project</Typography>
+        </MenuItem>
+        {projects.map((p) => (
+          <MenuItem key={p.id} onClick={() => navigate(createVoiceAgentUrl(org, p.handler))}>
+            {p.name}
+          </MenuItem>
+        ))}
+      </Menu>
+    </>
+  );
+}
+
+function VoiceAgentList({ org, projects }: { org: string; projects: Project[] }): JSX.Element {
+  const { rows, isLoading, isError, refetch } = useOrgVoiceAgents(org, projects);
+  const [query, setQuery] = useState('');
+
+  if (isLoading) return <VoiceAgentsSkeleton />;
+  if (isError)
+    return (
+      <Alert
+        severity="error"
+        action={
+          <Button color="inherit" size="small" onClick={refetch}>
+            Retry
+          </Button>
+        }>
+        Could not load the voice agents.
+      </Alert>
+    );
+  if (rows.length === 0) return <EmptyListing icon={<AudioLines size={48} />} title="No voice agents" description="Create a voice agent to let callers talk to one of your agents." />;
+
+  const needle = query.trim().toLowerCase();
+  const visible = needle ? rows.filter((r) => `${r.component.displayName} ${r.component.handler} ${r.project.name}`.toLowerCase().includes(needle)) : rows;
+  return (
+    <>
+      <SearchField value={query} onChange={setQuery} placeholder="Search voice agents" sx={SEARCH_SX} />
+      <ListingTable.Container>
+        <ListingTable>
+          <ListingTable.Head>
+            <ListingTable.Row>
+              <ListingTable.Cell>Name</ListingTable.Cell>
+              <ListingTable.Cell>Project</ListingTable.Cell>
+              <ListingTable.Cell>Description</ListingTable.Cell>
+            </ListingTable.Row>
+          </ListingTable.Head>
+          <ListingTable.Body>
+            {visible.map(({ component, project }) => (
+              <ListingTable.Row key={`${project.id}/${component.id}`}>
+                <ListingTable.Cell>
+                  <Link component={RouterLink} to={componentOverviewUrl(org, project.handler, component.handler)}>
+                    {component.displayName || component.handler}
+                  </Link>
+                </ListingTable.Cell>
+                <ListingTable.Cell>{project.name}</ListingTable.Cell>
+                <ListingTable.Cell>{component.description || '—'}</ListingTable.Cell>
+              </ListingTable.Row>
+            ))}
+          </ListingTable.Body>
+        </ListingTable>
+      </ListingTable.Container>
+      <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+        {visible.length === rows.length ? `${rows.length} voice agent${rows.length === 1 ? '' : 's'}` : `${visible.length} of ${rows.length} voice agents`}
+      </Typography>
+    </>
+  );
+}

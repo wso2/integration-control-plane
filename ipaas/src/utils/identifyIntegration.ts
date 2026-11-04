@@ -90,6 +90,12 @@ export function identifyIntegration(displayType: string, componentSubType: strin
   }
 
   // displayType fallback for types whose identity lives entirely in displayType.
+  // A voice agent is a generic service the BFF reports by its annotated logical
+  // type, which reaches the console as the displayType.
+  if (displayType === 'voiceAgent') {
+    return { type: 'voice-agent', runtime: 'unknown', raw };
+  }
+
   if (WEBHOOK_DISPLAY_TYPES.has(displayType)) {
     return { type: 'webhook', runtime: runtimeFromDisplayType(displayType), raw };
   }

@@ -118,6 +118,14 @@ export function componentsNewAiBuilderUrl(orgHandler: string, projectHandler: st
   return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/ai-builder`;
 }
 
+export function voiceAgentsUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/voice-agents`;
+}
+
+export function createVoiceAgentUrl(orgHandler: string, projectHandler: string): string {
+  return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/voice-agent`;
+}
+
 export function prebuiltIntegrationsUrl(orgHandler: string, projectHandler: string): string {
   return `/organizations/${orgHandler}/projects/${projectHandler}/prebuilt-integrations`;
 }

@@ -32,6 +32,7 @@ export const integrationModuleLoaders: Record<IntegrationType, ModuleLoader> = {
   'file-integration': () => import('./file-integration'),
   'event-integration': () => import('./event-integration'),
   'ai-agent': () => import('./ai-agent'),
+  'voice-agent': () => import('./voice-agent'),
   'mcp-server': () => import('./mcp-server'),
   'mcp-proxy': () => import('./mcp-server'),
   'tailscale-vpn': () => import('./tailscale-vpn'),

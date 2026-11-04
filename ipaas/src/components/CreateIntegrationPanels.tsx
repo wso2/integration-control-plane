@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, Card, CardContent, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowRight, GitHub, Plus, GitBranch } from '@wso2/oxygen-ui-icons-react';
+import { ArrowRight, AudioLines, GitHub, Plus, GitBranch } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX, type ReactNode } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useDeploySample } from '../hooks/useDeploySample';
@@ -40,9 +40,11 @@ import { GitProvider } from '../types/credentials';
 import { GITHUB_AUTH } from '../constants/github';
 import { PROVIDER_ICON_SX, GITHUB_ICON_SX, SECTION_LABEL_SX } from '../constants/styles';
 import { resourceUrl, narrow, type ProjectScope } from '../nav';
-import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl } from '../paths';
+import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl, createVoiceAgentUrl } from '../paths';
 import type { Sample } from '../types/samples';
 import { sampleKey } from '../constants/samples';
+
+const VOICE_AGENT_CARD_SX = { display: 'flex', alignItems: 'center', gap: 2, p: 2, '&:last-child': { pb: 2 } } as const;
 import { buildCloudEditorUrl } from '../utils/cloudEditor';
 import { useProjectId } from '../hooks/useProjects';
 import { useAccessControl } from '../contexts/AccessControlContext';
@@ -380,6 +382,26 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     </>
                   )}
                 </Box>
+              </CardContent>
+            </Card>
+          </Box>
+
+          {/* Voice agent: a prebuilt voice front end for an existing agent, so it is created by a form rather than from source. */}
+          <Box sx={{ flex: '0 0 auto' }}>
+            <Card sx={{ boxShadow: 'none', ...(creationBlocked ? { pointerEvents: 'none', opacity: 0.5 } : {}) }}>
+              <CardContent sx={VOICE_AGENT_CARD_SX}>
+                <AudioLines size={18} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography variant="body1" sx={{ fontWeight: 500 }}>
+                    Voice agent
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Let callers talk to one of your agents.
+                  </Typography>
+                </Box>
+                <Button variant="text" endIcon={<ArrowRight size={14} />} onClick={() => navigate(createVoiceAgentUrl(scope.org, scope.project))} disabled={creationBlocked}>
+                  Create voice agent
+                </Button>
               </CardContent>
             </Card>
           </Box>
