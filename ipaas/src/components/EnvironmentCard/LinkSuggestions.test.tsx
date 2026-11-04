@@ -22,18 +22,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResourceLink } from '../../types/configuration';
 import { LinkSuggestions } from './LinkSuggestions';
 
-const create = vi.hoisted(() => ({ current: {} as Record<string, unknown>, lastUnlinkAt: 0 }));
+const changeLink = { resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfCrm'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' };
+const create = vi.hoisted(() => ({ current: {} as Record<string, unknown>, lastUnlinkAt: 0, suggestions: [] as unknown[] }));
 vi.mock('../../hooks/useConfiguration', () => ({
-  useResourceLinkSuggestions: () => ({
-    data: [{ resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfCrm'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' }],
-  }),
+  useResourceLinkSuggestions: () => ({ data: create.suggestions }),
   useCreateResourceLink: () => create.current,
   useLastUnlinkAt: () => create.lastUnlinkAt,
 }));
 vi.mock('@wso2/oxygen-ui-icons-react', () => ({ Link: () => <span /> }));
 vi.mock('@wso2/oxygen-ui', () => {
   const Plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
-  return { Alert: Plain, Box: Plain, Stack: Plain, Typography: Plain, Chip: () => <span />, CircularProgress: () => <span />, Button: ({ children }: { children: ReactNode }) => <button>{children}</button> };
+  return {
+    Alert: Plain,
+    Box: Plain,
+    Stack: Plain,
+    Typography: Plain,
+    Chip: () => <span />,
+    CircularProgress: () => <span />,
+    Button: ({ children, onClick }: { children: ReactNode; onClick?: () => void }) => <button onClick={onClick}>{children}</button>,
+  };
 });
 
 let container: HTMLDivElement;
@@ -43,6 +50,7 @@ const variables = { projectId: 'default', componentId: 'sfdemo', resourceType: '
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  create.suggestions = [changeLink];
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -58,6 +66,16 @@ describe('LinkSuggestions', () => {
     await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} build="sfdemo-2" actions={['Change link']} />));
     expect(container.querySelector('button')?.textContent).toBe('Change link');
     expect(container.textContent).toContain('acme.sfdemo.sfSales → acme.sfdemo.sfCrm');
+  });
+
+  it('links a link made on WSO2 Cloud through a connection, without calling it a change', async () => {
+    const mutate = vi.fn();
+    create.current = { mutate, isPending: false, isError: false };
+    create.suggestions = [{ ...changeLink, linkedConnection: undefined }];
+    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[]} actions={['Link', 'Link through']} />));
+    expect(container.textContent).toContain('linked on WSO2 Cloud → acme.sfdemo.sfCrm');
+    await act(async () => container.querySelector('button')?.click());
+    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ connection: 'acme.sfdemo.sfCrm', changed: false }));
   });
 
   it('offers no change where it offers only new links', async () => {

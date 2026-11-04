@@ -85,7 +85,7 @@ export function LinkSuggestions({ projectId, componentId, open, links, build, ac
                 aria-label={`${label} ${r.resourceType} through ${r.connection}`}
                 startIcon={pending ? <CircularProgress size={14} /> : <Link size={14} />}
                 disabled={create.isPending}
-                onClick={() => create.mutate({ projectId, componentId, resourceType: r.resourceType, connection: r.connection, changed: r.action !== 'Link' })}>
+                onClick={() => create.mutate({ projectId, componentId, resourceType: r.resourceType, connection: r.connection, changed: r.action === 'Change link' })}>
                 {label}
               </Button>
             </Stack>
