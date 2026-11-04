@@ -44,6 +44,8 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
   const databaseOffering = useDatabaseOffering(available);
   const temporalOffering = useTemporalOffering(available);
   const lists = [databases, temporals];
+  // The lists and the plan details that describe them, refreshed and reported on together.
+  const queries = [...lists, databaseOffering, temporalOffering];
 
   const rows: ServiceRow[] = [...(databases.data ?? []).map((server): ServiceRow => ({ kind: 'postgres', server })), ...(temporals.data ?? []).map((server): ServiceRow => ({ kind: 'temporal', server }))].sort((a, b) =>
     a.server.name.localeCompare(b.server.name),
@@ -51,7 +53,7 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
 
   const create = () => navigate(newDatabaseUrl(scope));
   const open = (row: ServiceRow) => navigate(row.kind === 'temporal' ? temporalUrl(scope, row.server.id) : databaseUrl(scope, row.server.id));
-  const refresh = () => lists.forEach((q) => q.refetch());
+  const refresh = () => queries.forEach((q) => q.refetch());
   const retry = () => {
     availability.refetch();
     refresh();
@@ -64,7 +66,7 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
   // A failed poll keeps the last good data, so the list (and any delete dialog
   // open on it) stays up; a type that failed to load hides only its own rows.
   const failed = (availability.isError && !availability.data) || (available && lists.every((q) => q.isError && !q.data));
-  const stale = !failed && (availability.isError || (available && lists.some((q) => q.isError)));
+  const stale = !failed && (availability.isError || (available && queries.some((q) => q.isError)));
 
   const body = (): JSX.Element => {
     if (availability.isLoading || (available && lists.some((q) => q.isLoading))) return <DatabaseListSkeleton />;
@@ -90,7 +92,7 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
           <Stack direction="row" alignItems="center" gap={1}>
             <Tooltip title="Refresh">
               <span>
-                <IconButton size="small" aria-label="Refresh services" onClick={refresh} disabled={lists.some((q) => q.isFetching)}>
+                <IconButton size="small" aria-label="Refresh services" onClick={refresh} disabled={queries.some((q) => q.isFetching)}>
                   <RefreshCw size={16} />
                 </IconButton>
               </span>
@@ -103,7 +105,7 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
       </Stack>
       {stale && (
         <Alert severity="warning" action={retryButton} sx={{ mb: 2 }}>
-          Couldn&apos;t load or refresh some services. Showing what loaded.
+          Couldn&apos;t load or refresh some services or plan details. Showing what loaded.
         </Alert>
       )}
       {body()}

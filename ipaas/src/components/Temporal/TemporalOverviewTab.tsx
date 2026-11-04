@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, IconButton, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Cpu, Eye, EyeOff, Layers, MemoryStick, RefreshCw, Server } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { useRevealTemporalCredentials } from '../../hooks/useTemporal';
@@ -47,11 +47,13 @@ interface TemporalOverviewTabProps {
   service: TemporalServerDetail;
   /** The server's plan from the offering; undefined while it loads or for a plan no longer offered. */
   plan?: TemporalPlan;
+  /** Whether the offering that describes the plan is still loading. */
+  planLoading: boolean;
   onRefresh: () => void;
   isRefreshing: boolean;
 }
 
-export default function TemporalOverviewTab({ service, plan, onRefresh, isRefreshing }: TemporalOverviewTabProps): JSX.Element {
+export default function TemporalOverviewTab({ service, plan, planLoading, onRefresh, isRefreshing }: TemporalOverviewTabProps): JSX.Element {
   const reveal = useRevealTemporalCredentials(service.id);
   const [showKey, setShowKey] = useState(false);
   const credentials = reveal.data;
@@ -148,10 +150,11 @@ export default function TemporalOverviewTab({ service, plan, onRefresh, isRefres
               </Typography>
             )}
           </Box>
+          {planLoading && <Skeleton variant="rounded" width={360} height={40} aria-label="Loading plan details" />}
           {plan && (
             <>
               <PlanStat icon={<Server size={15} />} label="Replicas">
-                {plan.replicas > 1 ? `${plan.replicas} (highly available)` : '1 (not highly available)'}
+                {`${plan.replicas} (${plan.replicas > 1 ? 'highly available' : 'not highly available'})`}
               </PlanStat>
               {plan.cpu && (
                 <PlanStat icon={<Cpu size={15} />} label="CPU">

@@ -66,13 +66,21 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
 
   const offering = isTemporal ? temporalOffering : dbOffering;
   const planIds = (offering.data?.plans ?? []).map((p) => p.id);
-  const planId = planIds.includes(pickedPlan) ? pickedPlan : (offering.data?.defaultPlan ?? planIds[0] ?? '');
+  const defaultPlan = offering.data?.defaultPlan;
+  const fallbackPlan = defaultPlan && planIds.includes(defaultPlan) ? defaultPlan : (planIds[0] ?? '');
+  const planId = planIds.includes(pickedPlan) ? pickedPlan : fallbackPlan;
 
-  const takenNames = [...(databases.data ?? []), ...(temporals.data ?? [])].map((s) => s.name);
-  const nameError = isTemporal ? temporalNameError(name, takenNames, offering.data?.maxNameLength) : databaseNameError(name, takenNames, offering.data?.maxNameLength);
+  // A name can only be judged unique once both lists are in. The format is
+  // still checked as the user types, and the plan stays locked until then.
+  const takenNames = databases.data && temporals.data ? [...databases.data, ...temporals.data].map((s) => s.name) : null;
+  const namesFailed = (databases.isError && !databases.data) || (temporals.isError && !temporals.data);
+  const retryNames = () => [databases, temporals].filter((q) => q.isError).forEach((q) => q.refetch());
+  const validateName = isTemporal ? temporalNameError : databaseNameError;
+  const nameError = validateName(name, takenNames ?? [], offering.data?.maxNameLength);
   // Plans stay locked until the name is valid, so a missing name is never left behind a plan that already looks chosen.
-  const nameReady = name !== '' && !nameError;
-  const canCreate = nameReady && !!planId && !create.isPending;
+  const nameReady = name !== '' && !nameError && takenNames !== null;
+  const nameChecking = name !== '' && !nameError && takenNames === null;
+  const canCreate = nameReady && !!planId && !offering.isError && !create.isPending;
   const createError = create.isError ? (isTemporal ? toCreateTemporalError(create.error) : toCreateDatabaseError(create.error)) : null;
 
   const pickKind = (next: PlatformServiceKind) => {
@@ -114,6 +122,18 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
           sx={fieldSx}
         />
       )}
+      {kind && namesFailed && (
+        <Alert
+          severity="error"
+          sx={{ mt: 2, maxWidth: 480 }}
+          action={
+            <Button color="inherit" size="small" onClick={retryNames}>
+              Retry
+            </Button>
+          }>
+          Couldn&apos;t load the existing services, so the name can&apos;t be checked yet.
+        </Alert>
+      )}
     </>
   );
 
@@ -147,7 +167,7 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
       </Typography>
       {!nameReady && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-          Enter a valid name to choose a plan.
+          {!nameChecking ? 'Enter a valid name to choose a plan.' : namesFailed ? 'The name can be checked once the existing services load.' : 'Checking the name against existing services…'}
         </Typography>
       )}
       <Stack direction="row" gap={2} flexWrap="wrap">

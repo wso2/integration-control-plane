@@ -161,7 +161,7 @@ export default function TemporalServerDetail(scope: OrgScope): JSX.Element {
       {activeTab !== 'overview' ? (
         <AdvancedSettings service={service} onDeleted={() => navigate(orgDatabasesUrl(scope))} />
       ) : (
-        service.status !== 'CREATING' && <TemporalOverviewTab service={service} plan={offering.data?.plans.find((p) => p.id === service.plan)} onRefresh={() => refetch()} isRefreshing={isFetching} />
+        service.status !== 'CREATING' && <TemporalOverviewTab service={service} plan={offering.data?.plans.find((p) => p.id === service.plan)} planLoading={offering.isLoading} onRefresh={() => refetch()} isRefreshing={isFetching} />
       )}
     </PageContent>
   );

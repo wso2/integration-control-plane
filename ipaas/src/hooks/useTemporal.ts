@@ -64,11 +64,15 @@ export function useCreateTemporalServer() {
 
 /**
  * A mutation, not a query: every reveal is a fresh request to the provider, and
- * the key must not sit in the query cache.
+ * the key must not sit in the query cache. `gcTime: 0` drops it from the
+ * mutation cache as soon as the view hides it or unmounts, and the keyed
+ * observer resets when the page moves to another server.
  */
 export function useRevealTemporalCredentials(serverId: string) {
   return useMutation({
+    mutationKey: [ROOT_KEY, 'reveal', serverId],
     mutationFn: () => revealTemporalCredentials(serverId),
+    gcTime: 0,
   });
 }
 
@@ -78,7 +82,8 @@ export function useDeleteTemporalServer() {
     mutationFn: (serverId: string) => deleteTemporalServer(serverId),
     onSuccess: (_, serverId) => {
       qc.removeQueries({ queryKey: [ROOT_KEY, 'server', serverId] });
-      return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'servers'] });
+      // Not awaited: the dialog closes as soon as the delete is accepted, while the list refreshes behind it.
+      void qc.invalidateQueries({ queryKey: [ROOT_KEY, 'servers'] });
     },
   });
 }

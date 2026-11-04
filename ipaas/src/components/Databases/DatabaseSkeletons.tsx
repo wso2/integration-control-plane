@@ -52,13 +52,21 @@ export function DatabaseDetailSkeleton(): JSX.Element {
   );
 }
 
-/** Stands in for the plan step of the create wizard while the offering loads. */
+/**
+ * Stands in for the plan step of the create wizard while the offering loads:
+ * the version line, the "Select Service Plan" heading and a row of plan cards
+ * as tall as a card with a price block.
+ */
 export function DatabasePlansSkeleton(): JSX.Element {
   return (
-    <Stack direction="row" gap={2} flexWrap="wrap" aria-busy="true" aria-label="Loading service plans">
-      {[0, 1, 2].map((i) => (
-        <Skeleton key={i} variant="rounded" width={240} height={220} />
-      ))}
-    </Stack>
+    <Box aria-busy="true" aria-label="Loading service plans">
+      <Skeleton variant="text" width={280} height={20} sx={{ mb: 3 }} />
+      <Skeleton variant="text" width={140} height={22} sx={{ mb: 1.5 }} />
+      <Stack direction="row" gap={2} flexWrap="wrap">
+        {[0, 1, 2].map((i) => (
+          <Skeleton key={i} variant="rounded" width={240} height={220} />
+        ))}
+      </Stack>
+    </Box>
   );
 }

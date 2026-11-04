@@ -1042,7 +1042,7 @@ export default function AppLayout(): JSX.Element {
       </AppShell.Main>
 
       <AppShell.Footer>
-        {pathname.includes('/platform-services') && (
+        {activeNavId === 'org-platform-services' && (
           <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', fontStyle: 'italic', color: 'text.disabled', px: 2, pb: 1 }}>
             {DB_TRADEMARK_NOTICE}
           </Typography>
