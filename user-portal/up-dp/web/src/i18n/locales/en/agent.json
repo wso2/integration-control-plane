@@ -1,0 +1,18 @@
+{
+  "you": "You",
+  "agent": "Agent",
+  "copyMessage": "Copy message",
+  "chatEndpoint": "Chat endpoint",
+  "newChat": "New Chat",
+  "noEndpoint": "This agent has no chat endpoint deployed right now. Try again later, or ask your administrator.",
+  "empty": {
+    "title": "Chat with {{name}}",
+    "description": "Ask a question to start. Each chat is its own conversation; start a new one at any time."
+  },
+  "thinking": "Agent is thinking…",
+  "placeholder": "Type a message",
+  "message": "Message",
+  "send": "Send",
+  "disclaimer": "{{name}} is an AI agent published by {{org}}. Its answers can be wrong; check what matters.",
+  "noAnswer": "The agent did not answer."
+}

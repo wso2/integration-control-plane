@@ -1,0 +1,21 @@
+{
+  "http": {
+    "unreachable": "Could not reach the server. Check your connection and try again.",
+    "unauthorized": "Your session has ended. Sign in again.",
+    "forbidden": "You are not allowed to do this.",
+    "notFound": "It could not be found. It may have been removed.",
+    "conflict": "That is not possible in its current state.",
+    "unprocessable": "Some of the values were not accepted.",
+    "unavailable": "The service is unavailable right now. Try again shortly.",
+    "failed": "The request failed (status {{status}})."
+  },
+  "signIn": {
+    "accessDenied": "Sign-in was cancelled, or you are not allowed to use this portal.",
+    "unavailable": "The sign-in service is not available right now. Try again shortly.",
+    "unreachable": "Could not reach the sign-in service. Check your connection and try again.",
+    "stateMismatch": "This sign-in did not start in this tab, or it took too long. Sign in again.",
+    "generic": "Something went wrong while signing you in. Try again, and contact your administrator if it keeps happening.",
+    "couldNotStartSession": "Could not start your session.",
+    "couldNotStartSignIn": "Could not start signing in."
+  }
+}

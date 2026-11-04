@@ -1,0 +1,38 @@
+{
+  "notAllowed": "You are not allowed to run automations. Ask your administrator.",
+  "started": "{{name}} started.",
+  "runNow": "Run Now",
+  "environment": "Environment",
+  "deploymentError": "Could not load this automation's deployment.",
+  "noSchedule": "This automation has no schedule. It runs when someone starts it.",
+  "nextRun": "Next run {{relative}}, {{date}}",
+  "runs": "Runs",
+  "runsError": "Could not load the runs of this automation.",
+  "noRuns": {
+    "title": "No runs yet",
+    "scheduled": "The first scheduled run will show here.",
+    "onDemand": "Start a run to see it here."
+  },
+  "columns": {
+    "status": "Status",
+    "started": "Started",
+    "duration": "Duration",
+    "runId": "Run ID"
+  },
+  "status": {
+    "running": "Running",
+    "succeeded": "Succeeded",
+    "failed": "Failed"
+  },
+  "runDrawer": {
+    "title": "Run {{name}}",
+    "subtitle": "Fill in the arguments this run should use.",
+    "addValuePlaceholder": "Add a value and press Enter",
+    "addValue": "Add value",
+    "none": "None",
+    "required": "Required",
+    "enterNumber": "Enter a number",
+    "clear": "Clear",
+    "starting": "Starting…"
+  }
+}

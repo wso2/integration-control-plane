@@ -72,6 +72,7 @@ import {
   Server,
   Settings2,
   SlidersHorizontal,
+  Waypoints,
   Workflow,
   X,
 } from '@wso2/oxygen-ui-icons-react';
@@ -854,6 +855,15 @@ export default function AppLayout(): JSX.Element {
                               </Sidebar.ItemIcon>
                               <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                             </Sidebar.Item>
+                            {/* Only agents are instrumented, so no other integration has traces to show. */}
+                            {aiAgentType && (
+                              <Sidebar.Item id="traces">
+                                <Sidebar.ItemIcon>
+                                  <Waypoints size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Traces</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
                           </Sidebar.Item>
 
                           {/* Day-2 operations on a running integration. Sits beside Observe rather than
