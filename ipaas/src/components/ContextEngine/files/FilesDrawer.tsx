@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Drawer, IconButton, LinearProgress, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { FileText, RefreshCw, Search, Trash2, Upload, Users, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { changeUploadVisibility, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
+import { changeUploadVisibility, checkUpload, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
 import { useContextEngineProgress, useUploadAudience } from '../../../hooks/useContextEngine';
 import { useNow } from '../../../hooks/useNow';
 import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
@@ -47,7 +47,7 @@ import FileDropzone from './FileDropzone';
 import FileVisibilityField from './FileVisibilityField';
 import StagedFileList from './StagedFileList';
 import UploadStatusChip from './UploadStatusChip';
-import { drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx } from '../styles';
+import { checkAgainRowSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx, warningCaptionSx } from '../styles';
 import type { ContextSource, FileVisibility, StagedFileMeta, UploadEntry, UploadFileStatus } from '../../../types/contextEngine';
 
 interface FilesDrawerProps {
@@ -67,6 +67,7 @@ function UploadRow({
   roleNames,
   canRetry,
   onRetry,
+  onCheck,
   onReplace,
   onChangeVisibility,
   onRemove,
@@ -77,6 +78,8 @@ function UploadRow({
   roleNames: Record<string, string>;
   canRetry: boolean;
   onRetry: () => void;
+  /** Read the status again now, after a check that did not reach the engine. */
+  onCheck: () => void;
   onReplace: () => void;
   onChangeVisibility: (visibility: FileVisibility) => Promise<void>;
   onRemove: () => void;
@@ -87,6 +90,8 @@ function UploadRow({
   const active = isUploadActive(entry);
   // Ticks while the engine has the file, so "14 min so far" keeps counting between polls.
   const now = useNow(ELAPSED_TICK_MS, entry.status === 'queued');
+  // The status shown is the last one read: the engine was out of reach.
+  const retrying = entry.check !== undefined;
   const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
@@ -147,22 +152,32 @@ function UploadRow({
         <Box sx={uploadRowBodySx}>
           {entry.status === 'uploading' && <LinearProgress variant="determinate" value={entry.progress} aria-label={`${entry.name} upload`} sx={progressBarSx} />}
           {(entry.status === 'queued' || entry.status === 'indexing') && <LinearProgress variant="indeterminate" aria-label={`${entry.name} indexing`} sx={progressBarSx} />}
-          {entry.status === 'queued' && (
+          {retrying && (
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={checkAgainRowSx}>
+              <Typography variant="caption" sx={warningCaptionSx}>
+                {entry.detail}
+              </Typography>
+              <Button size="small" variant="text" startIcon={<RefreshCw size={14} />} onClick={onCheck}>
+                Check again
+              </Button>
+            </Stack>
+          )}
+          {entry.status === 'queued' && !retrying && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.75 }}>
               {queuedUploadText(entry, now)}
             </Typography>
           )}
-          {entry.status === 'queued' && !entry.retrying && uploadIsSlow(entry, now) && (
+          {entry.status === 'queued' && !entry.retrying && !retrying && uploadIsSlow(entry, now) && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }}>
               {UPLOAD_SLOW_NOTE}
             </Typography>
           )}
-          {entry.status === 'indexing' && (
+          {entry.status === 'indexing' && !retrying && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.75 }}>
               {entry.detail ?? 'Uploaded · the engine is writing it into the search index. Usually under a minute.'}
             </Typography>
           )}
-          {!active && entry.detail && (
+          {!active && !retrying && entry.detail && (
             <Typography variant="caption" sx={{ color: tone, display: 'block' }}>
               {entry.detail}
             </Typography>
@@ -374,6 +389,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                     roleNames={roleNames}
                     canRetry={entry.status === 'failed'}
                     onRetry={() => retryUpload(engineId, source.id, entry.recordId)}
+                    onCheck={() => checkUpload(engineId, source.id, entry.recordId)}
                     onReplace={() => {
                       replaceTarget.current = entry;
                       replaceInput.current?.click();

@@ -745,6 +745,9 @@ export const CONTEXT_ENGINE_QUESTIONS_KEY_PREFIX = 'contextEngine:questions:';
 /** How many asked questions are kept per engine. */
 export const ASKED_QUESTIONS_MAX = 20;
 
+/** How many turns a Playground conversation keeps on the page. */
+export const PLAYGROUND_TURNS_MAX = 20;
+
 /** localStorage key of the deletion job started from this browser, per engine, so a failed deletion can be told apart and retried. */
 export const CONTEXT_ENGINE_DELETION_KEY_PREFIX = 'contextEngine:deletion:';
 
@@ -797,6 +800,21 @@ export const UPLOAD_SLOW_AFTER_MS = 2 * 60_000;
 
 /** The engine reads every file with its language model, so the time grows with the file. Seen: 3.4 MB of JSON took 58 minutes. */
 export const UPLOAD_SLOW_NOTE = 'Big files take long: a 3 MB file can take about an hour.';
+/** Status reads in flight at once from one browser, so a restored list of files does not flood the engine. */
+export const UPLOAD_CHECK_CONCURRENCY = 4;
+
+/** Waits before reading a file's status again after the engine could not be reached, then every UPLOAD_CHECK_STEADY_MS. */
+export const UPLOAD_CHECK_BACKOFF_MS = [3000, 6000, 12000] as const;
+export const UPLOAD_CHECK_STEADY_MS = 30000;
+
+/** Shown under a file whose status check did not reach the engine; its last status stays. */
+export const UPLOAD_CHECK_RETRY_DETAIL = "Couldn't reach the engine to check this file. Trying again.";
+
+/** After this long without reaching the engine, a file's status reads stop until "Check again". */
+export const UPLOAD_CHECK_GIVE_UP_MS = 5 * 60_000;
+
+/** Shown under a file whose status checks stopped; its last status stays. */
+export const UPLOAD_CHECK_STOPPED_DETAIL = "Couldn't reach the engine to check this file.";
 
 export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
   uploading: 'Uploading',

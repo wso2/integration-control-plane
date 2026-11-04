@@ -27,6 +27,8 @@ import {
   engineMessage,
   engineErrorCode,
   sourceFailureNotice,
+  evidenceBackTarget,
+  isTransientReadError,
   formatBytes,
   describeUploadAudience,
   endsSentence,
@@ -64,6 +66,8 @@ import {
   overallProgress,
   progressHeadline,
   progressListingText,
+  progressListingLine,
+  listPollInterval,
   sourceIndexingText,
   sourceProgressDetail,
   sourceProgressStatus,
@@ -601,7 +605,7 @@ describe('first run', () => {
     const summary = { sourceCount: 2, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
     const moving = getStartedSteps(engineDetail(), false, summary);
     expect(moving[0].state).toBe('current');
-    expect(moving[0].description).toBe('1 of 2 sources processed. Items become searchable as the connector delivers them from 2 sources.');
+    expect(moving[0].description).toBe('Syncing 1 of 2 sources. Items become searchable as the connector delivers them from 2 sources.');
     expect(getStartedSteps(engineDetail(), false, { ...summary, active: 0, waiting: 1 })[0].state).toBe('done');
     expect(getStartedSteps(engineDetail(), false, { ...summary, processed: 0, active: 0, waiting: 2 })[0].state).toBe('current');
   });
@@ -773,7 +777,7 @@ describe('source progress', () => {
     const one = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [mapping], bytes: { delivered: 1000, finished: 0 } } });
     // One file being mapped: its share of items is the bar.
     expect(sourceProgressValue(one)).toBeCloseTo(38.35, 1);
-    expect(sourceProgressDetail(one)).toBe('0 of 1 item processed · 0 records stored · osgi_extraction.json: mapping items 1,200 of 3,129');
+    expect(sourceProgressDetail(one)).toBe('0 of 1 item processed · osgi_extraction.json: mapping items 1,200 of 3,129');
     // Inside the store's write the engine has no position: one file alone gets no number.
     const writing = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [{ ...mapping, phase: 'indexing', done: null }], bytes: { delivered: 1000, finished: 0 } } });
     expect(sourceProgressValue(writing)).toBeNull();
@@ -806,12 +810,14 @@ describe('source progress', () => {
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' } }))).toBe('Nothing delivered yet · 0 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' }, processing: { total: 12, succeeded: 12, percent: 100 }, records: { active: 12 } }))).toBe('12 of 12 items processed so far · 12 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1200, queued: 658, succeeded: 540, failed: 2, percent: 45.2 }, records: { active: 538, quarantined: 1 } }))).toBe(
-      '542 of 1,200 items processed · 2 failed · 1 quarantined · 538 records stored',
+      '542 of 1,200 items processed · 2 failed · 1 quarantined',
     );
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1, succeeded: 1, percent: 100 }, records: { active: 1 } }))).toBe('1 of 1 item processed · 1 record stored');
     // Nothing stored: the deletes are not shown as processed work, since that reads as if content were there.
     expect(sourceProgressDetail(progress({ processing: { total: 12, succeeded: 12, percent: 100 }, records: { deleted: 6 } }))).toBe('All records were deleted. Nothing is stored.');
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' } }))).toBe('Nothing is stored. The latest sync delivered nothing.');
+    // While items are still queued the stored count, which spans every sync, is left out rather than shown against a different base.
+    expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 50, queued: 48, succeeded: 2, percent: 4 }, records: { active: 3 } }))).toBe('2 of 50 items processed');
   });
 
   it('reports sync timing and indexing only when the engine has something to say', () => {
@@ -822,6 +828,9 @@ describe('source progress', () => {
     expect(sourceIndexingText(progress())).toBeNull();
     expect(sourceIndexingText(progress({ indexing: { state: 'unavailable' } }))).toMatch(/unavailable/);
     expect(sourceIndexingText(progress({ indexing: { state: 'ok', expected: 8, indexed: 6, indexing: 1, missing: 1, percent: 75 } }))).toBe('75% indexed (6 of 8) · 1 missing');
+    // While items are still queued, the index snapshot covers only the records stored so far: a count, not a percentage.
+    expect(sourceIndexingText(progress({ processing: { total: 50, queued: 48, succeeded: 2, percent: 4 }, records: { active: 3 }, indexing: { state: 'ok', expected: 3, indexed: 2, indexing: 1, percent: 66.7 } }))).toBe('2 indexed so far');
+    expect(sourceIndexingText(progress({ reading: { state: 'reading' }, indexing: { state: 'ok', expected: 3, indexed: 2, percent: 66.7 } }))).toBe('2 indexed so far');
   });
 
   it('rolls progress up across sources, counting ones the caller cannot inspect as hidden', () => {
@@ -832,7 +841,9 @@ describe('source progress', () => {
     ];
     const sum = summarizeEngineProgress(['a', 'b', 'c', 'd'], list);
     expect(sum).toEqual({ sourceCount: 4, processed: 1, active: 1, reading: 1, waiting: 1, hidden: 1, percent: 60, failedItems: 1 });
-    expect(progressHeadline(sum)).toBe('1 of 3 sources processed');
+    expect(progressHeadline(sum)).toBe('Syncing 1 of 3 sources');
+    expect(progressHeadline({ ...sum, active: 0, processed: 2 })).toBe('2 of 3 sources processed');
+    expect(progressHeadline(summarizeEngineProgress(['b'], [list[1]]))).toBe('Syncing 1 source');
     expect(progressListingText(sum)).toBe('Syncing');
     expect(progressListingText({ ...sum, reading: 0 })).toBe('Syncing · 60%');
     expect(isEngineProgressActive({ available: true, sources: list })).toBe(true);
@@ -858,6 +869,20 @@ describe('source progress', () => {
     expect(progressListingText(summarizeEngineProgress(['a'], [progress({ sourceId: 'a' })]))).toBe('Waiting for data');
     expect(progressListingText(summarizeEngineProgress(['a', 'b'], [progress({ sourceId: 'a', records: { active: 3 } }), progress({ sourceId: 'b' })]))).toBe('1 of 2 processed');
     expect(progressHeadline(summarizeEngineProgress(['a'], []))).toBe('Progress hidden');
+  });
+
+  it('says when an engine with sources reported no progress', () => {
+    expect(progressListingLine({ sourceCount: 0, progress: null })).toBeNull();
+    expect(progressListingLine({ sourceCount: 2, progress: null })).toBe('Progress unavailable');
+    expect(progressListingLine({ sourceCount: 1, progress: summarizeEngineProgress(['a'], [progress({ sourceId: 'a' })]) })).toBe('Waiting for data');
+  });
+
+  it('polls the list while any engine syncs or is being deleted', () => {
+    const syncing = summarizeEngineProgress(['b'], [progress({ sourceId: 'b', processing: { total: 10, queued: 6, succeeded: 4, percent: 40 } })]);
+    expect(listPollInterval(undefined)).toBe(false);
+    expect(listPollInterval([{ state: 'ready', summary: { progress: null } }])).toBe(false);
+    expect(listPollInterval([{ state: 'ready', summary: { progress: syncing } }])).toBe(3000);
+    expect(listPollInterval([{ state: 'deleting', summary: null }])).toBe(3000);
   });
 });
 
@@ -982,6 +1007,24 @@ describe('file uploads', () => {
     expect(engineMessage(new HttpError(502, 'HTTP 502: Bad Gateway'))).toBe('Bad Gateway');
     expect(engineMessage(new Error('offline'))).toBe('offline');
     expect(deliveryIdentity('a.md', '17')).toBe('4:a.md:17');
+  });
+
+  it('sends a passage page back to where the reader came from', () => {
+    expect(evidenceBackTarget({ backTo: 'playground' }, 'HotpotQA engine')).toEqual({ tab: 'playground', label: 'Back to the Playground' });
+    expect(evidenceBackTarget(null, 'HotpotQA engine')).toEqual({ tab: 'overview', label: 'Back to HotpotQA engine' });
+    expect(evidenceBackTarget(undefined, undefined)).toEqual({ tab: 'overview', label: 'Back to the context engine' });
+  });
+
+  it('treats only unreachable, timed out, rate limited or server errors as transient status reads', () => {
+    expect(isTransientReadError(new TypeError('Failed to fetch'))).toBe(true);
+    expect(isTransientReadError(new Error('Maximum update depth exceeded'))).toBe(true);
+    expect(isTransientReadError(new HttpError(503, 'HTTP 503: unavailable'))).toBe(true);
+    expect(isTransientReadError(new HttpError(0, 'HTTP 0: '))).toBe(true);
+    expect(isTransientReadError(new HttpError(408, 'HTTP 408: timeout'))).toBe(true);
+    expect(isTransientReadError(new HttpError(429, 'HTTP 429: slow down'))).toBe(true);
+    expect(isTransientReadError(new HttpError(404, 'HTTP 404: not found'))).toBe(false);
+    expect(isTransientReadError(new HttpError(403, 'HTTP 403: forbidden'))).toBe(false);
+    expect(isTransientReadError(new HttpError(400, 'HTTP 400: bad request'))).toBe(false);
   });
 
   it('blocks a File Upload source whose staged files lack a role choice or their bytes', () => {

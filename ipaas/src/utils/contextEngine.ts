@@ -21,6 +21,7 @@ import {
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
   CONTEXT_QUERY_ACTIONS,
+  DELETION_POLL_MS,
   EVERYONE_VISIBILITY,
   OWNER_GRANT_PREFIX,
   defaultStorage,
@@ -28,6 +29,7 @@ import {
   MCP_CLIENTS,
   RML_MAPPING,
   PLAYGROUND_SUGGESTIONS,
+  PROGRESS_POLL_ACTIVE_MS,
   ROLE_GRANT_PREFIX,
   STORAGE_BACKEND_BY_KIND,
   STORAGE_BACKENDS,
@@ -59,10 +61,13 @@ import type {
   CreateContextEngineInput,
   AskedQuestion,
   ContextEngineModels,
+  ContextEngineSummary,
+  ContextEngineTabKey,
   ContextModelInput,
   ContextModelSummary,
   ModelDraft,
   ContextEvidence,
+  ContextEvidenceLocationState,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -680,7 +685,8 @@ export function sourceProgressDetail(p: SourceProgress): string {
   else parts.push(p.reading.state === 'reading' ? 'Nothing delivered yet' : 'No new items in the latest sync');
   if (failed > 0) parts.push(`${failed.toLocaleString('en-US')} failed`);
   if (p.records.quarantined > 0) parts.push(`${p.records.quarantined.toLocaleString('en-US')} quarantined`);
-  parts.push(`${plural(p.records.active, 'record')} stored`);
+  // The stored count spans every sync, so against this sync's items it reads as a contradiction while they are still queued.
+  if (status !== 'processing') parts.push(`${plural(p.records.active, 'record')} stored`);
   // The deliveries running now, by name and position; a long record shows where it is instead of just "running".
   for (const item of p.processing.inProgress.slice(0, 2)) parts.push(`${item.recordId.split('/').pop() ?? item.recordId}: ${recordPhaseText(item)}`);
   return parts.join(' · ');
@@ -698,6 +704,10 @@ export function sourceIndexingText(p: SourceProgress): string | null {
   const ix = p.indexing;
   if (ix.state === 'unavailable') return 'Search index status is unavailable right now';
   if (ix.state !== 'ok' || !ix.expected) return null;
+  // While items are still being delivered or processed, the index figure covers only the records stored so far,
+  // so a percentage of it reads as a contradiction next to the processing percentage.
+  const status = sourceProgressStatus(p);
+  if (status === 'reading' || status === 'processing') return `${(ix.indexed ?? 0).toLocaleString('en-US')} indexed so far`;
   const parts = [`${ix.percent !== null ? formatProgressPercent(ix.percent) : '0%'} indexed (${(ix.indexed ?? 0).toLocaleString('en-US')} of ${ix.expected.toLocaleString('en-US')})`];
   if (ix.failed) parts.push(`${ix.failed.toLocaleString('en-US')} failed`);
   if (ix.missing) parts.push(`${ix.missing.toLocaleString('en-US')} missing`);
@@ -781,10 +791,11 @@ export function overallProgress(progress: SourceProgress[]): { value: number | n
   return null;
 }
 
-/** Card header text, e.g. "2 of 3 sources processed". */
+/** Card header text: what is happening while anything moves ("Syncing 1 source"), what is done once nothing does ("2 of 3 sources processed"). */
 export function progressHeadline(s: ContextEngineProgressSummary): string {
   const visible = s.sourceCount - s.hidden;
   if (visible === 0) return s.sourceCount === 0 ? 'No sources' : 'Progress hidden';
+  if (s.active > 0) return s.active === visible ? `Syncing ${plural(visible, 'source')}` : `Syncing ${s.active} of ${plural(visible, 'source')}`;
   return `${s.processed} of ${plural(visible, 'source')} processed`;
 }
 
@@ -797,6 +808,24 @@ export function progressListingText(s: ContextEngineProgressSummary | null): str
   if (s.active > 0) return s.percent !== null && s.reading === 0 ? `Syncing · ${formatProgressPercent(s.percent)}` : 'Syncing';
   if (s.processed === 0) return 'Waiting for data';
   return `${s.processed} of ${s.sourceCount - s.hidden} processed`;
+}
+
+/** Where a passage page's Back goes: the tab the reader came from, else the engine's Overview. */
+export function evidenceBackTarget(state: ContextEvidenceLocationState | null | undefined, engineName: string | undefined): { tab: ContextEngineTabKey; label: string } {
+  if (state?.backTo === 'playground') return { tab: 'playground', label: 'Back to the Playground' };
+  return { tab: 'overview', label: engineName ? `Back to ${engineName}` : 'Back to the context engine' };
+}
+
+/** The listing's progress line for one engine; says so when the engine has sources but reported no progress, instead of showing nothing. */
+export function progressListingLine(summary: Pick<ContextEngineSummary, 'sourceCount' | 'progress'>): string | null {
+  return progressListingText(summary.progress) ?? (summary.progress === null && summary.sourceCount > 0 ? 'Progress unavailable' : null);
+}
+
+/** How often the engines list should ask again: while any engine is syncing or being deleted, at the progress rate; otherwise not at all. */
+export function listPollInterval(engines: { state: string; summary?: Pick<ContextEngineSummary, 'progress'> | null }[] | undefined): number | false {
+  if (!engines?.length) return false;
+  if (engines.some((e) => e.state === 'deleting')) return DELETION_POLL_MS;
+  return engines.some((e) => (e.summary?.progress?.active ?? 0) > 0) ? PROGRESS_POLL_ACTIVE_MS : false;
 }
 
 // ── File uploads ────────────────────────────────────────────────────────────
@@ -1036,6 +1065,14 @@ export function summarizeUploads(entries: Pick<UploadEntry, 'status'>[]): string
   if (count('held')) parts.push(`${count('held')} held back`);
   if (count('failed')) parts.push(`${count('failed')} failed`);
   return parts.join(' · ');
+}
+
+/**
+ * A status read that said nothing about the file: the engine could not be reached, timed out,
+ * limited the rate, or answered with a server error. Only the engine's own verdicts may mark a file as failed.
+ */
+export function isTransientReadError(err: unknown): boolean {
+  return !(err instanceof HttpError) || err.status >= 500 || err.status === 0 || err.status === 408 || err.status === 429;
 }
 
 /** The engine's own message from a failed request, e.g. "Unsupported Media Type", else a fallback. */
