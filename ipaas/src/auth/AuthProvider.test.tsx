@@ -462,3 +462,49 @@ describe('cloud AuthProvider — actions', () => {
     expect(getOrgUuidFromToken()).toBeNull();
   });
 });
+
+describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
+  const GATEWAY_CLAIMS = { ...ID_CLAIMS, ouHandle: 'acme', ouId: 'org-uuid', ouName: 'Acme' };
+
+  beforeEach(() => {
+    window.API_CONFIG.authBffContext = '/_auth/integration';
+  });
+
+  it('signs in from the session’s ID token claims, without asking for a token', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    expect(auth).toMatchObject({ isAuthenticated: true, userId: 'u1', displayName: 'Ada Lovelace', orgHandle: 'acme' });
+    expect(getOrgUuidFromToken()).toBe('org-uuid');
+    expect(sdk.get().getAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('never tries a silent sign-in: the session check joins the cloud console’s session', async () => {
+    sdkWith({ getDecodedIdToken: vi.fn(async () => Promise.reject(new Error('not signed in'))) });
+    await render();
+
+    expect(screen()).toBe('signed-out');
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+  });
+
+  it('refuses a session without org claims', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => ID_CLAIMS) });
+    window.history.replaceState({}, '', '/signin');
+    await render();
+
+    await expect(auth?.completeSignIn(new URLSearchParams())).rejects.toThrow('Missing organization context');
+  });
+
+  it('sends API calls with the session cookie and no Authorization header, and ends the session on a 401', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    const fetchMock = vi.fn(async () => new Response('', { status: 401 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await authenticatedFetch('/_api/integration/projects');
+    });
+    expect(new Headers((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers).has('Authorization')).toBe(false);
+    expect(screen()).toBe('signed-out');
+  });
+});

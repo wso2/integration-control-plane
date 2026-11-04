@@ -24,6 +24,9 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `ASGARDEO_SCOPE`                                                             | Requested scopes                                                                                                         |
 | `ASGARDEO_RESOURCE`                                                          | `resource` on the authorize request only, never on the token request                                                     |
 | `ASGARDEO_SIGN_IN_REDIRECT_URL`                                              | Redirect URI. Defaults to `<console origin>/signin`.                                                                     |
+| `AUTH_BFF_CONTEXT`                                                           | Gateway sign-in context for this console, e.g. `/_auth/integration`. Set, sign-in runs on the gateway (see below).        |
+| `AUTH_BFF_SIGN_IN_URL`                                                       | Where gateway sign-in starts. Defaults to `<AUTH_BFF_CONTEXT>/signin`.                                                   |
+| `AUTH_BFF_PROXY_CONTEXT`                                                     | The gateway's API root that each product's session proxy sits under. Defaults to `/_api`.                                |
 | `VITE_OBSERVABILITY_URL`                                                     | Observability proxy (logs and metrics)                                                                                   |
 | `SYSTEM_APIS_BASE_URL`, `SYS_API_PREFIX`                                     | System APIs gateway (component logs, usage insights)                                                                     |
 | `BILLING_API_BASE_URL`                                                       | Billing user API. Loading the billing org activates the org's subscription.                                              |
@@ -41,6 +44,17 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `MOESIF_APP_API_KEY`                                                         | Moesif app key for product-usage events, set per deployment. Not API Insights. Unset disables Moesif tracking.           |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
+
+## Sign-in on the gateway (BFF)
+
+With `AUTH_BFF_CONTEXT` set, the WSO2 API Platform gateway signs the user in and holds the tokens; the browser holds only an HttpOnly session cookie on the console's origin. The SDK reads the session from `<AUTH_BFF_CONTEXT>/userinfo` and `/checksession`, refreshes it at `/refresh` and ends it at `/logout`. It never reaches Thunder, so `VITE_AUTH_BASE_URL`, `ASGARDEO_CLIENT_ID`, `ASGARDEO_SCOPE` and `ASGARDEO_RESOURCE` are unused: the gateway's own client config carries them.
+
+- API calls go to a same-origin `CHOREO_BASE_API_URL` (`/_api/integration`) with the cookie and no `Authorization` header; the gateway puts the session's token on them. `BILLING_API_BASE_URL` goes the same way, on the cloud console's session (`/_api/billing/api/v1`).
+- The org and profile come from the session's ID token claims (`ouHandle`, `ouId`, `ouName`).
+- There is no silent sign-in: the gateway's session check joins the cloud console's session itself.
+- Calls to other hosts with the user's token (`VITE_OBSERVABILITY_URL`, the AI Integration Builder copilot) get no token in this mode.
+
+Unset, the browser signs in itself with PKCE, as before.
 
 ## API Insights
 

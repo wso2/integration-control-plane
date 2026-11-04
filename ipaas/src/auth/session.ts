@@ -37,6 +37,8 @@ export interface CloudSession {
   orgHandle: string;
   /** `ouId` */
   orgUuid: string;
+  /** `ouName` */
+  orgName?: string;
 }
 
 interface Connection {

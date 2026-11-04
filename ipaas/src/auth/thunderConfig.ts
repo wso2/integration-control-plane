@@ -22,11 +22,20 @@ import { basePath } from '../utils/basePath';
 /** The SDK instance the console uses. Its `state` on the authorize request is prefixed with this. */
 export const THUNDER_INSTANCE_ID = 0;
 
+/** The only post-logout URI the client registers: the bare origin, or the console's prefix under it. */
+const afterSignOutUrl = (): string => (basePath ? `${window.location.origin}${basePath}/` : window.location.origin);
+
+/** Whether sign-in runs on the gateway (BFF): it holds the tokens, the browser only an HttpOnly session cookie. */
+export function isBffAuth(): boolean {
+  return Boolean(window.API_CONFIG.authBffContext);
+}
+
 /**
  * Thunder SDK options from the runtime config. Reuses the ASGARDEO_* keys the
  * cloud deployment already sets until it gets keys of its own.
  */
 export function thunderConfig(): ThunderIDProviderProps {
+  if (isBffAuth()) return bffConfig();
   const { authBaseUrl, asgardeoClientId, asgardeoScope, asgardeoSignInRedirectUrl } = window.API_CONFIG;
   return {
     instanceId: THUNDER_INSTANCE_ID,
@@ -34,8 +43,7 @@ export function thunderConfig(): ThunderIDProviderProps {
     clientId: asgardeoClientId,
     scopes: asgardeoScope,
     afterSignInUrl: asgardeoSignInRedirectUrl,
-    // The only post-logout URI the client registers: the bare origin, or the console's prefix under it.
-    afterSignOutUrl: basePath ? `${window.location.origin}${basePath}/` : window.location.origin,
+    afterSignOutUrl: afterSignOutUrl(),
     // Per tab, and gone when the tab closes (the cloud team's call). A reload keeps it; a new
     // tab signs in again through Thunder, whose own session usually makes that a redirect.
     // Each tab also refreshes its own tokens, so tabs never race on Thunder's rotating refresh token.
@@ -55,6 +63,46 @@ export function thunderConfig(): ThunderIDProviderProps {
       // The ID token carries the profile; /users/me would only repeat it.
       user: { fetchUserProfile: false },
       // Otherwise the SDK writes a language cookie for the whole parent domain.
+      i18n: { storageStrategy: 'none' },
+    },
+  };
+}
+
+/**
+ * SDK options for sign-in on the gateway. The gateway's oauth2-session for this console answers the
+ * session endpoints under authBffContext, and the client, its secret, scopes and resource live there.
+ * The browser never reaches Thunder, so discovery and the SDK's own profile and flow-metadata lookups
+ * would fail; the profile comes from the session's ID token claims.
+ */
+function bffConfig(): ThunderIDProviderProps {
+  const { authBffContext, authBffSignInUrl, authBffProxyContext, asgardeoSignInRedirectUrl } = window.API_CONFIG;
+  return {
+    instanceId: THUNDER_INSTANCE_ID,
+    baseUrl: window.location.origin,
+    endpoints: {
+      backend: {
+        // AUTH_BFF_SIGN_IN_URL lets sign-in start at the cloud console's login, with a returnTo back to
+        // this context's signin. The SDK appends ?returnTo=<page>; with a query already there it lands
+        // inside the outer returnTo, so the page is passed on to this context's signin, which returns to it.
+        signIn: authBffSignInUrl ?? `${authBffContext}/signin`,
+        // The policy names this one userinfoPath.
+        session: `${authBffContext}/userinfo`,
+        checkSession: `${authBffContext}/checksession`,
+        refresh: `${authBffContext}/refresh`,
+        signOut: `${authBffContext}/logout`,
+        // The gateway's API root, under which each product's oauth2-session-proxy sits.
+        proxy: authBffProxyContext ?? '/_api',
+        // No gateway operation answers it: the browser is never meant to hold a token, so a stray call 404s.
+        token: `${authBffContext}/token`,
+      },
+    },
+    afterSignInUrl: asgardeoSignInRedirectUrl,
+    afterSignOutUrl: afterSignOutUrl(),
+    session: { checkInterval: 30 },
+    discovery: { wellKnown: { enabled: false } },
+    preferences: {
+      resolveFromMeta: false,
+      user: { fetchUserProfile: false },
       i18n: { storageStrategy: 'none' },
     },
   };
