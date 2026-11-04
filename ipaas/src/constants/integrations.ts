@@ -55,6 +55,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
   'ballerinaFileIntegration',
   'miFileIntegration',
   'byoiService',
+  'voiceAgent',
 ]);
 
 /**
