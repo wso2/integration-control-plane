@@ -382,7 +382,7 @@ function DerivationSteps({
   const markList = marks.length > 1 ? `${marks.slice(0, -1).join(', ')} and ${marks[marks.length - 1]}` : marks.join('');
   const citedLine = !citedGiven.length ? 'It cited none of them.' : citedGiven.length === given ? (given === 1 ? `It cited it, ${markList}.` : `It cited all ${given} of them.`) : `It cited ${citedGiven.length} of them, ${markList}.`;
   const steps: { title: string; body: string; lit?: boolean }[] = [
-    { title: 'Scope', body: 'Only the sources you may read were searched; the engine never says what else exists.' },
+    { title: 'Scope', body: 'Only sources you may read were searched.' },
     {
       title: 'Retrieval',
       body: [

@@ -1362,8 +1362,6 @@ export function evidencePart(evidence: Pick<ContextEvidence, 'locator' | 'locati
   return m ? Number(m[1]) + 1 : undefined;
 }
 
-/** What a part is, for a passage the engine can place only by its part. */
-
 /** A record version as people read it: uploads and most connectors version by epoch milliseconds. */
 export function evidenceVersionLabel(version: string): string {
   const n = Number(version);
@@ -1372,8 +1370,12 @@ export function evidenceVersionLabel(version: string): string {
 }
 
 /** The version a passage was taken from, as a label, and what that date means. */
-export const versionFromLabel = (version: string): string => `Version from ${evidenceVersionLabel(version)}`;
-export const VERSION_HINT = 'Later changes to the file are not included.';
+/** "Version from 3 Nov 2026, 10:42" for a dated version, "Version v12" for any other. */
+export function versionFromLabel(version: string): string {
+  const label = evidenceVersionLabel(version);
+  return label === version ? `Version ${version}` : `Version from ${label}`;
+}
+export const VERSION_HINT = 'Later changes are not included.';
 
 /** The passage split into its numbered source lines, or null when the lines cannot be lined up with the text. */
 export function passageLines(evidence: Pick<ContextEvidence, 'locator' | 'passage'>): { n: number; text: string }[] | null {

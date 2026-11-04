@@ -39,6 +39,7 @@ import {
   evidencePart,
   evidencePlace,
   evidenceVersionLabel,
+  versionFromLabel,
   isSameModel,
   modelDraftError,
   modelKeysLabel,
@@ -1166,6 +1167,9 @@ describe('provenance and evidence', () => {
     expect(evidenceVersionLabel('1790872243455')).toMatch(/2026/);
     expect(evidenceVersionLabel('v12')).toBe('v12');
     expect(evidenceVersionLabel('17')).toBe('17');
+    // A version that is not a date is named, not dated.
+    expect(versionFromLabel('1790872243455')).toMatch(/^Version from .*2026/);
+    expect(versionFromLabel('v12')).toBe('Version v12');
   });
 
   it('numbers passage lines only when they line up with the locator', () => {
