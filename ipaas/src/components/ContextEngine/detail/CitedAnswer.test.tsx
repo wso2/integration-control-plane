@@ -58,6 +58,11 @@ describe('CitedAnswer', () => {
     expect(html).toMatch(/Rollbacks keep <span>secrets<button[^>]*aria-label="Evidence 1"[\s\S]*?<\/button><button[^>]*aria-label="Evidence 2"[\s\S]*?<\/button>\.<\/span>/);
   });
 
+  it('lets a long last word wrap, keeping only its end with the marks', () => {
+    const html = render({ answer: 'Edit /opt/wso2/conf/deployment/deployment.toml [1].' });
+    expect(html).toMatch(/Edit \/opt\/wso2\/conf\/deployment\/deployment\.<span>toml<button[^>]*aria-label="Evidence 1"[\s\S]*?<\/button>\.<\/span>/);
+  });
+
   it('reads citations only where the engine does', () => {
     const marks = (answer: string) => [...render({ answer }).matchAll(/aria-label="Evidence (\d+)"/g)].map((m) => m[1]);
     // Subscripts, reference links, and code of every kind are left as written.
