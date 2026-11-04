@@ -116,7 +116,7 @@ function UserDetailView({ orgHandler, user, onBack }: { orgHandler: string; user
       )}
       <ListingTable.Container>
         <ListingTable.Toolbar
-          searchSlot={<SearchField value={search} onChange={setSearch} />}
+          searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
           actions={
             !isSelf &&
             canManageUsers && (

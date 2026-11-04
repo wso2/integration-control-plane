@@ -95,7 +95,7 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
         <Stack gap={1.5}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            Source Repository
+            Source repository
           </Typography>
 
           <Divider />
@@ -130,14 +130,14 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2 }}>
         <Stack gap={1.5}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            Build Options
+            Build options
           </Typography>
 
           <Divider />
 
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Stack gap={0.25}>
-              <Typography variant="body2">Run Unit Tests</Typography>
+              <Typography variant="body2">Run unit tests</Typography>
               <Typography variant="caption" color="text.secondary">
                 Execute unit tests as part of the build process
               </Typography>
@@ -154,7 +154,7 @@ export default function BuildConfigPanel({ repository, componentId, versionId, o
               <Divider />
               <Stack direction="row" alignItems="center" justifyContent="space-between">
                 <Stack gap={0.25}>
-                  <Typography variant="body2">Pull Latest Submodules</Typography>
+                  <Typography variant="body2">Pull latest submodules</Typography>
                   <Typography variant="caption" color="text.secondary">
                     Update git submodules to the latest commit of their tracked branch instead of the commit the repository pins
                   </Typography>

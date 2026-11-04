@@ -122,7 +122,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
         {/* The heading stays put through every state — loading, not-deployed, editor — so the
             page never reads as just a floating notice. Only the action is state-dependent. */}
         <PageTitle>
-          <PageTitle.Header>Configs &amp; Secrets</PageTitle.Header>
+          <PageTitle.Header>Configs &amp; secrets</PageTitle.Header>
           {!isLoading && comp && releaseId && containerId && view.kind === 'list' && (
             <PageTitle.Actions>
               <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
@@ -188,7 +188,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
                             {managedByMi(r) && <Chip label="Managed by Configure" size="small" variant="outlined" />}
                           </Stack>
                         </ListingTable.Cell>
-                        <ListingTable.Cell>{r.kind === 'fileMount' ? 'File Mount' : 'Environment Variables'}</ListingTable.Cell>
+                        <ListingTable.Cell>{r.kind === 'fileMount' ? 'File mount' : 'Environment variables'}</ListingTable.Cell>
                         <ListingTable.Cell>{r.kind === 'fileMount' ? r.mount.mount_path || '—' : r.keys.join(', ') || '—'}</ListingTable.Cell>
                         <ListingTable.Cell align="right">
                           <Authorized permissions={Permissions.INTEGRATION_MANAGE}>

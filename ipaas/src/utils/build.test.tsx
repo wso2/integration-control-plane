@@ -84,7 +84,7 @@ describe('buildLogText', () => {
       init: makeStage({ log: btoa('init log'), status: 'completed' }),
       build: makeStage({ log: btoa('build log'), status: 'completed' }),
     });
-    expect(buildLogText(logs)).toBe('▶ Initialization\ninit log\n\n▶ Build Source & Test\nbuild log');
+    expect(buildLogText(logs)).toBe('▶ Initialization\ninit log\n\n▶ Build source & test\nbuild log');
   });
 
   it('ignores stages whose decoded log is the placeholder text', () => {
@@ -122,7 +122,7 @@ describe('buildLogText', () => {
       init: makeStage({ steps: [] }),
       build: makeStage({ steps: [{ number: 1, name: 'Compile', status: 'completed', conclusion: 'success' }] }),
     });
-    expect(buildLogText(logs)).toBe(['▶ Build Source & Test', '  ✓ Compile', ''].join('\n'));
+    expect(buildLogText(logs)).toBe(['▶ Build source & test', '  ✓ Compile', ''].join('\n'));
   });
 });
 

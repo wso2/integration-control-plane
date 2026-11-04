@@ -80,7 +80,7 @@ export default function ContainerEditForm({ container, projectId, componentId, r
         <Grid size={{ xs: 12, md: 6 }}>
           {form.limitsEnabled ? (
             <ResourceRangeSlider
-              label="CPU Request / Limit"
+              label="CPU request / limit"
               unit="CPU"
               min={CPU_MIN}
               max={CPU_MAX}
@@ -94,13 +94,13 @@ export default function ContainerEditForm({ container, projectId, componentId, r
               format={cpuFmt}
             />
           ) : (
-            <SingleResourceSlider label="CPU Request" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={CPU_STEP} value={form.cpuRequest} onChange={(v) => set('cpuRequest', v)} disabled={!isPaidOrPdpUser} format={cpuFmt} />
+            <SingleResourceSlider label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={CPU_STEP} value={form.cpuRequest} onChange={(v) => set('cpuRequest', v)} disabled={!isPaidOrPdpUser} format={cpuFmt} />
           )}
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           {form.limitsEnabled ? (
             <ResourceRangeSlider
-              label="Memory Request / Limit"
+              label="Memory request / limit"
               unit="Mi"
               min={MEMORY_MIN}
               max={MEMORY_MAX}
@@ -114,7 +114,7 @@ export default function ContainerEditForm({ container, projectId, componentId, r
               format={memFmt}
             />
           ) : (
-            <SingleResourceSlider label="Memory Request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={MEMORY_STEP} value={form.memRequest} onChange={(v) => set('memRequest', v)} disabled={!isPaidOrPdpUser} format={memFmt} />
+            <SingleResourceSlider label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={MEMORY_STEP} value={form.memRequest} onChange={(v) => set('memRequest', v)} disabled={!isPaidOrPdpUser} format={memFmt} />
           )}
         </Grid>
       </Grid>
@@ -124,13 +124,13 @@ export default function ContainerEditForm({ container, projectId, componentId, r
       <Grid container alignItems="center" spacing={2} sx={{ mb: 1 }}>
         <Grid size={{ xs: 12, md: 3 }}>
           <Typography variant="subtitle2" fontWeight={600}>
-            Image Pull Policy
+            Image pull policy
           </Typography>
         </Grid>
         <Grid size={{ xs: 12, md: 9 }}>
           <RadioGroup row value={form.imagePullPolicy} onChange={(e) => set('imagePullPolicy', e.target.value as ImagePullPolicy)}>
             <FormControlLabel value={IMAGE_PULL_POLICY.ALWAYS} control={<Radio />} label="Always" />
-            <FormControlLabel value={IMAGE_PULL_POLICY.IF_NOT_PRESENT} control={<Radio />} label="If Not Present" />
+            <FormControlLabel value={IMAGE_PULL_POLICY.IF_NOT_PRESENT} control={<Radio />} label="If not present" />
           </RadioGroup>
         </Grid>
       </Grid>

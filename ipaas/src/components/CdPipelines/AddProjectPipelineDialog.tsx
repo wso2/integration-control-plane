@@ -55,7 +55,7 @@ export default function AddProjectPipelineDialog({ projectId, currentPipelineIds
 
   return (
     <Dialog open onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Set Deployment Pipeline</DialogTitle>
+      <DialogTitle>Set deployment pipeline</DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>Select the deployment pipeline for your project.</DialogContentText>
         {isLoading ? (

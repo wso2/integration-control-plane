@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { componentSubTypeFromSample, getDisplayLabel, isSupportedIntegration } from './integrations';
+import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration } from './integrations';
 
 describe('project listing — RAG components', () => {
   it('labels the ingestion cronjob as "RAG Ingestion" (not Automation)', () => {
@@ -69,5 +69,16 @@ describe('componentSubTypeFromSample', () => {
     expect(componentSubTypeFromSample('service', 'ballerina')).toBeUndefined();
     expect(componentSubTypeFromSample('scheduled-task', 'ballerina')).toBeUndefined();
     expect(componentSubTypeFromSample('event-handler', 'ballerina')).toBeUndefined();
+  });
+});
+
+describe('formatBuildPack', () => {
+  it('names the sample buildpacks as the import flow names the technologies', () => {
+    expect(formatBuildPack('ballerina')).toBe('WSO2 Integrator');
+    expect(formatBuildPack('wso2-mi')).toBe('WSO2 Integrator: MI');
+  });
+
+  it('shows an unknown buildpack as reported', () => {
+    expect(formatBuildPack('java')).toBe('java');
   });
 });

@@ -94,7 +94,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
-        Create Environment
+        Create environment
       </Typography>
 
       {error && (
@@ -119,7 +119,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
               Failed to load data planes.
             </Alert>
           ) : dataPlanes.length > 1 ? (
-            <TextField labelPlacement="top" select label="Data Plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
+            <TextField labelPlacement="top" select label="Data plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
               {dataPlanes.map((dp) => (
                 <MenuItem key={dp.id} value={dp.id}>
                   {dp.name}

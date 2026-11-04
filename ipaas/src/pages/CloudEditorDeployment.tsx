@@ -184,7 +184,7 @@ export default function CloudEditorDeployment(): JSX.Element {
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 2, p: 4 }}>
         <Alert severity="error" sx={{ maxWidth: 520, width: '100%' }}>
           <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
-            Cloud Editor Setup Failed
+            Cloud Editor setup failed
           </Typography>
           <Typography variant="body2">{error}</Typography>
         </Alert>

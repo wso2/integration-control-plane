@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, Checkbox, CircularProgress, DrawerPanel, FormControlLabel, IconButton, InputAdornment, OutlinedInput, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Checkbox, CircularProgress, DrawerPanel, FormControlLabel, IconButton, InputAdornment, OutlinedInput, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { RefreshCcw, Search, X } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -64,7 +64,7 @@ export default function LogsDrawer({ open, onClose, executionId, componentId, de
   return (
     <DrawerPanel open={open} onClose={handleClose} width={680}>
       <DrawerPanel.Header>
-        <DrawerPanel.Title>Latest Logs</DrawerPanel.Title>
+        <DrawerPanel.Title>Latest logs</DrawerPanel.Title>
         <DrawerPanel.Actions>
           <DrawerPanel.CloseButton />
         </DrawerPanel.Actions>
@@ -86,9 +86,11 @@ export default function LogsDrawer({ open, onClose, executionId, componentId, de
           endAdornment={
             search ? (
               <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearch('')} edge="end">
-                  <X size={13} />
-                </IconButton>
+                <Tooltip title="Clear search">
+                  <IconButton aria-label="Clear search" size="small" onClick={() => setSearch('')} edge="end">
+                    <X size={13} />
+                  </IconButton>
+                </Tooltip>
               </InputAdornment>
             ) : null
           }

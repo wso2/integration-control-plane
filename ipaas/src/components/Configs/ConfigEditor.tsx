@@ -83,7 +83,7 @@ function TypeCard({ title, description, selected, disabled, onSelect }: { title:
 
 const NO_KEYS: ReadonlyMap<string, string> = new Map();
 
-/** The "Create a Config or Secret" form — env-var set or file mount, optionally a secret. */
+/** The "Create a config or secret" form — env-var set or file mount, optionally a secret. */
 export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, onBack, onSaved, onError }: ConfigEditorProps): JSX.Element {
   const isEdit = !!existing;
   const save = useSaveConfig(ctx.projectId, ctx.deploymentTrackId);
@@ -245,7 +245,7 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
         Back to configs
       </Button>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
-        {isEdit ? 'Edit Config or Secret' : 'Create a Config or Secret'}
+        {isEdit ? 'Edit config or secret' : 'Create a config or secret'}
       </Typography>
       {error && (
         <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
@@ -255,13 +255,13 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
 
       <BusyFields busy={save.isPending}>
         <Stack direction="row" gap={2} sx={{ mb: 2 }}>
-          <TypeCard title="Environment Variables" description="Inject a set of environment variables into the container" selected={kind === 'envVars'} disabled={isEdit} onSelect={() => setKind('envVars')} />
-          <TypeCard title="File Mount" description="Mount a file at a specified path in the container" selected={kind === 'fileMount'} disabled={isEdit} onSelect={() => setKind('fileMount')} />
+          <TypeCard title="Environment variables" description="Inject a set of environment variables into the container" selected={kind === 'envVars'} disabled={isEdit} onSelect={() => setKind('envVars')} />
+          <TypeCard title="File mount" description="Mount a file at a specified path in the container" selected={kind === 'fileMount'} disabled={isEdit} onSelect={() => setKind('fileMount')} />
         </Stack>
 
-        <FormControlLabel control={<Checkbox size="small" checked={isSecret} disabled={isEdit} onChange={(e) => setIsSecret(e.target.checked)} />} label="Mark as a Secret" sx={{ mb: 1 }} />
+        <FormControlLabel control={<Checkbox size="small" checked={isSecret} disabled={isEdit} onChange={(e) => setIsSecret(e.target.checked)} />} label="Mark as a secret" sx={{ mb: 1 }} />
         {/* An env-var group's name is its ID: the BFF keeps the stored name, so a rename would revert. */}
-        <TextField labelPlacement="top" label="Display Name" value={name} onChange={(e) => setName(e.target.value)} disabled={isEdit && kind === 'envVars'} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
+        <TextField labelPlacement="top" label="Display name" value={name} onChange={(e) => setName(e.target.value)} disabled={isEdit && kind === 'envVars'} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
 
         {kind === 'envVars' ? (
           <Box>
@@ -400,7 +400,7 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
           <Stack gap={3} sx={{ mt: 2 }}>
             <TextField
               labelPlacement="top"
-              label="File Mount path"
+              label="File mount path"
               value={mountPath}
               onChange={(e) => setMountPath(e.target.value)}
               fullWidth
@@ -425,7 +425,7 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
             </Box>
             <TextField
               labelPlacement="top"
-              label="File Content"
+              label="File content"
               value={fileContent}
               onChange={(e) => setFileContent(e.target.value)}
               fullWidth

@@ -269,7 +269,7 @@ export default function ComponentRoleDetail(): JSX.Element {
       )}
       <ListingTable.Container>
         <ListingTable.Toolbar
-          searchSlot={<SearchField value={search} onChange={setSearch} />}
+          searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
           actions={
             actionsVisible && (
               <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => setAddingGroups(true)}>

@@ -219,7 +219,7 @@ function getDefaultServices(componentId: string, componentType: ComponentType): 
     return {
       [serviceId]: {
         id: serviceId,
-        label: 'Web App',
+        label: 'Web app',
         type: 'http',
         dependencyIds: [],
         deploymentMetadata: {

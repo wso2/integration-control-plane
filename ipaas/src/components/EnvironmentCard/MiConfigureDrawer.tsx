@@ -30,6 +30,7 @@ import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, MI_SECRETS_GROUP, planMiCon
 import { EndpointCard } from '../EndpointCard';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 // No Certificate Mount step, unlike ConfigureDrawer: certificate mounts are not wired
 // to the BFF yet (api/configuration.ts reads none and saves nothing), so it would be empty.
@@ -134,6 +135,9 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const errors = useMemo(() => validateMiConfigDraft({ envVars: envVarsHidden ? [] : draft.envVars, secrets: secretsHidden ? [] : draft.secrets }, storedSecrets, data), [draft, storedSecrets, data, envVarsHidden, secretsHidden]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
+  useUnsavedChanges(open && hasChanges);
+  const guardNavigation = useLeaveGuard();
+  const requestClose = () => guardNavigation(handleClose);
 
   // Errors on blank rows only show after a save attempt, so a just-added row is not red.
   const errorFor = (id: string, key: string): string => {
@@ -279,25 +283,25 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           The integration reads these as <code>{'${configs.<key>}'}</code>. To mount files, go to{' '}
           {configsUrl ? (
             <Link component={RouterLink} to={configsUrl}>
-              Configs &amp; Secrets
+              Configs &amp; secrets
             </Link>
           ) : (
-            'Configs & Secrets'
+            'Configs & secrets'
           )}
           .
         </Alert>
         {data.envVarsGroupIsSecret ? (
           // Its values can't be read back, and saving variables here would replace them.
           <Alert severity="warning" sx={{ mb: 3 }}>
-            Environment variables can't be edited here: the <code>{MI_ENV_VARS_GROUP}</code> group on Configs &amp; Secrets is stored as a secret. Edit or delete that group there first.
+            Environment variables can't be edited here: the <code>{MI_ENV_VARS_GROUP}</code> group on Configs &amp; secrets is stored as a secret. Edit or delete that group there first.
           </Alert>
         ) : (
-          renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')
+          renderSection('Environment variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')
         )}
         {data.secretsGroupIsPlain ? (
           // Saving secrets here would turn that group into a secret one and drop its values.
           <Alert severity="warning" sx={{ mb: 3 }}>
-            Secrets can&apos;t be edited here: the <code>{MI_SECRETS_GROUP}</code> group on Configs &amp; Secrets is not stored as a secret. Edit or delete that group there first.
+            Secrets can&apos;t be edited here: the <code>{MI_SECRETS_GROUP}</code> group on Configs &amp; secrets is not stored as a secret. Edit or delete that group there first.
           </Alert>
         ) : (
           renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')
@@ -315,7 +319,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   return (
     <>
-      <DrawerPanel open={open} onClose={handleClose}>
+      <DrawerPanel open={open} onClose={requestClose}>
         <DrawerPanel.Header>
           <DrawerPanel.Title>Configurations</DrawerPanel.Title>
           <DrawerPanel.Actions>
@@ -336,7 +340,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         {/* ManageEndpoint has its own Cancel/Update. */}
         {!(step === 2 && managingEp) && (
           <DrawerPanel.Footer>
-            <Button variant="outlined" color="inherit" onClick={step === 2 ? () => setStep(1) : handleClose}>
+            <Button variant="outlined" color="inherit" onClick={step === 2 ? () => setStep(1) : requestClose}>
               {step === 2 ? 'Back' : 'Cancel'}
             </Button>
             {step < lastStep ? (

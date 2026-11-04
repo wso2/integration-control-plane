@@ -60,7 +60,7 @@ function EditEnvironmentForm({ env, orgHandler }: { env: Environment; orgHandler
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
-        Edit Environment
+        Edit environment
       </Typography>
 
       {error && (

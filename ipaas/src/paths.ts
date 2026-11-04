@@ -59,7 +59,11 @@ export function orgUrl(orgHandler: string): string {
 }
 
 export function orgHomeUrl(orgHandler: string): string {
-  return `/organizations/${orgHandler}/home`;
+  return `/organizations/${orgHandler}/overview`;
+}
+
+export function orgProjectsUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/projects`;
 }
 
 export function newOrgUrl(): string {

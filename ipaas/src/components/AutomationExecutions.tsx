@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, TablePagination, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, IconButton, ListingTable, TablePagination, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { CheckCircle2, ChevronRight, XCircle } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -75,11 +75,23 @@ function isInProgress(status: string, _completionTime: string): boolean {
   return true; // InProgress, Queued, or any non-terminal status
 }
 
-function StatusIcon({ status, inProgress }: { status: string; inProgress: boolean }) {
+function StatusIcon({ status, inProgress, failedReason }: { status: string; inProgress: boolean; failedReason?: string }) {
   if (inProgress) return <CircularProgress size={18} />;
   const val = status?.toLowerCase();
   if (val === 'succeeded' || val === 'success') return <CheckCircle2 size={18} color="green" />;
-  if (val === 'failed' || val === 'failure') return <XCircle size={18} color="red" />;
+  if (val === 'failed' || val === 'failure') {
+    const icon = <XCircle size={18} color="red" role="img" aria-label={failedReason ? `Failed: ${failedReason}` : 'Failed'} />;
+    if (!failedReason) return icon;
+    // The span gives the tooltip an element it can hold a ref to, and keyboard
+    // users a stop that opens it.
+    return (
+      <Tooltip title={failedReason}>
+        <Box component="span" tabIndex={0} sx={{ display: 'inline-flex' }}>
+          {icon}
+        </Box>
+      </Tooltip>
+    );
+  }
   return <CircularProgress size={18} />;
 }
 
@@ -119,10 +131,13 @@ export default function AutomationExecutions({
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
-  const [selectedExecution, setSelectedExecution] = useState<TaskExecution | null>(null);
+  // Hold the id, not the row: polling replaces the rows, and the open drawer
+  // must show the latest one (a failure reason can arrive while it is open).
+  const [selectedExecutionId, setSelectedExecutionId] = useState<string | null>(null);
   const [logsExecution, setLogsExecution] = useState<TaskExecution | null>(null);
 
   const { data: executions = [], isLoading, isError } = useTaskExecutions(releaseId, componentId, environmentId, projectId);
+  const selectedExecution = executions.find((e) => e.id === selectedExecutionId) ?? null;
   const { data: scheduleConfig } = useExecutionConfigs(componentId, releaseId, environmentId);
   const cronExpression = scheduleConfig?.cronjobFrequency ?? '';
   const cronTimezone = scheduleConfig?.cronjobTimezone ?? '';
@@ -261,10 +276,10 @@ export default function AutomationExecutions({
           <ListingTable.Head>
             <ListingTable.Row>
               <ListingTable.Cell>Status</ListingTable.Cell>
-              <ListingTable.Cell>Triggered At</ListingTable.Cell>
+              <ListingTable.Cell>Triggered at</ListingTable.Cell>
               <ListingTable.Cell>Duration</ListingTable.Cell>
               <ListingTable.Cell>Commit ID</ListingTable.Cell>
-              <ListingTable.Cell>Latest Logs</ListingTable.Cell>
+              <ListingTable.Cell>Latest logs</ListingTable.Cell>
               <ListingTable.Cell></ListingTable.Cell>
             </ListingTable.Row>
           </ListingTable.Head>
@@ -274,7 +289,7 @@ export default function AutomationExecutions({
               return (
                 <ListingTable.Row key={e.id}>
                   <ListingTable.Cell>
-                    <StatusIcon status={e.status} inProgress={inProgress} />
+                    <StatusIcon status={e.status} inProgress={inProgress} failedReason={e.failedReason} />
                   </ListingTable.Cell>
                   <ListingTable.Cell>
                     <Typography variant="body2">{inProgress ? '--' : formatTriggeredAt(e.startTime)}</Typography>
@@ -300,7 +315,7 @@ export default function AutomationExecutions({
                   </ListingTable.Cell>
                   <ListingTable.Cell>
                     {!e.id.startsWith(QUEUED_SENTINEL) && (
-                      <IconButton size="small" aria-label="View execution details" onClick={() => setSelectedExecution(e)}>
+                      <IconButton size="small" aria-label="View execution details" onClick={() => setSelectedExecutionId(e.id)}>
                         <ChevronRight size={16} />
                       </IconButton>
                     )}
@@ -328,7 +343,7 @@ export default function AutomationExecutions({
       <ExecutionDrawer
         open={!!selectedExecution}
         execution={selectedExecution}
-        onClose={() => setSelectedExecution(null)}
+        onClose={() => setSelectedExecutionId(null)}
         onRunSuccess={onRunSuccess}
         orgHandler={orgHandler}
         projectHandler={projectHandler}

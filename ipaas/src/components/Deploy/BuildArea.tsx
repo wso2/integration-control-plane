@@ -201,7 +201,7 @@ export default function BuildArea({
         }}>
         <CardContent>
           <Typography variant="h4" component="h2" sx={{ mb: 2 }}>
-            Set Up
+            Set up
           </Typography>
 
           <Divider sx={{ mb: 2 }} />
@@ -258,7 +258,7 @@ export default function BuildArea({
             control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
             label={
               <Stack direction="row" alignItems="center" gap={0.5}>
-                <Typography variant="body2">Auto Deploy on Build</Typography>
+                <Typography variant="body2">Auto deploy on build</Typography>
                 {updateAutoDeploy.isPending && <CircularProgress size={12} />}
               </Stack>
             }
@@ -344,7 +344,7 @@ export default function BuildArea({
 
       {/* Confirm deploy after configure */}
       <Dialog open={deployConfirmOpen} onClose={() => setDeployConfirmOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Deploy Now?</DialogTitle>
+        <DialogTitle>Deploy now?</DialogTitle>
         <DialogContent>
           <DialogContentText>Configuration saved. Would you like to deploy the selected image to the first environment now?</DialogContentText>
         </DialogContent>

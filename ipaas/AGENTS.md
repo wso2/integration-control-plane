@@ -110,6 +110,37 @@ All signed-in routes live under `/organizations/:org/`. The org handle comes fro
 - **Wording:** the third navigation level is an **Integration**. Never call it a "Component" in UI copy, comments or docs. Code identifiers such as `componentId` stay as they are.
 - **Formatting:** Prettier and ESLint configs are in the repo. Format only the lines you change. Some upstream files are not Prettier-clean, and reformatting them buries the real diff.
 
+## Oxygen UI guidelines
+
+The console is built on `@wso2/oxygen-ui`, and its guidelines are binding. The installed package ships them:
+
+- `node_modules/@wso2/oxygen-ui/.ai/` — `AGENTS.md` (critical rules), `components.md` (API), `patterns.md`, `theming.md`.
+- `node_modules/@wso2/oxygen-ui/.claude/skills/` — `oxygen-component`, `oxygen-form` and `oxygen-layout`. These hold the rules for tables, toolbars, containers and UI text.
+
+Read the guideline for the kind of UI you are changing before you change it. Where this file is stricter, follow this file. The rules below are the ones changes most often break:
+
+- **Components:** import components from `@wso2/oxygen-ui` and icons from `@wso2/oxygen-ui-icons-react`, never from `@mui/*`.
+  - Use the Oxygen component when one exists: `DrawerPanel`, `ListingTable`, `ListingCard`, `PageTitle`, `PageContent`, `RelativeTime`, `SearchBar`.
+  - Use theme tokens, never hardcoded colours or pixel spacing.
+- **UI text:** write every title, heading, button, link, menu item, tab, label, placeholder, table column, tooltip and message in sentence case: "Create project", "Last updated".
+  - Capitalize only the first word, proper nouns, product names and acronyms.
+  - Never change case with `textTransform: 'uppercase'` or `'capitalize'`; write the text in the case it should show.
+- **Search:** search is always visible.
+  - Its placeholder names what is searched ("Search projects", "Search by name"). Never use a bare "Search" or a trailing ellipsis.
+  - The placeholder doubles as the field's `aria-label` (see `SearchField`).
+- **Inputs and forms:** use `TextField` with `labelPlacement="top"`, and mark optional fields with `optional`. Required asterisks are hidden globally.
+  - Show validation with `error` and `helperText`.
+  - Group long forms into titled sections.
+  - Guard every editable page, drawer and dialog with `useUnsavedChanges`.
+- **Containers:** pick the lightest container that fits: modal, then right drawer, then page form, then full-page wizard. The `oxygen-component` skill, "Choosing a container", gives the rules.
+  - A modal holds one decision or one to three fields and never scrolls.
+  - A modal's title states the action, and its buttons use specific verbs, never "OK" or "Yes".
+  - A destructive modal confirms with danger styling. A high-impact delete also asks for the resource name (`ConfirmDeleteDialog`).
+  - Never nest modals, stack drawers or use `window.confirm`, `alert` or `prompt`.
+- **Toolbars:** keep this order: scope, search, filters, then view toggles, utility icons, secondary actions and one filled primary action at the right.
+  - Put the result count in the footer.
+  - Every icon button has a `Tooltip` and an `aria-label`.
+
 ## Boundaries
 
 - Never commit `.env.test`, `.env.local`, `.auth/` or real credentials in `public/config.json`.

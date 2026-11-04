@@ -213,7 +213,7 @@ export function BaseElement({
   const selectedGroup = configGroups?.find((g) => g.groupUuid === selectedGroupId) ?? null;
   const sensitiveAdornment = (
     <Tooltip title={isSensitive ? 'Mark as non-sensitive (stored in database)' : 'Mark as sensitive (stored in Key Vault)'}>
-      <IconButton size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
+      <IconButton aria-label={isSensitive ? 'Mark as non-sensitive' : 'Mark as sensitive'} size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
         {isSensitive ? <Lock size={14} /> : <Unlock size={14} />}
       </IconButton>
     </Tooltip>
@@ -222,21 +222,21 @@ export function BaseElement({
   const linkAdornment = allowLinking && (
     <>
       <Tooltip title={linked ? 'Linked to config group' : 'Link to config group'}>
-        <IconButton size="small" onClick={linked ? handleUnlink : handleLinkOpen} sx={{ p: 0.25 }}>
+        <IconButton aria-label={linked ? 'Unlink config group' : 'Link to config group'} size="small" onClick={linked ? handleUnlink : handleLinkOpen} sx={{ p: 0.25 }}>
           {linked ? <Link2Off size={14} /> : <Link2 size={14} />}
         </IconButton>
       </Tooltip>
       <Popover open={Boolean(linkAnchorEl)} anchorEl={linkAnchorEl} onClose={() => setLinkAnchorEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <Box sx={{ p: 2, minWidth: 280 }}>
           <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-            Link Configuration Group
+            Link configuration group
           </Typography>
           <TextField
             labelPlacement="top"
             select
             fullWidth
             size="small"
-            label="Config Group"
+            label="Config group"
             value={selectedGroupId}
             onChange={(e) => {
               setSelectedGroupId(e.target.value);
@@ -249,7 +249,7 @@ export function BaseElement({
               </MenuItem>
             ))}
           </TextField>
-          <TextField labelPlacement="top" select fullWidth size="small" label="Config Key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
+          <TextField labelPlacement="top" select fullWidth size="small" label="Config key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
             {(selectedGroup?.configurations || []).map((c) => (
               <MenuItem key={c.keyUuid} value={c.keyUuid}>
                 {c.key}
@@ -336,7 +336,7 @@ export function BaseElement({
         <Popover open={Boolean(secretAnchorEl)} anchorEl={secretAnchorEl} onClose={() => setSecretAnchorEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }}>
           <Box sx={{ p: 2, minWidth: 320 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Update Secret Content
+              Update secret content
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
               Updating the value removes the previous value permanently and cannot be restored.
@@ -355,9 +355,11 @@ export function BaseElement({
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                      {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </IconButton>
+                    <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                      <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                        {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </IconButton>
+                    </Tooltip>
                   </InputAdornment>
                 ),
               }}
@@ -405,9 +407,11 @@ export function BaseElement({
                 readOnly: !!linked,
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                      {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </IconButton>
+                    <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                      <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                        {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </IconButton>
+                    </Tooltip>
                     {linkAdornment}
                   </InputAdornment>
                 ),
@@ -431,7 +435,7 @@ export function BaseElement({
           )}
           <Chip label="secret" size="small" variant="outlined" color="info" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
           <Tooltip title="Mark as non-sensitive (stored in database)">
-            <IconButton size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
+            <IconButton aria-label="Mark as non-sensitive" size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
               <Lock size={14} />
             </IconButton>
           </Tooltip>
@@ -469,9 +473,11 @@ export function BaseElement({
             <InputAdornment position="end">
               {sensitiveAdornment}
               {isSensitive && (
-                <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                  {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                </IconButton>
+                <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                  <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                    {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </IconButton>
+                </Tooltip>
               )}
               {linkAdornment}
             </InputAdornment>

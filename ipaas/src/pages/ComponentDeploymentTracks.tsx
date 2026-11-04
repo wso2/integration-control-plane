@@ -119,8 +119,8 @@ interface ApiVersionFieldProps {
 }
 
 function ApiVersionField({ value, onChange, error, locked, required }: ApiVersionFieldProps): JSX.Element {
-  if (locked) return <TextField labelPlacement="top" label="API Version" value={value} fullWidth disabled helperText="A track's API version can't be changed once set." />;
-  return <TextField labelPlacement="top" label="API Version" value={value} onChange={(e) => onChange(e.target.value)} fullWidth required={required} error={!!error} helperText={error ?? API_VERSION_HELP} />;
+  if (locked) return <TextField labelPlacement="top" label="API version" value={value} fullWidth disabled helperText="A track's API version can't be changed once set." />;
+  return <TextField labelPlacement="top" label="API version" value={value} onChange={(e) => onChange(e.target.value)} fullWidth required={required} error={!!error} helperText={error ?? API_VERSION_HELP} />;
 }
 
 interface TrackDialogProps {
@@ -166,7 +166,7 @@ function TrackDialog({ orgUuid, componentId, repository, tracks, versionedApis, 
 
   return (
     <Dialog open onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle>{track ? 'Edit Deployment Track' : 'Create Deployment Track'}</DialogTitle>
+      <DialogTitle>{track ? 'Edit deployment track' : 'Create deployment track'}</DialogTitle>
       <DialogContent>
         {error && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -249,9 +249,9 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
             <ListingTable.Head>
               <ListingTable.Row>
                 <ListingTable.Cell>Branch</ListingTable.Cell>
-                {versionedApis && <ListingTable.Cell>API Version</ListingTable.Cell>}
+                {versionedApis && <ListingTable.Cell>API version</ListingTable.Cell>}
                 <ListingTable.Cell>Description</ListingTable.Cell>
-                <ListingTable.Cell>Auto Deploy</ListingTable.Cell>
+                <ListingTable.Cell>Auto deploy</ListingTable.Cell>
                 <ListingTable.Cell>Environments</ListingTable.Cell>
                 {deploymentTracksEnabled && <ListingTable.Cell align="right">Actions</ListingTable.Cell>}
               </ListingTable.Row>
@@ -332,7 +332,7 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
 
 /** The tracks table's shape while the integration loads. */
 function TracksSkeleton(): JSX.Element {
-  const columns = ['Branch', 'Description', 'Auto Deploy', 'Environments'];
+  const columns = ['Branch', 'Description', 'Auto deploy', 'Environments'];
   return (
     <ListingTable.Container>
       <ListingTable>
@@ -380,7 +380,7 @@ export default function ComponentDeploymentTracks(scope: ComponentScope): JSX.El
           Failed to load the integration&apos;s deployment tracks.
         </Alert>
       ) : !comp ? (
-        <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />
+        <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />
       ) : (
         <TracksBody scope={scope} projectId={projectId} componentId={comp.id} tracks={comp.deploymentTracks ?? []} deploymentTracksEnabled={!!comp.deploymentTracksEnabled} versionedApis={hasVersionedApis(comp)} />
       )}

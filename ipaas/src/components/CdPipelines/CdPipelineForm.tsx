@@ -97,7 +97,7 @@ export default function CdPipelineForm({ orgHandler, envTemplates, existingPipel
         Back to deployment pipelines
       </Button>
       <PageTitle>
-        <PageTitle.Header>{existing ? 'Edit Deployment Pipeline' : 'Create Deployment Pipeline'}</PageTitle.Header>
+        <PageTitle.Header>{existing ? 'Edit deployment pipeline' : 'Create deployment pipeline'}</PageTitle.Header>
       </PageTitle>
 
       <Stack gap={3} sx={{ maxWidth: 640, mt: 1 }}>
