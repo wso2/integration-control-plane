@@ -22,9 +22,10 @@ import { useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
-import { forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
+import { clearQuestions, forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
 import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
-import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
+import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MODES } from '../../../constants/contextEngine';
+import { defaultQueryMode } from '../../../utils/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
@@ -42,10 +43,6 @@ interface PlaygroundTabProps {
   orgHandle: string;
 }
 
-const MODES: { value: ContextQueryMode; label: string; hint: string }[] = [
-  { value: 'context', label: 'Passages', hint: 'Returns the source-linked passages you are allowed to read — exactly what an agent receives.' },
-  { value: 'answer', label: 'Answer', hint: 'Answers in prose from the passages you are allowed to read, and cites each one.' },
-];
 
 interface QueryFailure {
   message: string;
@@ -57,8 +54,8 @@ function queryFailure(e: unknown, mode: ContextQueryMode): QueryFailure {
   if (e instanceof HttpError) {
     if (e.status === 403) return { message: "You don't have query access to this engine.", forbidden: true };
     // The engine names a model provider failure by its code, so the message says what to fix.
-    if (e.status === 503 && engineErrorCode(e)?.startsWith('backend_model_')) return { message: `${engineMessage(e)}. Fix the engine's model settings, then ask again.` };
-    if (e.status === 503 && mode === 'answer') return { message: "The engine couldn't get an answer from its language model just now, and stored nothing. Check the engine's models and keys, or ask in Passages mode." };
+    if (e.status === 503 && engineErrorCode(e)?.startsWith('backend_model_')) return { message: `${engineMessage(e).replace(/\.$/, '')}. Fix the engine's model settings, then ask again.` };
+    if (e.status === 503 && mode === 'answer') return { message: "The engine couldn't get an answer from its language model just now, and stored nothing. Check the engine's models and keys, or ask in Context mode." };
     if (e.status === 503) return { message: "The engine is running without its knowledge backend, so it can't search yet. Start it in provider mode with model keys." };
     if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };
     if (e.status === 400) return { message: `The engine rejected the question: ${e.message}` };
@@ -95,7 +92,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const [params, setSearchParams] = useSearchParams();
   const { markAsked } = useAskedFlag(engine.id);
   // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
-  const { turns, mode = 'context', pending, failure } = usePlaygroundConversation(engine.id);
+  // Until a mode is chosen the engine's default holds, and a stored Answer gives way when the engine offers no answers.
+  const { turns, mode: chosenMode, pending, failure } = usePlaygroundConversation(engine.id);
+  const mode = chosenMode && (chosenMode !== 'answer' || engine.exposure.answers) ? chosenMode : defaultQueryMode(engine);
   // A question pending from before a tab switch still counts, so it is not asked twice.
   const asking = pending !== undefined;
   const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
@@ -174,7 +173,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     });
   };
 
-  const openInApi = (turn: PlaygroundTurn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}`);
+  const openInApi = (turn: PlaygroundTurn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}${turn.mode === 'answer' ? '&mode=answer' : ''}`);
   // The Graph tab draws an answer's derivation from the stored query; a passage given here opens chosen.
   const derivationHref = (queryId: string, ev?: ContextEvidence) => `${contextEngineUrl(orgHandle, engine.id, 'graph')}?query=${encodeURIComponent(queryId)}${ev ? `&node=${encodeURIComponent(`p:${ev.id}`)}` : ''}`;
 
@@ -319,7 +318,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       <Stack gap={3} sx={{ minWidth: 0 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
           <Typography variant="body2" sx={mutedSx}>
-            {MODES.find((m) => m.value === mode)?.hint}
+            {CONTEXT_QUERY_MODES.find((m) => m.value === mode)?.hint}
           </Typography>
           <Stack direction="row" alignItems="center" gap={1}>
             <ToggleButtonGroup
@@ -330,7 +329,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 if (next) setMode(next);
               }}
               aria-label="Query mode">
-              {MODES.map((m) =>
+              {CONTEXT_QUERY_MODES.map((m) =>
                 m.value !== 'answer' || engine.exposure.answers ? (
                   <ToggleButton key={m.value} value={m.value}>
                     {m.label}
@@ -422,7 +421,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </Stack>
       </Stack>
 
-      <RecentQuestions questions={asked} selectedId={shown} openingId={openingId ?? undefined} onOpen={reopenQuestion} />
+      <RecentQuestions questions={asked} selectedId={shown} openingId={openingId ?? undefined} onOpen={reopenQuestion} onClear={() => clearQuestions(engine.id)} />
     </Box>
   );
 }

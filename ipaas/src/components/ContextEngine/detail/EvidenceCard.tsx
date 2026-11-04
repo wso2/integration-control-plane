@@ -17,14 +17,12 @@
  */
 
 import { Box, Chip, IconButton, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, ExternalLink, Info, Link as LinkIcon } from '@wso2/oxygen-ui-icons-react';
+import { Check, ExternalLink, Link as LinkIcon } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { absoluteUrl, evidencePlace, evidenceVersionLabel, sourceTypeName } from '../../../utils/contextEngine';
+import { absoluteUrl, evidencePlace, sourceTypeName, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import SourceMark from '../SourceMark';
 import { evidenceCardSx, mutedSx, passageSx } from '../styles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
-
-const COARSE_HINT = 'The engine can only place this file type by its part for now.';
 
 /** Where a passage sits: the item, then a JSON path as code, lines or sentences, and its section. */
 export function EvidencePlace({ evidence, showRecord = true }: { evidence: ContextEvidence; showRecord?: boolean }): JSX.Element {
@@ -43,13 +41,6 @@ export function EvidencePlace({ evidence, showRecord = true }: { evidence: Conte
       {place.parts.map((p, i) => (
         <span key={p}>{`${showRecord || place.path || i > 0 ? '· ' : ''}${p}`}</span>
       ))}
-      {place.coarse && (
-        <Tooltip title={COARSE_HINT}>
-          <Box component="span" tabIndex={0} aria-label={COARSE_HINT} sx={{ display: 'inline-flex', color: 'text.secondary' }}>
-            <Info size={13} />
-          </Box>
-        </Tooltip>
-      )}
     </Typography>
   );
 }
@@ -86,7 +77,7 @@ export default function EvidenceCard({ evidence, n, source, href, onOpen, id }: 
           <Typography variant="caption" sx={{ fontWeight: 600 }} noWrap title={source ? sourceTypeName(source.type) : undefined}>
             {source ? source.name : evidence.sourceId}
           </Typography>
-          <Box component="span" title={`Version of ${evidenceVersionLabel(evidence.sourceVersion)}`} sx={{ minWidth: 0 }}>
+          <Box component="span" title={`${versionFromLabel(evidence.sourceVersion)}. ${VERSION_HINT}`} sx={{ minWidth: 0 }}>
             <EvidencePlace evidence={evidence} />
           </Box>
         </Stack>

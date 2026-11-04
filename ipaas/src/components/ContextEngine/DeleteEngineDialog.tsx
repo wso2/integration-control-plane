@@ -20,6 +20,7 @@ import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Database, History, KeyRound, MessageSquare, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
+import { wrapSx } from './styles';
 
 interface DeleteEngineDialogProps {
   name: string;
@@ -81,7 +82,11 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
     <ConfirmDeleteDialog
       title={
         <>
-          Delete <strong>{name}</strong>?
+          Delete{' '}
+          <Box component="strong" sx={wrapSx}>
+            {name}
+          </Box>
+          ?
         </>
       }
       onConfirm={() => matches && onConfirm()}
@@ -101,8 +106,11 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
         fullWidth
         size="small"
         autoFocus
-        label="Type the engine name to confirm"
-        placeholder={name}
+        label={
+          <>
+            Type <strong>{name}</strong> to confirm
+          </>
+        }
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         onKeyDown={(e) => {

@@ -18,7 +18,7 @@
 
 import { Box, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { EVERYONE_VISIBILITY } from '../../../constants/contextEngine';
+import { EVERYONE_VISIBILITY, UPLOAD_MAX_BYTES } from '../../../constants/contextEngine';
 import { formatBytes, stagedSummary } from '../../../utils/contextEngine';
 import { dropStagedFile, hasStagedFile, stageFiles } from '../../../utils/stagedFiles';
 import FileDropzone from './FileDropzone';
@@ -37,7 +37,6 @@ interface StagedProps {
  * the moment the engine exists, or, on a running engine, as soon as the source is added.
  */
 export function StagedFilesSection({ draft, onChange, onRunningEngine = false }: StagedProps & { onRunningEngine?: boolean }): JSX.Element {
-  const when = onRunningEngine ? 'as soon as you add the source' : 'the moment the engine is created';
   const staged = draft.staged ?? [];
   const missing = new Set(staged.filter((f) => !hasStagedFile(f.id)).map((f) => f.id));
   const sum = stagedSummary(staged, []);
@@ -47,10 +46,7 @@ export function StagedFilesSection({ draft, onChange, onRunningEngine = false }:
       <Typography variant="subtitle2" sx={sectionLabelSx}>
         Files
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5, lineHeight: 1.5 }}>
-        {`Chosen now, uploaded ${when}. Text, Markdown, HTML or JSON up to 25 MB each; PDFs are stored until the engine can read them.`}
-      </Typography>
-      <FileDropzone compact={staged.length > 0} hint="Text, Markdown, HTML or JSON, up to 25 MB each." onFiles={(files) => onChange({ ...draft, staged: stageFiles(staged, files) })} />
+      <FileDropzone compact={staged.length > 0} hint={`Up to ${formatBytes(UPLOAD_MAX_BYTES)} each.`} onFiles={(files) => onChange({ ...draft, staged: stageFiles(staged, files) })} />
       {staged.length > 0 && (
         <Box sx={{ mt: 1.5 }}>
           <StagedFileList
@@ -64,8 +60,8 @@ export function StagedFilesSection({ draft, onChange, onRunningEngine = false }:
           />
           <Typography variant="caption" color={missing.size ? 'warning.dark' : 'text.secondary'} sx={{ display: 'block', mt: 0.75 }}>
             {missing.size > 0
-              ? `${missing.size} of ${staged.length} file${staged.length === 1 ? '' : 's'} need adding again; the rest are staged in this browser.`
-              : `${sum.ready} file${sum.ready === 1 ? '' : 's'} · ${formatBytes(sum.bytes)} staged in this browser${sum.skipped ? ` · ${sum.skipped} skipped` : ''}. Nothing is sent until you ${onRunningEngine ? 'add the source' : 'create the engine'}.`}
+              ? `${missing.size} of ${staged.length} file${staged.length === 1 ? '' : 's'} need adding again. The rest are staged in this tab.`
+              : `${sum.ready} file${sum.ready === 1 ? '' : 's'} · ${formatBytes(sum.bytes)}${sum.skipped ? ` · ${sum.skipped} skipped` : ''}. They upload when you ${onRunningEngine ? 'add the source' : 'create the engine'}.`}
           </Typography>
         </Box>
       )}

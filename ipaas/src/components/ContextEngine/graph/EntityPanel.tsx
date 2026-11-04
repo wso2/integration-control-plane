@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, ButtonBase, CircularProgress, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, ButtonBase, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { MessageSquare, Waypoints, X } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import { useContextEntity } from '../../../hooks/useContextEngine';
@@ -310,28 +310,34 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
   );
 }
 
-/** A clickable entity name, to move the selection along a relationship. */
+/** A clickable entity name, to move the selection along a relationship. A long name is cut to one line and shown whole on hover. */
 export function EntityChip({ name, kind, onSelect, lit = false }: { name: string; kind?: string; onSelect: (name: string, kind?: string) => void; lit?: boolean }): JSX.Element {
   return (
-    <ButtonBase
-      onClick={() => onSelect(name, kind)}
-      sx={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 0.75,
-        height: 24,
-        px: 1,
-        borderRadius: 12,
-        border: '1px solid',
-        borderColor: lit ? 'primary.main' : 'divider',
-        bgcolor: 'background.paper',
-        fontSize: 12,
-        color: 'text.primary',
-        verticalAlign: 'middle',
-        '&:hover': { borderColor: 'primary.main' },
-      }}>
-      <Box aria-hidden sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: lit ? 'primary.main' : 'text.disabled' }} />
-      {name}
-    </ButtonBase>
+    <Tooltip title={name}>
+      <ButtonBase
+        onClick={() => onSelect(name, kind)}
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.75,
+          height: 24,
+          maxWidth: '100%',
+          minWidth: 0,
+          px: 1,
+          borderRadius: 12,
+          border: '1px solid',
+          borderColor: lit ? 'primary.main' : 'divider',
+          bgcolor: 'background.paper',
+          fontSize: 12,
+          color: 'text.primary',
+          verticalAlign: 'middle',
+          '&:hover': { borderColor: 'primary.main' },
+        }}>
+        <Box aria-hidden sx={{ width: 7, height: 7, flexShrink: 0, borderRadius: '50%', bgcolor: lit ? 'primary.main' : 'text.disabled' }} />
+        <Box component="span" sx={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {name}
+        </Box>
+      </ButtonBase>
+    </Tooltip>
   );
 }

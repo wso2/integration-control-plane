@@ -27,7 +27,7 @@ interface GetStartedChecklistProps {
   onAction: (id: GetStartedStepId) => void;
 }
 
-const ACTION_LABEL: Record<GetStartedStepId, string> = { index: 'View progress', ask: 'Open Playground', publish: 'Publish', grant: 'Manage access' };
+const ACTION_LABEL: Record<GetStartedStepId, string> = { index: 'View progress', ask: 'Open Playground', publish: 'View API', grant: 'Manage access' };
 
 /** Four first-run steps in a row; the current one carries its action. */
 export default function GetStartedChecklist({ steps, onAction }: GetStartedChecklistProps): JSX.Element {
