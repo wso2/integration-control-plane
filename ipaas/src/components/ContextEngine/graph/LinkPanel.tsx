@@ -245,7 +245,7 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourc
       )}
 
       <Stack direction="row" flexWrap="wrap" gap={1}>
-        <Button size="small" variant="text" startIcon={<MessageSquare size={15} />} onClick={() => navigate(`${contextEngineUrl(orgHandle, engineId, 'playground')}?q=${encodeURIComponent(`What do the sources say about whether ${sentence}?`)}`)}>
+        <Button size="small" variant="text" startIcon={<MessageSquare size={15} />} onClick={() => navigate(contextEngineUrl(orgHandle, engineId, 'playground', { q: `What do the sources say about whether ${sentence}?` }))}>
           Ask about this
         </Button>
       </Stack>
@@ -314,7 +314,7 @@ export function ConflictPanel({ engineId, orgHandle, conflicts, onSelectEntity, 
             size="small"
             variant="text"
             startIcon={<MessageSquare size={15} />}
-            onClick={() => navigate(`${contextEngineUrl(orgHandle, engineId, 'playground')}?q=${encodeURIComponent(`The sources say both “${sentenceOf(first.first)}” and “${sentenceOf(first.second)}”. Which is right?`)}`)}>
+            onClick={() => navigate(contextEngineUrl(orgHandle, engineId, 'playground', { q: `The sources say both “${sentenceOf(first.first)}” and “${sentenceOf(first.second)}”. Which is right?` }))}>
             Ask about this
           </Button>
         </Stack>
