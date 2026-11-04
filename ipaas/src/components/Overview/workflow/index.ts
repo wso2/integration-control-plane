@@ -21,6 +21,7 @@ import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from '../integration-as-api/HeaderStatus';
 import EnvCardActions from '../integration-as-api/EnvCardActions';
 import EnvCardBody from './EnvCardBody';
+import DeployAction from './DeployAction';
 
 /**
  * Workflow integration module. Resolves from the `ballerinaWorkflow` display type.
@@ -33,6 +34,7 @@ const workflowModule: IntegrationModule = {
   HeaderStatus,
   EnvCardActions,
   EnvCardBody,
+  DeployAction,
 };
 
 export default workflowModule;
