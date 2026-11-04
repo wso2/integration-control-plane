@@ -25,6 +25,7 @@ import { useUpdateContextSource } from '../../../hooks/useContextEngine';
 import { engineMessage, sourceNameError, sourceTypeName, uploadSourceRules, visibilityError, visibilityTags } from '../../../utils/contextEngine';
 import { HttpError } from '../../../types/http';
 import FileVisibilityField from '../files/FileVisibilityField';
+import VisibilityComingSoon from '../files/VisibilityComingSoon';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourceMark from '../SourceMark';
 import { connectorHeaderSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fieldStackSx, filesDrawerSx, mutedSx } from '../styles';
@@ -100,39 +101,40 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
           <TextField label="Source Name" required fullWidth size="small" value={name} error={!!nameError && name.trim() !== ''} helperText={(name.trim() !== '' && nameError) || undefined} onChange={(e) => setName(e.target.value)} sx={REQUIRED_FIELD_SX} />
         </Stack>
 
-        {ROLE_VISIBILITY_ENABLED &&
-          (isUpload ? (
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Who can see uploaded files
-              </Typography>
-              <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5, lineHeight: 1.5 }}>
-                Each file is shared when it is uploaded: with everyone who can query this engine, or with some roles. Change it per file from the Files drawer.
-              </Typography>
-            </Box>
-          ) : (
-            <>
-              <Alert severity="info" variant="outlined">
-                The engine does not report a source&apos;s current visibility. Leave this as it is to keep the source&apos;s rules. Changing it replaces who can see this content.
+        {!ROLE_VISIBILITY_ENABLED ? (
+          <VisibilityComingSoon label={isUpload ? 'Who can see uploaded files' : 'Who can see this content'} />
+        ) : isUpload ? (
+          <Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Who can see uploaded files
+            </Typography>
+            <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5, lineHeight: 1.5 }}>
+              Each file is shared when it is uploaded: with everyone who can query this engine, or with some roles. Change it per file from the Files drawer.
+            </Typography>
+          </Box>
+        ) : (
+          <>
+            <Alert severity="info" variant="outlined">
+              The engine does not report a source&apos;s current visibility. Leave this as it is to keep the source&apos;s rules. Changing it replaces who can see this content.
+            </Alert>
+            <FileVisibilityField
+              id="edit-source-visibility"
+              label="Who can see this content"
+              orgHandle={orgHandle}
+              queryRoles={queryRoles}
+              value={visibility}
+              onChange={(next) => {
+                setVisibility(next);
+                setVisibilityTouched(true);
+              }}
+            />
+            {noRules && (
+              <Alert severity="warning" variant="outlined">
+                No role can query this engine yet, so there is no one to map this content to. Grant query access first, or leave the visibility as it is.
               </Alert>
-              <FileVisibilityField
-                id="edit-source-visibility"
-                label="Who can see this content"
-                orgHandle={orgHandle}
-                queryRoles={queryRoles}
-                value={visibility}
-                onChange={(next) => {
-                  setVisibility(next);
-                  setVisibilityTouched(true);
-                }}
-              />
-              {noRules && (
-                <Alert severity="warning" variant="outlined">
-                  No role can query this engine yet, so there is no one to map this content to. Grant query access first, or leave the visibility as it is.
-                </Alert>
-              )}
-            </>
-          ))}
+            )}
+          </>
+        )}
 
         {update.isError && (
           <Alert severity="error" variant="outlined" action={forbidden ? <OwnerAccessButton engineId={engineId} onGranted={save} /> : undefined}>

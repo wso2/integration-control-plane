@@ -24,6 +24,7 @@ import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { sourceFieldError, sourceNameError, visibleFields } from '../../utils/contextEngine';
 import SecretField from '../common/SecretField';
 import FileVisibilityField from './files/FileVisibilityField';
+import VisibilityComingSoon from './files/VisibilityComingSoon';
 import { StagedFilesSection, StagedVisibilityField } from './files/StagedFilesSection';
 import SourceMark from './SourceMark';
 import { connectorHeaderSx, fieldGroupBodySx, fieldGroupChevronSx, fieldGroupToggleSx, fieldStackSx } from './styles';
@@ -208,23 +209,23 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
         {upload && <StagedFilesSection draft={draft} onChange={change} onRunningEngine={queryRoles !== undefined} />}
       </Stack>
 
-      {ROLE_VISIBILITY_ENABLED && (
-        <Box sx={{ mt: 2.5 }}>
-          {upload ? (
-            <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} />
-          ) : (
-            <FileVisibilityField
-              id="source-visibility"
-              label="Who can see this source"
-              hint="Access is set per source: everything this source brings in is visible to the same people."
-              orgHandle={orgHandle}
-              queryRoles={queryRoles}
-              value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}
-              onChange={(stagedVisibility) => change({ ...draft, stagedVisibility })}
-            />
-          )}
-        </Box>
-      )}
+      <Box sx={{ mt: 2.5 }}>
+        {!ROLE_VISIBILITY_ENABLED ? (
+          <VisibilityComingSoon label={upload ? 'Who can see these files' : 'Who can see this source'} />
+        ) : upload ? (
+          <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} />
+        ) : (
+          <FileVisibilityField
+            id="source-visibility"
+            label="Who can see this source"
+            hint="Access is set per source: everything this source brings in is visible to the same people."
+            orgHandle={orgHandle}
+            queryRoles={queryRoles}
+            value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}
+            onChange={(stagedVisibility) => change({ ...draft, stagedVisibility })}
+          />
+        )}
+      </Box>
     </>
   );
 }
