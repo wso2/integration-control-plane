@@ -277,7 +277,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Docs, markdown and code in a repository branch.',
     category: 'code',
     popular: true,
-    logo: `${CONNECTOR_LOGO_BASE}github.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}github.svg`, logoDark: `${CONNECTOR_LOGO_BASE}github-dark.svg`,
     icon: 'github',
     fields: [
       F('repositoryUrl', 'Repository URL', 'url', { placeholder: 'https://github.com/org/repo' }),
@@ -482,7 +482,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Zendesk',
     description: 'Tickets and help-center articles.',
     category: 'saas',
-    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`, logoDark: `${CONNECTOR_LOGO_BASE}zendesk-dark.svg`,
     icon: 'headset',
     fields: [F('subdomain', 'Subdomain', 'text', { placeholder: 'your-org' }), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['subdomain'],
