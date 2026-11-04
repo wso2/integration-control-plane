@@ -290,6 +290,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
             graph={served}
             link={selectedLink}
             sourceName={(id) => engine.sources.find((s) => s.id === id)?.name}
+            derivation={{ answer: data.answerWithheld ? undefined : data.answer, evidence: data.evidence, facts: [...facts, ...conflicts.flatMap((c) => [c.first, c.second])] }}
             onSelectEntity={selectEntity}
             // A document has no part of its own in an answer, so it opens in the explorer.
             onSelectRecord={onExploreNode}

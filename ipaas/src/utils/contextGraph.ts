@@ -803,6 +803,23 @@ export function withLinkSelection(part: FactSelection, pick: LinkSelection): Fac
   };
 }
 
+/** An entity as a fact or a link names it: its name, and its kind when known. */
+export interface NamedEnd {
+  name: string;
+  kind?: string;
+}
+
+/**
+ * Whether a fact is this relationship: the same relation from the same subject
+ * to the same object. Names and the relation are compared without case. A kind
+ * counts only when both sides know one, since an entity is its name and its kind.
+ */
+export function factIs(fact: ContextFact, subject: NamedEnd, relation: string, object: NamedEnd): boolean {
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const end = (name: string, kind: string | undefined, want: NamedEnd) => same(name, want.name) && (!kind || !want.kind || kind === want.kind);
+  return same(fact.relation, relation) && end(fact.subject, fact.subjectKind, subject) && end(fact.object, fact.objectKind, object);
+}
+
 /** Narrows the facts lit: those naming one entity, or those standing on one passage. */
 export interface FactFocus {
   entity?: string;
