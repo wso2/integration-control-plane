@@ -169,9 +169,12 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
 
       {view && (
         <>
-          <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-            Mentioned in {mentioned.length} passage{mentioned.length === 1 ? '' : 's'} across {records.size} document{records.size === 1 ? '' : 's'}.
-          </Typography>
+          {/* Hidden on the provenance page; the explorer, which passes no derivation, still shows it. */}
+          {!derivation && (
+            <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+              Mentioned in {mentioned.length} passage{mentioned.length === 1 ? '' : 's'} across {records.size} document{records.size === 1 ? '' : 's'}.
+            </Typography>
+          )}
 
           {derivation?.answer && (
             <Box>

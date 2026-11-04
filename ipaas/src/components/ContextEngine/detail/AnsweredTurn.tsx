@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Box, Button, Typography } from '@wso2/oxygen-ui';
-import { ArrowRight, Waypoints } from '@wso2/oxygen-ui-icons-react';
+import { Box, /* Button, */ Typography } from '@wso2/oxygen-ui';
+import { /* ArrowRight, */ Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
-import { Link as RouterLink } from 'react-router';
+// import { Link as RouterLink } from 'react-router';
 import { citedNumbers } from '../../../utils/contextEngine';
 import { derivationSummary } from '../../../utils/contextGraph';
 import CitedAnswer, { type CitationFocus } from './CitedAnswer';
@@ -61,6 +61,8 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
 
   // The rail names only the passage, so its click releases a pin made from any sentence; a mark releases its own sentence and re-pins another.
   const togglePin = (focus: CitationFocus) => setPinned((prev) => (prev && prev.n === focus.n && (focus.sentence === undefined || prev.sentence === focus.sentence) ? null : focus));
+  // With no graph facts the graph would light nothing, so the rail offers no way there.
+  const graphHrefFor = facts.length ? derivationHref : undefined;
 
   return (
     <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0, 1fr)', lg: 'minmax(0, 1fr) 330px' }, gap: 3, alignItems: 'start' }}>
@@ -78,7 +80,7 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
         onHover={(n) => setActive(n === null ? null : { n })}
         onPin={(n) => togglePin({ n })}
         onOpen={onOpen}
-        graphHrefFor={derivationHref}
+        graphHrefFor={graphHrefFor}
       />
     </Box>
   );
@@ -87,7 +89,7 @@ export default function AnsweredTurn({ answer, evidence, sources, facts = [], hr
 const count = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
 /** Under an answer: what it was built from, and a link to its derivation in the Graph tab. */
-function DerivationLine({ answer, evidence, facts, href }: { answer: string; evidence: ContextEvidence[]; facts: ContextFact[]; href: string }): JSX.Element {
+function DerivationLine({ answer, evidence, facts /* , href */ }: { answer: string; evidence: ContextEvidence[]; facts: ContextFact[]; href: string }): JSX.Element {
   const s = derivationSummary({ answer, evidence, facts });
   const parts = [count(s.sentences, 'sentence', 'sentences'), count(s.passages, 'passage', 'passages'), ...(s.entities ? [count(s.entities, 'entity', 'entities')] : [])];
   return (
@@ -96,9 +98,11 @@ function DerivationLine({ answer, evidence, facts, href }: { answer: string; evi
       <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: 12.5 }}>
         {parts.join(', ')}.
       </Typography>
+      {/* How this answer was derived, hidden for now.
       <Button size="small" variant="text" component={RouterLink} to={href} endIcon={<ArrowRight size={14} />} sx={{ fontWeight: 600, px: 0.5 }}>
         How this answer was derived
       </Button>
+      */}
     </Box>
   );
 }

@@ -857,6 +857,28 @@ export function queryConflictLink(m: GraphModel, graph: ContextGraph, conflict: 
   return at < 0 ? undefined : at;
 }
 
+/** The numbers of the passages a fact stands on, in order, where `[n]` is `evidence[n - 1]`; passages not among them are left out. */
+export function factPassages(fact: ContextFact, evidence: ContextQueryResult['evidence']): number[] {
+  return fact.evidenceIds
+    .map((id) => evidence.findIndex((e) => e.id === id) + 1)
+    .filter((n) => n > 0)
+    .sort((a, b) => a - b);
+}
+
+/**
+ * The line a fact stands for: the `relates` link between its two entities with
+ * the same relationship, or else any between them, as `factSelection` lights
+ * it. Undefined when the graph shown does not hold both entities, or draws no
+ * line between them.
+ */
+export function factLink(m: GraphModel, graph: ContextGraph, fact: ContextFact): number | undefined {
+  const subject = entityIndex(m, graph, fact.subject, fact.subjectKind);
+  const object = entityIndex(m, graph, fact.object, fact.objectKind);
+  if (subject === undefined || object === undefined) return undefined;
+  const between = m.links.map((link, i) => ({ link, i })).filter(({ link }) => link.kind === 'relates' && ((link.source === subject && link.target === object) || (link.source === object && link.target === subject)));
+  return (between.find(({ link }) => (link.label ?? '').toLowerCase() === fact.relation.toLowerCase()) ?? between[0])?.i;
+}
+
 /**
  * The part of the graph an answer's facts used: the entities they name and the
  * relationships between them, with the relationship text for each lit link. A
@@ -875,7 +897,6 @@ export function factSelection(m: GraphModel, graph: ContextGraph, facts: Context
   const links = new Set<number>();
   const tags: LinkTag[] = [];
   const missing = new Set<string>();
-  const relates = m.links.map((link, i) => ({ link, i })).filter(({ link }) => link.kind === 'relates');
   if (focus.entity) {
     const self = entityIndex(m, graph, focus.entity, focus.entityKind);
     if (self !== undefined) points.add(self);
@@ -890,13 +911,10 @@ export function factSelection(m: GraphModel, graph: ContextGraph, facts: Context
       if (end.index === undefined) missing.add(end.name);
       else points.add(end.index);
     }
-    const [subject, object] = ends.map((end) => end.index);
-    if (subject === undefined || object === undefined) continue;
-    const between = relates.filter(({ link }) => (link.source === subject && link.target === object) || (link.source === object && link.target === subject));
-    const match = between.find(({ link }) => same(link.label ?? '', fact.relation)) ?? between[0];
-    if (match && !links.has(match.i)) {
-      links.add(match.i);
-      tags.push({ link: match.i, text: fact.relation, ...(fact.text ? { detail: fact.text } : {}) });
+    const match = factLink(m, graph, fact);
+    if (match !== undefined && !links.has(match)) {
+      links.add(match);
+      tags.push({ link: match, text: fact.relation, ...(fact.text ? { detail: fact.text } : {}) });
     }
   }
   // A conflict's own line, between the two ends that differ, lights up when both of its sides are in the part shown.
