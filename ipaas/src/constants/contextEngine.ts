@@ -573,7 +573,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   },
   { id: 'sitemap', name: 'Sitemap', description: 'Every page listed in a sitemap.xml.', category: 'web-files', icon: 'globe', fields: [F('sitemapUrl', 'Sitemap URL', 'url', { placeholder: 'https://example.com/sitemap.xml' })], summaryKeys: ['sitemapUrl'] },
   { id: 'rss', name: 'RSS Feed', description: 'Articles from a feed.', category: 'web-files', icon: 'rss', fields: [F('feedUrl', 'Feed URL', 'url')], summaryKeys: ['feedUrl'] },
-  { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, catalogHidden: true },
+  { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, popular: true },
 ];
 
 export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntries(SOURCE_CONNECTORS.map((c) => [c.id, c]));
