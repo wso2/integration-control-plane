@@ -573,24 +573,6 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   { id: 'sitemap', name: 'Sitemap', description: 'Every page listed in a sitemap.xml.', category: 'web-files', icon: 'globe', fields: [F('sitemapUrl', 'Sitemap URL', 'url', { placeholder: 'https://example.com/sitemap.xml' })], summaryKeys: ['sitemapUrl'] },
   { id: 'rss', name: 'RSS Feed', description: 'Articles from a feed.', category: 'web-files', icon: 'rss', fields: [F('feedUrl', 'Feed URL', 'url')], summaryKeys: ['feedUrl'] },
   { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, catalogHidden: true },
-  {
-    id: 'docs_sync',
-    name: 'Docs Folder (scheduled)',
-    description: 'Markdown files from a folder, synced on a schedule.',
-    category: 'documentation',
-    icon: 'folder',
-    fields: [O('folder', 'Folder', 'text', { helper: 'Folder to read. Empty reads the default folder.' })],
-    summaryKeys: ['folder'],
-  },
-  {
-    id: 'docs_watch',
-    name: 'Docs Folder (watched)',
-    description: 'Markdown files from a folder, watched for changes.',
-    category: 'documentation',
-    icon: 'folder',
-    fields: [O('folder', 'Folder', 'text', { helper: 'Folder to read. Empty reads the default folder.' })],
-    summaryKeys: ['folder'],
-  },
 ];
 
 export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntries(SOURCE_CONNECTORS.map((c) => [c.id, c]));
@@ -601,7 +583,7 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * its backend lands — the catalog, quick-add row and forms pick it up with no
  * other change.
  */
-export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'docs_sync', 'docs_watch', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
 
 /**
  * Connectors the browser feeds itself, registered straight on the engine. Every other enabled

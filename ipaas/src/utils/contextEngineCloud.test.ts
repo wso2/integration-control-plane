@@ -75,15 +75,15 @@ describe('gateway key refusals', () => {
 describe('integrations', () => {
   it('runs every connector but uploads as an integration', () => {
     expect(integrationTypeFor('upload')).toBeNull();
-    expect(integrationTypeFor('docs_sync')).toBe('docs_sync');
+    expect(integrationTypeFor('mysql')).toBe('mysql');
     expect(integrationTypeFor('gdrive')).toBe('google_drive');
     expect(connectorFor('google_drive')?.id).toBe('gdrive');
   });
 
   it('sends the settings, secrets included, and labels records with each rule group', () => {
-    const request = toIntegrationRequest({ type: 'docs_sync', name: 'Team Docs', values: { folder: '' }, audience: [] }, 'docs_sync');
-    expect(request).toEqual({ name: 'team-docs', type: 'docs_sync', settings: {} });
-    const mapped = toIntegrationRequest({ type: 'docs_sync', name: 'Docs', values: { folder: 'eng' }, audience: [{ group: 'eng', role: 'engineers' }] }, 'docs_sync');
+    const request = toIntegrationRequest({ type: 'mysql', name: 'Team DB', values: { tableName: '' }, audience: [] }, 'mysql');
+    expect(request).toEqual({ name: 'team-db', type: 'mysql', settings: {} });
+    const mapped = toIntegrationRequest({ type: 'mysql', name: 'DB', values: { tableName: 'eng' }, audience: [{ group: 'eng', role: 'engineers' }] }, 'mysql');
     expect(mapped.source).toEqual({ audience: ['eng'], audienceMapping: { eng: 'engineers' } });
   });
 });

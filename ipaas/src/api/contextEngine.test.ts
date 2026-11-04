@@ -116,7 +116,7 @@ describe('engines', () => {
 
 describe('setting up a new engine', () => {
   const upload: ContextSourceConfig = { type: 'upload', name: 'Handbook', values: {}, audience: [] };
-  const docs: ContextSourceConfig = { type: 'docs_sync', name: 'Team Docs', values: { folder: 'docs' }, audience: [{ group: 'eng', role: 'eng' }] };
+  const db: ContextSourceConfig = { type: 'mysql', name: 'Team DB', values: { tableName: 'articles' }, audience: [{ group: 'eng', role: 'eng' }] };
 
   it('grants the creator, registers each source where it runs, and grants the roles', async () => {
     engineRequest.mockImplementation(async (_id: string, method: string, path: string) => {
@@ -124,16 +124,16 @@ describe('setting up a new engine', () => {
       if (method === 'POST' && path === '/v1/sources') return { id: 'src-upload', name: 'Handbook', type: 'upload', state: 'ready' };
       return {};
     });
-    bff.post.mockResolvedValueOnce({ name: 'team-docs', type: 'docs_sync', shape: 'automation', sourceId: 'src-docs', status: 'scheduled' });
+    bff.post.mockResolvedValueOnce({ name: 'team-db', type: 'mysql', shape: 'service', sourceId: 'src-db', status: 'provisioning' });
 
-    const result = await setUpContextEngine(ENGINE, { sources: [upload, docs], roles: ['eng'] });
+    const result = await setUpContextEngine(ENGINE, { sources: [upload, db], roles: ['eng'] });
 
-    expect(result).toEqual({ sources: { Handbook: 'src-upload', 'Team Docs': 'src-docs' }, warnings: [] });
+    expect(result).toEqual({ sources: { Handbook: 'src-upload', 'Team DB': 'src-db' }, warnings: [] });
     expect(engineRequest).toHaveBeenCalledWith(ENGINE, 'PUT', '/v1/resources/engine/grants/owner-user-1', expect.objectContaining({ principalId: 'user-1' }));
     expect(bff.post).toHaveBeenCalledWith('/context-engines/docs/environments/development/integrations', {
-      name: 'team-docs',
-      type: 'docs_sync',
-      settings: { folder: 'docs' },
+      name: 'team-db',
+      type: 'mysql',
+      settings: { tableName: 'articles' },
       source: { audience: ['eng'], audienceMapping: { eng: 'eng' } },
     });
     expect(engineRequest).toHaveBeenCalledWith(ENGINE, 'PUT', '/v1/resources/engine/grants/role-eng', { group: 'eng', actions: expect.any(Array) });
@@ -146,9 +146,9 @@ describe('setting up a new engine', () => {
     });
     bff.post.mockRejectedValueOnce(new BffError(400, JSON.stringify({ message: 'unknown integration type' })));
 
-    const result = await setUpContextEngine(ENGINE, { sources: [docs, upload], roles: [] });
+    const result = await setUpContextEngine(ENGINE, { sources: [db, upload], roles: [] });
 
     expect(result.sources).toEqual({ Handbook: 'src-upload' });
-    expect(result.warnings).toEqual(['Register source “Team Docs”: unknown integration type']);
+    expect(result.warnings).toEqual(['Register source “Team DB”: unknown integration type']);
   });
 });
