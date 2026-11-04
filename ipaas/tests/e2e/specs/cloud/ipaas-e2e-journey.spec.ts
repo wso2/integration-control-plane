@@ -38,7 +38,6 @@ import {
   EXECUTIONS_WATCH_MS,
   FOOTER_LINKS,
   MI_DEPLOY_TIMEOUT_MS,
-  MI_SAMPLE_TECHNOLOGY,
   MI_TECHNOLOGY,
   NO_CONSUMERS,
   NO_SCHEDULE,
@@ -365,7 +364,7 @@ test.describe('03 browse samples @smoke', () => {
     for (const section of ['Type', 'Technology', 'Tags']) {
       await expect(page.getByRole('button', { name: section, exact: true })).toBeVisible();
     }
-    await expect(page.getByRole('checkbox', { name: MI_SAMPLE_TECHNOLOGY, exact: true }), 'the Technology filter offers no MI samples').toBeVisible();
+    await expect(page.getByRole('checkbox', { name: MI_TECHNOLOGY, exact: true }), 'the Technology filter offers no MI samples').toBeVisible();
   });
 
   test('TC_IP_SMPL_005 a search with no matches shows the empty-result message', async () => {
