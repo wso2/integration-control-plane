@@ -81,14 +81,14 @@ describe('linkRows', () => {
     expect(linkRows([cloudLink], 'development')).toEqual([{ resourceType: 'orders-db', notes: ['linked from WSO2 Cloud'], noValues: false, canUnlink: false }]);
   });
 
-  it('says where a link made on WSO2 Cloud waits for the next release', () => {
+  it('calls a link made on WSO2 Cloud linked where the release carries it under earlier names', () => {
     const renamed: ResourceLink = {
       resourceType: 'salesforce-pilot',
       linked: true,
       environments: [env('development', true, true), env('production', true, true, { 'wso2.sfdemo.sfDeskBaseUrl': 'BASE_URL' }, 'next_release')],
     };
     expect(linkRows([renamed], 'development')[0].notes).toEqual(['linked from WSO2 Cloud']);
-    expect(linkRows([renamed], 'production')[0].notes).toEqual(['linked from WSO2 Cloud', 'next release']);
+    expect(linkRows([renamed], 'production')[0].notes).toEqual(['linked from WSO2 Cloud']);
   });
 
   it("names the release's connection while the link is ahead of it, without calling the environment unlinked", () => {
@@ -101,9 +101,9 @@ describe('linkRows', () => {
     expect(linkRows([rolledBack], 'development')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'link now uses wso2.sfdemo.sfCrm']);
   });
 
-  it('says a release has yet to carry the names a link has now', () => {
+  it("calls an environment linked where its release goes through the link's connection with other names", () => {
     const changed: ResourceLink = { ...sales, environments: [{ ...env('development', true, true, { 'wso2.sfdemo.sfSalesBaseUrl': 'BASE_URL' }, 'next_release'), connection: 'wso2.sfdemo.sfSales' }] };
-    expect(linkRows([changed], 'development')[0].notes).toEqual(['through wso2.sfdemo.sfSales', 'next release']);
+    expect(linkRows([changed], 'development')[0].notes).toEqual(['through wso2.sfdemo.sfSales']);
   });
 
   it('says where names set on WSO2 Cloud override the connection, and offers to unlink only the connection', () => {

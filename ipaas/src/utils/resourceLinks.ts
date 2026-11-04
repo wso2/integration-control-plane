@@ -61,7 +61,8 @@ export const linkRows = (links: ResourceLink[], env: string): LinkRow[] =>
   links.flatMap((l) => {
     const e = l.environments.find((x) => x.name === env);
     if (!l.linked && !l.sourceDefined && !e?.inRelease) return [];
-    const pending = l.linked && !l.sourceDefined && !!e && e.state !== 'linked';
+    // Where the release carries the resource, under whatever names, the environment is linked.
+    const pending = l.linked && !l.sourceDefined && !!e && !e.inRelease;
     const notes: string[] = [];
     if (!l.linked) notes.push(l.sourceDefined ? 'declared in workload.yaml' : 'unlinked · until next release');
     else if (!l.connection) notes.push('linked from WSO2 Cloud', ...(pending ? ['next release'] : []));
