@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Check, ExternalLink, FileText, History, Link as LinkIcon, MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, Check, ChevronDown, ChevronRight, ExternalLink, FileText, History, Link as LinkIcon, MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAskedQuestions } from '../../../hooks/contextQuestions';
 import { useContextGraph, useContextPermissions, useContextQueryResult, useContextQueryTrace } from '../../../hooks/useContextEngine';
@@ -96,6 +96,8 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
   const question = asked?.question ?? 'An earlier question';
   const [selectedKey, setSelectedKey] = useState<string | null>(initialKey);
   const [hovered, setHovered] = useState<number | null>(null);
+  // Held here, not in the panel, so the uncited passages stay open after one is read and released.
+  const [showUncited, setShowUncited] = useState(false);
 
   useEffect(() => setSelectedKey(initialKey), [initialKey]);
 
@@ -115,7 +117,15 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
     }
     return selectedKey?.startsWith('p:') ? { evidenceId: selectedKey.slice(2) } : {};
   }, [selectedKey]);
-  const whole = useMemo(() => (model && served ? factSelection(model, served, facts, {}, conflicts) : null), [model, served, facts, conflicts]);
+  // In an answer, only what stands on a passage it cites is lit: facts and conflicts on passages the model was given but did not cite stay grey with the rest of the graph.
+  const citedIds = useMemo(() => {
+    if (!data?.answer) return null;
+    const numbers = citedPassages(data.answer);
+    return new Set(data.evidence.filter((_, i) => numbers.has(i + 1)).map((e) => e.id));
+  }, [data]);
+  const litFacts = useMemo(() => (citedIds ? facts.filter((f) => f.evidenceIds.some((id) => citedIds.has(id))) : facts), [citedIds, facts]);
+  const litConflicts = useMemo(() => (citedIds ? conflicts.filter((c) => [c.first, c.second].every((side) => side.evidenceIds.some((id) => citedIds.has(id)))) : conflicts), [citedIds, conflicts]);
+  const whole = useMemo(() => (model && served ? factSelection(model, served, litFacts, {}, litConflicts) : null), [model, served, litFacts, litConflicts]);
   // How many of the answer's conflicts have their red line on the graph shown; null when there is no graph to draw them on.
   const drawnConflicts = useMemo(() => (model && served ? conflicts.filter((c) => queryConflictLink(model, served, c) !== undefined).length : null), [model, served, conflicts]);
   const part = useMemo(() => (model && served && (focus.entity || focus.evidenceId) ? factSelection(model, served, facts, focus, conflicts) : null), [model, served, facts, focus, conflicts]);
@@ -174,6 +184,8 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
 
   const cited = citedPassages(data.answer);
   const given = data.evidence.length;
+  // A query asked for passages, or one that found no answer, has no answer to speak of.
+  const subject = data.answer || data.answerWithheld ? 'answer' : 'query';
   const state = data.answerWithheld ? 'Answer hidden' : data.answer ? 'Answered' : data.insufficientEvidence ? 'No answer' : 'Passages';
   const passageOf = (id: string) => data.evidence.findIndex((e) => e.id === id) + 1;
   // An `[n]` beyond the passages the model was given names nothing, so it selects nothing.
@@ -192,7 +204,7 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
       <Stack direction="row" flexWrap="wrap" alignItems="center" justifyContent="space-between" gap={1.5} sx={{ px: 1.75, py: 1.25, border: '1px solid', borderColor: 'primary.light', borderRadius: 1.25, bgcolor: 'action.hover' }}>
         <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0, flexWrap: 'wrap' }}>
           <Button size="small" variant="text" startIcon={<ArrowLeft size={15} />} onClick={onBackToAnswer}>
-            Back to the answer
+            {subject === 'answer' ? 'Back to the answer' : 'Back to the passages'}
           </Button>
           <Typography variant="caption" sx={mutedSx}>
             Showing how this was derived
@@ -250,11 +262,11 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
               onHover={setHovered}
               accent={colors.accent}
               height={GRAPH_HEIGHT}
-              ariaLabel={`The part of the graph this answer used: ${litEntities} entit${litEntities === 1 ? 'y' : 'ies'} lit`}>
-              {facts.length === 0 && conflicts.length === 0 && (
+              ariaLabel={`The part of the graph this ${subject} used: ${litEntities} entit${litEntities === 1 ? 'y' : 'ies'} lit`}>
+              {litFacts.length === 0 && litConflicts.length === 0 && (
                 <Box sx={canvasNoteSx}>
                   <Typography variant="body2" sx={{ ...mutedSx, textAlign: 'center', maxWidth: 380, bgcolor: 'background.paper', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
-                    No graph relationships were used.
+                    {facts.length || conflicts.length ? 'No graph relationship stands on a cited passage.' : 'No graph relationships were used.'}
                   </Typography>
                 </Box>
               )}
@@ -262,13 +274,13 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
                 <Box sx={legendSx}>
                   <Stack direction="row" alignItems="center" gap={0.75}>
                     <Box sx={legendDotSx(colors.accent)} />
-                    Named by this answer’s facts
+                    {citedIds ? 'Named by facts on the cited passages' : `Named by this ${subject}’s facts`}
                   </Stack>
                   <Stack direction="row" alignItems="center" gap={0.75}>
                     <Box sx={legendDotSx(colors.muted)} />
-                    Rest of the graph
+                    {citedIds ? 'Not cited, and the rest of the graph' : 'Rest of the graph'}
                   </Stack>
-                  <span>{selectedKey ? 'Esc or click the background to see the whole answer' : 'Click an entity to see its part, or a label to see its relationship'}</span>
+                  <span>{selectedKey ? `Esc or click the background to see the whole ${subject}` : 'Click an entity to see its part, or a label to see its relationship'}</span>
                 </Box>
               </Box>
             </CosmosCanvas>
@@ -324,14 +336,13 @@ export default function ProvenanceView({ engine, orgHandle, queryId, initialKey,
         ) : selectedKey === 'answer' ? (
           <AnswerPanel result={data} onSelectPassage={selectPassage} onClose={() => select(null)} />
         ) : (
-          <DerivationSteps
+          <DerivationPanel
             result={data}
             trace={trace.data ?? null}
-            canTrace={canTrace}
-            permissionsKnown={!!permissions.data}
-            modelName={trace.data?.models.answer?.model ?? engine.models.llm?.model}
             drawnConflicts={drawnConflicts}
             sourceName={(id) => engine.sources.find((s) => s.id === id)?.name}
+            showUncited={showUncited}
+            onToggleUncited={() => setShowUncited((v) => !v)}
             onSelectPassage={selectPassage}
             onReadAnswer={data.answer && !data.answerWithheld ? () => select('answer') : undefined}
           />
@@ -349,75 +360,37 @@ function conflictsDrawnText(total: number, drawn: number | null): string {
   return `${drawn} of them ${drawn === 1 ? 'is' : 'are'} drawn in red on the graph; the rest name entities it does not hold.`;
 }
 
-/** The right panel before anything is chosen: what the engine did, step by step, from what it recorded, and every passage the answer was written from. */
-function DerivationSteps({
+/**
+ * The right panel before anything is chosen: the passages the answer cites,
+ * with the ones the model was given but did not cite folded underneath, the
+ * conflicts the index flagged among their facts, and the way to the answer
+ * itself. A query with no answer lists every passage it returned.
+ */
+function DerivationPanel({
   result,
   trace,
-  canTrace,
-  permissionsKnown,
-  modelName,
   drawnConflicts,
   sourceName,
+  showUncited,
+  onToggleUncited,
   onSelectPassage,
   onReadAnswer,
 }: {
   result: ContextQueryResult;
   trace: ContextQueryTrace | null;
-  canTrace: boolean;
-  permissionsKnown: boolean;
-  modelName?: string;
   /** How many of the answer's conflicts are drawn on the graph; null when there is no graph to draw them on. */
   drawnConflicts: number | null;
   sourceName: (sourceId: string) => string | undefined;
+  showUncited: boolean;
+  onToggleUncited: () => void;
   onSelectPassage: (n: number) => void;
   onReadAnswer?: () => void;
 }): JSX.Element {
-  const summary = derivationSummary(result);
   const cited = citedPassages(result.answer);
-  const through = [...new Set(result.facts.map((f) => f.linkedThrough).filter((n): n is string => !!n))];
-  const given = result.evidence.length;
-  // A mark the model wrote past the passages it was given is not a citation of anything.
-  const citedGiven = [...cited].filter((n) => n >= 1 && n <= given).sort((a, b) => a - b);
-  const marks = citedGiven.map((n) => `[${n}]`);
-  const markList = marks.length > 1 ? `${marks.slice(0, -1).join(', ')} and ${marks[marks.length - 1]}` : marks.join('');
-  const citedLine = !citedGiven.length ? 'It cited none of them.' : citedGiven.length === given ? (given === 1 ? `It cited it, ${markList}.` : `It cited all ${given} of them.`) : `It cited ${citedGiven.length} of them, ${markList}.`;
-  const steps: { title: string; body: string; lit?: boolean }[] = [
-    { title: 'Scope', body: 'Only sources you may read were searched.' },
-    {
-      title: 'Retrieval',
-      body: [
-        trace ? `${trace.retrieved} passage${trace.retrieved === 1 ? '' : 's'} matched the question, kept in rank order.` : `${result.evidence.length} passage${result.evidence.length === 1 ? '' : 's'} came back, in rank order.`,
-        result.facts.length ? 'The graph search added facts about them.' : '',
-        through.length ? `The graph walk followed ${through.join(', ')} to other records.` : '',
-      ]
-        .filter(Boolean)
-        .join(' '),
-    },
-    {
-      title: 'Access check',
-      body: trace?.suppressed ? `${trace.suppressed} withheld by the access check.` : trace ? 'Every passage passed the access check.' : 'Every passage shown passed the access check.',
-    },
-    result.answer
-      ? {
-          title: 'Answer',
-          lit: true,
-          body: `${modelName ?? 'The language model'} wrote ${summary.sentences} sentence${summary.sentences === 1 ? '' : 's'} from the ${given} passage${given === 1 ? '' : 's'} it was given. ${citedLine}`,
-        }
-      : { title: 'Answer', body: result.answerWithheld ? 'Hidden: a passage it was written from is out of your reach now.' : result.insufficientEvidence ? 'None: the passages did not answer the question.' : 'Passages only: no answer was written.' },
-    {
-      title: 'Entities',
-      body: [
-        result.facts.length
-          ? `${result.facts.length} fact${result.facts.length === 1 ? '' : 's'} from these passages name${result.facts.length === 1 ? 's' : ''} ${summary.entities} entit${summary.entities === 1 ? 'y' : 'ies'}, lit on the graph.`
-          : 'No graph facts were used.',
-        result.conflicts.length
-          ? `The index flagged ${result.conflicts.length} conflict${result.conflicts.length === 1 ? '' : 's'} among the facts behind these passages. ${conflictsDrawnText(result.conflicts.length, drawnConflicts)} The model was told about them.`
-          : '',
-      ]
-        .filter(Boolean)
-        .join(' '),
-    },
-  ];
+  const subject = result.answer || result.answerWithheld ? 'answer' : 'query';
+  const numbers = result.evidence.map((_, i) => i + 1);
+  const listed = result.answer ? numbers.filter((n) => cited.has(n)) : numbers;
+  const uncited = result.answer ? numbers.filter((n) => !cited.has(n)) : [];
   // Passages from one document are told apart by their place in it; otherwise by document.
   const oneDocument = result.evidence.length > 1 && result.evidence.every((e) => e.recordId === result.evidence[0].recordId && e.sourceId === result.evidence[0].sourceId);
   const statusOf = (n: number) => {
@@ -425,83 +398,99 @@ function DerivationSteps({
     const k = sentencesCiting(result.answer, n).length;
     return k ? `cited${k > 1 ? ` in ${k} sentences` : ''}` : 'given, not cited';
   };
+  const renderPassage = (n: number) => {
+    const ev = result.evidence[n - 1];
+    const strong = !result.answer || cited.has(n);
+    const place = evidencePlace(ev);
+    const where = oneDocument ? place.parts.join(' · ') : [shortLabel(ev.recordId, 30), sourceName(ev.sourceId)].filter(Boolean).join(' · ');
+    return (
+      <Box component="li" key={ev.id}>
+        <ButtonBase
+          aria-label={`Passage ${n}, ${ev.recordId}, ${statusOf(n)}`}
+          onClick={() => onSelectPassage(n)}
+          sx={{ width: '100%', justifyContent: 'flex-start', gap: 1, px: 0.75, py: 0.5, borderRadius: 1, textAlign: 'left', '&:hover': { bgcolor: 'action.hover' } }}>
+          <Box
+            sx={{
+              flexShrink: 0,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              fontSize: 11,
+              fontWeight: 700,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              bgcolor: strong ? 'primary.main' : 'transparent',
+              color: strong ? '#fff' : 'text.secondary',
+              border: strong ? 'none' : '1.5px solid',
+              borderColor: 'text.disabled',
+            }}>
+            {n}
+          </Box>
+          <Box sx={{ minWidth: 0, fontSize: 12.5, lineHeight: 1.35 }}>
+            <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={where}>
+              {where || ev.recordId}
+            </Box>
+            <Box sx={{ ...mutedSx, fontSize: 11.5 }}>{statusOf(n)}</Box>
+          </Box>
+        </ButtonBase>
+      </Box>
+    );
+  };
+  const passageListSx = { listStyle: 'none', m: 0, mt: 0.75, p: 0 };
   return (
-    <Box component="aside" aria-label="How the answer was derived" sx={panelSx(false)}>
-      <Typography variant="subtitle2" component="h2" sx={{ fontWeight: 600 }}>
-        How the answer was derived
-      </Typography>
-      <Stack component="ol" gap={1.5} sx={{ listStyle: 'none', m: 0, p: 0 }}>
-        {steps.map((step, i) => (
-          <Stack component="li" key={step.title} direction="row" gap={1.25}>
-            <Box
-              aria-hidden
-              sx={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', bgcolor: step.lit ? 'primary.main' : 'text.primary', color: 'background.paper', fontSize: 11.5, fontWeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              {i + 1}
-            </Box>
-            <Box sx={{ fontSize: 13, lineHeight: 1.5 }}>
-              <Box sx={{ fontWeight: 600 }}>{step.title}</Box>
-              <Box sx={mutedSx}>{step.body}</Box>
-              {step.title === 'Answer' && onReadAnswer && (
-                <Button size="small" variant="text" startIcon={<FileText size={14} />} onClick={onReadAnswer} sx={{ mt: 0.5, px: 0.5, minWidth: 0 }}>
-                  Read the answer with its citations
-                </Button>
-              )}
-            </Box>
-          </Stack>
-        ))}
-      </Stack>
+    <Box component="aside" aria-label={subject === 'answer' ? 'How the answer was derived' : 'How the passages were found'} sx={panelSx(false)}>
+      {onReadAnswer && (
+        <Button size="small" variant="text" startIcon={<FileText size={14} />} onClick={onReadAnswer} sx={{ alignSelf: 'flex-start', px: 0.5, minWidth: 0 }}>
+          Read the answer with its citations
+        </Button>
+      )}
+      {result.conflicts.length > 0 && (
+        <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+          The index flagged {result.conflicts.length} conflict{result.conflicts.length === 1 ? '' : 's'} among the facts behind these passages. {conflictsDrawnText(result.conflicts.length, drawnConflicts)}
+          {result.answer ? ' The model was told about them.' : ''}
+        </Typography>
+      )}
       <Box>
-        <Typography sx={panelLabelSx}>Passages · {result.evidence.length}</Typography>
+        <Typography sx={panelLabelSx}>
+          {result.answer ? 'Cited passages' : 'Passages'} · {listed.length}
+        </Typography>
         {oneDocument && (
           <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }} noWrap title={result.evidence[0].recordId}>
             All from {result.evidence[0].recordId}
           </Typography>
         )}
-        <Stack component="ol" gap={0.5} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
-          {result.evidence.map((ev, i) => {
-            const n = i + 1;
-            const strong = !result.answer || cited.has(n);
-            const place = evidencePlace(ev);
-            const where = oneDocument ? place.parts.join(' · ') : [shortLabel(ev.recordId, 30), sourceName(ev.sourceId)].filter(Boolean).join(' · ');
-            return (
-              <Box component="li" key={ev.id}>
-                <ButtonBase
-                  aria-label={`Passage ${n}, ${ev.recordId}, ${statusOf(n)}`}
-                  onClick={() => onSelectPassage(n)}
-                  sx={{ width: '100%', justifyContent: 'flex-start', gap: 1, px: 0.75, py: 0.5, borderRadius: 1, textAlign: 'left', '&:hover': { bgcolor: 'action.hover' } }}>
-                  <Box
-                    sx={{
-                      flexShrink: 0,
-                      width: 20,
-                      height: 20,
-                      borderRadius: '50%',
-                      fontSize: 11,
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      bgcolor: strong ? 'primary.main' : 'transparent',
-                      color: strong ? '#fff' : 'text.secondary',
-                      border: strong ? 'none' : '1.5px solid',
-                      borderColor: 'text.disabled',
-                    }}>
-                    {n}
-                  </Box>
-                  <Box sx={{ minWidth: 0, fontSize: 12.5, lineHeight: 1.35 }}>
-                    <Box sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={where}>
-                      {where || ev.recordId}
-                    </Box>
-                    <Box sx={{ ...mutedSx, fontSize: 11.5 }}>{statusOf(n)}</Box>
-                  </Box>
-                </ButtonBase>
-              </Box>
-            );
-          })}
-        </Stack>
+        {listed.length > 0 ? (
+          <Stack component="ol" gap={0.5} sx={passageListSx}>
+            {listed.map(renderPassage)}
+          </Stack>
+        ) : (
+          result.answer && (
+            <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.5, lineHeight: 1.5 }}>
+              The answer cites none of the passages it was given.
+            </Typography>
+          )
+        )}
+        {uncited.length > 0 && (
+          <Box sx={{ mt: 1 }}>
+            <Button size="small" variant="text" color="inherit" aria-expanded={showUncited} startIcon={showUncited ? <ChevronDown size={14} /> : <ChevronRight size={14} />} onClick={onToggleUncited} sx={{ color: 'text.secondary', fontWeight: 600, px: 0.5 }}>
+              Also given to the model ({uncited.length})
+            </Button>
+            {showUncited && (
+              <>
+                <Typography variant="caption" sx={{ ...mutedSx, display: 'block', px: 0.75, mt: 0.25, lineHeight: 1.5 }}>
+                  The answer doesn&apos;t cite these, but it may still draw on them. They&apos;re part of what the engine checks before showing this answer again.
+                </Typography>
+                <Stack component="ol" gap={0.5} sx={passageListSx}>
+                  {uncited.map(renderPassage)}
+                </Stack>
+              </>
+            )}
+          </Box>
+        )}
       </Box>
       <Typography variant="caption" sx={{ ...mutedSx, borderTop: '1px solid', borderColor: 'divider', pt: 1.25, lineHeight: 1.5 }}>
         {trace ? `Trace ${trace.traceId} · ${trace.outcome.replace('_', ' ')}${trace.retrievalMode ? ` · ${trace.retrievalMode} mode` : ''}` : `Trace ${result.traceId}`}
-        {permissionsKnown && !canTrace ? ' · retrieval counts need trace access' : ''}
       </Typography>
     </Box>
   );
