@@ -20,7 +20,7 @@ import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, I
 import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
-import { contextLogoUrl, LLM_AZURE_DEFAULT_API_VERSION, LLM_PROVIDERS } from '../../../constants/contextEngine';
+import { contextLogoUrl, EMBEDDING_LOGO_DARK, LLM_AZURE_DEFAULT_API_VERSION, LLM_PROVIDERS } from '../../../constants/contextEngine';
 import { AZURE_DEFAULT_API_VERSION, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
 import { engineMessage, isSameModel, modelDraftError, toModelInput } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
@@ -46,7 +46,7 @@ interface ProviderInfo {
 }
 
 /** Provider tiles with logos resolved against the app base, as the create wizard shows them. */
-const EMBEDDING_OPTIONS: ProviderInfo[] = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), logoDark: p.logoDark && ragLogoUrl(p.logoDark), models: p.models }));
+const EMBEDDING_OPTIONS: ProviderInfo[] = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]), models: p.models }));
 const LLM_OPTIONS: ProviderInfo[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
 
 const draftOf = (m: ContextModelSummary | null): ModelDraft | null =>

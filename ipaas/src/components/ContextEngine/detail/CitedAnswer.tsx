@@ -90,6 +90,11 @@ const CLOSING_PUNCTUATION_ONLY = /^[.!?,;:]+["”')\]]*\s*$/;
  * Hold a run of marks on one line with the word before it and the punctuation after it,
  * so a line never starts with a mark or with the full stop that follows the marks.
  */
+/** A last word longer than this, such as a path, is too long to hold on one line with its marks. */
+const WORD_IN_RUN_MAX = 20;
+/** How much of a long last word stays with its marks, so a mark never starts a line. */
+const LONG_WORD_TAIL = 4;
+
 function keepMarksTogether(nodes: ReactNode[]): ReactNode[] {
   // Placing a mark can leave an empty piece of text beside it, which would split a run of marks.
   const rest = nodes.filter((node) => node !== '');
@@ -104,8 +109,9 @@ function keepMarksTogether(nodes: ReactNode[]): ReactNode[] {
     const before = out[out.length - 1];
     const word = typeof before === 'string' ? /\S+$/.exec(before) : null;
     if (word && typeof before === 'string') {
-      out[out.length - 1] = before.slice(0, word.index);
-      run.unshift(word[0]);
+      const cut = before.length - (word[0].length > WORD_IN_RUN_MAX ? LONG_WORD_TAIL : word[0].length);
+      out[out.length - 1] = before.slice(0, cut);
+      run.unshift(before.slice(cut));
     }
     while (rest.length && citeOf(rest[0]) !== null) run.push(rest.shift());
     const after = rest[0];
