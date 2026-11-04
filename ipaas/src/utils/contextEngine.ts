@@ -404,7 +404,8 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
         shareApiKey: !!f.shareApiKey,
         // Drafts saved before the answers switch existed offered answers with the language model.
         answersEnabled: f.answersEnabled !== false,
-        answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS),
+        // A separate answer model on a provider no longer offered stays separate, with a model to choose.
+        answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS) ?? (f.answerLlm ? blankLlm(LLM_PROVIDERS[0].id) : null),
         storage: sanitizeStorage(f.storage),
         name: f.name,
         description: typeof f.description === 'string' ? f.description : '',

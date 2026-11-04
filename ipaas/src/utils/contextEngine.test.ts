@@ -401,8 +401,8 @@ describe('model providers', () => {
   });
 
   it('names offered, retired and unknown providers', () => {
-    expect(modelProviderName('embedding', 'openai')).toBe('Open AI');
-    expect(modelProviderName('llm', 'anthropic')).toBe('Anthropic AI');
+    expect(modelProviderName('embedding', 'openai')).toBe('OpenAI');
+    expect(modelProviderName('llm', 'anthropic')).toBe('Anthropic');
     expect(modelProviderName('llm', 'azure_openai')).toBe('Azure OpenAI');
     expect(modelProviderName('embedding', 'mistral')).toBe('Mistral AI');
     expect(modelProviderName('llm', 'acme')).toBe('acme');
@@ -680,7 +680,9 @@ describe('drafts', () => {
     const restored = fromDraft(JSON.stringify(stale))!.form;
     expect(restored.embedding).toBeNull();
     expect(restored.llm).toBeNull();
-    expect(restored.answerLlm).toBeNull();
+    // A separate answer model stays separate, with a model to choose, instead of turning into the language model.
+    expect(restored.answerLlm).toEqual(blankLlm('openai'));
+    expect(answerChoice(restored)).toBe('different');
     expect(restored.name).toBe('Support knowledge');
     expect(restored.sources).toHaveLength(1);
   });

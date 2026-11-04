@@ -21,7 +21,7 @@ import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
 import { CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, LLM_PROVIDERS } from '../../../constants/contextEngine';
-import { engineMessage, isSameModel, modelDraftError, toModelInput } from '../../../utils/contextEngine';
+import { engineMessage, isSameModel, modelDraftError, modelProviderName, toModelInput } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { HttpError } from '../../../types/http';
 import SelectableCard from '../../common/SelectableCard';
@@ -207,7 +207,7 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
                   {embeddingProvider && <Box component="img" src={embeddingProvider.logo} alt="" sx={{ width: 28, height: 28 }} />}
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {models.embedding ? (embeddingProvider?.name ?? models.embedding.provider) : 'Engine default'}
+                      {models.embedding ? modelProviderName('embedding', models.embedding.provider) : 'Engine default'}
                     </Typography>
                     <Typography variant="caption" sx={mutedSx}>
                       {models.embedding ? [models.embedding.model, models.embedding.dimensions ? `${models.embedding.dimensions} dimensions` : ''].filter(Boolean).join(' · ') : 'Set where the engine runs'}
