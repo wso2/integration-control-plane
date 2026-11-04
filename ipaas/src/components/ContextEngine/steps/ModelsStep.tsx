@@ -43,9 +43,9 @@ const EMBEDDING_OPTIONS = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, na
 const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
 
 const ANSWER_CHOICES: { value: AnswerChoice; label: string }[] = [
-  { value: 'same', label: 'Same as the language model' },
+  { value: 'same', label: 'Same as the ingestion model' },
   { value: 'different', label: 'A different model' },
-  { value: 'off', label: 'Off' },
+  { value: 'off', label: 'Disable' },
 ];
 
 /** Embedding, language and answer model side by side. */
@@ -67,27 +67,27 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, 
           modelLabel="Embedding model"
         />
         <ModelProviderColumn<LlmConfig>
-          title="Language model"
+          title="Ingestion language model"
           purpose={answerChoice === 'same' ? 'Builds the graph and writes answers.' : 'Builds the graph.'}
           providers={LLM_OPTIONS}
           value={llm}
           onChange={onLlmChange}
           blank={(id) => blankLlm(id as LlmProvider)}
-          modelLabel="Language model"
+          modelLabel="Ingestion language model"
           shareKey={{ available: canShareApiKey(embedding, llm), checked: shareApiKey, onChange: onShareApiKeyChange }}
         />
         <ModelProviderColumn<LlmConfig>
           key={answerChoice}
-          title="Answer model"
+          title="Answer language model"
           purpose="Writes the cited answers."
           providers={LLM_OPTIONS}
           value={answerLlm}
           onChange={onAnswerLlmChange}
           blank={(id) => blankLlm(id as LlmProvider)}
-          modelLabel="Answer model"
+          modelLabel="Answer language model"
           showProviders={answerChoice === 'different'}
           choice={
-            <RadioGroup value={answerChoice} onChange={(_e, value) => onAnswerChoiceChange(value as AnswerChoice)} aria-label="Answer model">
+            <RadioGroup value={answerChoice} onChange={(_e, value) => onAnswerChoiceChange(value as AnswerChoice)} aria-label="Answer language model">
               {ANSWER_CHOICES.map((c) => (
                 <FormControlLabel key={c.value} value={c.value} control={<Radio size="small" />} label={<Typography variant="body2">{c.label}</Typography>} />
               ))}

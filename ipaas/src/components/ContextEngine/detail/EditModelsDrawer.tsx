@@ -227,7 +227,7 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
 
         <Box sx={{ ...summaryCardSx, height: 'auto' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            Language model
+            Ingestion language model
           </Typography>
           <Box sx={{ mt: 2 }}>
             <ModelEditor kind="llm" providers={LLM_OPTIONS} draft={llm} current={models.llm} onChange={setLlm} />
