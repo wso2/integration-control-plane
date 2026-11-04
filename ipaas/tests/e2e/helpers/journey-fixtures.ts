@@ -25,7 +25,6 @@ export const AUTOMATION = 'Mi Automation';
 export const AUTOMATION_REPO_URL = 'https://github.com/Dilhasha/mi-cloud-samples';
 export const AUTOMATION_SUB_PATH = 'mi-automation';
 export const MI_TECHNOLOGY = 'WSO2 Integrator: MI';
-export const MI_SAMPLE_TECHNOLOGY = 'WSO2 MI';
 export const AGENT_TYPE = 'AI Agent';
 export const ENV = 'Development';
 
