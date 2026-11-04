@@ -33,7 +33,6 @@ import type {
 } from '../types/contextEngine';
 import type { EmbeddingProvider } from '../types/ragIngestion';
 
-const RAG_LOGO_BASE = 'assets/images/rag/';
 const GENAI_LOGO_BASE = 'assets/images/genai/';
 
 /** Resolve a public logo path against the app base URL. */
@@ -41,7 +40,7 @@ export const contextLogoUrl = (path: string): string => `${import.meta.env.BASE_
 
 // ── Step 1: the connector catalog ───────────────────────────────────────────
 
-const DB_LOGO_BASE = 'assets/images/databases/';
+const CONNECTOR_LOGO_BASE = 'assets/images/connectors/';
 
 export const SOURCE_CATEGORIES: { id: SourceCategory; label: string }[] = [
   { id: 'documentation', label: 'Documentation' },
@@ -154,6 +153,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Pages in an Atlassian Confluence space.',
     category: 'documentation',
     popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}confluence.svg`,
     icon: 'book',
     fields: [F('baseUrl', 'Base URL', 'url', { placeholder: 'https://your-org.atlassian.net/wiki' }), F('spaceKey', 'Space Key', 'text'), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['baseUrl', 'spaceKey'],
@@ -163,16 +163,19 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Notion',
     description: 'Pages and databases shared with an integration.',
     category: 'documentation',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}notion.svg`,
     icon: 'file',
     fields: [F('integrationToken', 'Integration Token', 'secret'), O('rootPageId', 'Root Page ID', 'text', { helper: 'Leave empty to read every page the integration can see.' })],
     summaryKeys: ['rootPageId'],
   },
-  { id: 'gitbook', name: 'GitBook', description: 'Published docs from a space.', category: 'documentation', icon: 'book', fields: [F('spaceId', 'Space ID', 'text'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['spaceId'] },
+  { id: 'gitbook', name: 'GitBook', description: 'Published docs from a space.', category: 'documentation', logo: `${CONNECTOR_LOGO_BASE}gitbook.svg`, icon: 'book', fields: [F('spaceId', 'Space ID', 'text'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['spaceId'] },
   {
     id: 'readme',
     name: 'ReadMe',
     description: 'Guides and API references in a project.',
     category: 'documentation',
+    logo: `${CONNECTOR_LOGO_BASE}readme.svg`,
     icon: 'book',
     fields: [F('projectSubdomain', 'Project Subdomain', 'text'), F('apiKey', 'API Key', 'secret')],
     summaryKeys: ['projectSubdomain'],
@@ -182,11 +185,12 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Document360',
     description: 'Knowledge base articles in a project version.',
     category: 'documentation',
+    logo: `${CONNECTOR_LOGO_BASE}document360.svg`,
     icon: 'book',
     fields: [F('projectVersionId', 'Project Version ID', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['projectVersionId'],
   },
-  { id: 'helpjuice', name: 'Helpjuice', description: 'Knowledge base articles.', category: 'documentation', icon: 'book', fields: [F('accountUrl', 'Account URL', 'url'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['accountUrl'] },
+  { id: 'helpjuice', name: 'Helpjuice', description: 'Knowledge base articles.', category: 'documentation', logo: `${CONNECTOR_LOGO_BASE}helpjuice.svg`, icon: 'book', fields: [F('accountUrl', 'Account URL', 'url'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['accountUrl'] },
 
   // Cloud storage
   {
@@ -195,7 +199,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'A Drive folder subtree, backfilled and kept in sync by the Changes API.',
     category: 'cloud-storage',
     popular: true,
-    logo: `${RAG_LOGO_BASE}googledrive.svg`,
+    logo: `${CONNECTOR_LOGO_BASE}gdrive.svg`,
     icon: 'folder',
     // Mirrors the Ballerina `google_drive` connector's GoogleDriveSettings: an auth block
     // (one of three OAuth2 flows, chosen by authType) plus the folder and sync options.
@@ -210,7 +214,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Amazon S3',
     description: 'Objects in a bucket, optionally under a prefix.',
     category: 'cloud-storage',
-    logo: `${RAG_LOGO_BASE}amazons3.svg`,
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}amazons3.svg`,
     icon: 'cloud',
     fields: [F('bucketName', 'Bucket Name', 'text'), O('prefix', 'Prefix', 'text', { placeholder: 'docs/' }), F('accessKeyId', 'Access Key ID', 'secret'), F('secretAccessKey', 'Secret Access Key', 'secret')],
     summaryKeys: ['bucketName', 'prefix'],
@@ -221,26 +226,29 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Document libraries in a Microsoft 365 site.',
     category: 'cloud-storage',
     popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}sharepoint.svg`,
     icon: 'building',
     fields: [F('siteUrl', 'Site URL', 'url', { placeholder: 'https://contoso.sharepoint.com/sites/docs' }), ...MS_GRAPH_APP],
     summaryKeys: ['siteUrl'],
   },
-  { id: 'onedrive', name: 'OneDrive', description: "Files in a user's or shared drive.", category: 'cloud-storage', icon: 'cloud', fields: [F('driveId', 'Drive ID', 'text'), ...MS_GRAPH_APP], summaryKeys: ['driveId'] },
+  { id: 'onedrive', name: 'OneDrive', description: "Files in a user's or shared drive.", category: 'cloud-storage', logo: `${CONNECTOR_LOGO_BASE}onedrive.svg`, icon: 'cloud', fields: [F('driveId', 'Drive ID', 'text'), ...MS_GRAPH_APP], summaryKeys: ['driveId'] },
   {
     id: 'dropbox',
     name: 'Dropbox',
     description: 'Files in a shared folder.',
     category: 'cloud-storage',
+    logo: `${CONNECTOR_LOGO_BASE}dropbox.svg`,
     icon: 'box',
     fields: [F('folderPath', 'Folder Path', 'text', { placeholder: '/Team/Docs' }), F('accessToken', 'Access Token', 'secret')],
     summaryKeys: ['folderPath'],
   },
-  { id: 'box', name: 'Box', description: 'Files in a folder tree.', category: 'cloud-storage', icon: 'box', fields: [F('folderId', 'Folder ID', 'text'), F('developerToken', 'Developer Token', 'secret')], summaryKeys: ['folderId'] },
+  { id: 'box', name: 'Box', description: 'Files in a folder tree.', category: 'cloud-storage', logo: `${CONNECTOR_LOGO_BASE}box.svg`, icon: 'box', fields: [F('folderId', 'Folder ID', 'text'), F('developerToken', 'Developer Token', 'secret')], summaryKeys: ['folderId'] },
   {
     id: 'azure-blob',
     name: 'Azure Blob Storage',
     description: 'Blobs in a storage container.',
     category: 'cloud-storage',
+    logo: `${CONNECTOR_LOGO_BASE}azure-blob.svg`,
     icon: 'cloud',
     fields: [F('accountName', 'Storage Account', 'text'), F('containerName', 'Container', 'text'), F('sasToken', 'SAS Token', 'secret')],
     summaryKeys: ['accountName', 'containerName'],
@@ -250,6 +258,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Google Cloud Storage',
     description: 'Objects in a bucket.',
     category: 'cloud-storage',
+    logo: `${CONNECTOR_LOGO_BASE}gcs.svg`,
     icon: 'cloud',
     fields: [F('bucketName', 'Bucket Name', 'text'), O('prefix', 'Prefix', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')],
     summaryKeys: ['bucketName', 'prefix'],
@@ -262,6 +271,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     description: 'Docs, markdown and code in a repository branch.',
     category: 'code',
     popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}github.svg`,
     icon: 'github',
     fields: [
       F('repositoryUrl', 'Repository URL', 'url', { placeholder: 'https://github.com/org/repo' }),
@@ -276,6 +286,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'GitLab',
     description: 'A project repository and its wiki.',
     category: 'code',
+    logo: `${CONNECTOR_LOGO_BASE}gitlab.svg`,
     icon: 'code',
     fields: [
       F('baseUrl', 'Base URL', 'url', { defaultValue: 'https://gitlab.com' }),
@@ -290,6 +301,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Bitbucket',
     description: 'Repositories in a workspace.',
     category: 'code',
+    logo: `${CONNECTOR_LOGO_BASE}bitbucket.svg`,
     icon: 'code',
     fields: [F('workspace', 'Workspace', 'text'), F('repositorySlug', 'Repository Slug', 'text'), F('branch', 'Branch', 'text', { defaultValue: 'main' }), F('appPassword', 'App Password', 'secret')],
     summaryKeys: ['workspace', 'repositorySlug'],
@@ -299,6 +311,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Azure DevOps',
     description: 'Repositories and wiki pages in a project.',
     category: 'code',
+    logo: `${CONNECTOR_LOGO_BASE}azure-devops.svg`,
     icon: 'code',
     fields: [F('organizationUrl', 'Organization URL', 'url', { placeholder: 'https://dev.azure.com/org' }), F('project', 'Project', 'text'), F('personalAccessToken', 'Personal Access Token', 'secret')],
     summaryKeys: ['organizationUrl', 'project'],
@@ -308,13 +321,15 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Jira',
     description: 'Issues in a project.',
     category: 'code',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}jira.svg`,
     icon: 'kanban',
     fields: [F('baseUrl', 'Base URL', 'url', { placeholder: 'https://your-org.atlassian.net' }), F('projectKey', 'Project Key', 'text'), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['baseUrl', 'projectKey'],
   },
-  { id: 'linear', name: 'Linear', description: 'Issues and project documents.', category: 'code', icon: 'kanban', fields: [F('teamKey', 'Team Key', 'text'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['teamKey'] },
-  { id: 'asana', name: 'Asana', description: 'Tasks and project descriptions.', category: 'code', icon: 'kanban', fields: [F('projectId', 'Project ID', 'text'), F('accessToken', 'Access Token', 'secret')], summaryKeys: ['projectId'] },
-  { id: 'trello', name: 'Trello', description: 'Cards in a board.', category: 'code', icon: 'kanban', fields: [F('boardId', 'Board ID', 'text'), F('apiKey', 'API Key', 'secret'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['boardId'] },
+  { id: 'linear', name: 'Linear', description: 'Issues and project documents.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}linear.svg`, icon: 'kanban', fields: [F('teamKey', 'Team Key', 'text'), F('apiKey', 'API Key', 'secret')], summaryKeys: ['teamKey'] },
+  { id: 'asana', name: 'Asana', description: 'Tasks and project descriptions.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}asana.svg`, icon: 'kanban', fields: [F('projectId', 'Project ID', 'text'), F('accessToken', 'Access Token', 'secret')], summaryKeys: ['projectId'] },
+  { id: 'trello', name: 'Trello', description: 'Cards in a board.', category: 'code', logo: `${CONNECTOR_LOGO_BASE}trello.svg`, icon: 'kanban', fields: [F('boardId', 'Board ID', 'text'), F('apiKey', 'API Key', 'secret'), F('apiToken', 'API Token', 'secret')], summaryKeys: ['boardId'] },
 
   // Collaboration
   {
@@ -322,16 +337,19 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Slack',
     description: 'Messages and files in selected channels.',
     category: 'collaboration',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}slack.svg`,
     icon: 'hash',
     fields: [F('channels', 'Channels', 'text', { placeholder: '#support, #platform' }), F('botToken', 'Bot Token', 'secret')],
     summaryKeys: ['channels'],
   },
-  { id: 'teams', name: 'Microsoft Teams', description: 'Channel conversations in a team.', category: 'collaboration', icon: 'chat', fields: [F('teamId', 'Team ID', 'text'), ...MS_GRAPH_APP], summaryKeys: ['teamId'] },
+  { id: 'teams', name: 'Microsoft Teams', description: 'Channel conversations in a team.', category: 'collaboration', logo: `${CONNECTOR_LOGO_BASE}teams.svg`, icon: 'chat', fields: [F('teamId', 'Team ID', 'text'), ...MS_GRAPH_APP], summaryKeys: ['teamId'] },
   {
     id: 'gmail',
     name: 'Gmail',
     description: 'Labelled mail threads from a mailbox.',
     category: 'collaboration',
+    logo: `${CONNECTOR_LOGO_BASE}gmail.svg`,
     icon: 'mail',
     fields: [F('label', 'Label', 'text', { placeholder: 'support' }), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret'), F('refreshToken', 'Refresh Token', 'secret')],
     summaryKeys: ['label'],
@@ -341,6 +359,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Google Calendar',
     description: 'Events of one calendar, backfilled and kept in sync by incremental sync.',
     category: 'collaboration',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}google-calendar.svg`,
     icon: 'calendar',
     // Mirrors the Ballerina `google_calendar` connector's GoogleCalendarSettings: the shared Google
     // auth block plus the calendar, the events to deliver and the page size.
@@ -370,6 +390,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Outlook',
     description: 'Mail folders from a Microsoft 365 mailbox.',
     category: 'collaboration',
+    logo: `${CONNECTOR_LOGO_BASE}outlook.svg`,
     icon: 'mail',
     fields: [F('mailbox', 'Mailbox', 'text', { placeholder: 'support@example.com' }), ...MS_GRAPH_APP],
     summaryKeys: ['mailbox'],
@@ -379,11 +400,12 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Zoom',
     description: 'Meeting transcripts and recordings.',
     category: 'collaboration',
+    logo: `${CONNECTOR_LOGO_BASE}zoom.svg`,
     icon: 'video',
     fields: [F('accountId', 'Account ID', 'text'), F('clientId', 'Client ID', 'text'), F('clientSecret', 'Client Secret', 'secret')],
     summaryKeys: ['accountId'],
   },
-  { id: 'google-chat', name: 'Google Chat', description: 'Conversations in a space.', category: 'collaboration', icon: 'chat', fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')], summaryKeys: ['spaceId'] },
+  { id: 'google-chat', name: 'Google Chat', description: 'Conversations in a space.', category: 'collaboration', logo: `${CONNECTOR_LOGO_BASE}google-chat.svg`, icon: 'chat', fields: [F('spaceId', 'Space ID', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')], summaryKeys: ['spaceId'] },
 
   // Databases
   {
@@ -391,7 +413,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'PostgreSQL',
     description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.',
     category: 'databases',
-    logo: `${DB_LOGO_BASE}postgresql.svg`,
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}postgresql.svg`,
     icon: 'database',
     fields: [
       ...DATABASE_FIELDS('5432', 'public'),
@@ -404,13 +427,14 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['host', 'database'],
     isStructuredData: true,
   },
-  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', logo: `${DB_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
-  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mysql', name: 'MySQL', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mysql.svg`, icon: 'database', fields: DATABASE_FIELDS('3306'), summaryKeys: ['host', 'database'], isStructuredData: true },
+  { id: 'mssql', name: 'Microsoft SQL Server', description: 'Rows of a table, backfilled and kept in sync by Change Data Capture.', category: 'databases', popular: true, logo: `${CONNECTOR_LOGO_BASE}mssql.svg`, icon: 'database', fields: DATABASE_FIELDS('1433', 'dbo'), summaryKeys: ['host', 'database'], isStructuredData: true },
   {
     id: 'mongodb',
     name: 'MongoDB',
     description: 'Documents in a collection.',
     category: 'databases',
+    logo: `${CONNECTOR_LOGO_BASE}mongodb.svg`,
     icon: 'database',
     fields: [F('connectionString', 'Connection String', 'secret'), F('database', 'Database', 'text'), F('collection', 'Collection', 'text')],
     summaryKeys: ['database', 'collection'],
@@ -420,6 +444,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Snowflake',
     description: 'Rows from a table or view.',
     category: 'databases',
+    logo: `${CONNECTOR_LOGO_BASE}snowflake.svg`,
     icon: 'database',
     fields: [F('account', 'Account', 'text'), F('warehouse', 'Warehouse', 'text'), F('database', 'Database', 'text'), F('schema', 'Schema', 'text'), F('table', 'Table', 'text'), F('user', 'User', 'text'), F('password', 'Password', 'secret')],
     summaryKeys: ['database', 'table'],
@@ -429,16 +454,18 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'BigQuery',
     description: 'Rows from a table.',
     category: 'databases',
+    logo: `${CONNECTOR_LOGO_BASE}bigquery.svg`,
     icon: 'table',
     fields: [F('projectId', 'Project ID', 'text'), F('dataset', 'Dataset', 'text'), F('table', 'Table', 'text'), F('serviceAccountJson', 'Service Account JSON', 'secret')],
     summaryKeys: ['dataset', 'table'],
   },
-  { id: 'redshift', name: 'Amazon Redshift', description: 'Rows from selected tables.', category: 'databases', icon: 'database', fields: SQL_TABLES('5439'), summaryKeys: ['host', 'database'] },
+  { id: 'redshift', name: 'Amazon Redshift', description: 'Rows from selected tables.', category: 'databases', logo: `${CONNECTOR_LOGO_BASE}redshift.svg`, icon: 'database', fields: SQL_TABLES('5439'), summaryKeys: ['host', 'database'] },
   {
     id: 'elasticsearch',
     name: 'Elasticsearch',
     description: 'Documents from an index.',
     category: 'databases',
+    logo: `${CONNECTOR_LOGO_BASE}elasticsearch.svg`,
     icon: 'database',
     fields: [F('endpoint', 'Endpoint', 'url'), F('indexName', 'Index', 'text'), F('apiKey', 'API Key', 'secret')],
     summaryKeys: ['endpoint', 'indexName'],
@@ -450,6 +477,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Zendesk',
     description: 'Tickets and help-center articles.',
     category: 'saas',
+    logo: `${CONNECTOR_LOGO_BASE}zendesk.svg`,
     icon: 'headset',
     fields: [F('subdomain', 'Subdomain', 'text', { placeholder: 'your-org' }), F('email', 'Account Email', 'text'), F('apiToken', 'API Token', 'secret')],
     summaryKeys: ['subdomain'],
@@ -459,6 +487,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Salesforce',
     description: 'Records of an object, synced by SOQL backfill and Change Data Capture.',
     category: 'saas',
+    popular: true,
+    logo: `${CONNECTOR_LOGO_BASE}salesforce.svg`,
     icon: 'cloud',
     fields: [
       ...G(
@@ -493,13 +523,14 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     summaryKeys: ['baseUrl', 'sobject'],
     isStructuredData: true,
   },
-  { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },
-  { id: 'intercom', name: 'Intercom', description: 'Help center articles and conversations.', category: 'saas', icon: 'headset', fields: [F('accessToken', 'Access Token', 'secret')], summaryKeys: [] },
+  { id: 'hubspot', name: 'HubSpot', description: 'Knowledge base articles and notes.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}hubspot.svg`, icon: 'chat', fields: [F('privateAppToken', 'Private App Token', 'secret')], summaryKeys: [] },
+  { id: 'intercom', name: 'Intercom', description: 'Help center articles and conversations.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}intercom.svg`, icon: 'headset', fields: [F('accessToken', 'Access Token', 'secret')], summaryKeys: [] },
   {
     id: 'servicenow',
     name: 'ServiceNow',
     description: 'Knowledge articles and incidents.',
     category: 'saas',
+    logo: `${CONNECTOR_LOGO_BASE}servicenow.svg`,
     icon: 'shield',
     fields: [F('instanceUrl', 'Instance URL', 'url'), F('username', 'Username', 'text'), F('password', 'Password', 'secret')],
     summaryKeys: ['instanceUrl'],
@@ -509,6 +540,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Freshdesk',
     description: 'Tickets and solution articles.',
     category: 'saas',
+    logo: `${CONNECTOR_LOGO_BASE}freshdesk.svg`,
     icon: 'headset',
     fields: [F('domain', 'Domain', 'text', { placeholder: 'your-org.freshdesk.com' }), F('apiKey', 'API Key', 'secret')],
     summaryKeys: ['domain'],
@@ -518,11 +550,12 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     name: 'Shopify',
     description: 'Products, policies and help pages.',
     category: 'saas',
+    logo: `${CONNECTOR_LOGO_BASE}shopify.svg`,
     icon: 'cart',
     fields: [F('storeDomain', 'Store Domain', 'text', { placeholder: 'your-store.myshopify.com' }), F('adminAccessToken', 'Admin Access Token', 'secret')],
     summaryKeys: ['storeDomain'],
   },
-  { id: 'stripe', name: 'Stripe', description: 'Products and their descriptions.', category: 'saas', icon: 'card', fields: [F('secretKey', 'Secret Key', 'secret')], summaryKeys: [] },
+  { id: 'stripe', name: 'Stripe', description: 'Products and their descriptions.', category: 'saas', logo: `${CONNECTOR_LOGO_BASE}stripe.svg`, icon: 'card', fields: [F('secretKey', 'Secret Key', 'secret')], summaryKeys: [] },
 
   // Web & files
   {
@@ -539,7 +572,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
   },
   { id: 'sitemap', name: 'Sitemap', description: 'Every page listed in a sitemap.xml.', category: 'web-files', icon: 'globe', fields: [F('sitemapUrl', 'Sitemap URL', 'url', { placeholder: 'https://example.com/sitemap.xml' })], summaryKeys: ['sitemapUrl'] },
   { id: 'rss', name: 'RSS Feed', description: 'Articles from a feed.', category: 'web-files', icon: 'rss', fields: [F('feedUrl', 'Feed URL', 'url')], summaryKeys: ['feedUrl'] },
-  { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', popular: true, icon: 'upload', fields: [], summaryKeys: [], single: true },
+  { id: 'upload', name: 'File Upload', description: 'Files you upload to the engine directly.', category: 'web-files', icon: 'upload', fields: [], summaryKeys: [], single: true, catalogHidden: true },
   {
     id: 'docs_sync',
     name: 'Docs Folder (scheduled)',
@@ -581,10 +614,13 @@ export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: '
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
 
-export const POPULAR_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => c.popular);
+/** Connectors visible in the Add Source catalog (excludes hidden ones like File Upload). */
+export const CATALOG_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => !c.catalogHidden);
+
+export const POPULAR_CONNECTORS: SourceConnector[] = CATALOG_CONNECTORS.filter((c) => c.popular).sort((a, b) => Number(isConnectorEnabled(b.id)) - Number(isConnectorEnabled(a.id)));
 
 /** Live connectors offered as quick-add shortcuts, most useful first. */
-export const QUICK_ADD_CONNECTORS: SourceConnector[] = SOURCE_CONNECTORS.filter((c) => isConnectorEnabled(c.id));
+export const QUICK_ADD_CONNECTORS: SourceConnector[] = CATALOG_CONNECTORS.filter((c) => isConnectorEnabled(c.id));
 
 /** Connectors rendered per catalog page; the next page loads as the list scrolls into view. */
 export const CATALOG_PAGE_SIZE = 24;

@@ -28,7 +28,6 @@ import {
   OWNER_GRANT_PREFIX,
   UNAVAILABLE_MODEL_PROVIDERS,
   defaultStorage,
-  isConnectorEnabled,
   LLM_PROVIDERS,
   MCP_CLIENTS,
   RML_MAPPING,
@@ -228,13 +227,13 @@ export function sourcesStepBlocker(sources: ContextSourceConfig[]): string | nul
 
 // ── Catalog ─────────────────────────────────────────────────────────────────
 
-/** Connectors matching a free-text query (name, description, category) and a category filter. Live connectors lead, then alphabetical, so the ones a source can be created from today are reachable before the "Coming soon" ones. */
+/** Connectors matching a free-text query (name, description, category) and a category filter, sorted alphabetically by name. */
 export function filterConnectors(connectors: SourceConnector[], query: string, category: SourceCategory | 'all'): SourceConnector[] {
   const q = query.trim().toLowerCase();
   return connectors
     .filter((c) => category === 'all' || c.category === category)
     .filter((c) => !q || c.name.toLowerCase().includes(q) || c.description.toLowerCase().includes(q) || c.id.includes(q))
-    .sort((a, b) => Number(isConnectorEnabled(b.id)) - Number(isConnectorEnabled(a.id)) || a.name.localeCompare(b.name));
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /** How many connectors each category holds (for the filter chips). */
