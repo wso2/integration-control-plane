@@ -25,7 +25,7 @@ import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import VoiceAgentTester from '../../VoiceAgent/VoiceAgentTester';
 
 /** The endpoint the BFF publishes the token service on (ipaas-service models.VoiceAgentTokenEndpointName). */
-const TOKEN_ENDPOINT_NAME = 'voice-agent-token';
+const TOKEN_ENDPOINT_NAME = 'token-service';
 
 const URL_SX = { fontFamily: 'monospace', wordBreak: 'break-all' } as const;
 
