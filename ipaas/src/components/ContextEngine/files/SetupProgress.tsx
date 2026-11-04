@@ -36,8 +36,6 @@ interface SetupProgressProps {
   engineId: string;
   engineName: string;
   phase: SetupPhase;
-  /** Why the engine is not running yet, when the BFF says. */
-  statusReason?: string;
   sourceCount: number;
   roleCount: number;
   /** Steps the engine refused. */
@@ -115,7 +113,7 @@ const HEADLINE: Record<SetupPhase, string> = {
 };
 
 /** What the wizard shows after Create: the engine starting, then its sources, grants and files being handed to it. */
-export default function SetupProgress({ engineId, engineName, phase, statusReason, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
+export default function SetupProgress({ engineId, engineName, phase, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
   const failedTo = (pattern: RegExp) => warnings.find((w) => pattern.test(w));
   const sourceFailures = warnings.filter((w) => w.startsWith('Register source')).length;
   const roleFailures = warnings.filter((w) => w.startsWith('Grant query access')).length;
@@ -136,14 +134,10 @@ export default function SetupProgress({ engineId, engineName, phase, statusReaso
       <Box sx={{ mt: 2 }}>
         <Step tone="done">Engine created</Step>
         {phase === 'starting' && (
-          <Step tone="running" aside={statusReason}>
-            Starting the engine
-          </Step>
+          <Step tone="running">Starting the engine</Step>
         )}
         {phase === 'failed' && (
-          <Step tone="failed" aside={statusReason}>
-            The engine failed to start
-          </Step>
+          <Step tone="failed">The engine failed to start</Step>
         )}
         {phase === 'setting-up' && <Step tone="running">Adding your sources and access</Step>}
         {phase === 'done' && (

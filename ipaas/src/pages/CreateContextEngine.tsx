@@ -221,7 +221,6 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             engineId={created.id}
             engineName={created.name}
             phase={phase}
-            statusReason={live.data?.statusReason}
             sourceCount={created.sources.length}
             roleCount={created.roles.length}
             warnings={result?.warnings ?? []}
