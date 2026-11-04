@@ -46,6 +46,7 @@ import OwnerAccessButton from '../detail/OwnerAccessButton';
 import SourceMark from '../SourceMark';
 import FileDropzone from './FileDropzone';
 import FileVisibilityField from './FileVisibilityField';
+import VisibilityComingSoon from './VisibilityComingSoon';
 import StagedFileList from './StagedFileList';
 import UploadStatusChip from './UploadStatusChip';
 import { checkAgainRowSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx, warningCaptionSx, wrapSx } from '../styles';
@@ -134,11 +135,20 @@ function UploadRow({
                     <Upload size={16} />
                   </IconButton>
                 </Tooltip>
-                {ROLE_VISIBILITY_ENABLED && (
+                {ROLE_VISIBILITY_ENABLED ? (
                   <Tooltip title="Change who can see it">
                     <IconButton size="small" aria-label={`Change who can see ${entry.name}`} onClick={() => setSharing(entry.visibility ?? EVERYONE_VISIBILITY)}>
                       <Users size={16} />
                     </IconButton>
+                  </Tooltip>
+                ) : (
+                  <Tooltip title="Choosing who can see a file is coming soon">
+                    {/* A disabled button shows no tooltip of its own, so the span carries it. */}
+                    <span>
+                      <IconButton size="small" disabled aria-label={`Change who can see ${entry.name}, coming soon`}>
+                        <Users size={16} />
+                      </IconButton>
+                    </span>
                   </Tooltip>
                 )}
               </>
@@ -334,11 +344,13 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 setStaged((s) => s.filter((f) => f.id !== id));
               }}
             />
-            {ROLE_VISIBILITY_ENABLED && (
-              <Box sx={{ mt: 2 }}>
+            <Box sx={{ mt: 2 }}>
+              {ROLE_VISIBILITY_ENABLED ? (
                 <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} value={visibility} onChange={setVisibility} />
-              </Box>
-            )}
+              ) : (
+                <VisibilityComingSoon label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} />
+              )}
+            </Box>
             <Stack direction="row" justifyContent="flex-end" gap={1.5} sx={{ mt: 2 }}>
               <Button
                 variant="outlined"

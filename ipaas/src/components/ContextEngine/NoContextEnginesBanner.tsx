@@ -33,7 +33,7 @@ const featureSx = {
 
 const featureIconSx = { color: 'primary.main', mt: 0.25, flexShrink: 0 } as const;
 
-function Feature({ icon, title, text }: { icon: ReactNode; title: string; text?: string }): JSX.Element {
+function Feature({ icon, title, text }: { icon: ReactNode; title: string; text: string }): JSX.Element {
   return (
     <Box sx={featureSx}>
       <Box sx={featureIconSx}>{icon}</Box>
@@ -41,11 +41,9 @@ function Feature({ icon, title, text }: { icon: ReactNode; title: string; text?:
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
           {title}
         </Typography>
-        {text && (
-          <Typography variant="caption" color="text.secondary">
-            {text}
-          </Typography>
-        )}
+        <Typography variant="caption" color="text.secondary">
+          {text}
+        </Typography>
       </Box>
     </Box>
   );
@@ -73,13 +71,13 @@ export default function NoContextEnginesBanner({ onCreate }: { onCreate: () => v
           <Feature icon={<Waypoints size={20} />} title="Choose sources" text="Drive, S3, SharePoint, Confluence, GitHub, websites or uploads." />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<ShieldCheck size={20} />} title="Grant access" />
+          <Feature icon={<ShieldCheck size={20} />} title="Grant access" text="Choose which roles can query the engine." />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<Braces size={20} />} title="Expose as API" />
+          <Feature icon={<Braces size={20} />} title="Expose as API" text="Query the engine from your integrations over REST." />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<Plug size={20} />} title="Expose as MCP" />
+          <Feature icon={<Plug size={20} />} title="Expose as MCP" text="Let agents query the engine over MCP." />
         </Grid>
       </Grid>
     </Stack>
