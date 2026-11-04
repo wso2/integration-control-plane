@@ -34,6 +34,8 @@ interface LinkSuggestionsProps {
   actions: LinkSuggestionAction[];
   /** Hide the heading and help text, for rows inside another box. */
   bare?: boolean;
+  /** Offer rows only for these resources. */
+  only?: string[];
 }
 
 const boxSx = { mb: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
@@ -41,12 +43,12 @@ const rowSx = { py: 0.75, borderTop: '1px solid', borderColor: 'divider' } as co
 const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 
 /** Resources a build's imports call for, one row per resource and connection. */
-export function LinkSuggestions({ projectId, componentId, open, links, build, actions, bare }: LinkSuggestionsProps) {
+export function LinkSuggestions({ projectId, componentId, open, links, build, actions, bare, only }: LinkSuggestionsProps) {
   const { data: suggestions = [] } = useResourceLinkSuggestions(projectId, componentId, build, open);
   const create = useCreateResourceLink();
   const lastUnlinkAt = useLastUnlinkAt(componentId);
 
-  const rows = linkSuggestionRows(suggestions, links, actions);
+  const rows = linkSuggestionRows(suggestions, links, actions).filter((r) => !only || only.includes(r.resourceType));
   // An unlink since makes the line about the link stale.
   const outcome = create.data && create.submittedAt > lastUnlinkAt && <LinkOutcome write={create.data} changed={!!create.variables.changed} />;
   if (rows.length === 0) return outcome || null;

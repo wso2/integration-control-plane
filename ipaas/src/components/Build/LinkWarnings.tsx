@@ -69,7 +69,7 @@ export function LinkWarnings({ projectId, componentId, versionId, build, firstEn
   );
 }
 
-/** The links whose connection a build doesn't have, with Change link to one of that build's connections. */
+/** The links whose connection a build doesn't have, with Change link to one of that build's connections; nothing where ipaas-service warns of none. */
 export function BuildChangeLink({ projectId, componentId, build }: { projectId: string; componentId: string; build: string }) {
   const { data: warnings = [] } = useLinkWarnings(projectId, componentId, build, true);
   const { data: links = noLinks } = useResourceLinks(projectId, componentId, true);
@@ -86,7 +86,8 @@ export function BuildChangeLink({ projectId, componentId, build }: { projectId: 
           ))}
         </Alert>
       )}
-      <LinkSuggestions projectId={projectId} componentId={componentId} open links={links} build={build} actions={['Change link']} bare />
+      {/* A Change link the build doesn't ask for would move the link off the connection the Workload's build reads. */}
+      <LinkSuggestions projectId={projectId} componentId={componentId} open links={links} build={build} actions={['Change link']} bare only={notInBuild.map((w) => w.resourceType)} />
     </>
   );
 }

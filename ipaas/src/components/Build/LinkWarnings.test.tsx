@@ -90,6 +90,24 @@ describe('LinkWarnings', () => {
     expect(deploy.mutate).toHaveBeenCalledWith({ componentId: 'sfdemo', id: 'v1', imageId: 'sfdemo-1793', environmentId: 'development', deploymentPipelineId: 'p1' });
   });
 
+  it("offers no Change link for a build the Workload doesn't hold, after a rollback", async () => {
+    // ipaas-service warns only for the Workload's build; the rolled-back build's suggestions still name its connections.
+    server.suggestions = [{ resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfOld'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' }];
+    await render();
+    expect(buttons()).toEqual([]);
+  });
+
+  it('offers Change link only for the resource the warning names', async () => {
+    server.warnings = [{ resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales', reason: 'not_in_build' }];
+    server.suggestions = [
+      { resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfCrm'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' },
+      { resourceType: 'salesforce-support', displayName: 'Salesforce Support', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfCrm'], linked: true, linkedConnection: 'acme.sfdemo.sfDesk' },
+    ];
+    await render();
+    expect(container.textContent).not.toContain('acme.sfdemo.sfDesk → acme.sfdemo.sfCrm');
+    expect(buttons()).toEqual(['Change link']);
+  });
+
   it('says nothing when the build and the links agree', async () => {
     await render();
     expect(container.textContent).toBe('');

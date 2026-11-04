@@ -22,16 +22,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResourceLink } from '../../types/configuration';
 import { FormLinks } from './FormLinks';
 
-// What ipaas-service answers for a build after a rename: the link's connection sfSales is gone, sfCrm is there.
+// What ipaas-service answers for the Workload's build after a rename: the link's connection sfSales is gone, sfCrm is
+// there. For any other build it warns of nothing, though that build's suggestions name its own connections.
+const workloadBuild = 'sfdemo-1793715328134';
 const server = vi.hoisted(() => ({ warningsFor: '' as string | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
   useLinkWarnings: (_p: string, _c: string, build: string) => {
     server.warningsFor = build;
-    return { data: [{ resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales', reason: 'not_in_build' }] };
+    return { data: build === workloadBuild ? [{ resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales', reason: 'not_in_build' }] : [] };
   },
   useResourceLinks: () => ({ data: [sales] }),
-  useResourceLinkSuggestions: () => ({
-    data: [{ resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: ['acme.sfdemo.sfCrm'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' }],
+  useResourceLinkSuggestions: (_p: string, _c: string, build?: string) => ({
+    data: [{ resourceType: 'salesforce-sales', displayName: 'Salesforce Sales', package: 'ballerinax/salesforce', connections: [build === workloadBuild ? 'acme.sfdemo.sfCrm' : 'acme.sfdemo.sfOld'], linked: true, linkedConnection: 'acme.sfdemo.sfSales' }],
   }),
   useCreateResourceLink: () => ({ mutate: vi.fn(), isPending: false, isError: false }),
   useLastUnlinkAt: () => 0,
@@ -80,10 +82,16 @@ afterEach(() => {
 
 describe('FormLinks', () => {
   it("offers Change link where the environment's build has no connection a link goes through", async () => {
-    await act(async () => root.render(<FormLinks projectId="default" componentId="sfdemo" env="development" open links={[sales]} build="sfdemo-1793715328134" />));
-    expect(server.warningsFor).toBe('sfdemo-1793715328134');
+    await act(async () => root.render(<FormLinks projectId="default" componentId="sfdemo" env="development" open links={[sales]} build={workloadBuild} />));
+    expect(server.warningsFor).toBe(workloadBuild);
     expect(container.textContent).toContain('salesforce-sales: this build has no sfSales');
     expect([...container.querySelectorAll('button')].map((b) => b.textContent)).toContain('Change link');
+  });
+
+  it('offers no Change link in production on an older build, which runs with its own names', async () => {
+    await act(async () => root.render(<FormLinks projectId="default" componentId="sfdemo" env="production" open links={[sales]} build="sfdemo-1793700000000" />));
+    expect(container.textContent).not.toContain('this build has no');
+    expect([...container.querySelectorAll('button')].map((b) => b.textContent)).not.toContain('Change link');
   });
 
   it("asks nothing of a form that doesn't know the environment's build", async () => {
