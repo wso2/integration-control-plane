@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   audienceError,
   audienceMappingFromRules,
@@ -27,18 +27,20 @@ import {
   engineMessage,
   engineErrorCode,
   sourceFailureNotice,
+  evidenceBackTarget,
+  isTransientReadError,
   formatBytes,
   describeUploadAudience,
   endsSentence,
   splitSentences,
   askedQuestionMeta,
   citedNumbers,
-  deletionFailureText,
+  evidencePart,
   evidencePlace,
   evidenceVersionLabel,
+  versionFromLabel,
   isSameModel,
   modelDraftError,
-  modelKeysLabel,
   passageLines,
   toModelInput,
   describeVisibility,
@@ -64,6 +66,8 @@ import {
   overallProgress,
   progressHeadline,
   progressListingText,
+  progressListingLine,
+  listPollInterval,
   sourceIndexingText,
   sourceProgressDetail,
   sourceProgressStatus,
@@ -73,14 +77,21 @@ import {
   summarizeEngineProgress,
   buildMcpClientConfigs,
   buildQueryCurl,
+  answerChoice,
+  applyAnswerChoice,
   canShareApiKey,
   connectorCountsByCategory,
+  defaultQueryMode,
   effectiveLlm,
   fromDraft,
+  effectiveVisibility,
+  summarizeSourceVisibility,
   getStartedSteps,
   isFormDirty,
   isGraphUri,
+  modelProviderName,
   modelsStepBlocker,
+  nameStepBlocker,
   sanitizeStorage,
   storageSelectionError,
   storageStepBlocker,
@@ -94,6 +105,7 @@ import {
   grantAllowsQuery,
   invalidSourceFields,
   isFieldVisible,
+  isCustomModel,
   isFormComplete,
   isHttpUrl,
   isLlmValid,
@@ -114,13 +126,34 @@ import {
   toCreateInput,
   toSourceRegistration,
   queuedUploadText,
+  uploadSourceTitle,
   uploadIsSlow,
 } from './contextEngine';
-import { blankLlm, blankSource, CONTEXT_ENGINE_NAME_MAX, defaultStorage, isConnectorEnabled, SOURCE_CONNECTORS } from '../constants/contextEngine';
-import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress } from '../types/contextEngine';
+import { blankLlm, blankSource, CONTEXT_EMBEDDING_PROVIDERS, CONTEXT_ENGINE_DESCRIPTION_MAX, CONTEXT_ENGINE_NAME_MAX, CONTEXT_QUERY_MODES, defaultStorage, isConnectorEnabled, LLM_PROVIDERS, SOURCE_CONNECTORS } from '../constants/contextEngine';
+import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
+import type { ContextEngineDetail, ContextEngineForm, ContextGrant, ContextRecordStatus, ContextSourceConfig, SourceProgress, UploadFileStatus } from '../types/contextEngine';
 import { HttpError } from '../types/http';
 import { dropStagedFile, putStagedFile } from './stagedFiles';
 import type { EmbeddingConfig } from '../types/ragIngestion';
+
+// The role path stays tested while choosing roles is turned off, so the switch is read through a getter the tests can flip.
+const roleSwitch = vi.hoisted(() => ({ on: false }));
+vi.mock('../constants/contextEngine', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../constants/contextEngine')>()),
+  get ROLE_VISIBILITY_ENABLED() {
+    return roleSwitch.on;
+  },
+}));
+
+/** Run `check` with choosing roles turned on, as before it was switched off. */
+function withRoleVisibility(check: () => void): void {
+  roleSwitch.on = true;
+  try {
+    check();
+  } finally {
+    roleSwitch.on = false;
+  }
+}
 
 const embedding: EmbeddingConfig = { provider: 'openai', model: 'text-embedding-3-small', apiKey: 'sk-test', azureApiVersion: '', azureBaseUrl: '' };
 
@@ -203,7 +236,7 @@ describe('source validation', () => {
     // Every source defaults to "everyone who can query"; only an empty "only some roles" choice is incomplete.
     const drive = withValues('gdrive', { folderId: 'abc', clientId: 'c', clientSecret: 's', refreshToken: 'r' });
     expect(sourceIncompleteReason(drive)).toBe('');
-    expect(sourceIncompleteReason({ ...drive, stagedVisibility: { kind: 'roles', roles: [] } })).toBe('Choose who can see this content');
+    withRoleVisibility(() => expect(sourceIncompleteReason({ ...drive, stagedVisibility: { kind: 'roles', roles: [] } })).toBe('Choose who can see this content'));
   });
 
   it('rejects empty and duplicate names', () => {
@@ -219,7 +252,7 @@ describe('source validation', () => {
     expect(sourcesStepBlocker([a])).toBeNull();
     expect(sourcesStepBlocker([a, upload()])).toBe('Give each source a unique name');
     expect(sourcesStepBlocker([a, withValues('github', {}, 'Platform docs')])).toBe('Complete “Platform docs” to continue');
-    expect(sourcesStepBlocker([a, { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Second'), stagedVisibility: { kind: 'roles', roles: [] } }])).toBe('Complete “Second” to continue');
+    withRoleVisibility(() => expect(sourcesStepBlocker([a, { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Second'), stagedVisibility: { kind: 'roles', roles: [] } }])).toBe('Complete “Second” to continue'));
     expect(isSourcesStepValid([a, upload('Second')])).toBe(true);
   });
 
@@ -357,6 +390,35 @@ describe('catalog', () => {
   });
 });
 
+describe('model providers', () => {
+  it('offers OpenAI and Anthropic language models, leaving out the OpenAI model being retired', () => {
+    expect(LLM_PROVIDERS.map((p) => p.id)).toEqual(['openai', 'anthropic']);
+    expect(LLM_PROVIDERS[0].models[0]).toBe('gpt-6-luna');
+    expect(LLM_PROVIDERS[0].models).not.toContain('gpt-5-mini');
+  });
+
+  it('offers OpenAI embeddings only, and leaves the RAG ingestion list as it was', () => {
+    expect(CONTEXT_EMBEDDING_PROVIDERS.map((p) => p.id)).toEqual(['openai']);
+    expect(EMBEDDING_PROVIDERS.map((p) => p.id)).toEqual(['openai', 'azure_openai', 'mistral']);
+  });
+
+  it('names offered, retired and unknown providers', () => {
+    expect(modelProviderName('embedding', 'openai')).toBe('OpenAI');
+    expect(modelProviderName('llm', 'anthropic')).toBe('Anthropic');
+    expect(modelProviderName('llm', 'azure_openai')).toBe('Azure OpenAI');
+    expect(modelProviderName('embedding', 'mistral')).toBe('Mistral AI');
+    expect(modelProviderName('llm', 'acme')).toBe('acme');
+  });
+
+  it('treats a model id outside the list, or any id when there is no list, as typed in', () => {
+    const models = ['gpt-5-mini', 'gpt-6-luna'];
+    expect(isCustomModel('', models)).toBe(false);
+    expect(isCustomModel('gpt-5-mini', models)).toBe(false);
+    expect(isCustomModel('gpt-4.1', models)).toBe(true);
+    expect(isCustomModel('', [])).toBe(true);
+  });
+});
+
 describe('model validation', () => {
   it('requires model and key, plus base url + version for azure', () => {
     expect(isLlmValid(null)).toBe(false);
@@ -378,6 +440,14 @@ describe('name step', () => {
     expect(isNameStepValid('', '')).toBe(false);
     expect(isNameStepValid('ok', '')).toBe(true);
   });
+
+  it('says why the step cannot proceed: a missing name first, then the first field error', () => {
+    expect(nameStepBlocker('', '')).toBe('Enter a name for the engine');
+    expect(nameStepBlocker('   ', '')).toBe('Enter a name for the engine');
+    expect(nameStepBlocker('a'.repeat(CONTEXT_ENGINE_NAME_MAX + 1), '')).toBe(engineNameError('a'.repeat(CONTEXT_ENGINE_NAME_MAX + 1)));
+    expect(nameStepBlocker('Ops', 'x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1))).toBe(engineDescriptionError('x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1)));
+    expect(nameStepBlocker('Ops', '')).toBeNull();
+  });
 });
 
 describe('form completion', () => {
@@ -387,6 +457,12 @@ describe('form completion', () => {
     expect(isFormComplete({ ...form, sources: [] })).toBe(false);
     expect(isFormComplete({ ...form, llm: null })).toBe(false);
     expect(isFormComplete({ ...form, name: '' })).toBe(false);
+  });
+
+  it('is incomplete when only the name step fails, whatever the later steps hold', () => {
+    const form = completeForm();
+    expect(isFormComplete({ ...form, name: '   ' })).toBe(false);
+    expect(isFormComplete({ ...form, description: 'x'.repeat(CONTEXT_ENGINE_DESCRIPTION_MAX + 1) })).toBe(false);
   });
 
   it('roles are optional — the owner can keep an engine private', () => {
@@ -529,6 +605,49 @@ describe('shared api key', () => {
   });
 });
 
+describe('answer model choice', () => {
+  const different = { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' };
+
+  it('reads the choice from the form', () => {
+    expect(answerChoice({ answersEnabled: true, answerLlm: null })).toBe('same');
+    expect(answerChoice({ answersEnabled: true, answerLlm: different })).toBe('different');
+    expect(answerChoice({ answersEnabled: false, answerLlm: null })).toBe('off');
+  });
+
+  it('reads a restored draft that is off but still holds a model as off', () => {
+    expect(answerChoice({ answersEnabled: false, answerLlm: different })).toBe('off');
+  });
+
+  it('maps same and off onto no separate model', () => {
+    const form = { ...completeForm(), answerLlm: different };
+    expect(applyAnswerChoice('same', form)).toEqual({ answersEnabled: true, answerLlm: null });
+    expect(applyAnswerChoice('off', form)).toEqual({ answersEnabled: false, answerLlm: null });
+  });
+
+  it('starts a different model on the language model provider', () => {
+    expect(applyAnswerChoice('different', completeForm())).toEqual({ answersEnabled: true, answerLlm: blankLlm('anthropic') });
+    expect(applyAnswerChoice('different', { llm: null, answerLlm: null }).answerLlm).toEqual(blankLlm(LLM_PROVIDERS[0].id));
+  });
+
+  it('keeps a different model already chosen', () => {
+    expect(applyAnswerChoice('different', { ...completeForm(), answerLlm: different })).toEqual({ answersEnabled: true, answerLlm: different });
+  });
+
+  it('round-trips each choice through the form state', () => {
+    for (const choice of ['same', 'different', 'off'] as const) {
+      expect(answerChoice(applyAnswerChoice(choice, completeForm()))).toBe(choice);
+    }
+  });
+
+  it('blocks the models step only while a different model is incomplete', () => {
+    const form = completeForm();
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('same', form) })).toBeNull();
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('off', form) })).toBeNull();
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', form) })).toBe('Complete the answer model');
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', { ...form, answerLlm: different }) })).toBeNull();
+  });
+});
+
 describe('drafts', () => {
   it('strips every secret and round-trips the rest', () => {
     const form = completeForm();
@@ -561,6 +680,19 @@ describe('drafts', () => {
     expect(bad.llm).toEqual({ provider: 'openai', model: '', apiKey: '', azureBaseUrl: '', azureApiVersion: '' });
     expect(fromDraft(JSON.stringify({ ...malformed, form: { ...malformed.form, llm: { provider: 'nope', model: 'x' } } }))!.form.llm).toBeNull();
     expect(fromDraft(JSON.stringify({ v: 1, form: { name: 'x' } }))).toBeNull();
+  });
+
+  it('drops a model whose provider is no longer offered, and keeps the rest of the draft', () => {
+    const form = toDraft(completeForm(), 'x').form;
+    const stale = { v: 1, savedAt: 'x', form: { ...form, embedding: { ...form.embedding, provider: 'azure_openai' }, llm: { ...form.llm, provider: 'mistral' }, answerLlm: { ...blankLlm('openai'), provider: 'azure_openai', model: 'dep' } } };
+    const restored = fromDraft(JSON.stringify(stale))!.form;
+    expect(restored.embedding).toBeNull();
+    expect(restored.llm).toBeNull();
+    // A separate answer model stays separate, with a model to choose, instead of turning into the language model.
+    expect(restored.answerLlm).toEqual(blankLlm('openai'));
+    expect(answerChoice(restored)).toBe('different');
+    expect(restored.name).toBe('Support knowledge');
+    expect(restored.sources).toHaveLength(1);
   });
 
   it('knows when there is nothing worth keeping', () => {
@@ -607,9 +739,31 @@ describe('first run', () => {
     const summary = { sourceCount: 2, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
     const moving = getStartedSteps(engineDetail(), false, summary);
     expect(moving[0].state).toBe('current');
-    expect(moving[0].description).toBe('1 of 2 sources processed. Items become searchable as the connector delivers them from 2 sources.');
+    expect(moving[0].description).toBe('Syncing 1 of 2 sources. Items become searchable as the connector delivers them from 2 sources.');
     expect(getStartedSteps(engineDetail(), false, { ...summary, active: 0, waiting: 1 })[0].state).toBe('done');
     expect(getStartedSteps(engineDetail(), false, { ...summary, processed: 0, active: 0, waiting: 2 })[0].state).toBe('current');
+  });
+
+  it('talks about files, not a connector, when every source is an upload', () => {
+    const uploads = engineDetail({ sources: [{ id: 's1', name: 'File Upload', type: 'upload', state: 'ready' }] });
+    const summary = { sourceCount: 1, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
+    expect(getStartedSteps(uploads, false, summary)[0].description).toBe('Syncing 1 source.');
+    expect(getStartedSteps(uploads, false)[0].description).toBe('Files become searchable after upload.');
+    expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent' });
+  });
+});
+
+describe('playground modes', () => {
+  it('starts in Answer when the engine offers answers', () => {
+    expect(defaultQueryMode(engineDetail())).toBe('answer');
+  });
+
+  it('starts in Context when the engine is set up without answers', () => {
+    expect(defaultQueryMode(engineDetail({ exposure: { api: false, mcp: false, answers: false } }))).toBe('context');
+  });
+
+  it('lists Answer before Context', () => {
+    expect(CONTEXT_QUERY_MODES.map((m) => m.label)).toEqual(['Answer', 'Context']);
   });
 });
 
@@ -727,12 +881,12 @@ const progress = (o: ProgressOverrides = {}): SourceProgress => ({
 describe('source progress', () => {
   it('tells the operator what to fix when files failed on the model provider', () => {
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 3, indexed: 1, failed: 2, failures: { backend_model_access_denied: 2 } } }))).toBe(
-      "2 files are not searchable: the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
+      "2 files in this source are not searchable: the model provider rejected the engine's API key, or the key may not use the configured model. Fix the engine's model settings.",
     );
-    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { backend_model_unavailable: 1 } } }))).toMatch(/^1 file is not searchable: the engine could not reach its model provider/);
-    // Two codes need two fixes, so the notice counts every file and sends the reader to the rows instead of naming one fix.
+    expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { backend_model_unavailable: 1 } } }))).toBe('1 file in this source is not searchable: the engine could not reach its model provider.');
+    // Two codes have no single cause, so the notice counts every file and names none. It names no retry either, since a connector source has no Retry.
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 4, indexed: 1, failed: 3, failures: { backend_model_access_denied: 2, backend_model_quota_exceeded: 1 } } }))).toBe(
-      "3 files are not searchable: the model provider failed on them for more than one reason. Each file's row says why.",
+      '3 files in this source are not searchable: the model provider failed on them for more than one reason.',
     );
     // A file the engine cannot read is the file's own problem, told on its row, not a notice.
     expect(sourceFailureNotice(progress({ indexing: { state: 'ok', expected: 2, indexed: 1, failed: 1, failures: { extraction_unsupported: 1 } } }))).toBeNull();
@@ -779,11 +933,11 @@ describe('source progress', () => {
     const one = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [mapping], bytes: { delivered: 1000, finished: 0 } } });
     // One file being mapped: its share of items is the bar.
     expect(sourceProgressValue(one)).toBeCloseTo(38.35, 1);
-    expect(sourceProgressDetail(one)).toBe('0 of 1 item processed · 0 records stored · osgi_extraction.json: mapping items 1,200 of 3,129');
+    expect(sourceProgressDetail(one)).toBe('0 of 1 item processed · osgi_extraction.json: mapping items 1,200 of 3,129');
     // Inside the store's write the engine has no position: one file alone gets no number.
     const writing = progress({ processing: { total: 1, running: 1, percent: 0, inProgress: [{ ...mapping, phase: 'indexing', done: null }], bytes: { delivered: 1000, finished: 0 } } });
     expect(sourceProgressValue(writing)).toBeNull();
-    expect(sourceProgressDetail(writing)).toMatch(/osgi_extraction.json: writing 3,129 items to the knowledge store$/);
+    expect(sourceProgressDetail(writing)).toMatch(/osgi_extraction.json: indexing 3,129 items$/);
     // Many files: finished bytes plus the running file's share, over everything delivered.
     const batch = progress({ processing: { total: 4, succeeded: 2, running: 1, queued: 1, percent: 50, inProgress: [{ ...mapping, done: 3129 }], bytes: { delivered: 4000, finished: 2000 } } });
     expect(sourceProgressValue(batch)).toBe(75);
@@ -808,16 +962,18 @@ describe('source progress', () => {
   });
 
   it('describes counts, failures and stored records', () => {
-    expect(sourceProgressDetail(progress())).toMatch(/No sync has started yet/);
+    expect(sourceProgressDetail(progress())).toBe('No sync yet.');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' } }))).toBe('Nothing delivered yet · 0 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'reading' }, processing: { total: 12, succeeded: 12, percent: 100 }, records: { active: 12 } }))).toBe('12 of 12 items processed so far · 12 records stored');
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1200, queued: 658, succeeded: 540, failed: 2, percent: 45.2 }, records: { active: 538, quarantined: 1 } }))).toBe(
-      '542 of 1,200 items processed · 2 failed · 1 quarantined · 538 records stored',
+      '542 of 1,200 items processed · 2 failed · 1 quarantined',
     );
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 1, succeeded: 1, percent: 100 }, records: { active: 1 } }))).toBe('1 of 1 item processed · 1 record stored');
     // Nothing stored: the deletes are not shown as processed work, since that reads as if content were there.
     expect(sourceProgressDetail(progress({ processing: { total: 12, succeeded: 12, percent: 100 }, records: { deleted: 6 } }))).toBe('All records were deleted. Nothing is stored.');
     expect(sourceProgressDetail(progress({ reading: { state: 'completed' } }))).toBe('Nothing is stored. The latest sync delivered nothing.');
+    // While items are still queued the stored count, which spans every sync, is left out rather than shown against a different base.
+    expect(sourceProgressDetail(progress({ reading: { state: 'completed' }, processing: { total: 50, queued: 48, succeeded: 2, percent: 4 }, records: { active: 3 } }))).toBe('2 of 50 items processed');
   });
 
   it('reports sync timing and indexing only when the engine has something to say', () => {
@@ -828,6 +984,9 @@ describe('source progress', () => {
     expect(sourceIndexingText(progress())).toBeNull();
     expect(sourceIndexingText(progress({ indexing: { state: 'unavailable' } }))).toMatch(/unavailable/);
     expect(sourceIndexingText(progress({ indexing: { state: 'ok', expected: 8, indexed: 6, indexing: 1, missing: 1, percent: 75 } }))).toBe('75% indexed (6 of 8) · 1 missing');
+    // While items are still queued, the index snapshot covers only the records stored so far: a count, not a percentage.
+    expect(sourceIndexingText(progress({ processing: { total: 50, queued: 48, succeeded: 2, percent: 4 }, records: { active: 3 }, indexing: { state: 'ok', expected: 3, indexed: 2, indexing: 1, percent: 66.7 } }))).toBe('2 indexed so far');
+    expect(sourceIndexingText(progress({ reading: { state: 'reading' }, indexing: { state: 'ok', expected: 3, indexed: 2, percent: 66.7 } }))).toBe('2 indexed so far');
   });
 
   it('rolls progress up across sources, counting ones the caller cannot inspect as hidden', () => {
@@ -838,7 +997,9 @@ describe('source progress', () => {
     ];
     const sum = summarizeEngineProgress(['a', 'b', 'c', 'd'], list);
     expect(sum).toEqual({ sourceCount: 4, processed: 1, active: 1, reading: 1, waiting: 1, hidden: 1, percent: 60, failedItems: 1 });
-    expect(progressHeadline(sum)).toBe('1 of 3 sources processed');
+    expect(progressHeadline(sum)).toBe('Syncing 1 of 3 sources');
+    expect(progressHeadline({ ...sum, active: 0, processed: 2 })).toBe('2 of 3 sources processed');
+    expect(progressHeadline(summarizeEngineProgress(['b'], [list[1]]))).toBe('Syncing 1 source');
     expect(progressListingText(sum)).toBe('Syncing');
     expect(progressListingText({ ...sum, reading: 0 })).toBe('Syncing · 60%');
     expect(isEngineProgressActive({ available: true, sources: list })).toBe(true);
@@ -864,6 +1025,20 @@ describe('source progress', () => {
     expect(progressListingText(summarizeEngineProgress(['a'], [progress({ sourceId: 'a' })]))).toBe('Waiting for data');
     expect(progressListingText(summarizeEngineProgress(['a', 'b'], [progress({ sourceId: 'a', records: { active: 3 } }), progress({ sourceId: 'b' })]))).toBe('1 of 2 processed');
     expect(progressHeadline(summarizeEngineProgress(['a'], []))).toBe('Progress hidden');
+  });
+
+  it('says when an engine with sources reported no progress', () => {
+    expect(progressListingLine({ sourceCount: 0, progress: null })).toBeNull();
+    expect(progressListingLine({ sourceCount: 2, progress: null })).toBe('Progress unavailable');
+    expect(progressListingLine({ sourceCount: 1, progress: summarizeEngineProgress(['a'], [progress({ sourceId: 'a' })]) })).toBe('Waiting for data');
+  });
+
+  it('polls the list while any engine syncs or is being deleted', () => {
+    const syncing = summarizeEngineProgress(['b'], [progress({ sourceId: 'b', processing: { total: 10, queued: 6, succeeded: 4, percent: 40 } })]);
+    expect(listPollInterval(undefined)).toBe(false);
+    expect(listPollInterval([{ state: 'ready', summary: { progress: null } }])).toBe(false);
+    expect(listPollInterval([{ state: 'ready', summary: { progress: syncing } }])).toBe(3000);
+    expect(listPollInterval([{ state: 'deleting', summary: null }])).toBe(3000);
   });
 });
 
@@ -893,12 +1068,12 @@ describe('file uploads', () => {
     const pdf = { name: 'ref.pdf', size: 4.8 * MB, contentType: 'application/pdf' };
     const dup = { name: 'oncall.txt', size: 1100, contentType: 'text/plain' };
     expect(checkStagedFile(big, [])).toEqual({ problem: 'too-large', replaces: false });
-    expect(stagedFileNote(checkStagedFile(big, []), big.size)).toBe('41.2 MB is over the 25 MB limit. Split it or leave it out.');
+    expect(stagedFileNote(checkStagedFile(big, []))).toBe('This file is over the 25 MB limit.');
     expect(checkStagedFile(bin, [])).toEqual({ problem: 'unsupported', replaces: false });
-    expect(checkStagedFile(pdf, [])).toEqual({ warning: 'pdf', replaces: false });
+    expect(checkStagedFile(pdf, [])).toEqual({ replaces: false });
     expect(checkStagedFile(dup, ['oncall.txt'])).toEqual({ replaces: true });
-    expect(stagedFileNote(checkStagedFile(dup, ['oncall.txt']), dup.size)).toBe('Replaces the version already in the source');
-    expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size, pdfs: 1 });
+    expect(stagedFileNote(checkStagedFile(dup, ['oncall.txt']))).toBe('Replaces the version already in the source');
+    expect(stagedSummary([big, bin, pdf, dup], ['oncall.txt'])).toEqual({ ready: 2, skipped: 2, bytes: pdf.size + dup.size });
   });
 
   it('turns a file visibility choice into role tags and identity rules', () => {
@@ -914,10 +1089,12 @@ describe('file uploads', () => {
       { group: 'viewer', role: 'viewer' },
     ]);
     // An upload allows every granted role; a connector's audience comes from its own visibility.
-    const sources = withSourceVisibilityRules([upload('Files'), withValues('gdrive', { folderId: 'abc', apiKey: 'k' }), { ...withValues('gdrive', { folderId: 'x', apiKey: 'y' }), stagedVisibility: { kind: 'roles', roles: ['viewer'] } }], ['admin']);
-    expect(sources[0].audience).toEqual([{ group: 'admin', role: 'admin' }]);
-    expect(sources[1].audience).toEqual([{ group: 'admin', role: 'admin' }]);
-    expect(sources[2].audience).toEqual([{ group: 'viewer', role: 'viewer' }]);
+    withRoleVisibility(() => {
+      const sources = withSourceVisibilityRules([upload('Files'), withValues('gdrive', { folderId: 'abc', apiKey: 'k' }), { ...withValues('gdrive', { folderId: 'x', apiKey: 'y' }), stagedVisibility: { kind: 'roles', roles: ['viewer'] } }], ['admin']);
+      expect(sources[0].audience).toEqual([{ group: 'admin', role: 'admin' }]);
+      expect(sources[1].audience).toEqual([{ group: 'admin', role: 'admin' }]);
+      expect(sources[2].audience).toEqual([{ group: 'viewer', role: 'viewer' }]);
+    });
     expect(visibilityError({ kind: 'roles', roles: [] })).toBe('Choose at least one role');
     expect(visibilityError({ kind: 'everyone' })).toBe('');
   });
@@ -947,15 +1124,18 @@ describe('file uploads', () => {
     const everyone = ['admin', 'developer', 'viewer'];
     const drive = { ...withValues('gdrive', { folderId: 'abc', apiKey: 'k' }, 'Drive'), stagedVisibility: { kind: 'roles' as const, roles: ['viewer'] } };
     const files = { ...upload('Files'), stagedVisibility: { kind: 'everyone' as const } };
-    // Files shared with everyone cover every role; the drive is shared only with viewer.
-    expect(sharingMismatches([drive, files], ['developer'], everyone, ['admin'])).toEqual({ seeNothing: [], cannotQuery: ['viewer'], hiddenFromMe: ['Drive'] });
-    // With only the connector, Developer can query but sees nothing.
-    expect(sharingMismatches([drive], ['developer', 'viewer'], everyone, ['viewer'])).toEqual({ seeNothing: ['developer'], cannotQuery: [], hiddenFromMe: [] });
+    withRoleVisibility(() => {
+      // Files shared with everyone cover every role; the drive is shared only with viewer.
+      expect(sharingMismatches([drive, files], ['developer'], everyone, ['admin'])).toEqual({ seeNothing: [], cannotQuery: ['viewer'], hiddenFromMe: ['Drive'] });
+      // With only the connector, Developer can query but sees nothing.
+      expect(sharingMismatches([drive], ['developer', 'viewer'], everyone, ['viewer'])).toEqual({ seeNothing: ['developer'], cannotQuery: [], hiddenFromMe: [] });
+    });
   });
 
   it('maps record status to a file status', () => {
     expect(uploadStatusFromRecord(record({ indexState: 'indexed' }))).toEqual({ status: 'searchable' });
     expect(uploadStatusFromRecord(record({ indexState: 'pending' }))).toEqual({ status: 'indexing' });
+    expect(uploadStatusFromRecord(record({ indexState: 'reconcile_required' }))).toEqual({ status: 'indexing' });
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'extraction_unsupported' })).status).toBe('unreadable');
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_error' }))).toEqual({ status: 'failed', detail: 'Indexing failed: backend_error.' });
     // The engine's model failure codes say what to fix, so the file shows that instead of a code.
@@ -965,12 +1145,19 @@ describe('file uploads', () => {
     });
     expect(uploadStatusFromRecord(record({ indexState: 'failed', indexError: 'backend_model_unavailable' })).detail).toBe('The engine could not reach its model provider. Retry the file later.');
     expect(uploadStatusFromRecord(record({ indexState: 'not_indexed' })).status).toBe('stored');
+    withRoleVisibility(() =>
+      expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
+        status: 'held',
+        detail: 'Nobody can see this file. Change who can see it.',
+      }),
+    );
+    // Changing who can see a file is hidden while roles are turned off, so the message does not point to it.
     expect(uploadStatusFromRecord(record({ state: 'quarantined', quarantineReason: 'unmapped_audience' }))).toEqual({
       status: 'held',
-      detail: "The source has no rule for this file's roles yet, so nobody can see it. Someone who manages the source can fix it by changing who can see the file.",
+      detail: 'Nobody can see this file.',
     });
     expect(summarizeUploads([{ status: 'searchable' }, { status: 'searchable' }, { status: 'held' }, { status: 'uploading' }])).toBe('4 files · 1 in progress · 2 searchable · 1 held back');
-    expect(summarizeUploads([])).toBe('No files yet');
+    expect(summarizeUploads([])).toBe('No files uploaded from this browser');
   });
 
   it('tells an unchanged file from a changed one by its hash and roles, not its version', () => {
@@ -990,10 +1177,30 @@ describe('file uploads', () => {
     expect(deliveryIdentity('a.md', '17')).toBe('4:a.md:17');
   });
 
+  it('sends a passage page back to where the reader came from', () => {
+    expect(evidenceBackTarget({ backTo: 'playground' }, 'HotpotQA engine')).toEqual({ tab: 'playground', label: 'Back to the Playground' });
+    expect(evidenceBackTarget(null, 'HotpotQA engine')).toEqual({ tab: 'overview', label: 'Back to HotpotQA engine' });
+    expect(evidenceBackTarget(undefined, undefined)).toEqual({ tab: 'overview', label: 'Back to the context engine' });
+  });
+
+  it('treats only unreachable, timed out, rate limited or server errors as transient status reads', () => {
+    expect(isTransientReadError(new TypeError('Failed to fetch'))).toBe(true);
+    expect(isTransientReadError(new Error('Maximum update depth exceeded'))).toBe(true);
+    expect(isTransientReadError(new HttpError(503, 'HTTP 503: unavailable'))).toBe(true);
+    expect(isTransientReadError(new HttpError(0, 'HTTP 0: '))).toBe(true);
+    expect(isTransientReadError(new HttpError(408, 'HTTP 408: timeout'))).toBe(true);
+    expect(isTransientReadError(new HttpError(429, 'HTTP 429: slow down'))).toBe(true);
+    expect(isTransientReadError(new HttpError(404, 'HTTP 404: not found'))).toBe(false);
+    expect(isTransientReadError(new HttpError(403, 'HTTP 403: forbidden'))).toBe(false);
+    expect(isTransientReadError(new HttpError(400, 'HTTP 400: bad request'))).toBe(false);
+  });
+
   it('blocks a File Upload source whose staged files lack a role choice or their bytes', () => {
     const src: ContextSourceConfig = { ...upload('Files'), staged: [{ id: 'f1', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedVisibility: { kind: 'roles', roles: [] } };
-    expect(stagedBlocker(src)).toBe('Choose who can see the files');
-    expect(isSourceValid(src)).toBe(false);
+    withRoleVisibility(() => {
+      expect(stagedBlocker(src)).toBe('Choose who can see the files');
+      expect(isSourceValid(src)).toBe(false);
+    });
     const labelled: ContextSourceConfig = { ...src, stagedVisibility: { kind: 'everyone' } };
     expect(stagedBlocker(labelled)).toBe('Re-add 1 file');
     expect(sourceIncompleteReason(labelled)).toBe('Re-add 1 file');
@@ -1014,6 +1221,30 @@ describe('file uploads', () => {
     // A draft saved with the old label falls back to everyone who can query.
     const old = JSON.stringify({ v: 1, savedAt: 'x', form: { ...form, sources: [{ ...upload('Files'), staged, stagedLabel: 'eng' }] } });
     expect(fromDraft(old)!.form.sources[0].stagedVisibility).toEqual({ kind: 'everyone' });
+  });
+
+  it('shares everything with everyone who can query while choosing roles is turned off', async () => {
+    const actual = await vi.importActual<typeof import('../constants/contextEngine')>('../constants/contextEngine');
+    expect(actual.ROLE_VISIBILITY_ENABLED).toBe(false);
+    const roles = { kind: 'roles' as const, roles: ['viewer'] };
+    expect(effectiveVisibility(roles, false)).toEqual({ kind: 'everyone' });
+    expect(effectiveVisibility(undefined, false)).toEqual({ kind: 'everyone' });
+    expect(effectiveVisibility(roles, true)).toEqual(roles);
+    expect(effectiveVisibility(undefined, true)).toEqual({ kind: 'everyone' });
+
+    // A restored draft that still holds a role choice registers and validates as everyone.
+    const everyone = ['admin', 'developer', 'viewer'];
+    const drive = { ...withValues('gdrive', { folderId: 'abc', clientId: 'c', clientSecret: 's', refreshToken: 'r' }, 'Drive'), stagedVisibility: roles };
+    const [registered] = withSourceVisibilityRules([drive], everyone);
+    expect(registered.audience).toEqual(uploadSourceRules(everyone));
+    expect(summarizeSourceVisibility(drive)).toBe('Everyone who can query');
+    expect(sharingMismatches([drive], ['developer'], everyone, ['admin'])).toEqual({ seeNothing: [], cannotQuery: [], hiddenFromMe: [] });
+    const empty: ContextSourceConfig = { ...upload('Files'), staged: [{ id: 'f9', name: 'a.md', size: 10, contentType: 'text/markdown' }], stagedVisibility: { kind: 'roles', roles: [] } };
+    putStagedFile('f9', new Blob(['# a']));
+    expect(stagedBlocker(empty)).toBe('');
+    expect(isSourceValid(empty)).toBe(true);
+    expect(sourceIncompleteReason({ ...drive, stagedVisibility: { kind: 'roles', roles: [] } })).toBe('');
+    dropStagedFile('f9');
   });
 
   it('offers the upload step first on an engine that only has an upload source', () => {
@@ -1037,10 +1268,19 @@ describe('provenance and evidence', () => {
     expect(evidencePlace({ location: 'chunk:4', locator: undefined })).toEqual({ path: undefined, parts: ['Part 5'], coarse: true });
   });
 
+  it('numbers the part a passage came from, from the locator or the location', () => {
+    expect(evidencePart(ev({ chunkIndex: 2 }))).toBe(3);
+    expect(evidencePart({ location: 'chunk:4', locator: undefined })).toBe(5);
+    expect(evidencePart({ location: 'page:4', locator: undefined })).toBeUndefined();
+  });
+
   it('shows epoch versions as dates and leaves other versions alone', () => {
     expect(evidenceVersionLabel('1790872243455')).toMatch(/2026/);
     expect(evidenceVersionLabel('v12')).toBe('v12');
     expect(evidenceVersionLabel('17')).toBe('17');
+    // A version that is not a date is named, not dated.
+    expect(versionFromLabel('1790872243455')).toMatch(/^Version from .*2026/);
+    expect(versionFromLabel('v12')).toBe('Version v12');
   });
 
   it('numbers passage lines only when they line up with the locator', () => {
@@ -1087,11 +1327,6 @@ describe('provenance and evidence', () => {
     expect(askedQuestionMeta({ askedAt: now, outcome: 'passages', passages: 1 })).toBe('Just now · 1 passage');
     expect(askedQuestionMeta({ askedAt: now, outcome: 'hidden', passages: 2 })).toBe('Just now · answer hidden');
   });
-
-  it('explains a failed deletion', () => {
-    expect(deletionFailureText('residue_found')).toMatch(/still searchable/);
-    expect(deletionFailureText(undefined)).toMatch(/continues where the last attempt stopped/);
-  });
 });
 
 describe('editing models on a running engine', () => {
@@ -1115,12 +1350,6 @@ describe('editing models on a running engine', () => {
     expect(modelDraftError({ ...draft, provider: 'azure_openai', model: 'dep', apiKey: 'k' }, null)).toBe('Enter the base URL and API version');
     expect(modelDraftError({ ...draft, model: ' ' }, current)).toBe('Choose a model');
   });
-
-  it('says how the keys are held', () => {
-    expect(modelKeysLabel({ embedding: { provider: 'openai', model: 'e', keyKind: 'encrypted' }, llm: current })).toBe('Keys encrypted by the engine');
-    expect(modelKeysLabel({ embedding: { provider: 'azure_openai', model: 'e', keyKind: 'reference' }, llm: null })).toBe('Keys from secret references');
-    expect(modelKeysLabel({ embedding: null, llm: null })).toBe('');
-  });
 });
 
 describe('upload and processing time texts', () => {
@@ -1130,7 +1359,7 @@ describe('upload and processing time texts', () => {
   it('says what the engine is doing with a queued file and for how long', () => {
     expect(queuedUploadText({ uploadedAt, running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph · 14 min so far');
     expect(queuedUploadText({ uploadedAt }, at(0))).toBe('Uploaded · waiting for the engine to start on it · under a minute so far');
-    expect(queuedUploadText({ uploadedAt, retrying: true, running: true }, at(14))).toBe('Running again on the engine from the file it already has · nothing was uploaded.');
+    expect(queuedUploadText({ uploadedAt, retrying: true, running: true }, at(14))).toBe('Running again from the stored file.');
     // A row remembered without a usable time still says what is happening.
     expect(queuedUploadText({ uploadedAt: 'bad', running: true }, at(14))).toBe('Uploaded · the engine is reading it with its language model and adding it to the graph');
   });
@@ -1139,5 +1368,37 @@ describe('upload and processing time texts', () => {
     expect(uploadIsSlow({ uploadedAt }, at(1))).toBe(false);
     expect(uploadIsSlow({ uploadedAt }, at(2))).toBe(true);
     expect(uploadIsSlow({ uploadedAt: 'bad' }, at(60))).toBe(false);
+  });
+});
+
+describe('uploadSourceTitle', () => {
+  const of = (...statuses: UploadFileStatus[]) => statuses.map((status) => ({ status }));
+
+  it('counts the files the engine has while the rest upload', () => {
+    expect(uploadSourceTitle(of('queued', 'uploading', 'uploading'), 'Docs')).toBe('Uploading 3 files to “Docs” · 1 of 3 sent');
+  });
+
+  it('says the files are sent once the engine has them all, while it still indexes them', () => {
+    expect(uploadSourceTitle(of('queued', 'indexing', 'searchable'), 'Docs')).toBe('3 files sent to “Docs” · indexing');
+  });
+
+  it('does not count a file the engine never received as sent', () => {
+    expect(uploadSourceTitle([{ status: 'failed' }, { status: 'uploading' }, { status: 'queued', jobId: 'job_1' }], 'Docs')).toBe('Uploading 3 files to “Docs” · 1 of 3 sent');
+    expect(uploadSourceTitle([{ status: 'failed' }, { status: 'queued', jobId: 'job_1' }, { status: 'indexing', jobId: 'job_2' }], 'Docs')).toBe('2 files sent to “Docs” · indexing · 1 failed');
+    // A file the engine took and then failed on was sent.
+    expect(
+      uploadSourceTitle(
+        [
+          { status: 'failed', jobId: 'job_0' },
+          { status: 'queued', jobId: 'job_1' },
+        ],
+        'Docs',
+      ),
+    ).toBe('2 files sent to “Docs” · indexing');
+  });
+
+  it('says how many failed once nothing is running', () => {
+    expect(uploadSourceTitle(of('searchable', 'failed'), 'Docs')).toBe('2 files uploaded to “Docs” · 1 failed');
+    expect(uploadSourceTitle(of('searchable'), 'Docs')).toBe('1 file uploaded to “Docs”');
   });
 });

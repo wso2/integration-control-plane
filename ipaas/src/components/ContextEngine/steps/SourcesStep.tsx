@@ -23,7 +23,7 @@ import { POPULAR_CONNECTORS, QUICK_ADD_CONNECTORS } from '../../../constants/con
 import { isSourceValid, sourceIncompleteReason, sourceTypeName, summarizeSourceVisibility, summarizeSource } from '../../../utils/contextEngine';
 import SourceDrawer, { type SourceDrawerStart } from '../SourceDrawer';
 import SourceMark from '../SourceMark';
-import { emptySourcesCardSx, marksRowSx, quickAddButtonSx, quickAddRowSx, sourceListSx, sourceRowSx, sourceRowTextSx, sourcesToolbarSx, stepHeadingSx, stepHintSx } from '../styles';
+import { emptySourcesCardSx, marksRowSx, quickAddButtonSx, quickAddRowSx, sourceListSx, sourceRowSx, sourceRowTextSx, sourcesToolbarSx, stepHeadingAloneSx } from '../styles';
 import type { ContextSourceConfig } from '../../../types/contextEngine';
 
 interface SourcesStepProps {
@@ -95,11 +95,8 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
 
   return (
     <>
-      <Typography variant="subtitle2" sx={stepHeadingSx}>
+      <Typography variant="subtitle2" sx={stepHeadingAloneSx}>
         Choose Sources
-      </Typography>
-      <Typography variant="body2" sx={stepHintSx}>
-        Choose the data sources for your context graph. Each source sets who can see its content.
       </Typography>
 
       {sources.length === 0 ? (
@@ -112,9 +109,6 @@ export default function SourcesStep({ orgHandle, sources, onAdd, onUpdate, onRem
             </Box>
             <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 1 }}>
               No sources yet
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 520 }}>
-              Browse connectors across cloud storage, wikis, code, ticketing, databases and the web, or upload files directly.
             </Typography>
             <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => openDrawer()} sx={{ mt: 0.5 }}>
               Add source

@@ -210,6 +210,8 @@ export interface SourceConnector {
   popular?: boolean;
   /** Logo path under the public folder; `icon` is drawn when absent. */
   logo?: string;
+  /** Light variant of a dark logo, for the dark theme. */
+  logoDark?: string;
   icon: SourceIcon;
   fields: SourceFieldDef[];
   /** Field keys shown in the one-line summary, in order. */
@@ -352,12 +354,10 @@ export interface StagedFileMeta {
   contentType: string;
 }
 
-/** Why a chosen file cannot be uploaded, or what to warn about. */
+/** Why a chosen file cannot be uploaded. */
 export interface StagedFileCheck {
   /** Blocks the upload. */
   problem?: 'too-large' | 'unsupported';
-  /** Uploads, but is worth a warning. */
-  warning?: 'pdf';
   /** A file of this name is already in the source; uploading replaces it. */
   replaces: boolean;
 }
@@ -415,6 +415,11 @@ export interface UploadEntry extends UploadedFile {
   retrying?: boolean;
   /** The engine's worker has started on the file, so the wait is the work itself, not the queue. */
   running?: boolean;
+  /**
+   * The last status read did not reach the engine, so `status` is the last one read: another read is
+   * scheduled (`retrying`), or the reads stopped until the user checks again (`stopped`).
+   */
+  check?: 'retrying' | 'stopped';
 }
 
 export interface IngestFileInput {
@@ -806,7 +811,7 @@ export interface GetStartedStep {
   action?: string;
   id: GetStartedStepId;
   title: string;
-  description: string;
+  description?: string;
   state: 'done' | 'current' | 'todo';
 }
 
@@ -819,4 +824,28 @@ export interface McpClientConfig {
   /** Where the client keeps this file. */
   path: string;
   json: string;
+}
+
+/** One exchange in the Playground, kept for the life of the page so the conversation survives a tab switch or a passage page. */
+export interface PlaygroundTurn {
+  question: string;
+  mode: ContextQueryMode;
+  result: ContextQueryResult;
+  /** Reopened from the recent list: when it was asked, and how many passages it had then. */
+  reopened?: { askedAt: string; passagesThen: number };
+}
+
+export interface PlaygroundConversation {
+  turns: PlaygroundTurn[];
+  /** The mode the user chose; unset until they choose one, so the tab picks its own default. */
+  mode?: ContextQueryMode;
+  /** The question on its way to the engine; `token` tells its answer from a later question's. */
+  pending?: { question: string; mode: ContextQueryMode; token: number };
+  /** The last question's failure, until it is dismissed or another question is asked. */
+  failure?: { error: unknown; mode: ContextQueryMode };
+}
+
+/** Router state a passage page is opened with, so its Back returns to where the reader came from. */
+export interface ContextEvidenceLocationState {
+  backTo?: ContextEngineTabKey;
 }

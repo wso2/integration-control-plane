@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, ListingTable, Stack, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, ListingTable, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useContextEngineBearer } from '../../../hooks/useContextEngine';
@@ -25,7 +25,7 @@ import { buildMcpClientConfigs, mcpEndpointUrl, resolveEngineBaseUrl } from '../
 import CodeViewer from '../../CodeViewer';
 import McpPlayground from '../../McpPlayground/McpPlayground';
 import SurfaceHeader from './SurfaceHeader';
-import { clientTabsSx, endpointFieldSx, endpointRowSx, mutedSx, playgroundFrameSx } from '../styles';
+import { clientTabsSx, endpointFieldSx, endpointRowSx, playgroundFrameSx } from '../styles';
 import type { ContextEngineDetail, McpClientId } from '../../../types/contextEngine';
 
 interface McpTabProps {
@@ -48,7 +48,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   return (
     <Box>
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="AI agents connect over the Model Context Protocol and call the engine's read tools with the user's identity." />
+        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." />
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
           Server endpoint
@@ -67,14 +67,11 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
         </Tabs>
         <CodeViewer title={selected.path} language="json" code={selected.json} showCopyButton />
 
-        <Stack direction="row" alignItems="center" gap={2} sx={{ my: 3 }} flexWrap="wrap">
+        <Box sx={{ my: 3 }}>
           <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} onClick={() => setTesting((t) => !t)}>
             {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
           </Button>
-          <Typography variant="body2" sx={mutedSx}>
-            Lists the tools below and lets you call them with your own identity — the same playground integrations already use.
-          </Typography>
-        </Stack>
+        </Box>
       </Box>
 
       {/* The playground takes the page's full width; the text around it keeps a readable measure. */}
@@ -97,7 +94,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
               </ListingTable.Row>
             </ListingTable.Head>
             <ListingTable.Body>
-              {CONTEXT_MCP_TOOLS.map((t) => (
+              {CONTEXT_MCP_TOOLS.filter((t) => t.name !== 'get_answer' || engine.exposure.answers).map((t) => (
                 <ListingTable.Row key={t.name}>
                   <ListingTable.Cell>
                     <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
@@ -116,7 +113,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
         </ListingTable.Container>
 
         <Alert severity="info" variant="outlined">
-          Every tool call and evidence read is authorized on the caller's own identity — an agent acting for a user sees exactly what that user may see, and no more.
+          Agents see only what their user may see.
         </Alert>
       </Box>
     </Box>

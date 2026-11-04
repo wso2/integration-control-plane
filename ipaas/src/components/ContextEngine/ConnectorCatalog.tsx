@@ -40,6 +40,7 @@ function ConnectorTile({ connector, disabled, comingSoon, onPick }: { connector:
       title={connector.name}
       description={disabled && !comingSoon ? 'Already added' : connector.description}
       logo={connector.logo ? contextLogoUrl(connector.logo) : undefined}
+      logoDark={connector.logoDark ? contextLogoUrl(connector.logoDark) : undefined}
       icon={sourceTypeIcon(connector.id, 24)}
       selected={false}
       disabled={disabled || comingSoon}
@@ -142,7 +143,7 @@ export default function ConnectorCatalog({ addedIds, onPick }: ConnectorCatalogP
 
       {results.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          No connectors match “{query.trim()}”. Try another name, or pick a category.
+          No connectors match “{query.trim()}”.
         </Typography>
       ) : (
         <Box sx={catalogGridSx}>

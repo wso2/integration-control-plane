@@ -16,14 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, /* Button, */ Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { EyeOff, Info, KeyRound, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { EyeOff, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { CONTEXT_ENGINE_PROVISIONING, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
-import { EVERYONE_VISIBILITY, LLM_PROVIDERS, STORAGE_BACKENDS } from '../../../constants/contextEngine';
-import { EMBEDDING_PROVIDERS } from '../../../constants/ragIngestion';
-import { checkStagedFile, connectorFor, engineMessage, getStartedSteps, modelKeysLabel, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
+import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { checkStagedFile, connectorFor, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GetStartedChecklist from './GetStartedChecklist';
@@ -33,7 +32,7 @@ import FilesDrawer from '../files/FilesDrawer';
 import EditSourceDrawer from './EditSourceDrawer';
 import EditModelsDrawer from './EditModelsDrawer';
 import SourceDrawer from '../SourceDrawer';
-import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
+import { deleteCardSx, mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
 import type { ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
@@ -46,6 +45,8 @@ interface OverviewTabProps {
   openFilesSourceId?: string;
   /** The engine is being deleted: show what it holds, offer nothing that changes it. */
   readOnly?: boolean;
+  /** Ask to delete the engine. The page owns the confirmation dialog. */
+  onRequestDelete?: () => void;
 }
 
 function Card({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }): JSX.Element {
@@ -62,11 +63,13 @@ function Card({ title, action, children }: { title: string; action?: ReactNode; 
   );
 }
 
-const providerName = (kind: 'embedding' | 'llm', id: string | undefined): string => {
-  if (!id) return '—';
-  const list: { id: string; name: string }[] = kind === 'embedding' ? EMBEDDING_PROVIDERS : LLM_PROVIDERS;
-  return list.find((p) => p.id === id)?.name ?? id;
-};
+function LockedChip({ title }: { title: string }): JSX.Element {
+  return (
+    <Tooltip title={title}>
+      <Chip size="small" variant="outlined" icon={<Lock size={12} />} label="Locked" sx={{ height: 22 }} />
+    </Tooltip>
+  );
+}
 
 function ModelRow({ label, provider, model, locked = false }: { label: string; provider: string; model: string | undefined; locked?: boolean }): JSX.Element {
   return (
@@ -75,19 +78,17 @@ function ModelRow({ label, provider, model, locked = false }: { label: string; p
         <Typography variant="body2" sx={mutedSx}>
           {label}
         </Typography>
-        {locked && (
-          <Tooltip title="Fixed while the engine holds indexed items: their vectors only match this model.">
-            <Chip size="small" variant="outlined" icon={<Lock size={12} />} label="Locked" sx={{ height: 22 }} />
-          </Tooltip>
-        )}
+        {locked && <LockedChip title="Can't change after indexing." />}
       </Stack>
       <Box sx={{ textAlign: 'right' }}>
         <Typography variant="body2" sx={{ fontWeight: 500 }}>
           {provider}
         </Typography>
-        <Typography variant="caption" sx={mutedSx}>
-          {model ?? 'Set where the engine runs'}
-        </Typography>
+        {model && (
+          <Typography variant="caption" sx={mutedSx}>
+            {model}
+          </Typography>
+        )}
       </Box>
     </Box>
   );
@@ -99,7 +100,7 @@ const canSeeModels = (actions: string[] | undefined): boolean => !actions || act
 const SOURCES_CARD_ID = 'context-engine-sources';
 
 /** Overview — first-run checklist, source progress, access, models, storage and exposure, each linking to its tab. */
-export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTab, openFilesSourceId, readOnly = false }: OverviewTabProps): JSX.Element {
+export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTab, openFilesSourceId, readOnly = false, onRequestDelete }: OverviewTabProps): JSX.Element {
   const [filesSource, setFilesSource] = useState<ContextSource | null>(() => engine.sources.find((s) => s.id === openFilesSourceId && s.type === 'upload') ?? null);
   const [filesOpen, setFilesOpen] = useState(!!openFilesSourceId);
   const openFiles = (source: ContextSource) => {
@@ -117,6 +118,9 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const permissions = useContextPermissions(engine.id);
   // Models come from the engine's environment; changing them is provisioning, the control plane's.
   const canEditModels = CONTEXT_ENGINE_PROVISIONING && !readOnly && !!permissions.data?.includes('engine.manage');
+  // Deleting the engine needs the manage permission, so people without it are not offered a button that only fails.
+  // Without provisioning, deleting only removes the engine from this console and needs no engine permission.
+  const canDelete = !readOnly && (!CONTEXT_ENGINE_PROVISIONING || !!permissions.data?.includes('engine.manage'));
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
   const openModels = () => {
@@ -141,12 +145,12 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
         });
         staged.forEach((m) => dropStagedFile(m.id));
         if (files.length) {
-          const visibility = config.stagedVisibility ?? EVERYONE_VISIBILITY;
+          const visibility = effectiveVisibility(config.stagedVisibility);
           startUploads(engine.id, created.id, files, visibility, visibilityTags(visibility, everyone));
           openFiles(created);
         }
         if ((connectorFor(config.type)?.fields.length ?? 0) > 0) {
-          setSourceNotice({ severity: 'warning', message: `“${created.name}” is registered, but its connection settings and credentials are not stored: the engine does not serve the configuration route yet.` });
+          setSourceNotice({ severity: 'warning', message: `“${created.name}” was added, but its settings were not saved.` });
         }
       },
       onError: (e) => {
@@ -247,39 +251,25 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             }>
             {canSeeModels(permissions.data) ? (
               <>
-                <ModelRow label="Embedding" provider={engine.models.embedding ? providerName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
-                <ModelRow label="Language model" provider={engine.models.llm ? providerName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
+                <ModelRow label="Embedding" provider={engine.models.embedding ? modelProviderName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
+                <ModelRow label="Language model" provider={engine.models.llm ? modelProviderName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
                 <ModelRow
                   label="Answer model"
-                  provider={!engine.exposure.answers ? 'Answers off' : engine.models.answer ? providerName('llm', engine.models.answer.provider) : 'Engine default'}
+                  provider={!engine.exposure.answers ? 'Answers off' : engine.models.answer ? modelProviderName('llm', engine.models.answer.provider) : 'Engine default'}
                   model={engine.exposure.answers ? engine.models.answer?.model : undefined}
                 />
-                {modelKeysLabel(engine.models) ? (
-                  <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
-                    <KeyRound size={14} aria-hidden />
-                    <Typography variant="caption">{modelKeysLabel(engine.models)}</Typography>
-                  </Stack>
-                ) : (
-                  !engine.models.embedding &&
-                  !engine.models.llm && (
-                    <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.25 }}>
-                      <Info size={14} aria-hidden />
-                      <Typography variant="caption">Uses the engine host&apos;s models until you choose its own.</Typography>
-                    </Stack>
-                  )
-                )}
               </>
             ) : (
               <Stack direction="row" gap={1} sx={mutedSx}>
                 <EyeOff size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-                <Typography variant="body2">Only people with access to the whole engine can see its models; access to a single source isn&apos;t enough.</Typography>
+                <Typography variant="body2">You need access to the whole engine to see its models.</Typography>
               </Stack>
             )}
           </Card>
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card title="Storage">
+          <Card title="Storage" action={<LockedChip title="Storage is fixed once the engine is created." />}>
             {STORAGE_BACKENDS.map((b) => {
               const sum = engine.storage?.[b.kind];
               return (
@@ -323,6 +313,24 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             </Box>
           </Card>
         </Grid>
+
+        {onRequestDelete && canDelete && (
+          <Grid size={{ xs: 12 }}>
+            <Box sx={deleteCardSx}>
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                  Delete engine
+                </Typography>
+                <Typography variant="body2" sx={mutedSx}>
+                  {CONTEXT_ENGINE_PROVISIONING ? 'Deletes the engine and everything it holds. This can’t be undone.' : 'Removes the engine from this console. Its data stays in the engine’s databases.'}
+                </Typography>
+              </Box>
+              <Button variant="outlined" color="error" onClick={onRequestDelete} sx={{ flexShrink: 0 }}>
+                Delete engine
+              </Button>
+            </Box>
+          </Grid>
+        )}
       </Grid>
 
       {modelsSession > 0 && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={engine.models} open={modelsOpen} onClose={() => setModelsOpen(false)} />}

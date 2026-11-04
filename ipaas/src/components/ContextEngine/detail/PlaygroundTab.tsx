@@ -21,9 +21,11 @@ import { Braces, Copy, Eraser, EyeOff, History, RotateCcw, Send, Unlink } from '
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
-import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
-import { forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
-import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
+import { useAskedFlag, useContextPermissions, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
+import { clearQuestions, forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
+import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
+import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH, CONTEXT_QUERY_MODES } from '../../../constants/contextEngine';
+import { defaultQueryMode } from '../../../utils/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { contextEngineUrl, contextEvidenceUrl } from '../../../paths';
@@ -34,25 +36,12 @@ import EvidenceCard from './EvidenceCard';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
 import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx /* , suggestionRowSx */ } from '../styles';
-import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextQueryMode, ContextQueryResult } from '../../../types/contextEngine';
+import type { AskedQuestion, ContextEngineDetail, ContextEvidence, ContextEvidenceLocationState, ContextQueryMode, ContextQueryResult, PlaygroundTurn } from '../../../types/contextEngine';
 
 interface PlaygroundTabProps {
   engine: ContextEngineDetail;
   orgHandle: string;
 }
-
-interface Turn {
-  question: string;
-  mode: ContextQueryMode;
-  result: ContextQueryResult;
-  /** Reopened from the recent list: when it was asked, and how many passages it had then. */
-  reopened?: { askedAt: string; passagesThen: number };
-}
-
-const MODES: { value: ContextQueryMode; label: string; hint: string }[] = [
-  { value: 'context', label: 'Passages', hint: 'Returns the source-linked passages you are allowed to read — exactly what an agent receives.' },
-  { value: 'answer', label: 'Answer', hint: 'Answers in prose from the passages you are allowed to read, and cites each one.' },
-];
 
 interface QueryFailure {
   message: string;
@@ -64,8 +53,8 @@ function queryFailure(e: unknown, mode: ContextQueryMode): QueryFailure {
   if (e instanceof HttpError) {
     if (e.status === 403) return { message: "You don't have query access to this engine.", forbidden: true };
     // The engine names a model provider failure by its code, so the message says what to fix.
-    if (e.status === 503 && engineErrorCode(e)?.startsWith('backend_model_')) return { message: `${engineMessage(e)}. Fix the engine's model settings, then ask again.` };
-    if (e.status === 503 && mode === 'answer') return { message: "The engine couldn't get an answer from its language model just now, and stored nothing. Check the engine's models and keys, or ask in Passages mode." };
+    if (e.status === 503 && engineErrorCode(e)?.startsWith('backend_model_')) return { message: `${engineMessage(e).replace(/\.$/, '')}. Fix the engine's model settings, then ask again.` };
+    if (e.status === 503 && mode === 'answer') return { message: "The engine couldn't get an answer from its language model just now, and stored nothing. Check the engine's models and keys, or ask in Context mode." };
     if (e.status === 503) return { message: "The engine is running without its knowledge backend, so it can't search yet. Start it in provider mode with model keys." };
     if (e.status === 404 || e.status === 405) return { message: 'Querying is not available on this engine yet — the query route has not been enabled.' };
     if (e.status === 400) return { message: `The engine rejected the question: ${e.message}` };
@@ -99,17 +88,20 @@ function SectionHeading({ title, caption }: { title: string; caption?: string })
 /** Test playground — ask in natural language, read the answer or the passages the engine lets you see, follow each to its source, and reopen what you asked before. */
 export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps): JSX.Element {
   const navigate = useAppNavigate();
-  const [params] = useSearchParams();
+  const [params, setSearchParams] = useSearchParams();
   const { markAsked } = useAskedFlag(engine.id);
-  const [mode, setMode] = useState<ContextQueryMode>('context');
-  const principal = useContextPrincipal();
-  const groups = principal.data?.groups ?? [];
+  // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
+  // Until a mode is chosen the engine's default holds, and a stored Answer gives way when the engine offers no answers.
+  const { turns, mode: chosenMode, pending, failure } = usePlaygroundConversation(engine.id);
+  const mode = chosenMode && (chosenMode !== 'answer' || engine.exposure.answers) ? chosenMode : defaultQueryMode(engine);
+  // A question pending from before a tab switch still counts, so it is not asked twice.
+  const asking = pending !== undefined;
+  const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
   const permissions = useContextPermissions(engine.id);
   const canQuery = !permissions.data || permissions.data.includes('context.read');
   const canGrantSelf = !!permissions.data?.includes('access.manage');
   // "Ask about this" on a passage page lands here with the question in the URL.
   const [question, setQuestion] = useState(() => params.get('q')?.trim() ?? '');
-  const [turns, setTurns] = useState<Turn[]>([]);
   const [copied, setCopied] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const query = useQueryContextEngine();
@@ -121,25 +113,26 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const sourcesById = new Map(engine.sources.map((s) => [s.id, s]));
   const llmModel = engine.models.llm?.model;
 
-  const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !query.isPending;
+  const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !asking && openingId === null;
   // const suggestions = suggestedQuestions(engine);
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
-  const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev));
+  const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
 
   const ask = (text = question, askMode = mode) => {
     const q = text.trim();
-    if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || query.isPending) return;
+    // A reopen in flight would replace the conversation and drop this question's turn.
+    if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || asking || openingId !== null) return;
     setNotice(null);
-    query.mutate(
-      { engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT },
-      {
-        onSuccess: (result) => {
-          setTurns((prev) => [...prev, { question: q, mode: askMode, result }]);
-          setQuestion('');
-          markAsked();
-          rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
-        },
+    const token = startQuestion(engine.id, q, askMode);
+    // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
+    query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT }).then(
+      (result) => {
+        // The engine stored the question either way, so it joins the recent list even when the conversation moved on.
+        rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
+        markAsked();
+        if (finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } })) setQuestion('');
       },
+      (error: unknown) => void finishQuestion(engine.id, token, { error }),
     );
   };
 
@@ -147,15 +140,15 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   // The promise, not per-call callbacks: those are dropped when the observer unsubscribes, as React's
   // development double mount does to the reopen started by `?open=` below.
   const reopenQuestion = (q: AskedQuestion) => {
+    // Reopening replaces the conversation, which would drop the answer still on its way.
+    if (asking) return;
     setNotice(null);
     setOpeningId(q.queryId);
     reopen
       .mutateAsync(q.queryId)
       .then(
         (result) => {
-          setTurns([{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }]);
-          setMode(q.mode);
-          query.reset();
+          replaceTurns(engine.id, [{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }], q.mode);
           if (result.answerWithheld && q.outcome !== 'hidden') updateQuestion(engine.id, q.queryId, { outcome: 'hidden' });
           window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         },
@@ -169,7 +162,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       .finally(() => setOpeningId((current) => (current === q.queryId ? null : current)));
   };
 
-  const copyResult = (turn: Turn) => {
+  const copyResult = (turn: PlaygroundTurn) => {
     const text = turn.result.answer && !turn.result.answerWithheld ? turn.result.answer : turn.result.evidence.map((e, i) => `[${i + 1}] ${e.passage}`).join('\n');
     navigator.clipboard?.writeText(text).then(() => {
       setCopied(turn.result.queryId);
@@ -177,7 +170,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     });
   };
 
-  const openInApi = (turn: Turn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}`);
+  const openInApi = (turn: PlaygroundTurn) => navigate(`${contextEngineUrl(orgHandle, engine.id, 'api')}?q=${encodeURIComponent(turn.question)}${turn.mode === 'answer' ? '&mode=answer' : ''}`);
   // The Graph tab draws an answer's derivation from the stored query; a passage given here opens chosen.
   const derivationHref = (queryId: string, ev?: ContextEvidence) => `${contextEngineUrl(orgHandle, engine.id, 'graph')}?query=${encodeURIComponent(queryId)}${ev ? `&node=${encodeURIComponent(`p:${ev.id}`)}` : ''}`;
 
@@ -187,16 +180,29 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   useEffect(() => {
     if (!openId || openRef.current === openId) return;
     openRef.current = openId;
-    const known = asked.find((q) => q.queryId === openId);
-    reopenQuestion(known ?? { queryId: openId, engineId: engine.id, question: 'An earlier question', mode: 'answer', askedAt: new Date().toISOString(), outcome: 'answered', passages: 0 });
+    // A conversation restored for this tab may already show the question; replacing it would drop the follow-ups.
+    if (turns.some((t) => t.result.queryId === openId)) window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    else {
+      const known = asked.find((q) => q.queryId === openId);
+      reopenQuestion(known ?? { queryId: openId, engineId: engine.id, question: 'An earlier question', mode: 'answer', askedAt: new Date().toISOString(), outcome: 'answered', passages: 0 });
+    }
+    // Handled once: drop the parameter so Back, forward or a return from a passage page does not replay it.
+    setSearchParams(
+      (next) => {
+        next.delete('open');
+        return next;
+      },
+      { replace: true },
+    );
     // Reopen once per id; the question list and handlers need not retrigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openId]);
 
-  const renderTurn = (t: Turn, i: number) => {
+  const renderTurn = (t: PlaygroundTurn, i: number) => {
     const { result } = t;
     const n = result.evidence.length;
-    const answered = t.mode === 'answer' && !!result.answer && !result.answerWithheld;
+    const answerText = t.mode === 'answer' && !result.answerWithheld ? result.answer : undefined;
+    const answered = !!answerText;
     const lost = t.reopened ? Math.max(0, t.reopened.passagesThen - n) : 0;
     // Full cards for passages, a hidden answer or an answer the engine declined; an answer gets its rail instead.
     const cards = result.evidence.map((ev, idx) => <EvidenceCard key={ev.id} evidence={ev} n={idx + 1} source={sourcesById.get(ev.sourceId)} href={hrefFor(ev)} onOpen={() => openEvidence(ev)} />);
@@ -214,10 +220,10 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 The answer is hidden
               </Typography>
               <Typography variant="body2" sx={mutedSx}>
-                One of the passages it was written from is no longer available to you, and showing the answer could reveal it. The passages you can still read are below.
+                A passage it used is no longer available to you.
               </Typography>
             </Box>
-            <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || query.isPending} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
+            <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || asking} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
               Ask again
             </Button>
           </Box>
@@ -225,14 +231,14 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
-    } else if (answered) {
+    } else if (answerText) {
       summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
-      body = <AnsweredTurn answer={result.answer!} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
+      body = <AnsweredTurn answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';
       body = (
         <Alert severity="info" variant="outlined">
-          No passages you can read matched this question. The engine only searches indexed items whose groups map to a role you belong to{groups.length ? ` (your groups: ${groups.join(', ')})` : ''}.
+          No passages you can read matched this question.
         </Alert>
       );
     } else if (t.mode === 'answer') {
@@ -243,9 +249,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               No answer from the passages you can read
             </Typography>
-            The engine found related passages, but none of them answers this, so it wrote nothing. It never answers without a passage it can cite.
+            Related passages were found, but none answers this.
           </Alert>
-          <SectionHeading title="Passages it checked" caption="Shown so you can judge for yourself" />
+          <SectionHeading title="Passages it checked" />
           <Stack gap={1.5}>{cards}</Stack>
         </>
       );
@@ -280,7 +286,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             <Box sx={{ display: 'flex', gap: 1.25, alignItems: 'flex-start', mt: 1.5, p: 1.5, borderRadius: 1, border: '1px dashed', borderColor: 'divider', color: 'text.secondary' }}>
               <Unlink size={16} aria-hidden style={{ marginTop: 2 }} />
               <Typography variant="body2">
-                {lost} passage{lost === 1 ? '' : 's'} from when you asked {lost === 1 ? 'is' : 'are'} no longer available. Their items changed, were removed, or are now outside what you can see.
+                {lost} passage{lost === 1 ? '' : 's'} from when you asked {lost === 1 ? 'is' : 'are'} no longer available.
               </Typography>
             </Box>
           )}
@@ -309,7 +315,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       <Stack gap={3} sx={{ minWidth: 0 }}>
         <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
           <Typography variant="body2" sx={mutedSx}>
-            {MODES.find((m) => m.value === mode)?.hint}
+            {CONTEXT_QUERY_MODES.find((m) => m.value === mode)?.hint}
           </Typography>
           <Stack direction="row" alignItems="center" gap={1}>
             <ToggleButtonGroup
@@ -320,13 +326,13 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 if (next) setMode(next);
               }}
               aria-label="Query mode">
-              {MODES.map((m) =>
+              {CONTEXT_QUERY_MODES.map((m) =>
                 m.value !== 'answer' || engine.exposure.answers ? (
                   <ToggleButton key={m.value} value={m.value}>
                     {m.label}
                   </ToggleButton>
                 ) : (
-                  <Tooltip key={m.value} title="This engine is set up without answers, so it returns passages only.">
+                  <Tooltip key={m.value} title="Answers are off for this engine.">
                     <span>
                       <ToggleButton value={m.value} disabled>
                         {m.label}
@@ -338,9 +344,11 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
             </ToggleButtonGroup>
             {turns.length > 0 && (
               <Tooltip title="Clear conversation">
-                <IconButton size="small" aria-label="Clear conversation" onClick={() => setTurns([])}>
-                  <Eraser size={16} />
-                </IconButton>
+                <span>
+                  <IconButton size="small" aria-label="Clear conversation" disabled={openingId !== null} onClick={() => clearTurns(engine.id)}>
+                    <Eraser size={16} />
+                  </IconButton>
+                </span>
               </Tooltip>
             )}
           </Stack>
@@ -348,12 +356,12 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
 
         {!canQuery && (
           <Alert severity="info" variant="outlined" action={canGrantSelf ? <OwnerAccessButton engineId={engine.id} /> : undefined}>
-            You can open passages that are cited to you, but you can&apos;t ask this engine questions. Ask an engine manager for query access.
+            You can&apos;t ask this engine questions. Ask an engine manager for access.
           </Alert>
         )}
 
         {/* Sample questions hidden for now.
-        {turns.length === 0 && !query.isPending && canQuery && (
+        {turns.length === 0 && !asking && canQuery && (
           <Box sx={suggestionRowSx}>
             <Typography variant="body2" sx={mutedSx}>
               Try
@@ -373,13 +381,13 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           </Alert>
         )}
 
-        {query.isError && (
+        {failure && (
           <Alert
             severity="error"
             variant="outlined"
-            onClose={queryFailure(query.error, mode).forbidden ? undefined : () => query.reset()}
-            action={queryFailure(query.error, mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
-            {queryFailure(query.error, mode).message}
+            onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
+            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
+            {queryFailure(failure.error, failure.mode).message}
           </Alert>
         )}
 
@@ -400,8 +408,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               }}
               inputProps={{ 'aria-label': 'Question', maxLength: CONTEXT_QUERY_MAX_LENGTH }}
             />
-            <Button variant="contained" disabled={!canAsk} startIcon={query.isPending ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />} onClick={() => ask()} sx={{ flexShrink: 0 }}>
-              {query.isPending ? 'Asking…' : 'Ask'}
+            <Button variant="contained" disabled={!canAsk} startIcon={asking ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />} onClick={() => ask()} sx={{ flexShrink: 0 }}>
+              {asking ? 'Asking…' : 'Ask'}
             </Button>
           </Box>
           <Typography variant="caption" sx={{ ...mutedSx, ml: 1.75 }}>
@@ -410,7 +418,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </Stack>
       </Stack>
 
-      <RecentQuestions questions={asked} selectedId={shown} openingId={openingId ?? undefined} onOpen={reopenQuestion} />
+      <RecentQuestions questions={asked} selectedId={shown} openingId={openingId ?? undefined} onOpen={reopenQuestion} onClear={() => clearQuestions(engine.id)} />
     </Box>
   );
 }

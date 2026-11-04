@@ -156,7 +156,7 @@ export function RelationPanel({ engineId, orgHandle, view, conflicts, ask, sourc
         </Typography>
       )}
       <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-        Found by the language model while the graph was built, in {count} document{count === 1 ? '' : 's'} you may read.
+        Mentioned in {count} document{count === 1 ? '' : 's'} you may read.
       </Typography>
 
       {/* While the passages are read, the sentences that cite them are not known yet, unless the answer's own facts named them. */}

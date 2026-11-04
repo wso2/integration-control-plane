@@ -16,14 +16,14 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, PageContent, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { CONTEXT_ENGINE_PROVISIONING, isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useDeletionJob } from '../hooks/useContextEngine';
-import { deletionFailureText, engineMessage } from '../utils/contextEngine';
+import { DELETION_FAILURE_TEXT, engineMessage } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
@@ -38,6 +38,7 @@ import McpTab from '../components/ContextEngine/detail/McpTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
 import type { CreateContextEngineLocationState } from './CreateContextEngine';
 import type { ContextEngineTabKey } from '../types/contextEngine';
+import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 const TABS: { value: ContextEngineTabKey; label: string }[] = [
@@ -86,7 +87,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isLoading) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Box sx={centeredSx}>
           <CircularProgress />
@@ -97,7 +98,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isError && error instanceof HttpError && error.status === 404) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <NotFound message={seenDeleting.current ? 'This context engine was deleted.' : "This context engine does not exist, or you don't have access to it."} backTo={base} />
       </PageContent>
@@ -106,7 +107,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isError || !engine) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Alert
           severity="error"
@@ -141,7 +142,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const shownTab: ContextEngineTabKey = deleting ? 'overview' : activeTab;
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       {back}
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
         <Box sx={{ minWidth: 0 }}>
@@ -151,17 +152,12 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             </Typography>
             <EngineStateChip state={engine.state} />
           </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {engine.description || 'No description'}
-          </Typography>
+          {engine.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {engine.description}
+            </Typography>
+          )}
         </Box>
-        {!deleting && (
-          <Tooltip title="Delete engine">
-            <IconButton color="error" aria-label={`Delete ${engine.name}`} onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={18} />
-            </IconButton>
-          </Tooltip>
-        )}
       </Stack>
 
       {deleting &&
@@ -178,14 +174,14 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               Deleting this engine failed
             </Typography>
-            {deletionFailureText(deletion.data?.error?.code)}
+            {DELETION_FAILURE_TEXT}
           </Alert>
         ) : (
           <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
             <Typography variant="body2" sx={{ fontWeight: 600 }}>
               This engine is being deleted
             </Typography>
-            Questions, uploads and changes are paused, and its API and MCP endpoints have stopped answering. It disappears from your list once the engine finishes.
+            Questions, uploads and changes are paused. API and MCP endpoints are off.
           </Alert>
         ))}
 
@@ -212,7 +208,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={deleting} />}
+      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={deleting} onRequestDelete={() => setConfirmDelete(true)} />}
       {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'api' && <ApiTab engine={engine} />}

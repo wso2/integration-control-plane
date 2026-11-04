@@ -120,11 +120,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
     return <Alert severity="error">Couldn’t read the engine’s graph. Please try again.</Alert>;
   }
   if (!data || !model || !buffers) {
-    return (
-      <Alert severity="info">
-        This engine doesn’t serve its graph yet. You can still see how an answer was derived: open one from the Playground with <strong>How this answer was derived</strong>.
-      </Alert>
-    );
+    return <Alert severity="info">Graph view isn’t available for this engine.</Alert>;
   }
   // The engine serves its graph, but there is nothing in it: no record is indexed yet, or every record was
   // deleted. The canvas is not mounted for it, since it has nothing to draw and no point to fit the camera to.
@@ -230,7 +226,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
           {model.nodes.length === 0 && (
             <Box sx={canvasNoteSx}>
               <Typography variant="body2" sx={{ ...mutedSx, textAlign: 'center', maxWidth: 380, bgcolor: 'background.paper', borderRadius: 1, px: 2, py: 1.25, border: '1px solid', borderColor: 'divider' }}>
-                {counts.records || counts.entities ? 'Nothing matches these filters. Turn on documents or entities to see them.' : 'Nothing to show yet. The graph is built as documents are indexed, and shows only the ones you can see.'}
+                {counts.records || counts.entities ? 'Nothing matches these filters. Turn on documents or entities to see them.' : 'Nothing to show yet.'}
               </Typography>
             </Box>
           )}
@@ -317,7 +313,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
                 Click a node
               </Typography>
               <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.55 }}>
-                Documents are the items your sources delivered. Entities are what the language model found in them while building the graph, or what a mapping wrote from them. A line between two entities is a relationship. Read it along its arrow, from the subject to the object; select it and the dots on it run the same way. Click the label on a line to see that relationship; a red “contradicts” label is a conflict between two of them. You see only what you may read.
+                A red “contradicts” label marks a conflict between two relationships.
               </Typography>
               <Box component="dl" sx={{ display: 'grid', gridTemplateColumns: 'auto 1fr', columnGap: 2, rowGap: 0.5, m: 0, fontSize: 13 }}>
                 <Box component="dt" sx={mutedSx}>
@@ -354,9 +350,6 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
             </Stack>
             {answered.length ? (
               <>
-                <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-                  Pick one of your recent questions to see how its answer was derived.
-                </Typography>
                 <TextField select size="small" label="Question" value={explain || answered[0].queryId} onChange={(e) => setExplain(e.target.value)}>
                   {answered.map((q) => (
                     <MenuItem key={q.queryId} value={q.queryId} sx={{ whiteSpace: 'normal' }}>
@@ -370,7 +363,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
               </>
             ) : (
               <Typography variant="body2" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-                Ask a question in Answer mode in the Playground, then come back to see how its answer was derived from this graph.
+                Ask a question in Answer mode to explain it here.
               </Typography>
             )}
           </Box>

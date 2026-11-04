@@ -20,7 +20,7 @@ import { Box, Chip, CircularProgress, Tooltip, Typography } from '@wso2/oxygen-u
 import { CircleAlert } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useDeletionJob } from '../../hooks/useContextEngine';
-import { deletionFailureText } from '../../utils/contextEngine';
+import { DELETION_FAILURE_TEXT } from '../../utils/contextEngine';
 import { formatDistanceToNow } from '../../utils/time';
 import EngineStateChip from './EngineStateChip';
 
@@ -35,7 +35,7 @@ export default function DeletionStatus({ engineId, state }: { engineId: string; 
   if (!deleting) return <EngineStateChip state={state} />;
   if (job.data?.state === 'failed') {
     return (
-      <Tooltip title={deletionFailureText(job.data.error?.code)}>
+      <Tooltip title={DELETION_FAILURE_TEXT}>
         <Chip size="small" variant="outlined" color="error" icon={<CircleAlert size={14} />} label="Deletion failed" />
       </Tooltip>
     );
