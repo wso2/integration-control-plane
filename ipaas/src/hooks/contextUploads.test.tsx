@@ -19,7 +19,7 @@
 import { act, type JSX } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CONTEXT_ENGINE_FILES_KEY_PREFIX, UPLOAD_CHECK_CONCURRENCY, UPLOAD_CHECK_RETRY_DETAIL } from '../constants/contextEngine';
+import { CONTEXT_ENGINE_FILES_KEY_PREFIX, UPLOAD_CHECK_CONCURRENCY, UPLOAD_CHECK_GIVE_UP_MS, UPLOAD_CHECK_RETRY_DETAIL, UPLOAD_CHECK_STOPPED_DETAIL } from '../constants/contextEngine';
 import { HttpError } from '../types/http';
 import type { UploadEntry } from '../types/contextEngine';
 
@@ -36,7 +36,7 @@ const api = vi.hoisted(() => ({
 }));
 vi.mock('#api/contextEngine', () => api);
 
-import { refreshUploads, retryUpload, startUploads, useSourceUploads } from './contextUploads';
+import { checkUpload, refreshUploads, retryUpload, startUploads, useSourceUploads } from './contextUploads';
 
 const INDEXED = { recordId: 'f0', state: 'active', indexState: 'indexed', currentVersion: '1' };
 let root: Root;
@@ -137,6 +137,28 @@ describe('useSourceUploads status reads', () => {
     expect(api.getContextRecordStatus).toHaveBeenCalledTimes(2);
     expect(seen).not.toContain('failed');
     expect(seen.at(-1)).toBe('searchable');
+  });
+
+  it('stops reading a status the engine keeps failing to answer, until checked again', async () => {
+    remember('s-down', 1);
+    api.getContextRecordStatus.mockRejectedValue(new HttpError(503, 'HTTP 503: unavailable'));
+    let last: UploadEntry | undefined;
+    mount('s-down', (e) => {
+      last = e[0];
+    });
+    await settle();
+    await settle(UPLOAD_CHECK_GIVE_UP_MS + 30_000);
+    expect(last?.check).toBe('stopped');
+    expect(last?.detail).toBe(UPLOAD_CHECK_STOPPED_DETAIL);
+    const calls = api.getContextRecordStatus.mock.calls.length;
+    await settle(10 * 60_000);
+    expect(api.getContextRecordStatus).toHaveBeenCalledTimes(calls);
+    // Checking again starts the reads over.
+    api.getContextRecordStatus.mockResolvedValue(INDEXED);
+    act(() => checkUpload('e1', 's-down', 'f0'));
+    await settle();
+    expect(last?.status).toBe('searchable');
+    expect(last?.check).toBeUndefined();
   });
 
   it('does not let a retry scheduled for the old file remove its replacement', async () => {

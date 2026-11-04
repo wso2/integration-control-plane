@@ -23,7 +23,7 @@ import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { useAskedFlag, useContextPermissions, useContextPrincipal, useQueryContextEngine, useReopenContextQuery } from '../../../hooks/useContextEngine';
 import { forgetQuestion, rememberQuestion, updateQuestion, useAskedQuestions } from '../../../hooks/contextQuestions';
-import { appendTurn, clearTurns, replaceTurns, setPlaygroundMode, usePlaygroundConversation } from '../../../hooks/contextTurns';
+import { clearTurns, dismissQuestionFailure, finishQuestion, replaceTurns, setPlaygroundMode, startQuestion, usePlaygroundConversation } from '../../../hooks/contextTurns';
 import { CONTEXT_QUERY_DEFAULT_LIMIT, CONTEXT_QUERY_MAX_LENGTH } from '../../../constants/contextEngine';
 // import { suggestedQuestions } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
@@ -95,7 +95,9 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const [params, setSearchParams] = useSearchParams();
   const { markAsked } = useAskedFlag(engine.id);
   // The conversation and mode live outside the tab, so a tab switch or a passage page does not empty them.
-  const { turns, mode = 'context' } = usePlaygroundConversation(engine.id);
+  const { turns, mode = 'context', pending, failure } = usePlaygroundConversation(engine.id);
+  // A question pending from before a tab switch still counts, so it is not asked twice.
+  const asking = pending !== undefined;
   const setMode = (next: ContextQueryMode) => setPlaygroundMode(engine.id, next);
   const principal = useContextPrincipal();
   const groups = principal.data?.groups ?? [];
@@ -115,7 +117,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const sourcesById = new Map(engine.sources.map((s) => [s.id, s]));
   const llmModel = engine.models.llm?.model;
 
-  const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !query.isPending && openingId === null;
+  const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !asking && openingId === null;
   // const suggestions = suggestedQuestions(engine);
   const hrefFor = (ev: ContextEvidence) => contextEvidenceUrl(orgHandle, engine.id, ev.id);
   const openEvidence = (ev: ContextEvidence) => navigate(hrefFor(ev), { state: { backTo: 'playground' } satisfies ContextEvidenceLocationState });
@@ -123,24 +125,27 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const ask = (text = question, askMode = mode) => {
     const q = text.trim();
     // A reopen in flight would replace the conversation and drop this question's turn.
-    if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || query.isPending || openingId !== null) return;
+    if (!q || q.length > CONTEXT_QUERY_MAX_LENGTH || asking || openingId !== null) return;
     setNotice(null);
+    const token = startQuestion(engine.id, q, askMode);
     // The promise, not a per-call callback: the answer is recorded even when the tab unmounts while it is pending.
-    query
-      .mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT })
-      .then((result) => {
-        appendTurn(engine.id, { question: q, mode: askMode, result });
-        setQuestion('');
-        markAsked();
+    query.mutateAsync({ engineId: engine.id, question: q, mode: askMode, limit: CONTEXT_QUERY_DEFAULT_LIMIT }).then(
+      (result) => {
+        // The engine stored the question either way, so it joins the recent list even when the conversation moved on.
         rememberQuestion({ queryId: result.queryId, engineId: engine.id, question: q, mode: askMode, askedAt: new Date().toISOString(), outcome: outcomeOf(askMode, result), passages: result.evidence.length });
-      })
-      .catch(() => undefined);
+        markAsked();
+        if (finishQuestion(engine.id, token, { turn: { question: q, mode: askMode, result } })) setQuestion('');
+      },
+      (error: unknown) => void finishQuestion(engine.id, token, { error }),
+    );
   };
 
   // Opening a recent question replaces the conversation with it and brings it into view; follow-ups then build on it.
   // The promise, not per-call callbacks: those are dropped when the observer unsubscribes, as React's
   // development double mount does to the reopen started by `?open=` below.
   const reopenQuestion = (q: AskedQuestion) => {
+    // Reopening replaces the conversation, which would drop the answer still on its way.
+    if (asking) return;
     setNotice(null);
     setOpeningId(q.queryId);
     reopen
@@ -148,7 +153,6 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
       .then(
         (result) => {
           replaceTurns(engine.id, [{ question: q.question, mode: q.mode, result, reopened: { askedAt: q.askedAt, passagesThen: q.passages } }], q.mode);
-          query.reset();
           if (result.answerWithheld && q.outcome !== 'hidden') updateQuestion(engine.id, q.queryId, { outcome: 'hidden' });
           window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
         },
@@ -223,7 +227,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
                 One of the passages it was written from is no longer available to you, and showing the answer could reveal it. The passages you can still read are below.
               </Typography>
             </Box>
-            <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || query.isPending} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
+            <Button size="small" variant="outlined" startIcon={<RotateCcw size={14} />} disabled={!canQuery || asking} onClick={() => ask(t.question, 'answer')} sx={{ flexShrink: 0 }}>
               Ask again
             </Button>
           </Box>
@@ -361,7 +365,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         )}
 
         {/* Sample questions hidden for now.
-        {turns.length === 0 && !query.isPending && canQuery && (
+        {turns.length === 0 && !asking && canQuery && (
           <Box sx={suggestionRowSx}>
             <Typography variant="body2" sx={mutedSx}>
               Try
@@ -381,13 +385,13 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
           </Alert>
         )}
 
-        {query.isError && (
+        {failure && (
           <Alert
             severity="error"
             variant="outlined"
-            onClose={queryFailure(query.error, mode).forbidden ? undefined : () => query.reset()}
-            action={queryFailure(query.error, mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
-            {queryFailure(query.error, mode).message}
+            onClose={queryFailure(failure.error, failure.mode).forbidden ? undefined : () => dismissQuestionFailure(engine.id)}
+            action={queryFailure(failure.error, failure.mode).forbidden ? <OwnerAccessButton engineId={engine.id} onGranted={() => ask()} /> : undefined}>
+            {queryFailure(failure.error, failure.mode).message}
           </Alert>
         )}
 
@@ -408,8 +412,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
               }}
               inputProps={{ 'aria-label': 'Question', maxLength: CONTEXT_QUERY_MAX_LENGTH }}
             />
-            <Button variant="contained" disabled={!canAsk} startIcon={query.isPending ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />} onClick={() => ask()} sx={{ flexShrink: 0 }}>
-              {query.isPending ? 'Asking…' : 'Ask'}
+            <Button variant="contained" disabled={!canAsk} startIcon={asking ? <CircularProgress size={16} color="inherit" /> : <Send size={16} />} onClick={() => ask()} sx={{ flexShrink: 0 }}>
+              {asking ? 'Asking…' : 'Ask'}
             </Button>
           </Box>
           <Typography variant="caption" sx={{ ...mutedSx, ml: 1.75 }}>

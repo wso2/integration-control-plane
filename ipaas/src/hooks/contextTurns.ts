@@ -37,14 +37,44 @@ export function getPlaygroundConversation(engineId: string): PlaygroundConversat
 }
 
 function write(engineId: string, next: PlaygroundConversation): void {
-  conversations.set(engineId, { turns: next.turns.slice(-PLAYGROUND_TURNS_MAX), mode: next.mode });
+  conversations.set(engineId, { ...next, turns: next.turns.slice(-PLAYGROUND_TURNS_MAX) });
   listeners.forEach((l) => l());
 }
 
 /** Add an answered question to the end of the conversation; past the cap the oldest turn goes. */
 export function appendTurn(engineId: string, turn: PlaygroundTurn): void {
   const current = getPlaygroundConversation(engineId);
-  write(engineId, { turns: [...current.turns, turn], mode: current.mode });
+  write(engineId, { ...current, turns: [...current.turns, turn] });
+}
+
+let lastToken = 0;
+
+/**
+ * A question is on its way to the engine. It is kept here, not in the tab, so a tab that
+ * remounts while it is pending still shows it and does not let it be asked twice.
+ */
+export function startQuestion(engineId: string, question: string, mode: ContextQueryMode): number {
+  lastToken += 1;
+  const { failure: _, ...current } = getPlaygroundConversation(engineId);
+  write(engineId, { ...current, pending: { question, mode, token: lastToken } });
+  return lastToken;
+}
+
+/**
+ * The engine answered a pending question, or failed to. A conversation cleared or replaced
+ * while the question was pending has moved on, so the outcome is dropped. True when it was kept.
+ */
+export function finishQuestion(engineId: string, token: number, outcome: { turn: PlaygroundTurn } | { error: unknown }): boolean {
+  const { pending, ...current } = getPlaygroundConversation(engineId);
+  if (pending?.token !== token) return false;
+  if ('turn' in outcome) write(engineId, { ...current, turns: [...current.turns, outcome.turn] });
+  else write(engineId, { ...current, failure: { error: outcome.error, mode: pending.mode } });
+  return true;
+}
+
+export function dismissQuestionFailure(engineId: string): void {
+  const { failure: _, ...current } = getPlaygroundConversation(engineId);
+  write(engineId, current);
 }
 
 /** A reopened question replaces the conversation; follow-ups then build on it. */
@@ -53,7 +83,7 @@ export function replaceTurns(engineId: string, turns: PlaygroundTurn[], mode: Co
 }
 
 export function setPlaygroundMode(engineId: string, mode: ContextQueryMode): void {
-  write(engineId, { turns: getPlaygroundConversation(engineId).turns, mode });
+  write(engineId, { ...getPlaygroundConversation(engineId), mode });
 }
 
 /** Empty the conversation; the chosen mode stays. */

@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { PLAYGROUND_TURNS_MAX } from '../constants/contextEngine';
-import { appendTurn, clearTurns, getPlaygroundConversation, replaceTurns, setPlaygroundMode } from './contextTurns';
+import { appendTurn, clearTurns, dismissQuestionFailure, finishQuestion, getPlaygroundConversation, replaceTurns, setPlaygroundMode, startQuestion } from './contextTurns';
 import type { PlaygroundTurn } from '../types/contextEngine';
 
 const turn = (n: number): PlaygroundTurn => ({
@@ -76,5 +76,35 @@ describe('contextTurns', () => {
     const after = getPlaygroundConversation('e-same');
     expect(after).not.toBe(before);
     expect(getPlaygroundConversation('e-same')).toBe(after);
+  });
+
+  it('keeps a pending question until its answer arrives', () => {
+    const token = startQuestion('e-pending', 'q', 'answer');
+    expect(getPlaygroundConversation('e-pending').pending).toEqual({ question: 'q', mode: 'answer', token });
+    expect(finishQuestion('e-pending', token, { turn: turn(1) })).toBe(true);
+    expect(getPlaygroundConversation('e-pending').pending).toBeUndefined();
+    expect(ids('e-pending')).toEqual(['q1']);
+  });
+
+  it('drops an answer that arrives after the conversation was cleared or replaced', () => {
+    const cleared = startQuestion('e-stale', 'q1', 'answer');
+    clearTurns('e-stale');
+    expect(finishQuestion('e-stale', cleared, { turn: turn(1) })).toBe(false);
+    const replaced = startQuestion('e-stale', 'q2', 'answer');
+    replaceTurns('e-stale', [turn(3)], 'context');
+    expect(finishQuestion('e-stale', replaced, { turn: turn(2) })).toBe(false);
+    expect(ids('e-stale')).toEqual(['q3']);
+  });
+
+  it('keeps a failure with the mode it was asked in until dismissed or asked again', () => {
+    const token = startQuestion('e-fail', 'q', 'answer');
+    const error = new Error('down');
+    finishQuestion('e-fail', token, { error });
+    expect(getPlaygroundConversation('e-fail').failure).toEqual({ error, mode: 'answer' });
+    dismissQuestionFailure('e-fail');
+    expect(getPlaygroundConversation('e-fail').failure).toBeUndefined();
+    finishQuestion('e-fail', startQuestion('e-fail', 'q', 'context'), { error });
+    startQuestion('e-fail', 'again', 'context');
+    expect(getPlaygroundConversation('e-fail').failure).toBeUndefined();
   });
 });

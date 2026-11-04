@@ -810,6 +810,12 @@ export const UPLOAD_CHECK_STEADY_MS = 30000;
 /** Shown under a file whose status check did not reach the engine; its last status stays. */
 export const UPLOAD_CHECK_RETRY_DETAIL = "Couldn't reach the engine to check this file. Trying again.";
 
+/** After this long without reaching the engine, a file's status reads stop until "Check again". */
+export const UPLOAD_CHECK_GIVE_UP_MS = 5 * 60_000;
+
+/** Shown under a file whose status checks stopped; its last status stays. */
+export const UPLOAD_CHECK_STOPPED_DETAIL = "Couldn't reach the engine to check this file.";
+
 export const UPLOAD_STATUS_LABEL: Record<UploadFileStatus, string> = {
   uploading: 'Uploading',
   queued: 'Queued',

@@ -90,7 +90,8 @@ function UploadRow({
   const active = isUploadActive(entry);
   // Ticks while the engine has the file, so "14 min so far" keeps counting between polls.
   const now = useNow(ELAPSED_TICK_MS, entry.status === 'queued');
-  const retrying = entry.check === 'retrying';
+  // The status shown is the last one read: the engine was out of reach.
+  const retrying = entry.check !== undefined;
   const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
