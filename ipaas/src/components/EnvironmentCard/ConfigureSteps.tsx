@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, Button, CircularProgress, Radio, Stack, Typography } from '@wso2/oxygen-ui';
-import { Building2, EyeOff, Globe } from '@wso2/oxygen-ui-icons-react';
+import { Building2, Folder, Globe } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import { useUpdateEndpoint } from '../../hooks/useComponents';
@@ -28,9 +28,9 @@ import { editorExposure, exposureLabels } from '../../utils/endpoints';
 // The gateway serves an endpoint on one host at a time: the public one, the organization's internal
 // one, or neither. Project access is always on and its URL always shows, so it is not a choice here.
 const EXPOSURE_OPTS: { value: EndpointExposure; label: string; Icon: typeof Globe; description: string }[] = [
-  { value: 'none', label: 'Not exposed', Icon: EyeOff, description: 'Not on the API gateway. Only integrations in the same project can call the endpoint.' },
   { value: 'public', label: 'Public', Icon: Globe, description: 'On the gateway’s public host. Any client can call it, including integrations in your organization.' },
   { value: 'organization', label: 'Organization', Icon: Building2, description: 'On the gateway’s internal host. Only integrations in your organization can call it.' },
+  { value: 'none', label: 'Project only', Icon: Folder, description: 'Not on the API gateway. Only integrations in the same project can call the endpoint.' },
 ];
 
 // Pieces shared by the configure drawers (ConfigureDrawer and MiConfigureDrawer).

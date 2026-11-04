@@ -137,13 +137,16 @@ function gatewayPublicUrl(ep: EnvEndpoint, externalUrlOverride?: string): string
 }
 
 /**
- * The env card's URL rows: Public, Organization and Project, always in that order. Project access
- * is always on, so its URL always shows. A gateway host the endpoint isn't served on, or whose URL
- * the gateway hasn't reported, gets an empty URL, which the card shows as '—', never another
- * host's URL in its place: a Project URL under Public would read as publicly reachable.
+ * The env card's URL rows: the gateway host the endpoint is exposed on, then Project. An endpoint is
+ * exposed on one host at a time, chosen the way the visibility editor opens, so the card and the
+ * editor never disagree; a Project-only endpoint has no gateway row. Project access is always on,
+ * so its URL always shows. A chosen host the endpoint isn't served on yet, or whose URL the gateway
+ * hasn't reported, gets an empty URL, which the card shows as '—', never another host's URL in its
+ * place: a Project URL under Public would read as publicly reachable.
  */
 export function envCardUrlRows(ep: EnvEndpoint, externalUrlOverride?: string): EndpointVisibilityUrl[] {
-  return VISIBILITY_URLS.map(({ key, label, getUrl }) => {
+  const { exposure } = editorExposure(ep);
+  return VISIBILITY_URLS.filter(({ key }) => key === 'project' || exposureOfTier[key] === exposure).map(({ key, label, getUrl }) => {
     if (key !== 'project' && !tierServed(ep, key, label)) return { key, label, url: '' };
     return { key, label, url: key === 'public' ? gatewayPublicUrl(ep, externalUrlOverride) : getUrl(ep) };
   });
