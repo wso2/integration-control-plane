@@ -17,18 +17,18 @@
  */
 
 import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Check, ChevronRight, Hash, Info, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
+import { ArrowLeft, Check, ChevronRight, Hash, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions, useRouteEngineId } from '../hooks/useContextEngine';
-import { absoluteUrl, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
+import { absoluteUrl, evidenceBackTarget, evidencePart, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
 import { contextEngineUrl, contextEnginesUrl, contextEvidenceUrl } from '../paths';
 import NotFound from '../components/NotFound';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
-import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../components/ContextEngine/styles';
-import type { ContextEvidence as Evidence } from '../types/contextEngine';
+import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx, wrapSx } from '../components/ContextEngine/styles';
+import type { ContextEvidence as Evidence, ContextEvidenceLocationState } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 } as const;
@@ -83,6 +83,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   const engine = useContextEngine(engineId);
   const evidence = useContextEvidence(engineId, evidenceId);
   const permissions = useContextPermissions(engineId);
+  const { state } = useLocation() as { state: ContextEvidenceLocationState | null };
   const [copied, setCopied] = useState(false);
 
   if (!isContextEngineEnabled()) {
@@ -97,16 +98,18 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   }
 
   const engineName = engine.data?.name;
-  const toEngine = () => navigate(contextEngineUrl(scope.org, engineId, 'overview'));
+  // Back returns to the Playground when the passage was opened from there, so the conversation is still on screen.
+  const backTarget = evidenceBackTarget(state, engineName);
+  const toEngine = () => navigate(contextEngineUrl(scope.org, engineId, backTarget.tab));
   const back = (
     <Button startIcon={<ArrowLeft size={16} />} onClick={toEngine} sx={{ mb: 2 }}>
-      {engineName ? `Back to ${engineName}` : 'Back to the context engine'}
+      {backTarget.label}
     </Button>
   );
 
   if (evidence.isLoading) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Box sx={centeredSx}>
           <CircularProgress />
@@ -119,7 +122,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   if (!ev) {
     const gone = evidence.error instanceof HttpError && evidence.error.status === 404;
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         {gone ? (
           <Box sx={{ ...summaryCardSx, height: 'auto', maxWidth: 620, p: 3.5 }}>
@@ -137,7 +140,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 Ask in the Playground
               </Button>
               <Button variant="outlined" onClick={toEngine}>
-                {engineName ? `Back to ${engineName}` : 'Back to the context engine'}
+                {backTarget.label}
               </Button>
             </Stack>
           </Box>
@@ -159,6 +162,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
   const source = engine.data?.sources.find((s) => s.id === ev.sourceId);
   const place = evidencePlace(ev);
+  const part = evidencePart(ev);
   const lines = passageLines(ev);
   const l = ev.locator;
   // Someone who may open evidence but not ask: the engine's evidence.read without context.read.
@@ -170,12 +174,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     });
-  const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', l?.chunkIndex !== undefined ? `part ${l.chunkIndex + 1}` : '']
+  const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', !place.coarse && part !== undefined ? `part ${part}` : '']
     .filter(Boolean)
     .join(' · ');
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       {back}
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} flexWrap="wrap">
         <Box sx={{ minWidth: 0 }}>
@@ -201,7 +205,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
       {readerOnly && (
         <Alert severity="info" variant="outlined" sx={{ mt: 2.5 }}>
-          You can open passages that are cited to you, but you can&apos;t ask this engine questions. Ask an engine manager for query access.
+          You can&apos;t ask this engine questions. Ask an engine manager for access.
         </Alert>
       )}
 
@@ -210,7 +214,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
         <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
         <ChainStep label="Item" value={ev.recordId} />
         <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
-        <ChainStep label="Version" value={evidenceVersionLabel(ev.sourceVersion)} detail="The version that was indexed" />
+        <ChainStep label="Version" value={evidenceVersionLabel(ev.sourceVersion)} />
         <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
         <ChainStep label="Passage" value={primaryPlace(ev)} detail={passageDetail || undefined} mono={!!l?.path} />
       </Stack>
@@ -221,9 +225,6 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             <Box sx={summaryCardHeaderSx}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
                 Passage
-              </Typography>
-              <Typography variant="caption" sx={mutedSx}>
-                Exactly as indexed
               </Typography>
             </Box>
             {l?.heading && (
@@ -250,10 +251,6 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                 {ev.passage}
               </Typography>
             )}
-            <Stack direction="row" alignItems="center" gap={0.75} sx={{ ...mutedSx, mt: 1.5 }}>
-              <Info size={14} aria-hidden />
-              <Typography variant="caption">Only the cited passage is shown. The rest of the item stays in the engine.</Typography>
-            </Stack>
           </Box>
         </Grid>
         <Grid size={{ xs: 12, md: 5 }}>
@@ -279,13 +276,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                   {l.characters.start}–{l.characters.end}
                 </Row>
               )}
-              {l?.chunkIndex !== undefined && <Row label="Part">{l.chunkIndex + 1} of the item</Row>}
-              <Row label="Version">{evidenceVersionLabel(ev.sourceVersion)}</Row>
-              {place.coarse && (
-                <Typography variant="caption" component="p" sx={{ ...mutedSx, mt: 1.25 }}>
-                  The engine can only place this file type by its part for now.
-                </Typography>
+              {part !== undefined && (
+                <Row label="Part">
+                  {part} of {ev.recordId}
+                </Row>
               )}
+              <Row label="Version">{evidenceVersionLabel(ev.sourceVersion)}</Row>
             </Box>
             <Box sx={{ ...summaryCardSx, height: 'auto' }}>
               <Stack direction="row" gap={1.25} alignItems="flex-start">
@@ -295,7 +291,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                     Who can open this link
                   </Typography>
                   <Typography variant="body2" sx={{ ...mutedSx, mt: 0.75, lineHeight: 1.55 }}>
-                    Anyone who can query this engine or open its evidence, and who may see this item. Access is checked every time the link opens, and the link stops working when the item gets a new version or is removed.
+                    People who can see this item. The link stops working when the item changes or is removed.
                   </Typography>
                 </Box>
               </Stack>

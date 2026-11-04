@@ -19,14 +19,15 @@
 import { Alert, Box, Button, Drawer, IconButton, LinearProgress, MenuItem, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { FileText, RefreshCw, Search, Trash2, Upload, Users, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
-import { changeUploadVisibility, holdsUploadBytes, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
+import { changeUploadVisibility, checkUpload, holdsUploadBytes, refreshUploads, removeUpload, retryForbidden, retryUpload, startUploads, useSourceUploads, type FileToUpload } from '../../../hooks/contextUploads';
 import { useContextEngineProgress, useUploadAudience } from '../../../hooks/useContextEngine';
 import { useNow } from '../../../hooks/useNow';
-import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
+import { ELAPSED_TICK_MS, EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED, UPLOAD_MAX_BYTES, UPLOAD_SLOW_NOTE, UPLOAD_STATUS_LABEL } from '../../../constants/contextEngine';
 import {
   checkStagedFile,
   contentTypeForFile,
   describeUploadAudience,
+  effectiveVisibility,
   engineMessage,
   formatBytes,
   isUploadActive,
@@ -46,9 +47,10 @@ import OwnerAccessButton from '../detail/OwnerAccessButton';
 import SourceMark from '../SourceMark';
 import FileDropzone from './FileDropzone';
 import FileVisibilityField from './FileVisibilityField';
+import VisibilityComingSoon from './VisibilityComingSoon';
 import StagedFileList from './StagedFileList';
 import UploadStatusChip from './UploadStatusChip';
-import { drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx } from '../styles';
+import { checkAgainRowSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fileListSx, filesDrawerSx, filesToolbarSx, mutedSx, progressBarSx, sectionLabelSx, uploadRowBodySx, uploadRowHeadSx, uploadRowSx, warningCaptionSx, wrapSx } from '../styles';
 import type { ContextSource, FileVisibility, StagedFileMeta, UploadEntry, UploadFileStatus } from '../../../types/contextEngine';
 
 interface FilesDrawerProps {
@@ -70,6 +72,7 @@ function UploadRow({
   canRetry,
   holdsBytes,
   onRetry,
+  onCheck,
   onReplace,
   onChangeVisibility,
   onRemove,
@@ -83,6 +86,8 @@ function UploadRow({
   /** This tab still holds the file's bytes; otherwise a visibility change needs the file chosen again. */
   holdsBytes: boolean;
   onRetry: () => void;
+  /** Read the status again now, after a check that did not reach the engine. */
+  onCheck: () => void;
   onReplace: () => void;
   onChangeVisibility: (visibility: FileVisibility, chosen?: File) => Promise<void>;
   onRemove: () => void;
@@ -101,6 +106,8 @@ function UploadRow({
   };
   // Ticks while the engine has the file, so "14 min so far" keeps counting between polls.
   const now = useNow(ELAPSED_TICK_MS, entry.status === 'queued');
+  // The status shown is the last one read: the engine was out of reach.
+  const retrying = entry.check !== undefined;
   const tone = entry.status === 'failed' ? 'error.main' : entry.status === 'held' || entry.status === 'unreadable' ? 'warning.dark' : 'text.secondary';
   const save = async () => {
     if (sharing === null) return;
@@ -142,11 +149,22 @@ function UploadRow({
                     <Upload size={16} />
                   </IconButton>
                 </Tooltip>
-                <Tooltip title="Change who can see it">
-                  <IconButton size="small" aria-label={`Change who can see ${entry.name}`} onClick={() => setSharing(entry.visibility ?? EVERYONE_VISIBILITY)}>
-                    <Users size={16} />
-                  </IconButton>
-                </Tooltip>
+                {ROLE_VISIBILITY_ENABLED ? (
+                  <Tooltip title="Change who can see it">
+                    <IconButton size="small" aria-label={`Change who can see ${entry.name}`} onClick={() => setSharing(entry.visibility ?? EVERYONE_VISIBILITY)}>
+                      <Users size={16} />
+                    </IconButton>
+                  </Tooltip>
+                ) : (
+                  <Tooltip title="Choosing who can see a file is coming soon">
+                    {/* A disabled button shows no tooltip of its own, so the span carries it. */}
+                    <span>
+                      <IconButton size="small" disabled aria-label={`Change who can see ${entry.name}, coming soon`}>
+                        <Users size={16} />
+                      </IconButton>
+                    </span>
+                  </Tooltip>
+                )}
               </>
             )}
             <Tooltip title="Remove from the engine">
@@ -161,22 +179,32 @@ function UploadRow({
         <Box sx={uploadRowBodySx}>
           {entry.status === 'uploading' && <LinearProgress variant="determinate" value={entry.progress} aria-label={`${entry.name} upload`} sx={progressBarSx} />}
           {(entry.status === 'queued' || entry.status === 'indexing') && <LinearProgress variant="indeterminate" aria-label={`${entry.name} indexing`} sx={progressBarSx} />}
-          {entry.status === 'queued' && (
+          {retrying && (
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={checkAgainRowSx}>
+              <Typography variant="caption" sx={warningCaptionSx}>
+                {entry.detail}
+              </Typography>
+              <Button size="small" variant="text" startIcon={<RefreshCw size={14} />} onClick={onCheck}>
+                Check again
+              </Button>
+            </Stack>
+          )}
+          {entry.status === 'queued' && !retrying && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.75 }}>
               {queuedUploadText(entry, now)}
             </Typography>
           )}
-          {entry.status === 'queued' && !entry.retrying && uploadIsSlow(entry, now) && (
+          {entry.status === 'queued' && !entry.retrying && !retrying && uploadIsSlow(entry, now) && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.25 }}>
               {UPLOAD_SLOW_NOTE}
             </Typography>
           )}
-          {entry.status === 'indexing' && (
+          {entry.status === 'indexing' && !retrying && (
             <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.75 }}>
-              {entry.detail ?? 'Uploaded · the engine is writing it into the search index. Usually under a minute.'}
+              {entry.detail ?? 'Indexing. Usually under a minute.'}
             </Typography>
           )}
-          {!active && entry.detail && (
+          {!active && !retrying && entry.detail && (
             <Typography variant="caption" sx={{ color: tone, display: 'block' }}>
               {entry.detail}
             </Typography>
@@ -274,10 +302,11 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
       return content && !checkStagedFile(m, existingNames).problem ? [{ content, name: m.name, size: m.size, contentType: m.contentType }] : [];
     });
 
+  const sendAs = effectiveVisibility(visibility);
   const upload = () => {
     const files = toUploads(staged);
-    if (!files.length || visibilityError(visibility)) return;
-    startUploads(engineId, source.id, files, visibility, visibilityTags(visibility, everyone));
+    if (!files.length || visibilityError(sendAs)) return;
+    startUploads(engineId, source.id, files, sendAs, visibilityTags(sendAs, everyone));
     staged.forEach((m) => dropStagedFile(m.id));
     setStaged([]);
   };
@@ -338,11 +367,10 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
           </Alert>
         )}
 
-        <FileDropzone
-          compact={entries.length > 0 || staged.length > 0}
-          hint="Text, Markdown, HTML or JSON, up to 25 MB each. PDFs are stored now and become searchable when the engine gains a PDF reader."
-          onFiles={(files) => setStaged((s) => stageFiles(s, files))}
-        />
+        <FileDropzone compact={entries.length > 0 || staged.length > 0} hint={`Up to ${formatBytes(UPLOAD_MAX_BYTES)} each.`} onFiles={(files) => setStaged((s) => stageFiles(s, files))} />
+        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: -1, lineHeight: 1.5 }}>
+          Only files uploaded from this browser are listed.
+        </Typography>
 
         {staged.length > 0 && (
           <Box>
@@ -363,7 +391,11 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
               }}
             />
             <Box sx={{ mt: 2 }}>
-              <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={visibility} onChange={setVisibility} />
+              {ROLE_VISIBILITY_ENABLED ? (
+                <FileVisibilityField id="upload-visibility" label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} value={visibility} onChange={setVisibility} />
+              ) : (
+                <VisibilityComingSoon label={`Who can see ${sum.ready === 1 ? 'this file' : `these ${sum.ready} files`}`} />
+              )}
             </Box>
             <Stack direction="row" justifyContent="flex-end" gap={1.5} sx={{ mt: 2 }}>
               <Button
@@ -374,7 +406,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 }}>
                 Clear
               </Button>
-              <Button variant="contained" startIcon={<Upload size={16} />} disabled={sum.ready === 0 || !!visibilityError(visibility)} onClick={upload}>
+              <Button variant="contained" startIcon={<Upload size={16} />} disabled={sum.ready === 0 || !!visibilityError(sendAs)} onClick={upload}>
                 Upload {sum.ready} file{sum.ready === 1 ? '' : 's'}
               </Button>
             </Stack>
@@ -422,6 +454,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                     canRetry={entry.status === 'failed'}
                     holdsBytes={holdsUploadBytes(source.id, entry.recordId)}
                     onRetry={() => retryUpload(engineId, source.id, entry.recordId)}
+                    onCheck={() => checkUpload(engineId, source.id, entry.recordId)}
                     onReplace={() => {
                       replaceTarget.current = entry;
                       replaceInput.current?.click();
@@ -432,9 +465,6 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
                 ))
               )}
             </Box>
-            <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1, lineHeight: 1.5 }}>
-              This list is what this browser uploaded. Removing a file deletes it from search and the graph on the engine&apos;s next pass.
-            </Typography>
           </Box>
         )}
         <input
@@ -459,7 +489,11 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
         <ConfirmDeleteDialog
           title={
             <>
-              Remove <strong>{removing.name}</strong>?
+              Remove{' '}
+              <Box component="strong" sx={wrapSx}>
+                {removing.name}
+              </Box>
+              ?
             </>
           }
           onConfirm={() => void confirmRemove()}
@@ -470,7 +504,7 @@ export default function FilesDrawer({ engineId, orgHandle, source, queryRoles, o
           confirmLabel="Remove"
           pendingLabel="Removing…">
           <Typography variant="body2" color="text.secondary">
-            It leaves search and the graph on the engine&apos;s next pass. Its text can remain in storage until the engine compacts, which is planned for a later release.
+            Its content will no longer appear in search results or answers.
           </Typography>
           {removeError && (
             <Alert severity="error" variant="outlined" sx={{ mt: 1.5 }}>

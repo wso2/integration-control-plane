@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, IconButton, PageContent, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Chip, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -38,6 +38,7 @@ import McpTab from '../components/ContextEngine/detail/McpTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
 import type { CreateContextEngineLocationState } from './CreateContextEngine';
 import type { ContextEngineState, ContextEngineTabKey } from '../types/contextEngine';
+import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 const TABS: { value: ContextEngineTabKey; label: string }[] = [
@@ -118,7 +119,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isLoading) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Box sx={centeredSx}>
           <CircularProgress />
@@ -129,7 +130,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (!engineId || (isError && error instanceof HttpError && error.status === 404)) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <NotFound message={seenDeleting.current ? 'This context engine was deleted.' : "This context engine does not exist, or you don't have access to it."} backTo={base} />
       </PageContent>
@@ -138,7 +139,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isError || !engine) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Alert
           severity="error"
@@ -164,7 +165,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const shownTab: ContextEngineTabKey = running ? activeTab : 'overview';
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       {back}
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
         <Box sx={{ minWidth: 0 }}>
@@ -175,17 +176,12 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
             <EngineStateChip state={engine.state} reason={engine.statusReason} />
             <Chip size="small" variant="outlined" label={engine.environment} />
           </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            {engine.description || 'No description'}
-          </Typography>
+          {engine.description && (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              {engine.description}
+            </Typography>
+          )}
         </Box>
-        {!deleting && (
-          <Tooltip title="Delete engine">
-            <IconButton color="error" aria-label={`Delete ${engine.name}`} onClick={() => setConfirmDelete(true)}>
-              <Trash2 size={18} />
-            </IconButton>
-          </Tooltip>
-        )}
       </Stack>
 
       {deleting && (
@@ -221,7 +217,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
         ))}
       </Tabs>
 
-      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} />}
+      {shownTab === 'overview' && <OverviewTab engine={engine} orgHandle={scope.org} roleNames={roleNames} onGoTab={goTab} openFilesSourceId={openFilesSourceId} readOnly={!running} onRequestDelete={deleting ? undefined : () => setConfirmDelete(true)} />}
       {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'api' && <ApiTab engine={engine} />}

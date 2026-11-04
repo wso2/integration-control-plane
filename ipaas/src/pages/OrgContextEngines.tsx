@@ -31,14 +31,14 @@ import EngineStateChip from '../components/ContextEngine/EngineStateChip';
 import SearchField from '../components/SearchField';
 import ExposurePills from '../components/ContextEngine/ExposurePills';
 import SourceMark from '../components/ContextEngine/SourceMark';
-import { listMarksSx, listProgressTextSx } from '../components/ContextEngine/styles';
-import { engineMessage, progressListingText, selectEnvironment } from '../utils/contextEngine';
+import { listMarksSx, listProgressTextSx, wrapSx } from '../components/ContextEngine/styles';
+import { engineMessage, progressListingLine, selectEnvironment } from '../utils/contextEngine';
 import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
 import type { ContextEngine, ContextEngineSummary } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
-const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } as const;
+const tableContainerSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflowX: 'auto' } as const;
 const envSelectSx = { minWidth: 200, height: 40 } as const;
 
 /** At most this many connector marks per row; the count covers the rest. */
@@ -84,7 +84,7 @@ function SummaryCells({ summary, pending }: { summary: ContextEngineSummary | nu
       </>
     );
   }
-  const progress = progressListingText(summary.progress);
+  const progress = progressListingLine(summary);
   return (
     <>
       <ListingTable.Cell>
@@ -132,13 +132,16 @@ function EngineRow({ engine, onOpen, onPlayground, onDelete }: { engine: Context
           onOpen();
         }
       }}>
-      <ListingTable.Cell sx={{ maxWidth: 360 }}>
+      {/* The description never wraps, so this cap decides the column's width; narrower on laptops keeps Actions in view. */}
+      <ListingTable.Cell sx={{ maxWidth: { xs: 280, lg: 360 } }}>
         <Typography variant="body2" sx={{ fontWeight: 500 }}>
           {engine.name}
         </Typography>
-        <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
-          {engine.description || 'No description'}
-        </Typography>
+        {engine.description && (
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block' }}>
+            {engine.description}
+          </Typography>
+        )}
       </ListingTable.Cell>
       <SummaryCells summary={running ? (summary.data ?? null) : null} pending={running && (!seen || summary.isLoading)} />
       <ListingTable.Cell>
@@ -262,7 +265,7 @@ export default function OrgContextEngines(scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2} sx={{ mb: 3 }}>
         <PageTitle>
           <PageTitle.Header>Context Engines</PageTitle.Header>

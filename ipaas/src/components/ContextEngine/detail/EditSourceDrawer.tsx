@@ -19,12 +19,13 @@
 import { Alert, Box, Button, CircularProgress, Drawer, IconButton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { EVERYONE_VISIBILITY } from '../../../constants/contextEngine';
+import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
 import { useUpdateContextSource } from '../../../hooks/useContextEngine';
 import { engineMessage, sourceNameError, sourceTypeName, uploadSourceRules, visibilityError, visibilityTags } from '../../../utils/contextEngine';
 import { HttpError } from '../../../types/http';
 import FileVisibilityField from '../files/FileVisibilityField';
+import VisibilityComingSoon from '../files/VisibilityComingSoon';
 import OwnerAccessButton from './OwnerAccessButton';
 import SourceMark from '../SourceMark';
 import { connectorHeaderSx, drawerBodySx, drawerFooterSx, drawerHeaderSx, fieldStackSx, filesDrawerSx, mutedSx } from '../styles';
@@ -50,6 +51,8 @@ interface EditSourceDrawerProps {
  */
 export default function EditSourceDrawer({ engineId, orgHandle, source, otherNames, queryRoles, open, onClose }: EditSourceDrawerProps): JSX.Element {
   const isUpload = source.type === 'upload';
+  // With roles turned off the drawer only renames, so a source registered earlier with some roles keeps them.
+  const editsRules = !isUpload && ROLE_VISIBILITY_ENABLED;
   const [name, setName] = useState(source.name);
   const [visibility, setVisibility] = useState<FileVisibility>(EVERYONE_VISIBILITY);
   // The engine keeps a source's rules but does not return them, so this form cannot show them. Rules
@@ -59,18 +62,15 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
   const [visibilityTouched, setVisibilityTouched] = useState(false);
   const update = useUpdateContextSource(engineId);
   const nameError = sourceNameError(name, otherNames);
-  const visError = isUpload ? '' : visibilityError(visibility);
-  const rules = isUpload ? [] : uploadSourceRules(visibilityTags(visibility, queryRoles));
+  const visError = editsRules ? visibilityError(visibility) : '';
+  const rules = editsRules ? uploadSourceRules(visibilityTags(visibility, queryRoles)) : [];
   // An empty rule set would make every record of the source unreadable, so it is never sent.
-  const noRules = !isUpload && visibilityTouched && rules.length === 0;
+  const noRules = editsRules && visibilityTouched && rules.length === 0;
   const canSave = nameError === '' && visError === '' && !noRules && !update.isPending;
   const forbidden = update.error instanceof HttpError && update.error.status === 403;
 
   const save = () => {
-    update.mutate(
-      { sourceId: source.id, name: name.trim(), ...(isUpload || !visibilityTouched ? {} : { audience: rules }) },
-      { onSuccess: onClose },
-    );
+    update.mutate({ sourceId: source.id, name: name.trim(), ...(editsRules && visibilityTouched ? { audience: rules } : {}) }, { onSuccess: onClose });
   };
 
   return (
@@ -92,26 +92,18 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
               {sourceTypeName(source.type)}
             </Typography>
             <Typography variant="body2" sx={mutedSx}>
-              Connection settings are kept by the engine and cannot be changed here yet.
+              Connection settings can&apos;t be edited.
             </Typography>
           </Box>
         </Box>
 
         <Stack sx={fieldStackSx}>
-          <TextField
-            label="Source Name"
-            required
-            fullWidth
-            size="small"
-            value={name}
-            error={!!nameError && name.trim() !== ''}
-            helperText={name.trim() !== '' ? nameError || undefined : 'How this source appears in the engine.'}
-            onChange={(e) => setName(e.target.value)}
-            sx={REQUIRED_FIELD_SX}
-          />
+          <TextField label="Source Name" required fullWidth size="small" value={name} error={!!nameError && name.trim() !== ''} helperText={(name.trim() !== '' && nameError) || undefined} onChange={(e) => setName(e.target.value)} sx={REQUIRED_FIELD_SX} />
         </Stack>
 
-        {isUpload ? (
+        {!ROLE_VISIBILITY_ENABLED ? (
+          <VisibilityComingSoon label={isUpload ? 'Who can see uploaded files' : 'Who can see this content'} />
+        ) : isUpload ? (
           <Box>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
               Who can see uploaded files
@@ -123,7 +115,7 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
         ) : (
           <>
             <Alert severity="info" variant="outlined">
-              The engine does not report a source&apos;s current visibility. Leave this as it is to keep the rules the source has; changing it replaces who can see this content.
+              The engine does not report a source&apos;s current visibility. Leave this as it is to keep the source&apos;s rules. Changing it replaces who can see this content.
             </Alert>
             <FileVisibilityField
               id="edit-source-visibility"

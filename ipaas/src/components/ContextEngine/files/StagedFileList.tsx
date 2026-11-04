@@ -34,16 +34,16 @@ interface StagedFileListProps {
 
 const TYPE_NAME: Record<string, string> = { 'text/plain': 'Plain text', 'text/markdown': 'Markdown', 'text/html': 'HTML', 'application/json': 'JSON', 'text/csv': 'CSV', 'application/pdf': 'PDF' };
 
-/** Chosen files with what will happen to each: ready, replaces, stored only, or skipped. */
+/** Chosen files with what will happen to each: ready, replaces, or skipped. */
 export default function StagedFileList({ files, existingNames, missingIds, onRemove }: StagedFileListProps): JSX.Element {
   return (
     <Box sx={fileListSx}>
       {files.map((f) => {
         const missing = missingIds?.has(f.id) ?? false;
         const check = checkStagedFile(f, existingNames);
-        const note = missing ? 'Add this file again; browsers do not keep chosen files between visits.' : stagedFileNote(check, f.size);
-        const tone = missing || check.problem ? (check.problem === 'too-large' || check.problem === 'unsupported' ? 'error' : 'warning') : check.warning ? 'warning' : check.replaces ? 'info' : 'success';
-        const label = missing ? 'Missing' : check.problem ? 'Skipped' : check.warning === 'pdf' ? 'Stored only' : check.replaces ? 'Replace' : 'Ready';
+        const note = missing ? 'Add this file again. Browsers do not keep chosen files between visits.' : stagedFileNote(check);
+        const tone = missing || check.problem ? (check.problem === 'too-large' || check.problem === 'unsupported' ? 'error' : 'warning') : check.replaces ? 'info' : 'success';
+        const label = missing ? 'Missing' : check.problem ? 'Skipped' : check.replaces ? 'Replace' : 'Ready';
         return (
           <Box key={f.id} sx={fileRowSx(!!check.problem)}>
             <FileText size={18} aria-hidden />

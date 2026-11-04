@@ -16,13 +16,12 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Drawer, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
 import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
-import { contextLogoUrl, LLM_AZURE_DEFAULT_API_VERSION, LLM_PROVIDERS } from '../../../constants/contextEngine';
-import { AZURE_DEFAULT_API_VERSION, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
-import { engineMessage, isSameModel, modelDraftError, toModelInput } from '../../../utils/contextEngine';
+import { CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, EMBEDDING_LOGO_DARK, LLM_PROVIDERS } from '../../../constants/contextEngine';
+import { engineMessage, isSameModel, modelDraftError, modelProviderName, toModelInput } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import { HttpError } from '../../../types/http';
 import SelectableCard from '../../common/SelectableCard';
@@ -41,21 +40,22 @@ interface ProviderInfo {
   id: string;
   name: string;
   logo: string;
+  logoDark?: string;
   models: string[];
 }
 
 /** Provider tiles with logos resolved against the app base, as the create wizard shows them. */
-const EMBEDDING_OPTIONS: ProviderInfo[] = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), models: p.models }));
-const LLM_OPTIONS: ProviderInfo[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
+const EMBEDDING_OPTIONS: ProviderInfo[] = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]), models: p.models }));
+const LLM_OPTIONS: ProviderInfo[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
 
 const draftOf = (m: ContextModelSummary | null): ModelDraft | null =>
   m ? { provider: m.provider, model: m.model, baseUrl: m.baseUrl ?? '', apiVersion: m.apiVersion ?? '', dimensions: m.dimensions, keyMode: m.keyKind === 'reference' ? 'ref' : 'key', apiKey: '', apiKeyRef: '' } : null;
 
-const blankDraft = (provider: string, kind: 'embedding' | 'llm'): ModelDraft => ({
+const blankDraft = (provider: string): ModelDraft => ({
   provider,
   model: '',
   baseUrl: '',
-  apiVersion: provider === 'azure_openai' ? (kind === 'embedding' ? AZURE_DEFAULT_API_VERSION : LLM_AZURE_DEFAULT_API_VERSION) : '',
+  apiVersion: '',
   keyMode: 'key',
   apiKey: '',
   apiKeyRef: '',
@@ -91,7 +91,7 @@ function KeyFields({ draft, current, onChange, idPrefix }: { draft: ModelDraft; 
           value={draft.apiKeyRef}
           placeholder={unchanged && current?.keyKind === 'reference' ? 'Leave empty to keep the current reference' : 'env:OPENAI_API_KEY'}
           onChange={(e) => onChange({ ...draft, apiKeyRef: e.target.value })}
-          helperText="The engine resolves it each time it calls the model: env:NAME reads a variable from the engine's environment, cp:ID a control plane secret."
+          helperText="env:NAME for an engine variable. cp:ID for a control plane secret."
           inputProps={{ style: { fontFamily: 'monospace' } }}
         />
       )}
@@ -105,7 +105,7 @@ function ModelEditor({ kind, providers, draft, current, onChange }: { kind: 'emb
     <Stack gap={2}>
       <Box sx={modelTileGridSx}>
         {providers.map((p) => (
-          <SelectableCard key={p.id} title={p.name} logo={p.logo} selected={draft?.provider === p.id} onSelect={() => onChange(current?.provider === p.id ? draftOf(current)! : blankDraft(p.id, kind))} />
+          <SelectableCard key={p.id} title={p.name} logo={p.logo} logoDark={p.logoDark} selected={draft?.provider === p.id} onSelect={() => onChange(current?.provider === p.id ? draftOf(current)! : blankDraft(p.id))} />
         ))}
       </Box>
       {draft && (
@@ -185,41 +185,32 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
             {failure.body}
           </Alert>
         )}
-        <Typography variant="body2" sx={mutedSx}>
-          The embedding model indexes your sources; the language model writes answers from what it finds.
-        </Typography>
-
         <Box sx={{ ...summaryCardSx, height: 'auto' }}>
           <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
-            <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Embedding model
-              </Typography>
-              <Typography variant="body2" sx={mutedSx}>
-                Turns documents into vectors for retrieval.
-              </Typography>
-            </Box>
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              Embedding model
+            </Typography>
             {locked && <Chip size="small" variant="outlined" icon={<Lock size={13} />} label="Locked" />}
           </Stack>
           <Box sx={{ mt: 2 }}>
             {locked ? (
               <Stack gap={1.75}>
                 <Stack direction="row" alignItems="center" gap={1.5} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                  {embeddingProvider && <Box component="img" src={embeddingProvider.logo} alt="" sx={{ width: 28, height: 28 }} />}
+                  {embeddingProvider && <ColorSchemeImage src={{ light: embeddingProvider.logo, dark: embeddingProvider.logoDark ?? embeddingProvider.logo }} alt="" width={28} height={28} />}
                   <Box>
                     <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {models.embedding ? (embeddingProvider?.name ?? models.embedding.provider) : 'Engine default'}
+                      {models.embedding ? modelProviderName('embedding', models.embedding.provider) : 'Engine default'}
                     </Typography>
-                    <Typography variant="caption" sx={mutedSx}>
-                      {models.embedding ? [models.embedding.model, models.embedding.dimensions ? `${models.embedding.dimensions} dimensions` : ''].filter(Boolean).join(' · ') : 'Set where the engine runs'}
-                    </Typography>
+                    {models.embedding && (
+                      <Typography variant="caption" sx={mutedSx}>
+                        {[models.embedding.model, models.embedding.dimensions ? `${models.embedding.dimensions} dimensions` : ''].filter(Boolean).join(' · ')}
+                      </Typography>
+                    )}
                   </Box>
                 </Stack>
                 <Stack direction="row" gap={1} sx={mutedSx}>
                   <Info size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-                  <Typography variant="body2">
-                    Locked because this engine already holds indexed items, and their vectors only match this model. Changing it needs a full re-index, which isn&apos;t available yet.{models.embedding ? ' You can still replace its key.' : ''}
-                  </Typography>
+                  <Typography variant="body2">Can&apos;t change after indexing.{models.embedding ? ' You can still replace its key.' : ''}</Typography>
                 </Stack>
                 {embedding && <KeyFields draft={embedding} current={models.embedding} onChange={setEmbedding} idPrefix="embedding" />}
               </Stack>
@@ -237,9 +228,6 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
         <Box sx={{ ...summaryCardSx, height: 'auto' }}>
           <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
             Language model
-          </Typography>
-          <Typography variant="body2" sx={mutedSx}>
-            Writes the answer from retrieved evidence.
           </Typography>
           <Box sx={{ mt: 2 }}>
             <ModelEditor kind="llm" providers={LLM_OPTIONS} draft={llm} current={models.llm} onChange={setLlm} />

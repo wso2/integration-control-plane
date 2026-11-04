@@ -807,7 +807,7 @@ export default function CosmosCanvas({
       {failed ? (
         <Box sx={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', p: 3 }}>
           <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', maxWidth: 360 }}>
-            This browser can’t draw the graph: it needs WebGL 2. The panel beside it still lists everything shown here.
+            This browser needs WebGL 2 to draw the graph.
           </Typography>
         </Box>
       ) : (

@@ -20,6 +20,7 @@ import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Database, KeyRound, MessageSquare, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
+import { wrapSx } from './styles';
 
 interface DeleteEngineDialogProps {
   name: string;
@@ -41,14 +42,14 @@ function Item({ icon, children }: { icon: ReactNode; children: ReactNode }): JSX
   );
 }
 
-/** What deleting removes when the engine deletes its own data, and what it keeps. */
+/** What deleting removes when the engine deletes its own data. */
 function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Element {
   const sources =
     sourceCount === undefined ? 'Its sources and everything indexed from them' : sourceCount === 0 ? 'Everything indexed in it' : `${sourceCount} source${sourceCount === 1 ? '' : 's'} and everything indexed from ${sourceCount === 1 ? 'it' : 'them'}`;
   return (
     <>
       <Typography variant="body2" color="text.secondary">
-        The engine, its storage and everything in it are deleted. This can&apos;t be undone.
+        This deletes the following. It can&apos;t be undone.
       </Typography>
       <Stack component="ul" gap={1} sx={{ listStyle: 'none', p: 0, m: 0, mt: 1.75 }}>
         <Item icon={<Database size={16} />}>{sources}</Item>
@@ -57,14 +58,14 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
         <Item icon={<KeyRound size={16} />}>Its models, API keys, integrations and every access grant</Item>
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>
-        Apps and agents calling its API or MCP endpoint stop getting answers as soon as deletion starts.
+        Agents using its API or MCP endpoint stop working right away.
       </Typography>
     </>
   );
 }
 
 /**
- * Confirm deleting an engine: what the engine removes, what it keeps, and the
+ * Confirm deleting an engine: what the engine removes, and the
  * engine's name typed to confirm. The engine shows as deleting until it is gone.
  */
 export default function DeleteEngineDialog({ name, sourceCount, isPending, error, onConfirm, onClose }: DeleteEngineDialogProps): JSX.Element {
@@ -74,7 +75,11 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
     <ConfirmDeleteDialog
       title={
         <>
-          Delete <strong>{name}</strong>?
+          Delete{' '}
+          <Box component="strong" sx={wrapSx}>
+            {name}
+          </Box>
+          ?
         </>
       }
       onConfirm={() => matches && onConfirm()}
@@ -88,8 +93,11 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
         fullWidth
         size="small"
         autoFocus
-        label="Type the engine name to confirm"
-        placeholder={name}
+        label={
+          <>
+            Type <strong>{name}</strong> to confirm
+          </>
+        }
         value={typed}
         onChange={(e) => setTyped(e.target.value)}
         onKeyDown={(e) => {

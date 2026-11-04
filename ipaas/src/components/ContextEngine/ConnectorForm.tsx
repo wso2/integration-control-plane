@@ -16,14 +16,15 @@
  * under the License.
  */
 
-import { Alert, Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, ButtonBase, Chip, Collapse, Link, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ChevronRight, Upload } from '@wso2/oxygen-ui-icons-react';
 import { Fragment, useRef, useState, type JSX } from 'react';
-import { EVERYONE_VISIBILITY } from '../../constants/contextEngine';
+import { EVERYONE_VISIBILITY, ROLE_VISIBILITY_ENABLED } from '../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { sourceFieldError, sourceNameError, visibleFields } from '../../utils/contextEngine';
 import SecretField from '../common/SecretField';
 import FileVisibilityField from './files/FileVisibilityField';
+import VisibilityComingSoon from './files/VisibilityComingSoon';
 import { StagedFilesSection, StagedVisibilityField } from './files/StagedFilesSection';
 import SourceMark from './SourceMark';
 import { connectorHeaderSx, fieldGroupBodySx, fieldGroupChevronSx, fieldGroupToggleSx, fieldStackSx } from './styles';
@@ -187,7 +188,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
           size="small"
           value={draft.name}
           error={!!nameError && draft.name.trim() !== ''}
-          helperText={draft.name.trim() !== '' ? nameError || undefined : 'How this source appears in the engine.'}
+          helperText={(draft.name.trim() !== '' && nameError) || undefined}
           onChange={(e) => change({ ...draft, name: e.target.value })}
           sx={REQUIRED_FIELD_SX}
         />
@@ -207,19 +208,13 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
             </Box>
           );
         })}
-        {upload ? (
-          <StagedFilesSection draft={draft} onChange={change} onRunningEngine={queryRoles !== undefined} />
-        ) : (
-          connector.fields.length === 0 && (
-            <Alert severity="info" variant="outlined">
-              No connection settings.
-            </Alert>
-          )
-        )}
+        {upload && <StagedFilesSection draft={draft} onChange={change} onRunningEngine={queryRoles !== undefined} />}
       </Stack>
 
       <Box sx={{ mt: 2.5 }}>
-        {upload ? (
+        {!ROLE_VISIBILITY_ENABLED ? (
+          <VisibilityComingSoon label={upload ? 'Who can see these files' : 'Who can see this source'} />
+        ) : upload ? (
           <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} />
         ) : (
           <FileVisibilityField

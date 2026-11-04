@@ -58,7 +58,7 @@ export default function NoContextEnginesBanner({ onCreate }: { onCreate: () => v
           Give your integrations grounded context
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          A Context Engine builds a governed knowledge graph from the sources you choose. Selected roles can ask it questions in natural language, and you can publish it as an API or an MCP server for your agents.
+          Build a knowledge graph from your sources. Ask it questions, or call it from agents over API or MCP.
         </Typography>
         <Box>
           <Button variant="contained" startIcon={<Plus size={20} />} onClick={onCreate} sx={{ mt: 1 }}>
@@ -71,13 +71,13 @@ export default function NoContextEnginesBanner({ onCreate }: { onCreate: () => v
           <Feature icon={<Waypoints size={20} />} title="Choose sources" text="Drive, S3, SharePoint, Confluence, GitHub, websites or uploads." />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<ShieldCheck size={20} />} title="Grant access" text="Pick the org roles that may query; evidence is access-checked on every read." />
+          <Feature icon={<ShieldCheck size={20} />} title="Grant access" text="Choose which roles can query the engine." />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<Braces size={20} />} title="Expose as API" text="Ask questions over REST with source-linked evidence." />
+          <Feature icon={<Braces size={20} />} title="Expose as API" text="Query the engine from your integrations over REST." />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <Feature icon={<Plug size={20} />} title="Expose as MCP" text="Let agents call query, evidence and explain tools." />
+          <Feature icon={<Plug size={20} />} title="Expose as MCP" text="Let agents query the engine over MCP." />
         </Grid>
       </Grid>
     </Stack>

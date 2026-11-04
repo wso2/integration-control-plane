@@ -24,15 +24,15 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useContextEngineDraft, useCreateContextEngine, useSetUpContextEngine, useUploadAudience } from '../hooks/useContextEngine';
 import { useAllEnvironments } from '../hooks/useEnvironments';
-import { EVERYONE_VISIBILITY } from '../constants/contextEngine';
 import {
+  answerChoice,
   selectEnvironment,
   checkStagedFile,
-  engineDescriptionError,
+  effectiveVisibility,
   engineMessage,
-  engineNameError,
   isFormDirty,
   modelsStepBlocker,
+  nameStepBlocker,
   sourcesStepBlocker,
   storageStepBlocker,
   toCreateInput,
@@ -43,6 +43,7 @@ import { contextEngineUrl, contextEnginesUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import VerticalStepper from '../components/VerticalStepper';
+import NameStep from '../components/ContextEngine/steps/NameStep';
 import SourcesStep from '../components/ContextEngine/steps/SourcesStep';
 // import AccessStep from '../components/ContextEngine/steps/AccessStep'; — 'Grant Access' step hidden
 import ModelsStep from '../components/ContextEngine/steps/ModelsStep';
@@ -53,11 +54,14 @@ import { rememberSourceRules, startUploads } from '../hooks/contextUploads';
 import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
 import type { ContextSourceConfig } from '../types/contextEngine';
+import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
-const STEP_LABELS = ['Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Name & Create'];
+const STEP_LABELS = ['Name', 'Choose Sources', /* 'Grant Access', */ 'Configure Models', 'Configure Storage', 'Review & Create'];
 const LAST_STEP = STEP_LABELS.length - 1;
+const MODELS_STEP = STEP_LABELS.indexOf('Configure Models');
+const STORAGE_STEP = STEP_LABELS.indexOf('Configure Storage');
 
 /** Passed to the detail page so it can show which steps the engine could not complete yet. */
 export interface CreateContextEngineLocationState {
@@ -150,7 +154,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             });
             staged.forEach((m) => dropStagedFile(m.id));
             if (files.length === 0) continue;
-            const visibility = source.stagedVisibility ?? EVERYONE_VISIBILITY;
+            const visibility = effectiveVisibility(source.stagedVisibility);
             startUploads(created.id, sourceId, files, visibility, visibilityTags(visibility, everyone));
             uploads.push({ sourceId, name: source.name.trim() });
           }
@@ -170,13 +174,15 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   }
 
   // Why each step's Next is disabled — shown beside the button so the user never guesses.
-  const stepBlocker: (string | null)[] = [
+  const setupBlockers: (string | null)[] = [
+    nameStepBlocker(form.name, form.description) ?? (environment ? null : 'Choose an environment'),
     sourcesStepBlocker(form.sources),
     // null, — 'Grant Access' step hidden
     modelsStepBlocker(form),
     storageStepBlocker(form.storage),
-    !form.name.trim() ? 'Enter a name for the engine' : engineNameError(form.name) || engineDescriptionError(form.description) || (environment ? null : 'Choose an environment'),
   ];
+  // The review step itself asks for nothing, so Create shows the first step still incomplete.
+  const stepBlocker = [...setupBlockers, setupBlockers.find((b) => b !== null) ?? null];
   const stepValid = stepBlocker.map((b) => b === null);
   const canCreate = stepValid.every(Boolean);
 
@@ -207,7 +213,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !created ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
@@ -233,10 +239,10 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           <Box sx={{ width: { xs: '100%', md: 240 }, flexShrink: 0, pt: 1 }}>
             <VerticalStepper activeStep={activeStep} steps={STEP_LABELS} onStepClick={setActiveStep} />
           </Box>
-          <Box sx={{ flex: 1, maxWidth: activeStep === 2 ? 1080 : 960, mt: 2 }}>
+          <Box sx={{ flex: 1, maxWidth: activeStep === MODELS_STEP || activeStep === STORAGE_STEP ? 1080 : 960, mt: 2 }}>
             {showRestored && (
               <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
-                We restored the draft you left in this session. API keys and tokens are never stored, so re-enter them before creating.
+                Draft restored. Re-enter API keys and tokens.
               </Alert>
             )}
 
@@ -247,6 +253,17 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             )}
 
             {activeStep === 0 && (
+              <NameStep
+                name={form.name}
+                description={form.description}
+                onNameChange={(value) => dispatch({ type: 'name', value })}
+                onDescriptionChange={(value) => dispatch({ type: 'description', value })}
+                environments={envList}
+                environment={environment}
+                onEnvironmentChange={setChosenEnv}
+              />
+            )}
+            {activeStep === 1 && (
               <SourcesStep
                 orgHandle={scope.org}
                 sources={form.sources}
@@ -256,38 +273,24 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
                 roleNames={roleNames}
               />
             )}
-            {/* 'Grant Access' step hidden — restore this branch (as activeStep === 1) and renumber the steps below to bring it back.
-            {activeStep === 1 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />} */}
-            {activeStep === 1 && (
+            {/* 'Grant Access' step hidden — restore this branch (as activeStep === 2) and renumber the steps below to bring it back.
+            {activeStep === 2 && <AccessStep orgHandle={scope.org} roles={form.roles} onChange={(value) => dispatch({ type: 'roles', value })} />} */}
+            {activeStep === 2 && (
               <ModelsStep
                 embedding={form.embedding}
                 llm={form.llm}
                 shareApiKey={form.shareApiKey}
-                answersEnabled={form.answersEnabled}
+                answerChoice={answerChoice(form)}
                 answerLlm={form.answerLlm}
                 onEmbeddingChange={(value) => dispatch({ type: 'embedding', value })}
                 onLlmChange={(value) => dispatch({ type: 'llm', value })}
                 onShareApiKeyChange={(value) => dispatch({ type: 'shareApiKey', value })}
-                onAnswersEnabledChange={(value) => dispatch({ type: 'answersEnabled', value })}
+                onAnswerChoiceChange={(value) => dispatch({ type: 'answerChoice', value })}
                 onAnswerLlmChange={(value) => dispatch({ type: 'answerLlm', value })}
               />
             )}
-            {activeStep === 2 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
-            {activeStep === 3 && (
-              <ReviewStep
-                form={form}
-                roleNames={roleNames}
-                everyone={everyone}
-                myGroups={myGroups}
-                draftSavedAt={draft.savedAt}
-                environments={envList}
-                environment={environment}
-                onEnvironmentChange={setChosenEnv}
-                onNameChange={(value) => dispatch({ type: 'name', value })}
-                onDescriptionChange={(value) => dispatch({ type: 'description', value })}
-                onEdit={setActiveStep}
-              />
-            )}
+            {activeStep === 3 && <StorageStep orgHandle={scope.org} storage={form.storage} onChange={(kind, value) => dispatch({ type: 'storage', kind, value })} />}
+            {activeStep === 4 && <ReviewStep form={form} roleNames={roleNames} everyone={everyone} myGroups={myGroups} draftSavedAt={draft.savedAt} onEdit={setActiveStep} />}
 
             <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 4 }}>
               <Button variant="outlined" disabled={create.isPending} onClick={activeStep === 0 ? () => (dirty ? setLeaveOpen(true) : navigate(base)) : () => setActiveStep((s) => Math.max(0, s - 1))}>
@@ -315,7 +318,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
       <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Leave without creating?</DialogTitle>
         <DialogContent>
-          <DialogContentText>Your sources, roles and model choices are kept as a draft for this browser session. API keys and tokens are not stored and will need re-entering.</DialogContentText>
+          <DialogContentText>Your draft is kept for this tab. API keys and tokens are not.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setLeaveOpen(false)}>Stay</Button>

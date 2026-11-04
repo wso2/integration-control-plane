@@ -27,7 +27,7 @@ interface GetStartedChecklistProps {
   onAction: (id: GetStartedStepId) => void;
 }
 
-const ACTION_LABEL: Record<GetStartedStepId, string> = { index: 'View progress', ask: 'Open Playground', publish: 'Publish', grant: 'Manage access' };
+const ACTION_LABEL: Record<GetStartedStepId, string> = { index: 'View progress', ask: 'Open Playground', publish: 'View API', grant: 'Manage access' };
 
 /** Four first-run steps in a row; the current one carries its action. */
 export default function GetStartedChecklist({ steps, onAction }: GetStartedChecklistProps): JSX.Element {
@@ -42,9 +42,11 @@ export default function GetStartedChecklist({ steps, onAction }: GetStartedCheck
             <Typography variant="body2" sx={{ fontWeight: step.state === 'current' ? 600 : 500 }}>
               {step.title}
             </Typography>
-            <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
-              {step.description}
-            </Typography>
+            {step.description && (
+              <Typography variant="caption" sx={{ ...mutedSx, display: 'block', lineHeight: 1.45 }}>
+                {step.description}
+              </Typography>
+            )}
             {step.state === 'current' && (
               <Button size="small" variant={step.id === 'index' && !step.action ? 'outlined' : 'contained'} onClick={() => onAction(step.id)} sx={{ mt: 1 }}>
                 {step.action ?? ACTION_LABEL[step.id]}

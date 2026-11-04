@@ -215,7 +215,7 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
 
       {sources.length === 0 ? (
         <Typography variant="body2" sx={mutedSx}>
-          No sources are registered on this engine yet.{onAddSource ? ' Add one to start indexing.' : ''}
+          No sources yet.
         </Typography>
       ) : (
         sources.map((s) => {

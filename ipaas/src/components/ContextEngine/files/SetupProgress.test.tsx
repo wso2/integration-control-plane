@@ -39,7 +39,7 @@ vi.mock('@wso2/oxygen-ui', () => ({
   Tooltip: ({ title, children }: { title: string; children?: ReactNode }) => createElement('div', { 'data-tooltip': title }, children),
 }));
 vi.mock('@wso2/oxygen-ui-icons-react', () => ({ Check: () => null, CircleAlert: () => null, FileText: () => null }));
-vi.mock('../../../hooks/contextUploads', () => ({ retryUpload: vi.fn(), useSourceUploads: () => [] }));
+vi.mock('../../../hooks/contextUploads', () => ({ retryUpload: vi.fn(), useAnySending: () => false, useSourceUploads: () => [] }));
 vi.mock('./UploadStatusChip', () => ({ default: () => null }));
 
 const render = (phase: SetupPhase) => renderToStaticMarkup(<SetupProgress engineId="e1" engineName="Docs" phase={phase} sourceCount={1} roleCount={0} warnings={[]} uploads={[]} onOpen={() => undefined} />);

@@ -19,8 +19,8 @@
 import { Box, Button, CircularProgress, LinearProgress, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, CircleAlert, FileText } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { retryUpload, useSourceUploads } from '../../../hooks/contextUploads';
-import { formatBytes, isUploadActive } from '../../../utils/contextEngine';
+import { retryUpload, useAnySending, useSourceUploads } from '../../../hooks/contextUploads';
+import { formatBytes, isUploadActive, uploadSourceTitle } from '../../../utils/contextEngine';
 import UploadStatusChip from './UploadStatusChip';
 import { fileListSx, mutedSx, progressBarSx, setupCardSx, setupDotSx, setupStepSx, uploadRowHeadSx, uploadRowSx } from '../styles';
 
@@ -64,14 +64,11 @@ function Step({ tone, children, aside }: { tone: 'done' | 'running' | 'skipped' 
 
 function UploadSource({ engineId, source }: { engineId: string; source: SetupUploadSource }): JSX.Element {
   const entries = useSourceUploads(engineId, source.sourceId);
-  const done = entries.filter((e) => !isUploadActive(e)).length;
   const failed = entries.filter((e) => e.status === 'failed').length;
   const running = entries.some(isUploadActive);
   const bytes = entries.reduce((n, e) => n + e.size, 0);
   const sent = entries.reduce((n, e) => n + (e.size * (e.status === 'uploading' ? e.progress : 100)) / 100, 0);
-  const title = running
-    ? `Uploading ${entries.length} file${entries.length === 1 ? '' : 's'} to “${source.name}” · ${done} of ${entries.length} done`
-    : `${entries.length} file${entries.length === 1 ? '' : 's'} uploaded to “${source.name}”${failed ? ` · ${failed} failed` : ''}`;
+  const title = uploadSourceTitle(entries, source.name);
   return (
     <Box>
       <Step tone={running ? 'running' : failed ? 'failed' : 'done'} aside={running ? `${formatBytes(sent)} of ${formatBytes(bytes)}` : undefined}>
@@ -105,13 +102,6 @@ function UploadSource({ engineId, source }: { engineId: string; source: SetupUpl
   );
 }
 
-const HEADLINE: Record<SetupPhase, string> = {
-  starting: 'The engine is starting. This usually takes about a minute.',
-  failed: 'The engine could not start.',
-  'setting-up': 'The engine is running. Your sources are being added now.',
-  done: 'The engine is ready. Your files are being handed to it now.',
-};
-
 /** What the wizard shows after Create: the engine starting, then its sources, grants and files being handed to it. */
 export default function SetupProgress({ engineId, engineName, phase, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
   const failedTo = (pattern: RegExp) => warnings.find((w) => pattern.test(w));
@@ -119,17 +109,13 @@ export default function SetupProgress({ engineId, engineName, phase, sourceCount
   const roleFailures = warnings.filter((w) => w.startsWith('Grant query access')).length;
   const ownerFailure = failedTo(/^Give you query and upload access/);
   const waiting = phase === 'starting' || phase === 'setting-up';
+  const sending = useAnySending();
   return (
     <Box sx={setupCardSx}>
       <Stack direction="row" alignItems="center" gap={1.5}>
-        <Box>
-          <Typography variant="h6" sx={{ fontWeight: 600 }}>
-            Setting up {engineName}
-          </Typography>
-          <Typography variant="body2" sx={mutedSx}>
-            {HEADLINE[phase]}
-          </Typography>
-        </Box>
+        <Typography variant="h6" sx={{ fontWeight: 600 }}>
+          Setting up {engineName}
+        </Typography>
       </Stack>
       <Box sx={{ mt: 2 }}>
         <Step tone="done">Engine created</Step>
@@ -154,13 +140,21 @@ export default function SetupProgress({ engineId, engineName, phase, sourceCount
         )}
       </Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-          {waiting
-            ? 'Keep this page open until the engine is running: your sources and files are sent to it from this page. If you leave, the engine is still created and you can add them again from its page.'
-            : phase === 'failed'
-              ? 'Open the engine to see why, or delete it and create it again.'
-              : 'Keep this tab open until the uploads finish. Opening the engine now is fine; they carry on in its Files drawer.'}
-        </Typography>
+        {waiting ? (
+          <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+            Keep this page open until the engine is running: your sources and files are sent to it from this page. If you leave, the engine is still created and you can add them again from its page.
+          </Typography>
+        ) : phase === 'failed' ? (
+          <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+            Open the engine to see why, or delete it and create it again.
+          </Typography>
+        ) : sending ? (
+          <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+            Files are still being sent. Closing or reloading this tab stops them. You can open the engine while they finish.
+          </Typography>
+        ) : (
+          <span />
+        )}
         {waiting ? (
           <Tooltip title="Available once the engine is running">
             <Box component="span" sx={{ flexShrink: 0 }}>

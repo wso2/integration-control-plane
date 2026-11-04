@@ -33,8 +33,9 @@ interface ApiTabProps {
 /** Expose as API — the engine's public endpoints, how to authenticate, and a ready-to-run request. */
 export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
   const [params] = useSearchParams();
-  // "Use in API" on the Playground lands here with the question in the URL.
+  // "Use in API" on the Playground lands here with the question, and the answer route when it was asked for an answer.
   const question = params.get('q')?.trim() || undefined;
+  const route = params.get('mode') === 'answer' && engine.exposure.answers ? 'answer' : 'context';
   const base = engine.publicApiUrl ?? '';
   const endpoints = [
     { label: 'Context', url: contextEndpointUrl(base), off: false },
@@ -44,7 +45,7 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <SurfaceHeader title="REST API" description="Integrations send a question and receive the source-linked passages, or a cited answer, from what the caller may read." />
+      <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
 
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Endpoints
@@ -60,19 +61,13 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
           Requests carry one of this engine's API keys in the <code>X-API-Key</code> header. The engine's gateway checks the key; a request without a valid one never reaches the engine.
         </Alert>
         <Typography variant="body2" sx={mutedSx}>
-          Send <code>{'{"question": "…"}'}</code>. <code>context</code> returns ranked passages, each with its source, item, version and link. <code>answer</code> returns an answer written from those passages, where each <code>[n]</code> cites the nth passage.
-          A question nothing visible answers returns <code>state: "insufficient_evidence"</code>, with no answer.
+          Send <code>{'{"question": "…"}'}</code>. In <code>answer</code>, <code>[n]</code> cites the nth passage. With no answer, <code>state</code> is <code>"insufficient_evidence"</code>.
         </Typography>
       </Stack>
 
       <ApiKeysSection engineId={engine.id} />
 
-      {question && (
-        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1 }}>
-          Pre-filled with the question you asked in the Playground.
-        </Typography>
-      )}
-      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, question)} showCopyButton wrapLongLines />
+      <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, question, route)} showCopyButton wrapLongLines />
       <Box sx={{ mt: 2 }}>
         <CodeViewer title="Example response" language="json" code={buildQueryResponseExample(engine.sources[0]?.id)} showCopyButton wrapLongLines />
       </Box>

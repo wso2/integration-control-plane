@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box } from '@wso2/oxygen-ui';
+import { Box, ColorSchemeImage } from '@wso2/oxygen-ui';
 import { BookOpen, Building2, Calendar, Cloud, Code, CreditCard, Database, FileText, Folder, GitHub, Globe, Hash, Headset, Kanban, Mail, MessageSquare, Package, Plug, Rss, ShieldCheck, ShoppingCart, Table, Upload, Video } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentType, JSX, ReactNode } from 'react';
 import { CONNECTOR_BY_ID, contextLogoUrl } from '../../constants/contextEngine';
@@ -68,7 +68,7 @@ interface SourceMarkProps {
 
 /** A connector's brand logo, or its icon when there is no logo. */
 export default function SourceMark({ type, size = 20, variant = 'plain' }: SourceMarkProps): JSX.Element {
-  const logo = CONNECTOR_BY_ID[type]?.logo;
-  const glyph = logo ? <Box component="img" src={contextLogoUrl(logo)} alt="" sx={{ height: size, display: 'block' }} /> : sourceTypeIcon(type, size);
+  const connector = CONNECTOR_BY_ID[type];
+  const glyph = connector?.logo ? <ColorSchemeImage src={{ light: contextLogoUrl(connector.logo), dark: contextLogoUrl(connector.logoDark ?? connector.logo) }} alt="" width="auto" height={size} sx={{ display: 'block' }} /> : sourceTypeIcon(type, size);
   return <Box sx={variant === 'tile' ? sourceTileMarkSx : sourceMarkSx}>{glyph}</Box>;
 }

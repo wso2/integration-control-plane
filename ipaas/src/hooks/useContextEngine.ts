@@ -49,7 +49,7 @@ import {
 } from '../api/contextEngine';
 import { CONTEXT_ENGINE_ASKED_KEY_PREFIX, CONTEXT_ENGINE_DRAFT_KEY_PREFIX, CONTEXT_OWNER_ACTIONS, DELETION_POLL_MS, ENGINE_STATUS_POLL_MS, PROGRESS_POLL_ACTIVE_MS, PROGRESS_POLL_IDLE_MS, SUMMARY_CONCURRENCY } from '../constants/contextEngine';
 import { contextEngineKey } from '../utils/contextEngineKey';
-import { everyoneRoles, fromDraft, isEngineProgressActive, ownerGrantId, toDraft } from '../utils/contextEngine';
+import { everyoneRoles, fromDraft, isEngineProgressActive, listPollInterval, ownerGrantId, toDraft } from '../utils/contextEngine';
 import { useRoles } from './useAuth';
 import type { ContextEngineForm, ContextEngineSetupInput, ContextEngineState, ContextQueryInput, ContextSourceConfig, CreateContextEngineInput, PutContextGrantInput, UpdateContextModelsInput, UpdateContextSourceInput } from '../types/contextEngine';
 
@@ -74,14 +74,14 @@ export function useRouteEngineId(): string {
 /** States an engine leaves on its own, so a page showing one checks again. */
 const TRANSIENT_STATES: ReadonlySet<ContextEngineState> = new Set(['provisioning', 'starting', 'deleting', 'unknown']);
 
-/** The engines in one environment; checked again while any is starting or being deleted. */
+/** The engines in one environment; checked again while any is starting, syncing or being deleted, so the listing's progress keeps moving. */
 export function useContextEngines(environment: string) {
   return useQuery({
     queryKey: [ROOT_KEY, 'list', environment],
     queryFn: () => listContextEngines(environment),
     enabled: isContextEngineEnabled() && !!environment,
     retry: false,
-    refetchInterval: (query) => (query.state.data?.some((e) => TRANSIENT_STATES.has(e.state)) ? DELETION_POLL_MS : false),
+    refetchInterval: (query) => (query.state.data?.some((e) => TRANSIENT_STATES.has(e.state)) ? DELETION_POLL_MS : listPollInterval(query.state.data)),
   });
 }
 
