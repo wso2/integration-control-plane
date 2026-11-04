@@ -286,7 +286,7 @@ export function applyAnswerChoice(choice: AnswerChoice, form: Pick<ContextEngine
 /** Why the Models step cannot proceed, or null. */
 export function modelsStepBlocker(form: Pick<ContextEngineForm, 'embedding' | 'llm' | 'shareApiKey' | 'answersEnabled' | 'answerLlm'>): string | null {
   if (!form.embedding) return 'Choose an embedding model';
-  if (!isEmbeddingValid(form.embedding)) return 'Complete the embedding model';
+  if (!isEmbeddingValid(form.embedding) || !nonEmpty(form.embedding.model)) return 'Complete the embedding model';
   if (!form.llm) return 'Choose an ingestion language model';
   if (!isLlmValid(effectiveLlm(form))) return 'Complete the ingestion language model';
   if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) return 'Complete the answer language model';
@@ -324,8 +324,10 @@ export function toCreateInput(form: ContextEngineForm): CreateContextEngineInput
   const llm = effectiveLlm(form);
   if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
   if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer language model configuration is incomplete.');
-  const answers = { enabled: form.answersEnabled, model: form.answersEnabled ? form.answerLlm : null };
-  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
+  // Model ids are typed or pasted, so they are trimmed like the name and description.
+  const trimmed = <T extends { model: string }>(m: T): T => ({ ...m, model: m.model.trim() });
+  const answers = { enabled: form.answersEnabled, model: form.answersEnabled && form.answerLlm ? trimmed(form.answerLlm) : null };
+  return { name: form.name.trim(), description: form.description.trim(), sources: form.sources, roles: form.roles, embedding: trimmed(form.embedding), llm: trimmed(llm), answers, storage: form.storage };
 }
 
 /** Whether the wizard holds anything worth keeping. */
@@ -1192,7 +1194,7 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
           description: uploadOnly ? (progress ? `${progressHeadline(progress)}.` : 'Files become searchable after upload.') : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
         },
     { id: 'ask', title: 'Ask it something', description: 'Try a question in the Playground.' },
-    { id: 'publish', title: 'Connect an agent', description: 'Call it from agents over REST or MCP.' },
+    { id: 'publish', title: 'Connect an agent', description: 'Call the engine from agents over REST or MCP.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
   ];
   let currentAssigned = false;
@@ -1403,7 +1405,6 @@ export function evidenceVersionLabel(version: string): string {
   return new Date(n).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-/** The version a passage was taken from, as a label, and what that date means. */
 /** "Version from 3 Nov 2026, 10:42" for a dated version, "Version v12" for any other. */
 export function versionFromLabel(version: string): string {
   const label = evidenceVersionLabel(version);

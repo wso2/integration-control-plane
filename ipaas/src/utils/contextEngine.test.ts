@@ -475,6 +475,14 @@ describe('form completion', () => {
     expect(input.description).toBe('d');
     expect(() => toCreateInput({ ...completeForm(), llm: null })).toThrow();
   });
+
+  it('trims typed model ids and treats a blank embedding id as missing', () => {
+    const form = completeForm();
+    const input = toCreateInput({ ...form, embedding: { ...form.embedding!, model: ' text-embedding-3-small ' }, llm: { ...form.llm!, model: 'gpt-6-luna ' } });
+    expect(input.embedding.model).toBe('text-embedding-3-small');
+    expect(input.llm.model).toBe('gpt-6-luna');
+    expect(modelsStepBlocker({ ...form, embedding: { ...form.embedding!, model: '   ' } })).toBe('Complete the embedding model');
+  });
 });
 
 describe('access helpers', () => {
@@ -743,7 +751,11 @@ describe('first run', () => {
     const summary = { sourceCount: 1, processed: 1, active: 1, reading: 0, waiting: 0, hidden: 0, percent: 50, failedItems: 0 };
     expect(getStartedSteps(uploads, false, summary)[0].description).toBe('Syncing 1 source.');
     expect(getStartedSteps(uploads, false)[0].description).toBe('Files become searchable after upload.');
-    expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent' });
+    expect(getStartedSteps(uploads, false)[0].description).not.toMatch(/connector/);
+  });
+
+  it('names the engine, not "it", in the agent step', () => {
+    expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent', description: 'Call the engine from agents over REST or MCP.' });
   });
 });
 
