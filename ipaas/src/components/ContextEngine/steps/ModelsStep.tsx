@@ -80,6 +80,7 @@ export default function ModelsStep({ embedding, llm, shareApiKey, answerChoice, 
           shareKey={{ available: canShareApiKey(embedding, llm), checked: shareApiKey, onChange: onShareApiKeyChange }}
         />
         <ModelProviderColumn<LlmConfig>
+          key={answerChoice}
           title="Answer model"
           purpose="Writes the cited answers."
           providers={LLM_OPTIONS}

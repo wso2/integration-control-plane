@@ -619,12 +619,12 @@ export interface LlmProviderInfo {
 }
 
 export const LLM_PROVIDERS: LlmProviderInfo[] = [
-  { id: 'openai', name: 'Open AI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra'] },
-  { id: 'anthropic', name: 'Anthropic AI', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
+  { id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['gpt-6-luna', 'gpt-6.1-terra', 'gpt-6.1-sol', 'gpt-6-astra'] },
+  { id: 'anthropic', name: 'Anthropic', logo: `${GENAI_LOGO_BASE}anthropic.svg`, models: ['claude-sonnet-5-5', 'claude-haiku-5-5', 'claude-sonnet-4-6', 'claude-haiku-4-5'] },
 ];
 
 /** Embedding providers a context engine offers. RAG ingestion keeps its own, longer list. */
-export const CONTEXT_EMBEDDING_PROVIDERS: EmbeddingProviderInfo[] = [{ id: 'openai', name: 'Open AI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] }];
+export const CONTEXT_EMBEDDING_PROVIDERS: EmbeddingProviderInfo[] = [{ id: 'openai', name: 'OpenAI', logo: `${GENAI_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] }];
 
 /** Display names for providers an engine may still run but the console no longer offers. */
 export const RETIRED_MODEL_PROVIDER_NAMES: Record<string, string> = { azure_openai: 'Azure OpenAI', mistral: 'Mistral AI' };
