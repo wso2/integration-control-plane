@@ -29,6 +29,47 @@ import { mutedSx } from '../styles';
 import { panelSx, panelLabelSx, selectRowSx, sentenceSx } from './graphStyles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
 
+interface PassageRowProps {
+  evidence: ContextEvidence;
+  engineId: string;
+  orgHandle: string;
+  sourceName?: string;
+  /** Its number among the passages the answer was given, when it was one of them. */
+  answerNumber?: number;
+  /** In the derivation view the row says whether the answer was given this passage; elsewhere it shows the start of its text. */
+  inDerivation: boolean;
+}
+
+/** One passage in a side panel: its document, where in it the passage sits, and a link that opens the passage. */
+export function PassageRow({ evidence: ev, engineId, orgHandle, sourceName, answerNumber: n, inDerivation }: PassageRowProps): JSX.Element {
+  const navigate = useAppNavigate();
+  const href = contextEvidenceUrl(orgHandle, engineId, ev.id);
+  return (
+    <Box component="li" sx={{ p: 1.25, borderRadius: 1, border: '1px solid', borderColor: n ? 'primary.light' : 'divider', bgcolor: n ? 'action.hover' : 'transparent' }}>
+      <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1}>
+        <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0 }} noWrap title={ev.recordId}>
+          {ev.recordId}
+        </Typography>
+        <Button size="small" variant="text" href={href} onClick={(e) => (e.preventDefault(), navigate(href))} sx={{ minWidth: 0, px: 0.5, flexShrink: 0 }}>
+          Open
+        </Button>
+      </Stack>
+      <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }}>
+        {sourceName ?? ev.sourceId} · <EvidencePlace evidence={ev} showRecord={false} />
+      </Typography>
+      {inDerivation ? (
+        <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: n ? 'primary.main' : 'text.secondary' }}>
+          {n ? `Passage ${n} of this answer` : 'Not retrieved for this question'}
+        </Typography>
+      ) : (
+        <Typography variant="body2" sx={{ mt: 0.5, fontSize: 13, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+          “{ev.passage}”
+        </Typography>
+      )}
+    </Box>
+  );
+}
+
 interface EntityPanelProps {
   engineId: string;
   orgHandle: string;
@@ -154,33 +195,9 @@ export default function EntityPanel({ engineId, orgHandle, name, kind, kindColor
           <Box>
             <Typography sx={panelLabelSx}>Mentioned in</Typography>
             <Stack component="ul" gap={0.75} sx={{ listStyle: 'none', m: 0, mt: 0.75, p: 0 }}>
-              {mentioned.map((ev) => {
-                const n = used.get(ev.id);
-                return (
-                  <Box component="li" key={ev.id} sx={{ p: 1.25, borderRadius: 1, border: '1px solid', borderColor: n ? 'primary.light' : 'divider', bgcolor: n ? 'action.hover' : 'transparent' }}>
-                    <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, minWidth: 0 }} noWrap title={ev.recordId}>
-                        {ev.recordId}
-                      </Typography>
-                      <Button size="small" variant="text" href={contextEvidenceUrl(orgHandle, engineId, ev.id)} onClick={(e) => (e.preventDefault(), navigate(contextEvidenceUrl(orgHandle, engineId, ev.id)))} sx={{ minWidth: 0, px: 0.5, flexShrink: 0 }}>
-                        Open
-                      </Button>
-                    </Stack>
-                    <Typography variant="caption" sx={{ ...mutedSx, display: 'block' }}>
-                      {sourceName.get(ev.sourceId) ?? ev.sourceId} · <EvidencePlace evidence={ev} showRecord={false} />
-                    </Typography>
-                    {derivation ? (
-                      <Typography variant="caption" sx={{ display: 'block', mt: 0.25, color: n ? 'primary.main' : 'text.secondary' }}>
-                        {n ? `Passage ${n} of this answer` : 'Not retrieved for this question'}
-                      </Typography>
-                    ) : (
-                      <Typography variant="body2" sx={{ mt: 0.5, fontSize: 13, lineHeight: 1.5, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                        “{ev.passage}”
-                      </Typography>
-                    )}
-                  </Box>
-                );
-              })}
+              {mentioned.map((ev) => (
+                <PassageRow key={ev.id} evidence={ev} engineId={engineId} orgHandle={orgHandle} sourceName={sourceName.get(ev.sourceId)} answerNumber={used.get(ev.id)} inDerivation={!!derivation} />
+              ))}
               {!mentioned.length && (
                 <Typography variant="body2" component="li" sx={mutedSx}>
                   No passage you can read names it directly.
