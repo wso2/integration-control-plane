@@ -572,8 +572,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     }
     return (
       <>
-        <LinkRows projectId={projectId} componentId={componentId} env={envId} links={links} />
-        <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} actions={['Link', 'Link through']} />
+        <FormLinks projectId={projectId} componentId={componentId} env={envId} open={open} links={links} build={buildId} />
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
