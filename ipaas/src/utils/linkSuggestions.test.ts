@@ -45,6 +45,15 @@ describe('linkSuggestionRows', () => {
     expect(rows(suggestions.slice(1), links)).toEqual(['Link salesforce-support → wso2.sfdemo.support.sfSupport']);
   });
 
+  it('tells a connection from another whose name it starts', () => {
+    const both = [{ resourceType: 'salesforce-support', displayName: 'Support', package: 'ballerinax/salesforce', connections: ['acme.app.sfSales', 'acme.app.sfSales2'], linked: false }];
+    const environments = [{ name: 'development', state: 'linked' as const, inRelease: true, hasValues: true, configurables: { 'acme.app.sfSales2BaseUrl': 'SALESFORCE_BASE_URL' } }];
+    const throughSfSales2: ResourceLink = { resourceType: 'salesforce-sales', connection: 'acme.app.sfSales2', linked: true, environments };
+    const onWso2Cloud: ResourceLink = { resourceType: 'salesforce-sales', linked: true, environments };
+    expect(rows(both, [throughSfSales2])).toEqual(['Link salesforce-support → acme.app.sfSales']);
+    expect(rows(both, [onWso2Cloud])).toEqual(['Link salesforce-support → acme.app.sfSales']);
+  });
+
   it('offers only the actions asked for', () => {
     const changed = { ...suggestions[0], linked: true, linkedConnection: 'wso2.sfdemo.sfCrm' } as (typeof suggestions)[0];
     expect(rows([changed, suggestions[1]], [], ['Link', 'Link through'])).toEqual(['Link salesforce-support → wso2.sfdemo.sfSales', 'Link salesforce-support → wso2.sfdemo.support.sfSupport']);

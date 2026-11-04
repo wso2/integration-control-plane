@@ -29,13 +29,19 @@ export interface LinkSuggestionRow extends ResourceLinkSuggestion {
 /**
  * One row per suggested resource and connection whose action is one of actions. A resource linked only on WSO2 Cloud
  * is offered as "Link through" (to add the integration's connection), one linked through another connection as
- * "Change link". It leaves out a connection whose configurables another link supplies.
+ * "Change link". It leaves out a connection another link goes through, or whose configurables a link made on WSO2
+ * Cloud supplies.
  */
 export function linkSuggestionRows(suggestions: ResourceLinkSuggestion[], links: ResourceLink[], actions: LinkSuggestionAction[]): LinkSuggestionRow[] {
+  const known = suggestions.flatMap((s) => s.connections);
   return suggestions.flatMap((s) => {
-    const taken = links.filter((l) => l.linked && l.resourceType !== s.resourceType).flatMap((l) => l.environments.flatMap((e) => Object.keys(e.configurables)));
+    const taken = new Set(links.filter((l) => l.linked && l.resourceType !== s.resourceType).flatMap((l) => (l.connection ? [l.connection] : l.environments.flatMap((e) => Object.keys(e.configurables).map((k) => connectionOf(k, known))))));
     const action: LinkSuggestionAction = !s.linked ? 'Link' : s.linkedConnection ? 'Change link' : 'Link through';
     if (!actions.includes(action)) return [];
-    return s.connections.filter((c) => !taken.some((k) => k.startsWith(c))).map((connection) => ({ ...s, connection, action }));
+    return s.connections.filter((c) => !taken.has(c)).map((connection) => ({ ...s, connection, action }));
   });
 }
+
+// A connection's configurables are named after it and a connector field: sfSales + BaseUrl. The longest connection
+// that names a key that way owns it, so sfSales2BaseUrl belongs to sfSales2, not sfSales.
+const connectionOf = (key: string, connections: string[]): string | undefined => connections.filter((c) => key.startsWith(c) && /^[A-Z]/.test(key.slice(c.length))).sort((a, b) => b.length - a.length)[0];
