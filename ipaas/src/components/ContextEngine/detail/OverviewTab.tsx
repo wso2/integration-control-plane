@@ -251,11 +251,11 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             }>
             {canSeeModels(permissions.data) ? (
               <>
-                <ModelRow label="Embedding" provider={engine.models.embedding ? modelProviderName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
-                <ModelRow label="Language model" provider={engine.models.llm ? modelProviderName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
+                <ModelRow label="Embedding model" provider={engine.models.embedding ? modelProviderName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
+                <ModelRow label="Ingestion language model" provider={engine.models.llm ? modelProviderName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
                 <ModelRow
-                  label="Answer model"
-                  provider={!engine.exposure.answers ? 'Answers off' : engine.models.answer ? modelProviderName('llm', engine.models.answer.provider) : 'Engine default'}
+                  label="Answer language model"
+                  provider={!engine.exposure.answers ? 'Disabled' : engine.models.answer ? modelProviderName('llm', engine.models.answer.provider) : 'Engine default'}
                   model={engine.exposure.answers ? engine.models.answer?.model : undefined}
                 />
               </>
