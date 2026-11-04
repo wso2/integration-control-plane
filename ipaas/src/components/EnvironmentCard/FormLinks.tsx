@@ -19,7 +19,6 @@
 import type { ResourceLink } from '../../types/configuration';
 import { BuildChangeLink } from '../Build/LinkWarnings';
 import { LinkRows } from './LinkRows';
-import { LinkSuggestions } from './LinkSuggestions';
 
 interface FormLinksProps {
   projectId: string;
@@ -31,13 +30,12 @@ interface FormLinksProps {
   build?: string;
 }
 
-/** A Configure form's links: Change link where env's build lacks a link's connection, each link as env gets it, and suggestions. */
+/** A Configure form's links: Change link where env's build lacks a link's connection, then each resource with its link or suggestion. */
 export function FormLinks({ projectId, componentId, env, open, links, build }: FormLinksProps) {
   return (
     <>
       {open && build && <BuildChangeLink projectId={projectId} componentId={componentId} build={build} />}
-      <LinkRows projectId={projectId} componentId={componentId} env={env} links={links} />
-      <LinkSuggestions projectId={projectId} componentId={componentId} open={open} links={links} actions={['Link', 'Link through']} />
+      <LinkRows projectId={projectId} componentId={componentId} env={env} open={open} links={links} />
     </>
   );
 }

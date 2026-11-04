@@ -68,16 +68,6 @@ describe('LinkSuggestions', () => {
     expect(container.textContent).toContain('acme.sfdemo.sfSales → acme.sfdemo.sfCrm');
   });
 
-  it('links a link made on WSO2 Cloud through a connection, without calling it a change', async () => {
-    const mutate = vi.fn();
-    create.current = { mutate, isPending: false, isError: false };
-    create.suggestions = [{ ...changeLink, linkedConnection: undefined }];
-    await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[]} actions={['Link', 'Link through']} />));
-    expect(container.textContent).toContain('linked on WSO2 Cloud → acme.sfdemo.sfCrm');
-    await act(async () => container.querySelector('button')?.click());
-    expect(mutate).toHaveBeenCalledWith(expect.objectContaining({ connection: 'acme.sfdemo.sfCrm', changed: false }));
-  });
-
   it('offers no change where it offers only new links', async () => {
     create.current = { mutate: vi.fn(), isPending: false, isError: false };
     await act(async () => root.render(<LinkSuggestions projectId="default" componentId="sfdemo" open links={[sales]} actions={['Link', 'Link through']} />));

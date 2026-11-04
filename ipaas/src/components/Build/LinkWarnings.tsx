@@ -87,7 +87,7 @@ export function BuildChangeLink({ projectId, componentId, build }: { projectId: 
         </Alert>
       )}
       {/* A Change link the build doesn't ask for would move the link off the connection the Workload's build reads. */}
-      <LinkSuggestions projectId={projectId} componentId={componentId} open links={links} build={build} actions={['Change link']} bare only={notInBuild.map((w) => w.resourceType)} />
+      <LinkSuggestions projectId={projectId} componentId={componentId} open links={links} build={build} actions={['Change link']} only={notInBuild.map((w) => w.resourceType)} />
     </>
   );
 }

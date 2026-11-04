@@ -42,6 +42,25 @@ export function linkSuggestionRows(suggestions: ResourceLinkSuggestion[], links:
   });
 }
 
+/** A suggested resource with every connection it is suggested through, best match first. */
+export interface LinkOffer {
+  resourceType: string;
+  displayName: string;
+  package: string;
+  action: LinkSuggestionAction;
+  connections: string[];
+  linkedConnection?: string;
+}
+
+/** The rows of linkSuggestionRows, one offer per resource. */
+export const linkOffers = (rows: LinkSuggestionRow[]): LinkOffer[] =>
+  rows.reduce<LinkOffer[]>((offers, r) => {
+    const offer = offers.find((o) => o.resourceType === r.resourceType);
+    if (offer) offer.connections.push(r.connection);
+    else offers.push({ resourceType: r.resourceType, displayName: r.displayName, package: r.package, action: r.action, connections: [r.connection], ...(r.linkedConnection && { linkedConnection: r.linkedConnection }) });
+    return offers;
+  }, []);
+
 // A connection's configurables are named after it and a connector field: sfSales + BaseUrl. The longest connection
 // that names a key that way owns it, so sfSales2BaseUrl belongs to sfSales2, not sfSales.
 const connectionOf = (key: string, connections: string[]): string | undefined => connections.filter((c) => key.startsWith(c) && /^[A-Z]/.test(key.slice(c.length))).sort((a, b) => b.length - a.length)[0];

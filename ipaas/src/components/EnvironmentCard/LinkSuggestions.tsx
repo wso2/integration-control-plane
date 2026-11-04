@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
-import { Link } from '@wso2/oxygen-ui-icons-react';
+import { Alert } from '@wso2/oxygen-ui';
 import { useCreateResourceLink, useLastUnlinkAt, useResourceLinkSuggestions } from '../../hooks/useConfiguration';
 import type { ResourceLink } from '../../types/configuration';
-import { type LinkSuggestionAction, linkSuggestionRows } from '../../utils/linkSuggestions';
+import { type LinkSuggestionAction, linkOffers, linkSuggestionRows } from '../../utils/linkSuggestions';
 import { LinkOutcome } from './LinkOutcome';
+import { OfferRow } from './OfferRow';
 
 interface LinkSuggestionsProps {
   projectId: string;
@@ -32,73 +32,37 @@ interface LinkSuggestionsProps {
   build?: string;
   /** What the rows may offer to do. */
   actions: LinkSuggestionAction[];
-  /** Hide the heading and help text, for rows inside another box. */
-  bare?: boolean;
   /** Offer rows only for these resources. */
   only?: string[];
 }
 
-const boxSx = { mb: 1.5, p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
-const rowSx = { py: 0.75, borderTop: '1px solid', borderColor: 'divider' } as const;
-const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
-
-/** Resources a build's imports call for, one row per resource and connection. */
-export function LinkSuggestions({ projectId, componentId, open, links, build, actions, bare, only }: LinkSuggestionsProps) {
+/** Resources a build's imports call for, one row per resource, for a box of another's. */
+export function LinkSuggestions({ projectId, componentId, open, links, build, actions, only }: LinkSuggestionsProps) {
   const { data: suggestions = [] } = useResourceLinkSuggestions(projectId, componentId, build, open);
   const create = useCreateResourceLink();
   const lastUnlinkAt = useLastUnlinkAt(componentId);
 
-  const rows = linkSuggestionRows(suggestions, links, actions).filter((r) => !only || only.includes(r.resourceType));
+  const offers = linkOffers(linkSuggestionRows(suggestions, links, actions)).filter((o) => !only || only.includes(o.resourceType));
   // An unlink since makes the line about the link stale.
   const outcome = create.data && create.submittedAt > lastUnlinkAt && <LinkOutcome write={create.data} changed={!!create.variables.changed} />;
-  if (rows.length === 0) return outcome || null;
 
   return (
     <>
       {outcome}
-      <Box sx={bare ? undefined : boxSx}>
-        {!bare && (
-          <>
-            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-              Suggested resources
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
-              For the connectors this integration uses.
-            </Typography>
-          </>
-        )}
-        {rows.map((r) => {
-          const pending = create.isPending && create.variables?.resourceType === r.resourceType && create.variables.connection === r.connection;
-          const label = r.action === 'Change link' ? r.action : 'Link';
-          return (
-            <Stack key={`${r.resourceType} ${r.connection}`} direction="row" alignItems="center" gap={1} sx={rowSx}>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Stack direction="row" alignItems="center" gap={0.75}>
-                  <Typography variant="body2">{r.displayName || r.resourceType}</Typography>
-                  <Chip label={r.package} size="small" variant="outlined" sx={chipSx} />
-                </Stack>
-                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-                  {r.action === 'Link' ? r.connection : r.action === 'Change link' ? `${r.linkedConnection} → ${r.connection}` : `linked on WSO2 Cloud → ${r.connection}`}
-                </Typography>
-              </Box>
-              <Button
-                size="small"
-                variant="outlined"
-                aria-label={`${label} ${r.resourceType} through ${r.connection}`}
-                startIcon={pending ? <CircularProgress size={14} /> : <Link size={14} />}
-                disabled={create.isPending}
-                onClick={() => create.mutate({ projectId, componentId, resourceType: r.resourceType, connection: r.connection, changed: r.action === 'Change link' })}>
-                {label}
-              </Button>
-            </Stack>
-          );
-        })}
-        {create.isError && (
-          <Alert severity="error" sx={{ mt: 1 }}>
-            {create.error instanceof Error ? create.error.message : 'Failed to link the resource'}
-          </Alert>
-        )}
-      </Box>
+      {offers.map((o) => (
+        <OfferRow
+          key={o.resourceType}
+          offer={o}
+          busy={create.isPending}
+          pending={create.isPending && create.variables?.resourceType === o.resourceType}
+          onLink={(connection) => create.mutate({ projectId, componentId, resourceType: o.resourceType, connection, changed: o.action === 'Change link' })}
+        />
+      ))}
+      {create.isError && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {create.error instanceof Error ? create.error.message : 'Failed to link the resource'}
+        </Alert>
+      )}
     </>
   );
 }
