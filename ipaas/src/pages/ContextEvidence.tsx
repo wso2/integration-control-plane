@@ -16,29 +16,30 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import { ArrowLeft, Check, ChevronRight, Hash, Link as LinkIcon, MessageSquare, Unlink, Users } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX, type ReactNode } from 'react';
+import { Alert, Box, Button, /* Chip, */ CircularProgress, Grid, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { ArrowLeft, /* Check, */ ChevronRight, Hash, /* Link as LinkIcon, */ MessageSquare, Unlink /* , Users */ } from '@wso2/oxygen-ui-icons-react';
+import { /* useState, */ type JSX /* , type ReactNode */ } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions, useRouteEngineId } from '../hooks/useContextEngine';
-import { absoluteUrl, evidenceBackTarget, evidencePart, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
-import { contextEngineUrl, contextEnginesUrl, contextEvidenceUrl } from '../paths';
+import { /* absoluteUrl, */ evidenceBackTarget, /* evidencePart, evidencePlace, */ evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
+import { contextEngineUrl, contextEnginesUrl /* , contextEvidenceUrl */ } from '../paths';
 import NotFound from '../components/NotFound';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
-import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx, wrapSx } from '../components/ContextEngine/styles';
-import type { ContextEvidence as Evidence, ContextEvidenceLocationState } from '../types/contextEngine';
+import { mutedSx, summaryCardHeaderSx, summaryCardSx, /* summaryRowSx, */ wrapSx } from '../components/ContextEngine/styles';
+import type { /* ContextEvidence as Evidence, */ ContextEvidenceLocationState } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 320 } as const;
 
-/** The most precise place the engine knows, for the title chip and the chain. */
-function primaryPlace(ev: Evidence): string {
-  const l = ev.locator;
-  if (l?.path) return l.path;
-  return evidencePlace(ev).parts.find((p) => !p.startsWith('under')) ?? 'Passage';
-}
+// The title chip and the chain's Passage step, both hidden for now.
+// /** The most precise place the engine knows, for the title chip and the chain. */
+// function primaryPlace(ev: Evidence): string {
+//   const l = ev.locator;
+//   if (l?.path) return l.path;
+//   return evidencePlace(ev).parts.find((p) => !p.startsWith('under')) ?? 'Passage';
+// }
 
 function ChainStep({ label, value, detail, mono = false }: { label: string; value: string; detail?: string; mono?: boolean }): JSX.Element {
   return (
@@ -58,18 +59,19 @@ function ChainStep({ label, value, detail, mono = false }: { label: string; valu
   );
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
-  return (
-    <Box sx={summaryRowSx}>
-      <Typography variant="body2" sx={mutedSx}>
-        {label}
-      </Typography>
-      <Typography variant="body2" sx={{ textAlign: 'right' }}>
-        {children}
-      </Typography>
-    </Box>
-  );
-}
+// The "Where it is" card's rows, hidden with the card for now.
+// function Row({ label, children }: { label: string; children: ReactNode }): JSX.Element {
+//   return (
+//     <Box sx={summaryRowSx}>
+//       <Typography variant="body2" sx={mutedSx}>
+//         {label}
+//       </Typography>
+//       <Typography variant="body2" sx={{ textAlign: 'right' }}>
+//         {children}
+//       </Typography>
+//     </Box>
+//   );
+// }
 
 /**
  * One cited passage, opened from a citation link. The engine checks access
@@ -84,7 +86,8 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   const evidence = useContextEvidence(engineId, evidenceId);
   const permissions = useContextPermissions(engineId);
   const { state } = useLocation() as { state: ContextEvidenceLocationState | null };
-  const [copied, setCopied] = useState(false);
+  // Copy link hidden for now.
+  // const [copied, setCopied] = useState(false);
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
@@ -161,22 +164,23 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   }
 
   const source = engine.data?.sources.find((s) => s.id === ev.sourceId);
-  const place = evidencePlace(ev);
-  const part = evidencePart(ev);
+  // const place = evidencePlace(ev);
+  // const part = evidencePart(ev);
   const lines = passageLines(ev);
   const l = ev.locator;
   // Someone who may open evidence but not ask: the engine's evidence.read without context.read.
   const readerOnly = !!permissions.data && !permissions.data.includes('context.read');
-  const subject = l?.heading ?? ev.recordId;
-  const askAbout = () => navigate(contextEngineUrl(scope.org, engineId, 'playground', { q: `What else do the sources say about “${subject}”?` }));
-  const copyLink = () =>
-    navigator.clipboard?.writeText(absoluteUrl(contextEvidenceUrl(scope.org, engineId, ev.id))).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    });
-  const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', !place.coarse && part !== undefined ? `part ${part}` : '']
-    .filter(Boolean)
-    .join(' · ');
+  // Ask about this hidden for now.
+  // const subject = l?.heading ?? ev.recordId;
+  // const askAbout = () => navigate(contextEngineUrl(scope.org, engineId, 'playground', { q: `What else do the sources say about “${subject}”?` }));
+  // const copyLink = () =>
+  //   navigator.clipboard?.writeText(absoluteUrl(contextEvidenceUrl(scope.org, engineId, ev.id))).then(() => {
+  //     setCopied(true);
+  //     window.setTimeout(() => setCopied(false), 1500);
+  //   });
+  // const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', !place.coarse && part !== undefined ? `part ${part}` : '']
+  //   .filter(Boolean)
+  //   .join(' · ');
 
   return (
     <PageContent sx={wrapSx}>
@@ -187,12 +191,17 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             <Typography variant="h6" component="h1" sx={{ fontWeight: 600, wordBreak: 'break-word' }}>
               {ev.recordId}
             </Typography>
+            {/* The passage's place, such as "Part 2", hidden for now.
             <Chip size="small" variant="outlined" label={primaryPlace(ev)} sx={l?.path ? { fontFamily: 'monospace' } : undefined} />
+            */}
           </Stack>
+          {/* The subtitle, hidden for now.
           <Typography variant="body2" sx={{ ...mutedSx, mt: 0.5 }}>
             A passage from {engineName ?? 'this context engine'}, cited as evidence.
           </Typography>
+          */}
         </Box>
+        {/* Copy link and Ask about this hidden for now.
         <Stack direction="row" gap={1.25}>
           <Button variant="outlined" startIcon={copied ? <Check size={16} /> : <LinkIcon size={16} />} onClick={() => void copyLink()}>
             {copied ? 'Link copied' : 'Copy link'}
@@ -201,6 +210,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             Ask about this
           </Button>
         </Stack>
+        */}
       </Stack>
 
       {readerOnly && (
@@ -209,22 +219,32 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
         </Alert>
       )}
 
-      <Stack direction="row" alignItems="stretch" gap={1} sx={{ mt: 3, flexWrap: { xs: 'wrap', md: 'nowrap' }, '& > svg': { alignSelf: 'center' } }} aria-label="Where this passage comes from">
-        <ChainStep label="Source" value={source?.name ?? ev.sourceId} detail={source ? sourceTypeName(source.type) : undefined} />
-        <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
-        <ChainStep label="Item" value={ev.recordId} />
-        <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
-        <ChainStep label="Version" value={evidenceVersionLabel(ev.sourceVersion)} />
-        <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
-        <ChainStep label="Passage" value={primaryPlace(ev)} detail={passageDetail || undefined} mono={!!l?.path} />
-      </Stack>
+      <Box sx={{ ...summaryCardSx, height: 'auto', mt: 3 }}>
+        <Box sx={summaryCardHeaderSx}>
+          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+            Provenance
+          </Typography>
+        </Box>
+        <Stack direction="row" alignItems="stretch" gap={1} sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' }, '& > svg': { alignSelf: 'center' } }} aria-label="Where this passage comes from">
+          <ChainStep label="Source" value={source?.name ?? ev.sourceId} detail={source ? sourceTypeName(source.type) : undefined} />
+          <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
+          <ChainStep label="ID" value={ev.recordId} />
+          <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
+          <ChainStep label="Version" value={evidenceVersionLabel(ev.sourceVersion)} />
+          {/* The Passage step, hidden for now.
+          <ChevronRight size={18} aria-hidden style={{ flexShrink: 0, opacity: 0.5 }} />
+          <ChainStep label="Passage" value={primaryPlace(ev)} detail={passageDetail || undefined} mono={!!l?.path} />
+          */}
+        </Stack>
+      </Box>
 
-      <Grid container spacing={2} sx={{ mt: 1 }}>
-        <Grid size={{ xs: 12, md: 7 }}>
+      <Grid container spacing={2} sx={{ mt: 2 }}>
+        {/* Full width while the side cards are hidden; it was md: 7 beside them. */}
+        <Grid size={{ xs: 12 }}>
           <Box sx={{ ...summaryCardSx, height: 'auto' }}>
             <Box sx={summaryCardHeaderSx}>
               <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-                Passage
+                Evidence
               </Typography>
             </Box>
             {l?.heading && (
@@ -253,6 +273,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             )}
           </Box>
         </Grid>
+        {/* The "Where it is" and "Who can open this link" cards, hidden for now.
         <Grid size={{ xs: 12, md: 5 }}>
           <Stack gap={2}>
             <Box sx={{ ...summaryCardSx, height: 'auto' }}>
@@ -298,6 +319,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
             </Box>
           </Stack>
         </Grid>
+        */}
       </Grid>
     </PageContent>
   );

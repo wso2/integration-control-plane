@@ -626,6 +626,24 @@ export const railNumberSx = (lit: boolean) =>
     transition: 'background-color 120ms, color 120ms',
   }) as const;
 
+/** A passage's number beside a relationship: filled when the answer cites the passage (or there is no answer), outlined when it was only given. */
+export const passageBadgeSx = (strong: boolean) =>
+  ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+    width: 18,
+    height: 18,
+    borderRadius: '50%',
+    fontSize: 10.5,
+    fontWeight: 700,
+    bgcolor: strong ? 'primary.main' : 'transparent',
+    color: strong ? 'primary.contrastText' : 'text.secondary',
+    border: strong ? 'none' : '1.5px solid',
+    borderColor: 'text.disabled',
+  }) as const;
+
 export const answerFooterSx = {
   display: 'flex',
   alignItems: 'center',

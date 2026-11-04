@@ -17,10 +17,10 @@
  */
 
 import { Box, Button, ButtonBase, Chip, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, ChevronDown, ChevronRight, ExternalLink, History, Link as LinkIcon, Waypoints } from '@wso2/oxygen-ui-icons-react';
+import { /* Check, */ ChevronDown, ChevronRight, ExternalLink, History /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
-import { Link as RouterLink } from 'react-router';
-import { absoluteUrl, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
+// import { Link as RouterLink } from 'react-router';
+import { /* absoluteUrl, */ VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import { EvidencePlace } from './EvidenceCard';
 import { mutedSx, railCardSx, railNumberSx } from '../styles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
@@ -30,7 +30,7 @@ interface RailCardProps {
   n: number;
   source?: ContextSource;
   cited: boolean;
-  /** Its mark in the answer is hovered or focused. */
+  /** Its mark in the answer, or beside a graph fact, is hovered or focused. */
   active: boolean;
   pinned: boolean;
   /** Another passage is pinned, so this one steps back. */
@@ -43,17 +43,11 @@ interface RailCardProps {
   graphHref?: string;
 }
 
-function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, onHover, onPin, onOpen, graphHref }: RailCardProps): JSX.Element {
+function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen /* , graphHref */ }: RailCardProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (pinned) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [pinned]);
-  const copy = () =>
-    navigator.clipboard?.writeText(absoluteUrl(href)).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    });
   return (
     <Box ref={ref} onMouseEnter={() => onHover(n)} onMouseLeave={() => onHover(null)} sx={railCardSx(active, pinned, dimmed)}>
       <Stack direction="row" alignItems="center" gap={1}>
@@ -81,16 +75,8 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, on
           </Stack>
           <Stack direction="row" gap={1} sx={{ mt: 1.25 }}>
             <Button size="small" variant="outlined" startIcon={<ExternalLink size={14} />} onClick={onOpen}>
-              Open passage
+              Open
             </Button>
-            <Button size="small" variant="text" startIcon={copied ? <Check size={14} /> : <LinkIcon size={14} />} onClick={() => void copy()}>
-              {copied ? 'Link copied' : 'Copy link'}
-            </Button>
-            {graphHref && (
-              <Button size="small" variant="text" component={RouterLink} to={graphHref} startIcon={<Waypoints size={14} />}>
-                In graph
-              </Button>
-            )}
           </Stack>
           <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1 }}>
             Pinned. Press Esc to release.
@@ -105,8 +91,8 @@ interface EvidenceRailProps {
   /** The passages the model was given, in prompt order: `[n]` is `evidence[n - 1]`. */
   evidence: ContextEvidence[];
   sources: ContextSource[];
-  /** Evidence numbers the answer cites. */
-  cited: Set<number>;
+  /** Evidence numbers the answer cites; absent beside graph facts, where every passage was returned and none is cited. */
+  cited?: Set<number>;
   active: number | null;
   pinned: number | null;
   hrefFor: (evidence: ContextEvidence) => string;
@@ -121,11 +107,12 @@ interface EvidenceRailProps {
  * The passages beside an answer: the cited ones first, lit together with the
  * sentence that cites them, and the ones the model was given but did not cite
  * folded underneath. Those still count: the answer may draw on them, and the
- * engine checks all of them before showing the answer again.
+ * engine checks all of them before showing the answer again. Beside graph
+ * facts, with no answer, every passage is listed in the order it came back.
  */
 export default function EvidenceRail({ evidence, sources, cited, active, pinned, hrefFor, onHover, onPin, onOpen, graphHrefFor }: EvidenceRailProps): JSX.Element {
   const byId = new Map(sources.map((s) => [s.id, s]));
-  const uncited = evidence.map((_, i) => i + 1).filter((n) => !cited.has(n));
+  const uncited = cited ? evidence.map((_, i) => i + 1).filter((n) => !cited.has(n)) : [];
   const [showUncited, setShowUncited] = useState(false);
   // Pinning an uncited passage from the answer cannot happen, but hovering its card can; keep it reachable.
   const open = showUncited || (pinned !== null && uncited.includes(pinned));
@@ -138,7 +125,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
         evidence={ev}
         n={n}
         source={byId.get(ev.sourceId)}
-        cited={cited.has(n)}
+        cited={!cited || cited.has(n)}
         active={active === n}
         pinned={pinned === n}
         dimmed={pinned !== null && pinned !== n}
@@ -155,10 +142,11 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
     <Stack gap={1.25} sx={{ position: { lg: 'sticky' }, top: { lg: 16 } }}>
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Evidence
+          {cited ? 'Evidence' : 'Citations'}
         </Typography>
         <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
-          Cited in the answer
+          {cited ? 'Cited in the answer' : 'In rank order'}
+          {/* See in graph, hidden for now.
           {graphHrefFor && (
             <>
               <span aria-hidden>·</span>
@@ -167,11 +155,12 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
               </Button>
             </>
           )}
+          */}
         </Typography>
       </Stack>
       {evidence
         .map((_, i) => i + 1)
-        .filter((n) => cited.has(n))
+        .filter((n) => !cited || cited.has(n))
         .map(renderCard)}
       {uncited.length > 0 && (
         <Box sx={{ borderTop: '1px solid', borderColor: 'divider', pt: 0.5, mt: 0.5 }}>

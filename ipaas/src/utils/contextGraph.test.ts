@@ -34,6 +34,8 @@ import {
   exploreModel,
   factEntityNames,
   factIs,
+  factLink,
+  factPassages,
   factSelection,
   gridColumns,
   hexToRgba,
@@ -494,6 +496,22 @@ describe('facts on the graph', () => {
       ['stores keys in', true],
     ]);
     expect(other.missing).toEqual(part.missing);
+  });
+
+  it('finds the line a fact stands for, the one its part lights, and none for a fact the graph does not draw', () => {
+    const m = exploreModel(GRAPH, { records: true, entities: true, detail: 'all' });
+    const failover = factLink(m, GRAPH, facts[0]);
+    expect(failover).toBe(factSelection(m, GRAPH, [facts[0]]).links[0]);
+    expect(m.links[failover!].label).toBe('fails over to');
+    // Named the other way round, it is still the line between the two.
+    expect(factLink(m, GRAPH, { subject: 'Kandy', relation: 'FAILS OVER TO', object: 'gateway 7', evidenceIds: [] })).toBe(failover);
+    expect(factLink(m, GRAPH, facts[1])).toBeUndefined();
+  });
+
+  it('numbers the passages a fact stands on as the answer cites them, leaving out passages not given', () => {
+    const evidence = [{ id: 'e2' }, { id: 'e9' }, { id: 'e1' }] as ContextEvidence[];
+    expect(factPassages({ subject: 'a', relation: 'r', object: 'b', evidenceIds: ['e1', 'e2', 'gone'] }, evidence)).toEqual([1, 3]);
+    expect(factPassages({ subject: 'a', relation: 'r', object: 'b', evidenceIds: [] }, evidence)).toEqual([]);
   });
 
   it('finds a relationship among facts by its ends and relation, with kinds only when both sides know one', () => {

@@ -33,6 +33,7 @@ import { HttpError } from '../../../types/http';
 import { engineErrorCode, engineMessage } from '../../../utils/contextEngine';
 import AnsweredTurn from './AnsweredTurn';
 import EvidenceCard from './EvidenceCard';
+import FactsTurn from './FactsTurn';
 import OwnerAccessButton from './OwnerAccessButton';
 import RecentQuestions from './RecentQuestions';
 import { answerCardSx, answerFooterSx, askBarSx, mutedSx, questionBubbleSx /* , suggestionRowSx */ } from '../styles';
@@ -171,7 +172,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   };
 
   const openInApi = (turn: PlaygroundTurn) => navigate(contextEngineUrl(orgHandle, engine.id, 'api', { q: turn.question, mode: turn.mode === 'answer' ? 'answer' : undefined }));
-  // The Graph tab draws an answer's derivation from the stored query; a passage given here opens chosen.
+  // The Graph tab draws a stored query's derivation, with or without an answer; a passage given here opens chosen.
   const derivationHref = (queryId: string, ev?: ContextEvidence) => contextEngineUrl(orgHandle, engine.id, 'graph', { query: queryId, node: ev ? `p:${ev.id}` : undefined });
 
   // "Back to the answer" from the Graph tab lands here with `?open=` naming the question to reopen.
@@ -256,8 +257,12 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </>
       );
     } else {
-      summary = `${n} passage${n === 1 ? '' : 's'}`;
-      body = (
+      const f = result.facts.length;
+      summary = `${n} passage${n === 1 ? '' : 's'}${f ? ` · ${f} evidence` : ''}`;
+      // With graph facts, the passages move to a rail beside them, as an answer's do; without, they are the whole result.
+      body = f ? (
+        <FactsTurn facts={result.facts} evidence={result.evidence} sources={engine.sources} hrefFor={hrefFor} onOpen={openEvidence} graphHrefFor={(ev) => derivationHref(result.queryId, ev)} />
+      ) : (
         <>
           <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1.5 }}>
             Passages

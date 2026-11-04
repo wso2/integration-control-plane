@@ -17,10 +17,10 @@
  */
 
 import { Alert, Autocomplete, Box, Button, ButtonBase, CircularProgress, MenuItem, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { ArrowRight, Search, Waypoints, X } from '@wso2/oxygen-ui-icons-react';
+import { /* ArrowRight, */ Search, /* Waypoints, */ X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useContextGraph } from '../../../hooks/useContextEngine';
-import { useAskedQuestions } from '../../../hooks/contextQuestions';
+// import { useAskedQuestions } from '../../../hooks/contextQuestions';
 import { conflictLink, cosmosBuffers, entityConflicts, exploreModel, kindSlots, labelled, linkIndex, linkKey, linkSelection, litLinkColors, neighbourhood, relationTags, searchLabel, searchNodes, shortLabel, type ExploreFilter, type LinkTag, type Selection } from '../../../utils/contextGraph';
 import CosmosCanvas from './CosmosCanvas';
 import EntityPanel, { EntityChip } from './EntityPanel';
@@ -54,7 +54,7 @@ interface GraphExplorerProps {
  * or, on a "contradicts" label, the whole conflict. Everything shown passed
  * the engine's access check for this reader.
  */
-export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain, onSelectKey }: GraphExplorerProps): JSX.Element {
+export default function GraphExplorer({ engine, orgHandle, initialKey, /* onExplain, */ onSelectKey }: GraphExplorerProps): JSX.Element {
   const { colors, palette } = useGraphTheme();
   const [filter, setFilter] = useState<ExploreFilter>({ records: true, entities: true, detail: 'all' });
   // With a source chosen, the engine is asked for that source alone, so its names fill the slots
@@ -76,8 +76,9 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
   const linkColors = useMemo(() => (model && selection ? litLinkColors(model, palette, selection, palette.lit) : null), [model, palette, selection]);
   // The selected link's label, or a selected node's relationships, written on their links.
   const linkTags = useMemo(() => (picked ? picked.tags : model && selection ? relationTags(model, selection) : NO_TAGS), [picked, model, selection]);
-  const answered = useAskedQuestions(engine.id).filter((q) => q.mode === 'answer' && q.outcome === 'answered');
-  const [explain, setExplain] = useState('');
+  // Explain an answer, hidden for now.
+  // const answered = useAskedQuestions(engine.id).filter((q) => q.mode === 'answer' && q.outcome === 'answered');
+  // const [explain, setExplain] = useState('');
 
   useEffect(() => setSelectedKey(initialKey), [initialKey]);
 
@@ -341,6 +342,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
             </Box>
           )}
 
+          {/* Explain an answer, hidden for now.
           <Box component="section" sx={{ ...panelSx(false), borderColor: 'primary.light', bgcolor: 'action.hover' }}>
             <Stack direction="row" alignItems="center" gap={1}>
               <Waypoints size={18} aria-hidden />
@@ -367,6 +369,7 @@ export default function GraphExplorer({ engine, orgHandle, initialKey, onExplain
               </Typography>
             )}
           </Box>
+          */}
         </Stack>
       </Box>
     </Box>
