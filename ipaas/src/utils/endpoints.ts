@@ -116,7 +116,8 @@ export function visibilityUrlOptions(ep: EnvEndpoint, externalUrlOverride?: stri
   return options;
 }
 
-const exposureOfTier: Record<VisibilityKey, EndpointExposure | null> = { public: 'public', organization: 'organization', project: null };
+// The exposure each URL row belongs to: a gateway host's own, and Project for an endpoint on neither.
+const exposureOfTier: Record<VisibilityKey, EndpointExposure> = { public: 'public', organization: 'organization', project: 'none' };
 
 /** Whether the gateway serves the endpoint on this host, or, while it can't confirm the host, whether the saved choice is this host. */
 function tierServed(ep: EnvEndpoint, key: VisibilityKey, label: string): boolean {
@@ -137,16 +138,16 @@ function gatewayPublicUrl(ep: EnvEndpoint, externalUrlOverride?: string): string
 }
 
 /**
- * The env card's URL rows: the gateway host the endpoint is exposed on, then Project. An endpoint is
- * exposed on one host at a time, chosen the way the visibility editor opens, so the card and the
- * editor never disagree; a Project-only endpoint has no gateway row. Project access is always on,
- * so its URL always shows. A chosen host the endpoint isn't served on yet, or whose URL the gateway
- * hasn't reported, gets an empty URL, which the card shows as '—', never another host's URL in its
- * place: a Project URL under Public would read as publicly reachable.
+ * The env card's URL row: the one host the endpoint is exposed on, chosen the way the visibility
+ * editor opens, so the card and the editor never disagree. An endpoint on a gateway host shows that
+ * host's URL; a Project-only endpoint shows its project URL. A chosen gateway host the endpoint isn't
+ * served on yet, or whose URL the gateway hasn't reported, gets an empty URL, which the card shows as
+ * '—', never another host's URL in its place: a Project URL under Public would read as publicly
+ * reachable.
  */
 export function envCardUrlRows(ep: EnvEndpoint, externalUrlOverride?: string): EndpointVisibilityUrl[] {
   const { exposure } = editorExposure(ep);
-  return VISIBILITY_URLS.filter(({ key }) => key === 'project' || exposureOfTier[key] === exposure).map(({ key, label, getUrl }) => {
+  return VISIBILITY_URLS.filter(({ key }) => exposureOfTier[key] === exposure).map(({ key, label, getUrl }) => {
     if (key !== 'project' && !tierServed(ep, key, label)) return { key, label, url: '' };
     return { key, label, url: key === 'public' ? gatewayPublicUrl(ep, externalUrlOverride) : getUrl(ep) };
   });

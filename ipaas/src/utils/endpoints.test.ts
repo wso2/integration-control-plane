@@ -215,19 +215,18 @@ describe('envCardUrlRows', () => {
   const urls = { publicUrl: 'https://gw.example/api', organizationUrl: 'http://apip-internal:8080/api', projectUrl: 'http://svc.dp:8090' };
   const rows = (partial: Partial<EnvEndpoint>, override?: string) => Object.fromEntries(envCardUrlRows(ep({ ...urls, ...partial }), override).map((row) => [row.key, row.url]));
 
-  it('shows only the exposed host, then the project URL', () => {
-    expect(envCardUrlRows(ep({ ...urls, networkVisibilities: ['Organization'] })).map((row) => row.key)).toEqual(['organization', 'project']);
-    expect(rows({ networkVisibilities: ['Organization'] })).toEqual({ organization: urls.organizationUrl, project: urls.projectUrl });
-    expect(rows({ networkVisibilities: ['Public'] })).toEqual({ public: urls.publicUrl, project: urls.projectUrl });
+  it('shows only the host the endpoint is exposed on, never the project URL', () => {
+    expect(rows({ networkVisibilities: ['Project', 'Organization'] })).toEqual({ organization: urls.organizationUrl });
+    expect(rows({ networkVisibilities: ['Project', 'Public'] })).toEqual({ public: urls.publicUrl });
   });
 
-  it('shows only the project URL for a project-only endpoint', () => {
-    expect(rows({ networkVisibilities: [] })).toEqual({ project: urls.projectUrl });
-    expect(rows({ networkVisibilities: ['Public'], exposure: 'none' })).toEqual({ project: urls.projectUrl });
+  it('shows the project URL only for a project-only endpoint', () => {
+    expect(rows({ networkVisibilities: ['Project'] })).toEqual({ project: urls.projectUrl });
+    expect(rows({ networkVisibilities: ['Project', 'Public'], exposure: 'none' })).toEqual({ project: urls.projectUrl });
   });
 
   it('never puts the project or invoke URL in a gateway row', () => {
-    expect(rows({ networkVisibilities: [], exposure: 'public', publicUrl: '', invokeUrl: urls.projectUrl })).toEqual({ public: '', project: urls.projectUrl });
+    expect(rows({ networkVisibilities: [], exposure: 'public', publicUrl: '', invokeUrl: urls.projectUrl })).toEqual({ public: '' });
   });
 
   it('shows the gateway URL for Public when the API is served there', () => {
@@ -241,10 +240,10 @@ describe('envCardUrlRows', () => {
   });
 
   it('follows the saved choice while the gateway cannot confirm the host', () => {
-    expect(rows({ networkVisibilities: [], exposure: 'organization', visibilityStatus: tiers('UNKNOWN', 'UNKNOWN') })).toEqual({ organization: urls.organizationUrl, project: urls.projectUrl });
+    expect(rows({ networkVisibilities: [], exposure: 'organization', visibilityStatus: tiers('UNKNOWN', 'UNKNOWN') })).toEqual({ organization: urls.organizationUrl });
   });
 
   it('shows the saved host as pending while the gateway still serves the other one', () => {
-    expect(rows({ networkVisibilities: ['Public'], exposure: 'organization' })).toEqual({ organization: '', project: urls.projectUrl });
+    expect(rows({ networkVisibilities: ['Public'], exposure: 'organization' })).toEqual({ organization: '' });
   });
 });
