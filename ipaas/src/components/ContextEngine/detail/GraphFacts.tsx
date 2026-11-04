@@ -48,7 +48,7 @@ export default function GraphFacts({ facts, evidence, active, pinned, onHover, o
   return (
     <Box>
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 0.5 }}>
-        Graph facts
+        Evidence
       </Typography>
       <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1.25 }}>
         {count(facts.length, 'relationship', 'relationships')} naming {count(entities, 'entity', 'entities')}, each marked with the passages it stands on. They were written while indexing; cite the passages.

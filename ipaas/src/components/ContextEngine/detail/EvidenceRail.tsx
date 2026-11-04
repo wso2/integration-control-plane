@@ -17,10 +17,10 @@
  */
 
 import { Box, Button, ButtonBase, Chip, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Check, ChevronDown, ChevronRight, ExternalLink, History, Link as LinkIcon, Waypoints } from '@wso2/oxygen-ui-icons-react';
+import { /* Check, */ ChevronDown, ChevronRight, ExternalLink, History /* , Link as LinkIcon, Waypoints */ } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
-import { Link as RouterLink } from 'react-router';
-import { absoluteUrl, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
+// import { Link as RouterLink } from 'react-router';
+import { /* absoluteUrl, */ VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import { EvidencePlace } from './EvidenceCard';
 import { mutedSx, railCardSx, railNumberSx } from '../styles';
 import type { ContextEvidence, ContextSource } from '../../../types/contextEngine';
@@ -43,17 +43,11 @@ interface RailCardProps {
   graphHref?: string;
 }
 
-function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, onHover, onPin, onOpen, graphHref }: RailCardProps): JSX.Element {
+function RailCard({ evidence, n, source, cited, active, pinned, dimmed, /* href, */ onHover, onPin, onOpen /* , graphHref */ }: RailCardProps): JSX.Element {
   const ref = useRef<HTMLDivElement>(null);
-  const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (pinned) ref.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }, [pinned]);
-  const copy = () =>
-    navigator.clipboard?.writeText(absoluteUrl(href)).then(() => {
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    });
   return (
     <Box ref={ref} onMouseEnter={() => onHover(n)} onMouseLeave={() => onHover(null)} sx={railCardSx(active, pinned, dimmed)}>
       <Stack direction="row" alignItems="center" gap={1}>
@@ -81,16 +75,8 @@ function RailCard({ evidence, n, source, cited, active, pinned, dimmed, href, on
           </Stack>
           <Stack direction="row" gap={1} sx={{ mt: 1.25 }}>
             <Button size="small" variant="outlined" startIcon={<ExternalLink size={14} />} onClick={onOpen}>
-              Open passage
+              Open
             </Button>
-            <Button size="small" variant="text" startIcon={copied ? <Check size={14} /> : <LinkIcon size={14} />} onClick={() => void copy()}>
-              {copied ? 'Link copied' : 'Copy link'}
-            </Button>
-            {graphHref && (
-              <Button size="small" variant="text" component={RouterLink} to={graphHref} startIcon={<Waypoints size={14} />}>
-                In graph
-              </Button>
-            )}
           </Stack>
           <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 1 }}>
             Pinned. Press Esc to release.
@@ -156,10 +142,11 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
     <Stack gap={1.25} sx={{ position: { lg: 'sticky' }, top: { lg: 16 } }}>
       <Stack direction="row" alignItems="baseline" justifyContent="space-between" gap={1}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Evidence
+          {cited ? 'Evidence' : 'Citations'}
         </Typography>
         <Typography variant="caption" sx={{ ...mutedSx, display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
           {cited ? 'Cited in the answer' : 'In rank order'}
+          {/* See in graph, hidden for now.
           {graphHrefFor && (
             <>
               <span aria-hidden>·</span>
@@ -168,6 +155,7 @@ export default function EvidenceRail({ evidence, sources, cited, active, pinned,
               </Button>
             </>
           )}
+          */}
         </Typography>
       </Stack>
       {evidence
