@@ -38,6 +38,7 @@ import McpTab from '../components/ContextEngine/detail/McpTab';
 // import AccessTab from '../components/ContextEngine/detail/AccessTab';
 import type { CreateContextEngineLocationState } from './CreateContextEngine';
 import type { ContextEngineTabKey } from '../types/contextEngine';
+import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 const TABS: { value: ContextEngineTabKey; label: string }[] = [
@@ -86,7 +87,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isLoading) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Box sx={centeredSx}>
           <CircularProgress />
@@ -97,7 +98,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isError && error instanceof HttpError && error.status === 404) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <NotFound message={seenDeleting.current ? 'This context engine was deleted.' : "This context engine does not exist, or you don't have access to it."} backTo={base} />
       </PageContent>
@@ -106,7 +107,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
 
   if (isError || !engine) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Alert
           severity="error"
@@ -141,7 +142,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   const shownTab: ContextEngineTabKey = deleting ? 'overview' : activeTab;
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       {back}
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} sx={{ mb: 2 }}>
         <Box sx={{ minWidth: 0 }}>

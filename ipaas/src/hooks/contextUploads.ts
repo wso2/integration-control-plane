@@ -111,13 +111,35 @@ function writeJson(key: string, value: unknown): void {
 /**
  * Tell subscribers once per task, not once per patch: a burst of status results then
  * costs one render, and no subscriber runs on the stack of the code that patched the store.
+ * The leave prompt follows at once, since the browser may ask before that task runs.
  */
 function emit(): void {
+  syncLeaveGuard();
   if (notifyTimer !== undefined) return;
   notifyTimer = window.setTimeout(() => {
     notifyTimer = undefined;
     listeners.forEach((l) => l());
   }, 0);
+}
+
+/**
+ * Closing or reloading the tab stops a file still being sent, so the browser asks first. The store
+ * registers the prompt, not a page, because uploads carry on whichever page is open.
+ * Browsers show their own wording in that prompt; a page cannot set it.
+ */
+function askBeforeLeaving(event: BeforeUnloadEvent): void {
+  event.preventDefault();
+  // Older Chrome and Edge show the prompt only when this is set.
+  event.returnValue = true;
+}
+let guardingLeave = false;
+
+function syncLeaveGuard(): void {
+  const sending = anySending();
+  if (sending === guardingLeave) return;
+  guardingLeave = sending;
+  if (sending) window.addEventListener('beforeunload', askBeforeLeaving);
+  else window.removeEventListener('beforeunload', askBeforeLeaving);
 }
 
 function entriesOf(sourceId: string): UploadEntry[] {
@@ -575,6 +597,17 @@ export function useSourceUploads(engineId: string, sourceId: string): UploadEntr
     if (engineId && sourceId) ensureLoaded(engineId, sourceId);
   }, [engineId, sourceId]);
   return entries;
+}
+
+/** Whether any file, in any source, is still being sent from this tab. */
+function anySending(): boolean {
+  for (const list of entriesBySource.values()) if (list.some((e) => e.status === 'uploading')) return true;
+  return false;
+}
+
+/** True while any file is still being sent from this tab. */
+export function useAnySending(): boolean {
+  return useSyncExternalStore(subscribe, anySending, () => false);
 }
 
 // ── Rules ───────────────────────────────────────────────────────────────────

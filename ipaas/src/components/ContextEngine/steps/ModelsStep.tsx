@@ -19,7 +19,7 @@
 import { Box, Button, Checkbox, Chip, FormControlLabel, Stack, Switch, Typography } from '@wso2/oxygen-ui';
 import { Sparkles } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { blankLlm, contextLogoUrl, LLM_PROVIDERS, RECOMMENDED_MODELS } from '../../../constants/contextEngine';
+import { blankLlm, contextLogoUrl, EMBEDDING_LOGO_DARK, LLM_PROVIDERS, RECOMMENDED_MODELS } from '../../../constants/contextEngine';
 import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
 import { canShareApiKey } from '../../../utils/contextEngine';
 import ModelProviderColumn from './ModelProviderColumn';
@@ -41,8 +41,8 @@ interface ModelsStepProps {
   onAnswerLlmChange: (value: LlmConfig | null) => void;
 }
 
-const EMBEDDING_OPTIONS = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), models: p.models }));
-const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), models: p.models }));
+const EMBEDDING_OPTIONS = EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: ragLogoUrl(p.logo), logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]), models: p.models }));
+const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
 
 /** Step 3 — embedding and language model side by side, with a one-click recommended pair, then whether and with what the engine answers. */
 export default function ModelsStep({ embedding, llm, shareApiKey, answersEnabled, answerLlm, onEmbeddingChange, onLlmChange, onShareApiKeyChange, onAnswersEnabledChange, onAnswerLlmChange }: ModelsStepProps): JSX.Element {

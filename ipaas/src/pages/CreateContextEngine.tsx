@@ -49,6 +49,7 @@ import SetupProgress, { type SetupUploadSource } from '../components/ContextEngi
 import { rememberSourceRules, startUploads } from '../hooks/contextUploads';
 import { dropStagedFile, getStagedFile } from '../utils/stagedFiles';
 import { contextEngineFormReducer, initialContextEngineForm } from '../components/ContextEngine/formReducer';
+import { wrapSx } from '../components/ContextEngine/styles';
 import type { OrgScope } from '../nav';
 
 // 'Grant Access' step hidden for now; access is granted after creation from the Access tab. Restore it (and the commented blocks below) to bring the step back.
@@ -167,7 +168,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   };
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !setup ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
@@ -195,7 +196,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
           <Box sx={{ flex: 1, maxWidth: activeStep === 2 ? 1080 : 960, mt: 2 }}>
             {showRestored && (
               <Alert severity="info" variant="outlined" onClose={() => setShowRestored(false)} sx={{ mb: 3 }}>
-                We restored the draft you left in this session. API keys and tokens are never stored, so re-enter them before creating.
+                Draft restored. Re-enter API keys and tokens.
               </Alert>
             )}
 
@@ -271,7 +272,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
       <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Leave without creating?</DialogTitle>
         <DialogContent>
-          <DialogContentText>Your sources, roles and model choices are kept as a draft for this browser session. API keys and tokens are not stored and will need re-entering.</DialogContentText>
+          <DialogContentText>Your draft is kept for this tab. API keys and tokens are not.</DialogContentText>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setLeaveOpen(false)}>Stay</Button>
