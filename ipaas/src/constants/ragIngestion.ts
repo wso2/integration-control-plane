@@ -72,8 +72,8 @@ export interface EmbeddingProviderInfo {
 }
 
 export const EMBEDDING_PROVIDERS: EmbeddingProviderInfo[] = [
-  { id: 'openai', name: 'OpenAI', logo: `${RAG_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] },
-  { id: 'azure_openai', name: 'Azure OpenAI', logo: `${RAG_LOGO_BASE}azure-openai.svg`, models: [] },
+  { id: 'openai', name: 'Open AI', logo: `${RAG_LOGO_BASE}openai.svg`, models: ['text-embedding-3-small', 'text-embedding-3-large', 'text-embedding-ada-002'] },
+  { id: 'azure_openai', name: 'Azure Open AI', logo: `${RAG_LOGO_BASE}azure-openai.svg`, models: [] },
   { id: 'mistral', name: 'Mistral AI', logo: `${RAG_LOGO_BASE}mistral.svg`, models: ['mistral-embed'] },
 ];
 
