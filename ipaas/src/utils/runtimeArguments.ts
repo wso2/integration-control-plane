@@ -112,7 +112,23 @@ function createFormFieldFromArgument(arg: RuntimeArgument): FormField {
   };
 }
 
-export const parseRuntimeArgumentsToFormFields = (runtimeArguments: RuntimeArgument[]): FormField[] => runtimeArguments.map(createFormFieldFromArgument);
+/**
+ * Values bind by position, so a positional argument before a required one needs a value
+ * whatever its own schema says: it is marked required up front rather than failing the
+ * order check on run. A repeated argument stays as declared, since it may be empty
+ * mid-list (see validatePositionalOrder).
+ */
+export function parseRuntimeArgumentsToFormFields(runtimeArguments: RuntimeArgument[]): FormField[] {
+  const fields = runtimeArguments.map(createFormFieldFromArgument);
+  let laterRequired = false;
+  for (let i = runtimeArguments.length - 1; i >= 0; i -= 1) {
+    const arg = runtimeArguments[i];
+    if (arg.prefix) continue;
+    if (laterRequired && !arg.repeat) fields[i] = { ...fields[i], required: true };
+    if (fields[i].required) laterRequired = true;
+  }
+  return fields;
+}
 
 // validation
 

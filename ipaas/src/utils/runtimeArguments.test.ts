@@ -42,12 +42,12 @@ describe('parseRuntimeArgumentsToFormFields', () => {
     expect(fields.map((f) => f.required)).toEqual([true, false, true]);
   });
 
-  it('a positional arg the schema marks required: false is optional', () => {
+  it('a trailing positional arg the schema marks required: false is optional', () => {
     const fields = parseRuntimeArgumentsToFormFields([
-      { name: 'name', type: 'string', required: false }, // has a default
       { name: 'count', type: 'int', required: true },
+      { name: 'name', type: 'string', required: false }, // has a default
     ]);
-    expect(fields.map((f) => f.required)).toEqual([false, true]);
+    expect(fields.map((f) => f.required)).toEqual([true, false]);
   });
 
   it('turns enum values into options and uses displayName as label', () => {
@@ -74,6 +74,27 @@ describe('validateRequiredFields', () => {
 
   it('passes when required values are present; optional (prefixed) never blocks', () => {
     expect(validateRequiredFields(fields, { name: 'x', tags: ['a'] })).toEqual({});
+  });
+});
+
+describe('parseRuntimeArgumentsToFormFields positional requirement', () => {
+  it('marks an optional positional argument before a required one as required', () => {
+    // main(string? region, int count, string suffix = "")
+    const fields = parseRuntimeArgumentsToFormFields([
+      { name: 'region', type: 'string', required: false },
+      { name: 'count', type: 'int', required: true },
+      { name: 'suffix', type: 'string', required: false },
+      { name: 'verbose', type: 'boolean', prefix: '--verbose' },
+    ]);
+    expect(fields.map((f) => f.required)).toEqual([true, true, false, false]);
+  });
+
+  it('leaves a repeated argument optional before a required one', () => {
+    const fields = parseRuntimeArgumentsToFormFields([
+      { name: 'tags', type: 'string', repeat: true, required: false },
+      { name: 'name', type: 'string', required: true },
+    ]);
+    expect(fields.map((f) => f.required)).toEqual([false, true]);
   });
 });
 
