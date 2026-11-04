@@ -618,19 +618,19 @@ describe('shared api key', () => {
     expect(canShareApiKey(sameProvider.embedding, sameProvider.llm)).toBe(true);
     expect(effectiveLlm(sameProvider)?.apiKey).toBe('sk-test');
     expect(modelsStepBlocker(sameProvider)).toBeNull();
-    expect(modelsStepBlocker({ ...sameProvider, shareApiKey: false })).toBe('Complete the language model');
+    expect(modelsStepBlocker({ ...sameProvider, shareApiKey: false })).toBe('Complete the ingestion language model');
     expect(toCreateInput(sameProvider, 'development').llm.apiKey).toBe('sk-test');
   });
 
   it('names the first missing piece of the models step', () => {
     const noAnswerModel = { answersEnabled: true, answerLlm: null };
     expect(modelsStepBlocker({ embedding: null, llm: null, shareApiKey: false, ...noAnswerModel })).toBe('Choose an embedding model');
-    expect(modelsStepBlocker({ embedding, llm: null, shareApiKey: false, ...noAnswerModel })).toBe('Choose a language model');
+    expect(modelsStepBlocker({ embedding, llm: null, shareApiKey: false, ...noAnswerModel })).toBe('Choose an ingestion language model');
   });
 
   it('checks a separate answer model only while answers are offered', () => {
     const form = { ...completeForm(), answerLlm: blankLlm('openai') };
-    expect(modelsStepBlocker(form)).toBe('Complete the answer model');
+    expect(modelsStepBlocker(form)).toBe('Complete the answer language model');
     expect(modelsStepBlocker({ ...form, answersEnabled: false })).toBeNull();
     const chosen = { ...form, answerLlm: { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' } };
     expect(modelsStepBlocker(chosen)).toBeNull();
@@ -678,7 +678,7 @@ describe('answer model choice', () => {
     const form = completeForm();
     expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('same', form) })).toBeNull();
     expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('off', form) })).toBeNull();
-    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', form) })).toBe('Complete the answer model');
+    expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', form) })).toBe('Complete the answer language model');
     expect(modelsStepBlocker({ ...form, ...applyAnswerChoice('different', { ...form, answerLlm: different }) })).toBeNull();
   });
 });

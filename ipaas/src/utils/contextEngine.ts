@@ -304,9 +304,9 @@ export function modelsStepBlocker(form: Pick<ContextEngineForm, 'embedding' | 'l
   if (unavailable) return 'Azure OpenAI is not available yet; choose another provider';
   if (!form.embedding) return 'Choose an embedding model';
   if (!isEmbeddingValid(form.embedding)) return 'Complete the embedding model';
-  if (!form.llm) return 'Choose a language model';
-  if (!isLlmValid(effectiveLlm(form))) return 'Complete the language model';
-  if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) return 'Complete the answer model';
+  if (!form.llm) return 'Choose an ingestion language model';
+  if (!isLlmValid(effectiveLlm(form))) return 'Complete the ingestion language model';
+  if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) return 'Complete the answer language model';
   return null;
 }
 
@@ -345,7 +345,7 @@ export function isModelProviderUnavailable(provider: string): boolean {
 export function toCreateInput(form: ContextEngineForm, environment: string): CreateContextEngineInput {
   const llm = effectiveLlm(form);
   if (!form.embedding || !isLlmValid(llm)) throw new Error('Model configuration is incomplete.');
-  if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer model configuration is incomplete.');
+  if (form.answersEnabled && form.answerLlm && !isLlmValid(form.answerLlm)) throw new Error('Answer language model configuration is incomplete.');
   const answers = { enabled: form.answersEnabled, model: form.answersEnabled ? form.answerLlm : null };
   return { name: form.name.trim(), description: form.description.trim(), environment, sources: form.sources, roles: form.roles, embedding: form.embedding, llm, answers, storage: form.storage };
 }

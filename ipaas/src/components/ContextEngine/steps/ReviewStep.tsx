@@ -185,7 +185,7 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
               </Box>
               <Box>
                 <Typography variant="caption" sx={mutedSx}>
-                  Language model
+                  Ingestion language model
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                   {llmName}
@@ -197,10 +197,10 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
               </Box>
               <Box>
                 <Typography variant="caption" sx={mutedSx}>
-                  Answer model
+                  Answer language model
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                  {answer === 'different' && form.answerLlm ? modelProviderName('llm', form.answerLlm.provider) : answer === 'same' ? 'Same as the language model' : 'Off'}
+                  {answer === 'different' && form.answerLlm ? modelProviderName('llm', form.answerLlm.provider) : answer === 'same' ? 'Same as the ingestion model' : 'Disabled'}
                 </Typography>
                 {answer === 'different' && form.answerLlm && (
                   <Typography variant="caption" sx={mutedSx}>
