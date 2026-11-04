@@ -19,7 +19,7 @@
 import { Box, Button, CircularProgress, LinearProgress, Stack, Typography } from '@wso2/oxygen-ui';
 import { Check, CircleAlert, FileText } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { retryUpload, useSourceUploads } from '../../../hooks/contextUploads';
+import { retryUpload, useAnySending, useSourceUploads } from '../../../hooks/contextUploads';
 import { formatBytes, isUploadActive, uploadSourceTitle } from '../../../utils/contextEngine';
 import UploadStatusChip from './UploadStatusChip';
 import { fileListSx, mutedSx, progressBarSx, setupCardSx, setupDotSx, setupStepSx, uploadRowHeadSx, uploadRowSx } from '../styles';
@@ -101,6 +101,7 @@ function UploadSource({ engineId, source }: { engineId: string; source: SetupUpl
 /** What the wizard shows after Create while the staged files are handed to the new engine. */
 export default function SetupProgress({ engineId, engineName, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
   const configSkipped = warnings.some((w) => /models/i.test(w));
+  const sending = useAnySending();
   return (
     <Box sx={setupCardSx}>
       <Stack direction="row" alignItems="center" gap={1.5}>
@@ -125,9 +126,13 @@ export default function SetupProgress({ engineId, engineName, sourceCount, roleC
         ))}
       </Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
-          Keep this tab open until the uploads finish. Opening the engine now is fine; they carry on in its Files drawer.
-        </Typography>
+        {sending ? (
+          <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+            Files are still being sent. Closing or reloading this tab stops them. You can open the engine while they finish.
+          </Typography>
+        ) : (
+          <span />
+        )}
         <Button variant="contained" onClick={onOpen} sx={{ flexShrink: 0 }}>
           Open engine
         </Button>

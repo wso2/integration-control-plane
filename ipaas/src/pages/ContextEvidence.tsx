@@ -22,11 +22,11 @@ import { useState, type JSX, type ReactNode } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions } from '../hooks/useContextEngine';
-import { absoluteUrl, evidenceBackTarget, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
+import { absoluteUrl, evidenceBackTarget, evidencePart, evidencePlace, evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
 import { contextEngineUrl, contextEvidenceUrl } from '../paths';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
-import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../components/ContextEngine/styles';
+import { mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx, wrapSx } from '../components/ContextEngine/styles';
 import type { ContextEvidence as Evidence, ContextEvidenceLocationState } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
@@ -100,7 +100,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
   if (evidence.isLoading) {
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         <Box sx={centeredSx}>
           <CircularProgress />
@@ -113,7 +113,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   if (!ev) {
     const gone = evidence.error instanceof HttpError && evidence.error.status === 404;
     return (
-      <PageContent>
+      <PageContent sx={wrapSx}>
         {back}
         {gone ? (
           <Box sx={{ ...summaryCardSx, height: 'auto', maxWidth: 620, p: 3.5 }}>
@@ -153,6 +153,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
   const source = engine.data?.sources.find((s) => s.id === ev.sourceId);
   const place = evidencePlace(ev);
+  const part = evidencePart(ev);
   const lines = passageLines(ev);
   const l = ev.locator;
   // Someone who may open evidence but not ask: the engine's evidence.read without context.read.
@@ -164,12 +165,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     });
-  const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', l?.chunkIndex !== undefined ? `part ${l.chunkIndex + 1}` : '']
+  const passageDetail = [l?.sentences ? (l.sentences.first === l.sentences.last ? `Sentence ${l.sentences.first}` : `Sentences ${l.sentences.first}–${l.sentences.last}`) : '', !place.coarse && part !== undefined ? `part ${part}` : '']
     .filter(Boolean)
     .join(' · ');
 
   return (
-    <PageContent>
+    <PageContent sx={wrapSx}>
       {back}
       <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2} flexWrap="wrap">
         <Box sx={{ minWidth: 0 }}>
@@ -266,13 +267,12 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
                   {l.characters.start}–{l.characters.end}
                 </Row>
               )}
-              {l?.chunkIndex !== undefined && <Row label="Part">{l.chunkIndex + 1} of the item</Row>}
-              <Row label="Version">{evidenceVersionLabel(ev.sourceVersion)}</Row>
-              {place.coarse && (
-                <Typography variant="caption" component="p" sx={{ ...mutedSx, mt: 1.25 }}>
-                  The engine can only place this file type by its part for now.
-                </Typography>
+              {part !== undefined && (
+                <Row label="Part">
+                  {part} of {ev.recordId}
+                </Row>
               )}
+              <Row label="Version">{evidenceVersionLabel(ev.sourceVersion)}</Row>
             </Box>
             <Box sx={{ ...summaryCardSx, height: 'auto' }}>
               <Stack direction="row" gap={1.25} alignItems="flex-start">

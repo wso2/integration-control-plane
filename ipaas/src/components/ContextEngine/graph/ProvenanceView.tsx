@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, ButtonBase, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Check, ExternalLink, FileText, History, Link as LinkIcon, MessageSquare, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAskedQuestions } from '../../../hooks/contextQuestions';
@@ -24,7 +24,7 @@ import { useContextGraph, useContextPermissions, useContextQueryResult, useConte
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { contextEvidenceUrl } from '../../../paths';
 import { HttpError } from '../../../types/http';
-import { absoluteUrl, evidencePlace, evidenceVersionLabel } from '../../../utils/contextEngine';
+import { absoluteUrl, evidencePlace, VERSION_HINT, versionFromLabel } from '../../../utils/contextEngine';
 import {
   answerSentences,
   citedPassages,
@@ -375,13 +375,12 @@ function DerivationSteps({
   const summary = derivationSummary(result);
   const cited = citedPassages(result.answer);
   const through = [...new Set(result.facts.map((f) => f.linkedThrough).filter((n): n is string => !!n))];
-  const uncited = result.evidence.map((_, i) => i + 1).filter((n) => !cited.has(n));
-  const citations = [...cited]
-    .sort((a, b) => a - b)
-    .map((n) => {
-      const k = sentencesCiting(result.answer, n).length;
-      return `[${n}] cited${k > 1 ? ` ${k} times` : ''}`;
-    });
+  const given = result.evidence.length;
+  // A mark the model wrote past the passages it was given is not a citation of anything.
+  const citedGiven = [...cited].filter((n) => n >= 1 && n <= given).sort((a, b) => a - b);
+  const marks = citedGiven.map((n) => `[${n}]`);
+  const markList = marks.length > 1 ? `${marks.slice(0, -1).join(', ')} and ${marks[marks.length - 1]}` : marks.join('');
+  const citedLine = !citedGiven.length ? 'It cited none of them.' : citedGiven.length === given ? (given === 1 ? `It cited it, ${markList}.` : `It cited all ${given} of them.`) : `It cited ${citedGiven.length} of them, ${markList}.`;
   const steps: { title: string; body: string; lit?: boolean }[] = [
     { title: 'Scope', body: 'Only sources you may read were searched.' },
     {
@@ -402,7 +401,7 @@ function DerivationSteps({
       ? {
           title: 'Answer',
           lit: true,
-          body: `${modelName ?? 'The language model'} wrote ${summary.sentences} sentence${summary.sentences === 1 ? '' : 's'} from the ${result.evidence.length} passage${result.evidence.length === 1 ? '' : 's'} it was given. Citations checked: ${citations.join(', ') || 'none'}${uncited.length ? `; ${uncited.map((n) => `passage ${n}`).join(', ')} given, not cited` : ''}.`,
+          body: `${modelName ?? 'The language model'} wrote ${summary.sentences} sentence${summary.sentences === 1 ? '' : 's'} from the ${given} passage${given === 1 ? '' : 's'} it was given. ${citedLine}`,
         }
       : { title: 'Answer', body: result.answerWithheld ? 'Hidden: a passage it was written from is out of your reach now.' : result.insufficientEvidence ? 'None: the passages did not answer the question.' : 'Passages only: no answer was written.' },
     {
@@ -568,9 +567,11 @@ function PassagePanel({
       <Box sx={{ fontSize: 13, lineHeight: 1.5, bgcolor: 'action.hover', borderRadius: 1, p: 1.25, maxHeight: 220, overflowY: 'auto' }}>“{evidence.passage}”</Box>
       <Stack direction="row" alignItems="center" gap={0.75} sx={mutedSx}>
         <History size={13} aria-hidden />
-        <Typography variant="caption">
-          Version of {evidenceVersionLabel(evidence.sourceVersion)} · retrieved {ordinal(n)}
-        </Typography>
+        <Tooltip title={VERSION_HINT}>
+          <Typography variant="caption">
+            {versionFromLabel(evidence.sourceVersion)} · retrieved {ordinal(n)}
+          </Typography>
+        </Tooltip>
       </Stack>
       {result.answer && (
         <Box>

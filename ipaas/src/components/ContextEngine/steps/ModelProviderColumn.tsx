@@ -16,9 +16,10 @@
  * under the License.
  */
 
-import { Box, Checkbox, FormControlLabel, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import { Box, Checkbox, FormControlLabel, Link, MenuItem, Select, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { useState, type JSX, type ReactNode } from 'react';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
+import { isCustomModel } from '../../../utils/contextEngine';
 import SelectableCard from '../../common/SelectableCard';
 import SecretField from '../../common/SecretField';
 import { modelColumnSx, modelTileGridSx } from '../styles';
@@ -37,9 +38,14 @@ export interface ProviderOption {
   name: string;
   /** Full logo URL. */
   logo: string;
-  /** Selectable model ids; empty means a free-text deployment id (Azure). */
+  /** Full URL of the dark theme logo, when the logo is dark. */
+  logoDark?: string;
+  /** Selectable model ids; empty means the model id is typed in. */
   models: string[];
 }
+
+/** Select value for the last option, which swaps the list for a text field. */
+const OTHER_MODEL = '__other__';
 
 interface ShareKeyOption {
   /** Both models use the same provider, so one key can serve both. */
@@ -60,13 +66,19 @@ interface ModelProviderColumnProps<T extends ModelLike> {
   shareKey?: ShareKeyOption;
   /** Accessible name for the model selector. */
   modelLabel: string;
+  /** Shown under the purpose line, before the providers. */
+  choice?: ReactNode;
+  /** False leaves only the title, purpose and choice. */
+  showProviders?: boolean;
 }
 
-/** One model choice — provider tiles, model, credentials — laid out as a column so two fit side by side. */
-export default function ModelProviderColumn<T extends ModelLike>({ title, purpose, providers, value, onChange, blank, shareKey, modelLabel }: ModelProviderColumnProps<T>): JSX.Element {
+/** One model choice — provider tiles, model, credentials — laid out as a column so three fit side by side. */
+export default function ModelProviderColumn<T extends ModelLike>({ title, purpose, providers, value, onChange, blank, shareKey, modelLabel, choice, showProviders = true }: ModelProviderColumnProps<T>): JSX.Element {
   const providerInfo = providers.find((p) => p.id === value?.provider);
   const models = providerInfo?.models ?? [];
   const keyShared = !!shareKey?.available && shareKey.checked;
+  const [otherChosen, setOtherChosen] = useState(false);
+  const typed = otherChosen || (!!value && isCustomModel(value.model, models));
 
   return (
     <Box sx={modelColumnSx}>
@@ -81,22 +93,41 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
         )}
       </Box>
 
-      <Box sx={modelTileGridSx}>
-        {providers.map((p) => (
-          <SelectableCard key={p.id} title={p.name} logo={p.logo} selected={value?.provider === p.id} onSelect={() => onChange(blank(p.id))} />
-        ))}
-      </Box>
+      {choice}
 
-      {value && (
+      {showProviders && (
+        <Box sx={modelTileGridSx}>
+          {providers.map((p) => (
+            <SelectableCard
+              key={p.id}
+              title={p.name}
+              logo={p.logo}
+              logoDark={p.logoDark}
+              selected={value?.provider === p.id}
+              onSelect={() => {
+                setOtherChosen(false);
+                onChange(blank(p.id));
+              }}
+            />
+          ))}
+        </Box>
+      )}
+
+      {showProviders && value && (
         <Stack gap={2}>
-          {models.length > 0 ? (
+          {!typed ? (
             <Select
               size="small"
               fullWidth
               displayEmpty
               required
               value={value.model}
-              onChange={(e) => onChange({ ...value, model: e.target.value })}
+              onChange={(e) => {
+                if (e.target.value === OTHER_MODEL) {
+                  setOtherChosen(true);
+                  onChange({ ...value, model: '' });
+                } else onChange({ ...value, model: e.target.value });
+              }}
               inputProps={{ 'aria-label': modelLabel }}
               renderValue={(selected) =>
                 selected ? (
@@ -115,16 +146,25 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
                   {m}
                 </MenuItem>
               ))}
+              <MenuItem value={OTHER_MODEL}>Other model…</MenuItem>
             </Select>
           ) : (
-            <TextField label="Deployment Id" required fullWidth size="small" value={value.model} placeholder="Enter the deployment/model id" onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
-          )}
-
-          {value.provider === 'azure_openai' && (
-            <>
-              <TextField label="Base URL" required fullWidth size="small" value={value.azureBaseUrl} placeholder="https://<resource>.openai.azure.com" onChange={(e) => onChange({ ...value, azureBaseUrl: e.target.value })} sx={REQUIRED_FIELD_SX} />
-              <TextField label="API Version" required fullWidth size="small" value={value.azureApiVersion} onChange={(e) => onChange({ ...value, azureApiVersion: e.target.value })} sx={REQUIRED_FIELD_SX} />
-            </>
+            <Box>
+              <TextField label="Model id" required fullWidth size="small" value={value.model} onChange={(e) => onChange({ ...value, model: e.target.value })} sx={REQUIRED_FIELD_SX} />
+              {models.length > 0 && (
+                <Link
+                  component="button"
+                  type="button"
+                  variant="body2"
+                  onClick={() => {
+                    setOtherChosen(false);
+                    onChange({ ...value, model: '' });
+                  }}
+                  sx={{ mt: 0.75 }}>
+                  Choose from the list
+                </Link>
+              )}
+            </Box>
           )}
 
           {shareKey?.available && <FormControlLabel control={<Checkbox size="small" checked={shareKey.checked} onChange={(_e, checked) => shareKey.onChange(checked)} />} label="Use the same API key as the embedding model" />}

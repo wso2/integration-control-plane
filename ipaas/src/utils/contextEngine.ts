@@ -17,7 +17,9 @@
  */
 
 import {
+  blankLlm,
   CONNECTOR_BY_ID,
+  CONTEXT_EMBEDDING_PROVIDERS,
   CONTEXT_ENGINE_DESCRIPTION_MAX,
   CONTEXT_ENGINE_NAME_MAX,
   CONTEXT_QUERY_ACTIONS,
@@ -31,6 +33,7 @@ import {
   RML_MAPPING,
   PLAYGROUND_SUGGESTIONS,
   PROGRESS_POLL_ACTIVE_MS,
+  RETIRED_MODEL_PROVIDER_NAMES,
   ROLE_GRANT_PREFIX,
   STORAGE_BACKEND_BY_KIND,
   STORAGE_BACKENDS,
@@ -46,7 +49,6 @@ import { hasStagedFile } from './stagedFiles';
 import { HttpError } from '../types/http';
 import { formatDistanceToNow, formatElapsed } from './time';
 import { isEmbeddingValid } from './ragIngestion';
-import { EMBEDDING_PROVIDERS } from '../constants/ragIngestion';
 import type {
   AudienceRule,
   ContextEngineDetail,
@@ -68,6 +70,7 @@ import type {
   ModelDraft,
   ContextEvidence,
   ContextEvidenceLocationState,
+  ContextQueryMode,
   ContextRange,
   FileVisibility,
   GetStartedStep,
@@ -242,6 +245,17 @@ export function isModelsStepValid(embedding: EmbeddingConfig | null, llm: LlmCon
   return isEmbeddingValid(embedding) && isLlmValid(llm);
 }
 
+/** A provider's display name for either kind of model, including providers the console no longer offers; the id itself when nothing names it. */
+export function modelProviderName(kind: 'embedding' | 'llm', id: string): string {
+  const offered: readonly { id: string; name: string }[] = kind === 'embedding' ? CONTEXT_EMBEDDING_PROVIDERS : LLM_PROVIDERS;
+  return offered.find((p) => p.id === id)?.name ?? RETIRED_MODEL_PROVIDER_NAMES[id] ?? id;
+}
+
+/** Whether a model id is typed in rather than picked: the provider lists none, or the id is not among them. */
+export function isCustomModel(model: string, models: readonly string[]): boolean {
+  return models.length === 0 || (model !== '' && !models.includes(model));
+}
+
 /** The embedding key can stand in for the LLM key only when both use the same provider. */
 export function canShareApiKey(embedding: EmbeddingConfig | null, llm: LlmConfig | null): boolean {
   return !!embedding && !!llm && embedding.provider === llm.provider;
@@ -252,6 +266,21 @@ export function effectiveLlm(form: Pick<ContextEngineForm, 'embedding' | 'llm' |
   if (!form.llm) return null;
   if (form.shareApiKey && form.embedding && canShareApiKey(form.embedding, form.llm)) return { ...form.llm, apiKey: form.embedding.apiKey };
   return form.llm;
+}
+
+/** Who writes answers: the language model, a model of its own, or nobody. */
+export type AnswerChoice = 'same' | 'different' | 'off';
+
+export function answerChoice(form: Pick<ContextEngineForm, 'answersEnabled' | 'answerLlm'>): AnswerChoice {
+  if (!form.answersEnabled) return 'off';
+  return form.answerLlm ? 'different' : 'same';
+}
+
+/** The form fields for an answer choice. A different model keeps the one already chosen, or starts on the language model's provider. */
+export function applyAnswerChoice(choice: AnswerChoice, form: Pick<ContextEngineForm, 'llm' | 'answerLlm'>): Pick<ContextEngineForm, 'answersEnabled' | 'answerLlm'> {
+  if (choice === 'off') return { answersEnabled: false, answerLlm: null };
+  if (choice === 'same') return { answersEnabled: true, answerLlm: null };
+  return { answersEnabled: true, answerLlm: form.answerLlm ?? blankLlm(form.llm?.provider ?? LLM_PROVIDERS[0].id) };
 }
 
 /** Why the Models step cannot proceed, or null. */
@@ -276,12 +305,18 @@ export function engineDescriptionError(description: string): string {
   return description.length > CONTEXT_ENGINE_DESCRIPTION_MAX ? `Description must be at most ${CONTEXT_ENGINE_DESCRIPTION_MAX} characters.` : '';
 }
 
+/** Why the Name step cannot proceed, or null. */
+export function nameStepBlocker(name: string, description: string): string | null {
+  if (!nonEmpty(name)) return 'Enter a name for the engine';
+  return engineNameError(name) || engineDescriptionError(description) || null;
+}
+
 export function isNameStepValid(name: string, description: string): boolean {
-  return nonEmpty(name) && !engineNameError(name) && !engineDescriptionError(description);
+  return nameStepBlocker(name, description) === null;
 }
 
 export function isFormComplete(form: ContextEngineForm): boolean {
-  return isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null && isNameStepValid(form.name, form.description);
+  return isNameStepValid(form.name, form.description) && isSourcesStepValid(form.sources) && modelsStepBlocker(form) === null && storageStepBlocker(form.storage) === null;
 }
 
 /** The wizard form as a create request. Throws when a required section is missing — call after {@link isFormComplete}. */
@@ -363,12 +398,13 @@ export function fromDraft(raw: string | null): ContextEngineDraft | null {
       form: {
         sources: f.sources.map(sanitizeSourceConfig),
         roles: f.roles,
-        embedding: sanitizeModel(f.embedding, EMBEDDING_PROVIDERS),
+        embedding: sanitizeModel(f.embedding, CONTEXT_EMBEDDING_PROVIDERS),
         llm: sanitizeModel(f.llm, LLM_PROVIDERS),
         shareApiKey: !!f.shareApiKey,
         // Drafts saved before the answers switch existed offered answers with the language model.
         answersEnabled: f.answersEnabled !== false,
-        answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS),
+        // A separate answer model on a provider no longer offered stays separate, with a model to choose.
+        answerLlm: sanitizeModel(f.answerLlm, LLM_PROVIDERS) ?? (f.answerLlm ? blankLlm(LLM_PROVIDERS[0].id) : null),
         storage: sanitizeStorage(f.storage),
         name: f.name,
         description: typeof f.description === 'string' ? f.description : '',
@@ -415,7 +451,7 @@ export function summarizeSource(source: ContextSourceConfig): string {
     const staged = source.staged ?? [];
     if (staged.length === 0) return 'Upload files after the engine is created';
     const sum = stagedSummary(staged, []);
-    return `${plural(staged.length, 'file')} staged · ${formatBytes(sum.bytes)}${sum.pdfs ? ` · ${plural(sum.pdfs, 'PDF')} stored only` : ''}`;
+    return `${plural(staged.length, 'file')} staged · ${formatBytes(sum.bytes)}`;
   }
   const parts = connector.summaryKeys
     .map((key) => {
@@ -719,11 +755,11 @@ export function sourceIndexingText(p: SourceProgress): string | null {
  * reason follows "N files are not searchable: ".
  */
 const MODEL_FAILURE_REASON: Record<string, string> = {
-  backend_model_access_denied: "the model provider rejected the engine's API key, or the key may not use the configured model. Fix the key, then retry.",
-  backend_model_not_found: 'the model provider does not know the configured model name. Fix the model settings, then retry.',
-  backend_model_quota_exceeded: "the model provider's rate limit or budget was reached. Retry later.",
-  backend_model_unavailable: 'the engine could not reach its model provider. Retry later.',
-  backend_model_failed: 'the model provider refused the request. Retry later.',
+  backend_model_access_denied: "the model provider rejected the engine's API key, or the key may not use the configured model. Fix the engine's model settings.",
+  backend_model_not_found: "the model provider does not know the configured model name. Fix the engine's model settings.",
+  backend_model_quota_exceeded: "the model provider's rate limit or budget was reached.",
+  backend_model_unavailable: 'the engine could not reach its model provider.',
+  backend_model_failed: 'the model provider refused the request.',
 };
 
 /**
@@ -738,9 +774,9 @@ export function sourceFailureNotice(p: SourceProgress): string | null {
   const failures = Object.entries(p.indexing.failures ?? {}).filter(([code, count]) => code in MODEL_FAILURE_REASON && count > 0);
   if (!failures.length) return null;
   const total = failures.reduce((n, [, count]) => n + count, 0);
-  // One code names its fix. With more than one, no single fix fits every file, so each file's row says its own.
-  const reason = failures.length === 1 ? MODEL_FAILURE_REASON[failures[0][0]] : "the model provider failed on them for more than one reason. Each file's row says why.";
-  return `${plural(total, 'file')} ${total === 1 ? 'is' : 'are'} not searchable: ${reason}`;
+  // One code names its cause. With more than one, no single cause fits every file.
+  const reason = failures.length === 1 ? MODEL_FAILURE_REASON[failures[0][0]] : 'the model provider failed on them for more than one reason.';
+  return `${plural(total, 'file')} in this source ${total === 1 ? 'is' : 'are'} not searchable: ${reason}`;
 }
 
 /** Roll-up across the engine's sources. Sources without a progress entry are ones the caller may not inspect. */
@@ -852,22 +888,19 @@ export function checkStagedFile(meta: Pick<StagedFileMeta, 'name' | 'size' | 'co
   const replaces = existingNames.includes(meta.name);
   if (!meta.contentType) return { problem: 'unsupported', replaces };
   if (meta.size > UPLOAD_MAX_BYTES) return { problem: 'too-large', replaces };
-  return meta.contentType === 'application/pdf' ? { warning: 'pdf', replaces } : { replaces };
+  return { replaces };
 }
 
 /** The row's caption for a check; '' when there is nothing to say. */
-export function stagedFileNote(check: StagedFileCheck, size: number): string {
-  if (check.problem === 'too-large') return `${formatBytes(size)} is over the ${formatBytes(UPLOAD_MAX_BYTES)} limit. Split it or leave it out.`;
+export function stagedFileNote(check: StagedFileCheck): string {
+  if (check.problem === 'too-large') return `This file is over the ${formatBytes(UPLOAD_MAX_BYTES)} limit.`;
   if (check.problem === 'unsupported') return 'Only text, Markdown, HTML, JSON or PDF files can be uploaded.';
-  const notes: string[] = [];
-  if (check.warning === 'pdf') notes.push('Stored, but not searchable until the engine can read PDFs');
-  if (check.replaces) notes.push('Replaces the version already in the source');
-  return notes.join(' · ');
+  return check.replaces ? 'Replaces the version already in the source' : '';
 }
 
 /** How many of the chosen files will upload, how many are skipped, and their size. */
-export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'contentType'>[], existingNames: string[]): { ready: number; skipped: number; bytes: number; pdfs: number } {
-  const sum = { ready: 0, skipped: 0, bytes: 0, pdfs: 0 };
+export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'contentType'>[], existingNames: string[]): { ready: number; skipped: number; bytes: number } {
+  const sum = { ready: 0, skipped: 0, bytes: 0 };
   for (const f of files) {
     const check = checkStagedFile(f, existingNames);
     if (check.problem) {
@@ -876,7 +909,6 @@ export function stagedSummary(files: Pick<StagedFileMeta, 'name' | 'size' | 'con
     }
     sum.ready += 1;
     sum.bytes += f.size;
-    if (check.warning === 'pdf') sum.pdfs += 1;
   }
   return sum;
 }
@@ -1071,7 +1103,7 @@ export function uploadSourceTitle(entries: Pick<UploadEntry, 'status' | 'jobId'>
 
 /** Header line for a source's files, e.g. "6 files · 4 searchable · 1 held back · 1 not readable". */
 export function summarizeUploads(entries: Pick<UploadEntry, 'status'>[]): string {
-  if (entries.length === 0) return 'No files yet';
+  if (entries.length === 0) return 'No files uploaded from this browser';
   const count = (s: UploadFileStatus): number => entries.filter((e) => e.status === s).length;
   const parts = [plural(entries.length, 'file')];
   const moving = entries.filter(isUploadActive).length;
@@ -1150,12 +1182,17 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
   };
   const n = engine.sources.length;
   const indexing = progress ? `${progressHeadline(progress)}. ` : '';
+  const uploadOnly = n > 0 && engine.sources.every((s) => s.type === 'upload');
   const defs: Omit<GetStartedStep, 'state'>[] = [
     uploadFirst && !done.index
       ? { id: 'index', title: 'Upload your first files', description: 'Files become searchable after upload.', action: 'Upload files' }
-      : { id: 'index', title: 'Index your sources', description: `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.` },
+      : {
+          id: 'index',
+          title: 'Index your sources',
+          description: uploadOnly ? (progress ? `${progressHeadline(progress)}.` : 'Files become searchable after upload.') : `${indexing}Items become searchable as the connector delivers them from ${n} source${n === 1 ? '' : 's'}.`,
+        },
     { id: 'ask', title: 'Ask it something' },
-    { id: 'publish', title: 'Publish', description: 'Turn on the REST API or the MCP server for agents.' },
+    { id: 'publish', title: 'Connect an agent', description: 'Call it from agents over REST or MCP.' },
     { id: 'grant', title: 'Grant access', description: done.grant ? `${engine.queryRoles.length} role${engine.queryRoles.length === 1 ? '' : 's'} can query.` : 'Only you can query until roles are granted.' },
   ];
   let currentAssigned = false;
@@ -1170,6 +1207,11 @@ export function getStartedSteps(engine: ContextEngineDetail, asked: boolean, pro
 }
 
 // ── Playground ──────────────────────────────────────────────────────────────
+
+/** The mode a new Playground conversation starts in: Answer when the engine offers answers, Context otherwise. */
+export function defaultQueryMode(engine: { exposure: Pick<ContextEngineDetail['exposure'], 'answers'> }): ContextQueryMode {
+  return engine.exposure.answers ? 'answer' : 'context';
+}
 
 /** Questions to offer in an empty Playground, seeded from the engine's sources. */
 export function suggestedQuestions(engine: Pick<ContextEngineDetail, 'sources'>): string[] {
@@ -1347,12 +1389,27 @@ export function evidencePlace(evidence: Pick<ContextEvidence, 'locator' | 'locat
   return { path: l?.path, parts, coarse: !fine };
 }
 
+/** Which part of its item a passage came from, counted from 1, when the engine says. */
+export function evidencePart(evidence: Pick<ContextEvidence, 'locator' | 'location'>): number | undefined {
+  if (evidence.locator?.chunkIndex !== undefined) return evidence.locator.chunkIndex + 1;
+  const m = /^chunk:(\d+)$/.exec(evidence.location ?? '');
+  return m ? Number(m[1]) + 1 : undefined;
+}
+
 /** A record version as people read it: uploads and most connectors version by epoch milliseconds. */
 export function evidenceVersionLabel(version: string): string {
   const n = Number(version);
   if (!Number.isFinite(n) || n < 1e12 || n > 1e14) return version;
   return new Date(n).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
+
+/** The version a passage was taken from, as a label, and what that date means. */
+/** "Version from 3 Nov 2026, 10:42" for a dated version, "Version v12" for any other. */
+export function versionFromLabel(version: string): string {
+  const label = evidenceVersionLabel(version);
+  return label === version ? `Version ${version}` : `Version from ${label}`;
+}
+export const VERSION_HINT = 'Later changes are not included.';
 
 /** The passage split into its numbered source lines, or null when the lines cannot be lined up with the text. */
 export function passageLines(evidence: Pick<ContextEvidence, 'locator' | 'passage'>): { n: number; text: string }[] | null {

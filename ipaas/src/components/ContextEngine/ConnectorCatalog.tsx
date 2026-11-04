@@ -40,6 +40,7 @@ function ConnectorTile({ connector, disabled, comingSoon, onPick }: { connector:
       title={connector.name}
       description={disabled && !comingSoon ? 'Already added' : connector.description}
       logo={connector.logo ? contextLogoUrl(connector.logo) : undefined}
+      logoDark={connector.logoDark ? contextLogoUrl(connector.logoDark) : undefined}
       icon={sourceTypeIcon(connector.id, 24)}
       selected={false}
       disabled={disabled || comingSoon}

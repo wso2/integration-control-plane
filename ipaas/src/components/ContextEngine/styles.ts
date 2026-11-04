@@ -16,6 +16,14 @@
  * under the License.
  */
 
+// ── Every screen ────────────────────────────────────────────────────────────
+
+/**
+ * Every Context Engine page and drawer passes this down, so a long path, URL, id or file name
+ * breaks inside its box instead of running past it. `break-word` changes no column or row sizing.
+ */
+export const wrapSx = { overflowWrap: 'break-word' } as const;
+
 // ── Wizard ──────────────────────────────────────────────────────────────────
 
 /** Step section heading — smaller than the page title. */
@@ -131,6 +139,7 @@ export const sourceDrawerSx = {
     maxWidth: '100%',
     display: 'flex',
     flexDirection: 'column',
+    ...wrapSx,
   },
 } as const;
 
@@ -179,10 +188,14 @@ export const catalogSectionSx = {
   fontSize: 12,
 } as const;
 
+/** The logo of a light and dark pair defaults to 16 px wide; tiles let it keep its own proportions. */
+const tileLogoSx = { '& img': { width: 'auto' } } as const;
+
 export const catalogGridSx = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 1.5,
+  ...tileLogoSx,
 } as const;
 
 export const catalogSentinelSx = {
@@ -266,6 +279,16 @@ export const deleteCardSx = {
   borderColor: 'error.main',
 } as const;
 
+/** A description on a summary card, cut to three lines so a long one does not stretch the card. */
+export const summaryDescriptionSx = {
+  display: '-webkit-box',
+  mt: 0.5,
+  color: 'text.secondary',
+  overflow: 'hidden',
+  WebkitLineClamp: 3,
+  WebkitBoxOrient: 'vertical',
+} as const;
+
 // ── Source visibility rules ─────────────────────────────────────────────────
 
 export const audienceSectionSx = { mt: 3, pt: 2.5, borderTop: '1px solid', borderColor: 'divider' } as const;
@@ -332,7 +355,7 @@ export const uploadRowHeadSx = { display: 'flex', alignItems: 'center', gap: 1.5
 /** Lines the bar and captions up with the file name: the 18px icon plus the 12px gap. */
 export const uploadRowBodySx = { pl: '30px', mt: 0.75 } as const;
 
-export const filesDrawerSx = { '& .MuiDrawer-paper': { width: { xs: '100%', sm: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column' } } as const;
+export const filesDrawerSx = { '& .MuiDrawer-paper': { width: { xs: '100%', sm: 600 }, maxWidth: '100%', display: 'flex', flexDirection: 'column', ...wrapSx } } as const;
 
 export const filesToolbarSx = { display: 'flex', alignItems: 'center', gap: 1.5, flexWrap: 'wrap' } as const;
 
@@ -443,21 +466,10 @@ export const endpointFieldSx = {
 
 // ── Models step ─────────────────────────────────────────────────────────────
 
-export const recommendedBannerSx = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 1.75,
-  p: 2,
-  mb: 2.5,
-  border: '1px solid',
-  borderColor: 'primary.light',
-  borderRadius: 1,
-  bgcolor: 'background.paper',
-} as const;
-
 export const modelColumnsSx = {
   display: 'grid',
-  gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' },
+  // Fits as many columns as the space allows, since the sidebar changes the width a viewport breakpoint sees.
+  gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
   gap: 2.5,
 } as const;
 
@@ -476,6 +488,7 @@ export const modelTileGridSx = {
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: 1.25,
+  ...tileLogoSx,
 } as const;
 
 // ── Quick add ───────────────────────────────────────────────────────────────
@@ -572,12 +585,17 @@ export const answerMarkdownSx = {
   '& > :last-child, & > div > :last-child': { mb: 0 },
 } as const;
 
+/** A sentence's last word, its citation marks and its closing punctuation, kept on one line. */
+export const citationRunSx = { whiteSpace: 'nowrap' } as const;
+
 /** The sentence a pointed-at citation supports. */
 export const litSentenceSx = {
   bgcolor: 'rgba(255, 115, 0, 0.12)',
   boxShadow: (t: { palette: { primary: { main: string } } }) => `0 1px 0 ${t.palette.primary.main}`,
   borderRadius: '3px',
+  // The margin cancels the padding, so lighting a sentence never reflows the line it sits on.
   px: 0.25,
+  mx: -0.25,
 } as const;
 
 /** A passage in the evidence rail beside an answer. */

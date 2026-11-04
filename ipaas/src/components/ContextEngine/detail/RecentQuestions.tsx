@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, ButtonBase, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, ButtonBase, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
 import { History } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { askedQuestionMeta } from '../../../utils/contextEngine';
@@ -30,6 +30,8 @@ interface RecentQuestionsProps {
   /** The question being reopened, with a spinner. */
   openingId?: string;
   onOpen: (question: AskedQuestion) => void;
+  /** Empty the list kept in this browser. */
+  onClear?: () => void;
 }
 
 /**
@@ -37,14 +39,19 @@ interface RecentQuestionsProps {
  * for the stored query, which checks every passage again and hides an answer
  * whose sources the reader can no longer see.
  */
-export default function RecentQuestions({ questions, selectedId, openingId, onOpen }: RecentQuestionsProps): JSX.Element {
+export default function RecentQuestions({ questions, selectedId, openingId, onOpen, onClear }: RecentQuestionsProps): JSX.Element {
   return (
     <Box sx={{ ...summaryCardSx, px: 1, py: 2 }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ px: 1.5 }}>
         <History size={18} aria-hidden />
-        <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+        <Typography variant="subtitle2" sx={{ fontWeight: 600, flex: 1 }}>
           Recent questions
         </Typography>
+        {onClear && questions.length > 0 && (
+          <Button size="small" variant="text" onClick={onClear} disabled={!!openingId} sx={{ minWidth: 0 }}>
+            Clear list
+          </Button>
+        )}
       </Stack>
       {questions.length > 0 && (
         <Stack gap={0.25} sx={{ mt: 1.25 }} component="ul" style={{ listStyle: 'none', margin: '10px 0 0', padding: 0 }}>
