@@ -133,8 +133,9 @@ describe('the Configure form with links', () => {
   });
 
   it('offers a resource whose key only a link the build lost holds, as for a renamed connection', async () => {
-    const used = links.used;
-    links.used = { ...used, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') };
+    const [used, usedByOrphaned] = [links.used, links.usedByOrphaned];
+    const { 'github-corp|GITHUB_AUTH_TOKEN': _, ...rest } = used;
+    Object.assign(links, { used: rest, usedByOrphaned: { ...usedByOrphaned, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') } });
     try {
       await act(async () => root.render(<Form />));
       await act(async () => (container.querySelector('[aria-label="Link backup"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
@@ -143,7 +144,7 @@ describe('the Configure form with links', () => {
         ['GitHub Corp', null],
       ]);
     } finally {
-      links.used = used;
+      Object.assign(links, { used, usedByOrphaned });
     }
   });
 
