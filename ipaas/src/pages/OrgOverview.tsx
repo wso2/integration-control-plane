@@ -27,9 +27,10 @@ import ProjectPickerDialog from '../components/OrgOverview/ProjectPickerDialog';
 import { Permissions } from '../constants/permissions';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useDatabaseAvailability } from '../hooks/useDatabases';
 import { useOrgComponents } from '../hooks/useComponents';
 import { useProjects } from '../hooks/useProjects';
-import { newComponentUrl, newProjectUrl, type OrgScope } from '../nav';
+import { newComponentUrl, newDatabaseUrl, newProjectUrl, type OrgScope } from '../nav';
 import { orgProjectsUrl, projectHomeUrl } from '../paths';
 import type { Project } from '../types/project';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
@@ -136,6 +137,9 @@ function RowsSkeleton(): JSX.Element {
 
 export default function OrgOverview(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
+  const dbAvailability = useDatabaseAvailability();
+  const databasesAvailable = dbAvailability.data?.available === true;
+  const databasesUnavailableReason = dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
   const [pickingProject, setPickingProject] = useState(false);
   const { displayName, username } = useAuth();
   const { hasOrgPermission } = useAccessControl();
@@ -211,7 +215,14 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           disabledReason={createDeniedReason}
         />
         <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" disabledReason="Coming soon" />
-        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" disabledReason="Coming soon" />
+        <SummaryCard
+          icon={<Database size={24} />}
+          title="Databases"
+          description="Provision managed databases for your integrations to store and query data."
+          actionLabel="Create a database"
+          onAction={databasesAvailable ? () => navigate(newDatabaseUrl(scope, 'postgres')) : undefined}
+          disabledReason={databasesUnavailableReason}
+        />
       </Box>
 
       <Card>

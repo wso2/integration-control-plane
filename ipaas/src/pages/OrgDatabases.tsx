@@ -24,12 +24,14 @@ import { useDatabaseAvailability, useDatabaseOffering, useDatabaseServers } from
 import { useTemporalOffering, useTemporalServers } from '../hooks/useTemporal';
 import { databaseUrl, newDatabaseUrl, temporalUrl, type OrgScope } from '../nav';
 import PlatformServicesTable, { type ServiceRow } from '../components/Databases/PlatformServicesTable';
-import NoDatabaseServersBanner from '../components/Databases/NoDatabaseServersBanner';
+import CreateServiceWizard from '../components/Databases/CreateServiceWizard';
 import { DatabaseListSkeleton } from '../components/Databases/DatabaseSkeletons';
 import type { DatabasePlan } from '../types/databases';
 import type { TemporalPlan } from '../types/temporal';
 
-const headerSx = { mb: 3 } as const;
+const headerSx = { mb: 5 } as const;
+// The header row owns the spacing below the title, so PageTitle's own margin is dropped.
+const titleSx = { mb: 0 } as const;
 const NO_DATABASE_PLANS: readonly DatabasePlan[] = [];
 const NO_TEMPORAL_PLANS: readonly TemporalPlan[] = [];
 
@@ -77,14 +79,15 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
         </Alert>
       );
     if (!available) return <Alert severity="info">Platform services are not available in this environment.</Alert>;
-    if (!rows.length) return <NoDatabaseServersBanner onCreate={create} />;
+    // With nothing to list, the page is the create flow itself.
+    if (!rows.length) return <CreateServiceWizard scope={scope} />;
     return <PlatformServicesTable rows={rows} databasePlans={databaseOffering.data?.plans ?? NO_DATABASE_PLANS} temporalPlans={temporalOffering.data?.plans ?? NO_TEMPORAL_PLANS} onOpen={open} />;
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={headerSx}>
-        <PageTitle>
+        <PageTitle sx={titleSx}>
           <PageTitle.Header>Platform Services</PageTitle.Header>
           <PageTitle.SubHeader>Managed services your integrations can connect to.</PageTitle.SubHeader>
         </PageTitle>

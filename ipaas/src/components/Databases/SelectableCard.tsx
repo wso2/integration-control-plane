@@ -33,10 +33,10 @@ interface SelectableCardProps {
   onSelect: () => void;
 }
 
-/** An outlined, clickable card for choosing a database type / cloud provider / region. */
+/** A clickable card for choosing a service type, cloud provider or region. */
 export default function SelectableCard({ title, description, logo, logoDark, icon, selected, disabled, onSelect }: SelectableCardProps): JSX.Element {
   return (
-    <Card variant="outlined" sx={{ height: '100%', borderColor: selected ? 'primary.main' : 'divider', borderWidth: selected ? 2 : 1, opacity: disabled ? 0.5 : 1 }}>
+    <Card sx={{ height: '100%', border: 2, borderColor: selected ? 'primary.main' : 'transparent', opacity: disabled ? 0.5 : 1 }}>
       <CardActionArea disabled={disabled} onClick={onSelect} sx={{ height: '100%', p: 2, alignItems: 'flex-start', justifyContent: 'flex-start' }}>
         {logo && logoDark ? <ColorSchemeImage src={{ light: logo, dark: logoDark }} alt="" height={28} sx={{ mb: 1, display: 'block' }} /> : logo && <Box component="img" src={logo} alt="" sx={{ height: 28, mb: 1, display: 'block' }} />}
         {!logo && icon && <Box sx={{ height: 28, mb: 1, display: 'flex', alignItems: 'center', color: 'primary.main' }}>{icon}</Box>}

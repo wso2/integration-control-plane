@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Card, CardActionArea, Divider, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { planLabel, planPrice } from '../../utils/databases';
+import ServicePlanCard, { type PlanSpec } from './ServicePlanCard';
+import { cpuLabel, memoryLabel, planLabel, planPrice } from '../../utils/databases';
 import type { DatabasePlan } from '../../types/databases';
 
 interface PlanCardProps {
@@ -28,38 +28,23 @@ interface PlanCardProps {
   onSelect: () => void;
 }
 
-/** A selectable service-plan card showing the plan's per-node size and list price. */
+/** A PostgreSQL plan option showing the plan's per-node size and list price. */
 export default function PlanCard({ plan, selected, disabled, onSelect }: PlanCardProps): JSX.Element {
-  const price = planPrice(plan);
+  const specs: PlanSpec[] = [{ label: 'Nodes', value: String(plan.nodeCount) }];
+  if (plan.defaultStorageGi !== undefined) specs.push({ label: 'Storage', value: `${plan.defaultStorageGi} GB` });
+  if (plan.memory) specs.push({ label: 'Memory', value: `${memoryLabel(plan.memory)} / node` });
+  if (plan.cpu) specs.push({ label: 'CPU', value: `${cpuLabel(plan.cpu)} / node` });
   return (
-    <Card variant="outlined" sx={{ width: 240, borderColor: selected ? 'primary.main' : 'divider', borderWidth: selected ? 2 : 1, opacity: disabled ? 0.5 : 1 }}>
-      <CardActionArea disabled={disabled} onClick={onSelect} aria-pressed={selected} sx={{ p: 2, alignItems: 'flex-start' }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          {planLabel(plan.id)}
-        </Typography>
-        <Typography variant="body2">Nodes: {plan.nodeCount}</Typography>
-        {plan.memory && <Typography variant="body2">Memory: {plan.memory} per node</Typography>}
-        {plan.cpu && <Typography variant="body2">CPU: {plan.cpu} per node</Typography>}
-        {plan.defaultStorageGi !== undefined && <Typography variant="body2">Storage: {plan.defaultStorageGi} GB</Typography>}
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-          {plan.backups ? 'Daily backups included, kept for 7 days.' : 'No backups. For development use only.'}
-        </Typography>
-        {price && (
-          <>
-            <Divider sx={{ my: 1.5 }} />
-            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 600 }}>
-              {price.monthly}
-              <Typography component="span" variant="caption" color="text.secondary">
-                {' '}
-                / month
-              </Typography>
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {price.hourly} / hour
-            </Typography>
-          </>
-        )}
-      </CardActionArea>
-    </Card>
+    <ServicePlanCard
+      name={planLabel(plan.id)}
+      tagline={plan.nodeCount > 1 ? `${plan.nodeCount}-node cluster` : 'Single node'}
+      price={planPrice(plan)}
+      specs={specs}
+      note={plan.backups ? 'Daily backups, kept 7 days' : 'No backups · development only'}
+      noteTone={plan.backups ? 'success' : 'warning'}
+      selected={selected}
+      disabled={disabled}
+      onSelect={onSelect}
+    />
   );
 }
