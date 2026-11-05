@@ -62,7 +62,7 @@ func newTestRouter(t *testing.T) http.Handler {
 			Logo:        config.Logo{Light: "https://acme.example/logo.svg", Dark: "https://acme.example/logo-white.svg"},
 		},
 		Org:  config.Org{Handle: "acme", Name: "Acme Corporation"},
-		OIDC: config.OIDC{Issuer: "https://idp.example", ClientID: "up-portal", Scopes: "openid profile"},
+		OIDC: config.OIDC{Issuer: "https://idp.example", ClientID: "up-portal", Resource: "https://portal.example", Scopes: "openid profile"},
 	}
 	return Mount(&service.Registry{TokenService: service.NewTokenService(), ScopeService: fixedScopes{"openid", "offline_access"}}, cfg, zap.NewNop())
 }
@@ -141,7 +141,7 @@ func TestConfigScriptSetsTheSPAConfig(t *testing.T) {
 	assert.Equal(t, `window.__UP_DP_CONFIG__ = {"portalName":"Acme \u003cApps\u003e","productName":"Integration Platform","theme":"",`+
 		`"links":{"terms":"https://acme.example/terms"},"logo":{"light":"https://acme.example/logo.svg","dark":"https://acme.example/logo-white.svg"},`+
 		`"orgHandle":"acme","orgName":"Acme Corporation",`+
-		`"auth":{"issuer":"https://idp.example","clientId":"up-portal"}};`+"\n", rec.Body.String())
+		`"auth":{"issuer":"https://idp.example","clientId":"up-portal","resource":"https://portal.example"}};`+"\n", rec.Body.String())
 }
 
 func TestPageIsTheBuildWithItsTitleOnly(t *testing.T) {
