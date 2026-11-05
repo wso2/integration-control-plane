@@ -131,6 +131,21 @@ describe('the Configure form with links', () => {
     expect(writes).toEqual([{ connection: id('backup'), ref: 'github-sandbox' }]);
   });
 
+  it('offers a resource whose key only a link the build lost holds, as for a renamed connection', async () => {
+    const used = links.used;
+    links.used = { ...used, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') };
+    try {
+      await act(async () => root.render(<Form />));
+      await act(async () => (container.querySelector('[aria-label="Link backup"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+      expect(Array.from(document.querySelectorAll('[role="option"]')).map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+        ['GitHub Sandbox', null],
+        ['GitHub Corp', null],
+      ]);
+    } finally {
+      links.used = used;
+    }
+  });
+
   it('links a field to the key picked from its link icon', async () => {
     await act(async () => button('Link ordersDatabaseUrl').click());
     await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent === 'Enter a value') as HTMLElement).click());
