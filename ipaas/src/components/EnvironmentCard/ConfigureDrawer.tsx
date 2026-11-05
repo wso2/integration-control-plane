@@ -1034,7 +1034,7 @@ function GenericServiceConfigureDrawer({
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Configuration schema is not available for this component.
+            {linked.unread ?? 'Configuration schema is not available for this component.'}
           </Typography>
         </Box>
       );
