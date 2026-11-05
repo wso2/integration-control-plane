@@ -109,7 +109,7 @@ const SQL_TABLES = (port: string) => [
   F('database', 'Database', 'text'),
   F('tables', 'Tables', 'text', { placeholder: 'public.docs, public.faq', helper: 'Comma-separated, schema-qualified.' }),
   F('user', 'User', 'text'),
-  F('password', 'Password', 'secret'),
+  F('password', 'Password', 'secret', { verbatim: true }),
 ];
 
 /**
@@ -126,7 +126,7 @@ const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[]
     F('database', 'Database', 'text', { setting: 'databaseName' }),
     ...(schemaDefault !== undefined ? [O('schema', 'Schema', 'text', { defaultValue: schemaDefault })] : []),
     F('username', 'Username', 'text'),
-    F('password', 'Password', 'secret'),
+    F('password', 'Password', 'secret', { verbatim: true }),
   ),
   ...G(
     'Data to sync',
@@ -446,7 +446,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     category: 'databases',
     logo: `${CONNECTOR_LOGO_BASE}snowflake.svg`,
     icon: 'database',
-    fields: [F('account', 'Account', 'text'), F('warehouse', 'Warehouse', 'text'), F('database', 'Database', 'text'), F('schema', 'Schema', 'text'), F('table', 'Table', 'text'), F('user', 'User', 'text'), F('password', 'Password', 'secret')],
+    fields: [F('account', 'Account', 'text'), F('warehouse', 'Warehouse', 'text'), F('database', 'Database', 'text'), F('schema', 'Schema', 'text'), F('table', 'Table', 'text'), F('user', 'User', 'text'), F('password', 'Password', 'secret', { verbatim: true })],
     summaryKeys: ['database', 'table'],
   },
   {
@@ -527,7 +527,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     category: 'saas',
     logo: `${CONNECTOR_LOGO_BASE}servicenow.svg`,
     icon: 'shield',
-    fields: [F('instanceUrl', 'Instance URL', 'url'), F('username', 'Username', 'text'), F('password', 'Password', 'secret')],
+    fields: [F('instanceUrl', 'Instance URL', 'url'), F('username', 'Username', 'text'), F('password', 'Password', 'secret', { verbatim: true })],
     summaryKeys: ['instanceUrl'],
   },
   {

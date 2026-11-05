@@ -184,6 +184,8 @@ export interface SourceFieldDef {
   defaultValue?: string;
   /** Choices for a `select` field. */
   options?: SourceFieldOption[];
+  /** Send the value exactly as typed, without trimming (passwords). */
+  verbatim?: boolean;
   /** Accepted file types for a `file` field, as an input `accept` string (e.g. ".rml.ttl,.ttl"). */
   accept?: string;
   /** Render this field only when its condition is met; always shown when absent. */

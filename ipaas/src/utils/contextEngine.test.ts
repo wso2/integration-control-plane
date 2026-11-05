@@ -553,7 +553,7 @@ describe('wire payloads', () => {
       databaseName: 'cetest',
       schema: 'kb',
       username: 'u',
-      password: 'p',
+      password: ' p ',
       tableName: 'articles',
       primaryKey: 'id',
       columns: ['title', 'body', 'category'],

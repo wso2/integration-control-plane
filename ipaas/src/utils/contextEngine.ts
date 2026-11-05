@@ -1559,8 +1559,9 @@ function integrationSettings(source: ContextSourceConfig): Record<string, unknow
   const settings: Record<string, unknown> = {};
   if (!connector) return settings;
   for (const f of visibleFields(connector, source.values)) {
-    const raw = (source.values[f.key] ?? '').trim();
-    if (raw === '' || f.kind === 'file') continue;
+    const value = source.values[f.key] ?? '';
+    const raw = f.verbatim ? value : value.trim();
+    if (raw.trim() === '' || f.kind === 'file') continue;
     const path = (f.setting ?? f.key).split('.');
     let table = settings;
     for (const key of path.slice(0, -1)) table = (table[key] ??= {}) as Record<string, unknown>;
