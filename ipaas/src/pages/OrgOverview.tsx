@@ -28,6 +28,7 @@ import { Permissions } from '../constants/permissions';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useOrgComponents } from '../hooks/useComponents';
+import { useDatabaseAvailability } from '../hooks/useDatabases';
 import { useProjects } from '../hooks/useProjects';
 import { newComponentUrl, newDatabaseUrl, newProjectUrl, type OrgScope } from '../nav';
 import { orgProjectsUrl, projectHomeUrl } from '../paths';
@@ -135,6 +136,9 @@ function RowsSkeleton(): JSX.Element {
 }
 
 export default function OrgOverview(scope: OrgScope): JSX.Element {
+  const dbAvailability = useDatabaseAvailability();
+  const databasesAvailable = dbAvailability.data?.available === true;
+  const databasesUnavailableReason = dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
   const navigate = useAppNavigate();
   const [pickingProject, setPickingProject] = useState(false);
   const { displayName, username } = useAuth();
@@ -211,7 +215,14 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           disabledReason={createDeniedReason}
         />
         <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" disabledReason="Coming soon" />
-        <SummaryCard icon={<Database size={24} />} title="Databases" description="Provision managed databases for your integrations to store and query data." actionLabel="Create a database" onAction={() => navigate(newDatabaseUrl(scope))} />
+        <SummaryCard
+          icon={<Database size={24} />}
+          title="Databases"
+          description="Provision managed databases for your integrations to store and query data."
+          actionLabel="Create a database"
+          onAction={databasesAvailable ? () => navigate(newDatabaseUrl(scope)) : undefined}
+          disabledReason={databasesUnavailableReason}
+        />
       </Box>
 
       <Card>

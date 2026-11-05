@@ -23,7 +23,6 @@ import GitLogoIcon from '../../assets/icons/GitLogoIcon';
 import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../../constants/import';
 import type { useGitRepoSource } from '../../hooks/useGitRepoSource';
 import { external } from '../../paths';
-import { parseGitHubUrl } from '../../utils/github';
 import DirectoryPickerField from '../DirectoryPicker';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems } from '../Import/gitHubSelectActions';
 
@@ -45,7 +44,6 @@ export default function RepoSourceFields({ source, directoryHint }: RepoSourceFi
     setRepoUrl,
     urlError,
     parsedOrg,
-    parsedRepo,
     selectedBranch,
     setSelectedBranch,
     subPath,
@@ -80,12 +78,8 @@ export default function RepoSourceFields({ source, directoryHint }: RepoSourceFi
             label="Repository URL"
             required
             value={repoUrl}
-            onChange={(e) => {
-              setRepoUrl(e.target.value);
-              // Parsing is debounced, so a URL naming another repository drops the old branch now.
-              const next = parseGitHubUrl(e.target.value);
-              if (next && (next.org !== parsedOrg || next.repo !== parsedRepo)) setSelectedBranch('');
-            }}
+            // The debounce clears the branch once the URL settles on another repository; pathReady blocks submission until then.
+            onChange={(e) => setRepoUrl(e.target.value)}
             fullWidth
             error={!!urlError}
             placeholder={PUBLIC_REPO_URL_PLACEHOLDER}

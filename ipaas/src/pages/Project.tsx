@@ -718,6 +718,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   // The editor clones the project repo, so only an integration that builds from it can open.
   const openInCloudComponent = components.find((c) => isSupportedIntegration(c.displayType, c.componentSubType, c.buildpackType) && !isExternalRepo(c) && (!isRepoLinked || repoByHandler.get(c.handler) !== undefined)) ?? null;
   const projectRepoUrl = buildProjectRepoUrl(project.gitProvider, project.gitOrganization, project.repository, project.branch);
+  const showEditor = !!openInCloudComponent && !!projectRepoUrl;
 
   const externalComponents = components.filter(isExternalRepo);
 
@@ -961,8 +962,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
                   {updateProject.isPending && <CircularProgress size={12} sx={{ mt: 0.25 }} />}
                 </Stack>
                 {projectRepoUrl ? (
-                  <Stack direction="row" alignItems="center" gap={0.5} sx={{ mt: 2 }}>
-                    <GitHub size={14} />
+                  <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 2 }}>
+                    <GitHub size={18} />
                     <Link href={projectRepoUrl} target="_blank" rel="noreferrer" data-testid="project-repo-link-link" underline="hover" sx={{ color: 'primary.main', fontSize: '0.8125rem' }}>
                       {projectRepoUrl}
                     </Link>
@@ -977,13 +978,9 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </div>
             </Stack>
           </Stack>
-          <Stack direction="row" alignItems="center" gap={1.5} sx={{ flexShrink: 0 }}>
-            <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
-              <Button variant="outlined" size="small" startIcon={<SlidersHorizontal size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
-                Manage project
-              </Button>
-            </Authorized>
-            {openInCloudComponent && projectRepoUrl && (
+          {/* Beside the editor, Manage project steps back to a link under it so the editor stays the one prominent action. */}
+          <Stack direction={showEditor ? 'column' : 'row'} alignItems={showEditor ? 'flex-end' : 'center'} gap={showEditor ? 0.5 : 1.5} sx={{ flexShrink: 0 }}>
+            {showEditor && (
               <Box sx={{ position: 'relative', flexShrink: 0 }}>
                 {openInIntegratorEnabled ? (
                   <>
@@ -1044,6 +1041,11 @@ export default function Project(scope: ProjectScope): JSX.Element {
                 )}
               </Box>
             )}
+            <Authorized permissions={PROJECT_EDIT_PERMISSIONS}>
+              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<SlidersHorizontal size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
+                Manage project
+              </Button>
+            </Authorized>
           </Stack>
         </Stack>
       )}
