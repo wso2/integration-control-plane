@@ -29,6 +29,13 @@ export const GitRefType = {
 } as const;
 export type GitRefType = (typeof GitRefType)[keyof typeof GitRefType];
 
+/**
+ * Whether the Deploy page offers "Auto deploy on build". Off while ipaas-service
+ * deploys every build itself (it refuses turning auto-deploy on); turn it back on
+ * together with ipaas-service's openChoreoAutoDeploy.
+ */
+export const AUTO_DEPLOY_AVAILABLE = false;
+
 export const BUILD_STAGES = [
   { key: 'init' as const, label: 'Initialization' },
   { key: 'build' as const, label: 'Build source & test' },

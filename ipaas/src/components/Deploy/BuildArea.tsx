@@ -47,6 +47,7 @@ import type { JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import { useUpdateAutoDeployEnabled } from '../../hooks/useComponents';
+import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import { useComponentDeployment, useDeploymentStatus, useDeploymentTrackImages } from '../../hooks/useDeployments';
 import type { DeploymentTrackImage } from '../../types/deployment';
 import ConfigureDrawer from '../EnvironmentCard/ConfigureDrawer';
@@ -254,16 +255,18 @@ export default function BuildArea({
           <Divider sx={{ borderStyle: 'dashed', mb: 1.5 }} />
 
           {/* ── Auto Deploy on Build ── */}
-          <FormControlLabel
-            control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
-            label={
-              <Stack direction="row" alignItems="center" gap={0.5}>
-                <Typography variant="body2">Auto deploy on build</Typography>
-                {updateAutoDeploy.isPending && <CircularProgress size={12} />}
-              </Stack>
-            }
-            sx={{ mb: 2, ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
-          />
+          {AUTO_DEPLOY_AVAILABLE && (
+            <FormControlLabel
+              control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
+              label={
+                <Stack direction="row" alignItems="center" gap={0.5}>
+                  <Typography variant="body2">Auto deploy on build</Typography>
+                  {updateAutoDeploy.isPending && <CircularProgress size={12} />}
+                </Stack>
+              }
+              sx={{ mb: 2, ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+            />
+          )}
 
           {/* ── Endpoint Configurations (only for deployed service integrations;
                hidden for file/event/AI-agent, which have no endpoints) ── */}
