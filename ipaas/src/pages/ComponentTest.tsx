@@ -23,6 +23,7 @@ import AutomationTest from './AutomationTest';
 import ComingSoon from './ComingSoon';
 import McpTest from './McpTest';
 import TestConsole from './TestConsole';
+import VoiceAgentTestConsole from './VoiceAgentTestConsole';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useIntegrationIdentity } from '../hooks/useIntegrationIdentity';
 import { useProjectId } from '../hooks/useProjects';
@@ -66,6 +67,7 @@ export default function ComponentTest(scope: ComponentScope): JSX.Element {
   if (identity?.type === 'mcp-server' || identity?.type === 'mcp-proxy') return <McpTest {...scope} />;
   if (identity?.type === 'integration-as-api') return <TestConsole {...scope} />;
   if (identity?.type === 'ai-agent') return <AgentChatConsole {...scope} />;
+  if (identity?.type === 'voice-agent') return <VoiceAgentTestConsole {...scope} />;
   return <ComingSoon title="Coming soon" description="Testing tools are currently under development." />;
 }
 
@@ -115,4 +117,30 @@ function RouteLoading(): JSX.Element {
       </Box>
     </PageContent>
   );
+}
+
+/** Route guard for `test/voice-agent`; like {@link AgentChatTestRoute}, another type bounces to `test`. */
+export function VoiceAgentTestRoute(scope: ComponentScope): JSX.Element {
+  const { projectId } = useProjectId(scope.project);
+  const { data: comp, isPending } = useComponentByHandler(projectId, scope.component);
+  const identity = useIntegrationIdentity(comp ?? undefined);
+
+  const voiceAgentId = comp && identity?.type === 'voice-agent' ? comp.id : undefined;
+  useEffect(() => {
+    if (voiceAgentId) trackEvent('component-test');
+  }, [voiceAgentId]);
+
+  if (projectId && isPending) {
+    return (
+      <PageContent fullWidth>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
+          <CircularProgress />
+        </Box>
+      </PageContent>
+    );
+  }
+
+  if (comp && identity?.type !== 'voice-agent') return <Navigate to={`${componentUrl(scope.org, scope.project, scope.component)}/test`} replace />;
+
+  return <VoiceAgentTestConsole {...scope} />;
 }

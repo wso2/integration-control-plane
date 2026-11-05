@@ -90,6 +90,7 @@ const ProjectDeploy = lazyPage(() => import('../pages/ProjectDeploy'));
 const Deploy = lazyPage(() => import('../pages/Deploy'));
 const TestConsoleRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.TestConsoleRoute })));
 const AgentChatTestRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.AgentChatTestRoute })));
+const VoiceAgentTestRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.VoiceAgentTestRoute })));
 const RuntimeLogsOrg = lazyPage(() => import('../pages/RuntimeLogsOrg'));
 const RuntimeLogsProject = lazyPage(() => import('../pages/RuntimeLogsProject'));
 const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegration'));
@@ -210,6 +211,10 @@ const routes: AppRoute[] = [
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/agent-chat',
                 element: createElement(withScope(AgentChatTestRoute, ['components'])),
+              },
+              {
+                path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/voice-agent',
+                element: createElement(withScope(VoiceAgentTestRoute, ['components'])),
               },
               {
                 path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/test/api-chat',

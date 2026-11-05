@@ -24,6 +24,7 @@ import {
   DEFAULT_VOICE_AGENT_SETTINGS,
   MAX_TRANSCRIPT_MESSAGES,
   isWebSocketUrl,
+  tokenServiceUrlOf,
   validateAgentStep,
   validateLiveKitStep,
   validateTtsStep,
@@ -169,5 +170,21 @@ describe('applyTranscriptEvent', () => {
     for (let i = 0; i < MAX_TRANSCRIPT_MESSAGES + 5; i++) t = applyTranscriptEvent(t, said(`m${i}`), i);
     expect(t).toHaveLength(MAX_TRANSCRIPT_MESSAGES);
     expect(t[t.length - 1].text).toBe(`m${MAX_TRANSCRIPT_MESSAGES + 4}`);
+  });
+});
+
+describe('tokenServiceUrlOf', () => {
+  it('returns the token service endpoint’s external URL', () => {
+    const endpoints = [
+      { id: 'other', publicUrl: 'https://x/other' },
+      { id: 'token-service', publicUrl: 'https://gw:19443/agent-token-service' },
+    ];
+    expect(tokenServiceUrlOf(endpoints)).toBe('https://gw:19443/agent-token-service');
+  });
+
+  it('is null until the endpoint has an external URL', () => {
+    expect(tokenServiceUrlOf(undefined)).toBeNull();
+    expect(tokenServiceUrlOf([{ id: 'token-service', publicUrl: null }])).toBeNull();
+    expect(tokenServiceUrlOf([{ id: 'token-service', publicUrl: '' }])).toBeNull();
   });
 });

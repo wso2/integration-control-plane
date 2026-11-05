@@ -22,10 +22,8 @@ import type { ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import { tokenServiceUrlOf } from '../../../utils/voiceAgent';
 import VoiceAgentTester from '../../VoiceAgent/VoiceAgentTester';
-
-/** The endpoint the BFF publishes the token service on (ipaas-service models.VoiceAgentTokenEndpointName). */
-const TOKEN_ENDPOINT_NAME = 'token-service';
 
 const URL_SX = { fontFamily: 'monospace', wordBreak: 'break-all' } as const;
 
@@ -63,7 +61,7 @@ export default function EnvCardBody({ component, versionId, releaseId, hasDeploy
     );
   }
 
-  const tokenServiceUrl = endpoints?.find((e) => e.id === TOKEN_ENDPOINT_NAME)?.publicUrl;
+  const tokenServiceUrl = tokenServiceUrlOf(endpoints);
   return (
     <>
       <Divider sx={{ my: 2 }} />

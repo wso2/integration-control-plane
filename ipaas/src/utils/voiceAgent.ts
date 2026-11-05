@@ -240,3 +240,11 @@ export function applyTranscriptEvent(prev: VoiceTranscriptMessage[], raw: string
   const next = [...prev, { id: nextId, role: event.type === 'stt' ? 'user' : 'assistant', text: event.text.trim() } satisfies VoiceTranscriptMessage];
   return next.length > MAX_TRANSCRIPT_MESSAGES ? next.slice(next.length - MAX_TRANSCRIPT_MESSAGES) : next;
 }
+
+/** The endpoint the BFF publishes a voice agent's token service on (ipaas-service models.VoiceAgentTokenEndpointName). */
+export const VOICE_AGENT_TOKEN_ENDPOINT = 'token-service';
+
+/** The token service URL the browser calls, or null while the endpoint has no external URL yet. */
+export function tokenServiceUrlOf(endpoints: readonly { id: string; publicUrl?: string | null }[] | undefined): string | null {
+  return endpoints?.find((e) => e.id === VOICE_AGENT_TOKEN_ENDPOINT)?.publicUrl || null;
+}

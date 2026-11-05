@@ -334,6 +334,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'console', navId: 'console', segment: 'test/console', parent: 'test' },
     { key: 'api-chat', navId: 'api-chat', segment: 'test/api-chat', parent: 'test' },
     { key: 'agent-chat', navId: 'agent-chat', segment: 'test/agent-chat', parent: 'test' },
+    { key: 'voice-agent', navId: 'voice-agent', segment: 'test/voice-agent', parent: 'test' },
     { key: 'logs', navId: 'logs', segment: 'logs', parent: 'observability' },
     { key: 'metrics', navId: 'metrics', segment: 'metrics', parent: 'observability' },
     { key: 'traces', navId: 'traces', segment: 'traces', parent: 'observability' },
