@@ -108,14 +108,14 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
     setFilesOpen(true);
   };
   const { asked } = useAskedFlag(engine.id);
-  const progress = useContextEngineProgress(engine.id);
+  const progress = useContextEngineProgress(readOnly ? '' : engine.id);
   // Adding a source reuses the wizard's drawer; the session key remounts it fresh each time.
   const [addSession, setAddSession] = useState(0);
   const [addOpen, setAddOpen] = useState(false);
   const [editSource, setEditSource] = useState<ContextSource | null>(null);
   const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
-  const permissions = useContextPermissions(engine.id);
+  const permissions = useContextPermissions(readOnly ? '' : engine.id);
   // Models are set when the engine is created; the BFF cannot change them yet.
   const canEditModels = CONTEXT_ENGINE_MODEL_UPDATES && !readOnly && !!permissions.data?.includes('engine.manage');
   const [modelsOpen, setModelsOpen] = useState(false);
@@ -124,7 +124,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
     setModelsSession((n) => n + 1);
     setModelsOpen(true);
   };
-  const { everyone } = useUploadAudience(orgHandle, engine.queryRoles, engine.id);
+  const { everyone } = useUploadAudience(orgHandle, engine.queryRoles, readOnly ? null : engine.id);
   const existingConfigs = engine.sources.map((s) => sourceAsConfig(s, rememberedSourceRules(s.id)));
 
   const submitNewSource = (picked: ContextSourceConfig) => {
@@ -195,6 +195,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
           <SourcesProgressCard
             id={SOURCES_CARD_ID}
             engineId={engine.id}
+            running={!readOnly}
             sources={engine.sources}
             onManageFiles={readOnly ? undefined : openFiles}
             onAddSource={

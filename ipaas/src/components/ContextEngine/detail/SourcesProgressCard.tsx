@@ -44,6 +44,8 @@ interface SourcesProgressCardProps {
   /** DOM id, so the checklist can scroll here. */
   id?: string;
   engineId: string;
+  /** Progress comes from the engine, so it is asked for only once the engine runs. */
+  running: boolean;
   sources: ContextSource[];
   /** Drives the fallback chip on engines that do not report progress yet. */
   /** Opens the Files drawer for a File Upload source. */
@@ -139,8 +141,8 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  * how many delivered items the engine has processed, and, once the engine
  * collects it, how much the search index has caught up. Polls while anything moves.
  */
-export default function SourcesProgressCard({ id, engineId, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
-  const progressQuery = useContextEngineProgress(engineId);
+export default function SourcesProgressCard({ id, engineId, running, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
+  const progressQuery = useContextEngineProgress(running ? engineId : '');
   const integrations = useContextIntegrations(
     engineId,
     sources.some((s) => s.type !== 'upload'),
