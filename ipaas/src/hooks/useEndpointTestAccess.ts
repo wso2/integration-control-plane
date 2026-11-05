@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
 import { useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
 import type { EndpointRef, SecurityMode } from '../types/consumers';
@@ -87,13 +87,15 @@ const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.component
  */
 export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabled = true, gatewayUrlFallback = ''): EndpointTestAccess {
   const { data: security, isError: isSecurityError, error: securityError } = useEndpointSecurity(ref, enabled);
-  const createTestKey = useCreateEndpointTestKey(ref);
-  const enableApiKeyAuth = useEnableEndpointApiKeyAuth(ref);
+  const createTestKey = useCreateEndpointTestKey();
+  const enableApiKeyAuth = useEnableEndpointApiKeyAuth();
 
-  // The minted key and any failure are stored against the endpoint they belong
-  // to, so a response that lands after the selection moved on is ignored by
-  // construction — no cancellation bookkeeping needed.
+  // Each request goes to the endpoint it was started for, and its result is stored against that
+  // endpoint, so a response that lands after the selection moved on is ignored by construction.
   const refKey = keyOf(ref);
+  // The endpoint by identity: a caller's new object for the same endpoint must not re-run the auto-mint.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const endpoint = useMemo(() => ref, [refKey]);
   const [minted, setMinted] = useState<{ refKey: string; key: string | null } | null>(null);
   const [failure, setFailure] = useState<{ refKey: string; message: string } | null>(null);
   const [apiKeyRequiredFor, setApiKeyRequiredFor] = useState<string | null>(null);
@@ -102,25 +104,25 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
   const apiKey = minted?.refKey === refKey ? minted.key : null;
   const keyError = failure?.refKey === refKey ? failure.message : null;
 
-  const mintKey = useCallback(
-    async (): Promise<string | null> => {
-      if (!ref) return null;
+  const { mutateAsync: createKeyFor } = createTestKey;
+  const mintFor = useCallback(
+    async (target: EndpointRef): Promise<string | null> => {
+      const targetKey = keyOf(target);
       setFailure(null);
       try {
-        const key = (await createTestKey.mutateAsync())?.apiKey ?? null;
-        setMinted({ refKey, key });
-        if (!key) setFailure({ refKey, message: MINT_FAILED });
+        const key = (await createKeyFor(target))?.apiKey ?? null;
+        setMinted({ refKey: targetKey, key });
+        if (!key) setFailure({ refKey: targetKey, message: MINT_FAILED });
         return key;
       } catch (err) {
-        if (isApiKeyAuthRequired(err)) setApiKeyRequiredFor(refKey);
-        else setFailure({ refKey, message: friendlyApiError(err, MINT_FAILED) });
+        if (isApiKeyAuthRequired(err)) setApiKeyRequiredFor(targetKey);
+        else setFailure({ refKey: targetKey, message: friendlyApiError(err, MINT_FAILED) });
         return null;
       }
     },
-    // createTestKey is a stable mutation object; the endpoint identity drives it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [refKey],
+    [createKeyFor],
   );
+  const mintKey = useCallback(async () => (endpoint ? mintFor(endpoint) : null), [endpoint, mintFor]);
 
   // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
   const mintingFor = useRef<string | null>(null);
@@ -148,23 +150,25 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
     void mintKey();
   }, [mode, refKey, mintKey]);
 
+  const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
+    if (!endpoint) return null;
+    const target = endpoint;
+    const targetKey = keyOf(target);
     setFailure(null);
     // This mints itself; the auto-mint must not mint a second key when the mode refetches as api-key.
-    mintingFor.current = refKey;
+    mintingFor.current = targetKey;
     try {
-      await enableApiKeyAuth.mutateAsync();
-      setApiKeyRequiredFor(null);
-      return await mintKey();
+      await enableApiKeyAuthFor(target);
+      setApiKeyRequiredFor((current) => (current === targetKey ? null : current));
+      return await mintFor(target);
     } catch (err) {
-      setFailure({ refKey, message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
+      setFailure({ refKey: targetKey, message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
       return null;
     } finally {
-      mintingFor.current = null;
+      if (mintingFor.current === targetKey) mintingFor.current = null;
     }
-    // enableApiKeyAuth is a stable mutation object; the endpoint identity drives it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refKey, mintKey]);
+  }, [endpoint, enableApiKeyAuthFor, mintFor]);
 
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
   // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
@@ -179,10 +183,10 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, enabl
     apiKey,
     // An open (mode `none`) endpoint needs no credential; anything else does.
     isAuthorized: mode === 'none' || !!apiKey,
-    isMinting: createTestKey.isPending,
+    isMinting: createTestKey.isPending && keyOf(createTestKey.variables) === refKey,
     keyError,
     needsApiKeyAuth: (mode === 'jwt' && !apiKey) || apiKeyRequiredFor === refKey,
-    isSwitching: enableApiKeyAuth.isPending,
+    isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
     switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never
     // reports unavailable — only a real answer does.
