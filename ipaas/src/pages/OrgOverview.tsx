@@ -220,7 +220,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           title="Databases"
           description="Provision managed databases for your integrations to store and query data."
           actionLabel="Create a database"
-          onAction={databasesAvailable ? () => navigate(newDatabaseUrl(scope)) : undefined}
+          onAction={databasesAvailable ? () => navigate(newDatabaseUrl(scope, 'postgres')) : undefined}
           disabledReason={databasesUnavailableReason}
         />
       </Box>

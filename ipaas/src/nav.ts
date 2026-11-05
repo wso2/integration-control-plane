@@ -22,6 +22,7 @@ import { capitalize } from './utils/string';
 import { SETTINGS_SECTIONS, type SettingsSectionDef } from './constants/orgSettingsSections';
 import { COMPONENT_SETTINGS_SECTIONS } from './constants/componentSettingsSections';
 import { local } from './utils/storage';
+import type { PlatformServiceKind } from './constants/databases';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -204,8 +205,9 @@ export function orgDatabasesUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/platform-services`;
 }
 
-export function newDatabaseUrl(scope: { org: string }): string {
-  return `${orgDatabasesUrl(scope)}/new`;
+/** With a `kind`, the create wizard opens on that service's details step. */
+export function newDatabaseUrl(scope: { org: string }, kind?: PlatformServiceKind): string {
+  return `${orgDatabasesUrl(scope)}/new${kind ? `?type=${kind}` : ''}`;
 }
 
 /** A database's detail page, on one of its tabs. */
