@@ -112,7 +112,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
   const rootRef = useRef<HTMLDivElement>(null);
   const asked = useAskedQuestions(engine.id);
   const sourcesById = new Map(engine.sources.map((s) => [s.id, s]));
-  const llmModel = engine.models.llm?.model;
+  // Answers come from the answer model when the engine has one, else from the ingestion model.
+  const answerModel = engine.models.answer?.model ?? engine.models.llm?.model;
 
   const canAsk = canQuery && question.trim().length > 0 && question.length <= CONTEXT_QUERY_MAX_LENGTH && !asking && openingId === null;
   // const suggestions = suggestedQuestions(engine);
@@ -183,6 +184,8 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
     openRef.current = openId;
     // A conversation restored for this tab may already show the question; replacing it would drop the follow-ups.
     if (turns.some((t) => t.result.queryId === openId)) window.requestAnimationFrame(() => rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // Reopening replaces the conversation, which would drop the answer still on its way, so it waits.
+    else if (asking) setNotice('Wait for the current question to finish, then open that one again.');
     else {
       const known = asked.find((q) => q.queryId === openId);
       reopenQuestion(known ?? { queryId: openId, engineId: engine.id, question: 'An earlier question', mode: 'answer', askedAt: new Date().toISOString(), outcome: 'answered', passages: 0 });
@@ -233,7 +236,7 @@ export default function PlaygroundTab({ engine, orgHandle }: PlaygroundTabProps)
         </>
       );
     } else if (answerText) {
-      summary = `Answered${llmModel ? ` by ${llmModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
+      summary = `Answered${answerModel ? ` by ${answerModel}` : ''} from ${n} passage${n === 1 ? '' : 's'}`;
       body = <AnsweredTurn answer={answerText} evidence={result.evidence} sources={engine.sources} facts={result.facts} hrefFor={hrefFor} onOpen={openEvidence} derivationHref={(ev) => derivationHref(result.queryId, ev)} />;
     } else if (n === 0) {
       summary = t.mode === 'answer' ? 'No answer' : '0 passages';

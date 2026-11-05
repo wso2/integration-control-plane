@@ -33,8 +33,9 @@ export default function VisibilityComingSoon({ label }: { label: string }): JSX.
         <Chip size="small" label="Coming soon" />
       </Stack>
       <RadioGroup value="everyone" sx={{ mt: 0.5 }}>
-        <FormControlLabel value="everyone" disabled control={<Radio size="small" />} label={<Typography variant="body2">Everyone who can query this engine</Typography>} />
-        <FormControlLabel value="roles" disabled control={<Radio size="small" />} label={<Typography variant="body2">Only some roles</Typography>} />
+        {/* A plain-text label, so the disabled grey reaches it: a Typography label is passed through unstyled. */}
+        <FormControlLabel value="everyone" disabled control={<Radio size="small" />} label="Everyone who can query this engine" slotProps={{ typography: { variant: 'body2' } }} />
+        <FormControlLabel value="roles" disabled control={<Radio size="small" />} label="Only some roles" slotProps={{ typography: { variant: 'body2' } }} />
       </RadioGroup>
     </Box>
   );

@@ -48,7 +48,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   return (
     <Box>
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." />
+        <SurfaceHeader title="MCP server" description={engine.exposure.answers ? 'Agents connect here and call get_context and get_answer.' : 'Agents connect here and call get_context.'} />
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
           Server endpoint

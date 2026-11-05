@@ -86,15 +86,15 @@ function citeOf(node: ReactNode): number | null {
 const CLOSING_PUNCTUATION = /^[.!?,;:]+["”')\]]*/;
 const CLOSING_PUNCTUATION_ONLY = /^[.!?,;:]+["”')\]]*\s*$/;
 
-/**
- * Hold a run of marks on one line with the word before it and the punctuation after it,
- * so a line never starts with a mark or with the full stop that follows the marks.
- */
 /** A last word longer than this, such as a path, is too long to hold on one line with its marks. */
 const WORD_IN_RUN_MAX = 20;
 /** How much of a long last word stays with its marks, so a mark never starts a line. */
 const LONG_WORD_TAIL = 4;
 
+/**
+ * Hold a run of marks on one line with the word before it and the punctuation after it,
+ * so a line never starts with a mark or with the full stop that follows the marks.
+ */
 function keepMarksTogether(nodes: ReactNode[]): ReactNode[] {
   // Placing a mark can leave an empty piece of text beside it, which would split a run of marks.
   const rest = nodes.filter((node) => node !== '');

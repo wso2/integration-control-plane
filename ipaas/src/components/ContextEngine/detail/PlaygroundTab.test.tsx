@@ -92,7 +92,7 @@ vi.mock('./RecentQuestions', () => ({
 }));
 
 import PlaygroundTab from './PlaygroundTab';
-import { appendTurn, getPlaygroundConversation } from '../../../hooks/contextTurns';
+import { appendTurn, getPlaygroundConversation, startQuestion } from '../../../hooks/contextTurns';
 import { rememberQuestion } from '../../../hooks/contextQuestions';
 
 const engine = { id: 'e-play', sources: [], models: {}, exposure: { answers: true } } as unknown as ContextEngineDetail;
@@ -162,5 +162,32 @@ describe('PlaygroundTab', () => {
     expect(button('Clear conversation')?.disabled).toBe(true);
     act(() => button('Ask')?.click());
     expect(queryContext.mutateAsync).not.toHaveBeenCalled();
+  });
+
+  it('credits an answer to the answer model when the engine has one', () => {
+    const answered = { queryId: 'qry_a', answer: 'It is [1].', evidence: [{ id: 'evi_1', recordId: 'a.md', sourceId: 's1', sourceVersion: '1', passage: 'p' }], facts: [] } as unknown as ContextQueryResult;
+    appendTurn('e-models', { question: 'Q', mode: 'answer', result: answered });
+    act(() =>
+      root.render(
+        <MemoryRouter>
+          <PlaygroundTab engine={{ ...engine, id: 'e-models', models: { llm: { provider: 'openai', model: 'ingest-m' }, answer: { provider: 'anthropic', model: 'answer-m' } } } as unknown as ContextEngineDetail} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    expect(host.textContent).toContain('Answered by answer-m');
+    expect(host.textContent).not.toContain('ingest-m');
+  });
+
+  it('keeps a pending question and says why when Graph asks to reopen another', () => {
+    startQuestion('e-open', 'Still waiting', 'answer');
+    act(() =>
+      root.render(
+        <MemoryRouter initialEntries={['/?open=qry_old']}>
+          <PlaygroundTab engine={{ ...engine, id: 'e-open' }} orgHandle="org" />
+        </MemoryRouter>,
+      ),
+    );
+    expect(reopenContext.mutateAsync).not.toHaveBeenCalled();
+    expect(host.textContent).toContain('Wait for the current question to finish, then open that one again.');
   });
 });
