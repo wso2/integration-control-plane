@@ -252,7 +252,11 @@ export function useCreateContextEngine() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateContextEngineInput) => createContextEngine(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] }),
+    onSuccess: (created) => {
+      // An engine deleted and created again under the same name must not reuse the old one's status.
+      qc.removeQueries({ queryKey: [ROOT_KEY, 'detail', created.id] });
+      return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
+    },
   });
 }
 
