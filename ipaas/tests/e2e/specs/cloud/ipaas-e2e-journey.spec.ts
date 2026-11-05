@@ -38,7 +38,6 @@ import {
   EXECUTIONS_WATCH_MS,
   FOOTER_LINKS,
   MI_DEPLOY_TIMEOUT_MS,
-  MI_SAMPLE_TECHNOLOGY,
   MI_TECHNOLOGY,
   NO_CONSUMERS,
   NO_SCHEDULE,
@@ -51,7 +50,7 @@ import {
   UNPORTED_SECTIONS,
 } from '../../helpers/journey-fixtures.js';
 import { activeProject, listFixtureProjects, STALE_AGE_MS, staleProjects, setActiveProject } from '../../helpers/journey-project.js';
-import { enterOrgHome, enterProject, enterProjectOrSkip, openProjectSettings, projectSettingsButton, reseedHere } from '../../helpers/journey-session.js';
+import { appears, enterOrgHome, enterProject, enterProjectOrSkip, filterToProject, openProjectCard, projectDeleteButton, reseedHere } from '../../helpers/journey-session.js';
 import {
   agentRow,
   confirmRemoval,
@@ -126,12 +125,6 @@ async function filterToLegacyProject(page: Page): Promise<Locator> {
   return page.locator('.MuiCard-root').filter({ has: page.getByText(PROJECT, { exact: true }) });
 }
 
-async function openLegacySettings(page: Page): Promise<void> {
-  await filterToLegacyProject(page);
-  await page.getByRole('button', { name: `Settings for ${PROJECT}`, exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible({ timeout: 30_000 });
-}
-
 /** Deletes every integration the overview still lists and waits the deletions out. */
 async function emptyLegacyProject(page: Page): Promise<number> {
   const card = await filterToLegacyProject(page);
@@ -156,28 +149,24 @@ async function sweepLegacyProject(page: Page, note: (description: string) => voi
     return;
   }
 
-  // A project already being deleted keeps its card but loses the settings button, so it is only waited out.
-  const settings = page.getByRole('button', { name: `Settings for ${PROJECT}`, exact: true });
-  if (await settings.isVisible({ timeout: 15_000 }).catch(() => false)) {
-    // Delete Project stays disabled while integrations remain, so a disabled button sends the sweep back to the overview.
-    const deleteProject = page.getByRole('button', { name: 'Delete Project', exact: true });
+  // A project already being deleted keeps its card but loses the delete button, so it is only waited out.
+  const deleteProject = projectDeleteButton(page, PROJECT);
+  if (await appears(deleteProject)) {
+    // The card's delete stays disabled while integrations remain, so a disabled button sends the sweep back to the overview.
     let enabled = false;
     for (let round = 0; round < 2 && !enabled; round++) {
       note(`removed ${await emptyLegacyProject(page)} integration(s) from ${PROJECT}`);
-      await openLegacySettings(page);
+      // The card fetches its integration count only once hovered.
+      await (await filterToLegacyProject(page)).first().hover();
       enabled = await expect(deleteProject)
         .toBeEnabled({ timeout: 30_000 })
         .then(() => true)
         .catch(() => false);
     }
-    if (!enabled) throw new Error(`Delete Project stayed disabled — ${PROJECT} still holds integrations`);
+    if (!enabled) throw new Error(`the project delete stayed disabled — ${PROJECT} still holds integrations`);
 
     await deleteProject.click();
     await confirmRemoval(page, 'Enter project name to confirm', PROJECT);
-    const rejected = page.getByRole('alert').filter({ hasText: /Failed to delete the project/i });
-    if (await rejected.isVisible({ timeout: 10_000 }).catch(() => false)) {
-      throw new Error(`the console rejected the delete: ${(await rejected.textContent())?.trim()}`);
-    }
   } else {
     note(`${PROJECT} is already being deleted; waiting for it to finish`);
   }
@@ -233,16 +222,10 @@ test.describe('01 fixture project @smoke', () => {
     await enterOrgHome(page, orgHandler);
   });
 
-  test('TC_IP_PROJ_001 the organization home lists its projects', async () => {
-    await expect(page.getByRole('heading', { name: 'All Projects' })).toBeVisible({ timeout: 60_000 });
+  test('TC_IP_PROJ_001 the organization Projects page lists its projects', async () => {
+    await expect(page.getByRole('heading', { name: 'All projects' })).toBeVisible({ timeout: 60_000 });
     // first(): an org with no projects also offers it in the empty state, and both open the same form.
-    await expect(page.getByRole('button', { name: 'Create Project', exact: true }).first()).toBeVisible();
-  });
-
-  test('TC_IP_PROJ_002 the organization home links to tutorials and Discord support', async () => {
-    // EXPLORE_GROUPS is rendered by Projects.tsx, the org project list, not a project overview.
-    await expect(page.getByRole('link', { name: 'Build an Automation' })).toHaveAttribute('href', /get-started\/build-automation$/);
-    await expect(page.getByRole('link', { name: 'Get Support on Discord' })).toHaveAttribute('href', 'https://discord.com/invite/wso2');
+    await expect(page.getByRole('button', { name: 'Create project', exact: true }).first()).toBeVisible();
   });
 
   test('TC_IP_PROJ_003 this run creates a fixture project of its own', async () => {
@@ -251,10 +234,10 @@ test.describe('01 fixture project @smoke', () => {
     // The pipeline starts a run every half hour and a run lasts nearly an hour, so runs never share one.
     const project = activeProject();
 
-    // first(): an org with no projects also offers it in the empty state; the form's submit shares the name but lives on the next page.
-    await page.getByRole('button', { name: 'Create Project', exact: true }).first().click();
-    await page.getByRole('textbox', { name: 'Project Name' }).fill(project);
-    await page.getByRole('button', { name: 'Create Project', exact: true }).click();
+    // first(): an org with no projects also offers it in the empty state, so first() picks one.
+    await page.getByRole('button', { name: 'Create project', exact: true }).first().click();
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill(project);
+    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
     const landed = await page
       .getByRole('heading', { name: project })
@@ -274,7 +257,7 @@ test.describe('01 fixture project @smoke', () => {
       // Project quota is a 402 from platform-api surfaced as a 500, so the console shows a
       // generic failure. Skipped rather than failed: the suite cannot create quota it lacks.
       test.skip(/quota|already exists|internal server error|failed to create/i.test(reason), `Project could not be created: ${reason || 'no error shown'}`);
-      throw new Error(`Create Project did not land on the project. Alert: ${reason || 'none'}`);
+      throw new Error(`Create project did not land on the project. Alert: ${reason || 'none'}`);
     }
 
     test.info().annotations.push({ type: 'fixture', description: `created ${project}` });
@@ -296,18 +279,18 @@ test.describe('02 empty project overview @smoke', () => {
   });
 
   test('TC_IP_OVW_001 offers to create an integration on Cloud', async () => {
-    await expect(page.getByText('Create an Integration on Cloud', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Create an integration on Cloud', { exact: true })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: 'Open Cloud Editor' })).toBeVisible();
   });
 
   test('TC_IP_OVW_002 offers to import your own integration', async () => {
-    await expect(page.getByText('Import your own Integration', { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('button', { name: 'Import from a Public Repository' })).toBeVisible();
+    await expect(page.getByText('Import your own integration', { exact: true })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Import from a public repository' })).toBeVisible();
   });
 
   test('TC_IP_OVW_003 offers the Start quickly panel with both tabs', async () => {
     await expect(page.getByText('Start quickly', { exact: true })).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole('tab', { name: 'Prebuilt Integrations' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Prebuilt integrations' })).toBeVisible();
     await expect(samplesTab(page)).toBeVisible();
   });
 
@@ -317,7 +300,7 @@ test.describe('02 empty project overview @smoke', () => {
   });
 
   test('TC_IP_OVW_005 the Prebuilt Integrations tab is selected by default and lists cards', async () => {
-    await expect(page.getByRole('tab', { name: 'Prebuilt Integrations' })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByRole('tab', { name: 'Prebuilt integrations' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('button', { name: 'Explore more prebuilt integrations' })).toBeVisible();
   });
 
@@ -348,12 +331,12 @@ test.describe('03 browse samples @smoke', () => {
       test.skip(true, 'Could not determine project handler from the URL after entering the project');
       return;
     }
-    browseSamplesUrl = `/organizations/${orgHandler}/projects/${match[1]}/components/new/samples`;
+    browseSamplesUrl = `organizations/${orgHandler}/projects/${match[1]}/components/new/samples`;
 
     await page.goto(browseSamplesUrl, { waitUntil: 'domcontentloaded' });
     await Promise.race([
       page
-        .getByRole('heading', { name: 'Browse Samples' })
+        .getByRole('heading', { name: 'Browse samples' })
         .waitFor({ state: 'visible', timeout: 30_000 })
         .catch(() => {}),
       page
@@ -365,40 +348,40 @@ test.describe('03 browse samples @smoke', () => {
   });
 
   test('TC_IP_SMPL_001 shows the Browse Samples heading and subtitle', async () => {
-    await expect(page.getByRole('heading', { name: 'Browse Samples' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Browse samples' })).toBeVisible();
     await expect(page.getByText('Deploy a sample to get started quickly.')).toBeVisible();
   });
 
   test('TC_IP_SMPL_002 shows a Back button to the integration creation options', async () => {
-    await expect(page.getByRole('button', { name: 'Back', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Back to create integration', exact: true })).toBeVisible();
   });
 
   test('TC_IP_SMPL_003 shows the sample search input', async () => {
-    await expect(page.getByPlaceholder('Search samples…')).toBeVisible();
+    await expect(page.getByPlaceholder('Search samples')).toBeVisible();
   });
 
   test('TC_IP_SMPL_004 shows the Type, Technology and Tags filter sections', async () => {
     for (const section of ['Type', 'Technology', 'Tags']) {
       await expect(page.getByRole('button', { name: section, exact: true })).toBeVisible();
     }
-    await expect(page.getByRole('checkbox', { name: MI_SAMPLE_TECHNOLOGY, exact: true }), 'the Technology filter offers no MI samples').toBeVisible();
+    await expect(page.getByRole('checkbox', { name: MI_TECHNOLOGY, exact: true }), 'the Technology filter offers no MI samples').toBeVisible();
   });
 
   test('TC_IP_SMPL_005 a search with no matches shows the empty-result message', async () => {
-    // Every SampleGridCard renders a "Quick Deploy" button — asserting on it first confirms
+    // Every SampleGridCard renders a "Quick deploy" button — asserting on it first confirms
     // real results are showing before we search them away.
-    await expect(page.getByRole('button', { name: 'Quick Deploy' }).first()).toBeVisible();
-    await page.getByPlaceholder('Search samples…').fill(`no-such-sample-${Date.now()}`);
+    await expect(page.getByRole('button', { name: 'Quick deploy' }).first()).toBeVisible();
+    await page.getByPlaceholder('Search samples').fill(`no-such-sample-${Date.now()}`);
     await expect(page.getByText('No samples match your search.')).toBeVisible();
   });
 
   test('TC_IP_SMPL_006 clearing the search brings the results back', async () => {
-    const search = page.getByPlaceholder('Search samples…');
+    const search = page.getByPlaceholder('Search samples');
     await search.fill(`no-such-sample-${Date.now()}`);
     await expect(page.getByText('No samples match your search.')).toBeVisible();
     await search.clear();
     await expect(page.getByText('No samples match your search.')).not.toBeVisible();
-    await expect(page.getByRole('button', { name: 'Quick Deploy' }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Quick deploy' }).first()).toBeVisible();
   });
 });
 
@@ -427,14 +410,14 @@ test.describe('04 deploy a sample @smoke', () => {
   });
 
   test('TC_IP_DEPLOY_003 the integration overview reports a build', async () => {
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 2 * 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 2 * 60_000 });
   });
 
   test('TC_IP_DEPLOY_004 the sample appears in the project with the table columns', async () => {
     await enterProject(page, orgHandler);
     const table = page.getByRole('table').first();
     await expect(table).toBeVisible({ timeout: 30_000 });
-    for (const column of ['Name', 'Description', 'Type', 'Last Updated']) {
+    for (const column of ['Name', 'Type', 'Last updated']) {
       await expect(table.getByRole('columnheader', { name: column, exact: true })).toBeVisible();
     }
     await expect(integrationRow(page, SAMPLE)).toHaveCount(1);
@@ -443,7 +426,7 @@ test.describe('04 deploy a sample @smoke', () => {
   test('TC_IP_DEPLOY_005 the sample build completes', async () => {
     test.setTimeout(BUILD_TIMEOUT_MS + 2 * 60_000);
     await openIntegration(page, SAMPLE);
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
 
     const status = await waitForBuildToSettle(page);
     test.info().annotations.push({ type: 'build', description: `${SAMPLE}: ${status}` });
@@ -468,7 +451,7 @@ test.describe('04b endpoint and consumers @smoke', () => {
   // Serial: a build that never completed leaves nothing to test, so one failure reports the cause once.
   test('TC_IP_DEPLOY_006 the latest build reports Completed', async () => {
     test.setTimeout(BUILD_TIMEOUT_MS + 2 * 60_000);
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
     const status = await waitForBuildToSettle(page);
     expect(status, `${SAMPLE} build ended as ${status}`).toMatch(/^Completed/);
   });
@@ -485,15 +468,15 @@ test.describe('04b endpoint and consumers @smoke', () => {
   test('TC_IP_DEPLOY_008 the env card offers the endpoint URLs and the resources it exposes', async () => {
     await dismissStrayDialog(page);
     const card = envCard(page);
-    await expect(card.getByText('URLs', { exact: true })).toBeVisible({ timeout: 3 * 60_000 });
-    await expect(card.getByText('Download Spec', { exact: true })).toBeVisible();
-    await expect(card.getByRole('button', { name: 'View Details' }).first(), 'the card lists no resources').toBeVisible();
+    await expect(card.getByText('URLs:', { exact: true })).toBeVisible({ timeout: 3 * 60_000 });
+    await expect(card.getByText('Download spec:', { exact: true })).toBeVisible();
+    await expect(card.getByRole('button', { name: 'View details' }).first(), 'the card lists no resources').toBeVisible();
   });
 
   test('TC_IP_CONS_001 the consumers section is offered with its security scheme', async () => {
     const card = envCard(page);
     await expect(card.getByText(/^Consumers\s*\(\d+\)/)).toBeVisible({ timeout: 60_000 });
-    await expect(card.getByText(/^Security Scheme:/)).toBeVisible();
+    await expect(card.getByText(/^Security scheme:/)).toBeVisible();
   });
 
   // Skipped where deletion is unavailable: creating and revoking are still worth exercising.
@@ -512,11 +495,11 @@ test.describe('04b endpoint and consumers @smoke', () => {
     await openConsumerDrawer(page);
     // By placeholder: the drawer's label is a sibling Typography, so the field has no accessible name.
     await page.getByPlaceholder('e.g. my-greeting-client').fill(consumerName);
-    await page.getByRole('button', { name: 'Generate Credentials' }).click();
+    await page.getByRole('button', { name: 'Generate credentials' }).click();
 
     const drawer = page.getByRole('dialog').filter({ hasText: consumerName });
     await expect(drawer.getByText('Header', { exact: true })).toBeVisible({ timeout: 60_000 });
-    await expect(drawer.getByText('API Key', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('API key', { exact: true })).toBeVisible();
     await drawer.getByRole('button', { name: 'Done', exact: true }).click();
   });
 
@@ -568,7 +551,7 @@ test.describe('04c test console @smoke', () => {
     await expect(testButton).toBeVisible({ timeout: 60_000 });
     await testButton.click();
     await expect(page).toHaveURL(/\/test\/console$/, { timeout: 60_000 });
-    await expect(page.getByRole('heading', { name: 'Test Console', level: 1 })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'Test console', level: 1 })).toBeVisible({ timeout: 60_000 });
   });
 
   test('TC_IP_TEST_003 the console names the endpoint, visibility, invoke URL and security header', async () => {
@@ -576,14 +559,14 @@ test.describe('04c test console @smoke', () => {
       await expect(page.getByText(label, { exact: true }), `the console is missing the ${label} field`).toBeVisible({ timeout: 60_000 });
     }
     // Not exact: the label carries the header's name as a caption inside it, so its text is both.
-    await expect(page.getByText(/^Security Header\S/), 'the console is missing the Security Header field, or it names no header').toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(/^Security header\S/), 'the console is missing the Security Header field, or it names no header').toBeVisible({ timeout: 60_000 });
   });
 
   test('TC_IP_TEST_004 a test key is held, or fetched on demand', async () => {
     const field = page.getByPlaceholder('Paste or fetch a test key');
     await expect(field).toBeVisible({ timeout: 60_000 });
     if (!(await field.inputValue())) {
-      await page.getByRole('button', { name: 'Get Test Key' }).click();
+      await page.getByRole('button', { name: 'Get test key' }).click();
     }
     await expect.poll(async () => (await field.inputValue()).length, { message: 'no test key was populated', timeout: 60_000 }).toBeGreaterThan(0);
   });
@@ -624,7 +607,7 @@ test.describe('04c test console @smoke', () => {
 // 04d — an MI automation imported from a public repository: schedule it, then watch it run
 
 async function stopSchedule(page: Page): Promise<void> {
-  await envCard(page).getByRole('button', { name: 'Stop Schedule' }).click();
+  await envCard(page).getByRole('button', { name: 'Stop schedule' }).click();
   await expect(envCard(page).getByRole('button', { name: 'Schedule', exact: true }), 'the schedule is still live').toBeVisible({ timeout: 2 * 60_000 });
 }
 
@@ -644,7 +627,12 @@ test.describe('04d schedule an automation @smoke', () => {
   // Serial mode skips TC_IP_AUTO_007 once an earlier test fails, and a live one-minute schedule would keep firing on the shared org.
   test.afterAll(async () => {
     await dismissStrayDialog(page);
-    if (!(await page.getByRole('heading', { name: AUTOMATION }).isVisible().catch(() => false))) {
+    if (
+      !(await page
+        .getByRole('heading', { name: AUTOMATION })
+        .isVisible()
+        .catch(() => false))
+    ) {
       await enterProject(page, orgHandler);
       await waitForIntegrationsToLoad(page);
       if (!(await isPresent(page, AUTOMATION))) return;
@@ -655,7 +643,7 @@ test.describe('04d schedule an automation @smoke', () => {
     }
 
     const schedule = envCard(page).getByRole('button', { name: 'Schedule', exact: true });
-    const stop = envCard(page).getByRole('button', { name: 'Stop Schedule' });
+    const stop = envCard(page).getByRole('button', { name: 'Stop schedule' });
     // isVisible() does not wait, and the card renders after the reload.
     const rendered = await schedule
       .or(stop)
@@ -670,22 +658,22 @@ test.describe('04d schedule an automation @smoke', () => {
   test('TC_IP_AUTO_001 the import form resolves the repository and its MI sub path', async () => {
     test.setTimeout(3 * 60_000);
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
-    const importButton = page.getByRole('button', { name: 'Import from a Public Repository' });
+    const importButton = page.getByRole('button', { name: 'Import from a public repository' });
     await reachCreateControl(page, importButton);
     await importButton.click();
-    await expect(page.getByRole('heading', { name: 'Import an Integration' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Import an integration' })).toBeVisible({ timeout: 30_000 });
 
     await page.getByRole('textbox', { name: 'Repository URL' }).fill(AUTOMATION_REPO_URL);
     await expect(page.getByRole('combobox', { name: /^Branch/ }), 'the repository did not resolve into a branch — GitHub public API rate limit is the usual cause').toContainText('main', { timeout: 60_000 });
 
-    await page.getByRole('textbox', { name: 'Repository Sub Path' }).click();
-    const picker = page.getByRole('dialog').filter({ hasText: 'Repository Sub Path' });
+    await page.getByRole('textbox', { name: 'Repository sub path' }).click();
+    const picker = page.getByRole('dialog').filter({ hasText: 'Repository sub path' });
     // Prefix match: an expanded folder's name would also carry its children's.
     await picker.getByRole('treeitem', { name: new RegExp(`^${AUTOMATION_SUB_PATH}`) }).click();
     await picker.getByRole('button', { name: 'Continue', exact: true }).click();
 
-    await expect(page.getByRole('textbox', { name: 'Repository Sub Path' })).toHaveValue(`/${AUTOMATION_SUB_PATH}`);
-    await expect(page.getByRole('textbox', { name: 'Integration Name' })).toHaveValue(AUTOMATION);
+    await expect(page.getByRole('textbox', { name: 'Repository sub path' })).toHaveValue(`/${AUTOMATION_SUB_PATH}`);
+    await expect(page.getByRole('textbox', { name: 'Integration name' })).toHaveValue(AUTOMATION);
   });
 
   test('TC_IP_AUTO_002 WSO2 Integrator: MI is selected and importing provisions the automation', async () => {
@@ -696,8 +684,8 @@ test.describe('04d schedule an automation @smoke', () => {
     await page.getByRole('button', { name: /^Automation/ }).click();
 
     // The cards expose no selected state, so an enabled submit (it needs a technology) is the closest check that detection picked one.
-    const submit = page.getByRole('button', { name: 'Import Integration' });
-    await expect(submit, 'Import Integration stayed disabled — technology detection did not select WSO2 Integrator: MI').toBeEnabled({ timeout: 60_000 });
+    const submit = page.getByRole('button', { name: 'Import integration' });
+    await expect(submit, 'Import integration stayed disabled — technology detection did not select WSO2 Integrator: MI').toBeEnabled({ timeout: 60_000 });
     await submit.click();
 
     await expect(page.getByRole('heading', { name: AUTOMATION }), 'the import did not land on the automation overview').toBeVisible({ timeout: 2 * 60_000 });
@@ -724,7 +712,7 @@ test.describe('04d schedule an automation @smoke', () => {
     await page.getByRole('option', { name: 'Minute', exact: true }).click();
     await drawer.getByRole('button', { name: 'Update', exact: true }).click();
 
-    await expect(envCard(page).getByRole('button', { name: 'Stop Schedule' }), 'the schedule was not accepted').toBeVisible({ timeout: 2 * 60_000 });
+    await expect(envCard(page).getByRole('button', { name: 'Stop schedule' }), 'the schedule was not accepted').toBeVisible({ timeout: 2 * 60_000 });
     await expect(envCard(page).getByText(NO_SCHEDULE)).toHaveCount(0);
   });
 
@@ -766,10 +754,10 @@ test.describe('05 import an AI agent @smoke', () => {
   });
 
   test('TC_IP_AGENT_001 the import form opens from the project', async () => {
-    const importButton = page.getByRole('button', { name: 'Import from a Public Repository' });
+    const importButton = page.getByRole('button', { name: 'Import from a public repository' });
     await reachCreateControl(page, importButton);
     await importButton.click();
-    await expect(page.getByRole('heading', { name: 'Import an Integration' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Import an integration' })).toBeVisible({ timeout: 30_000 });
   });
 
   test('TC_IP_AGENT_002 the repository URL resolves into a branch and a derived name', async () => {
@@ -780,8 +768,8 @@ test.describe('05 import an AI agent @smoke', () => {
     // the public API's hourly rate limit is spent, which a real user hits too.
     await expect(page.getByRole('combobox', { name: /^Branch/ }), 'the repository did not resolve into a branch — GitHub public API rate limit is the usual cause').toContainText('main', { timeout: 60_000 });
     // Read, never opened: the picker re-runs technology detection, which can leave the submit disabled.
-    await expect(page.getByRole('textbox', { name: 'Repository Sub Path' })).toBeVisible();
-    await expect(page.getByRole('textbox', { name: 'Integration Name' }), 'the integration name was not derived from the repository').not.toHaveValue('');
+    await expect(page.getByRole('textbox', { name: 'Repository sub path' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Integration name' }), 'the integration name was not derived from the repository').not.toHaveValue('');
   });
 
   test('TC_IP_AGENT_003 importing provisions the agent under its derived name', async () => {
@@ -789,15 +777,15 @@ test.describe('05 import an AI agent @smoke', () => {
     await page.getByRole('button', { name: new RegExp(`^${AGENT_TYPE}`) }).click();
 
     // Polled, not read once: `isEnabled()` reports the state at the moment it is called.
-    const submit = page.getByRole('button', { name: 'Import Integration' });
-    await expect(submit, 'Import Integration stayed disabled — technology detection did not settle').toBeEnabled({ timeout: 60_000 });
+    const submit = page.getByRole('button', { name: 'Import integration' });
+    await expect(submit, 'Import integration stayed disabled — technology detection did not settle').toBeEnabled({ timeout: 60_000 });
     await submit.click();
 
     const heading = page.getByRole('heading', { name: AGENT_NAME_PATTERN }).first();
     await expect(heading, 'the import did not land on the agent overview').toBeVisible({ timeout: 2 * 60_000 });
     agentName = (await heading.textContent())?.trim() ?? '';
     test.info().annotations.push({ type: 'fixture', description: `agent imported as ${agentName}` });
-    await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 2 * 60_000 });
+    await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 2 * 60_000 });
   });
 
   test('TC_IP_AGENT_004 the imported agent reports its source and type', async () => {
@@ -820,16 +808,16 @@ test.describe('05 import an AI agent @smoke', () => {
     await expect(first, 'the build section did not move back').toBeVisible({ timeout: 30_000 });
   });
 
-  test('TC_IP_AGENT_006 View Logs opens the build logs and Hide Logs closes them', async () => {
-    const viewLogs = page.getByRole('button', { name: 'View Logs' }).first();
+  test('TC_IP_AGENT_006 View logs opens the build logs and Hide logs closes them', async () => {
+    const viewLogs = page.getByRole('button', { name: 'View logs' }).first();
     await expect(viewLogs).toBeVisible({ timeout: 5 * 60_000 });
     await viewLogs.click();
 
-    // One button carries both labels (BuildCard.tsx:208), so the flip is the evidence.
-    const hideLogs = page.getByRole('button', { name: 'Hide Logs' }).first();
+    // One button carries both labels (BuildCard.tsx), so the flip is the evidence.
+    const hideLogs = page.getByRole('button', { name: 'Hide logs' }).first();
     await expect(hideLogs).toBeVisible({ timeout: 30_000 });
     await hideLogs.click();
-    await expect(page.getByRole('button', { name: 'View Logs' }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'View logs' }).first()).toBeVisible({ timeout: 30_000 });
   });
 
   test('TC_IP_AGENT_007 the build completed and the deployment is Active', async () => {
@@ -848,7 +836,7 @@ test.describe('05 import an AI agent @smoke', () => {
     test.setTimeout(DEPLOY_TIMEOUT_MS + 3 * 60_000);
     test.skip(true, 'awaiting a valid model key: E2E_OPENAI_KEY is not issued yet');
 
-    await envCard(page).getByRole('button', { name: 'Configure to Continue' }).click();
+    await envCard(page).getByRole('button', { name: 'Configure to continue' }).click();
     await fillSecret(page.getByRole('textbox', { name: 'Enter a value' }).first(), openAiKey!);
 
     // Stepped through, because the wizard's length is the configuration's — and Apply commits it.
@@ -918,18 +906,18 @@ test.describe('06 populated project overview @smoke', () => {
     await expect(page.getByRole('table').first()).toBeVisible({ timeout: 30_000 });
 
     // Current strings: the removed spec asserted text that no longer exists, so it could only pass.
-    await expect(page.getByText('Import your own Integration', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Import your own integration', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Start quickly', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Open Cloud Editor', exact: true })).toHaveCount(0);
   });
 
   test('TC_IP_OVW_010 the architecture panel is offered', async () => {
-    await expect(page.getByRole('heading', { name: 'Architecture Diagram' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Architecture diagram' })).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole('button', { name: /architecture diagram$/ })).toBeVisible();
   });
 
   test('TC_IP_OVW_011 the integration count panel totals the rows in the table', async () => {
-    await expect(page.getByRole('heading', { name: 'Integration Count by Type' })).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name: 'Integration count by type' })).toBeVisible({ timeout: 30_000 });
 
     const rowCount = await page.getByRole('row', { name: /^View details for / }).count();
     const total = page.getByText('Total', { exact: true }).locator('xpath=following-sibling::*[1]');
@@ -976,8 +964,8 @@ test.describe('07 page availability @smoke', () => {
     await expandSidebar(page);
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
-    await openNavGroup(page, 'Observe', 'Runtime Logs');
-    await expectNavItems(page, ['Runtime Logs', 'Metrics']);
+    await openNavGroup(page, 'Observe', 'Runtime logs');
+    await expectNavItems(page, ['Runtime logs', 'Metrics']);
     await openNavGroup(page, 'Infrastructure', 'Environments');
     await expectNavItems(page, ['Environments', 'Pipelines', 'Settings']);
   });
@@ -987,10 +975,12 @@ test.describe('07 page availability @smoke', () => {
     await expandSidebar(page);
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
-    await openNavGroup(page, 'Observe', 'Runtime Logs');
-    await expectNavItems(page, ['Runtime Logs', 'Metrics']);
+    await openNavGroup(page, 'Observe', 'Runtime logs');
+    await expectNavItems(page, ['Runtime logs', 'Metrics']);
     await openNavGroup(page, 'Infrastructure', 'Environments');
-    await expectNavItems(page, ['Environments', 'Pipelines', 'Settings']);
+    await expectNavItems(page, ['Environments', 'Pipelines']);
+    // Projects have no Settings page: editing is on the overview and deletion on the project list's card.
+    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await expect(page.getByRole('heading', { name: activeProject() })).toBeVisible({ timeout: 30_000 });
@@ -1004,18 +994,18 @@ test.describe('07 page availability @smoke', () => {
     await expandSidebar(page);
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
-    await openNavGroup(page, 'Observe', 'Runtime Logs');
-    await expectNavItems(page, ['Runtime Logs', 'Metrics']);
+    await openNavGroup(page, 'Observe', 'Runtime logs');
+    await expectNavItems(page, ['Runtime logs', 'Metrics']);
 
     // Opened, not just listed: a nav item survives a page that fails to render, and the
     // integration-scoped observability specs no longer run on cloud to catch that.
-    for (const observePage of ['Runtime Logs', 'Metrics']) {
+    for (const observePage of ['Runtime logs', 'Metrics']) {
       await page.getByRole('button', { name: observePage, exact: true }).click();
       await expect(page.locator('main').getByRole('heading').first(), `${observePage} did not render`).toBeVisible({ timeout: 60_000 });
     }
 
     await openNavGroup(page, 'Operate', 'Runtime');
-    await expectNavItems(page, ['Runtime', 'Containers', 'Configs & Secrets']);
+    await expectNavItems(page, ['Runtime', 'Containers', 'Configs & secrets']);
     await openNavGroup(page, 'Infrastructure', 'Environments');
     await expectNavItems(page, ['Environments', 'Pipelines']);
 
@@ -1046,21 +1036,21 @@ test.describe('07 page availability @smoke', () => {
   });
 
   test('TC_IP_SET_001 organization settings page exists', async () => {
-    await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
+    await expectPageRendered(page, `organizations/${orgHandler}/settings`);
   });
 
-  const SECTION_IDS: Record<(typeof CLOUD_SECTIONS)[number], string> = { 'Package Registries': 'TC_IP_SET_003' };
+  const SECTION_IDS: Record<(typeof CLOUD_SECTIONS)[number], string> = { 'Package registries': 'TC_IP_SET_003' };
   for (const section of CLOUD_SECTIONS) {
     test(`${SECTION_IDS[section]} organization settings offers "${section}"`, async () => {
-      await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
+      await expectPageRendered(page, `organizations/${orgHandler}/settings`);
       await expect(page.getByText(section, { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     });
   }
 
   test('TC_IP_SET_004 organization settings offers no unported section', async () => {
-    await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
+    await expectPageRendered(page, `organizations/${orgHandler}/settings`);
     // Positive assertion first: these absences would pass on a blank page.
-    await expect(page.getByText('Package Registries', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText('Package registries', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
     // Org Details was removed from cloud settings, so it must not come back either.
     await expect(page.getByText('Org Details', { exact: true })).not.toBeVisible();
     for (const section of UNPORTED_SECTIONS) {
@@ -1069,7 +1059,7 @@ test.describe('07 page availability @smoke', () => {
   });
 
   test('TC_IP_SET_005 package registries page exists', async () => {
-    await expectPageRendered(page, `/organizations/${orgHandler}/settings/package-registries`);
+    await expectPageRendered(page, `organizations/${orgHandler}/settings/package-registries`);
   });
 });
 
@@ -1112,14 +1102,13 @@ test.describe('08 clean up @smoke', () => {
     await expect(page.getByRole('row').filter({ hasText: AGENT_NAME_PATTERN }), 'the imported agent is still listed').toHaveCount(0, { timeout: 60_000 });
   });
 
-  test('TC_IP_PROJ_005 Delete Project becomes available once the project is empty', async () => {
+  test('TC_IP_PROJ_005 the project card offers delete once the project is empty', async () => {
     test.setTimeout(REMOVAL_TIMEOUT_MS + 3 * 60_000);
-    // Back to project scope: cloud's integration scope offers no Settings item (AppLayout.tsx:1424).
-    await openProjectSettings(page, orgHandler);
+    await openProjectCard(page, orgHandler);
 
-    // Disabled while integrations remain (ProjectOverview.tsx:120), so this also proves the
+    // Disabled while integrations remain (ProjectCard in Projects.tsx), so this also proves the
     // deletions landed. Re-entered each attempt because the components query does not refetch.
-    const deleteProject = page.getByRole('button', { name: 'Delete Project', exact: true });
+    const deleteProject = projectDeleteButton(page);
     let enabled = false;
     // 40 attempts at 15s, matching the budget a single integration's removal gets.
     for (let attempt = 0; attempt < 40 && !enabled; attempt++) {
@@ -1127,26 +1116,15 @@ test.describe('08 clean up @smoke', () => {
         .toBeEnabled({ timeout: 15_000 })
         .then(() => true)
         .catch(() => false);
-      if (!enabled) await openProjectSettings(page, orgHandler);
+      if (!enabled) await openProjectCard(page, orgHandler);
     }
-    expect(enabled, 'Delete Project stayed disabled — an integration is still being removed').toBe(true);
+    expect(enabled, 'the project delete stayed disabled — an integration is still being removed').toBe(true);
   });
 
-  test('TC_IP_PROJ_006 deleting the project returns to the organization home without its card', async () => {
+  test('TC_IP_PROJ_006 deleting the project removes its card from the organization home', async () => {
     test.setTimeout(PROJECT_REMOVAL_TIMEOUT_MS + 3 * 60_000);
-    await page.getByRole('button', { name: 'Delete Project', exact: true }).click();
+    await projectDeleteButton(page).click();
     await confirmRemoval(page, 'Enter project name to confirm', activeProject());
-
-    // No success alert exists (ProjectOverview.tsx:72 navigates with state Projects.tsx:93
-    // clears), so the redirect is the signal. Raced against the failure branch (:76) so a
-    // rejected delete reports its reason instead of timing out on a heading.
-    const landed = page.getByRole('heading', { name: 'All Projects' });
-    const rejected = page.getByRole('alert').filter({ hasText: /Failed to delete the project/i });
-    await Promise.race([landed.waitFor({ state: 'visible', timeout: 2 * 60_000 }).catch(() => {}), rejected.waitFor({ state: 'visible', timeout: 2 * 60_000 }).catch(() => {})]);
-    if (await rejected.isVisible().catch(() => false)) {
-      throw new Error(`the console rejected the delete: ${(await rejected.textContent())?.trim()}`);
-    }
-    await expect(landed, 'the delete neither completed nor reported an error').toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(activeProject(), { exact: true }), `the ${activeProject()} card is still on the org home`).toHaveCount(0, { timeout: PROJECT_REMOVAL_TIMEOUT_MS });
   });
 });
@@ -1184,13 +1162,10 @@ test.describe('08b sweep abandoned projects @smoke', () => {
         // The helpers act on whichever project is active, so the sweep borrows the name in turn.
         setActiveProject(project);
         await enterOrgHome(page, orgHandler);
+        await filterToProject(page);
 
-        // A project already being deleted keeps its card but loses the settings button, so it cannot be opened.
-        if (
-          !(await projectSettingsButton(page)
-            .isVisible({ timeout: 15_000 })
-            .catch(() => false))
-        ) {
+        // A project already being deleted keeps its card but loses the delete button, so it is left to finish.
+        if (!(await appears(projectDeleteButton(page)))) {
           test.info().annotations.push({ type: 'fixture', description: `${project} is already being deleted; left to finish` });
           continue;
         }
@@ -1199,8 +1174,8 @@ test.describe('08b sweep abandoned projects @smoke', () => {
         await waitForIntegrationsToLoad(page);
         await deleteAllIntegrations(page);
 
-        await openProjectSettings(page, orgHandler);
-        const deleteProject = page.getByRole('button', { name: 'Delete Project', exact: true });
+        await openProjectCard(page, orgHandler);
+        const deleteProject = projectDeleteButton(page);
         await expect(deleteProject).toBeEnabled({ timeout: PROJECT_REMOVAL_TIMEOUT_MS });
         await deleteProject.click();
         await confirmRemoval(page, 'Enter project name to confirm', project);
@@ -1226,11 +1201,11 @@ test.describe('09 sign out @smoke', () => {
     await enterOrgHome(page, orgHandler);
 
     await page.getByRole('button', { name: 'Account' }).click();
-    await page.getByRole('menuitem', { name: 'Sign Out' }).click();
+    await page.getByRole('menuitem', { name: 'Sign out' }).click();
 
     const dialog = page.getByRole('dialog');
     await expect(dialog, 'signing out did not ask for confirmation').toBeVisible({ timeout: 30_000 });
-    await dialog.getByRole('button', { name: 'Sign Out' }).click();
+    await dialog.getByRole('button', { name: 'Sign out' }).click();
 
     // Cloud has no in-app login page — /login hands off to Thunder's hosted Gate.
     await expect(page).toHaveURL(/\/gate\/signin/, { timeout: 60_000 });

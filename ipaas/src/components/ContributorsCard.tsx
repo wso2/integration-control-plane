@@ -27,31 +27,34 @@ export default function ContributorsCard({ projectId }: { projectId: string }): 
   if (!contributors || contributors.length === 0) return null;
 
   return (
-    <Card variant="outlined">
+    <Card>
       <CardContent>
         <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
           <Users size={20} aria-hidden="true" />
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600 }}>
             Contributors
           </Typography>
-          <Tooltip title="Users who have created integrations in this project">
+          <Tooltip title="Contributors to the source of the integrations deployed in this project">
             <Info size={14} aria-label="Contributors info" style={{ color: 'var(--oxygen-palette-text-secondary, #6b7280)', cursor: 'default' }} />
           </Tooltip>
         </Stack>
         <Stack direction="row" flexWrap="wrap" gap={1}>
-          {contributors.map((contributor) => (
-            <Tooltip key={contributor.id} title={`${contributor.displayName || contributor.email} · ${contributor.totalContributions} contributions`}>
-              <Avatar
-                src={contributor.pictureUrl || undefined}
-                alt={contributor.displayName || contributor.email}
-                role="img"
-                tabIndex={0}
-                aria-label={`${contributor.displayName || contributor.email}: ${contributor.totalContributions} contributions`}
-                sx={{ width: 32, height: 32, fontSize: 14, bgcolor: 'primary.main', color: 'primary.contrastText', cursor: 'default' }}>
-                {(contributor.displayName || contributor.email)[0].toUpperCase()}
-              </Avatar>
-            </Tooltip>
-          ))}
+          {contributors.map((contributor, i) => {
+            const name = contributor.displayName || contributor.email || 'Unknown contributor';
+            return (
+              <Tooltip key={contributor.email || `${name}-${i}`} title={`${name} · ${contributor.totalContributions} contributions`}>
+                <Avatar
+                  src={contributor.pictureUrl || undefined}
+                  alt={name}
+                  role="img"
+                  tabIndex={0}
+                  aria-label={`${name}: ${contributor.totalContributions} contributions`}
+                  sx={{ width: 32, height: 32, fontSize: 14, bgcolor: 'primary.main', color: 'primary.contrastText', cursor: 'default' }}>
+                  {name[0].toUpperCase()}
+                </Avatar>
+              </Tooltip>
+            );
+          })}
         </Stack>
       </CardContent>
     </Card>

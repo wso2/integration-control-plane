@@ -1,0 +1,36 @@
+{
+  "actions": {
+    "back": "Back",
+    "cancel": "Cancel",
+    "close": "Close",
+    "copy": "Copy",
+    "copied": "Copied",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "run": "Run",
+    "search": "Search",
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "start": "Start",
+    "viewAll": "View all"
+  },
+  "kind": {
+    "aiAgent_one": "AI Agent",
+    "aiAgent_other": "AI Agents",
+    "automation_one": "Automation",
+    "automation_other": "Automations",
+    "workflow_one": "Workflow",
+    "workflow_other": "Workflows"
+  },
+  "loading": "Loading…",
+  "noValue": "—",
+  "list": {
+    "runs_one": "Showing {{count}} run",
+    "runs_other": "Showing {{count}} runs",
+    "runsMore_one": "Showing {{count}} run — more available",
+    "runsMore_other": "Showing {{count}} runs — more available",
+    "loadMore": "Load more"
+  },
+  "unnamedUser": "User",
+  "you": "You"
+}

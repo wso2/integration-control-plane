@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Collapse, Grid, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Autocomplete, Box, Collapse, Grid, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { type JSX, useEffect, useState } from 'react';
 import { ALERT_CREATE_NEW_RULE_ADVANCED_TITLE, ALERT_RULE_THRESHOLD_MAX, ALERT_RULE_THRESHOLD_MIN, AlertComponentType, AlertTypeConstants, AlertTypes, type AlertRulePeriodOption, type AlertRulePeriod } from '../../../../constants/alerts';
@@ -114,7 +113,7 @@ export default function StatusCodeAlertRuleForm(props: AlertRuleFormProps): JSX.
               setMetric(v);
               setIsAlertRuleHalfConfigured(true);
             }}
-            renderInput={(params) => <TextField {...params} required label="Metric (status code)" size="small" />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} required label="Metric (status code)" size="small" />}
             isOptionEqualToValue={(o, v) => o.value === v.value}
           />
         </Grid>
@@ -156,12 +155,12 @@ export default function StatusCodeAlertRuleForm(props: AlertRuleFormProps): JSX.
                     setIsAlertRuleHalfConfigured(true);
                   }
                 }}
-                renderInput={(params) => <TextField {...params} label="Interval" size="small" helperText="Frequency at which the occurrences must exceed the count" />}
+                renderInput={(params) => <TextField labelPlacement="top" {...params} label="Interval" size="small" helperText="Frequency at which the occurrences must exceed the count" />}
                 isOptionEqualToValue={(o, v) => o.value === v.value}
               />
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <TextField label="Count" size="small" fullWidth value={count ?? ''} onChange={handleCountChange} error={!!errorCount} helperText={errorCount || 'Number of occurrences that must exceed the threshold'} />
+              <TextField labelPlacement="top" label="Count" size="small" fullWidth value={count ?? ''} onChange={handleCountChange} error={!!errorCount} helperText={errorCount || 'Number of occurrences that must exceed the threshold'} />
             </Grid>
           </Grid>
         </Collapse>

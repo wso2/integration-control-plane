@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useUpdateMaintenanceWindow } from '../../../../hooks/usePlatformServices';
 import { MAINTENANCE_DAYS, MAINTENANCE_TIMES } from '../../../../constants/platformServices';
@@ -54,14 +53,14 @@ export default function MaintenanceWindowDialog({ serverId, variant = 'db-server
       <DialogTitle>Maintenance Window</DialogTitle>
       <DialogContent>
         <Stack direction="row" gap={2} sx={{ mt: 1 }}>
-          <TextField select fullWidth size="small" label="Day of week" value={day} onChange={(e) => setDay(e.target.value)}>
+          <TextField labelPlacement="top" select fullWidth size="small" label="Day of week" value={day} onChange={(e) => setDay(e.target.value)}>
             {MAINTENANCE_DAYS.map((d) => (
               <MenuItem key={d.value} value={d.value}>
                 {d.label}
               </MenuItem>
             ))}
           </TextField>
-          <TextField select fullWidth size="small" label="Time (UTC)" value={time} onChange={(e) => setTime(e.target.value)}>
+          <TextField labelPlacement="top" select fullWidth size="small" label="Time (UTC)" value={time} onChange={(e) => setTime(e.target.value)}>
             {MAINTENANCE_TIMES.map((t) => (
               <MenuItem key={t} value={t}>
                 {t}

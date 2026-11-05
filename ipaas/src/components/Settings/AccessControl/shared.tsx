@@ -55,7 +55,9 @@ export function FormDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="outlined" color="inherit" onClick={onClose}>
+          Cancel
+        </Button>
         <Button variant="contained" disabled={primaryDisabled} onClick={onPrimary}>
           {primaryLabel}
         </Button>

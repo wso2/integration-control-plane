@@ -36,7 +36,6 @@ export default function SampleGridCard({ sample, onDeploy, isDeploying }: { samp
 
   return (
     <Card
-      variant="outlined"
       sx={{
         display: 'flex',
         flexDirection: 'column',
@@ -104,15 +103,15 @@ export default function SampleGridCard({ sample, onDeploy, isDeploying }: { samp
 
       {/* Actions */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        <Tooltip title="Go to Source" placement="top">
-          <IconButton size="small" aria-label="Go to Source" onClick={() => window.open(sourceUrl, '_blank', 'noopener,noreferrer')} sx={{ width: 30, height: 30, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
+        <Tooltip title="Go to source" placement="top">
+          <IconButton size="small" aria-label="Go to source" onClick={() => window.open(sourceUrl, '_blank', 'noopener,noreferrer')} sx={{ width: 30, height: 30, color: 'text.secondary', '&:hover': { color: 'primary.main' } }}>
             <ExternalLink size={14} />
           </IconButton>
         </Tooltip>
         <Tooltip title="Deploy this sample" placement="top">
           <span>
             <Button size="small" variant="contained" startIcon={isDeploying ? undefined : <Rocket size={12} />} onClick={onDeploy} disabled={isDeploying} sx={{ height: 30, fontSize: 12, px: 1.5 }}>
-              {isDeploying ? <CircularProgress size={12} color="inherit" /> : 'Quick Deploy'}
+              {isDeploying ? <CircularProgress size={12} color="inherit" /> : 'Quick deploy'}
             </Button>
           </span>
         </Tooltip>

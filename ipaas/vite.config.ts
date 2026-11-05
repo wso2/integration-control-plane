@@ -21,9 +21,12 @@ import react from '@vitejs/plugin-react-swc';
 import { visualizer } from 'rollup-plugin-visualizer';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 
+// Path prefix the console is served under (e.g. BASE_PATH=/integration-platform); the root by default.
+const basePath = (process.env.BASE_PATH ?? '').replace(/^\/+|\/+$/g, '');
+
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/',
+  base: basePath ? `/${basePath}/` : '/',
   server: {
     port: 3000,
     https: {},

@@ -28,6 +28,8 @@ import { decodeJwtPayload, isExpired, stringClaim } from './jwt';
 import { clearLegacySession } from './legacySession';
 import { connect, disconnect, type CloudSession, type CloudUser } from './session';
 import { THUNDER_INSTANCE_ID, signInParams, thunderConfig } from './thunderConfig';
+import { stripBase } from '../utils/basePath';
+import { local, session as browserSession } from '../utils/storage';
 
 const ORG_HANDLE_KEY = 'org_handle';
 const MISSING_ORG = 'Missing organization context after sign-in. Please try logging in again.';
@@ -37,7 +39,11 @@ const REFRESH_WAIT_MS = 5_000;
 const RECHECK_MS = 250;
 // Set by logout() for the load it returns to. A Thunder session that outlives the sign-out (its
 // end-session failed, or the user came back to a cached page) must not sign the user straight back in.
-const SKIP_SILENT_KEY = 'ipaas:skip-silent-sign-in';
+const SKIP_SILENT_KEY = 'skip-silent-sign-in';
+// The slot this flag used before storage keys were namespaced. A sign-out that started on a build
+// without the prefix finishes on this one, so that load still has to see it. Remove once no
+// unprefixed build is deployed.
+const LEGACY_SKIP_SILENT_KEY = 'ipaas:skip-silent-sign-in';
 
 // Before giving up on a session, one prompt=none attempt joins a Thunder session from another console.
 type Silent = 'idle' | 'trying' | 'done';
@@ -45,8 +51,13 @@ type Status = { kind: 'pending' } | { kind: 'signedIn'; session: CloudSession } 
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+// Either slot counts: this load may be the one returning from a sign-out the previous build began.
+function skipSilentRequested(): boolean {
+  return browserSession.get(SKIP_SILENT_KEY) !== null || sessionStorage.getItem(LEGACY_SKIP_SILENT_KEY) !== null;
+}
+
 function isSignInLanding(): boolean {
-  return window.location.pathname === oidcCallbackUrl();
+  return stripBase(window.location.pathname) === oidcCallbackUrl();
 }
 
 /**
@@ -124,7 +135,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
   const [status, setStatus] = useState<Status>({ kind: 'pending' });
   // A sign-in landing already carries Thunder's answer, a code or an error; a load right after a
   // sign-out must not rejoin the session it left.
-  const [silent, setSilent] = useState<Silent>(() => (isSignInLanding() || sessionStorage.getItem(SKIP_SILENT_KEY) ? 'done' : 'idle'));
+  const [silent, setSilent] = useState<Silent>(() => (isSignInLanding() || skipSilentRequested() ? 'done' : 'idle'));
   const silentStarted = useRef(false);
   const [waitFrom, setWaitFrom] = useState(Date.now);
   const [recheck, setRecheck] = useState(0);
@@ -175,7 +186,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
       connect({ session, getAccessToken, onExpired: () => endSession(null) });
       // Read by AppLayout and the post-login routing to know the active org.
-      localStorage.setItem(ORG_HANDLE_KEY, session.orgHandle);
+      local.set(ORG_HANDLE_KEY, session.orgHandle);
       setStatus({ kind: 'signedIn', session });
     };
     settle().catch(() => {
@@ -189,7 +200,8 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   // Read once in the initialiser above; cleared here, not there, so StrictMode's second call agrees.
   useEffect(() => {
-    sessionStorage.removeItem(SKIP_SILENT_KEY);
+    browserSession.remove(SKIP_SILENT_KEY);
+    sessionStorage.removeItem(LEGACY_SKIP_SILENT_KEY);
   }, []);
 
   // Thunder answers prompt=none without its sign-in page: a code when it holds a session, else
@@ -230,8 +242,8 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   const logout = useCallback(async () => {
     disconnect();
-    localStorage.removeItem(ORG_HANDLE_KEY);
-    sessionStorage.setItem(SKIP_SILENT_KEY, '1');
+    local.remove(ORG_HANDLE_KEY);
+    browserSession.set(SKIP_SILENT_KEY, '1');
     // Clears the local session, then leaves for Thunder's end-session endpoint.
     await signOut();
     // Callers don't navigate over the redirect.

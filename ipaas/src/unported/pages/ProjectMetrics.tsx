@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, MenuItem, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, IconButton, MenuItem, PageContent, PageTitle, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
@@ -111,7 +110,7 @@ export default function ProjectMetrics(scope: ProjectScope): JSX.Element {
 
       <MetricsHeader range={range} onRangeChange={setRange} refreshSeconds={refreshSeconds} onRefreshSecondsChange={setRefreshSeconds} onRefresh={handleRefresh} isRefreshing={diagram.isFetching}>
         {environments.length > 1 && (
-          <TextField select size="small" label="Environment" value={envId} onChange={(e) => setEnvId(e.target.value)} sx={{ minWidth: 150 }}>
+          <TextField labelPlacement="top" select size="small" label="Environment" value={envId} onChange={(e) => setEnvId(e.target.value)} sx={{ minWidth: 150 }}>
             {environments.map((e) => (
               <MenuItem key={e.id} value={e.id}>
                 {e.name}

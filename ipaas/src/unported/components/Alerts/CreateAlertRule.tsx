@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Autocomplete, Box, Button, Grid, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Autocomplete, Box, Button, Grid, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { type JSX, useEffect, useState } from 'react';
 import type { Environment } from '../../../types/environment';
@@ -178,7 +177,7 @@ export default function CreateAlertRule(props: CreateAlertRuleProps): JSX.Elemen
             onChange={handleAlertTypeChange}
             disabled={isEditAlertRule}
             getOptionDisabled={(o) => o.value === AlertTypeConstants.STATUS_CODE && isStatusCodeDisabled}
-            renderInput={(params) => <TextField {...params} label="Alert Type" size="small" />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} label="Alert Type" size="small" />}
             isOptionEqualToValue={(o, v) => o.value === v.value}
           />
         </Grid>
@@ -195,7 +194,7 @@ export default function CreateAlertRule(props: CreateAlertRuleProps): JSX.Elemen
                 }
               }}
               disabled={isEditAlertRule}
-              renderInput={(params) => <TextField {...params} label="Environment" size="small" />}
+              renderInput={(params) => <TextField labelPlacement="top" {...params} label="Environment" size="small" />}
               isOptionEqualToValue={(o, v) => o.id === v.id}
             />
           </Grid>

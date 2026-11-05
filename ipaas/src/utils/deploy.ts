@@ -44,12 +44,12 @@ export function getDeploymentStatusLabel(status: DeploymentStatus | undefined): 
     case DeploymentStatus.Error:
       return 'Error';
     case DeploymentStatus.InProgress:
-      return 'In Progress';
+      return 'In progress';
     case DeploymentStatus.Suspended:
       return 'Suspended';
     case DeploymentStatus.NotDeployed:
     default:
-      return 'Not Deployed';
+      return 'Not deployed';
   }
 }
 

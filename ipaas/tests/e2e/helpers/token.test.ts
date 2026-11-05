@@ -164,7 +164,7 @@ describe('buildStorageState', () => {
   });
 
   it('marks terms of use accepted for this user and org', () => {
-    expect(entries()['tos_accepted:user-1:e2e-org']).toBe('true');
+    expect(entries()['icp:tos_accepted:user-1:e2e-org']).toBe('true');
   });
 
   // The console reads the token only through the SDK now; these would be dead weight.

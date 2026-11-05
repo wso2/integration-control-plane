@@ -20,6 +20,8 @@ import { Card, CardContent } from '@wso2/oxygen-ui';
 import { useEffect, useCallback, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { withTrackParam } from '../../hooks/useSelectedTrack';
+import { useLocation } from 'react-router';
 import { useComponentDeployment, useEnvEndpoints } from '../../hooks/useDeployments';
 import { useExecutionConfigs } from '../../hooks/useExecutions';
 import { useSchemaConfig } from '../../hooks/useConfiguration';
@@ -59,6 +61,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
   const isGenericService = GENERIC_SERVICE_TYPES.has(displayType ?? '');
   const queryClient = useQueryClient();
   const navigate = useAppNavigate();
+  const location = useLocation();
   const [configureOpen, setConfigureOpen] = useState(false);
   const [logsOpen, setLogsOpen] = useState(false);
   const [notification, setNotification] = useState<{ text: string; severity: 'success' | 'error' } | null>(null);
@@ -220,7 +223,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
   };
 
   return (
-    <Card variant="outlined" sx={{ mb: 3 }}>
+    <Card sx={{ mb: 3 }}>
       <CardContent sx={{ pb: (theme) => `${theme.spacing(2)} !important` }}>
         <EnvironmentCardHeader
           envName={env.name}
@@ -259,7 +262,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
           onRefresh={handleRefresh}
           onConfigure={() => setConfigureOpen(true)}
           onViewLogs={isGenericService ? () => setLogsOpen(true) : undefined}
-          onTest={isGenericService ? () => navigate(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test/console`) : undefined}
+          onTest={isGenericService ? () => navigate(withTrackParam(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test/console`, location.search)) : undefined}
           hasMissingConfigs={hasMissingConfigs}
           isBuildInProgress={isBuildInProgress}
         />
@@ -339,7 +342,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
         buildId={envDeployment?.build?.buildId}
       />
 
-      {isGenericService && <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} componentId={componentId} environmentId={env.id} envName={env.name} versionId={versionId} />}
+      {isGenericService && <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} projectId={projectId} componentHandler={componentHandler} env={env} versionId={versionId} />}
     </Card>
   );
 }

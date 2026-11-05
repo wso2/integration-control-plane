@@ -32,6 +32,8 @@ interface HealthCheckCardProps {
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   environmentId: string;
   canManage: boolean;
   onNotify: (type: 'success' | 'error', message: string) => void;
@@ -39,7 +41,7 @@ interface HealthCheckCardProps {
 
 const cardSx = { p: 3, mb: 2 } as const;
 
-export default function HealthCheckCard({ healthCheck: hc, container, projectId, componentId, releaseId, environmentId, canManage, onNotify }: HealthCheckCardProps): JSX.Element {
+export default function HealthCheckCard({ healthCheck: hc, container, projectId, componentId, releaseId, deploymentTrackId, environmentId, canManage, onNotify }: HealthCheckCardProps): JSX.Element {
   const [formKind, setFormKind] = useState<ProbeKind | null>(null);
   const update = useUpdateHealthCheck(projectId);
   const del = useDeleteHealthCheck(projectId);
@@ -59,6 +61,7 @@ export default function HealthCheckCard({ healthCheck: hc, container, projectId,
         projectId={projectId}
         componentId={componentId}
         releaseId={releaseId}
+        deploymentTrackId={deploymentTrackId}
         environmentId={environmentId}
         onClose={() => setFormKind(null)}
         onSaved={(m) => {
@@ -79,6 +82,7 @@ export default function HealthCheckCard({ healthCheck: hc, container, projectId,
           componentId,
           releaseId,
           environmentId,
+          deploymentTrackId,
           containerId: container.ID,
           healthCheckId: hc.ID,
           data: {
@@ -92,7 +96,7 @@ export default function HealthCheckCard({ healthCheck: hc, container, projectId,
       );
     } else {
       // Last probe: delete the whole health check.
-      del.mutate({ componentId, releaseId, environmentId, containerId: container.ID, healthCheckId: hc.ID }, done);
+      del.mutate({ componentId, releaseId, environmentId, deploymentTrackId, containerId: container.ID, healthCheckId: hc.ID }, done);
     }
   };
 
@@ -113,7 +117,7 @@ export default function HealthCheckCard({ healthCheck: hc, container, projectId,
 
       {hasLiveness && (
         <Box>
-          <ProbeSectionTitle title="Liveness Probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.LIVENESS)} onDelete={() => deleteProbe(PROBE_KIND.LIVENESS)} />
+          <ProbeSectionTitle title="Liveness probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.LIVENESS)} onDelete={() => deleteProbe(PROBE_KIND.LIVENESS)} />
           <ProbeDisplay probe={hc.probes.liveness_probe} showSuccess={false} />
         </Box>
       )}
@@ -122,7 +126,7 @@ export default function HealthCheckCard({ healthCheck: hc, container, projectId,
 
       {hasReadiness && (
         <Box>
-          <ProbeSectionTitle title="Readiness Probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.READINESS)} onDelete={() => deleteProbe(PROBE_KIND.READINESS)} />
+          <ProbeSectionTitle title="Readiness probe" canManage={canManage} busy={busy} onEdit={() => setFormKind(PROBE_KIND.READINESS)} onDelete={() => deleteProbe(PROBE_KIND.READINESS)} />
           <ProbeDisplay probe={hc.probes.readiness_probe} showSuccess />
         </Box>
       )}

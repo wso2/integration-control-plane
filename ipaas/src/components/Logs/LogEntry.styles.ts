@@ -173,8 +173,6 @@ export const detailsSx = {
 export const detailLabelSx = {
   fontSize: 11,
   fontWeight: 600,
-  letterSpacing: '0.04em',
-  textTransform: 'uppercase',
   color: 'text.secondary',
 } as const;
 

@@ -49,7 +49,7 @@ export default function OrgInfoHeader({ orgHandler }: { orgHandler: string }): J
           </span>
         </Tooltip>
         <Tooltip title={copied === 'handle' ? 'Copied' : ''}>
-          <Button onClick={() => copy(orgHandler, 'handle')}>Copy Handle</Button>
+          <Button onClick={() => copy(orgHandler, 'handle')}>Copy handle</Button>
         </Tooltip>
       </ButtonGroup>
     </Stack>

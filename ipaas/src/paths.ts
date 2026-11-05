@@ -3,6 +3,8 @@
  * Navigation for the main matrix pages is handled by src/nav.ts.
  */
 
+import { withBase } from './utils/basePath';
+
 export function loginUrl(): string {
   return '/login';
 }
@@ -31,6 +33,13 @@ export function termsOfUseUrl(): string {
   return 'https://wso2.com/integration-platform/terms-of-use';
 }
 
+/** The billing console's upgrade page for an org, or null when billing is not configured. */
+export function billingUpgradeUrl(orgUuid: string): string | null {
+  const base = window.API_CONFIG?.billingConsoleUrl;
+  if (!window.API_CONFIG?.enableBillingFeature || !base || !orgUuid) return null;
+  return `${base}/cloud/devant/upgrade?orgId=${encodeURIComponent(orgUuid)}`;
+}
+
 export function documentationUrl(): string {
   return 'https://wso2.com/integration-platform/docs/';
 }
@@ -50,7 +59,11 @@ export function orgUrl(orgHandler: string): string {
 }
 
 export function orgHomeUrl(orgHandler: string): string {
-  return `/organizations/${orgHandler}/home`;
+  return `/organizations/${orgHandler}/overview`;
+}
+
+export function orgProjectsUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/projects`;
 }
 
 export function newOrgUrl(): string {
@@ -271,7 +284,7 @@ export const gitProviderBase = {
 // redirectUri falls back to window.location.origin + '/ghapp' when empty.
 export function buildGitHubOAuthUrl(redirectUri: string, clientId: string, state: string, scope = 'repo,read:user'): string {
   const params = new URLSearchParams({
-    redirect_uri: redirectUri || `${window.location.origin}/ghapp`,
+    redirect_uri: redirectUri || `${window.location.origin}${withBase('/ghapp')}`,
     client_id: clientId,
     scope,
     state,

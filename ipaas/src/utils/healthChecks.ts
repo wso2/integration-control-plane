@@ -58,11 +58,11 @@ export function validatePath(val: string): string | undefined {
 export function probeTypeLabel(type: ProbeType): string {
   switch (type) {
     case PROBE_TYPE.HTTP_GET:
-      return 'HTTP GET Request';
+      return 'HTTP GET request';
     case PROBE_TYPE.TCP:
-      return 'TCP Socket';
+      return 'TCP socket';
     case PROBE_TYPE.EXEC:
-      return 'Execute a Command';
+      return 'Execute a command';
     default:
       return '';
   }
@@ -134,6 +134,11 @@ export function formToProbe(form: ProbeFormState): HCProbe {
       exec: { command: isExec ? form.command : [] },
     },
   };
+}
+
+/** Whether any field of a probe form differs from the state it started in. */
+export function isProbeFormChanged(form: ProbeFormState, initial: ProbeFormState): boolean {
+  return (Object.keys(initial) as (keyof ProbeFormState)[]).some((key) => JSON.stringify(form[key]) !== JSON.stringify(initial[key]));
 }
 
 /** Whether a probe form passes all required-field validations for its type. */

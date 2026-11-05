@@ -62,7 +62,7 @@ export default function ScheduleButton({ hasSchedule, disabled, disabledReason, 
             <span>
             <ButtonGroup variant="contained" size="small" ref={splitButtonRef} disabled={disabled || stopSchedule.isPending}>
               <Button startIcon={<CalendarClock size={14} />} onClick={handleStopSchedule}>
-                Stop Schedule
+                Stop schedule
               </Button>
               <Button size="small" sx={{ px: 0.5 }} onClick={() => setSplitOpen((prev) => !prev)}>
                 <ChevronDown size={14} />
@@ -79,7 +79,7 @@ export default function ScheduleButton({ hasSchedule, disabled, disabledReason, 
                             setSplitOpen(false);
                             setDialogOpen(true);
                           }}>
-                          Edit Schedule
+                          Edit schedule
                         </MenuItem>
                       </MenuList>
                     </ClickAwayListener>

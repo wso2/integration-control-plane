@@ -48,13 +48,14 @@ export function identifyIntegration(displayType: string, componentSubType: strin
   if (componentSubType === 'tailscale') {
     return { type: 'tailscale-vpn', runtime: 'unknown', raw };
   }
-  // RAG: the scheduled ingestion cronjob has its own Overview; the retrieval
-  // service and the RAG API service are BYOI services surfaced as an
-  // Integration as API (with no source/commit/build — gated in the page).
-  if (componentSubType === 'rag-ingestion') {
+  // RAG: the scheduled ingestion cronjob (a knowledge base's data source) has
+  // its own Overview; the knowledge base's service, the retrieval service and
+  // the RAG API service are surfaced as an Integration as API (with no
+  // source/commit/build — gated in the page).
+  if (componentSubType === 'rag-ingestion' || componentSubType === 'kb-ingestion') {
     return { type: 'rag-ingestion', runtime: 'unknown', raw };
   }
-  if (componentSubType === 'rag-retrieval-service' || componentSubType === 'rag-service') {
+  if (componentSubType === 'rag-retrieval-service' || componentSubType === 'rag-service' || componentSubType === 'knowledge-base') {
     return { type: 'integration-as-api', runtime: 'unknown', raw };
   }
   if (componentSubType === 'ballerinaFileIntegration') {

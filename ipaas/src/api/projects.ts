@@ -21,6 +21,7 @@
 import type { Project, ProjectContributor, ProjectHandlerAvailability, CreateProjectInput, CreateMonoRepoProjectInput, LinkProjectRepositoryInput, UpdateProjectInput } from '../types/project';
 import { bff, items, q, seg, type ListResponse } from './_client';
 import { fetchComponents } from './components';
+import { mergeContributors } from '../utils/contributors';
 
 // The org comes from the access token, so these take no org id.
 
@@ -30,7 +31,11 @@ export const fetchProject = (projectId: string): Promise<Project> => bff.get<Pro
 
 export const fetchProjectByHandler = (projectHandler: string): Promise<Project> => bff.get<Project>(`/projects/${seg(projectHandler)}`);
 
-export const fetchProjectContributors = (projectId: string): Promise<ProjectContributor[]> => bff.get<ListResponse<ProjectContributor>>(`/projects/${seg(projectId)}/contributors`).then(items);
+export const fetchProjectContributors = (projectId: string): Promise<ProjectContributor[]> =>
+  bff
+    .get<ListResponse<ProjectContributor>>(`/projects/${seg(projectId)}/contributors`)
+    .then(items)
+    .then(mergeContributors);
 
 // Derived client-side rather than from GET /projects/{p}/labels: OpenChoreo has
 // no label index, so the BFF would have to list every component and union the

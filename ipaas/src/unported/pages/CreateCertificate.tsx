@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, Card, CardActionArea, Chip, CircularProgress, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Button, Card, CardActionArea, Chip, CircularProgress, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { REQUIRED_FIELD_SX } from '../../constants/styles';
 import { Upload } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState, type JSX } from 'react';
@@ -157,9 +156,9 @@ export default function CreateCertificate(scope: OrgScope): JSX.Element {
           </Stack>
         </Stack>
 
-        <TextField required label="Name" value={certName} onChange={(e) => setCertName(e.target.value)} onBlur={() => setNameTouched(true)} error={nameError} helperText={nameError ? 'Certificate name is required.' : ' '} fullWidth />
+        <TextField labelPlacement="top" required label="Name" value={certName} onChange={(e) => setCertName(e.target.value)} onBlur={() => setNameTouched(true)} error={nameError} helperText={nameError ? 'Certificate name is required.' : ' '} fullWidth />
 
-        <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} multiline minRows={2} fullWidth />
+        <TextField labelPlacement="top" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} multiline minRows={2} fullWidth />
 
         <Stack gap={1}>
           <Typography variant="subtitle2">Certificate file</Typography>

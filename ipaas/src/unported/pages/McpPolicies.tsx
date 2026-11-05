@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Drawer, IconButton, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Divider, Drawer, IconButton, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, ShieldCheck, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Navigate } from 'react-router';
@@ -277,8 +276,8 @@ export default function McpPolicies(scope: ComponentScope): JSX.Element {
           </Stack>
           <Box sx={{ overflowY: 'auto', p: 3, flex: 1 }}>
             <Stack gap={2.5}>
-              <TextField size="small" label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} fullWidth />
-              <TextField size="small" label="Description" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} fullWidth multiline minRows={2} />
+              <TextField labelPlacement="top" size="small" label="Name" value={editName} onChange={(e) => setEditName(e.target.value)} fullWidth />
+              <TextField labelPlacement="top" size="small" label="Description" value={editDesc} onChange={(e) => setEditDesc(e.target.value)} fullWidth multiline minRows={2} />
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
                   Schema

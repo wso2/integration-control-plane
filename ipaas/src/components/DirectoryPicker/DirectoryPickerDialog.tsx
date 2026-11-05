@@ -16,13 +16,12 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, Tooltip, Typography, TreeView } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
-import { Folder, RefreshCw, Search } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Tooltip, Typography, TreeView, TextField } from '@wso2/oxygen-ui';
+import { Folder, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useState, type JSX } from 'react';
 import type { RepoTreeNode } from '../../types/repository';
 import { renderTree, filterDirectories, buildDefaultExpanded } from '../../utils/directoryTree';
-import { external } from '../../paths';
+import SearchField from '../SearchField';
 
 const { SimpleTreeView, TreeItem } = TreeView;
 
@@ -75,30 +74,15 @@ export default function DirectoryPickerDialog({ open, onClose, onSave, repoName,
   return (
     <Dialog open={open} onClose={handleCancel} maxWidth="sm" fullWidth>
       <DialogTitle sx={{ pb: 1 }}>
-        <Typography variant="h6">Repository Sub Path</Typography>
+        <Typography variant="h6">Repository sub path</Typography>
       </DialogTitle>
 
       <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, pb: 1 }}>
         {/* Path preview */}
-        <TextField size="small" fullWidth value={`/${repoName}${selectedPath === '/' ? '' : selectedPath}`} slotProps={{ input: { readOnly: true } }} label="Selected path" />
+        <TextField labelPlacement="top" size="small" fullWidth value={`/${repoName}${selectedPath === '/' ? '' : selectedPath}`} slotProps={{ input: { readOnly: true } }} label="Selected path" />
 
         {/* Search */}
-        <TextField
-          size="small"
-          fullWidth
-          placeholder="Search directories…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          slotProps={{
-            input: {
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={15} />
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
+        <SearchField value={search} onChange={setSearch} placeholder="Search directories" fullWidth />
 
         {/* Tree */}
         <Box
@@ -143,16 +127,14 @@ export default function DirectoryPickerDialog({ open, onClose, onSave, repoName,
         </Box>
 
         <Typography variant="caption" color="text.secondary">
-          Hint: To use an empty directory,{' '}
-          <a href={external.githubNew} target="_blank" rel="noopener noreferrer">
-            create it in GitHub
-          </a>{' '}
-          with a <code>.keep</code> file and select it here.
+          Hint: To use an empty directory, commit a <code>.keep</code> file to your repository and select the directory here.
         </Typography>
       </DialogContent>
 
       <DialogActions>
-        <Button onClick={handleCancel}>Cancel</Button>
+        <Button variant="outlined" color="inherit" onClick={handleCancel}>
+          Cancel
+        </Button>
         <Button variant="contained" onClick={handleContinue} disabled={isFetching}>
           Continue
         </Button>

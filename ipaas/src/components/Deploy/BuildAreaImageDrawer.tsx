@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, Divider, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, CircularProgress, DrawerPanel, Stack, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import type { DeploymentTrackImage } from '../../types/deployment';
 import BuildImageCard from './BuildImageCard';
@@ -33,15 +32,15 @@ interface BuildAreaImageDrawerProps {
 
 export default function BuildAreaImageDrawer({ open, onClose, images, isLoading, selectedImageId, onSelect }: BuildAreaImageDrawerProps): JSX.Element {
   return (
-    <Drawer anchor="right" open={open} onClose={onClose} PaperProps={{ sx: { width: 440 } }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="h6">Select Image</Typography>
-        <IconButton size="small" onClick={onClose}>
-          <X size={18} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={onClose} width={440}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Select image</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={{ flex: 1, overflowY: 'auto', p: 2 }}>
+      <DrawerPanel.Body>
         {isLoading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
             <CircularProgress size={28} />
@@ -72,14 +71,13 @@ export default function BuildAreaImageDrawer({ open, onClose, images, isLoading,
               />
             ))}
         </Stack>
-      </Box>
+      </DrawerPanel.Body>
 
-      <Divider />
-      <Box sx={{ px: 2, py: 1.5 }}>
+      <DrawerPanel.Footer>
         <Button variant="outlined" size="small" fullWidth onClick={onClose}>
           Close
         </Button>
-      </Box>
-    </Drawer>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

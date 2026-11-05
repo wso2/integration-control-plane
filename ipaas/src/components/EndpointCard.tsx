@@ -63,7 +63,7 @@ export function CopyBtn({ text }: { text: string }) {
   }, [text]);
   return (
     <Tooltip title={copied ? 'Copied!' : 'Copy'}>
-      <IconButton size="small" onClick={handle} sx={{ p: 0.25, flexShrink: 0 }}>
+      <IconButton aria-label="Copy" size="small" onClick={handle} sx={{ p: 0.25, flexShrink: 0 }}>
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </IconButton>
     </Tooltip>
@@ -102,6 +102,7 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
         {!readOnly && onEdit && (
           <Tooltip title="Edit endpoint">
             <IconButton
+              aria-label="Edit endpoint"
               size="small"
               sx={{ p: 0.5, flexShrink: 0 }}
               onClick={(e) => {
@@ -116,6 +117,7 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
         {onSettings && (
           <Tooltip title="API settings">
             <IconButton
+              aria-label="API settings"
               size="small"
               sx={{ p: 0.5, flexShrink: 0 }}
               onClick={(e) => {
@@ -127,9 +129,11 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
           </Tooltip>
         )}
         {/* Chevron */}
-        <IconButton size="small" sx={{ p: 0.25, flexShrink: 0 }} onClick={() => setOpen((p) => !p)}>
-          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-        </IconButton>
+        <Tooltip title={open ? 'Collapse' : 'Expand'}>
+          <IconButton aria-label={open ? 'Collapse endpoint' : 'Expand endpoint'} size="small" sx={{ p: 0.25, flexShrink: 0 }} onClick={() => setOpen((p) => !p)}>
+            {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          </IconButton>
+        </Tooltip>
       </Stack>
 
       {/* Expanded content */}

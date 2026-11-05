@@ -142,6 +142,15 @@ describe('visibilityUrlOptions', () => {
     const value = visibilityUrlOptions(ep({ networkVisibilities: ['Public'], invokeUrl: 'https://only.example' }));
     expect(value).toEqual([{ key: 'public', label: 'Public', url: 'https://only.example' }]);
   });
+
+  it('labels the invoke-URL fallback with the visibility the endpoint has', () => {
+    const value = visibilityUrlOptions(ep({ networkVisibilities: ['Project'], invokeUrl: 'http://svc.cluster.local' }));
+    expect(value).toEqual([{ key: 'project', label: 'Project', url: 'http://svc.cluster.local' }]);
+  });
+
+  it('labels the fallback Public when the endpoint names no visibility', () => {
+    expect(visibilityUrlOptions(ep({ invokeUrl: 'https://only.example' }))).toEqual([{ key: 'public', label: 'Public', url: 'https://only.example' }]);
+  });
 });
 
 describe('isBrowserReachable', () => {

@@ -25,12 +25,13 @@ import { INTEGRATION_TYPES } from '../../constants/import';
 interface IntegrationTypeSelectorProps {
   selected: IntegrationType | null;
   onSelect: (type: IntegrationType) => void;
+  excludedTypes?: IntegrationType[];
 }
 
-export default function IntegrationTypeSelector({ selected, onSelect }: IntegrationTypeSelectorProps): JSX.Element {
+export default function IntegrationTypeSelector({ selected, onSelect, excludedTypes = [] }: IntegrationTypeSelectorProps): JSX.Element {
   return (
     <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-      {INTEGRATION_TYPES.map((opt) => {
+      {INTEGRATION_TYPES.filter((opt) => !excludedTypes.includes(opt.id)).map((opt) => {
         const isActive = selected === opt.id;
         return (
           <Card

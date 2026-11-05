@@ -58,6 +58,11 @@ interface Operation {
   path: string;
 }
 
+const tileColors = (method: string) => {
+  const { badgeBg, cardBg } = getHttpMethodColors(method);
+  return { badgeBg, cardBg };
+};
+
 /**
  * Drawer body for a single operation: the shared {@link OperationHeader} (method
  * badge + path) followed by the SwaggerUI view for just that operation. Computed
@@ -76,7 +81,7 @@ function OperationDetailContent({ method, path, swagger }: { method: string; pat
 
   return (
     <>
-      <OperationHeader badgeLabel={method} label={path} colors={{ badgeBg: getHttpMethodColors(method).badgeBg }} />
+      <OperationHeader badgeLabel={method} label={path} colors={tileColors(method)} />
       {filteredSpec ? (
         <SwaggerUI spec={filteredSpec} plugins={[HidePlugin]} docExpansion="full" />
       ) : (
@@ -113,14 +118,7 @@ export default function SwaggerOperationsList({ swagger }: SwaggerOperationsList
   return (
     <Box sx={{ mt: 1.5 }}>
       {operations.map((op) => (
-        <OperationTile
-          key={`${op.method}-${op.path}`}
-          badgeLabel={op.method}
-          label={op.path}
-          colors={{ badgeBg: getHttpMethodColors(op.method).badgeBg }}
-          drawerContent={<OperationDetailContent method={op.method} path={op.path} swagger={swagger} />}
-          drawerWidth={720}
-        />
+        <OperationTile key={`${op.method}-${op.path}`} badgeLabel={op.method} label={op.path} colors={tileColors(op.method)} drawerContent={<OperationDetailContent method={op.method} path={op.path} swagger={swagger} />} drawerWidth={720} />
       ))}
     </Box>
   );

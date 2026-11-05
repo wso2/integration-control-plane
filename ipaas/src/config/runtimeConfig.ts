@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { withBase } from '../utils/basePath';
+
 interface RuntimeConfig {
   VITE_AUTH_BASE_URL?: string;
   VITE_OBSERVABILITY_URL?: string;
@@ -33,6 +35,7 @@ interface RuntimeConfig {
   GITHUB_APP_CLIENT_ID?: string;
   GITHUB_APP_AUTH_REDIRECTION_URL?: string;
   GITHUB_APP_SLUG?: string;
+  AZURE_DEVOPS_CLIENT_ID?: string;
   SAMPLES_URL?: string;
   PREBUILT_INTEGRATIONS_URL?: string;
   AI_COPILOT_URL_SUFFIX?: string;
@@ -48,6 +51,9 @@ interface RuntimeConfig {
   INTEGRATION_BUILDER_MAX_TOKENS?: string;
   INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL?: string;
   MOESIF_APP_URL?: string;
+  /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
+  TRACKING_ENV?: string;
+  MOESIF_APP_API_KEY?: string;
   /** Context Engine REST base (the app calls `<base>/v1/...`). Unset disables the feature. */
   CONTEXT_ENGINE_API_URL?: string;
   /** Local-development only: a static engine token when the engine cannot verify platform tokens. */
@@ -70,6 +76,10 @@ export interface ApiConfig {
   githubAppAuthRedirectUrl?: string;
   /** GitHub App slug — powers https://github.com/apps/{slug}/installations/new when the App is authorized but not yet installed on any account. */
   githubAppSlug?: string;
+  /** Entra application client id for Azure DevOps delegated repository access. Empty hides the provider. */
+  azureDevOpsClientId?: string;
+  /** Always derived from the active origin/base path so it exactly matches the popup callback. */
+  azureDevOpsRedirectUrl: string;
   billingApiBaseUrl: string;
   /** External billing console base — the Upgrade button links to `${billingConsoleUrl}/cloud/devant/upgrade`. */
   billingConsoleUrl?: string;
@@ -116,6 +126,10 @@ export interface ApiConfig {
   integrationBuilderCentralGraphqlUrl: string;
   /** Trusted Moesif embed origin; empty disables API Insights. */
   moesifAppUrl?: string;
+  /** Which tracking codes (GTM container, CookiePro domain script) to load; 'off' loads none. */
+  trackingEnv: 'dev' | 'stage' | 'prod' | 'off';
+  /** Moesif app key for product-usage analytics. Separate from the API Insights embed above. Unset disables Moesif tracking. */
+  moesifAppApiKey?: string;
   /** Context Engine REST base. Empty when the engine is not configured for this deployment. */
   contextEngineApiUrl: string;
   /** Dev-only static bearer token for the engine; unset sends the platform token. */
@@ -137,20 +151,30 @@ function parsePositiveInt(value: unknown, fallback: number): number {
   return Number.isInteger(n) && n > 0 ? n : fallback;
 }
 
+// Accepts only the recognized tracking-env values; anything else (including unset) falls back to 'dev'.
+// A set but unrecognized value is warned about, since a typo would otherwise load dev codes silently.
+function parseTrackingEnv(value: unknown): ApiConfig['trackingEnv'] {
+  if (value === 'stage' || value === 'prod' || value === 'off') return value;
+  if (typeof value === 'string' && value.trim() !== '' && value !== 'dev') console.warn(`Unrecognized TRACKING_ENV "${value}"; using 'dev'.`);
+  return 'dev';
+}
+
 // Default configuration (used as fallback if config.json fails to load)
 const DEFAULT_CONFIG: ApiConfig = {
   authBaseUrl: 'https://localhost:9445/auth',
   observabilityUrl: 'https://localhost:9448/icp/observability',
   asgardeoClientId: '',
-  asgardeoSignInRedirectUrl: `${window.location.origin}/signin`,
+  asgardeoSignInRedirectUrl: `${window.location.origin}${withBase('/signin')}`,
   asgardeoScope: 'openid profile email groups',
   choreoBaseApiUrl: 'https://apis.preview-dv.choreo.dev',
   choreoOrgApiUrl: 'https://apis.preview-dv.choreo.dev/orgs/1.0.0',
   systemApisBaseUrl: '',
   sysApiPrefix: '783c6c4d-8b9b-4190-b70a-e717ab1ee739-systemapis',
   githubAppClientId: '',
-  githubAppAuthRedirectUrl: `${window.location.origin}/ghapp`,
+  githubAppAuthRedirectUrl: `${window.location.origin}${withBase('/ghapp')}`,
   githubAppSlug: '',
+  azureDevOpsClientId: '',
+  azureDevOpsRedirectUrl: `${window.location.origin}${withBase('/adoapp')}`,
   billingApiBaseUrl: '',
   aiCopilotUrlSuffix: '',
   editorCallbackOrigins: [],
@@ -159,6 +183,7 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderLlmModel: 'claude-sonnet-4-6',
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
+  trackingEnv: 'dev',
   contextEngineApiUrl: '',
 };
 
@@ -168,7 +193,7 @@ const DEFAULT_CONFIG: ApiConfig = {
  */
 export async function loadConfig(): Promise<void> {
   try {
-    const response = await fetch('/config.json');
+    const response = await fetch(`${import.meta.env.BASE_URL}config.json`);
     if (!response.ok) {
       throw new Error(`Failed to load config.json: ${response.status}`);
     }
@@ -192,6 +217,8 @@ export async function loadConfig(): Promise<void> {
       githubAppClientId: config.GITHUB_APP_CLIENT_ID || DEFAULT_CONFIG.githubAppClientId,
       githubAppAuthRedirectUrl: config.GITHUB_APP_AUTH_REDIRECTION_URL || DEFAULT_CONFIG.githubAppAuthRedirectUrl,
       githubAppSlug: config.GITHUB_APP_SLUG || DEFAULT_CONFIG.githubAppSlug,
+      azureDevOpsClientId: config.AZURE_DEVOPS_CLIENT_ID?.trim() || DEFAULT_CONFIG.azureDevOpsClientId,
+      azureDevOpsRedirectUrl: `${window.location.origin}${withBase('/adoapp')}`,
       billingApiBaseUrl: trim(config.BILLING_API_BASE_URL || DEFAULT_CONFIG.billingApiBaseUrl),
       samplesUrl: config.SAMPLES_URL || undefined,
       prebuiltIntegrationsUrl: config.PREBUILT_INTEGRATIONS_URL || undefined,
@@ -215,6 +242,9 @@ export async function loadConfig(): Promise<void> {
       integrationBuilderMaxTokens: parsePositiveInt(config.INTEGRATION_BUILDER_MAX_TOKENS, DEFAULT_CONFIG.integrationBuilderMaxTokens),
       integrationBuilderCentralGraphqlUrl: config.INTEGRATION_BUILDER_CENTRAL_GRAPHQL_URL || 'https://api.dev-central.ballerina.io/2.0/graphql',
       moesifAppUrl: config.MOESIF_APP_URL?.trim() || undefined,
+      trackingEnv: parseTrackingEnv(config.TRACKING_ENV),
+      // config.json is untyped: a non-string value must not throw here and reset the whole config.
+      moesifAppApiKey: typeof config.MOESIF_APP_API_KEY === 'string' ? config.MOESIF_APP_API_KEY.trim() || undefined : undefined,
       contextEngineApiUrl: config.CONTEXT_ENGINE_API_URL ? trim(config.CONTEXT_ENGINE_API_URL) : DEFAULT_CONFIG.contextEngineApiUrl,
       contextEngineApiToken: config.CONTEXT_ENGINE_API_TOKEN?.trim() || undefined,
       enableContextEngineFeature: config.ENABLE_CONTEXT_ENGINE_FEATURE === 'true' || config.ENABLE_CONTEXT_ENGINE_FEATURE === true,

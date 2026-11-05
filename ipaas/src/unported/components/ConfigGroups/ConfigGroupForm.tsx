@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Check, CircleAlert, Lock, Pencil, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useConfigGroupNameAvailability } from '../../hooks/useConfigGroups';
@@ -148,8 +147,9 @@ export default function ConfigGroupForm({ mode, orgHandle, initial, submitting, 
       {step === 0 ? (
         <>
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} sx={{ mb: 1, maxWidth: 720 }}>
-            <TextField label="Config Group Name" required fullWidth value={displayName} onChange={(e) => setDisplayName(e.target.value)} sx={{ ...requiredSx, flex: 1 }} helperText=" " />
+            <TextField labelPlacement="top" label="Config Group Name" required fullWidth value={displayName} onChange={(e) => setDisplayName(e.target.value)} sx={{ ...requiredSx, flex: 1 }} helperText=" " />
             <TextField
+              labelPlacement="top"
               label="Config Group Id"
               required
               fullWidth
@@ -182,7 +182,7 @@ export default function ConfigGroupForm({ mode, orgHandle, initial, submitting, 
               FormHelperTextProps={{ sx: { color: taken ? 'error.main' : available ? 'success.main' : 'text.secondary' } }}
             />
           </Stack>
-          <TextField label="Description" fullWidth multiline rows={3} value={description} onChange={(e) => setDescription(e.target.value)} sx={{ maxWidth: 720, mb: 4 }} />
+          <TextField labelPlacement="top" label="Description" fullWidth multiline rows={3} value={description} onChange={(e) => setDescription(e.target.value)} sx={{ maxWidth: 720, mb: 4 }} />
 
           <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 0.5 }}>
             Configuration Keys

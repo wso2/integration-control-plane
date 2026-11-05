@@ -166,6 +166,7 @@ export function trackFailedRequests(page: Page): string[] {
 }
 
 // A redirect away is how a missing or gated page presents itself, so the URL is checked first.
+// `url` is relative to the console's base URL, so it survives a deployment under a base path.
 export async function expectPageRendered(page: Page, url: string): Promise<void> {
   await page.goto(url, { waitUntil: 'domcontentloaded' });
   await expect(page, `Navigating to ${url} did not stay there`).toHaveURL(new RegExp(url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), { timeout: 30_000 });

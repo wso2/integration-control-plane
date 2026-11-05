@@ -90,7 +90,7 @@ export function UsersTab({ orgHandler }: { orgHandler: string }): JSX.Element {
           </ToggleButton>
         </ToggleButtonGroup>
         <Stack direction="row" gap={1} alignItems="center">
-          {view === 'users' && <SearchField value={search} onChange={setSearch} />}
+          {view === 'users' && <SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
           <Authorized permissions={Permissions.USER_MANAGE_USERS}>
             <Button variant="contained" startIcon={<UserPlus size={18} />} onClick={() => setInviting(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
               Invite Users

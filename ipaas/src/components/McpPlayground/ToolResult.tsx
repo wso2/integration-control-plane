@@ -60,7 +60,7 @@ function ContentBlock({ block }: { block: McpToolContent }): JSX.Element {
 }
 
 /**
- * The result of a tool invocation: a "Tool Result: Success/Error" label, the structured result
+ * The result of a tool invocation: a "Tool result: Success/Error" label, the structured result
  * when the tool returns one, and every content block that adds something to it. Servers repeat
  * the structured result as a JSON text block for older clients; that copy is not shown twice.
  */
@@ -72,7 +72,7 @@ export default function ToolResult({ result }: { result: McpToolResult }): JSX.E
     <Stack gap={1}>
       <Stack direction="row" alignItems="center" gap={1}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Tool Result:{' '}
+          Tool result:{' '}
           <Box component="span" sx={{ color: result.isError ? 'error.main' : 'success.main' }}>
             {result.isError ? 'Error' : 'Success'}
           </Box>

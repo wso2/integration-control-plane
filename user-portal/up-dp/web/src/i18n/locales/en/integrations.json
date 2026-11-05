@@ -1,0 +1,110 @@
+{
+  "kindAndProject": "{{kind}} · {{project}}",
+  "open": "Open {{name}}",
+  "listing": {
+    "aiAgent": {
+      "title": "AI Agents",
+      "subheader": "Chat with the AI agents your organization published to you.",
+      "noAccess": "You can't view AI agents",
+      "loadError": "Could not load your AI agents.",
+      "noMatch": "No AI agents match",
+      "empty": "No AI agents yet",
+      "search": "Search AI agents"
+    },
+    "automation": {
+      "title": "Automations",
+      "subheader": "Run automations on demand, and see how their scheduled runs went.",
+      "noAccess": "You can't view automations",
+      "loadError": "Could not load your automations.",
+      "noMatch": "No automations match",
+      "empty": "No automations yet",
+      "search": "Search automations"
+    },
+    "workflow": {
+      "title": "Workflows",
+      "subheader": "Start workflows, follow their runs, and act on the tasks they wait for.",
+      "noAccess": "You can't view workflows",
+      "loadError": "Could not load your workflows.",
+      "noMatch": "No workflows match",
+      "empty": "No workflows yet",
+      "search": "Search workflows"
+    },
+    "loading": "Loading integrations",
+    "askForAccess": "Ask your organization administrator for access.",
+    "noMatchDescription": "Try adjusting your search or filters.",
+    "clearSearchAndFilters": "Clear Search and Filters",
+    "emptyDescription": "Nothing of this kind has been published to you. Ask your organization administrator for access.",
+    "gridView": "Grid view",
+    "listView": "List view",
+    "filterByProject": "Filter by project",
+    "project": "Project",
+    "clearFilter": "Clear filter",
+    "showMore": "Show more ({{shown}} of {{total}})"
+  },
+  "page": {
+    "notFound": "This integration does not exist, or it is not published to you.",
+    "backToOverview": "Back to Overview",
+    "loadError": "Could not load this integration."
+  },
+  "header": {
+    "deploymentTrack": "Deployment track",
+    "latest": "latest"
+  },
+  "card": {
+    "noDescription": "No description."
+  },
+  "table": {
+    "name": "Name",
+    "description": "Description",
+    "type": "Type",
+    "project": "Project",
+    "status": "Status"
+  },
+  "status": {
+    "nextRun": "Next run {{when}}",
+    "onDemand": "Runs on demand",
+    "runningNow": "Running now",
+    "lastRun": "Last run {{when}}",
+    "tasksWaiting_one": "{{count}} task waiting on you",
+    "tasksWaiting_other": "{{count}} tasks waiting on you",
+    "nothingWaiting": "Nothing waiting on you",
+    "chatEndpoints_one": "{{count}} chat endpoint",
+    "chatEndpoints_other": "{{count}} chat endpoints",
+    "readyToChat": "Ready to chat"
+  },
+  "schemaEditor": {
+    "form": "Form",
+    "json": "JSON",
+    "none": "None",
+    "noInput": "No input is needed.",
+    "rawLabel": "Input (JSON)",
+    "fixJson": "Fix the JSON before switching back to the form."
+  },
+  "schema": {
+    "required": "Required",
+    "wholeNumber": "Enter a whole number",
+    "number": "Enter a number",
+    "validJson": "Enter valid JSON",
+    "invalidJson": "Not valid JSON"
+  },
+  "value": {
+    "yes": "Yes",
+    "no": "No",
+    "empty": "Empty"
+  },
+  "detail": {
+    "status": {
+      "RUNNING": "Running",
+      "PENDING": "Pending",
+      "COMPLETED": "Completed",
+      "SUCCEEDED": "Succeeded",
+      "FAILED": "Failed",
+      "TERMINATED": "Terminated",
+      "CANCELED": "Canceled",
+      "TIMED_OUT": "Timed out",
+      "SUSPENDED": "Suspended",
+      "WAITING": "Waiting"
+    },
+    "notProvided": "Not provided"
+  }
+}

@@ -17,7 +17,7 @@
  */
 
 import { Alert, Box, CircularProgress, PageContent, PageTitle } from '@wso2/oxygen-ui';
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import ContainerInfoCard from '../components/Containers/ContainerInfoCard';
@@ -29,6 +29,7 @@ import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { isPrivateDpRelease } from '../utils/containers';
 import type { ComponentScope } from '../nav';
 
@@ -39,11 +40,7 @@ export default function ComponentContainers({ org, project, component }: Compone
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
   const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, comp?.id);
 
-  const tracks = useMemo(() => comp?.deploymentTracks ?? [], [comp?.deploymentTracks]);
-  const [trackId, setTrackId] = useState('');
-  useEffect(() => {
-    if (tracks.length) setTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [tracks]);
+  const { tracks, trackId } = useSelectedTrack(comp);
 
   const { data: environments = [] } = useEnvironments(org, projectId);
   const [envId, setEnvId] = useState('');
@@ -53,7 +50,7 @@ export default function ComponentContainers({ org, project, component }: Compone
 
   const { data: deployment } = useComponentDeployment(org, orgUuid ?? '', comp?.id ?? '', trackId, envId);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId);
+  const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId, trackId);
 
   // Paid subscriptions aren't served by cloud yet, so only a private data plane unlocks the paid fields.
   const isPaidOrPdpUser = isPrivateDpRelease(release);
@@ -67,8 +64,8 @@ export default function ComponentContainers({ org, project, component }: Compone
 
   return (
     <Box>
-      {tracks.length > 0 && <DeploymentTrackBar extra={envSelect} />}
-      <PageContent>
+      {tracks.length > 0 && <DeploymentTrackBar component={comp} extra={envSelect} />}
+      <PageContent fullWidth>
         <PageTitle>
           <PageTitle.Header>Containers</PageTitle.Header>
         </PageTitle>
@@ -85,16 +82,17 @@ export default function ComponentContainers({ org, project, component }: Compone
           </Box>
         ) : !comp ? (
           <Alert severity="error">Integration not found</Alert>
-        ) : containers.length === 0 ? (
+        ) : trackId === undefined ? null : containers.length === 0 ? (
           <Alert severity="info">This integration has no containers in the selected environment yet. Deploy it to configure its containers.</Alert>
         ) : (
           containers.map((c) => (
             <ContainerInfoCard
-              key={c.ID}
+              key={`${trackId}/${c.ID}`}
               container={c}
               projectId={projectId}
               componentId={comp.id}
               releaseId={releaseId}
+              deploymentTrackId={trackId}
               isPaidOrPdpUser={isPaidOrPdpUser}
               canManage={canManage}
               onSaved={(message) => setAlert({ type: 'success', message })}

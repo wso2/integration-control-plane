@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, IconButton, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, CircularProgress, IconButton, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, ArrowRight, Plus, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useEffect, type JSX } from 'react';
 import { useLocation } from 'react-router';
@@ -80,24 +80,27 @@ function AppSlot({ app, isActiveTarget, onRemove }: AppSlotProps): JSX.Element {
         <>
           <AppAvatar name={app} size={40} />
           {onRemove && (
-            <IconButton
-              size="small"
-              onClick={onRemove}
-              sx={{
-                position: 'absolute',
-                top: 4,
-                right: 4,
-                width: 18,
-                height: 18,
-                minWidth: 'unset',
-                padding: 0,
-                bgcolor: 'background.paper',
-                border: '1px solid',
-                borderColor: 'divider',
-                '&:hover': { bgcolor: 'action.hover' },
-              }}>
-              <X size={10} />
-            </IconButton>
+            <Tooltip title="Remove">
+              <IconButton
+                aria-label={`Remove ${app}`}
+                size="small"
+                onClick={onRemove}
+                sx={{
+                  position: 'absolute',
+                  top: 4,
+                  right: 4,
+                  width: 18,
+                  height: 18,
+                  minWidth: 'unset',
+                  padding: 0,
+                  bgcolor: 'background.paper',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  '&:hover': { bgcolor: 'action.hover' },
+                }}>
+                <X size={10} />
+              </IconButton>
+            </Tooltip>
           )}
         </>
       ) : isActiveTarget ? (
@@ -162,24 +165,27 @@ function IntegrationSlot({ integration, isActiveTarget, app1, onRemove }: Integr
           <DirectionArrow bidirectional={integration.bidirectional} size={16} />
         </Box>
         {onRemove && (
-          <IconButton
-            size="small"
-            onClick={onRemove}
-            sx={{
-              position: 'absolute',
-              top: 4,
-              right: 4,
-              width: 18,
-              height: 18,
-              minWidth: 'unset',
-              padding: 0,
-              bgcolor: 'background.paper',
-              border: '1px solid',
-              borderColor: 'divider',
-              '&:hover': { bgcolor: 'action.hover' },
-            }}>
-            <X size={10} />
-          </IconButton>
+          <Tooltip title="Remove">
+            <IconButton
+              aria-label="Remove"
+              size="small"
+              onClick={onRemove}
+              sx={{
+                position: 'absolute',
+                top: 4,
+                right: 4,
+                width: 18,
+                height: 18,
+                minWidth: 'unset',
+                padding: 0,
+                bgcolor: 'background.paper',
+                border: '1px solid',
+                borderColor: 'divider',
+                '&:hover': { bgcolor: 'action.hover' },
+              }}>
+              <X size={10} />
+            </IconButton>
+          </Tooltip>
         )}
       </Box>
     );
@@ -389,14 +395,14 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
     navigate(locationState.fromPath ?? newComponentUrl(scope));
   };
 
-  const backLabel = wizardStep === 0 ? 'Back to Create Integration' : 'Go back';
+  const backLabel = wizardStep === 0 ? 'Back to create integration' : 'Go back';
 
   const subtitle =
     wizardStep === 0 ? "Let's start by choosing an application to integrate" : wizardStep === 1 ? `Choose an application to integrate ${firstApp} with` : wizardStep === 2 ? `Get started with pre-built integrations for ${firstApp} and ${secondApp}` : null;
 
   if (isLoading) {
     return (
-      <PageContent sx={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+      <PageContent fullWidth sx={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress />
       </PageContent>
     );
@@ -404,7 +410,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
 
   if (isError) {
     return (
-      <PageContent sx={{ pt: 5 }}>
+      <PageContent fullWidth sx={{ pt: 5 }}>
         <Button startIcon={<ArrowLeft size={16} />} onClick={goBack} sx={{ mb: 3 }}>
           {backLabel}
         </Button>
@@ -414,7 +420,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
   }
 
   return (
-    <PageContent sx={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%', pt: 5, pb: 3 }}>
+    <PageContent fullWidth sx={{ display: 'flex', flex: 1, overflow: 'hidden', height: '100%', pt: 5, pb: 3 }}>
       <Box
         sx={{
           width: 280,
@@ -479,7 +485,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
 
         {wizardStep <= 1 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <SearchField value={appSearch} onChange={setAppSearch} placeholder="Search" fullWidth sx={{ mb: 3 }} />
+            <SearchField value={appSearch} onChange={setAppSearch} placeholder="Search applications" fullWidth sx={{ mb: 3 }} />
             {displayedApps.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 No applications found{appSearch ? ` for "${appSearch}"` : ''}.

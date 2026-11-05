@@ -99,10 +99,10 @@ export default function SampleRowCard({
 
       {/* Source + Deploy actions */}
       <Box sx={{ flexShrink: 0, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <Tooltip title="Go to Source" placement="top">
+        <Tooltip title="Go to source" placement="top">
           <IconButton
             size="small"
-            aria-label="Go to Source"
+            aria-label="Go to source"
             onClick={(e) => {
               e.stopPropagation();
               window.open(sourceUrl, '_blank', 'noopener,noreferrer');

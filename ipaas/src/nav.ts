@@ -20,8 +20,8 @@ import { createContext, createElement, useContext, type FC, type JSX } from 'rea
 import { Outlet, useParams, useLocation } from 'react-router';
 import { capitalize } from './utils/string';
 import { SETTINGS_SECTIONS, type SettingsSectionDef } from './constants/orgSettingsSections';
-import { PROJECT_SETTINGS_SECTIONS } from './constants/projectSettingsSections';
 import { COMPONENT_SETTINGS_SECTIONS } from './constants/componentSettingsSections';
+import { local } from './utils/storage';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -115,7 +115,7 @@ export function resourceUrl(scope: Scope, resource: Resource): string {
 // The Settings sections available at each level.
 function settingsSectionsForLevel(level: Level): readonly SettingsSectionDef[] {
   if (level === 'organizations') return SETTINGS_SECTIONS;
-  if (level === 'projects') return PROJECT_SETTINGS_SECTIONS;
+  if (level === 'projects') return [];
   return COMPONENT_SETTINGS_SECTIONS;
 }
 
@@ -168,7 +168,15 @@ export function sidebarItems(scope: Scope, currentResource: Resource | null): Si
 }
 
 export function newProjectUrl(scope: { org: string }): string {
-  return `/organizations/${scope.org}/projects/new`;
+  return `/organizations/${scope.org}/new`;
+}
+
+export function editProjectUrl(scope: { org: string; project: string }): string {
+  return `/organizations/${scope.org}/projects/${scope.project}/edit`;
+}
+
+export function linkRepositoryUrl(scope: { org: string; project: string }): string {
+  return `/organizations/${scope.org}/projects/${scope.project}/link-repository`;
 }
 
 export function importProjectUrl(scope: { org: string }): string {
@@ -187,6 +195,41 @@ export function orgCdPipelinesUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/admin/cd-pipelines`;
 }
 
+/** The org's RAG knowledge bases. */
+export function knowledgeBasesUrl(scope: { org: string }): string {
+  return `/organizations/${scope.org}/ai-services/knowledge-bases`;
+}
+
+export function newKnowledgeBaseUrl(scope: { org: string }): string {
+  return `${knowledgeBasesUrl(scope)}/new`;
+}
+
+export function knowledgeBaseUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBasesUrl(scope)}/${encodeURIComponent(name)}`;
+}
+
+export function newKnowledgeBaseDataSourceUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBaseUrl(scope, name)}/data-sources/new`;
+}
+
+export function orgDatabasesUrl(scope: { org: string }): string {
+  return `/organizations/${scope.org}/platform-services`;
+}
+
+export function newDatabaseUrl(scope: { org: string }): string {
+  return `${orgDatabasesUrl(scope)}/new`;
+}
+
+/** A database's detail page, on one of its tabs. */
+export function databaseUrl(scope: { org: string }, serverId: string, tab = 'overview'): string {
+  return `${orgDatabasesUrl(scope)}/${encodeURIComponent(serverId)}/${tab}`;
+}
+
+/** A Temporal server's detail page, on one of its tabs. */
+export function temporalUrl(scope: { org: string }, serverId: string, tab = 'overview'): string {
+  return `${orgDatabasesUrl(scope)}/temporal/${encodeURIComponent(serverId)}/${tab}`;
+}
+
 /** The org Settings landing route — redirects to the first section the user can access. */
 export function orgSettingsUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/settings`;
@@ -195,11 +238,6 @@ export function orgSettingsUrl(scope: { org: string }): string {
 /** A specific org Settings section. `sectionPath` is the suffix after `/settings/` (may include a sub-tab, e.g. `access-control/users`). */
 export function orgSettingsSectionUrl(scope: { org: string }, sectionPath: string): string {
   return `/organizations/${scope.org}/settings/${sectionPath}`;
-}
-
-/** The project Settings landing route — redirects to the first section the user can access. */
-export function projectSettingsUrl(scope: { org: string; project: string }): string {
-  return `/organizations/${scope.org}/projects/${scope.project}/settings`;
 }
 
 /** A specific project Settings section. `sectionPath` is the suffix after `/settings/` (may include a sub-tab). */
@@ -265,7 +303,8 @@ export interface NavEntry {
 
 const NAV: Record<Level, NavEntry[]> = {
   organizations: [
-    { key: 'overview', navId: 'overview', segment: 'home' },
+    { key: 'overview', navId: 'org-overview', segment: 'overview' },
+    { key: 'projects', navId: 'org-projects', segment: 'projects' },
     { key: 'build', navId: 'build', segment: 'build' },
     { key: 'deploy', navId: 'org-deploy', segment: 'deploy' },
     { key: 'test', navId: 'org-test', segment: 'test' },
@@ -275,6 +314,8 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'context-engines', navId: 'org-context-engines', segment: 'context-engines' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
     { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
+    { key: 'knowledge-bases', navId: 'org-knowledge-bases', segment: 'ai-services/knowledge-bases', parent: 'org-ai-services' },
+    { key: 'platform-services', navId: 'org-platform-services', segment: 'platform-services' },
     { key: 'settings', navId: 'org-settings', segment: 'settings' },
   ],
   projects: [
@@ -285,7 +326,6 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'logs', navId: 'proj-logs', segment: 'observe/runtimelogs', parent: 'proj-observability' },
     { key: 'metrics', navId: 'proj-metrics', segment: 'observe/metrics', parent: 'proj-observability' },
     { key: 'cd-pipelines', navId: 'proj-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'proj-admin' },
-    { key: 'settings', navId: 'proj-settings', segment: 'settings' },
   ],
   components: [
     { key: 'overview', navId: 'overview', segment: 'overview' },
@@ -297,11 +337,13 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'agent-chat', navId: 'agent-chat', segment: 'test/agent-chat', parent: 'test' },
     { key: 'logs', navId: 'logs', segment: 'logs', parent: 'observability' },
     { key: 'metrics', navId: 'metrics', segment: 'metrics', parent: 'observability' },
+    { key: 'traces', navId: 'traces', segment: 'traces', parent: 'observability' },
     { key: 'runtime', navId: 'runtime', segment: 'runtimes', parent: 'operate' },
     { key: 'containers', navId: 'containers', segment: 'admin/containers', parent: 'operate' },
     { key: 'configs-secrets', navId: 'configs-secrets', segment: 'admin/configs', parent: 'operate' },
     { key: 'health-checks', navId: 'health-checks', segment: 'admin/health-checks', parent: 'operate' },
     { key: 'scaling', navId: 'scaling', segment: 'admin/scaling', parent: 'operate' },
+    { key: 'settings', navId: 'component-settings', segment: 'settings' },
   ],
 };
 
@@ -379,10 +421,12 @@ function toOrgScope(scope: Scope): Scope {
 const CROSS_SCOPE_NAV_URL: Partial<Record<Level, Record<string, (scope: Scope) => string>>> = {
   projects: {
     'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
+    'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
   components: {
     'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
     'proj-cd-pipelines': (scope) => buildUrl(broaden(scope)!, 'admin/cd-pipelines'),
+    'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
 };
 
@@ -454,7 +498,7 @@ export function ScopeResolver(): JSX.Element {
   const { pathname } = useLocation();
   // When not inside an org route (e.g. /profile), fall back to the stored handle so the
   // nav shows the correct org rather than a synthetic 'default' that would produce bad URLs.
-  const stored = localStorage.getItem('org_handle');
+  const stored = local.get('org_handle');
   const validUrl = urlOrgHandler && urlOrgHandler !== 'default' ? urlOrgHandler : null;
   const orgHandler = validUrl ?? (stored && stored !== 'default' ? stored : '');
   const scope = resolveScope(orgHandler, projectHandler, componentHandler);

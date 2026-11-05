@@ -17,9 +17,12 @@
  */
 
 import { Box, Button, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { RefreshCw, Clock, SlidersHorizontal, GitCommit, Square, RotateCw, FlaskConical, List } from '@wso2/oxygen-ui-icons-react';
+import { RefreshCw, Clock, SlidersHorizontal, Square, RotateCw, FlaskConical, List } from '@wso2/oxygen-ui-icons-react';
+import CommitSummary from '../CommitSummary';
+import { CARD_HEADER_TITLE_SX } from '../../constants/styles';
 import ScheduleButton, { type ScheduleButtonProps } from '../Overview/_shared/ScheduleButton';
 import RunButton from '../Overview/automation/RunButton';
+import { capitalize } from '../../utils/string';
 
 interface EnvironmentCardHeaderProps {
   envName: string;
@@ -50,9 +53,9 @@ interface EnvironmentCardHeaderProps {
 const STATUS_DOT_MAP: Record<string, { label: string; dotColor: string }> = {
   ACTIVE: { label: 'Active', dotColor: 'success.main' },
   ERROR: { label: 'Error', dotColor: 'error.main' },
-  IN_PROGRESS: { label: 'In Progress', dotColor: 'warning.main' },
+  IN_PROGRESS: { label: 'In progress', dotColor: 'warning.main' },
   SUSPENDED: { label: 'Suspended', dotColor: 'text.disabled' },
-  NOT_DEPLOYED: { label: 'Not Deployed', dotColor: 'text.disabled' },
+  NOT_DEPLOYED: { label: 'Not deployed', dotColor: 'text.disabled' },
 };
 
 export default function EnvironmentCardHeader({
@@ -92,22 +95,10 @@ export default function EnvironmentCardHeader({
     <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap">
       {/* Left: env name + status chip + commit info + configure */}
       <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, textTransform: 'capitalize', flexShrink: 0 }}>
-          {envName}
+        <Typography variant="h5" component="h2" sx={CARD_HEADER_TITLE_SX}>
+          {capitalize(envName)}
         </Typography>
-        {hasDeployment && deployedCommit?.sha && (
-          <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
-            <GitCommit size={14} style={{ opacity: 0.55, flexShrink: 0 }} />
-            <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.secondary', flexShrink: 0 }}>
-              {deployedCommit.sha.substring(0, 7)}
-            </Typography>
-            {deployedCommit.message && (
-              <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {deployedCommit.message}
-              </Typography>
-            )}
-          </Stack>
-        )}
+        {hasDeployment && deployedCommit?.sha && <CommitSummary sha={deployedCommit.sha} message={deployedCommit.message} />}
         {statusDot && (
           <Stack direction="row" alignItems="center" gap={0.75} sx={{ flexShrink: 0 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: statusDot.dotColor, flexShrink: 0 }} />
@@ -118,7 +109,7 @@ export default function EnvironmentCardHeader({
         )}
         {hasDeployment && onConfigure && (isAutomation || isGenericService) && (
           <Button variant="outlined" size="small" color={hasMissingConfigs ? 'error' : 'primary'} startIcon={<SlidersHorizontal size={14} />} onClick={onConfigure} sx={{ mr: 1 }}>
-            {hasMissingConfigs ? 'Configure to Continue' : 'Configure'}
+            {hasMissingConfigs ? 'Configure to continue' : 'Configure'}
           </Button>
         )}
       </Stack>
@@ -134,7 +125,7 @@ export default function EnvironmentCardHeader({
             )}
             {hasDeployment && onViewLogs && (
               <Button variant="text" size="small" startIcon={<List size={14} />} onClick={onViewLogs} sx={{ textTransform: 'none' }}>
-                View Logs
+                View logs
               </Button>
             )}
             {(canStop || isInProgress) && (

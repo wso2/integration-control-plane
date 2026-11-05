@@ -1,0 +1,191 @@
+{
+  "runStatus": {
+    "RUNNING": "Running",
+    "SUSPENDED": "Suspended",
+    "COMPLETED": "Completed",
+    "FAILED": "Failed",
+    "CANCELED": "Canceled",
+    "TERMINATED": "Terminated",
+    "TIMED_OUT": "Timed out"
+  },
+  "stepStatus": {
+    "RUNNING": "running",
+    "WAITING": "waiting",
+    "COMPLETED": "completed",
+    "FAILED": "failed",
+    "TIMED_OUT": "timed out",
+    "CANCELED": "canceled"
+  },
+  "columns": {
+    "workflow": "Workflow",
+    "status": "Status",
+    "started": "Started",
+    "duration": "Duration",
+    "title": "Title",
+    "type": "Type",
+    "outcome": "Outcome",
+    "completed": "Completed",
+    "waitingSince": "Waiting since",
+    "by": "By"
+  },
+  "workItemType": {
+    "task": "Task",
+    "review": "Approval",
+    "reviewAfterFailure": "Approval after failure"
+  },
+  "outcome": {
+    "completed": "Completed",
+    "approved": "Approved",
+    "approvedWithChanges": "Approved with changes",
+    "retried": "Retried",
+    "retriedWithChanges": "Retried with changes",
+    "rejected": "Rejected",
+    "timedOut": "Timed out",
+    "canceled": "Canceled",
+    "terminated": "Terminated",
+    "decided": "Decided"
+  },
+  "workItems": {
+    "openItem": "Open {{title}}"
+  },
+  "view": {
+    "noEndpoint": "This workflow has no management endpoint deployed right now. Try again later, or ask your administrator.",
+    "openRun": "Open run {{id}}",
+    "executions": "Executions",
+    "tasks": "Tasks",
+    "statusFilter": "Status",
+    "allRuns": "All runs",
+    "updatedAt": "Updated {{time}}",
+    "noRunsWithStatus": {
+      "RUNNING": "No running runs",
+      "SUSPENDED": "No suspended runs",
+      "COMPLETED": "No completed runs",
+      "FAILED": "No failed runs",
+      "CANCELED": "No canceled runs",
+      "TERMINATED": "No terminated runs",
+      "TIMED_OUT": "No timed-out runs"
+    },
+    "noRuns": "No runs yet",
+    "chooseAnotherStatus": "Choose another status to see other runs.",
+    "startFirstRun": "Start the workflow to see its first run here.",
+    "showAllRuns": "Show All Runs",
+    "nothingWaiting": {
+      "title": "Nothing waiting on you",
+      "description": "Tasks and approvals from this workflow's runs show here when they need you."
+    },
+    "runStarted": "Run started."
+  },
+  "startDrawer": {
+    "title": "Start {{name}}",
+    "subtitle": "A new run starts as soon as you submit.",
+    "input": "Input",
+    "starting": "Starting…",
+    "loadError": "Could not load what this workflow can start.",
+    "nothingToStart": "This workflow has nothing you can start right now.",
+    "workflow": "Workflow",
+    "chooseWhatToStart": "Choose what to start."
+  },
+  "taskDrawer": {
+    "subtitle": "{{type}} · {{workflow}}",
+    "yourResponse": "Your Response",
+    "completeTask": "Complete Task",
+    "yourDecision": "Your Decision",
+    "approve": "Approve",
+    "approveSubtitle": "Let {{step}} run as proposed.",
+    "retry": "Retry",
+    "retrySubtitle": "Run the step again as it was.",
+    "approveWithChanges": "Approve with changes",
+    "retryWithChanges": "Retry with changes",
+    "withChangesSubtitle": "Edit the step's input, then let it run.",
+    "reject": "Reject",
+    "rejectSubtitle": "Stop the workflow here.",
+    "reason": "Reason",
+    "reasonPlaceholder": "Tell the requester why",
+    "approveWithChangesButton": "Approve with Changes",
+    "retryWithChangesButton": "Retry with Changes",
+    "rejected": "Rejected “{{title}}”.",
+    "completed": "Completed “{{title}}”.",
+    "approved": "Approved “{{title}}”.",
+    "loadTaskError": "Could not load this task.",
+    "loadReviewError": "Could not load this approval.",
+    "details": "Details",
+    "workflow": "Workflow",
+    "step": "Step",
+    "created": "Created",
+    "closed": "Closed",
+    "completedBy": "Completed by",
+    "stepFailed": "The step failed",
+    "proposedInput": "Proposed Input",
+    "context": "Context",
+    "response": "Response",
+    "assignedElsewhere": "This is assigned to another role, so you can see it but not act on it."
+  },
+  "runDrawer": {
+    "title": "Workflow run",
+    "waitingFor": "{{step}} · waiting {{duration}}",
+    "cancelRun": "Cancel Run",
+    "notFound": "This run could not be found. It may be older than the runs this workflow keeps.",
+    "loadError": "Could not load this run.",
+    "summary": "Summary",
+    "runId": "Run ID",
+    "started": "Started",
+    "ended": "Ended",
+    "duration": "Duration",
+    "waitingOnYou": "Waiting on You",
+    "runFailed": "The run failed",
+    "error": "Error",
+    "result": "Result",
+    "steps": "Steps",
+    "confirmTitle": "Cancel this run?",
+    "confirmMessage": "The run stops where it is. Steps that already finished are not undone, and any task it waits on is withdrawn.",
+    "keepRunning": "Keep Running",
+    "cancelled": "Run cancelled."
+  },
+  "steps": {
+    "type": {
+      "HUMAN_TASK": "Task",
+      "REVIEW_ACTIVITY": "Approval",
+      "TIMER": "Timer",
+      "CHILD_WORKFLOW": "Workflow"
+    },
+    "approveStep": "Approve {{step}}",
+    "attempt": "Attempt {{attempt}} · {{status}} · {{started}} · {{duration}}",
+    "input": "Input",
+    "output": "Output",
+    "attempts_one": "{{count}} attempt",
+    "attempts_other": "{{count}} attempts",
+    "waitingForSomeone": "Waiting for someone",
+    "rejected": "Rejected",
+    "noneStarted": "No step has started yet."
+  },
+  "tasksPage": {
+    "noAccess": {
+      "title": "You can't view workflows",
+      "description": "Tasks come from workflows. Ask your organization administrator for access."
+    },
+    "title": "My Tasks",
+    "subtitle": "Tasks and approvals your workflows are waiting for you to act on.",
+    "waitingOnYou": "Waiting on you",
+    "completed": "Completed",
+    "searchPlaceholder": "Search tasks",
+    "typeFilter": "Type",
+    "allTypes": "All types",
+    "tasks": "Tasks",
+    "approvals": "Approvals",
+    "workflowFilter": "Workflow",
+    "allWorkflows": "All workflows",
+    "unreachable": "Could not reach {{name}}, so its tasks are missing from this list.",
+    "noMatches": {
+      "title": "Nothing matches",
+      "description": "Try adjusting your search or filters."
+    },
+    "caughtUp": {
+      "title": "You're all caught up",
+      "description": "Nothing is waiting on you right now."
+    },
+    "nothingCompleted": {
+      "title": "Nothing completed yet",
+      "description": "Tasks and approvals you complete will show here."
+    }
+  }
+}

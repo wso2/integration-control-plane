@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useMutation, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
 import { fetchExecutionConfigs, fetchTaskExecutions, fetchRuntimeArguments, fetchExecutionArguments, fetchExecutionLogs, fetchTaskExecutionCount, updateJobConfigs, stopSchedule, triggerTask, triggerComponentRun } from '../api/executions';
-import type { StopScheduleInput, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
+import type { StopScheduleInput, TaskExecution, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
 
 export function useExecutionConfigs(componentId: string, releaseId: string, envId = '') {
@@ -30,7 +30,8 @@ export function useExecutionConfigs(componentId: string, releaseId: string, envI
   });
 }
 
-export function useTaskExecutions(releaseId: string, componentId = '', envId = '', projectId = '', refetchInterval: number | false = false) {
+// `refetchInterval` may be a function of the query, to poll only while a run is in flight.
+export function useTaskExecutions(releaseId: string, componentId = '', envId = '', projectId = '', refetchInterval: number | false | ((query: Query<TaskExecution[]>) => number | false) = false) {
   return useQuery({
     queryKey: ['taskExecutions', releaseId, componentId, envId, projectId],
     queryFn: () => fetchTaskExecutions(releaseId, componentId, envId, projectId),
@@ -48,10 +49,10 @@ export function useTaskExecutions(releaseId: string, componentId = '', envId = '
  * `retry: false` so a 404 (no schema for this component) surfaces promptly to the
  * caller, which treats it the same as an empty schema.
  */
-export function useRuntimeArguments(componentId: string, deploymentTrackId: string, commitHash: string, enabled = true) {
+export function useRuntimeArguments(componentId: string, deploymentTrackId: string | undefined, commitHash: string, enabled = true) {
   return useQuery<RuntimeArgument[]>({
     queryKey: ['runtimeArguments', componentId, deploymentTrackId, commitHash],
-    queryFn: () => fetchRuntimeArguments(componentId, deploymentTrackId, commitHash),
+    queryFn: () => fetchRuntimeArguments(componentId, deploymentTrackId!, commitHash),
     enabled: enabled && !!componentId && !!deploymentTrackId && !!commitHash,
     retry: false,
     staleTime: 5 * 60 * 1000,
