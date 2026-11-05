@@ -35,7 +35,8 @@ const links: IntegrationLinks = {
     { id: 'github-sandbox', displayName: 'GitHub Sandbox', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
     { id: 'github-corp', displayName: 'GitHub Corp', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
   ],
-  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken'), 'orders-db|URL': id('ordersDbUrl'), 'github-corp|GITHUB_AUTH_TOKEN': id('otherToken') },
+  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken'), 'github-corp|GITHUB_AUTH_TOKEN': id('otherToken') },
+  usedByOrphaned: { 'orders-db|URL': id('ordersDbUrl') },
   connections: [
     { id: id('github'), link: 'github-acme', suggestions: ['github-acme', 'github-sandbox', 'github-corp'], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] },
     { id: id('backup'), suggestions: ['github-sandbox', 'github-corp'], fields: [{ configurable: id('backupToken'), key: 'GITHUB_AUTH_TOKEN' }] },
@@ -132,8 +133,9 @@ describe('the Configure form with links', () => {
   });
 
   it('offers a resource whose key only a link the build lost holds, as for a renamed connection', async () => {
-    const used = links.used;
-    links.used = { ...used, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') };
+    const [used, usedByOrphaned] = [links.used, links.usedByOrphaned];
+    const { 'github-corp|GITHUB_AUTH_TOKEN': _, ...rest } = used;
+    Object.assign(links, { used: rest, usedByOrphaned: { ...usedByOrphaned, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') } });
     try {
       await act(async () => root.render(<Form />));
       await act(async () => (container.querySelector('[aria-label="Link backup"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
@@ -142,7 +144,7 @@ describe('the Configure form with links', () => {
         ['GitHub Corp', null],
       ]);
     } finally {
-      links.used = used;
+      Object.assign(links, { used, usedByOrphaned });
     }
   });
 

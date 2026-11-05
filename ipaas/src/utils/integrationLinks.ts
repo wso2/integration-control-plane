@@ -84,7 +84,6 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
     }
   };
 
-  const orphans = new Set(links.orphaned.map((o) => o.target));
   const target = (id: string): TargetView => {
     if (!editable) {
       const ref = release?.configurables[id] ?? release?.env[id];
@@ -100,9 +99,10 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
         name: r.displayName,
         keys: r.keys.map(({ name: key }) => {
           const by = links.used[`${r.id}|${key}`];
-          if (!by || by === id) return { key };
+          if (by && by !== id) return { key, usedBy: targetName(by) };
           // A write that takes a key from a link the build lost moves it.
-          return orphans.has(by) ? { key, orphanOf: targetName(by) } : { key, usedBy: targetName(by) };
+          const orphan = links.usedByOrphaned[`${r.id}|${key}`];
+          return orphan ? { key, orphanOf: targetName(orphan) } : { key };
         }),
       })),
     };

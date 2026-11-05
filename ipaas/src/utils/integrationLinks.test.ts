@@ -40,6 +40,7 @@ const base: IntegrationLinks = {
     },
   ],
   used: {},
+  usedByOrphaned: {},
   connections: [{ id: id('github'), suggestions: ['github-acme', 'github-sandbox', 'github-corp'], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }, { configurable: id('githubTimeout') }] }],
   fieldLinks: {},
   orphaned: [],
@@ -101,7 +102,8 @@ describe('formLinkView', () => {
   it('offers a key held only by a link the build lost, naming that target', () => {
     const links: IntegrationLinks = {
       ...base,
-      used: { 'orders-db|URL': id('ordersDbUrl'), 'orders-db|PASSWORD': id('ordersDbPassword') },
+      used: { 'orders-db|PASSWORD': id('ordersDbPassword') },
+      usedByOrphaned: { 'orders-db|URL': id('ordersDbUrl') },
       orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL' }],
     };
     expect(
