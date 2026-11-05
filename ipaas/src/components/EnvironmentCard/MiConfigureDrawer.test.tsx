@@ -108,7 +108,7 @@ describe('the MI Configure form', () => {
     expect(supplied('GITHUB_TOKEN')).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
     expect(document.querySelector('[aria-label="Link GITHUB_TOKEN"]')).toBeNull();
     expect(document.querySelector('[aria-label="Link DB_URL"]')).toBeNull();
-    expect(document.body.textContent).toContain('No Production values');
+    expect(document.body.textContent).toContain('No Production values. Add them in WSO2 Cloud.');
     expect(document.body.textContent).toContain('Links apply to all environments. Change links in Development.');
   });
 });

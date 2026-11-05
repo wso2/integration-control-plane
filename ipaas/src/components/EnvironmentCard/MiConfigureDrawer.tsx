@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, DrawerPanel, IconButton, InputAdornment, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, DrawerPanel, IconButton, InputAdornment, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
@@ -207,7 +207,11 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           inputProps={{ 'aria-label': `${name} is supplied by ${view.source.name}` }}
           InputProps={{ endAdornment: picker && <InputAdornment position="end">{picker}</InputAdornment> }}
         />
-        {view.source.noValues && <Chip label={`No ${envName(envId)} values`} size="small" color="warning" variant="outlined" sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />}
+        {view.source.noValues && (
+          <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+            No {envName(envId)} values. Add them in WSO2 Cloud.
+          </Typography>
+        )}
       </Box>
     );
   };
