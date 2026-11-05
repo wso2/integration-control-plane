@@ -88,7 +88,7 @@ function ToolPanel({ tool, callTool, paneRef }: { tool: McpTool; callTool: Tools
           <DynamicJsonForm schema={tool.inputSchema} value={args} onChange={setArgs} />
           <Box>
             <Button variant="contained" size="small" startIcon={running ? <CircularProgress size={14} color="inherit" /> : <Play size={16} />} disabled={running} onClick={() => void run()}>
-              {running ? 'Running…' : 'Run Tool'}
+              {running ? 'Running…' : 'Run tool'}
             </Button>
           </Box>
         </Stack>

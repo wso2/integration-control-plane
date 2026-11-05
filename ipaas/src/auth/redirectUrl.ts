@@ -16,6 +16,9 @@
  * under the License.
  */
 
+import { stripBase } from '../utils/basePath';
+import { local } from '../utils/storage';
+
 // Where to send the user after sign-in. Not auth: both products save it before
 // leaving for the IdP and read it back on /signin.
 
@@ -25,16 +28,16 @@ export function saveRedirectUrl(url: string): void {
   // Never persist a redirect to the synthetic 'default' org — it isn't real and
   // would loop back there on every subsequent login.
   try {
-    const pathname = new URL(url).pathname;
+    const pathname = stripBase(new URL(url).pathname);
     if (pathname.startsWith('/organizations/default/') || pathname === '/organizations/default') return;
   } catch {
     /* ignore malformed URLs */
   }
-  localStorage.setItem(REDIRECT_URL_KEY, url);
+  local.set(REDIRECT_URL_KEY, url);
 }
 
 export function getAndClearRedirectUrl(): string | null {
-  const url = localStorage.getItem(REDIRECT_URL_KEY);
-  localStorage.removeItem(REDIRECT_URL_KEY);
+  const url = local.get(REDIRECT_URL_KEY);
+  local.remove(REDIRECT_URL_KEY);
   return url;
 }

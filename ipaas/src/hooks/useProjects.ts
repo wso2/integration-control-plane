@@ -17,6 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { trackEvent } from '../services/tracking/tracking';
 import { UUID_RE } from '../utils/string';
 import { fetchProjects, fetchProject, fetchProjectContributors, fetchProjectComponentLabels, fetchProjectHandlerAvailability, createProject, createMonoRepoProject, linkProjectRepository, updateProject, deleteProject } from '../api/projects';
 import type { Project, CreateProjectInput, CreateMonoRepoProjectInput, LinkProjectRepositoryInput, UpdateProjectInput } from '../types/project';
@@ -84,8 +85,14 @@ export function useProjectHandlerAvailability(candidate: string, enabled: boolea
 export function useCreateProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateProjectInput) => createProject(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    mutationFn: (input: CreateProjectInput) => {
+      trackEvent('project-create-start');
+      return createProject(input);
+    },
+    onSuccess: () => {
+      trackEvent('project-create-end');
+      qc.invalidateQueries({ queryKey: ['projects'] });
+    },
   });
 }
 
@@ -117,8 +124,14 @@ export function useDeleteProject() {
 export function useCreateMonoRepoProject() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateMonoRepoProjectInput) => createMonoRepoProject(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
+    mutationFn: (input: CreateMonoRepoProjectInput) => {
+      trackEvent('project-create-start');
+      return createMonoRepoProject(input);
+    },
+    onSuccess: () => {
+      trackEvent('project-create-end');
+      qc.invalidateQueries({ queryKey: ['projects'] });
+    },
   });
 }
 
@@ -153,8 +166,8 @@ export function useGitHubReadme(gitOrganization?: string, repository?: string) {
 
 export function useProjectId(projectIdentifier: string) {
   const isProjectUuid = UUID_RE.test(projectIdentifier);
-  const { data: projectById, isLoading: loadingById } = useProject(isProjectUuid ? projectIdentifier : '');
-  const { data: allProjects = [], isLoading: loadingProjects } = useProjects();
+  const { data: projectById, isLoading: loadingById, isError: errorById, refetch: refetchById } = useProject(isProjectUuid ? projectIdentifier : '');
+  const { data: allProjects = [], isLoading: loadingProjects, isError: errorProjects, refetch: refetchProjects } = useProjects();
 
   const projectFromList = !isProjectUuid ? (allProjects.find((p) => p.handler === projectIdentifier) ?? null) : null;
   const project = isProjectUuid ? projectById : (projectFromList ?? undefined);
@@ -163,5 +176,7 @@ export function useProjectId(projectIdentifier: string) {
     projectId: project?.id ?? '',
     project,
     isLoading: !!projectIdentifier && !project && (isProjectUuid ? loadingById : loadingProjects),
+    isError: !project && (isProjectUuid ? errorById : errorProjects),
+    refetch: isProjectUuid ? refetchById : refetchProjects,
   };
 }

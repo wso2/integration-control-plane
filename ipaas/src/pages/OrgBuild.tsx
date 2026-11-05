@@ -23,7 +23,7 @@ import type { OrgScope } from '../nav';
 
 export default function OrgBuild(scope: OrgScope): JSX.Element {
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <IntegrationScopePicker org={scope.org} segment="build" />
     </PageContent>
   );

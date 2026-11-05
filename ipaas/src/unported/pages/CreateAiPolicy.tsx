@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, Chip, CircularProgress, FormControlLabel, PageContent, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Button, Chip, CircularProgress, FormControlLabel, PageContent, Radio, RadioGroup, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useParams } from 'react-router';

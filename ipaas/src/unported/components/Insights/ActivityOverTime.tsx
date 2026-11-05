@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, MenuItem } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Box, MenuItem, TextField } from '@wso2/oxygen-ui';
 import { useEffect, useState, type JSX } from 'react';
 import { InsightsCard, TrendBarChart } from './shared';
 import { UNIT_BY_KIND } from '../../../constants/insights';

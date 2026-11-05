@@ -102,10 +102,10 @@ export default function ServiceInsights({ envName, envId, apimEnvId, projectId, 
   const loading = insights === null;
 
   const tiles = [
-    { key: 'traffic', label: 'Total Traffic', icon: <TrendingUp size={16} />, value: insights?.requestCount ?? null, unit: undefined },
-    { key: 'errors', label: 'Error Count', icon: <AlertTriangle size={16} />, value: insights?.errorCount ?? null, unit: undefined },
-    { key: 'errorRate', label: 'Avg Error Rate', icon: <Activity size={16} />, value: insights?.errorRate ?? null, unit: '%' },
-    { key: 'latency', label: 'P99 Latency', icon: <Clock size={16} />, value: insights?.latency ?? null, unit: 'ms' },
+    { key: 'traffic', label: 'Total traffic', icon: <TrendingUp size={16} />, value: insights?.requestCount ?? null, unit: undefined },
+    { key: 'errors', label: 'Error count', icon: <AlertTriangle size={16} />, value: insights?.errorCount ?? null, unit: undefined },
+    { key: 'errorRate', label: 'Avg error rate', icon: <Activity size={16} />, value: insights?.errorRate ?? null, unit: '%' },
+    { key: 'latency', label: 'P99 latency', icon: <Clock size={16} />, value: insights?.latency ?? null, unit: 'ms' },
   ] as const;
 
   return (

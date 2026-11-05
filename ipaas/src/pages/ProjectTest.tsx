@@ -23,7 +23,7 @@ import type { ProjectScope } from '../nav';
 
 export default function ProjectTest(scope: ProjectScope): JSX.Element {
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <IntegrationScopePicker org={scope.org} project={scope.project} segment="test" />
     </PageContent>
   );

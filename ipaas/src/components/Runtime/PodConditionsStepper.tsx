@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Box, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Box, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { Circle, CircleCheck, HelpCircle } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, type JSX } from 'react';
 import * as styles from './PodConditionsStepper.styles';
 import { POD_CONDITION_DEFINITIONS } from '../../constants/runtime';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import type { ClusterPod } from '../../types/runtime';
 
 export default function PodConditionsStepper({ pod }: { pod: ClusterPod | null }): JSX.Element | null {
@@ -57,9 +57,13 @@ export default function PodConditionsStepper({ pod }: { pod: ClusterPod | null }
               </Tooltip>
             </Stack>
 
-            <Typography variant="body2" color="text.secondary" align="center" sx={styles.time}>
-              {met && condition.lastTransitionTime ? formatDistanceToNow(condition.lastTransitionTime) : '—'}
-            </Typography>
+            {met && condition.lastTransitionTime ? (
+              <RelativeTime time={formatDistanceToNow(condition.lastTransitionTime)} dateTime={condition.lastTransitionTime} tooltip={formatDateTime(condition.lastTransitionTime)} sx={styles.time} />
+            ) : (
+              <Typography variant="body2" color="text.secondary" align="center" sx={styles.time}>
+                —
+              </Typography>
+            )}
 
             {condition.message && (
               <Tooltip title={condition.message}>

@@ -16,84 +16,79 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Card, CardContent, CircularProgress, Grid, IconButton, ListingTable, PageContent, PageTitle, Stack, TablePagination, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { CARD_TABLE_SX } from '../constants/styles';
-import { Clock, Folder, FolderInput, LayoutGrid, List, Plus, RefreshCw, Settings } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, CircularProgress, Grid, IconButton, ListingCard, PageContent, PageTitle, TablePagination, Tooltip } from '@wso2/oxygen-ui';
+import { Folder, FolderInput, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import SearchField from '../components/SearchField';
-import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useEffect, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useProjects } from '../hooks/useProjects';
+import { useComponents } from '../hooks/useComponents';
+import DeleteProjectDialog from '../components/DeleteProjectDialog';
 import { useRemovalNotice } from '../hooks/useRemovalNotice';
 import type { Project } from '../types/project';
 import EmptyListing from '../components/EmptyListing';
-import { formatDistanceToNow } from '../utils/time';
-import ExploreMore from '../components/ExploreMore';
-import { newProjectUrl, importProjectUrl, projectSettingsSectionUrl, type OrgScope } from '../nav';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
+import { newProjectUrl, importProjectUrl, type OrgScope } from '../nav';
 import { projectHomeUrl } from '../paths';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
 import Authorized from '../components/Authorized';
 import * as styles from './Projects.styles';
 
-function ProjectCard({ project, onClick, onSettingsClick }: { project: Project; onClick: () => void; onSettingsClick: () => void }) {
+function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: string; project: Project; canDelete: boolean; onClick: () => void; onDelete: () => void }) {
   const deleting = project.deleting === true;
+  // The delete action shows on hover or focus, so its integration count is fetched then rather than for every card.
+  const [armed, setArmed] = useState(false);
+  const { data: components, isError: componentsError } = useComponents(org, armed && canDelete && !deleting ? project.id : '');
+  const hasComponents = !!components?.length;
   return (
     <Tooltip title={deleting ? 'This project is being deleted' : ''}>
-      <Card variant="outlined" aria-disabled={deleting || undefined} sx={deleting ? styles.cardDeleting : styles.card} onClick={deleting ? undefined : onClick}>
-        <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, p: 2.5 }}>
-          <Avatar variant="rounded" sx={{ bgcolor: 'action.hover', color: 'text.secondary', width: 48, height: 48, borderRadius: 1 }}>
-            {project.name[0].toUpperCase()}
-          </Avatar>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600, flex: 1 }}>
-            {project.name}
-          </Typography>
-        </CardContent>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ px: 2.5, pb: 2 }}>
-          {deleting ? (
-            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.75, color: 'text.secondary' }}>
-              <CircularProgress size={12} color="inherit" />
-              Deleting
-            </Typography>
-          ) : (
-            <>
-              <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary' }}>
-                <Clock size={14} />
-                {formatDistanceToNow(project.updatedAt)}
-              </Typography>
-              <IconButton
-                size="small"
-                aria-label={`Settings for ${project.name}`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSettingsClick();
-                }}>
-                <Settings size={16} />
-              </IconButton>
-            </>
-          )}
-        </Stack>
-      </Card>
+      <ListingCard
+        title={project.name}
+        description={project.description?.trim() || undefined}
+        updatedTime={deleting ? 'Deleting…' : formatDistanceToNow(project.updatedAt)}
+        updatedDateTime={deleting ? undefined : project.updatedAt}
+        updatedTooltip={deleting ? undefined : formatDateTime(project.updatedAt)}
+        onClick={deleting ? undefined : onClick}
+        aria-disabled={deleting || undefined}
+        sx={deleting ? styles.cardDeleting : styles.card}
+        onMouseEnter={() => setArmed(true)}
+        onFocus={() => setArmed(true)}
+        actions={
+          deleting || !canDelete ? undefined : (
+            <Tooltip title={componentsError ? 'Could not check this project for integrations. Try again later.' : hasComponents ? 'To remove a project, you must delete all integrations in it.' : 'Delete'}>
+              {/* A disabled button fires no events, so the span carries the tooltip and stops the click opening the card. */}
+              <span onClick={(e) => e.stopPropagation()}>
+                <IconButton
+                  size="small"
+                  color="error"
+                  aria-label={`Delete ${project.name}`}
+                  disabled={!components || hasComponents}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}>
+                  <Trash2 size={16} />
+                </IconButton>
+              </span>
+            </Tooltip>
+          )
+        }
+      />
     </Tooltip>
   );
 }
 
 export default function Projects(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
-  const location = useLocation();
   const [query, setQuery] = useState('');
-  const [view, setView] = useState<'grid' | 'list'>('grid');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [alert, setAlert] = useState<string | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
   const { hasOrgPermission } = useAccessControl();
   const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
-  const { data: projects, isLoading, refetch } = useProjects();
-
-  useEffect(() => {
-    const state = location.state as { projectDeleted?: boolean } | null;
-    if (state?.projectDeleted) navigate(location.pathname, { replace: true, state: null });
-  }, [location, navigate]);
+  const { data: projects, isLoading } = useProjects();
 
   useRemovalNotice(
     scope.org,
@@ -119,125 +114,23 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const safePage = Math.min(page, maxPage);
   const paginated = filtered.slice(safePage * rowsPerPage, safePage * rowsPerPage + rowsPerPage);
 
-  const projectsView =
-    view === 'list' ? (
-      <ListingTable.Container disablePaper>
-        <ListingTable variant="card" density="compact" sx={CARD_TABLE_SX}>
-          <ListingTable.Head>
-            <ListingTable.Row>
-              <ListingTable.Cell width={300}>Name</ListingTable.Cell>
-              <ListingTable.Cell>Description</ListingTable.Cell>
-              <ListingTable.Cell>Last Updated</ListingTable.Cell>
-              <ListingTable.Cell width={100}>Actions</ListingTable.Cell>
-            </ListingTable.Row>
-          </ListingTable.Head>
-          <ListingTable.Body>
-            {paginated.map((p) => {
-              const deleting = p.deleting === true;
-              return (
-                // followCursor because ListingTable.Row does not forward a ref for the tooltip to anchor to.
-                <Tooltip key={p.id} followCursor title={deleting ? 'This project is being deleted' : ''}>
-                  <ListingTable.Row
-                    variant="card"
-                    hover={!deleting}
-                    clickable={!deleting}
-                    aria-disabled={deleting || undefined}
-                    // The card variant tints its own background on hover; pin both states so a dying row stays inert.
-                    sx={deleting ? { opacity: 0.38, cursor: 'default', backgroundColor: 'background.acrylic', '&:hover': { backgroundColor: 'background.acrylic' } } : undefined}
-                    onClick={deleting ? undefined : () => navigate(projectHomeUrl(scope.org, p.handler))}>
-                    <ListingTable.Cell>
-                      <Stack direction="row" alignItems="center" gap={1.5}>
-                        <Avatar variant="rounded" sx={{ width: 32, height: 32, borderRadius: 1, fontSize: 14, bgcolor: 'action.hover', color: 'text.primary' }}>
-                          {p.name[0].toUpperCase()}
-                        </Avatar>
-                        <Typography variant="body2" fontWeight={600}>
-                          {p.name}
-                        </Typography>
-                      </Stack>
-                    </ListingTable.Cell>
-                    <ListingTable.Cell>
-                      <Typography variant="body2" color="text.secondary" noWrap sx={{ maxWidth: 300 }}>
-                        {p.description || ''}
-                      </Typography>
-                    </ListingTable.Cell>
-                    <ListingTable.Cell>
-                      {!deleting && (
-                        <Typography variant="body2" color="text.secondary">
-                          {formatDistanceToNow(p.updatedAt)}
-                        </Typography>
-                      )}
-                    </ListingTable.Cell>
-                    <ListingTable.Cell>
-                      {deleting ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                          <CircularProgress size={12} color="inherit" />
-                          <Typography variant="caption" color="text.secondary" noWrap>
-                            Deleting
-                          </Typography>
-                        </Box>
-                      ) : (
-                        <IconButton
-                          size="small"
-                          aria-label={`Settings for ${p.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(projectSettingsSectionUrl({ org: scope.org, project: p.handler }, 'project-overview'));
-                          }}>
-                          <Settings size={16} />
-                        </IconButton>
-                      )}
-                    </ListingTable.Cell>
-                  </ListingTable.Row>
-                </Tooltip>
-              );
-            })}
-          </ListingTable.Body>
-        </ListingTable>
-      </ListingTable.Container>
-    ) : (
-      <Grid container spacing={2}>
-        {paginated.map((p) => (
-          <Grid key={p.id} size={{ xs: 12, sm: 6, md: 4 }}>
-            <ProjectCard project={p} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onSettingsClick={() => navigate(projectSettingsSectionUrl({ org: scope.org, project: p.handler }, 'project-overview'))} />
-          </Grid>
-        ))}
-      </Grid>
-    );
-
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <PageTitle>
-        <PageTitle.Header>
-          <Stack direction="row" alignItems="center" gap={1}>
-            All Projects
-            <IconButton size="small" aria-label="Refresh projects" onClick={() => refetch()}>
-              <RefreshCw size={18} />
-            </IconButton>
-          </Stack>
-        </PageTitle.Header>
+        <PageTitle.Header>All projects</PageTitle.Header>
         <PageTitle.Actions>
-          <ToggleButtonGroup value={view} exclusive onChange={(_, v) => v && setView(v)} size="small">
-            <ToggleButton value="grid" aria-label="Grid view">
-              <LayoutGrid size={18} />
-            </ToggleButton>
-            <ToggleButton value="list" aria-label="List view">
-              <List size={18} />
-            </ToggleButton>
-          </ToggleButtonGroup>
+          <Authorized permissions={Permissions.PROJECT_MANAGE}>
+            <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>
+              Import project
+            </Button>
+            <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={styles.projectActionSx}>
+              Create project
+            </Button>
+          </Authorized>
         </PageTitle.Actions>
       </PageTitle>
 
-      <Stack direction="row" gap={1} alignItems="center" sx={{ mb: 3, ml: 1 }}>
-        <SearchField value={query} onChange={setQuery} placeholder="Search projects" fullWidth />
-        <Authorized permissions={Permissions.PROJECT_MANAGE}>
-          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={styles.projectActionSx}>
-            Create Project
-          </Button>
-          <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>
-            Import Project
-          </Button>
-        </Authorized>
-      </Stack>
+      <SearchField value={query} onChange={setQuery} placeholder="Search projects" fullWidth sx={styles.searchSx} />
 
       {alert && (
         <Alert severity="success" onClose={() => setAlert(null)} sx={{ mb: 3 }}>
@@ -251,12 +144,18 @@ export default function Projects(scope: OrgScope): JSX.Element {
           title="No projects found"
           description={query ? 'Try adjusting your search' : canCreateProject ? 'Create your first project to get started' : 'Ask your administrator for access'}
           showAction={!query && canCreateProject}
-          actionLabel="Create Project"
+          actionLabel="Create project"
           onAction={() => navigate(newProjectUrl(scope))}
         />
       ) : (
         <>
-          {projectsView}
+          <Grid container spacing={2}>
+            {paginated.map((p) => (
+              <Grid key={p.id} size={{ xs: 12, sm: 6, md: 3 }}>
+                <ProjectCard org={scope.org} project={p} canDelete={canCreateProject} onClick={() => navigate(projectHomeUrl(scope.org, p.handler))} onDelete={() => setDeletingProject(p)} />
+              </Grid>
+            ))}
+          </Grid>
           {filtered.length > 10 && (
             <TablePagination
               component="div"
@@ -275,7 +174,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
         </>
       )}
 
-      <ExploreMore />
+      {deletingProject && <DeleteProjectDialog project={deletingProject} onClose={() => setDeletingProject(null)} />}
     </PageContent>
   );
 }

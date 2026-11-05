@@ -1,0 +1,35 @@
+{
+  "documentTitle": "{{portal}} · {{product}}",
+  "signedOut": {
+    "title": "You have signed out",
+    "description": "You signed out of the portal, in this tab or another one."
+  },
+  "sessionError": {
+    "title": "Could not start your session",
+    "description": "Something went wrong while signing you in.",
+    "signInAgain": "Sign In Again"
+  },
+  "noAccess": {
+    "title": "You are not authorized to use the {{portal}}",
+    "description": "Your account has no roles that give access to anything in the {{portal}}. Ask your organization's administrator to assign you the appropriate roles, then check again.",
+    "checkAgain": "Check Again"
+  },
+  "signingIn": "Signing in",
+  "nav": {
+    "overview": "Overview",
+    "tasks": "My Tasks",
+    "integrations": "Integrations"
+  },
+  "profile": {
+    "moreRoles": "+{{count}} more"
+  },
+  "footer": {
+    "support": "Support",
+    "terms": "Terms of Use",
+    "privacy": "Privacy Policy",
+    "copyright": "© {{year}}, WSO2 LLC."
+  },
+  "signOutDialog": {
+    "message": "Are you sure you want to sign out?"
+  }
+}

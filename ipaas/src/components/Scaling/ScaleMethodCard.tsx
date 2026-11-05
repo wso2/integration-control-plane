@@ -34,7 +34,6 @@ const noteSx = { display: 'block', mt: 1, fontWeight: 600 } as const;
 export default function ScaleMethodCard({ title, description, selected, disabled, note, onSelect }: ScaleMethodCardProps): JSX.Element {
   return (
     <Card
-      variant="outlined"
       sx={{
         flex: 1,
         minWidth: 280,

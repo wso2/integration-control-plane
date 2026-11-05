@@ -16,5 +16,5 @@
  * under the License.
  */
 
-export const CRITICAL_ENVIRONMENT_LABEL = 'Mark as Critical Environment';
-export const CRITICAL_ENVIRONMENT_HELP = 'Use for production. Test keys generated here are Production keys.';
+export const CRITICAL_ENVIRONMENT_LABEL = 'Mark as critical environment';
+export const CRITICAL_ENVIRONMENT_HELP = 'Use for production. Test keys generated here are production keys.';

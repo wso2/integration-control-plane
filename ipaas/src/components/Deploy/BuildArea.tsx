@@ -17,6 +17,7 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   ButtonGroup,
@@ -82,7 +83,7 @@ export default function BuildArea({
   const isBuildRunning = pendingBuild?.status === 'in_progress';
   const buildingCommit = pendingBuild ? (commits.find((c) => c.sha === pendingBuild.sha) ?? null) : null;
 
-  const { data: images = [], isLoading: imagesLoading } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
+  const { data: images = [], isLoading: imagesLoading, isSuccess: imagesLoaded, isError: imagesFailed, refetch: refetchImages } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
   const { data: firstEnvDeployment } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, firstEnvId);
   const firstEnvReleaseId = firstEnvDeployment?.releaseId ?? '';
 
@@ -130,14 +131,21 @@ export default function BuildArea({
 
   const isLatest = selectedImage?.imageId === images[0]?.imageId;
   const isDeploying = deployTrack.isPending;
-  const canDeploy = !!selectedImage?.imageId && !!firstEnvId && !isDeploying && !isBuildPending;
+  // Image-only components (e.g. knowledge base data sources) have no builds, so there is
+  // no image to pick. Once deployed they can still be redeployed: an empty imageId makes
+  // the BFF cut a new release from the current workload, picking up component changes.
+  // Only once the images have loaded: a failed fetch is not the same as having none.
+  const redeployCurrent = imagesLoaded && images.length === 0 && !!firstEnvReleaseId;
+  // A picked image must still be in the loaded list, so a stale pick is not deployed.
+  const imagePicked = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId);
+  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending;
 
   const handleDeploy = () => {
     if (!canDeploy) return;
     deployTrack.mutate({
       componentId,
       id: versionId,
-      imageId: selectedImage!.imageId,
+      imageId: selectedImage?.imageId ?? '',
       environmentId: firstEnvId,
       deploymentPipelineId,
     });
@@ -191,7 +199,6 @@ export default function BuildArea({
   return (
     <>
       <Card
-        variant="outlined"
         sx={{
           width: 320,
           flexShrink: 0,
@@ -202,7 +209,7 @@ export default function BuildArea({
         }}>
         <CardContent>
           <Typography variant="h4" component="h2" sx={{ mb: 2 }}>
-            Set Up
+            Set up
           </Typography>
 
           <Divider sx={{ mb: 2 }} />
@@ -232,16 +239,27 @@ export default function BuildArea({
                 variant="detail"
               />
             </Box>
+          ) : imagesFailed ? (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => refetchImages()}>
+                  Retry
+                </Button>
+              }>
+              Could not load the build images.
+            </Alert>
           ) : images.length === 0 ? (
             <Box sx={{ py: 2 }}>
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, color: 'text.secondary' }}>
                 <Rocket size={16} />
                 <Typography variant="body2" color="text.secondary">
-                  No images available yet.
+                  {redeployCurrent ? 'No build images for this component.' : 'No images available yet.'}
                 </Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary">
-                Trigger a build from the Build page first.
+                {redeployCurrent ? 'Deploy redeploys the current image with the latest component settings.' : 'Trigger a build from the Build page first.'}
               </Typography>
             </Box>
           ) : (
@@ -259,7 +277,7 @@ export default function BuildArea({
             control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
             label={
               <Stack direction="row" alignItems="center" gap={0.5}>
-                <Typography variant="body2">Auto Deploy on Build</Typography>
+                <Typography variant="body2">Auto deploy on build</Typography>
                 {updateAutoDeploy.isPending && <CircularProgress size={12} />}
               </Stack>
             }
@@ -270,7 +288,7 @@ export default function BuildArea({
                hidden for file/event/AI-agent, which have no endpoints) ── */}
           {!flags.isAutomation && !hideEndpoints && !!firstEnvReleaseId && (
             <Button variant="text" size="small" startIcon={<Settings size={14} />} onClick={() => setEndpointConfigOpen(true)} sx={{ mb: 2, width: '100%', justifyContent: 'flex-start' }}>
-              Endpoint Configurations
+              Endpoint configurations
             </Button>
           )}
 
@@ -281,7 +299,7 @@ export default function BuildArea({
                 startIcon={isDeploying || isBuildRunning ? <CircularProgress color="inherit" size={14} /> : selectedDeployAction === 'deploy' ? <Rocket size={14} /> : <Settings size={14} />}
                 onClick={handleMainButtonClick}
                 sx={{ whiteSpace: 'nowrap', flex: 1 }}>
-                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & Deploying' : isBuildPending ? 'Build queued' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & Deploy'}
+                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
               </Button>
               <Button size="small" sx={{ px: 0.5 }} aria-label="More deploy options" aria-expanded={splitOpen} onClick={() => setSplitOpen((prev) => !prev)}>
                 <ChevronDown size={14} />
@@ -302,7 +320,7 @@ export default function BuildArea({
                         <MenuItem onClick={handleSelectConfigureAndDeploy} selected={selectedDeployAction === 'configure'}>
                           <Stack direction="row" alignItems="center" gap={1}>
                             <Settings size={14} />
-                            <Typography variant="body2">Configure &amp; Deploy</Typography>
+                            <Typography variant="body2">Configure &amp; deploy</Typography>
                           </Stack>
                         </MenuItem>
                       </MenuList>
@@ -317,7 +335,7 @@ export default function BuildArea({
 
       {/* Endpoint configuration drawer */}
       {!flags.isAutomation && !hideEndpoints && !!firstEnvReleaseId && (
-        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} />
+        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} projectId={projectId} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} />
       )}
 
       {/* Image selection drawer */}
@@ -345,12 +363,14 @@ export default function BuildArea({
 
       {/* Confirm deploy after configure */}
       <Dialog open={deployConfirmOpen} onClose={() => setDeployConfirmOpen(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Deploy Now?</DialogTitle>
+        <DialogTitle>Deploy now?</DialogTitle>
         <DialogContent>
           <DialogContentText>Configuration saved. Would you like to deploy the selected image to the first environment now?</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeployConfirmOpen(false)}>Cancel</Button>
+          <Button variant="outlined" color="inherit" onClick={() => setDeployConfirmOpen(false)}>
+            Cancel
+          </Button>
           <Button
             variant="contained"
             disabled={!canDeploy}

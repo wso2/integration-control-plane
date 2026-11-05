@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useProviderTemplate, useProviderTemplates } from '../../hooks/useGenaiServices';
@@ -211,11 +210,21 @@ export default function GenAIServiceWizard({ orgHandle, submitting, submitError,
               {templateLoading && <CircularProgress size={20} sx={{ display: 'block', mb: 2 }} />}
               <Stack gap={2} sx={{ maxWidth: 560 }}>
                 <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
-                  <TextField label="Name" required fullWidth value={name} onChange={(e) => setName(e.target.value)} sx={{ ...requiredSx, flex: 1 }} />
-                  <TextField label="Version" fullWidth value={version} onChange={(e) => setVersion(e.target.value)} sx={{ flex: 1 }} />
+                  <TextField labelPlacement="top" label="Name" required fullWidth value={name} onChange={(e) => setName(e.target.value)} sx={{ ...requiredSx, flex: 1 }} />
+                  <TextField labelPlacement="top" label="Version" fullWidth value={version} onChange={(e) => setVersion(e.target.value)} sx={{ flex: 1 }} />
                 </Stack>
-                <TextField label="Summary" fullWidth multiline rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
-                <TextField label="Service URL" required fullWidth value={serviceUrl} onChange={(e) => setServiceUrl(e.target.value)} disabled={serviceUrlLocked} sx={requiredSx} helperText={serviceUrlLocked ? 'Provided by the selected provider.' : ' '} />
+                <TextField labelPlacement="top" label="Summary" fullWidth multiline rows={2} value={summary} onChange={(e) => setSummary(e.target.value)} />
+                <TextField
+                  labelPlacement="top"
+                  label="Service URL"
+                  required
+                  fullWidth
+                  value={serviceUrl}
+                  onChange={(e) => setServiceUrl(e.target.value)}
+                  disabled={serviceUrlLocked}
+                  sx={requiredSx}
+                  helperText={serviceUrlLocked ? 'Provided by the selected provider.' : ' '}
+                />
               </Stack>
             </>
           )}
@@ -249,8 +258,17 @@ export default function GenAIServiceWizard({ orgHandle, submitting, submitError,
 
                     <Stack gap={2}>
                       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2}>
-                        <TextField label="Name" required size="small" fullWidth value={ep.name} onChange={(e) => patchEndpoint(ep.id, { name: e.target.value })} sx={{ ...requiredSx, flex: 1 }} />
-                        <TextField label="Endpoint URL" required size="small" fullWidth value={ep.values[SERVICE_URL_FIELD] ?? ''} onChange={(e) => setEndpointValue(ep.id, SERVICE_URL_FIELD, e.target.value)} sx={{ ...requiredSx, flex: 1 }} />
+                        <TextField labelPlacement="top" label="Name" required size="small" fullWidth value={ep.name} onChange={(e) => patchEndpoint(ep.id, { name: e.target.value })} sx={{ ...requiredSx, flex: 1 }} />
+                        <TextField
+                          labelPlacement="top"
+                          label="Endpoint URL"
+                          required
+                          size="small"
+                          fullWidth
+                          value={ep.values[SERVICE_URL_FIELD] ?? ''}
+                          onChange={(e) => setEndpointValue(ep.id, SERVICE_URL_FIELD, e.target.value)}
+                          sx={{ ...requiredSx, flex: 1 }}
+                        />
                       </Stack>
 
                       {paramEntries.length > 0 && (
@@ -264,6 +282,7 @@ export default function GenAIServiceWizard({ orgHandle, submitting, submitError,
                               const isRevealed = revealed.has(revealKey);
                               return (
                                 <TextField
+                                  labelPlacement="top"
                                   key={entry.name}
                                   label={entry.name}
                                   required={!entry.isOptional}

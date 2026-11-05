@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, Divider, MenuItem, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from './common/TextField';
+import { Box, Button, Divider, MenuItem, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -80,9 +79,11 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
       <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems={{ sm: 'flex-end' }}>
         {!project && (
           <TextField
+            labelPlacement="top"
             select
             size="small"
             label="Project"
+            required
             sx={fieldSx}
             value={projectHandler}
             onChange={(e) => {
@@ -96,7 +97,7 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
             <MenuItem value={CREATE}>
               <Stack direction="row" alignItems="center" gap={1} sx={actionItemSx}>
                 <Plus size={16} />
-                Create Project
+                Create project
               </Stack>
             </MenuItem>
             <Divider />
@@ -109,9 +110,11 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
         )}
 
         <TextField
+          labelPlacement="top"
           select
           size="small"
           label="Integration"
+          required
           sx={fieldSx}
           value={componentHandler}
           disabled={!projectHandler}
@@ -126,7 +129,7 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
           <MenuItem value={CREATE}>
             <Stack direction="row" alignItems="center" gap={1} sx={actionItemSx}>
               <Plus size={16} />
-              Create Integration
+              Create integration
             </Stack>
           </MenuItem>
           <Divider />
@@ -138,7 +141,7 @@ export default function IntegrationScopePicker({ org, project, segment }: Integr
         </TextField>
 
         <Button variant="contained" onClick={go} disabled={!projectHandler || !componentHandler} sx={goButtonSx}>
-          Go to Integration
+          Go to integration
         </Button>
       </Stack>
     </Box>

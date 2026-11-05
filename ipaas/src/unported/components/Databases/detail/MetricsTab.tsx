@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Grid, MenuItem, Paper, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Box, Button, Grid, MenuItem, Paper, Skeleton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { LineChart } from '@wso2/oxygen-ui-charts-react';
 import { useState, type JSX } from 'react';
 import { useServerMetrics } from '../../../../hooks/usePlatformServices';
@@ -34,7 +33,7 @@ export default function MetricsTab({ serverId, variant = 'db-servers' }: { serve
   return (
     <Box>
       <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-        <TextField select size="small" label="Period" value={period} onChange={(e) => setPeriod(e.target.value as MetricPeriod)} sx={{ minWidth: 180 }}>
+        <TextField labelPlacement="top" select size="small" label="Period" value={period} onChange={(e) => setPeriod(e.target.value as MetricPeriod)} sx={{ minWidth: 180 }}>
           {METRIC_PERIODS.map((p) => (
             <MenuItem key={p.value} value={p.value}>
               {p.label}

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, MenuItem, PageContent, Paper, Select, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, MenuItem, PageContent, Paper, Select, Stack, Tab, Tabs, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp, Edit, FileText, Plus, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import ReactMarkdown from 'react-markdown';

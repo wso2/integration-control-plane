@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, CircularProgress, MenuItem, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, CircularProgress, MenuItem, PageContent, PageTitle, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, GitHub } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
@@ -172,7 +171,7 @@ export default function ConfigureDelivery(scope: OrgScope | ProjectScope): JSX.E
               {dataPlanesLoading ? (
                 <CircularProgress size={24} />
               ) : (
-                <TextField select label="Data Plane" size="small" value={dataPlaneId} onChange={(e) => setDataPlaneId(e.target.value)} disabled={isEdit} fullWidth>
+                <TextField labelPlacement="top" select label="Data Plane" size="small" value={dataPlaneId} onChange={(e) => setDataPlaneId(e.target.value)} disabled={isEdit} fullWidth>
                   {isEdit && dataPlaneId && !sharedDataPlanes.some((dp) => dp.id === dataPlaneId) && <MenuItem value={dataPlaneId}>{dataPlaneId}</MenuItem>}
                   {sharedDataPlanes.map((dp) => (
                     <MenuItem key={dp.id} value={dp.id}>
@@ -192,7 +191,7 @@ export default function ConfigureDelivery(scope: OrgScope | ProjectScope): JSX.E
                 options={[] as string[]}
                 value={incidentLabels}
                 onChange={(_, value) => setIncidentLabels(value as string[])}
-                renderInput={(params) => <TextField {...params} label="Incident Label" helperText="GitHub issue labels that mark an incident. Press Enter to add." />}
+                renderInput={(params) => <TextField labelPlacement="top" {...params} label="Incident Label" helperText="GitHub issue labels that mark an incident. Press Enter to add." />}
               />
               <Autocomplete
                 multiple
@@ -200,7 +199,7 @@ export default function ConfigureDelivery(scope: OrgScope | ProjectScope): JSX.E
                 options={[] as string[]}
                 value={invalidLabels}
                 onChange={(_, value) => setInvalidLabels(value as string[])}
-                renderInput={(params) => <TextField {...params} label="Invalid Label (optional)" helperText="Labels that mark an issue as not a real incident. Press Enter to add." />}
+                renderInput={(params) => <TextField labelPlacement="top" {...params} label="Invalid Label (optional)" helperText="Labels that mark an issue as not a real incident. Press Enter to add." />}
               />
             </Stack>
           )}

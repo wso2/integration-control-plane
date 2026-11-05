@@ -75,7 +75,7 @@ export function RolesTab({ orgHandler, projectId, projectHandler, componentHandl
       )}
       <ListingTable.Container>
         <ListingTable.Toolbar
-          searchSlot={<SearchField value={search} onChange={setSearch} />}
+          searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
           actions={
             !effectiveReadOnly && (
               <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => navigate(newOrgRoleUrl(orgHandler))}>

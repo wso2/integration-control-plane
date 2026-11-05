@@ -16,20 +16,16 @@
  * under the License.
  */
 
-import { Box, Button, FormControlLabel, IconButton, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Button, FormControlLabel, IconButton, Radio, RadioGroup, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import StringArrayInput from '../common/StringArrayInput';
 import { PROBE_TYPE, type HttpHeader, type ProbeType } from '../../types/healthChecks';
 import { REQUIRED_ERROR, validatePath, validatePort, type ProbeFormState } from '../../utils/healthChecks';
 
-/** Colour the required-field asterisk red (Devant style). */
-const reqSx = { '& .MuiFormLabel-asterisk': { color: 'error.main' } } as const;
-
 /** The required numeric Port field shared by the HTTP GET and TCP probe forms. */
 function PortField({ value, onChange, onBlur, error }: { value: string; onChange: (value: string) => void; onBlur: () => void; error?: string }): JSX.Element {
-  return <TextField label="Port" required size="small" value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} inputProps={{ inputMode: 'numeric' }} sx={{ width: 120, ...reqSx }} error={!!error} helperText={error ?? ' '} />;
+  return <TextField labelPlacement="top" label="Port" required size="small" value={value} onChange={(e) => onChange(e.target.value)} onBlur={onBlur} inputProps={{ inputMode: 'numeric' }} sx={{ width: 120 }} error={!!error} helperText={error ?? ' '} />;
 }
 
 interface ProbeConfigFieldsProps {
@@ -57,9 +53,9 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
         Select {kind} Probe Type:
       </Typography>
       <RadioGroup row value={form.type} onChange={(e) => onChange({ type: e.target.value as Exclude<ProbeType, ''> })} sx={{ mb: 2 }}>
-        <FormControlLabel value={PROBE_TYPE.HTTP_GET} control={<Radio />} label="HTTP GET Request" />
-        <FormControlLabel value={PROBE_TYPE.TCP} control={<Radio />} label="TCP Probe" />
-        <FormControlLabel value={PROBE_TYPE.EXEC} control={<Radio />} label="Execute a Command" />
+        <FormControlLabel value={PROBE_TYPE.HTTP_GET} control={<Radio />} label="HTTP GET request" />
+        <FormControlLabel value={PROBE_TYPE.TCP} control={<Radio />} label="TCP probe" />
+        <FormControlLabel value={PROBE_TYPE.EXEC} control={<Radio />} label="Execute a command" />
       </RadioGroup>
 
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -71,13 +67,14 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
           <Stack direction="row" gap={2} sx={{ mb: 2 }}>
             <PortField value={form.port} onChange={(v) => onChange({ port: v })} onBlur={touch('port')} error={shownErr('port', validatePort(form.port))} />
             <TextField
+              labelPlacement="top"
               label="Path"
               required
               size="small"
               value={form.path}
               onChange={(e) => onChange({ path: e.target.value })}
               onBlur={touch('path')}
-              sx={{ flex: 1, ...reqSx }}
+              sx={{ flex: 1 }}
               error={!!shownErr('path', validatePath(form.path))}
               helperText={shownErr('path', validatePath(form.path)) ?? ' '}
             />
@@ -86,24 +83,26 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
             {form.httpHeaders.map((h, i) => (
               <Stack key={i} direction="row" gap={1.5} alignItems="flex-start">
                 <TextField
-                  label="Header Key"
+                  labelPlacement="top"
+                  label="Header key"
                   required
                   size="small"
                   value={h.name}
                   onChange={(e) => setHeaders(form.httpHeaders.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
                   onBlur={touch(`hk${i}`)}
-                  sx={{ flex: 1, ...reqSx }}
+                  sx={{ flex: 1 }}
                   error={!!shownErr(`hk${i}`, h.name.trim() === '' ? REQUIRED_ERROR : undefined)}
                   helperText={shownErr(`hk${i}`, h.name.trim() === '' ? REQUIRED_ERROR : undefined) ?? ' '}
                 />
                 <TextField
-                  label="Header Value"
+                  labelPlacement="top"
+                  label="Header value"
                   required
                   size="small"
                   value={h.value}
                   onChange={(e) => setHeaders(form.httpHeaders.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
                   onBlur={touch(`hv${i}`)}
-                  sx={{ flex: 1, ...reqSx }}
+                  sx={{ flex: 1 }}
                   error={!!shownErr(`hv${i}`, h.value.trim() === '' ? REQUIRED_ERROR : undefined)}
                   helperText={shownErr(`hv${i}`, h.value.trim() === '' ? REQUIRED_ERROR : undefined) ?? ' '}
                 />
@@ -114,7 +113,7 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
             ))}
           </Stack>
           <Button variant="outlined" size="small" startIcon={<Plus size={16} />} onClick={() => setHeaders([...form.httpHeaders, { name: '', value: '' }])}>
-            Add HTTP Header
+            Add HTTP header
           </Button>
         </>
       )}
@@ -126,7 +125,7 @@ export default function ProbeConfigFields({ kind, form, onChange }: ProbeConfigF
           <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1, fontFamily: 'monospace' }}>
             Eg. [&quot;cat&quot;, &quot;/tmp/healthy&quot;]
           </Typography>
-          <StringArrayInput label="Command" value={form.command} onChange={(command) => onChange({ command })} addLabel="Add Command" />
+          <StringArrayInput label="Command" value={form.command} onChange={(command) => onChange({ command })} addLabel="Add command" />
         </Box>
       )}
     </Box>

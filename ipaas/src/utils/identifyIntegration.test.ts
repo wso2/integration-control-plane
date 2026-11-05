@@ -29,6 +29,11 @@ describe('identifyIntegration — RAG types', () => {
     expect(identifyIntegration('byoiService', 'rag-service').type).toBe('integration-as-api');
   });
 
+  it('maps a knowledge base data source to rag-ingestion and its service to integration-as-api', () => {
+    expect(identifyIntegration('automation', 'kb-ingestion').type).toBe('rag-ingestion');
+    expect(identifyIntegration('service', 'knowledge-base').type).toBe('integration-as-api');
+  });
+
   it('leaves a plain byoi service (no RAG subtype) unsupported', () => {
     expect(identifyIntegration('byoiService', null).type).toBe('unsupported');
   });

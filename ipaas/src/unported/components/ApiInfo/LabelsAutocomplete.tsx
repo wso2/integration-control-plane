@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Autocomplete, Checkbox, Chip } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Autocomplete, Checkbox, Chip, TextField } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import menuItems from './menuItems.json';
 
@@ -46,7 +45,7 @@ export default function LabelsAutocomplete({ value, onChange, disabled }: Labels
         </li>
       )}
       renderTags={(val, getTagProps) => val.map((option, index) => <Chip label={option} size="small" {...getTagProps({ index })} key={option} />)}
-      renderInput={(params) => <TextField {...params} label="Labels" size="small" />}
+      renderInput={(params) => <TextField labelPlacement="top" {...params} label="Labels" size="small" />}
     />
   );
 }

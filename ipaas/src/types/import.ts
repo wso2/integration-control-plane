@@ -17,9 +17,9 @@
  */
 
 import type { ReactNode } from 'react';
-import type { GitProvider, WorkspaceIntegrationType } from './project';
+import type { WorkspaceIntegrationType } from './project';
 
-export type { GitProvider as SourceMode } from './project';
+export type SourceMode = 'github' | 'public' | 'azure-devops';
 export type { WorkspaceIntegrationType as IntegrationType } from './project';
 
 export type AuthStatus = 'idle' | 'authenticating' | 'needs-install' | 'installing' | 'done' | 'failed';
@@ -27,7 +27,7 @@ export type AuthStatus = 'idle' | 'authenticating' | 'needs-install' | 'installi
 export interface LocationState {
   authCode?: string;
   authenticated?: boolean;
-  mode?: GitProvider;
+  mode?: SourceMode;
 }
 
 export interface IntegrationTypeOption {

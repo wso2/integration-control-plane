@@ -16,10 +16,10 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Divider, Link, PageTitle, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Clock, GitCommit, History, Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Button, Divider, Link, PageTitle, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { GitCommit, History, Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import { RUNTIME_ARGS_DOC_URL } from '../../constants/docs';
 
 interface FormExecutionSummaryProps {
@@ -38,26 +38,24 @@ interface FormExecutionSummaryProps {
  * Devant's FormExecutionSummary layout.
  */
 export default function FormExecutionSummary({ commitSha, buildDate, onNewTest, newTestDisabled, onExecutions, onRefresh, refreshDisabled }: FormExecutionSummaryProps): JSX.Element {
-  const age = buildDate ? formatDistanceToNow(buildDate) : '--';
-
   return (
     <Box sx={{ width: '100%' }}>
       <PageTitle>
-        <PageTitle.Header>Test Your Automation</PageTitle.Header>
+        <PageTitle.Header>Test your automation</PageTitle.Header>
         <PageTitle.Actions>
-          <Tooltip title="Create New Test">
+          <Tooltip title="Create new test">
             <span>
               <Button variant="text" size="small" startIcon={<Plus size={16} />} disabled={newTestDisabled} onClick={onNewTest}>
-                New Test
+                New test
               </Button>
             </span>
           </Tooltip>
-          <Tooltip title="View Executions">
+          <Tooltip title="View executions">
             <Button variant="text" size="small" startIcon={<History size={16} />} onClick={onExecutions}>
               Executions
             </Button>
           </Tooltip>
-          <Tooltip title="Refresh Test">
+          <Tooltip title="Refresh test">
             <span>
               <Button variant="text" size="small" startIcon={<RefreshCw size={16} />} disabled={refreshDisabled} onClick={onRefresh}>
                 Refresh
@@ -75,19 +73,20 @@ export default function FormExecutionSummary({ commitSha, buildDate, onNewTest, 
       </Alert>
 
       <Stack direction="row" alignItems="center" gap={2} sx={{ color: 'text.secondary' }}>
-        <Typography variant="caption">Current Build:</Typography>
+        <Typography variant="caption">Current build:</Typography>
         <Stack direction="row" alignItems="center" gap={0.5}>
           <GitCommit size={14} />
           <Typography variant="body2" color="text.secondary">
             {commitSha ? commitSha.slice(0, 9) : '--'}
           </Typography>
         </Stack>
-        <Stack direction="row" alignItems="center" gap={0.5}>
-          <Clock size={14} />
+        {buildDate ? (
+          <RelativeTime time={formatDistanceToNow(buildDate)} dateTime={buildDate} tooltip={formatDateTime(buildDate)} />
+        ) : (
           <Typography variant="body2" color="text.secondary">
-            {age}
+            --
           </Typography>
-        </Stack>
+        )}
       </Stack>
 
       <Divider sx={{ mt: 2 }} />

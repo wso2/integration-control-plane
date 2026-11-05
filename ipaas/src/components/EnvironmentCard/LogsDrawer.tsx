@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, Checkbox, CircularProgress, Drawer, FormControlLabel, IconButton, InputAdornment, OutlinedInput, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, Checkbox, CircularProgress, DrawerPanel, FormControlLabel, IconButton, InputAdornment, OutlinedInput, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { RefreshCcw, Search, X } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -35,17 +35,6 @@ interface LogsDrawerProps {
   /** The run's bounds, which cloud needs to isolate this execution's log lines. */
   run?: ExecutionLogWindow;
 }
-
-const drawerSx = {
-  '& .MuiDrawer-paper': {
-    width: 680,
-    position: 'fixed',
-    top: 64,
-    height: 'calc(100% - 64px)',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-} as const;
 
 export default function LogsDrawer({ open, onClose, executionId, componentId, deploymentTrackId, environmentId, run }: LogsDrawerProps) {
   const queryClient = useQueryClient();
@@ -73,16 +62,13 @@ export default function LogsDrawer({ open, onClose, executionId, componentId, de
   }, [lines, search, filterMode]);
 
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-      {/* Header */}
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600 }}>
-          Latest Logs
-        </Typography>
-        <IconButton size="small" aria-label="close" onClick={handleClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={handleClose} width={680}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Latest logs</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
       {/* Search + filter */}
       <Box sx={{ px: 2, pt: 2, pb: 1, flexShrink: 0 }}>
@@ -100,9 +86,11 @@ export default function LogsDrawer({ open, onClose, executionId, componentId, de
           endAdornment={
             search ? (
               <InputAdornment position="end">
-                <IconButton size="small" onClick={() => setSearch('')} edge="end">
-                  <X size={13} />
-                </IconButton>
+                <Tooltip title="Clear search">
+                  <IconButton aria-label="Clear search" size="small" onClick={() => setSearch('')} edge="end">
+                    <X size={13} />
+                  </IconButton>
+                </Tooltip>
               </InputAdornment>
             ) : null
           }
@@ -123,7 +111,7 @@ export default function LogsDrawer({ open, onClose, executionId, componentId, de
       </Box>
 
       {/* Log content */}
-      <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 1 }}>
+      <DrawerPanel.Body sx={{ px: 2, py: 1 }}>
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <CircularProgress size={32} color="primary" />
@@ -149,7 +137,7 @@ export default function LogsDrawer({ open, onClose, executionId, componentId, de
             ))}
           </Box>
         )}
-      </Box>
-    </Drawer>
+      </DrawerPanel.Body>
+    </DrawerPanel>
   );
 }

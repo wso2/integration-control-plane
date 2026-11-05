@@ -72,10 +72,14 @@ describe('validateProjectHandler', () => {
     expect(validateProjectHandler('project-')).not.toBeNull();
   });
 
-  it('returns error for reserved names', () => {
-    expect(validateProjectHandler('new')).not.toBeNull();
-    expect(validateProjectHandler('settings')).not.toBeNull();
-    expect(validateProjectHandler('delete')).not.toBeNull();
+  it('returns error for handles that collide with a project-level route', () => {
+    expect(validateProjectHandler('import')).not.toBeNull();
+    expect(validateProjectHandler('redirect')).not.toBeNull();
+  });
+
+  it('accepts names that no longer collide with a route', () => {
+    expect(validateProjectHandler('new')).toBeNull();
+    expect(validateProjectHandler('settings')).toBeNull();
   });
 
   it('returns null for valid handlers', () => {

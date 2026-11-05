@@ -16,12 +16,12 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, MenuItem, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Button, CircularProgress, MenuItem, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Wrench } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useApimApi } from '../hooks/useApim';
 import { useProjectId } from '../hooks/useProjects';
@@ -31,7 +31,6 @@ import { toHandler } from '../utils/string';
 import { newComponentUrl, resourceUrl, type ProjectScope } from '../nav';
 
 const ROW_GAP = 2;
-const REQUIRED_SX = { '& .MuiFormLabel-asterisk': { color: 'error.main' } };
 const RESERVE_HELPER_SX = { '& .MuiFormHelperText-root': { minHeight: '1rem', mt: 0.5 } };
 
 /**
@@ -80,6 +79,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
   const [displayName, setDisplayName] = useState('');
   const [name, setName] = useState('');
   const [nameEdited, setNameEdited] = useState(false);
+  const [displayNameEdited, setDisplayNameEdited] = useState(false);
   const [description, setDescription] = useState('');
   const [version, setVersion] = useState('1.0');
   useEffect(() => {
@@ -116,6 +116,8 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
   const requiredFilled = displayName.trim().length > 0 && name.trim().length > 0 && version.trim().length > 0;
 
   const create = useCreateMcpProxy();
+  // The seeded name can change as the source loads, so only the user's own typing counts.
+  const allowLeave = useUnsavedChanges(displayNameEdited || nameEdited || description !== '' || version !== '1.0' || selectedApiIdState !== '');
   const canSubmit = !!apimId && !!apiInfo && requiredFilled && nameLengthValid && !nameTaken && versionValid && !create.isPending;
 
   const handleSubmit = () => {
@@ -124,68 +126,88 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
     const selectedOperations = operations.map((o) => ({ id: apimId, verb: o.verb, target: o.target, mcpFeature: 'Tool' as const }));
     create.mutate(
       { orgHandler: scope.org, projectId, name, displayName: displayName.trim(), description, context: basePath, version: version.trim(), endpoint: 'https://localhost:9001', policies: ['Bronze'], selectedOperations },
-      { onSuccess: (component) => navigate(resourceUrl({ level: 'components', org: scope.org, project: scope.project, component: component.handler }, 'overview')) },
+      {
+        onSuccess: (component) => {
+          allowLeave();
+          navigate(resourceUrl({ level: 'components', org: scope.org, project: scope.project, component: component.handler }, 'overview'));
+        },
+      },
     );
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => navigate(backUrl)} sx={{ mb: 1, textTransform: 'none' }}>
-        Back
+        {sourceHandler ? `Back to ${sourceName || 'integration'}` : 'Back to create integration'}
       </Button>
       <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1 }}>
-        <Typography variant="h1">Generate MCP Server</Typography>
+        <Typography variant="h1">Generate MCP server</Typography>
       </Stack>
       <Typography color="text.secondary" sx={{ mb: 4 }}>
         Expose this Integration as API&apos;s operations as MCP tools.
       </Typography>
 
       {!apimId && !loadingSource ? (
-        <Alert severity="info">No source API was provided. Open an Integration as API and use its Generate MCP Server action.</Alert>
+        <Alert severity="info">No source API was provided. Open an Integration as API and use its Generate MCP server action.</Alert>
       ) : (
         <Stack gap={ROW_GAP} sx={{ maxWidth: 760 }}>
           {/* Identity — Integration Name + Integration Id, two columns */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
-            <TextField required size="small" label="Integration Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth sx={{ flex: 1, ...REQUIRED_SX, ...RESERVE_HELPER_SX }} helperText=" " />
             <TextField
+              labelPlacement="top"
               required
               size="small"
-              label="Integration Id"
+              label="Integration name"
+              value={displayName}
+              onChange={(e) => {
+                setDisplayName(e.target.value);
+                setDisplayNameEdited(true);
+              }}
+              fullWidth
+              sx={{ flex: 1, ...RESERVE_HELPER_SX }}
+              helperText=" "
+            />
+            <TextField
+              labelPlacement="top"
+              required
+              size="small"
+              label="Integration ID"
               value={name}
               onChange={(e) => {
                 setNameEdited(true);
                 setName(e.target.value);
               }}
               fullWidth
-              sx={{ flex: 1, ...REQUIRED_SX, ...RESERVE_HELPER_SX }}
+              sx={{ flex: 1, ...RESERVE_HELPER_SX }}
               error={(!!name && !nameLengthValid) || nameTaken}
               helperText={identifierHelper ?? ' '}
             />
           </Stack>
 
           {/* Description — own row */}
-          <TextField size="small" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} sx={RESERVE_HELPER_SX} helperText=" " />
+          <TextField labelPlacement="top" optional size="small" label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} sx={RESERVE_HELPER_SX} helperText=" " />
 
           {/* Version (new MCP, editable) + Base Path (disabled) — one row */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
             <TextField
+              labelPlacement="top"
               required
               size="small"
               label="Version"
               value={version}
               onChange={(e) => setVersion(e.target.value)}
-              sx={{ flex: 1, ...REQUIRED_SX, ...RESERVE_HELPER_SX }}
+              sx={{ flex: 1, ...RESERVE_HELPER_SX }}
               error={!!version && !versionValid}
               helperText={version && !versionValid ? 'e.g. 1.0 or 1.0.0' : ' '}
             />
-            <TextField size="small" label="Base Path" value={basePath} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX, '& input': { fontFamily: 'monospace' } }} helperText=" " />
+            <TextField labelPlacement="top" size="small" label="Base path" value={basePath} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX, '& input': { fontFamily: 'monospace' } }} helperText=" " />
           </Stack>
 
           {/* Source Integration as API (disabled) + its API version (selectable) — one row */}
           <Stack direction={{ xs: 'column', sm: 'row' }} gap={2} alignItems="flex-start">
-            <TextField size="small" label="Integration as API" value={loadingSource && !sourceName ? 'Loading…' : sourceName || '—'} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
+            <TextField labelPlacement="top" size="small" label="Integration as API" value={loadingSource && !sourceName ? 'Loading…' : sourceName || '—'} fullWidth disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
             {versions.length > 0 ? (
-              <TextField select size="small" label="Source API Version" value={selectedApiId} onChange={(e) => setSelectedApiId(e.target.value)} sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" ">
+              <TextField labelPlacement="top" select size="small" label="Source API version" value={selectedApiId} onChange={(e) => setSelectedApiId(e.target.value)} sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" ">
                 {versions.map((v) => (
                   <MenuItem key={v.id} value={v.id}>
                     {v.apiVersion}
@@ -194,7 +216,7 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
                 ))}
               </TextField>
             ) : (
-              <TextField size="small" label="Source API Version" value={loadingApi || loadingSource ? 'Loading…' : sourceApiVersion || '—'} disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
+              <TextField labelPlacement="top" size="small" label="Source API version" value={loadingApi || loadingSource ? 'Loading…' : sourceApiVersion || '—'} disabled sx={{ flex: 1, ...RESERVE_HELPER_SX }} helperText=" " />
             )}
           </Stack>
 
@@ -202,9 +224,16 @@ export default function McpProxyFromApi(scope: ProjectScope): JSX.Element {
 
           <Stack direction="row" gap={1} sx={{ mt: 1 }}>
             <Button variant="contained" startIcon={create.isPending ? <CircularProgress color="inherit" size={16} /> : <Wrench size={16} />} onClick={handleSubmit} disabled={!canSubmit}>
-              {create.isPending ? 'Creating & Deploying ...' : 'Create & Deploy'}
+              {create.isPending ? 'Creating & deploying ...' : 'Create & deploy'}
             </Button>
-            <Button variant="outlined" onClick={() => navigate(backUrl)} disabled={create.isPending}>
+            <Button
+              variant="outlined"
+              color="inherit"
+              onClick={() => {
+                allowLeave();
+                navigate(backUrl);
+              }}
+              disabled={create.isPending}>
               Cancel
             </Button>
           </Stack>

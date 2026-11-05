@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, MenuItem, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, MenuItem, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -28,6 +27,9 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import BusyFields from '../components/common/BusyFields';
 import { resourceUrl, type OrgScope } from '../nav';
 import { CRITICAL_ENVIRONMENT_HELP, CRITICAL_ENVIRONMENT_LABEL } from '../constants/environment';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+
+const DEFAULT_NAME = 'My-New-Environment';
 
 export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -36,7 +38,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const { data: dataPlanes = [], isLoading: loadingDataPlanes, isError: dataPlanesError, refetch: refetchDataPlanes } = useDataPlanes();
   const create = useAddEnvironment();
 
-  const [name, setName] = useState('My-New-Environment');
+  const [name, setName] = useState(DEFAULT_NAME);
   const [description, setDescription] = useState('');
   const [dataplaneId, setDataplaneId] = useState('');
   const [critical, setCritical] = useState(false);
@@ -47,6 +49,8 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   useEffect(() => {
     if (dataPlanes.length) setDataplaneId((prev) => (prev && dataPlanes.some((d) => d.id === prev) ? prev : dataPlanes[0].id));
   }, [dataPlanes]);
+
+  const allowLeave = useUnsavedChanges(name !== DEFAULT_NAME || description !== '' || critical || (dataplaneId !== '' && dataPlanes.length > 0 && dataplaneId !== dataPlanes[0].id));
 
   const submit = () => {
     setError(null);
@@ -64,7 +68,10 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
         description: description.trim(),
       },
       {
-        onSuccess: () => navigate(listUrl, { state: { success: true, environmentName: name.trim() } }),
+        onSuccess: () => {
+          allowLeave();
+          navigate(listUrl, { state: { success: true, environmentName: name.trim() } });
+        },
         onError: (err) => {
           // The BFF's wording names the resource and its limit, so it is shown as sent.
           setErrorSeverity(isQuotaError(err) ? 'warning' : 'error');
@@ -81,13 +88,13 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const canSubmit = !!name.trim() && !create.isPending && !create.isSuccess;
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(listUrl)} sx={{ mb: 2 }}>
-        Back to Environments
+        Back to environments
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
-        Create Environment
+        Create environment
       </Typography>
 
       {error && (
@@ -98,7 +105,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
 
       <BusyFields busy={create.isPending}>
         <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
-          <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+          <TextField labelPlacement="top" label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
           {loadingDataPlanes ? (
             <CircularProgress size={20} />
           ) : dataPlanesError ? (
@@ -112,7 +119,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
               Failed to load data planes.
             </Alert>
           ) : dataPlanes.length > 1 ? (
-            <TextField select label="Data Plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
+            <TextField labelPlacement="top" select label="Data plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
               {dataPlanes.map((dp) => (
                 <MenuItem key={dp.id} value={dp.id}>
                   {dp.name}
@@ -120,7 +127,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
               ))}
             </TextField>
           ) : null}
-          <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
+          <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
           <Box>
             <FormControlLabel control={<Checkbox checked={critical} onChange={(_, v) => setCritical(v)} />} label={CRITICAL_ENVIRONMENT_LABEL} />
             <FormHelperText sx={{ mt: 0 }}>{CRITICAL_ENVIRONMENT_HELP}</FormHelperText>
@@ -129,7 +136,14 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
       </BusyFields>
 
       <Stack direction="row" gap={2}>
-        <Button variant="outlined" onClick={() => navigate(listUrl)} disabled={create.isPending}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(listUrl);
+          }}
+          disabled={create.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={submit} disabled={!canSubmit} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

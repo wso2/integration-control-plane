@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Autocomplete, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from './common/TextField';
+import { Autocomplete, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField } from '@wso2/oxygen-ui';
 import { useEffect, useState } from 'react';
 import type { ComponentDetail } from '../types/component';
 import { useProjectComponentLabels } from '../hooks/useProjects';
@@ -119,6 +118,8 @@ interface LabelDialogProps {
   currentLabels: string[];
 }
 
+const titleSx = { fontWeight: 700 } as const;
+
 export default function LabelDialog({ open, onClose, component, projectId, currentLabels }: LabelDialogProps) {
   const [labels, setLabels] = useState<string[]>(currentLabels);
   const updateComponent = useUpdateComponent();
@@ -131,6 +132,7 @@ export default function LabelDialog({ open, onClose, component, projectId, curre
 
   const options = [...new Set([...LABEL_OPTIONS, ...projectLabels])];
   const hasChanges = [...labels].sort().join(',') !== [...currentLabels].sort().join(',');
+  const hasLabels = currentLabels.length > 0;
 
   const handleSave = () => {
     updateComponent.mutate(
@@ -149,12 +151,9 @@ export default function LabelDialog({ open, onClose, component, projectId, curre
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Edit Labels</DialogTitle>
+      <DialogTitle sx={titleSx}>{hasLabels ? 'Edit labels' : 'Labels'}</DialogTitle>
       <DialogContent>
         <Stack gap={1} sx={{ pt: 1 }}>
-          <Typography variant="body2" color="text.secondary">
-            Add new label
-          </Typography>
           <Autocomplete
             multiple
             options={options}
@@ -169,12 +168,14 @@ export default function LabelDialog({ open, onClose, component, projectId, curre
                 return <Chip key={key} label={option} size="small" variant="outlined" {...tagProps} />;
               })
             }
-            renderInput={(params) => <TextField {...params} variant="outlined" size="small" placeholder={labels.length === 0 ? 'Press enter to add labels' : ''} />}
+            renderInput={(params) => (
+              <TextField {...params} labelPlacement="top" label={hasLabels ? 'Labels' : 'Add new label'} variant="outlined" size="small" placeholder={labels.length === 0 ? 'e.g. payments' : ''} helperText="Press Enter to add a label." />
+            )}
           />
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button variant="outlined" onClick={onClose} disabled={updateComponent.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={updateComponent.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={handleSave} disabled={!hasChanges || updateComponent.isPending} startIcon={updateComponent.isPending ? <CircularProgress size={13} color="inherit" /> : undefined}>

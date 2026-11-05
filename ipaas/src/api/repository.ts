@@ -47,11 +47,65 @@ interface GitTreeEntry {
   type: string; // 'tree' | 'blob'
 }
 
+interface AzureDevOpsOrganization {
+  organization: string;
+}
+
+interface AzureDevOpsProject {
+  id: string;
+  name: string;
+}
+
+interface AzureDevOpsRepository {
+  name: string;
+  project: string;
+  // Absent on a repository with no commits yet.
+  defaultBranch?: string;
+  webUrl?: string;
+}
+
 // GET repos answers 409 with this marker when the user's GitHub authorization
 // expired or was revoked — the UI falls back to the Authorize button.
 const GITHUB_AUTH_REQUIRED = 'github-auth-required';
+const AZURE_DEVOPS_AUTH_REQUIRED = 'azuredevops-auth-required';
 
 const isGitHubAuthRequired = (err: unknown): boolean => err instanceof BffError && err.status === 409 && err.body.includes(GITHUB_AUTH_REQUIRED);
+export const isAzureDevOpsAuthRequired = (err: unknown): boolean => err instanceof BffError && err.status === 409 && err.body.includes(AZURE_DEVOPS_AUTH_REQUIRED);
+
+export async function connectAzureDevOps(authorizationCode: string, redirectUri: string): Promise<AzureDevOpsOrganization[]> {
+  return items(await bff.post<ListResponse<AzureDevOpsOrganization>>('/git/azuredevops/organizations', { code: authorizationCode, redirectUri }));
+}
+
+export async function fetchAzureDevOpsOrganizations(): Promise<AzureDevOpsOrganization[]> {
+  return items(await bff.get<ListResponse<AzureDevOpsOrganization>>('/git/azuredevops/organizations'));
+}
+
+export async function fetchAzureDevOpsProjects(organization: string): Promise<AzureDevOpsProject[]> {
+  return items(await bff.get<ListResponse<AzureDevOpsProject>>(`/git/azuredevops/projects${q({ organization })}`));
+}
+
+export async function fetchAzureDevOpsRepositories(organization: string, project: string): Promise<AzureDevOpsRepository[]> {
+  return items(await bff.get<ListResponse<AzureDevOpsRepository>>(`/git/azuredevops/repos${q({ organization, project })}`));
+}
+
+const stripHeadsRef = (ref: string): string => ref.replace(/^refs\/heads\//, '');
+
+// Branch names only: which one is the default comes from the repository list
+// the picker already holds, so loading branches never refetches that list.
+export async function fetchAzureDevOpsBranches(organization: string, project: string, repo: string): Promise<string[]> {
+  return items(await bff.get<ListResponse<string>>(`/git/azuredevops/branches${q({ organization, project, repo })}`)).map(stripHeadsRef);
+}
+
+export function markAzureDevOpsDefaultBranch(names: string[], defaultBranchRef?: string): RepoBranch[] {
+  const defaultBranch = defaultBranchRef ? stripHeadsRef(defaultBranchRef) : undefined;
+  return names.map((name) => ({ name, isDefault: name === defaultBranch }));
+}
+
+export async function fetchAzureDevOpsContents(organization: string, project: string, repo: string, branch: string): Promise<RepoTreeNode[]> {
+  const response = await bff.get<{ items: GitTreeEntry[]; truncated?: boolean }>(`/git/azuredevops/tree${q({ organization, project, repo, branch })}`);
+  if (response?.truncated) console.warn(`[cloud] Azure DevOps tree for ${organization}/${project}/${repo}@${branch} is truncated`);
+  return buildRepoTree(response?.items ?? []);
+}
 
 // The shared branch/tree signatures identify a repo by owner+name only, so the
 // installation that grants access is resolved through this index, rebuilt on
@@ -97,11 +151,19 @@ const REPO_METADATA_EMPTY: RepoMetadata = {
   isSubPathEmpty: true,
 };
 
+export function toRepository(repo: Partial<Repository> | null | undefined): Repository | null {
+  if (!repo?.organizationApp || !repo.nameApp) return null;
+  return repo as Repository;
+}
+
 // BFF ComponentRepository fields map 1:1 to Repository; projectName scopes
-// the lookup to the component within the caller's namespace.
+// the lookup to the component within the caller's namespace. Repo-less
+// components (knowledge base services, proxies) answer with an object that
+// lacks the org and repo name, which is no repository at all.
 export async function fetchComponentRepository(projectId: string, componentHandler: string): Promise<Repository | null> {
   try {
-    return (await bff.get<Repository | null>(`/components/${seg(componentHandler)}/repository${q({ projectName: projectId })}`)) ?? null;
+    const repo = await bff.get<Partial<Repository> | null>(`/components/${seg(componentHandler)}/repository${q({ projectName: projectId })}`);
+    return toRepository(repo);
   } catch {
     return null;
   }
@@ -213,30 +275,32 @@ function collectBlobPaths(nodes: RepoTreeNode[], acc: string[] = []): string[] {
 export async function fetchRepoMetadata(org: string, repo: string, branch: string, subPath: string, isPublicRepo = false): Promise<RepoMetadata> {
   try {
     const tree = await fetchRepoContents(org, repo, branch, isPublicRepo);
-    if (tree.length === 0) return REPO_METADATA_EMPTY;
-
-    const blobs = collectBlobPaths(tree);
-    const norm = subPath.replace(/^\/+/, '').replace(/\/+$/, '');
-    const atRoot = (file: string) => blobs.includes(file);
-    const atPath = (file: string) => (norm === '' ? atRoot(file) : blobs.includes(`${norm}/${file}`));
-    const childrenOfPath = norm === '' ? blobs : blobs.filter((p) => p.startsWith(`${norm}/`));
-
-    return {
-      ...REPO_METADATA_DEFAULT,
-      isValidRepo: true,
-      isSubPathValid: norm === '' || childrenOfPath.length > 0,
-      isSubPathEmpty: childrenOfPath.length === 0,
-      hasBallerinaTomlInRoot: atRoot('Ballerina.toml'),
-      hasBallerinaTomlInPath: atPath('Ballerina.toml'),
-      hasPomXmlInRoot: atRoot('pom.xml'),
-      hasPomXmlInPath: atPath('pom.xml'),
-      hasDockerfileInPath: atPath('Dockerfile'),
-      isProcfileExists: atPath('Procfile'),
-      isEndpointYamlExists: atPath('endpoints.yaml') || atPath('endpoint.yaml'),
-    };
+    return metadataFromTree(tree, subPath);
   } catch {
     return REPO_METADATA_DEFAULT;
   }
+}
+
+export function metadataFromTree(tree: RepoTreeNode[], subPath: string): RepoMetadata {
+  if (tree.length === 0) return REPO_METADATA_EMPTY;
+  const blobs = collectBlobPaths(tree);
+  const norm = subPath.replace(/^\/+/, '').replace(/\/+$/, '');
+  const atRoot = (file: string) => blobs.includes(file);
+  const atPath = (file: string) => (norm === '' ? atRoot(file) : blobs.includes(`${norm}/${file}`));
+  const childrenOfPath = norm === '' ? blobs : blobs.filter((p) => p.startsWith(`${norm}/`));
+  return {
+    ...REPO_METADATA_DEFAULT,
+    isValidRepo: true,
+    isSubPathValid: norm === '' || childrenOfPath.length > 0,
+    isSubPathEmpty: childrenOfPath.length === 0,
+    hasBallerinaTomlInRoot: atRoot('Ballerina.toml'),
+    hasBallerinaTomlInPath: atPath('Ballerina.toml'),
+    hasPomXmlInRoot: atRoot('pom.xml'),
+    hasPomXmlInPath: atPath('pom.xml'),
+    hasDockerfileInPath: atPath('Dockerfile'),
+    isProcfileExists: atPath('Procfile'),
+    isEndpointYamlExists: atPath('endpoints.yaml') || atPath('endpoint.yaml'),
+  };
 }
 
 // The BFF advertises the deployable sample images; today that is only the

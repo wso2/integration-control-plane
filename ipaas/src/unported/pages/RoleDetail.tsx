@@ -41,8 +41,8 @@ import {
   Tooltip,
   Typography,
   PageContent,
+  TextField,
 } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
 import { ArrowLeft, ChevronDown, ChevronUp, Link2, Lock, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, useCallback, type JSX } from 'react';
 import { useParams } from 'react-router';
@@ -166,7 +166,7 @@ function AssignRoleToGroupsDialog({ orgHandler, roleId, roleName, existingGroupI
             value={selected}
             onChange={(_, v) => setSelected(v)}
             isOptionEqualToValue={(a, b) => a.groupId === b.groupId}
-            renderInput={(params) => <TextField {...params} label="Groups" />}
+            renderInput={(params) => <TextField labelPlacement="top" {...params} label="Groups" />}
           />
           <Box sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 2, bgcolor: 'background.paper' }}>
             <Typography variant="body2" sx={{ mb: 1 }}>
@@ -177,7 +177,7 @@ function AssignRoleToGroupsDialog({ orgHandler, roleId, roleName, existingGroupI
               <FormControlLabel value="selected" control={<Radio />} label="Selected Environments" />
             </RadioGroup>
             {envMode === 'selected' && (
-              <TextField select fullWidth label="Select applicable environments" value={selectedEnvs[0] || ''} onChange={(e) => setSelectedEnvs(e.target.value ? [e.target.value] : [])} sx={{ mt: 2 }}>
+              <TextField labelPlacement="top" select fullWidth label="Select applicable environments" value={selectedEnvs[0] || ''} onChange={(e) => setSelectedEnvs(e.target.value ? [e.target.value] : [])} sx={{ mt: 2 }}>
                 {allEnvironments.map((env) => (
                   <MenuItem key={env.id} value={env.id}>
                     {env.name}
@@ -341,7 +341,7 @@ export default function RoleDetail(): JSX.Element {
         <>
           <ListingTable.Container>
             <ListingTable.Toolbar
-              searchSlot={<SearchField value={search} onChange={setSearch} />}
+              searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
               actions={
                 <Authorized permissions={roleModifyPerms}>
                   <Button variant="contained" startIcon={<Plus size={18} />} onClick={() => setAddingGroups(true)}>

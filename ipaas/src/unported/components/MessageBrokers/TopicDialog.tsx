@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Stack, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useCreateKafkaTopic, useKafkaTopics, useKafkaUserConfigs, useUpdateKafkaTopic } from '../../../hooks/usePlatformServices';
 import type { KafkaTopic, KafkaTopicCreatePayload, KafkaTopicUpdatePayload } from '../../../types/platformServices';
@@ -137,6 +136,7 @@ export default function TopicDialog({ brokerId, topic, onClose }: TopicDialogPro
           {error && <Alert severity="error">{error}</Alert>}
 
           <TextField
+            labelPlacement="top"
             label="Topic Name"
             fullWidth
             size="small"
@@ -149,6 +149,7 @@ export default function TopicDialog({ brokerId, topic, onClose }: TopicDialogPro
           />
 
           <TextField
+            labelPlacement="top"
             label="Partitions"
             fullWidth
             size="small"
@@ -160,6 +161,7 @@ export default function TopicDialog({ brokerId, topic, onClose }: TopicDialogPro
           />
 
           <TextField
+            labelPlacement="top"
             label="Replication"
             fullWidth
             size="small"
@@ -171,6 +173,7 @@ export default function TopicDialog({ brokerId, topic, onClose }: TopicDialogPro
           />
 
           <TextField
+            labelPlacement="top"
             label="Min In-Sync Replicas"
             fullWidth
             size="small"
@@ -181,9 +184,10 @@ export default function TopicDialog({ brokerId, topic, onClose }: TopicDialogPro
             helperText={getFieldError('minInSyncReplicas', minInSyncReplicas) || getHelperText('minInSyncReplicas')}
           />
 
-          <TextField label="Retention Hours" fullWidth size="small" type="number" value={retentionHours} onChange={(e) => setRetentionHours(e.target.value)} helperText="Number of hours to retain messages" />
+          <TextField labelPlacement="top" label="Retention Hours" fullWidth size="small" type="number" value={retentionHours} onChange={(e) => setRetentionHours(e.target.value)} helperText="Number of hours to retain messages" />
 
           <TextField
+            labelPlacement="top"
             label="Retention Bytes"
             fullWidth
             size="small"
@@ -194,7 +198,7 @@ export default function TopicDialog({ brokerId, topic, onClose }: TopicDialogPro
             helperText={getFieldError('retentionBytes', retentionBytes) || getHelperText('retentionBytes')}
           />
 
-          <TextField select label="Cleanup Policy" size="small" fullWidth value={cleanupPolicy} onChange={(e) => setCleanupPolicy(e.target.value as 'delete' | 'compact' | 'compact,delete')}>
+          <TextField labelPlacement="top" select label="Cleanup Policy" size="small" fullWidth value={cleanupPolicy} onChange={(e) => setCleanupPolicy(e.target.value as 'delete' | 'compact' | 'compact,delete')}>
             <MenuItem value="delete">Delete</MenuItem>
             <MenuItem value="compact">Compact</MenuItem>
             <MenuItem value="compact,delete">Compact and Delete</MenuItem>
