@@ -46,7 +46,20 @@ function ServiceTable({ summaries, selected, onSelect }: { summaries: ServiceTra
       </TableHead>
       <TableBody>
         {summaries.map((s) => (
-          <TableRow key={s.service} hover selected={s.service === selected} onClick={() => onSelect(s.service)} sx={styles.clickableRow}>
+          <TableRow
+            key={s.service}
+            hover
+            selected={s.service === selected}
+            aria-selected={s.service === selected}
+            tabIndex={0}
+            onClick={() => onSelect(s.service)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect(s.service);
+              }
+            }}
+            sx={styles.clickableRow}>
             <TableCell sx={styles.mono}>{s.service}</TableCell>
             <TableCell>{s.traces.toLocaleString()}</TableCell>
             <TableCell>{s.errorTraces.toLocaleString()}</TableCell>

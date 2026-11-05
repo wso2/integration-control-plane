@@ -25,7 +25,7 @@ import * as styles from './IntegrationTraces.styles';
 
 interface TraceStatCardsProps {
   stats: TraceStats;
-  /** Services seen in the sampled spans; undefined while they load. */
+  /** Services seen in the sampled spans (the newest traces only); undefined while they load. */
   services: number | undefined;
 }
 
@@ -35,7 +35,7 @@ export default function TraceStatCards({ stats, services }: TraceStatCardsProps)
       <StatCard label="Total traces" value={formatCount(stats.traces, stats.lowerBound)} icon={<Waypoints size={20} />} iconColor="primary" />
       <StatCard label="Error traces" value={`${formatCount(stats.errorTraces, stats.lowerBound)} (${formatPercent(stats.errorRate)})`} icon={<TriangleAlert size={20} />} iconColor="error" />
       <StatCard label="Spans" value={formatCount(stats.spans, stats.lowerBound)} icon={<Layers size={20} />} iconColor="info" />
-      <StatCard label="Services" value={services === undefined ? '—' : services} icon={<Server size={20} />} iconColor="secondary" />
+      <StatCard label="Services (sampled)" value={services === undefined ? '—' : services} icon={<Server size={20} />} iconColor="secondary" />
     </Box>
   );
 }
