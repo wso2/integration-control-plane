@@ -73,6 +73,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
     isContentsLoading,
     isContentsError,
     authStatus,
+    canConnect,
     startGitHubAuth,
     startGitHubAppInstall,
     isCheckingAuth,
@@ -221,7 +222,9 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           </Box>
         ) : (
           <Box sx={{ mb: 1 }}>
-            {gitProvider === 'github' && <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />}
+            {gitProvider === 'github' && (
+              <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} canConnect={canConnect} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />
+            )}
             <RepoSourceFields source={source} directoryHint={workspaceHint} />
             {pathReady && !isContentsLoading && !isContentsError && !isWorkspace && (
               <Alert severity="info" sx={{ mb: 3 }}>

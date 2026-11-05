@@ -53,6 +53,7 @@ import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
 import type { IntegrationType, SourceMode, LocationState } from '../types/import';
 import { SAMPLE_REPO_URL } from '../constants/github';
 import { external } from '../paths';
+import ConnectRefused from '../components/Import/ConnectRefused';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems, selectMenuHeader } from '../components/Import/gitHubSelectActions';
 import { GitProvider } from '../types/credentials';
 import { buildAzureDevOpsRepoUrl, buildRepoUrl } from '../utils/gitProviderUrl';
@@ -68,7 +69,7 @@ import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
 import { useWorkflowRuntime } from '../hooks/useWorkflowRuntime';
 import { Scopes } from '../constants/permissions';
-import { useCan } from '../hooks/useCan';
+import { CONNECT_REFUSAL, useCan } from '../hooks/useCan';
 
 // One Moesif event per selectable integration type. A type added later without an entry here still
 // reaches Moesif through the generic 'component-create-select-type', with `integrationType` set.
@@ -96,7 +97,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const isPublicRepo = sourceMode === 'public';
   const isAzureDevOps = sourceMode === GitProvider.AZURE_DEVOPS;
 
-  const { authStatus, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth(preAuthenticated ? 'done' : pendingAuthCode ? 'authenticating' : 'idle');
+  const { authStatus, canConnect, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth(preAuthenticated ? 'done' : pendingAuthCode ? 'authenticating' : 'idle');
   const { authStatus: azureAuthStatus, errorMessage: azureAuthError, startAzureDevOpsAuth } = useAzureDevOpsAuth();
   const [selectedOrg, setSelectedOrg] = useState('');
   const [selectedAdoProject, setSelectedAdoProject] = useState('');
@@ -472,6 +473,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         </Box>
       );
     }
+    if (!canConnect) return <ConnectRefused label="Authorize with GitHub" icon={<GitHub size={16} />} mb={4} />;
     // Authorized, but the GitHub App is not installed on any
     // account yet. The install popup must open from this button's click —
     // opening it straight from the token exchange gets popup-blocked (no
@@ -552,14 +554,15 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           severity="error"
           sx={{ mb: 4 }}
           action={
-            <Button color="inherit" size="small" onClick={() => startAzureDevOpsAuth(() => refetchAdoOrganizations(), true)}>
+            <Button color="inherit" size="small" disabled={!canConnect} onClick={() => startAzureDevOpsAuth(() => refetchAdoOrganizations(), true)}>
               Reconnect
             </Button>
           }>
-          {azureAuthError || 'Your Azure DevOps connection needs to be refreshed.'}
+          {azureAuthError || 'Your Azure DevOps connection needs to be refreshed.'} {!canConnect && CONNECT_REFUSAL}
         </Alert>
       );
     }
+    if (!canConnect) return <ConnectRefused label={isAuthenticated ? 'Connect another account' : 'Connect Azure DevOps'} icon={<AzureDevOpsIcon size={16} />} mb={isAuthenticated ? 2 : 4} />;
     if (!isAuthenticated) {
       return (
         <Box sx={{ mb: 4 }}>
@@ -739,7 +742,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                         ),
                       },
                     }}>
-                    {organizationActionItems(!!githubInstallUrl, isAuthenticated ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
+                    {organizationActionItems(!!githubInstallUrl, isAuthenticated && canConnect ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
                     {orgOptions.map((org) => (
                       <MenuItem key={org} value={org}>
                         {org}

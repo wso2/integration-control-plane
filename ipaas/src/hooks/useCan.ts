@@ -26,6 +26,8 @@ export function useCan(): (scope: string) => boolean {
 
 export const AGENT_REFUSAL = "Your role doesn't allow this for AI agents.";
 
+export const CONNECT_REFUSAL = "Your role can't connect a GitHub or Azure DevOps account. You can still import from a public repository, or from an account already connected.";
+
 /** Why the role may not make an AI-agent write that agent-manager checks against `agentScope`; empty when it may. */
 export function useAgentRefusal(): (agentScope: string) => string {
   const can = useCan();
