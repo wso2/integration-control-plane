@@ -24,6 +24,7 @@ import PlanCard from './PlanCard';
 import TemporalPlanCard from '../Temporal/TemporalPlanCard';
 import { DatabasePlansSkeleton } from './DatabaseSkeletons';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import { useCreateDatabaseServer, useDatabaseOffering, useDatabaseServers } from '../../hooks/useDatabases';
 import { useCreateTemporalServer, useTemporalOffering, useTemporalServers } from '../../hooks/useTemporal';
 import { PLATFORM_SERVICE_TYPES, type PlatformServiceKind } from '../../constants/databases';
@@ -89,27 +90,33 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
   const validateName = isTemporal ? temporalNameError : databaseNameError;
   const nameError = validateName(name, takenNames ?? [], offering.data?.maxNameLength);
   const nameReady = name !== '' && !nameError && takenNames !== null;
+  const allowLeave = useUnsavedChanges(name !== '' && !create.isSuccess);
   const canCreate = nameReady && !!planId && !offering.isError && !create.isPending;
   const createError = create.isError ? (isTemporal ? toCreateTemporalError(create.error) : toCreateDatabaseError(create.error)) : null;
 
-  const pickKind = (next: PlatformServiceKind) => {
-    if (next === kind) return;
-    setKind(next);
+  // The heading stays mounted across steps, so it can take focus at once; the details step focuses its name field itself.
+  const goBack = () => {
+    setName('');
     setPickedPlan('');
     createDatabase.reset();
     createTemporal.reset();
-  };
-
-  // The heading stays mounted across steps, so it can take focus at once; the details step focuses its name field itself.
-  const goBack = () => {
     setStep('service');
     stepHeadingRef.current?.focus();
   };
 
+  const cancel = (leave: () => void) => () => {
+    allowLeave();
+    leave();
+  };
+
   const submit = () => {
     const input = { name, plan: planId || undefined };
-    if (isTemporal) createTemporal.mutate(input, { onSuccess: (server) => navigate(temporalUrl(scope, server.id)) });
-    else createDatabase.mutate(input, { onSuccess: (server) => navigate(databaseUrl(scope, server.id)) });
+    const open = (url: string) => {
+      allowLeave();
+      navigate(url);
+    };
+    if (isTemporal) createTemporal.mutate(input, { onSuccess: (server) => open(temporalUrl(scope, server.id)) });
+    else createDatabase.mutate(input, { onSuccess: (server) => open(databaseUrl(scope, server.id)) });
   };
 
   const createLabel = isTemporal ? 'Create Temporal server' : 'Create database';
@@ -120,7 +127,7 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
     <Grid container spacing={2}>
       {PLATFORM_SERVICE_TYPES.map((type) => (
         <Grid key={type.id} size={{ xs: 12, sm: 6, md: 3 }}>
-          <SelectableCard title={type.name} description={type.description} logo={type.logo && assetUrl(type.logo)} icon={<Workflow size={28} />} selected={type.id === kind} disabled={create.isPending} onSelect={() => pickKind(type.id)} />
+          <SelectableCard title={type.name} description={type.description} logo={type.logo && assetUrl(type.logo)} icon={<Workflow size={28} />} selected={type.id === kind} disabled={create.isPending} onSelect={() => setKind(type.id)} />
         </Grid>
       ))}
     </Grid>
@@ -255,7 +262,7 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
           {step === 'service' ? (
             <>
               {onCancel && (
-                <Button variant="outlined" color="inherit" onClick={onCancel}>
+                <Button variant="outlined" color="inherit" onClick={cancel(onCancel)}>
                   Cancel
                 </Button>
               )}

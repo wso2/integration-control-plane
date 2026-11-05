@@ -21,7 +21,7 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import CreateServiceWizard from '../components/Databases/CreateServiceWizard';
-import { DatabasePlansSkeleton } from '../components/Databases/DatabaseSkeletons';
+import { CreateServiceWizardSkeleton } from '../components/Databases/DatabaseSkeletons';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useDatabaseAvailability } from '../hooks/useDatabases';
 import { orgDatabasesUrl, type OrgScope } from '../nav';
@@ -45,8 +45,7 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
   if (availability.isLoading)
     return (
       <PageContent fullWidth>
-        {backButton}
-        <DatabasePlansSkeleton />
+        <CreateServiceWizardSkeleton />
       </PageContent>
     );
   if (availability.isError)
@@ -74,7 +73,8 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent fullWidth>
-      <CreateServiceWizard scope={scope} initialKind={initialKind} onCancel={leave} />
+      {/* Keyed on the type, so following another ?type= link from this page starts the wizard afresh. */}
+      <CreateServiceWizard key={initialKind ?? 'none'} scope={scope} initialKind={initialKind} onCancel={leave} />
     </PageContent>
   );
 }

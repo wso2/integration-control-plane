@@ -75,14 +75,18 @@ export const specGridSx = {
   overflow: 'hidden',
 } as const;
 
+// Two columns of one to four cells: no divider on the last row's bottom or after a cell with nothing beside it.
 export const specCellSx = {
   display: 'flex',
   flexDirection: 'column',
   gap: 0.25,
   px: 1.5,
   py: 1.25,
-  '&:nth-of-type(odd)': { borderRight: 1, borderColor: 'divider' },
-  '&:nth-of-type(-n+2)': { borderBottom: 1, borderColor: 'divider' },
+  borderBottom: 1,
+  borderColor: 'divider',
+  '&:last-of-type, &:nth-last-of-type(2):nth-of-type(odd)': { borderBottom: 0 },
+  '&:nth-of-type(odd):not(:last-of-type)': { borderRight: 1, borderColor: 'divider' },
+  '&:nth-of-type(odd):last-of-type': { gridColumn: 'span 2' },
 } as const;
 
 // Pinned to the bottom, so the notes line up across cards of one row.
