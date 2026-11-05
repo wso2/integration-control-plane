@@ -19,6 +19,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { BffError } from '../../api/_client';
 import type { IntegrationLinks } from '../../types/configuration';
 import type { JSONSchema } from '../../types/schema';
 import { ConfigForm } from '../SchemaConfigForm/ConfigForm';
@@ -142,6 +143,13 @@ describe('the Configure form with links', () => {
     expect(container.textContent).toContain("Unlinking didn't finish.");
     await act(async () => button('Try again').click());
     expect(writes).toEqual([{ connection: id('github') }]);
+  });
+
+  it('offers no retry of a refusal', async () => {
+    failed.current = { error: new BffError(409, JSON.stringify({ message: 'GitHub Acme · GITHUB_AUTH_TOKEN is already used by githubAuthToken.' })), variables: { target: { connection: id('github'), ref: 'github-acme' } } };
+    await act(async () => root.render(<Form />));
+    expect(container.textContent).toContain('GitHub Acme · GITHUB_AUTH_TOKEN is already used by githubAuthToken.');
+    expect(button('Try again')).toBeUndefined();
   });
 
   it('moves a link the build lost to the field it names now', async () => {
