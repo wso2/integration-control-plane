@@ -25,6 +25,7 @@
 export interface AuthConfig {
   issuer: string;
   clientId: string;
+  resource: string;
 }
 
 /** `GET /api/v1/auth/scopes`: what the SPA asks for when it signs in. It answers without a token. */

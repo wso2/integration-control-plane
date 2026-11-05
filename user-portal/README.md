@@ -67,8 +67,9 @@ Register the portal app on the published environment's ThunderID:
   call the token and revocation endpoints. Send `PUT /server-config/cors` with
   `{"allowedOrigins": ["http://localhost:5173", "http://localhost:9200"]}`, with an
   administrator's token that has the `system` scope.
-- Access tokens must be JWTs whose `aud` is the portal's API resource. The gateway checks it;
-  on the mock, set it as `GATEWAY_AUDIENCES`.
+- Access tokens must be JWTs whose `aud` is the portal's API resource: set its identifier as
+  `OIDC_RESOURCE`, which the SPA sends as `resource`. The gateway checks the audience; on the
+  mock, set the same value as `GATEWAY_AUDIENCES`.
 - Add the portal's own permissions to the portal's API resource and grant them to roles:
   `aiagent:view`, `automation:view` and `workflow:view` to see each kind of integration, and
   `automation:trigger` to run automations. UP-DP checks them itself; without a kind's view
