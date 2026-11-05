@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { hasMissingRequiredConfigs, missingConfigsReason } from './configStatus';
-import type { ResourceLink, SchemaConfigData } from '../../../types/configuration';
+import type { IntegrationLinks, SchemaConfigData } from '../../../types/configuration';
 
 // Package wso2/sftask: two required configurables of connection sfSales, and an optional one.
 const jsonSchema = btoa(
@@ -40,10 +40,27 @@ const jsonSchema = btoa(
   }),
 );
 const value = (key: string, v: string) => ({ key, values: [{ environmentUuid: 'development', value: v }] });
-const link = (configurables: Record<string, string>, hasValues = true): ResourceLink => ({
-  resourceType: 'salesforce-sales',
-  linked: true,
-  environments: [{ name: 'development', state: 'linked', inRelease: true, hasValues, configurables }],
+// ipaas-service's answer: development's release links configurables to salesforce-sales's keys.
+const link = (configurables: Record<string, string>, hasValues = true): IntegrationLinks => ({
+  kind: 'ballerina',
+  resources: [{ id: 'salesforce-sales', displayName: 'salesforce-sales', keys: [], valuesIn: hasValues ? ['development'] : [] }],
+  used: {},
+  connections: [],
+  fieldLinks: {},
+  orphaned: [],
+  env: {},
+  environments: [
+    {
+      name: 'development',
+      deployed: true,
+      resources: [{ ref: 'salesforce-sales', state: 'in_use' }],
+      valuesChanged: false,
+      linksNeedDeploy: false,
+      connections: {},
+      configurables: Object.fromEntries(Object.entries(configurables).map(([k, key]) => [k.replace('wso2.sftask.', 'wso2/sftask:'), { ref: 'salesforce-sales', key }])),
+      env: {},
+    },
+  ],
 });
 const sales = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL', 'wso2.sftask.sfSalesAuthClientId': 'SALESFORCE_AUTH_CLIENT_ID' });
 
@@ -54,16 +71,16 @@ describe('hasMissingRequiredConfigs', () => {
   });
 
   it('counts the configurables a link supplies as filled where its release carries it with values', () => {
-    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, [sales], 'development')).toBe(false);
-    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, [sales], 'production')).toBe(true);
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, sales, 'development')).toBe(false);
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, sales, 'production')).toBe(true);
     const noValues = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL', 'wso2.sftask.sfSalesAuthClientId': 'SALESFORCE_AUTH_CLIENT_ID' }, false);
-    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, [noValues], 'development')).toBe(true);
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, noValues, 'development')).toBe(true);
   });
 
   it('still asks for a required configurable no link supplies', () => {
     const partial = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL' });
-    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, [partial], 'development')).toBe(true);
-    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [value('wso2.sftask.sfSalesAuthClientId', 'id')] }, [partial], 'development')).toBe(false);
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, partial, 'development')).toBe(true);
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [value('wso2.sftask.sfSalesAuthClientId', 'id')] }, partial, 'development')).toBe(false);
   });
 
   it('counts a saved secret as set, though its value comes back empty', () => {
@@ -73,7 +90,7 @@ describe('hasMissingRequiredConfigs', () => {
   });
 
   it('ignores a link that supplies no configurable', () => {
-    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, [link({})], 'development')).toBe(true);
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, link({}), 'development')).toBe(true);
   });
 });
 
@@ -81,14 +98,14 @@ describe('missingConfigsReason', () => {
   const noValues = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL', 'wso2.sftask.sfSalesAuthClientId': 'SALESFORCE_AUTH_CLIENT_ID' }, false);
 
   it('names the linked resource without values', () => {
-    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [noValues], 'development')).toBe('salesforce-sales has no values in development. Add them on WSO2 Cloud.');
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, noValues, 'development')).toBe('salesforce-sales has no values in development. Add them on WSO2 Cloud.');
   });
 
   it('says required configurables have no values when no link is the cause', () => {
-    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [], 'development')).toBe('Required configurables have no values in development.');
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, undefined, 'development')).toBe('Required configurables have no values in development.');
   });
 
   it('is undefined when nothing is missing', () => {
-    expect(missingConfigsReason({ jsonSchema, configurations: [] }, [sales], 'development')).toBeUndefined();
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, sales, 'development')).toBeUndefined();
   });
 });

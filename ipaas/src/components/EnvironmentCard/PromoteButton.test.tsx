@@ -20,6 +20,7 @@ import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PromoteButton from './PromoteButton';
+import type { LinkableResource } from '../../types/configuration';
 
 const deployments: Record<string, { releaseId: string; build: { buildId: string } } | undefined> = {};
 const mutate = vi.hoisted(() => vi.fn());
@@ -30,8 +31,12 @@ vi.mock('../../hooks/useDeployments', () => ({
 vi.mock('../../hooks/useOrgUuid', () => ({ useOrgUuid: () => 'org' }));
 // The read of the links the click makes: what it answers, or a promise that never settles.
 const read = vi.hoisted(() => ({ result: undefined as unknown }));
-vi.mock('../../hooks/useConfiguration', () => ({ useResourceLinks: () => ({ refetch: () => read.result }) }));
-const answered = (data: unknown[]) => Promise.resolve({ isSuccess: true, data });
+vi.mock('../../hooks/useConfiguration', () => ({ useIntegrationLinks: () => ({ refetch: () => read.result }) }));
+const answered = (resources: LinkableResource[] = [], uses: string[] = []) =>
+  Promise.resolve({
+    isSuccess: true,
+    data: { kind: 'ballerina', resources, used: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [{ name: 'development', resources: uses.map((ref) => ({ ref, state: 'in_use' })) }] },
+  });
 vi.mock('../Authorized', () => ({ default: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock('@wso2/oxygen-ui', () => {
   const Plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
@@ -59,7 +64,7 @@ const button = () => container.querySelector('button')!;
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   mutate.mockClear();
-  read.result = answered([]);
+  read.result = answered();
   deployments.development = { releaseId: 'sftask-784445f4b4', build: { buildId: 'b1' } };
   deployments.production = { releaseId: 'sftask-66d97f5f4d', build: { buildId: 'b1' } };
   container = document.createElement('div');
@@ -111,19 +116,10 @@ describe('PromoteButton', () => {
   });
 
   it('warns before promoting a release whose resource has no values in the target', async () => {
-    read.result = answered([
-      {
-        resourceType: 'salesforce-marketing',
-        linked: true,
-        environments: [
-          { name: 'development', state: 'linked', inRelease: true, hasValues: true, configurables: {} },
-          { name: 'production', state: 'next_release', inRelease: false, hasValues: false, configurables: {} },
-        ],
-      },
-    ]);
+    read.result = answered([{ id: 'salesforce-marketing', displayName: 'Salesforce Marketing', keys: [], valuesIn: ['development'] }], ['salesforce-marketing']);
     await render();
     await act(async () => button().click());
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('salesforce-marketing has no values in production.');
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Salesforce Marketing has no values in production.');
     expect(mutate).not.toHaveBeenCalled();
   });
 });

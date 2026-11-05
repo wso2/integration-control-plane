@@ -304,7 +304,6 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   const { data, isLoading, isError } = useSchemaConfig(projectId, componentId, envId, deploymentTrackId, commitHash);
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, envId, deploymentTrackId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
-  const { links, linkedFrom } = useFormLinks(projectId, componentId, envId, open);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
   const deployTrack = useDeployDeploymentTrack();
@@ -326,6 +325,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return null;
     }
   }, [data?.jsonSchema]);
+  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? schemaFields(parsedSchema).map((f) => f.path) : []);
 
   // Seed values only on open; avoid clobbering edits on background refetches.
   const seededRef = useRef(false);
@@ -462,7 +462,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       const configurations: SchemaConfigItem[] = [];
       valueMap.forEach((value, key) => {
         // A link supplies it; a value of the form's own would compete with the link's.
-        if (linkedFrom.has(key)) return;
+        if (linked.linkedKeys.has(key)) return;
         if (value !== '' && value !== undefined && value !== null) {
           const linking = linkingMap.get(key);
           const isSensitive = sensitiveMap.get(key) || false;
@@ -574,7 +574,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     }
     return (
       <>
-        <FormLinks projectId={projectId} componentId={componentId} env={envId} open={open} links={links} build={buildId} />
+        {linked.top}
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -586,7 +586,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
-          linkedFrom={linkedFrom}
+          groups={linked.groups}
+          fieldLinks={linked.fieldLinks}
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>
@@ -601,7 +602,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
 
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
   // A field marked invalid before its link loaded is no longer the form's to fill.
-  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linkedFrom.has(key));
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
   const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';

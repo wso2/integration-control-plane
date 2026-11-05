@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { IntegrationLinks, KeyRef, LinkableResource, LinkConnection, OrphanedLink } from '../types/configuration';
+import type { EnvironmentLinks, IntegrationLinks, KeyRef, LinkableResource, LinkConnection, OrphanedLink } from '../types/configuration';
 
 /** `acme.ghdemo.githubAuthToken` → `acme/ghdemo:githubAuthToken`; a submodule joins its package with a dot. */
 export const configurableId = (configKey: string): string => {
@@ -116,3 +116,17 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
 
   return { editable, connections, target, orphaned: links.orphaned.map((o) => ({ ...o, name: name(o.ref) })) };
 }
+
+/** The resources the source environment's release uses that have no values in target: promoting starts it there without them. */
+export const promoteWithoutValues = (links: IntegrationLinks, source: string, target: string): string[] =>
+  (links.environments.find((e) => e.name === source)?.resources ?? []).flatMap(({ ref }) => {
+    const r = links.resources.find((x) => x.id === ref);
+    return r?.valuesIn.includes(target) ? [] : [r?.displayName ?? ref];
+  });
+
+/** Whether target's release uses what source's does: after a promote, once target runs source's release. */
+export const sameLinks = (links: IntegrationLinks, source: string, target: string): boolean => {
+  const [s, t] = [source, target].map((name) => links.environments.find((e) => e.name === name));
+  const uses = (e?: EnvironmentLinks) => JSON.stringify([e?.resources.map((r) => r.ref), e?.connections, e?.configurables, e?.env]);
+  return uses(s) === uses(t);
+};

@@ -205,7 +205,7 @@ export function usePromote() {
       trackEvent('component-promote');
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
       // The links report what the target's release carries; they follow it until it is the promoted one.
-      qc.invalidateQueries({ queryKey: ['resourceLinks'] });
+      qc.invalidateQueries({ queryKey: ['integrationLinks'] });
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId] });
     },
   });

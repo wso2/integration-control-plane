@@ -19,8 +19,8 @@
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowDown } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ReactNode } from 'react';
-import { useResourceLinks } from '../../hooks/useConfiguration';
-import { promoteWithoutValues } from '../../utils/resourceLinks';
+import { useIntegrationLinks } from '../../hooks/useConfiguration';
+import { promoteWithoutValues } from '../../utils/integrationLinks';
 import { useComponentDeployment } from '../../hooks/useDeployments';
 import { usePromote } from '../../hooks/useDeployments';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
@@ -45,7 +45,7 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
-  const links = useResourceLinks(projectId, componentId, true);
+  const links = useIntegrationLinks(projectId, componentId, true);
   const [checking, setChecking] = useState(false);
   const [confirming, setConfirming] = useState<{ withoutValues: string[]; unchecked: boolean } | null>(null);
 

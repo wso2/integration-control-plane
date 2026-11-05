@@ -20,23 +20,26 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useFormLinks } from './useConfiguration';
+import { useIntegrationLinks } from './useConfiguration';
 import { usePromote } from './useDeployments';
+import type { EnvironmentLinks } from '../types/configuration';
 
-// What ipaas-service answers: development's release carries the link; production's does once it runs that release.
+// What ipaas-service answers: development's release links sfSales; production's does once it runs that release.
 const server = vi.hoisted(() => ({ productionPromoted: false, reads: 0 }));
-const environment = (name: string, inRelease: boolean) => ({
+const environment = (name: string, linked: boolean): EnvironmentLinks => ({
   name,
-  inRelease,
-  hasValues: true,
-  state: inRelease ? 'linked' : 'next_release',
-  configurables: inRelease ? { 'acme.sfdemo.sfSalesBaseUrl': 'BASE_URL' } : {},
-  ...(inRelease && { connection: 'acme.sfdemo.sfSales' }),
+  deployed: true,
+  resources: linked ? [{ ref: 'salesforce-sales', state: 'in_use' }] : [],
+  valuesChanged: false,
+  linksNeedDeploy: false,
+  connections: linked ? { 'acme/sfdemo:sfSales': 'salesforce-sales' } : {},
+  configurables: linked ? { 'acme/sfdemo:sfSalesBaseUrl': { ref: 'salesforce-sales', key: 'BASE_URL' } } : {},
+  env: {},
 });
 vi.mock('../api/configuration', () => ({
-  fetchResourceLinks: async () => {
+  fetchIntegrationLinks: async () => {
     server.reads++;
-    return [{ resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales', linked: true, environments: [environment('development', true), environment('production', server.productionPromoted)] }];
+    return { kind: 'ballerina', resources: [], used: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [environment('development', true), environment('production', server.productionPromoted)] };
   },
 }));
 vi.mock('../api/deployments', () => ({ promote: async () => 'promoted' }));
@@ -46,9 +49,9 @@ let root: Root;
 let promote: ReturnType<typeof usePromote>;
 
 function ProductionForm() {
-  const { linkedFrom } = useFormLinks('default', 'sfdemo', 'production', true);
+  const { data } = useIntegrationLinks('default', 'sfdemo', true);
   promote = usePromote();
-  return <span>{[...linkedFrom.keys()].join()}</span>;
+  return <span>{Object.keys(data?.environments[1].configurables ?? {}).join()}</span>;
 }
 
 const wait = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
@@ -83,7 +86,7 @@ describe('after a promote', () => {
 
     server.productionPromoted = true;
     await wait(4000);
-    expect(container.textContent).toBe('acme.sfdemo.sfSalesBaseUrl');
+    expect(container.textContent).toBe('acme/sfdemo:sfSalesBaseUrl');
 
     const reads = server.reads;
     await wait(30_000);
