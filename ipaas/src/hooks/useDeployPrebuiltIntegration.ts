@@ -78,6 +78,7 @@ export function useDeployPrebuiltIntegration() {
         isPublicRepo: true,
         enableAutoDeploy: false,
         isPrebuilt: true,
+        creation: { method: 'from-prebuilt', prebuiltSlug: slug },
       });
       createdComponentId = component.id;
 
