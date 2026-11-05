@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Grid, PageContent, PageTitle, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, Workflow } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import SelectableCard from '../components/Databases/SelectableCard';
@@ -24,7 +24,7 @@ import PlanCard from '../components/Databases/PlanCard';
 import TemporalPlanCard from '../components/Temporal/TemporalPlanCard';
 import { DatabasePlansSkeleton } from '../components/Databases/DatabaseSkeletons';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useCreateDatabaseServer, useDatabaseOffering, useDatabaseServers } from '../hooks/useDatabases';
+import { useCreateDatabaseServer, useDatabaseAvailability, useDatabaseOffering, useDatabaseServers } from '../hooks/useDatabases';
 import { useCreateTemporalServer, useTemporalOffering, useTemporalServers } from '../hooks/useTemporal';
 import { PLATFORM_SERVICE_TYPES, type PlatformServiceKind } from '../constants/databases';
 import { REQUIRED_FIELD_SX } from '../constants/styles';
@@ -49,11 +49,14 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
   const [kind, setKind] = useState<PlatformServiceKind | null>(null);
   const isTemporal = kind === 'temporal';
 
+  // Reachable by URL too, so the form checks availability itself rather than trusting the page that linked here.
+  const availability = useDatabaseAvailability();
+  const available = availability.data?.available === true;
   // Every service in the organization shares one namespace of names, whatever its type.
-  const databases = useDatabaseServers();
-  const temporals = useTemporalServers();
-  const dbOffering = useDatabaseOffering(kind === 'postgres');
-  const temporalOffering = useTemporalOffering(isTemporal);
+  const databases = useDatabaseServers(available);
+  const temporals = useTemporalServers(available);
+  const dbOffering = useDatabaseOffering(available && kind === 'postgres');
+  const temporalOffering = useTemporalOffering(available && isTemporal);
   const createDatabase = useCreateDatabaseServer();
   const createTemporal = useCreateTemporalServer();
   const create = isTemporal ? createTemporal : createDatabase;
@@ -99,7 +102,7 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
   const typeAndName = (
     <>
       <Typography variant="subtitle2" sx={sectionHeadingSx}>
-        Select Service Type
+        Select service type
       </Typography>
       <Grid container spacing={2} sx={{ mb: 3 }}>
         {PLATFORM_SERVICE_TYPES.map((type) => (
@@ -183,16 +186,50 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
     </>
   );
 
+  const backButton = (
+    <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgDatabasesUrl(scope))} sx={{ mb: 2 }}>
+      Back to Platform Services
+    </Button>
+  );
+
+  if (availability.isLoading)
+    return (
+      <PageContent fullWidth>
+        {backButton}
+        <DatabasePlansSkeleton />
+      </PageContent>
+    );
+  if (availability.isError)
+    return (
+      <PageContent fullWidth>
+        {backButton}
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => availability.refetch()}>
+              Retry
+            </Button>
+          }>
+          Could not check whether platform services are available.
+        </Alert>
+      </PageContent>
+    );
+  if (!available)
+    return (
+      <PageContent fullWidth>
+        {backButton}
+        <Alert severity="info">Platform services are not available in this environment.</Alert>
+      </PageContent>
+    );
+
   return (
-    <PageContent>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgDatabasesUrl(scope))} sx={{ mb: 2 }}>
-        Back to Platform Services
-      </Button>
+    <PageContent fullWidth>
+      {backButton}
 
       <Box sx={{ maxWidth: 900 }}>
-        <Typography variant="h5" sx={{ fontWeight: 600, mb: 3 }}>
-          Create Service
-        </Typography>
+        <PageTitle>
+          <PageTitle.Header>Create service</PageTitle.Header>
+        </PageTitle>
 
         {createError && (
           <Alert severity="error" onClose={() => create.reset()} sx={{ mb: 3 }}>
@@ -207,11 +244,11 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
         {kind && <Box sx={{ mt: 4 }}>{planSection}</Box>}
 
         <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
+          <Button variant="outlined" color="inherit" disabled={create.isPending} onClick={() => navigate(orgDatabasesUrl(scope))}>
+            Cancel
+          </Button>
           <Button variant="contained" disabled={!canCreate} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
             {create.isPending ? 'Creating…' : 'Create'}
-          </Button>
-          <Button variant="outlined" disabled={create.isPending} onClick={() => navigate(orgDatabasesUrl(scope))}>
-            Cancel
           </Button>
         </Stack>
       </Box>

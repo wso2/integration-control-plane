@@ -22,6 +22,14 @@ import type { JSX, KeyboardEvent, MouseEvent } from 'react';
 import type { IntegrationType } from '../../types/import';
 import { INTEGRATION_TYPES } from '../../constants/import';
 
+// Three cards a row from lg, each as wide as one column of a four-column grid with 16px gaps.
+const GRID_SX = {
+  display: 'grid',
+  gap: 2,
+  gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' },
+  maxWidth: { lg: 'calc(75% - 4px)' },
+} as const;
+
 interface IntegrationTypeSelectorProps {
   selected: IntegrationType | null;
   onSelect: (type: IntegrationType) => void;
@@ -31,7 +39,7 @@ interface IntegrationTypeSelectorProps {
 
 export default function IntegrationTypeSelector({ selected, onSelect, excludedTypes = [] }: IntegrationTypeSelectorProps): JSX.Element {
   return (
-    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+    <Box sx={GRID_SX}>
       {INTEGRATION_TYPES.filter((opt) => !excludedTypes.includes(opt.id)).map((opt) => {
         const isActive = selected === opt.id;
         return (
@@ -48,8 +56,6 @@ export default function IntegrationTypeSelector({ selected, onSelect, excludedTy
               }
             }}
             sx={{
-              width: '25%',
-              minWidth: 180,
               border: 2,
               borderColor: isActive ? 'primary.main' : 'divider',
               bgcolor: isActive ? 'primary.50' : 'background.paper',

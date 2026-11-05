@@ -18,7 +18,7 @@
 
 import { PageContent } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import OrgSettingsTabs from '../../components/Settings/OrgSettingsTabs';
+import OrgSettingsTabs from '../../components/Settings/OrgConfigureTabs';
 import EgressPolicyEditor from '../components/Settings/Egress/EgressPolicyEditor';
 import type { OrgScope } from '../../nav';
 

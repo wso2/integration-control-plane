@@ -424,7 +424,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
       )}
       {/* Plain padded container (not PageContent) so the page uses the single outer scroller — the
           sticky track bar above pins against it, with no nested scroll region. */}
-      <Box sx={{ width: '100%', maxWidth: 1400, mx: 'auto', p: 8 }}>{renderBody()}</Box>
+      <Box sx={{ p: 8 }}>{renderBody()}</Box>
     </>
   );
 }

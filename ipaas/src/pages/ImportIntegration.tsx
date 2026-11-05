@@ -578,7 +578,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const renderRepoPickers = () => (
     <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
       {isPublicRepo ? (
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <TextField
             labelPlacement="top"
             label="Repository URL"
@@ -610,7 +610,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         <>
           {isAzureDevOps && (
             <>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <TextField
                   labelPlacement="top"
                   label="Organization"
@@ -641,7 +641,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   ))}
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <TextField
                   labelPlacement="top"
                   label="Project"
@@ -665,7 +665,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   ))}
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <TextField
                   labelPlacement="top"
                   label="Repository"
@@ -695,7 +695,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           )}
           {!isAzureDevOps && (
             <>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   <TextField
                     labelPlacement="top"
@@ -745,7 +745,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                 </Stack>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   <TextField
                     labelPlacement="top"
@@ -800,7 +800,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       )}
 
       {showBranchAndSubPath && (
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Stack direction="row" alignItems="center" spacing={0.5}>
             <TextField
               labelPlacement="top"
@@ -839,7 +839,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       )}
 
       {showBranchAndSubPath && (
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Stack direction="row" gap={0.5}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <DirectoryPickerField
@@ -962,7 +962,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
           {/* Row 2 — Integration Name + auto-generated Integration Id */}
           <Grid container columnSpacing={3} rowSpacing={1} sx={{ mt: 2, mb: 1 }}>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
               <TextField
                 labelPlacement="top"
                 label="Integration name"
@@ -978,7 +978,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
               />
             </Grid>
 
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
               <TextField
                 labelPlacement="top"
                 label="Integration ID"
@@ -1000,7 +1000,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
           {/* Row 3 — Description */}
           <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, lg: 6 }}>
               <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} />
             </Grid>
           </Grid>

@@ -21,14 +21,14 @@ import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { useAccessControl } from '../../contexts/AccessControlContext';
 import { SETTINGS_SECTIONS, isSettingsSectionVisible } from '../../constants/orgSettingsSections';
 import { orgSettingsSectionUrl, useScope } from '../../nav';
-import SettingsTabs from './SettingsTabs';
+import ConfigureTabs from './ConfigureTabs';
 
-/** The org Settings header — resolves the visible sections and delegates chrome to `SettingsTabs`. */
+/** The org Configure header — resolves the visible sections and delegates chrome to `SettingsTabs`. */
 export default function OrgSettingsTabs({ active }: { active: string }): JSX.Element {
   const scope = useScope();
   const navigate = useAppNavigate();
   const { hasAnyPermission } = useAccessControl();
 
   const visible = SETTINGS_SECTIONS.filter((s) => isSettingsSectionVisible(s, hasAnyPermission));
-  return <SettingsTabs active={active} sections={visible} onSelect={(path) => navigate(orgSettingsSectionUrl(scope, path))} />;
+  return <ConfigureTabs active={active} sections={visible} onSelect={(path) => navigate(orgSettingsSectionUrl(scope, path))} />;
 }

@@ -20,7 +20,7 @@ import { Box, PageTitle, Tab, Tabs } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import type { SettingsSectionDef } from '../../constants/orgSettingsSections';
 
-interface SettingsTabsProps {
+interface ConfigureTabsProps {
   /** Id of the active section. */
   active: string;
   /** Sections to show, already filtered to those the user can access. */
@@ -30,16 +30,16 @@ interface SettingsTabsProps {
 }
 
 /**
- * Presentational "Settings" header (title + tab bar) shared by the Org, Project,
+ * Presentational "Configure" header (title + tab bar) shared by the Org, Project,
  * and Integration settings shells. Each scope-specific wrapper resolves its own
  * visible sections + navigation; this owns only the chrome.
  */
-export default function SettingsTabs({ active, sections, onSelect }: SettingsTabsProps): JSX.Element {
+export default function ConfigureTabs({ active, sections, onSelect }: ConfigureTabsProps): JSX.Element {
   const activeIndex = sections.findIndex((s) => s.id === active);
   return (
     <>
       <PageTitle>
-        <PageTitle.Header>Settings</PageTitle.Header>
+        <PageTitle.Header>Configure</PageTitle.Header>
       </PageTitle>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
         <Tabs value={activeIndex < 0 ? false : activeIndex} onChange={(_, v) => onSelect(sections[v].path)} variant="scrollable" scrollButtons="auto">
