@@ -19,29 +19,24 @@
 import { Alert, Button, type SxProps, type Theme } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { SECURITY_MODE_LABEL } from '../constants/apiConsumption';
-import { Scopes } from '../constants/permissions';
-import { useCan } from '../hooks/useCan';
 import type { EndpointTestAccess } from '../hooks/useEndpointTestAccess';
 
-/**
- * Shown when ipaas-service refuses a test key because the endpoint uses another auth mode. Switching
- * changes the security of the whole API, so it is gated like Configure Security.
- */
+/** Shown when ipaas-service refuses a test key because the endpoint uses another auth mode; offers the switch where `access.canSwitch`. */
 export default function ApiKeyAuthOffer({ access, sx }: { access: EndpointTestAccess; sx?: SxProps<Theme> }): JSX.Element | null {
-  const canSwitch = useCan()(Scopes.ENDPOINT_UPDATE);
   if (!access.needsApiKeyAuth) return null;
   return (
     <Alert
       severity="info"
       sx={sx}
       action={
-        canSwitch && (
+        access.canSwitch && (
           <Button color="inherit" size="small" disabled={access.isSwitching} onClick={() => void access.switchToApiKey()}>
             Switch to API key
           </Button>
         )
       }>
-      This endpoint uses {access.mode ? SECURITY_MODE_LABEL[access.mode] : 'another'} authentication, so it can&apos;t issue a test key. Switching it to API key changes how every caller of this API authenticates.
+      This endpoint uses {access.mode ? SECURITY_MODE_LABEL[access.mode] : 'another'} authentication, so it can&apos;t issue a test key.
+      {access.canSwitch && ' Switching it to API key changes how every caller of this API authenticates.'}
     </Alert>
   );
 }

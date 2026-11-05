@@ -32,8 +32,8 @@ vi.mock('../api/consumers', () => ({ getEndpointSecurity: vi.fn(), createEndpoin
 const ref: EndpointRef = { componentName: 'orders', environmentName: 'development', endpointName: 'http', deploymentTrackId: 'v1' };
 
 /** The Test page's part of the flow: the auto-minted key's refusal, the offer, and the key once minted. */
-function TestKey() {
-  const access = useEndpointTestAccess(ref);
+function TestKey({ agent = false }: { agent?: boolean }) {
+  const access = useEndpointTestAccess(ref, { agent });
   return (
     <>
       <ApiKeyAuthOffer access={access} />
@@ -52,8 +52,8 @@ beforeEach(() => {
   vi.mocked(setEndpointApiKeyAuth).mockResolvedValue(true);
 });
 
-async function refusedTestKey(scopes: string[]) {
-  const r = await renderWithScopes(<TestKey />, scopes);
+async function refusedTestKey(scopes: string[], agent = false) {
+  const r = await renderWithScopes(<TestKey agent={agent} />, scopes);
   unmount = r.unmount;
   await flush();
   return r.container;
@@ -76,6 +76,13 @@ describe('ApiKeyAuthOffer', () => {
   it('only explains to a role that may test the endpoint but not change its security', async () => {
     const c = await refusedTestKey(DEVELOPER.filter((s) => s !== Scopes.ENDPOINT_UPDATE));
     expect(document.body.textContent).toContain("can't issue a test key");
+    expect(button(c, 'Switch to API key')).toBeUndefined();
+  });
+
+  it("only explains for an AI agent, whose security Agent Manager owns, not the API Platform's API the switch edits", async () => {
+    const c = await refusedTestKey(DEVELOPER, true);
+    expect(document.body.textContent).toContain("can't issue a test key");
+    expect(document.body.textContent).not.toContain('Switching it');
     expect(button(c, 'Switch to API key')).toBeUndefined();
   });
 

@@ -51,6 +51,11 @@ export interface EndpointTestAccess {
   keyError: string | null;
   /** The endpoint uses another auth mode (jwt, or a refused test key says so), so it takes no test key until switched to API-key auth. */
   needsApiKeyAuth: boolean;
+  /**
+   * The role may switch the endpoint to API-key auth. Never for an AI agent: its security comes from Agent Manager,
+   * while the switch edits the API Platform's API.
+   */
+  canSwitch: boolean;
   /** The endpoint is being switched to API-key auth. */
   isSwitching: boolean;
   /** Switch the endpoint to API-key auth, then mint. Resolves to the plaintext, or `null` on failure. */
@@ -102,6 +107,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const { data: security, isError: isSecurityError, error: securityError } = useEndpointSecurity(ref, enabled);
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
+  const canSwitch = canCreateKey && !agent && can(Scopes.ENDPOINT_UPDATE);
   const createTestKey = useCreateEndpointTestKey();
   const enableApiKeyAuth = useEnableEndpointApiKeyAuth();
 
@@ -169,7 +175,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
 
   const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
-    if (!endpoint || !canCreateKey) return null;
+    if (!endpoint || !canSwitch) return null;
     const target = endpoint;
     const targetKey = keyOf(target);
     setFailure(null);
@@ -185,7 +191,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     } finally {
       if (mintingFor.current === targetKey) mintingFor.current = null;
     }
-  }, [endpoint, canCreateKey, enableApiKeyAuthFor, mintFor]);
+  }, [endpoint, canSwitch, enableApiKeyAuthFor, mintFor]);
 
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
   // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
@@ -204,6 +210,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     canCreateKey,
     keyError,
     needsApiKeyAuth: canCreateKey && ((mode === 'jwt' && !apiKey) || apiKeyRequiredFor === refKey),
+    canSwitch,
     isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
     switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never
