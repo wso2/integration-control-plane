@@ -28,7 +28,7 @@ import { OrphanedLinks } from './OrphanedLinks';
 import type { FormGroup } from '../SchemaConfigForm/ConfigForm';
 import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
 
-const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [] };
+const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [] };
 
 /** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's config keys. */
 export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[]) {

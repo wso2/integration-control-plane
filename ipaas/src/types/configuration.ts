@@ -178,12 +178,14 @@ export interface EnvironmentLinks {
 
 /**
  * An integration's links. A configurable is `<org>/<module>:<name>`, a connection `<org>/<module>:<connection>`.
- * `used` is `<resource>|<KEY>` → the target it feeds.
+ * `used` is `<resource>|<KEY>` → the target it feeds; `usedByOrphaned` → the orphaned configurable link holding it,
+ * which a write taking the key moves.
  */
 export interface IntegrationLinks {
   kind: 'ballerina' | 'mi';
   resources: LinkableResource[];
   used: Record<string, string>;
+  usedByOrphaned: Record<string, string>;
   connections: LinkConnection[];
   fieldLinks: Record<string, KeyRef>;
   orphaned: OrphanedLink[];
