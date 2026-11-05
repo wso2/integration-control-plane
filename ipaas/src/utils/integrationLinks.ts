@@ -45,7 +45,7 @@ export interface Picker {
   first: typeof VIA | typeof ENTER;
   /** `first`, or `<resource>|<KEY>`. */
   selected: string;
-  resources: { id: string; name: string; keys: { key: string; usedBy?: string }[] }[];
+  resources: { id: string; name: string; keys: { key: string; usedBy?: string; orphanOf?: string }[] }[];
 }
 
 /** One target's link in a form: where its value comes from, and the picker's choices where links can change. */
@@ -84,6 +84,7 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
     }
   };
 
+  const orphans = new Set(links.orphaned.map((o) => o.target));
   const target = (id: string): TargetView => {
     if (!editable) {
       const ref = release?.configurables[id] ?? release?.env[id];
@@ -99,7 +100,9 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
         name: r.displayName,
         keys: r.keys.map(({ name: key }) => {
           const by = links.used[`${r.id}|${key}`];
-          return { key, ...(by && by !== id && { usedBy: targetName(by) }) };
+          if (!by || by === id) return { key };
+          // A write that takes a key from a link the build lost moves it.
+          return orphans.has(by) ? { key, orphanOf: targetName(by) } : { key, usedBy: targetName(by) };
         }),
       })),
     };

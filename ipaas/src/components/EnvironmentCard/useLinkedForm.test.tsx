@@ -131,10 +131,33 @@ describe('the Configure form with links', () => {
     expect(writes).toEqual([{ connection: id('backup'), ref: 'github-sandbox' }]);
   });
 
+  it('offers a resource whose key only a link the build lost holds, as for a renamed connection', async () => {
+    const used = links.used;
+    links.used = { ...used, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') };
+    try {
+      await act(async () => root.render(<Form />));
+      await act(async () => (container.querySelector('[aria-label="Link backup"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+      expect(Array.from(document.querySelectorAll('[role="option"]')).map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+        ['GitHub Sandbox', null],
+        ['GitHub Corp', null],
+      ]);
+    } finally {
+      links.used = used;
+    }
+  });
+
   it('links a field to the key picked from its link icon', async () => {
     await act(async () => button('Link ordersDatabaseUrl').click());
     await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent === 'Enter a value') as HTMLElement).click());
     expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl') }]);
+  });
+
+  it('offers a key a link the build lost holds, and takes it in one write', async () => {
+    await act(async () => button('Link ordersDatabaseUrl').click());
+    const url = Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent?.startsWith('URL')) as HTMLElement;
+    expect([url.textContent, url.getAttribute('aria-disabled')]).toEqual(['URLfrom ordersDbUrl, no longer in the code', null]);
+    await act(async () => url.click());
+    expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
   });
 
   it('tries a write that failed partway again', async () => {
@@ -157,6 +180,6 @@ describe('the Configure form with links', () => {
     await act(async () => (container.querySelector('[aria-label="Move ordersDbUrl to"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
     await act(async () => (Array.from(document.querySelectorAll('li')).find((li) => li.textContent === 'ordersDatabaseUrl') as HTMLElement).click());
     await act(async () => button('Move').click());
-    expect(writes).toEqual([{ configurable: id('ordersDbUrl') }, { configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
+    expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
   });
 });

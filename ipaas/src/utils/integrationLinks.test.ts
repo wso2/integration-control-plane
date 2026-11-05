@@ -97,4 +97,20 @@ describe('formLinkView', () => {
     const view = formLinkView({ ...base, orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL' }] }, 'development', envName);
     expect(view.orphaned).toEqual([{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL', name: 'orders-db' }]);
   });
+
+  it('offers a key held only by a link the build lost, naming that target', () => {
+    const links: IntegrationLinks = {
+      ...base,
+      used: { 'orders-db|URL': id('ordersDbUrl'), 'orders-db|PASSWORD': id('ordersDbPassword') },
+      orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL' }],
+    };
+    expect(
+      formLinkView(links, 'development', envName)
+        .target(id('ordersUrl'))
+        .picker?.resources.find((r) => r.id === 'orders-db')?.keys,
+    ).toEqual([
+      { key: 'URL', orphanOf: 'ordersDbUrl' },
+      { key: 'PASSWORD', usedBy: 'ordersDbPassword' },
+    ]);
+  });
 });
