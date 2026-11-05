@@ -26,6 +26,12 @@ describe('project listing — RAG components', () => {
     expect(getDisplayLabel('byoiCronjob', null)).toBe('Automation');
   });
 
+  it('labels a knowledge base\'s service and data sources', () => {
+    expect(getDisplayLabel('service', 'knowledge-base')).toBe('Knowledge Base Service');
+    expect(getDisplayLabel('automation', 'kb-ingestion')).toBe('Knowledge Base Data Source');
+    expect(isSupportedIntegration('service', 'knowledge-base')).toBe(true);
+  });
+
   it('labels every foreign-runtime component "Other"', () => {
     expect(getDisplayLabel('otherAiAgent', null)).toBe('Other');
     expect(getDisplayLabel('otherService', null)).toBe('Other');

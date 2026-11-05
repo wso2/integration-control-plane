@@ -51,7 +51,7 @@ function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: stri
         updatedTooltip={deleting ? undefined : formatDateTime(project.updatedAt)}
         onClick={deleting ? undefined : onClick}
         aria-disabled={deleting || undefined}
-        sx={deleting ? styles.cardDeleting : undefined}
+        sx={deleting ? styles.cardDeleting : styles.card}
         onMouseEnter={() => setArmed(true)}
         onFocus={() => setArmed(true)}
         actions={

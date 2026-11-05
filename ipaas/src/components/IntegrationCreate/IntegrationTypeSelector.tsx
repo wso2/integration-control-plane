@@ -33,7 +33,8 @@ const GRID_SX = {
 interface IntegrationTypeSelectorProps {
   selected: IntegrationType | null;
   onSelect: (type: IntegrationType) => void;
-  excludedTypes?: IntegrationType[];
+  /** Types this create cannot offer, such as one the chosen source or technology does not support. */
+  excludedTypes?: readonly IntegrationType[];
 }
 
 export default function IntegrationTypeSelector({ selected, onSelect, excludedTypes = [] }: IntegrationTypeSelectorProps): JSX.Element {
@@ -68,18 +69,20 @@ export default function IntegrationTypeSelector({ selected, onSelect, excludedTy
                 <Typography variant="body2" fontWeight={600} sx={{ color: isActive ? 'primary.main' : 'text.primary' }}>
                   {opt.title}
                 </Typography>
-                <Tooltip title="View documentation" placement="top">
-                  <Box
-                    component="a"
-                    href={opt.docLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={`View documentation for ${opt.title}`}
-                    onClick={(e: MouseEvent) => e.stopPropagation()}
-                    sx={{ display: 'flex', color: 'text.disabled', '&:hover': { color: 'text.secondary' }, ml: 0.5, flexShrink: 0 }}>
-                    <ExternalLink size={13} />
-                  </Box>
-                </Tooltip>
+                {opt.docLink && (
+                  <Tooltip title="View documentation" placement="top">
+                    <Box
+                      component="a"
+                      href={opt.docLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`View documentation for ${opt.title}`}
+                      onClick={(e: MouseEvent) => e.stopPropagation()}
+                      sx={{ display: 'flex', color: 'text.disabled', '&:hover': { color: 'text.secondary' }, ml: 0.5, flexShrink: 0 }}>
+                      <ExternalLink size={13} />
+                    </Box>
+                  </Tooltip>
+                )}
               </Box>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5, lineHeight: 1.4, flex: 1 }}>
                 {opt.description}

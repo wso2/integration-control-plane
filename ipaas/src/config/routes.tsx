@@ -91,6 +91,10 @@ const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegr
 const AgentTraces = lazyPage(() => import('../pages/AgentTraces'));
 const ApiInsights = lazyPage(() => import('../pages/ApiInsights'));
 const ComingSoon = lazyPage(() => import('../pages/ComingSoon'));
+const KnowledgeBases = lazyPage(() => import('../pages/KnowledgeBases'));
+const CreateKnowledgeBase = lazyPage(() => import('../pages/CreateKnowledgeBase'));
+const KnowledgeBaseDetails = lazyPage(() => import('../pages/KnowledgeBaseDetails'));
+const AddKnowledgeBaseDataSource = lazyPage(() => import('../pages/AddKnowledgeBaseDataSource'));
 
 export interface AppRoute extends Omit<RouteProps, 'children'> {
   children?: AppRoute[];
@@ -138,6 +142,10 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/insights', element: createElement(withScope(ApiInsights, ['organizations'])) },
               { path: 'organizations/:orgHandler/metrics', element: <ComingSoon description="One view of throughput, latency and errors for every integration you run." /> },
               { path: 'organizations/:orgHandler/admin/data-planes', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDataPlanes, ['organizations']))) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases', element: createElement(withScope(KnowledgeBases, ['organizations'])) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases/new', element: createElement(withScope(CreateKnowledgeBase, ['organizations'])) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases/:knowledgeBase', element: createElement(withScope(KnowledgeBaseDetails, ['organizations'])) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases/:knowledgeBase/data-sources/new', element: createElement(withScope(AddKnowledgeBaseDataSource, ['organizations'])) },
               { path: 'organizations/:orgHandler/platform-services', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDatabases, ['organizations']))) },
               { path: 'organizations/:orgHandler/platform-services/new', element: createElement(RouteErrorBoundary, null, createElement(withScope(CreateDatabaseServer, ['organizations']))) },
               { path: 'organizations/:orgHandler/platform-services/:dbServerId', element: createElement(RouteErrorBoundary, null, createElement(withScope(DatabaseServerDetail, ['organizations']))) },

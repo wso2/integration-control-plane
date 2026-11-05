@@ -30,11 +30,11 @@ import { componentOverviewUrl } from '../../paths';
 import ComingSoon from '../../pages/ComingSoon';
 import RagUpgradeRequired from '../components/RagIngestion/RagUpgradeRequired';
 import VerticalStepper from '../../components/VerticalStepper';
-import VectorStoreStep from '../components/RagIngestion/steps/VectorStoreStep';
-import EmbeddingModelStep from '../components/RagIngestion/steps/EmbeddingModelStep';
-import ChunkingStep from '../components/RagIngestion/steps/ChunkingStep';
+import VectorStoreStep from '../../components/KnowledgeBase/steps/VectorStoreStep';
+import EmbeddingModelStep from '../../components/KnowledgeBase/steps/EmbeddingModelStep';
+import ChunkingStep from '../../components/KnowledgeBase/steps/ChunkingStep';
 import AutomationStep from '../components/RagIngestion/steps/AutomationStep';
-import DatasourceStep from '../components/RagIngestion/steps/DatasourceStep';
+import DatasourceStep from '../../components/KnowledgeBase/steps/DatasourceStep';
 import type { OrgScope } from '../../nav';
 
 const STEP_LABELS = ['Initialize Vector Store', 'Configure Embedding Model', 'Configure Chunking', 'Create Automation', 'Configure Datasource'];

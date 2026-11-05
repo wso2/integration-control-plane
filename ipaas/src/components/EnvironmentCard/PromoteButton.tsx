@@ -35,9 +35,11 @@ interface PromoteButtonProps {
   icon?: ReactNode;
   onPromoteStarted?: () => void;
   onPromoteSettled?: () => void;
+  /** Why the promote cannot run yet, when something outside this deployment holds it back. */
+  blockedReason?: string;
 }
 
-export default function PromoteButton({ orgHandler, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled }: PromoteButtonProps) {
+export default function PromoteButton({ orgHandler, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
@@ -49,7 +51,7 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
   const alreadyPromoted = !deploymentsLoading && !!buildId && buildId === targetDeployment?.build?.buildId;
 
   const missingPipeline = !deploymentPipelineId;
-  const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted;
+  const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted && !blockedReason;
 
   const handlePromote = () => {
     if (!canPromote || !sourceReleaseId) return;
@@ -68,7 +70,8 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
     );
   };
 
-  const tooltipTitle = !buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : '';
+  const tooltipTitle =
+    blockedReason ?? (!buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : promote.isError ? promote.error.message : '');
 
   return (
     <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>

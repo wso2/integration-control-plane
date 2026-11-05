@@ -183,6 +183,23 @@ export function importProjectUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/import-project`;
 }
 
+/** The org's RAG knowledge bases. */
+export function knowledgeBasesUrl(scope: { org: string }): string {
+  return `/organizations/${scope.org}/ai-services/knowledge-bases`;
+}
+
+export function newKnowledgeBaseUrl(scope: { org: string }): string {
+  return `${knowledgeBasesUrl(scope)}/new`;
+}
+
+export function knowledgeBaseUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBasesUrl(scope)}/${encodeURIComponent(name)}`;
+}
+
+export function newKnowledgeBaseDataSourceUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBaseUrl(scope, name)}/data-sources/new`;
+}
+
 export function orgDatabasesUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/platform-services`;
 }
@@ -276,6 +293,9 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'insights', navId: 'org-insights', segment: 'insights' },
     { key: 'logs', navId: 'org-logs', segment: 'logs', parent: 'org-observability' },
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
+    { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
+    { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
+    { key: 'knowledge-bases', navId: 'org-knowledge-bases', segment: 'ai-services/knowledge-bases', parent: 'org-ai-services' },
     { key: 'platform-services', navId: 'org-platform-services', segment: 'platform-services' },
     { key: 'settings', navId: 'org-settings', segment: 'settings' },
   ],
