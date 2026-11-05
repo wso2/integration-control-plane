@@ -21,12 +21,15 @@ import { useOrgUuid } from './useOrgUuid';
 import { useProjectDeploymentPipelines } from './useDeploymentPipelines';
 import { entryEnvironmentIds, isEntryEnvironment } from '../utils/entryEnvironment';
 
-/** Whether envId is one of the project's entry environments, and the entries' display names for copy that points there. */
-export function useEntryEnvironment(projectId: string, envId: string): { isEntry: boolean; entryEnvironmentName: string } {
+/**
+ * Whether envId is one of the project's entry environments, and the entries' display names for copy that points there.
+ * isEntry is false until the pipeline has loaded, so copy that claims an environment is not the entry waits for loading to clear.
+ */
+export function useEntryEnvironment(projectId: string, envId: string): { isEntry: boolean; loading: boolean; entryEnvironmentName: string } {
   const { data: pipelines, isError } = useProjectDeploymentPipelines(projectId);
   const { data: environments = [] } = useEnvironments(useOrgUuid() ?? '', projectId);
   // A failed read is "no pipeline", not "still loading": the BFF still guards the change.
   const tree = isError ? null : pipelines === undefined ? undefined : (pipelines[0]?.promotion_tree ?? null);
   const entryNames = entryEnvironmentIds(tree).map((id) => environments.find((env) => env.id === id)?.name ?? id);
-  return { isEntry: isEntryEnvironment(tree, envId), entryEnvironmentName: entryNames.length ? entryNames.join(' or ') : 'the first environment' };
+  return { isEntry: isEntryEnvironment(tree, envId), loading: tree === undefined, entryEnvironmentName: entryNames.length ? entryNames.join(' or ') : 'the first environment' };
 }

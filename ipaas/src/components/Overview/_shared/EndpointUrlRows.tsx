@@ -69,7 +69,7 @@ function VisibilityUrlRow({ option, note }: { option: EndpointVisibilityUrl; not
           <CopyButton url={option.url} />
         </>
       ) : (
-        <Typography variant="body2" color="text.secondary" sx={urlSx} aria-label={`Not on the ${option.label.toLowerCase()} host`}>
+        <Typography variant="body2" color="text.secondary" sx={urlSx} aria-label={`No ${option.label.toLowerCase()} URL`}>
           —
         </Typography>
       )}

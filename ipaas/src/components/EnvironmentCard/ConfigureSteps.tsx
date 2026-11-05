@@ -28,7 +28,7 @@ import { editorExposure, exposureLabels } from '../../utils/endpoints';
 // The gateway serves an endpoint on one host at a time: the public one, the organization's internal
 // one, or neither. Project access is always on and its URL always shows, so it is not a choice here.
 const EXPOSURE_OPTS: { value: EndpointExposure; label: string; Icon: typeof Globe; description: string }[] = [
-  { value: 'public', label: 'Public', Icon: Globe, description: 'On the gateway’s public host. Any client can call it, including integrations in your organization.' },
+  { value: 'public', label: 'Public', Icon: Globe, description: 'On the gateway’s public host. Reachable from the internet, including integrations in your organization. The API’s security settings still apply.' },
   { value: 'organization', label: 'Organization', Icon: Building2, description: 'On the gateway’s internal host. Only integrations in your organization can call it.' },
   { value: 'none', label: 'Project only', Icon: Folder, description: 'Not on the API gateway. Only integrations in the same project can call the endpoint.' },
 ];
@@ -172,14 +172,14 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
                   {description}
                 </Typography>
               </Box>
-              <Radio checked={selected} size="small" value={value} sx={{ p: 0, flexShrink: 0, mt: 0.25 }} inputProps={{ 'aria-label': label }} onClick={(e) => e.stopPropagation()} onChange={() => setExposure(value)} />
+              <Radio checked={selected} size="small" name="network-visibility" value={value} sx={{ p: 0, flexShrink: 0, mt: 0.25 }} inputProps={{ 'aria-label': label }} onClick={(e) => e.stopPropagation()} onChange={() => setExposure(value)} />
             </Box>
           );
         })}
       </Stack>
       {legacyBothHosts && (
         <Alert severity="info" sx={{ mb: 1.5 }}>
-          This endpoint was exposed on both the public and the organization host. An endpoint is now served on one host, so it is shown as Public, which stays reachable from inside the organization through the public URL.
+          This endpoint was exposed on both the public and the organization host. An endpoint is now served on one host, so saving keeps it only on the host selected here.
         </Alert>
       )}
 
