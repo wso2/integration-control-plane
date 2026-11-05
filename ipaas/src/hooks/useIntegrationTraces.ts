@@ -20,16 +20,28 @@ import { skipToken, useIsFetching, useQuery } from '@tanstack/react-query';
 import { fetchComponentTraces, fetchTraceSpans } from '../api/integrationTraces';
 import { SPAN_FETCH_CONCURRENCY, SPAN_SAMPLE_TRACES } from '../constants/integrationTraces';
 import { mapWithConcurrency } from '../utils/integrationTraces';
-import type { ComponentTracesRequest, SpanRow, TraceRow } from '../types/integrationTraces';
+import type { ComponentTracesRequest, SpanRow, TracePage, TraceRow } from '../types/integrationTraces';
 
 const ROOT_KEY = 'integration-traces';
+
+/**
+ * Keeps the shown data while the same integration and environment refresh. Another
+ * integration's or environment's traces would read as this one's, so a switch shows
+ * the skeleton instead. Both query keys carry the request third.
+ */
+function sameScope<T>(req: ComponentTracesRequest | null) {
+  return (prev: T | undefined, prevQuery?: { queryKey: readonly unknown[] }): T | undefined => {
+    const prevReq = prevQuery?.queryKey[2] as ComponentTracesRequest | null | undefined;
+    return prevReq?.componentId === req?.componentId && prevReq?.environmentId === req?.environmentId ? prev : undefined;
+  };
+}
 
 export function useComponentTraces(req: ComponentTracesRequest | null) {
   return useQuery({
     queryKey: [ROOT_KEY, 'list', req],
     queryFn: req ? () => fetchComponentTraces(req) : skipToken,
     retry: false,
-    placeholderData: (prev) => prev,
+    placeholderData: sameScope<TracePage>(req),
   });
 }
 
@@ -66,6 +78,6 @@ export function useSampledTraceSpans(req: ComponentTracesRequest | null, traces:
           }
         : skipToken,
     retry: false,
-    placeholderData: (prev) => prev,
+    placeholderData: sameScope<SampledSpans>(req),
   });
 }
