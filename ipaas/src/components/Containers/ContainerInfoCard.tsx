@@ -32,7 +32,7 @@ interface ContainerInfoCardProps {
   releaseId: string;
   /** The deployment track the release belongs to. */
   deploymentTrackId: string;
-  isPaidOrPdpUser: boolean;
+  paid: boolean;
   canManage: boolean;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
@@ -42,7 +42,7 @@ const cardSx = { p: 3, mb: 2 } as const;
 const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
+export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, deploymentTrackId, paid, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   if (isEditOpen) {
@@ -53,7 +53,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
         componentId={componentId}
         releaseId={releaseId}
         deploymentTrackId={deploymentTrackId}
-        isPaidOrPdpUser={isPaidOrPdpUser}
+        paid={paid}
         onClose={() => setIsEditOpen(false)}
         onSaved={(m) => {
           setIsEditOpen(false);

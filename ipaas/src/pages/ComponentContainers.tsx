@@ -23,6 +23,8 @@ import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import ContainerInfoCard from '../components/Containers/ContainerInfoCard';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
+import { BILLING_PRODUCT_CODE } from '../constants/subscription';
+import { useBillingOrg, useBillingPlan } from '../hooks/useBillingOrg';
 import { useRelease } from '../hooks/useDevopsConfigs';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
@@ -30,7 +32,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
-import { isPrivateDpRelease } from '../utils/containers';
+import { isPaidPlan } from '../utils/billing';
 import type { ComponentScope } from '../nav';
 
 export default function ComponentContainers({ org, project, component }: ComponentScope): JSX.Element {
@@ -52,8 +54,12 @@ export default function ComponentContainers({ org, project, component }: Compone
   const releaseId = deployment?.releaseId ?? '';
   const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId, trackId);
 
-  // Paid subscriptions aren't served by cloud yet, so only a private data plane unlocks the paid fields.
-  const isPaidOrPdpUser = isPrivateDpRelease(release);
+  // Changing CPU and memory is a paid feature, and ipaas-service refuses it on other plans. The plan
+  // summary on the billing org carries no type, so the plan itself is read for whether it is paid.
+  const { org: billingOrg, isLoading: loadingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
+  const { plan, isLoading: loadingPlanType } = useBillingPlan(billingOrg?.subscription?.plan?.code);
+  const loadingPlan = loadingOrg || loadingPlanType;
+  const paid = isPaidPlan(billingOrg, plan);
 
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   useEffect(() => setAlert(null), [trackId, envId]);
@@ -76,7 +82,7 @@ export default function ComponentContainers({ org, project, component }: Compone
           </Alert>
         )}
 
-        {isLoading || (loadingRelease && !!releaseId) ? (
+        {isLoading || loadingPlan || (loadingRelease && !!releaseId) ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
             <CircularProgress />
           </Box>
@@ -93,7 +99,7 @@ export default function ComponentContainers({ org, project, component }: Compone
               componentId={comp.id}
               releaseId={releaseId}
               deploymentTrackId={trackId}
-              isPaidOrPdpUser={isPaidOrPdpUser}
+              paid={paid}
               canManage={canManage}
               onSaved={(message) => setAlert({ type: 'success', message })}
               onError={(message) => setAlert({ type: 'error', message })}

@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { containerImageName, containerToForm, cpuToMilli, encodeArrayItems, encodeBase64, formToWriteData, hasCustomImage, isMainContainer, isPrivateDpRelease, milliToCpu } from './containers';
+import { containerImageName, containerToForm, cpuToMilli, encodeArrayItems, encodeBase64, formToWriteData, hasCustomImage, isMainContainer, milliToCpu } from './containers';
 import type { ReleaseContainer } from '../types/devopsConfigs';
 
 const baseContainer: ReleaseContainer = {
@@ -74,15 +74,6 @@ describe('image helpers', () => {
   it('identifies the main container', () => {
     expect(isMainContainer({ type: 'MAIN' })).toBe(true);
     expect(isMainContainer({ type: 'INIT' })).toBe(false);
-  });
-});
-
-describe('isPrivateDpRelease', () => {
-  it('is true only when choreo_env is private_dp', () => {
-    expect(isPrivateDpRelease({ ID: 'r', containers: [], metadata: { choreo_env: 'private_dp' } })).toBe(true);
-    expect(isPrivateDpRelease({ ID: 'r', containers: [], environment: { choreo_env: 'private_dp' } })).toBe(true);
-    expect(isPrivateDpRelease({ ID: 'r', containers: [], metadata: { choreo_env: 'dev' } })).toBe(false);
-    expect(isPrivateDpRelease(undefined)).toBe(false);
   });
 });
 

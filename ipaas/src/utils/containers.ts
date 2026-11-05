@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import type { ContainerWriteData, ReleaseContainer, ReleaseDetails } from '../types/devopsConfigs';
+import type { ContainerWriteData, ReleaseContainer } from '../types/devopsConfigs';
 
 // Resource bounds mirror Devant's containerUtils. CPU is in whole CPUs at the
 // UI layer (0.01–4) and converted to milli-CPU (×1000) on the wire; memory is Mi.
+// ipaas-service rejects sizes outside the same bounds, so change both together.
 export const CPU_MIN = 0.01;
 export const CPU_MAX = 4;
 export const CPU_STEP = 0.01;
@@ -53,12 +54,6 @@ export function containerImageName(c: ReleaseContainer): string | undefined {
 
 export function isMainContainer(c: Pick<ReleaseContainer, 'type'>): boolean {
   return c.type === 'MAIN';
-}
-
-/** Container running on a Private Data Plane — resource limits are always configurable there. */
-export function isPrivateDpRelease(release: ReleaseDetails | undefined): boolean {
-  const choreoEnv = release?.metadata?.choreo_env ?? release?.environment?.choreo_env;
-  return choreoEnv === 'private_dp';
 }
 
 /** milli-CPU (wire) → CPU (display). */

@@ -32,8 +32,8 @@ interface ContainerEditFormProps {
   releaseId: string;
   /** The deployment track the release belongs to. */
   deploymentTrackId: string;
-  /** Paid subscription or Private Data Plane — resource limits are configurable. */
-  isPaidOrPdpUser: boolean;
+  /** The org is on a paid plan, so resource requests and limits are configurable. */
+  paid: boolean;
   onClose: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
@@ -42,7 +42,7 @@ interface ContainerEditFormProps {
 const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerEditForm({ container, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
+export default function ContainerEditForm({ container, projectId, componentId, releaseId, deploymentTrackId, paid, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
   const [form, setForm] = useState(() => containerToForm(container));
   const initialForm = useRef(form).current;
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
@@ -70,9 +70,9 @@ export default function ContainerEditForm({ container, projectId, componentId, r
         </Button>
       </Box>
 
-      {!isPaidOrPdpUser && (
+      {!paid && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Resource requests and limits can only be configured with an upgraded subscription or private data plane.
+          Resource requests and limits can only be configured on a paid plan.
         </Alert>
       )}
 
@@ -90,11 +90,11 @@ export default function ContainerEditForm({ container, projectId, componentId, r
               limit={form.cpuLimit}
               onRequestChange={(v) => set('cpuRequest', v)}
               onLimitChange={(v) => set('cpuLimit', v)}
-              disabled={!isPaidOrPdpUser}
+              disabled={!paid}
               format={cpuFmt}
             />
           ) : (
-            <SingleResourceSlider label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={CPU_STEP} value={form.cpuRequest} onChange={(v) => set('cpuRequest', v)} disabled={!isPaidOrPdpUser} format={cpuFmt} />
+            <SingleResourceSlider label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={CPU_STEP} value={form.cpuRequest} onChange={(v) => set('cpuRequest', v)} disabled={!paid} format={cpuFmt} />
           )}
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
@@ -110,11 +110,11 @@ export default function ContainerEditForm({ container, projectId, componentId, r
               limit={form.memLimit}
               onRequestChange={(v) => set('memRequest', v)}
               onLimitChange={(v) => set('memLimit', v)}
-              disabled={!isPaidOrPdpUser}
+              disabled={!paid}
               format={memFmt}
             />
           ) : (
-            <SingleResourceSlider label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={MEMORY_STEP} value={form.memRequest} onChange={(v) => set('memRequest', v)} disabled={!isPaidOrPdpUser} format={memFmt} />
+            <SingleResourceSlider label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={MEMORY_STEP} value={form.memRequest} onChange={(v) => set('memRequest', v)} disabled={!paid} format={memFmt} />
           )}
         </Grid>
       </Grid>
