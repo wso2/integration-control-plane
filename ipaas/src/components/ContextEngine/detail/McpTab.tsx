@@ -80,6 +80,20 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
       {/* The playground takes the page's full width; the text around it keeps a readable measure. */}
       {testing && (
         <Box sx={playgroundFrameSx}>
+          {testKey.isError && (
+            <Alert
+              severity="error"
+              variant="outlined"
+              action={
+                <Button size="small" onClick={mintTestKey}>
+                  Try again
+                </Button>
+              }
+              sx={{ mb: 2 }}
+            >
+              Couldn&apos;t create a test key.
+            </Alert>
+          )}
           <McpPlayground url={endpoint} token={testKey.data?.apiKey ?? null} headerName="X-API-Key" isTokenFetching={testKey.isPending} onTokenRegenerate={mintTestKey} connectionLayout="bar" />
         </Box>
       )}

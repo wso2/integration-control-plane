@@ -222,7 +222,7 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
       {shownTab === 'playground' && <PlaygroundTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'graph' && <GraphTab engine={engine} orgHandle={scope.org} />}
       {shownTab === 'api' && <ApiTab engine={engine} />}
-      {shownTab === 'mcp' && <McpTab engine={engine} />}
+      {shownTab === 'mcp' && <McpTab key={engine.id} engine={engine} />}
       {/* {shownTab === 'access' && <AccessTab engine={engine} orgHandle={scope.org} />} */}
 
       {confirmDelete && (
