@@ -27,8 +27,8 @@ import ProjectPickerDialog from '../components/OrgOverview/ProjectPickerDialog';
 import { Permissions } from '../constants/permissions';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useDatabaseAvailability } from '../hooks/useDatabases';
 import { useOrgComponents } from '../hooks/useComponents';
+import { useDatabaseAvailability } from '../hooks/useDatabases';
 import { useProjects } from '../hooks/useProjects';
 import { newComponentUrl, newDatabaseUrl, newProjectUrl, type OrgScope } from '../nav';
 import { orgProjectsUrl, projectHomeUrl } from '../paths';
@@ -136,10 +136,10 @@ function RowsSkeleton(): JSX.Element {
 }
 
 export default function OrgOverview(scope: OrgScope): JSX.Element {
-  const navigate = useAppNavigate();
   const dbAvailability = useDatabaseAvailability();
   const databasesAvailable = dbAvailability.data?.available === true;
   const databasesUnavailableReason = dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
+  const navigate = useAppNavigate();
   const [pickingProject, setPickingProject] = useState(false);
   const { displayName, username } = useAuth();
   const { hasOrgPermission } = useAccessControl();

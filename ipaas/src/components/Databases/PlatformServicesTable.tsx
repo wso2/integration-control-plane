@@ -115,9 +115,16 @@ export default function PlatformServicesTable({ rows, databasePlans, temporalPla
                   <Stack direction="row" alignItems="center" gap={1.5}>
                     {row.kind === 'temporal' ? <Workflow size={20} /> : <Database size={20} />}
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {server.name}
-                      </Typography>
+                      <Stack direction="row" alignItems="center" gap={1}>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {server.name}
+                        </Typography>
+                        {row.kind === 'temporal' && row.server.managed && (
+                          <Tooltip title="Runs your workflow integrations. The integration platform created it.">
+                            <Chip label="Managed" size="small" variant="outlined" sx={badgeSx} />
+                          </Tooltip>
+                        )}
+                      </Stack>
                       {row.kind === 'temporal' && row.server.namespace && (
                         <Typography variant="caption" color="text.secondary">
                           Namespace {row.server.namespace}

@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Card, Chip, CircularProgress, Grid, InputAdornment, TextField, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft, ArrowRight, CircleCheck, Database, Server, Workflow } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState, type JSX } from 'react';
-import SelectableCard from './SelectableCard';
+import SelectableCard from '../common/SelectableCard';
 import PlanCard from './PlanCard';
 import TemporalPlanCard from '../Temporal/TemporalPlanCard';
 import { DatabasePlansSkeleton } from './DatabaseSkeletons';

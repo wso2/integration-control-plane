@@ -16,11 +16,19 @@
  * under the License.
  */
 
-import type { JSX } from 'react';
-import { Navigate } from 'react-router';
-import { newProjectUrl, type OrgScope } from '../nav';
+/** The workflow runtime: the managed Temporal server the platform runs workflow integrations on, one namespace per environment. */
 
-/** Old bookmarks of the create page would otherwise resolve `new` as a project handle. */
-export default function LegacyNewProjectRedirect(scope: OrgScope): JSX.Element {
-  return <Navigate to={newProjectUrl(scope)} replace />;
+export type WorkflowRuntimeStatus = 'NOT_CONFIGURED' | 'NOT_PROVISIONED' | 'PROVISIONING' | 'READY' | 'ERROR';
+
+export interface WorkflowNamespace {
+  environment: string;
+  namespace: string;
+}
+
+export interface WorkflowRuntime {
+  status: WorkflowRuntimeStatus;
+  /** The managed server's name; absent until the platform creates it. */
+  serverName?: string;
+  /** Derived from the environment names, so listed before the namespaces are registered. */
+  namespaces: WorkflowNamespace[];
 }

@@ -47,22 +47,3 @@ export interface DeploymentPipeline {
   /** Project-level default pipeline (project listing). */
   is_project_default?: boolean;
 }
-
-export interface CreateDeploymentPipelineRequest {
-  name: string;
-  promotion_tree: PromotionTreeNode;
-}
-
-/** A project that references a pipeline — surfaced when a delete is blocked. */
-export interface PipelineProjectRef {
-  id: string;
-  name: string;
-  handler: string;
-}
-
-export interface PipelineDeletionEligibility {
-  id: string;
-  name: string;
-  isDeletable: boolean;
-  usedProjects: PipelineProjectRef[];
-}

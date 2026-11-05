@@ -16,11 +16,14 @@
  * under the License.
  */
 
-import { PageContent } from '@wso2/oxygen-ui';
+import { Alert, Button, PageContent } from '@wso2/oxygen-ui';
+import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import CreateServiceWizard from '../components/Databases/CreateServiceWizard';
+import { DatabasePlansSkeleton } from '../components/Databases/DatabaseSkeletons';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useDatabaseAvailability } from '../hooks/useDatabases';
 import { orgDatabasesUrl, type OrgScope } from '../nav';
 import { PLATFORM_SERVICE_TYPES } from '../constants/databases';
 
@@ -29,9 +32,49 @@ export default function CreateDatabaseServer(scope: OrgScope): JSX.Element {
   const [params] = useSearchParams();
   // An unknown ?type= falls back to the service step rather than failing the page.
   const initialKind = PLATFORM_SERVICE_TYPES.find((t) => t.id === params.get('type'))?.id;
+  // Reachable by URL too, so the page checks availability itself rather than trusting the page that linked here.
+  const availability = useDatabaseAvailability();
+  const leave = () => navigate(orgDatabasesUrl(scope));
+
+  const backButton = (
+    <Button startIcon={<ArrowLeft size={16} />} onClick={leave} sx={{ mb: 2 }}>
+      Back to Platform Services
+    </Button>
+  );
+
+  if (availability.isLoading)
+    return (
+      <PageContent fullWidth>
+        {backButton}
+        <DatabasePlansSkeleton />
+      </PageContent>
+    );
+  if (availability.isError)
+    return (
+      <PageContent fullWidth>
+        {backButton}
+        <Alert
+          severity="error"
+          action={
+            <Button color="inherit" size="small" onClick={() => availability.refetch()}>
+              Retry
+            </Button>
+          }>
+          Could not check whether platform services are available.
+        </Alert>
+      </PageContent>
+    );
+  if (availability.data?.available !== true)
+    return (
+      <PageContent fullWidth>
+        {backButton}
+        <Alert severity="info">Platform services are not available in this environment.</Alert>
+      </PageContent>
+    );
+
   return (
     <PageContent fullWidth>
-      <CreateServiceWizard scope={scope} initialKind={initialKind} onCancel={() => navigate(orgDatabasesUrl(scope))} />
+      <CreateServiceWizard scope={scope} initialKind={initialKind} onCancel={leave} />
     </PageContent>
   );
 }

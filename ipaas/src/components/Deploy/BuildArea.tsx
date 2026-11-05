@@ -47,6 +47,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { useWorkflowRuntime } from '../../hooks/useWorkflowRuntime';
 import { useUpdateAutoDeployEnabled } from '../../hooks/useComponents';
 import { useComponentDeployment, useDeploymentStatus, useDeploymentTrackImages } from '../../hooks/useDeployments';
 import type { DeploymentTrackImage } from '../../types/deployment';
@@ -74,6 +75,7 @@ export default function BuildArea({
   projectHandler,
   displayType,
   hideEndpoints = false,
+  isWorkflow = false,
 }: BuildAreaProps): JSX.Element {
   // Determine build-in-progress state first so images can poll faster during active builds
   const { data: builds = [] } = useDeploymentStatus(componentId, versionId);
@@ -138,7 +140,10 @@ export default function BuildArea({
   const redeployCurrent = imagesLoaded && images.length === 0 && !!firstEnvReleaseId;
   // A picked image must still be in the loaded list, so a stale pick is not deployed.
   const imagePicked = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId);
-  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending;
+  const { data: workflowRuntime } = useWorkflowRuntime(isWorkflow);
+  // A workflow's worker needs the runtime to connect to; the environment card says why it is not ready.
+  const workflowRuntimeBlocked = isWorkflow && workflowRuntime?.status !== 'READY';
+  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending && !workflowRuntimeBlocked;
 
   const handleDeploy = () => {
     if (!canDeploy) return;
@@ -299,7 +304,7 @@ export default function BuildArea({
                 startIcon={isDeploying || isBuildRunning ? <CircularProgress color="inherit" size={14} /> : selectedDeployAction === 'deploy' ? <Rocket size={14} /> : <Settings size={14} />}
                 onClick={handleMainButtonClick}
                 sx={{ whiteSpace: 'nowrap', flex: 1 }}>
-                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
+                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : workflowRuntimeBlocked ? 'Preparing workflow runtime' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
               </Button>
               <Button size="small" sx={{ px: 0.5 }} aria-label="More deploy options" aria-expanded={splitOpen} onClick={() => setSplitOpen((prev) => !prev)}>
                 <ChevronDown size={14} />
@@ -330,6 +335,11 @@ export default function BuildArea({
               )}
             </Popper>
           </Box>
+          {deployTrack.isError && (
+            <Alert severity="error" sx={{ mt: 1.5 }}>
+              {deployTrack.error.message}
+            </Alert>
+          )}
         </CardContent>
       </Card>
 

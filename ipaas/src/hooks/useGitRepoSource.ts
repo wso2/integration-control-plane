@@ -38,6 +38,8 @@ export function useGitRepoSource() {
   const [urlError, setUrlError] = useState('');
   const [parsedOrg, setParsedOrg] = useState('');
   const [parsedRepo, setParsedRepo] = useState('');
+  // The URL the debounce last parsed; until it catches up, parsedOrg/parsedRepo describe an older URL.
+  const [parsedUrl, setParsedUrl] = useState('');
   const [selectedBranch, setSelectedBranch] = useState('');
   const [subPath, setSubPath] = useState('/');
   const [isWorkspace, setIsWorkspace] = useState(false);
@@ -51,7 +53,9 @@ export function useGitRepoSource() {
   const activeOrg = isPublicRepo ? parsedOrg : selectedOrg;
   const activeRepo = isPublicRepo ? parsedRepo : selectedRepo;
   const showBranchAndSubPath = !!(activeOrg && activeRepo);
-  const pathReady = !!(activeOrg && activeRepo && selectedBranch);
+  const sourceSelected = !!(activeOrg && activeRepo && selectedBranch);
+  // Submission also waits for the typed URL to be parsed and valid; detection keys on the selection alone, so URL edits keep the modules.
+  const pathReady = sourceSelected && (!isPublicRepo || (parsedUrl === repoUrl && !urlError));
 
   const reposEnabled = !isPublicRepo && authStatus === 'done';
   const { data: userRepos, isLoading: isReposLoading, isError: isReposError, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled);
@@ -105,6 +109,7 @@ export function useGitRepoSource() {
   useEffect(() => {
     if (!isPublicRepo) return;
     const id = setTimeout(() => {
+      setParsedUrl(repoUrl);
       if (!repoUrl) {
         setUrlError('');
         setParsedOrg('');
@@ -114,10 +119,9 @@ export function useGitRepoSource() {
         return;
       }
       const parsed = parseGitHubUrl(repoUrl);
+      // The last valid repository stays selected, so fixing a typo does not lose its branch or modules.
       if (!parsed) {
         setUrlError('Enter a valid GitHub URL, e.g. https://github.com/org/repo');
-        setParsedOrg('');
-        setParsedRepo('');
         return;
       }
       setUrlError('');
@@ -135,7 +139,7 @@ export function useGitRepoSource() {
 
   // Workspace detection from repo contents
   useEffect(() => {
-    if (!pathReady || isContentsLoading) {
+    if (!sourceSelected || isContentsLoading) {
       setIsWorkspace(false);
       setWorkspaceModules([]);
       return;
@@ -149,7 +153,7 @@ export function useGitRepoSource() {
     const workspace = isBallerinaWorkspace(nodes);
     setIsWorkspace(workspace);
     if (!workspace) setWorkspaceModules([]);
-  }, [repoContents, subPath, pathReady, isContentsLoading]);
+  }, [repoContents, subPath, sourceSelected, isContentsLoading]);
 
   const resetPickers = () => {
     setSelectedOrg('');
@@ -158,6 +162,7 @@ export function useGitRepoSource() {
     setUrlError('');
     setParsedOrg('');
     setParsedRepo('');
+    setParsedUrl('');
     setSelectedBranch('');
     setSubPath('/');
     setIsWorkspace(false);

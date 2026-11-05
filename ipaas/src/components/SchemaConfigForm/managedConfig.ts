@@ -16,5 +16,10 @@
  * under the License.
  */
 
-export const CRITICAL_ENVIRONMENT_LABEL = 'Mark as critical environment';
-export const CRITICAL_ENVIRONMENT_HELP = 'Use for production. Test keys generated here are production keys.';
+import { createContext } from 'react';
+
+/**
+ * Config keys the platform sets, such as a workflow integration's runtime connection.
+ * Provided by `ConfigForm` and read by the leaf elements, which show these keys read-only.
+ */
+export const ManagedConfigContext = createContext<ReadonlySet<string>>(new Set());

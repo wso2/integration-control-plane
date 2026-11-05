@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Globe, Clock, Repeat, FileText, Bot, MCP, Cable } from '@wso2/oxygen-ui-icons-react';
+import { Globe, Clock, Repeat, FileText, Bot, MCP, Cable, Workflow, UserCheck } from '@wso2/oxygen-ui-icons-react';
 import IntegratorIcon from '../assets/icons/IntegratorIcon';
 import GraphqlIcon from '../assets/icons/GraphqlIcon';
 import GrpcIcon from '../assets/icons/GrpcIcon';
@@ -86,6 +86,15 @@ export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
     icons: [
       { icon: <FileText size={16} />, label: 'File' },
       { icon: <S3Icon size={16} />, label: 'S3' },
+    ],
+  },
+  {
+    id: 'workflow',
+    title: 'Workflow',
+    description: 'Run durable, long-running processes that survive restarts and wait on people or events',
+    icons: [
+      { icon: <Workflow size={16} />, label: 'Durable Workflow' },
+      { icon: <UserCheck size={16} />, label: 'Human Task' },
     ],
   },
 ];
