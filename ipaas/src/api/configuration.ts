@@ -25,21 +25,7 @@
  */
 
 import { bff, q, seg } from './_client';
-import type {
-  CertGroup,
-  CertMapping,
-  SchemaConfigData,
-  ConfigMgtData,
-  SchemaConfigItem,
-  SaveSchemaConfigInput,
-  ConfigMgtSaveItem,
-  ResourceLink,
-  ResourceLinkSuggestion,
-  LinkWarning,
-  ResourceLinkWrite,
-  CreateResourceLinkInput,
-  DeleteResourceLinkInput,
-} from '../types/configuration';
+import type { CertGroup, CertMapping, SchemaConfigData, ConfigMgtData, SchemaConfigItem, SaveSchemaConfigInput, ConfigMgtSaveItem, IntegrationLinks, LinkWrite, LinkWriteInput } from '../types/configuration';
 
 export interface PostConfigMgtInput {
   orgHandler: string;
@@ -63,18 +49,9 @@ export const saveSchemaConfig = (input: SaveSchemaConfigInput): Promise<{ config
     })
     .then((r) => ({ configurations: r?.configurations ?? input.configurations }));
 
-export const fetchResourceLinks = (projectId: string, componentId: string): Promise<ResourceLink[]> => bff.get<ResourceLink[]>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`);
+export const fetchIntegrationLinks = (projectId: string, componentId: string): Promise<IntegrationLinks> => bff.get<IntegrationLinks>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`);
 
-/** The resources build calls for (the latest build when absent). */
-export const fetchResourceLinkSuggestions = (projectId: string, componentId: string, build?: string): Promise<ResourceLinkSuggestion[]> =>
-  bff.get<ResourceLinkSuggestion[]>(`/components/${seg(componentId)}/link-suggestions${q({ projectName: projectId, build })}`);
-
-export const fetchLinkWarnings = (projectId: string, componentId: string, build: string): Promise<LinkWarning[]> => bff.get<LinkWarning[]>(`/components/${seg(componentId)}/link-warnings${q({ projectName: projectId, build })}`);
-
-export const createResourceLink = ({ projectId, componentId, resourceType, connection }: CreateResourceLinkInput): Promise<ResourceLinkWrite> =>
-  bff.post<ResourceLinkWrite>(`/components/${seg(componentId)}/links${q({ projectName: projectId })}`, { resourceType, connection });
-
-export const deleteResourceLink = ({ projectId, componentId, resourceType }: DeleteResourceLinkInput): Promise<ResourceLinkWrite> => bff.delete<ResourceLinkWrite>(`/components/${seg(componentId)}/links/${seg(resourceType)}${q({ projectName: projectId })}`);
+export const writeLink = ({ projectId, componentId, target }: LinkWriteInput): Promise<LinkWrite> => bff.put<LinkWrite>(`/components/${seg(componentId)}/link${q({ projectName: projectId })}`, target);
 
 // --- Choreo-v2 concepts not present on the OpenChoreo stack: safe defaults. ---
 export const fetchCertificateGroups = (_projectId: string, _componentId: string): Promise<CertGroup[]> => Promise.resolve([]);

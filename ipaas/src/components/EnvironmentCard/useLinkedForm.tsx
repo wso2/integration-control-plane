@@ -1,0 +1,107 @@
+/**
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import { useMemo, type ReactNode } from 'react';
+import { Alert, Button, Stack, Typography } from '@wso2/oxygen-ui';
+import { Unlink } from '@wso2/oxygen-ui-icons-react';
+import { useEnvironments } from '../../hooks/useEnvironments';
+import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
+import type { IntegrationLinks, LinkTarget } from '../../types/configuration';
+import { configKey, configurableId, formLinkView, targetName } from '../../utils/integrationLinks';
+import { OrphanedLinks } from './OrphanedLinks';
+import type { FormGroup } from '../SchemaConfigForm/ConfigForm';
+import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
+
+const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [] };
+
+/** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's config keys. */
+export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[]) {
+  const { data: links = noLinks } = useIntegrationLinks(projectId, componentId, open);
+  const { data: environments = [] } = useEnvironments('', projectId);
+  const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
+  const view = useMemo(() => formLinkView(links, env, envName), [links, env, environments]); // eslint-disable-line react-hooks/exhaustive-deps
+  const write = useLinkWrite();
+  const change = (target: LinkTarget) => write.mutateAsync({ projectId, componentId, target }).catch(() => undefined);
+
+  const fieldLinks: FieldLinks = (path) => {
+    const id = configurableId(path);
+    const t = view.target(id);
+    return {
+      ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }) } }),
+      ...(t.picker && { picker: { ...t.picker, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
+    };
+  };
+
+  const groups: FormGroup[] = view.connections.map(({ connection: c, linked, note }) => ({
+    id: c.id,
+    title: (
+      <Stack direction="row" alignItems="center" gap={1}>
+        <Typography variant="subtitle2" sx={{ fontFamily: 'monospace' }}>
+          {targetName(c.id)}
+        </Typography>
+        {linked && (
+          <Typography variant="caption" color="text.secondary">
+            Linked to {linked.displayName}
+          </Typography>
+        )}
+      </Stack>
+    ),
+    actions: view.editable && c.link && (
+      <Button size="small" variant="outlined" color="error" startIcon={<Unlink size={14} />} disabled={write.isPending} onClick={() => change({ connection: c.id })} aria-label={`Unlink ${targetName(c.id)}`}>
+        Unlink
+      </Button>
+    ),
+    note: note && (
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+        {note}
+      </Typography>
+    ),
+    keys: c.fields.map((f) => configKey(f.configurable)),
+  }));
+
+  const linkedKeys = new Set(
+    [...Object.keys(links.fieldLinks), ...links.connections.flatMap((c) => c.fields.map((f) => f.configurable)), ...Object.keys(links.environments.find((e) => e.name === env)?.configurables ?? {})].filter((id) => view.target(id).source).map(configKey),
+  );
+
+  const top: ReactNode = (
+    <>
+      {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending} change={change} />}
+      {write.data?.workload === 'next_deploy' && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          Deploy to apply.
+        </Alert>
+      )}
+      {write.isError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 1.5 }}
+          action={
+            write.variables && (
+              <Button size="small" color="inherit" onClick={() => change(write.variables!.target)}>
+                Try again
+              </Button>
+            )
+          }>
+          {write.error instanceof Error ? write.error.message : "Linking didn't finish."}
+        </Alert>
+      )}
+    </>
+  );
+
+  return { links, view, groups, fieldLinks, linkedKeys, top };
+}

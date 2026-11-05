@@ -25,13 +25,14 @@ import { useSchemaConfig, useCertificateGroups, useCertificateMappings, useConfi
 import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
-import { useSaveSchemaConfig, usePostCertificateMappings, useFormLinks } from '../../hooks/useConfiguration';
-import { FormLinks } from './FormLinks';
+import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
+import { useLinkedForm } from './useLinkedForm';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCard } from '../EndpointCard';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
+import { schemaFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -737,7 +738,6 @@ function GenericServiceConfigureDrawer({
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
   hideEndpoints = false,
-  buildId,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
   // File/event integrations have no endpoints (devant: they open the
@@ -769,7 +769,6 @@ function GenericServiceConfigureDrawer({
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, schemaEnvId, versionId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
   const { data: endpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
-  const { links, linkedFrom } = useFormLinks(projectId, componentId, schemaEnvId, open);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
   const generateEp = useGenerateComponentEndpoints();
@@ -782,6 +781,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? schemaFields(parsedSchema).map((f) => f.path) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {
@@ -912,7 +912,7 @@ function GenericServiceConfigureDrawer({
     const configurations: SchemaConfigItem[] = [];
     valueMap.forEach((value, key) => {
       // A link supplies it; a value of the form's own would compete with the link's.
-      if (linkedFrom.has(key)) return;
+      if (linked.linkedKeys.has(key)) return;
       if (value !== '' && value !== undefined && value !== null) {
         const linking = linkingMap.get(key);
         const isSensitive = sensitiveMap.get(key) || false;
@@ -1042,7 +1042,7 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
-        <FormLinks projectId={projectId} componentId={componentId} env={schemaEnvId} open={open} links={links} build={buildId} />
+        {linked.top}
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -1054,7 +1054,8 @@ function GenericServiceConfigureDrawer({
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
-          linkedFrom={linkedFrom}
+          groups={linked.groups}
+          fieldLinks={linked.fieldLinks}
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>
@@ -1092,7 +1093,7 @@ function GenericServiceConfigureDrawer({
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
   // A field marked invalid before its link loaded is no longer the form's to fill.
-  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linkedFrom.has(key));
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
   const isApplying = save.isPending || saveCertMappings.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';

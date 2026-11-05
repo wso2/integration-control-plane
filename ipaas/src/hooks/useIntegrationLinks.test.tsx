@@ -20,58 +20,46 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { focusManager, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useCreateResourceLink, useDeleteResourceLink, useFormLinks } from './useConfiguration';
-import type { ResourceLink, ResourceLinkWrite } from '../types/configuration';
+import { useIntegrationLinks, useLinkWrite } from './useConfiguration';
+import type { IntegrationLinks, LinkWrite } from '../types/configuration';
 
-// What ipaas-service answers: the stored link, and what development's release carries, which OpenChoreo changes after the write.
-const server = vi.hoisted(() => ({ linked: false, inRelease: false, workload: 'updated' as ResourceLinkWrite['workload'], reads: 0 }));
-const links = (): ResourceLink[] =>
-  server.linked || server.inRelease
-    ? [
-        {
-          resourceType: 'salesforce-sales',
-          connection: 'acme.sfdemo.sfSales',
-          linked: server.linked,
-          environments: [
-            {
-              name: 'development',
-              inRelease: server.inRelease,
-              hasValues: true,
-              state: server.inRelease ? 'linked' : 'next_release',
-              configurables: server.inRelease ? { 'acme.sfdemo.sfSalesBaseUrl': 'BASE_URL' } : {},
-              ...(server.inRelease && { connection: 'acme.sfdemo.sfSales' }),
-            },
-          ],
-        },
-      ]
-    : [];
+// What ipaas-service answers: the stored link, and what development's release uses, which OpenChoreo changes after the write.
+const server = vi.hoisted(() => ({ linked: false, inRelease: false, workload: 'updated' as LinkWrite['workload'], reads: 0 }));
+const target = 'acme/sfdemo:sfSalesBaseUrl';
+const ref = { ref: 'salesforce-sales', key: 'SALESFORCE_BASE_URL' };
+const links = (): IntegrationLinks => ({
+  kind: 'ballerina',
+  resources: [],
+  used: {},
+  connections: [],
+  fieldLinks: server.linked ? { [target]: ref } : {},
+  orphaned: [],
+  env: {},
+  environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: server.linked !== server.inRelease, connections: {}, configurables: server.inRelease ? { [target]: ref } : {}, env: {} }],
+});
 vi.mock('../api/configuration', () => ({
-  fetchResourceLinks: async () => {
+  fetchIntegrationLinks: async () => {
     server.reads++;
-    return JSON.parse(JSON.stringify(links()));
+    return links();
   },
-  createResourceLink: async () => {
-    server.linked = true;
-    return { resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales', workload: server.workload, environmentsWithoutValues: [] };
-  },
-  deleteResourceLink: async () => {
-    server.linked = false;
-    return { resourceType: 'salesforce-sales', workload: server.workload, environmentsWithoutValues: [] };
+  writeLink: async ({ target: t }: { target: { ref?: string } }) => {
+    server.linked = !!t.ref;
+    return { workload: server.workload };
   },
 }));
 
 let container: HTMLDivElement;
 let root: Root;
-let link: ReturnType<typeof useCreateResourceLink>;
-let unlink: ReturnType<typeof useDeleteResourceLink>;
+let write: ReturnType<typeof useLinkWrite>;
 
 function Form() {
-  const { linkedFrom } = useFormLinks('default', 'sfdemo', 'development', true);
-  link = useCreateResourceLink();
-  unlink = useDeleteResourceLink();
-  return <span>{[...linkedFrom.keys()].join()}</span>;
+  const { data } = useIntegrationLinks('default', 'sfdemo', true);
+  write = useLinkWrite();
+  return <span>{Object.keys(data?.environments[0].configurables ?? {}).join()}</span>;
 }
 
+const link = () => act(() => write.mutateAsync({ projectId: 'default', componentId: 'sfdemo', target: { configurable: target, ...ref } }));
+const unlink = () => act(() => write.mutateAsync({ projectId: 'default', componentId: 'sfdemo', target: { configurable: target } }));
 const wait = (ms: number) => act(() => vi.advanceTimersByTimeAsync(ms));
 const linkedFields = () => container.textContent;
 
@@ -103,13 +91,13 @@ const open = async () => {
 describe('an open Configure form', () => {
   it('shows a linked field read-only once development runs the release that carries the link', async () => {
     await open();
-    await act(() => link.mutateAsync({ projectId: 'default', componentId: 'sfdemo', resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales' }));
+    await link();
     await wait(0);
     expect(linkedFields()).toBe('');
 
     server.inRelease = true;
     await wait(4000);
-    expect(linkedFields()).toBe('acme.sfdemo.sfSalesBaseUrl');
+    expect(linkedFields()).toBe(target);
 
     const reads = server.reads;
     await wait(30_000);
@@ -119,10 +107,10 @@ describe('an open Configure form', () => {
   it('frees an unlinked field once development runs a release without the link', async () => {
     Object.assign(server, { linked: true, inRelease: true });
     await open();
-    expect(linkedFields()).toBe('acme.sfdemo.sfSalesBaseUrl');
-    await act(() => unlink.mutateAsync({ projectId: 'default', componentId: 'sfdemo', resourceType: 'salesforce-sales' }));
+    expect(linkedFields()).toBe(target);
+    await unlink();
     await wait(0);
-    expect(linkedFields()).toBe('acme.sfdemo.sfSalesBaseUrl');
+    expect(linkedFields()).toBe(target);
 
     server.inRelease = false;
     await wait(4000);
@@ -131,13 +119,13 @@ describe('an open Configure form', () => {
 
   it('follows a write minutes after an earlier one', async () => {
     await open();
-    await act(() => link.mutateAsync({ projectId: 'default', componentId: 'sfdemo', resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales' }));
+    await link();
     server.inRelease = true;
     await wait(4000);
     await wait(240_000);
-    await act(() => unlink.mutateAsync({ projectId: 'default', componentId: 'sfdemo', resourceType: 'salesforce-sales' }));
+    await unlink();
     await wait(90_000);
-    expect(linkedFields()).toBe('acme.sfdemo.sfSalesBaseUrl');
+    expect(linkedFields()).toBe(target);
 
     server.inRelease = false;
     await wait(4000);
@@ -147,7 +135,7 @@ describe('an open Configure form', () => {
   it("doesn't wait for a release when the write leaves development's Workload as it is", async () => {
     server.workload = 'no_workload';
     await open();
-    await act(() => link.mutateAsync({ projectId: 'default', componentId: 'sfdemo', resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales' }));
+    await link();
     const reads = server.reads;
     await wait(30_000);
     expect(server.reads).toBe(reads);
@@ -155,7 +143,7 @@ describe('an open Configure form', () => {
 
   it('stops waiting when development never gets the release', async () => {
     await open();
-    await act(() => link.mutateAsync({ projectId: 'default', componentId: 'sfdemo', resourceType: 'salesforce-sales', connection: 'acme.sfdemo.sfSales' }));
+    await link();
     await wait(120_000);
     const reads = server.reads;
     await wait(30_000);

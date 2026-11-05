@@ -106,6 +106,27 @@ export const getSchemasAtLevel = (schema: JSONSchema, targetLevel: number, curre
   return schemas.reverse();
 };
 
+/** A configurable at the schema's required level: its config key, its key in its module's schema, and a label relative to the root module. */
+export interface SchemaField {
+  path: string;
+  key: string;
+  label: string;
+  schema: JSONSchema;
+  required: boolean;
+}
+
+/** Every configurable at the schema's required level, labelled relative to the root module. */
+export const schemaFields = (schema: JSONSchema): SchemaField[] => {
+  const levels = getSchemasAtLevel(schema, schema.requiredLevel || 1);
+  const root = levels.map((l) => l.path).reduce((a, b) => (a.length <= b.length ? a : b), levels[0]?.path ?? '');
+  return levels.flatMap(({ schema: level, path }) =>
+    Object.keys(level.properties ?? {}).map((key) => {
+      const fullPath = path ? `${path}.${key}` : key;
+      return { path: fullPath, key, label: root ? fullPath.slice(root.length + 1) : fullPath, schema: level, required: (level.required ?? []).includes(key) };
+    }),
+  );
+};
+
 export function getRequiredPathsAtLevel(schema: JSONSchema): string[] {
   const schemas = getSchemasAtLevel(schema, schema.requiredLevel || 1);
   const paths: string[] = [];
