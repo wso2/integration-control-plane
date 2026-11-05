@@ -37,11 +37,8 @@ export function OrphanedLinks({ view, connections, configurables, busy, change }
 function Orphan({ orphan: o, name, targets, busy, change }: { orphan: OrphanedLink; name: string; targets: string[]; busy: boolean; change: (t: LinkTarget) => Promise<unknown> }) {
   const [to, setTo] = useState('');
   const removal: LinkTarget = o.kind === 'connection' ? { connection: o.target } : { configurable: o.target };
-  // The key stays in use by the lost target until that link goes.
-  const move = async () => {
-    await change(removal);
-    await change(o.kind === 'connection' ? { connection: to, ref: o.ref } : { configurable: to, ref: o.ref, key: o.key });
-  };
+  // Taking the key from the lost target moves the link: the orphan goes in the same write.
+  const move = () => change(o.kind === 'connection' ? { connection: to, ref: o.ref } : { configurable: to, ref: o.ref, key: o.key });
   return (
     <Stack direction="row" alignItems="center" gap={1} sx={{ py: 0.5 }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>

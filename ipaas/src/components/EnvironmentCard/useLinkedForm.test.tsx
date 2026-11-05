@@ -110,6 +110,14 @@ describe('the Configure form with links', () => {
     expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl') }]);
   });
 
+  it('offers a key a link the build lost holds, and takes it in one write', async () => {
+    await act(async () => button('Link ordersDatabaseUrl').click());
+    const url = Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent?.startsWith('URL')) as HTMLElement;
+    expect([url.textContent, url.getAttribute('aria-disabled')]).toEqual(['URLfrom ordersDbUrl, no longer in the code', null]);
+    await act(async () => url.click());
+    expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
+  });
+
   it('tries a write that failed partway again', async () => {
     failed.current = { error: new Error("Unlinking didn't finish."), variables: { target: { connection: id('github') } } };
     await act(async () => root.render(<Form />));
@@ -130,6 +138,6 @@ describe('the Configure form with links', () => {
     await act(async () => (container.querySelector('[aria-label="Move ordersDbUrl to"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
     await act(async () => (Array.from(document.querySelectorAll('li')).find((li) => li.textContent === 'ordersDatabaseUrl') as HTMLElement).click());
     await act(async () => button('Move').click());
-    expect(writes).toEqual([{ configurable: id('ordersDbUrl') }, { configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
+    expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
   });
 });

@@ -27,14 +27,13 @@ export interface LinkedSource {
   overrides?: boolean;
   /** The environment the resource has no values in. */
   noValuesIn?: string;
-  /** Where to add the missing values. */
-  valuesHref?: string;
 }
 
-/** A resource key the picker offers, and the field that uses it already. */
+/** A resource key the picker offers: the field that uses it already, or the lost target a pick takes it from. */
 export interface PickerKey {
   key: string;
   usedBy?: string;
+  orphanOf?: string;
 }
 
 /** The choices of a field's link icon. `selected` is `first` for no own link, else `resource|key`. */
