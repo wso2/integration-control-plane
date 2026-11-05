@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { Alert, Box, CircularProgress, PageContent, PageTitle } from '@wso2/oxygen-ui';
+import { Alert, Box, PageContent, PageTitle } from '@wso2/oxygen-ui';
 import { useEffect, useState, type JSX } from 'react';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import EnvironmentSelect from '../components/common/EnvironmentSelect';
+import ContainerCardSkeleton from '../components/Containers/ContainerCardSkeleton';
 import ContainerInfoCard from '../components/Containers/ContainerInfoCard';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
@@ -86,9 +87,7 @@ export default function ComponentContainers({ org, project, component }: Compone
         )}
 
         {isLoading || loadingPlan || (loadingRelease && !!releaseId) ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
-            <CircularProgress />
-          </Box>
+          <ContainerCardSkeleton />
         ) : !comp ? (
           <Alert severity="error">Integration not found</Alert>
         ) : trackId === undefined ? null : containers.length === 0 ? (
