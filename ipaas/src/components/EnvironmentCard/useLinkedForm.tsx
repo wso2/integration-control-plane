@@ -18,6 +18,7 @@
 
 import { useMemo, type ReactNode } from 'react';
 import { Alert, Button, Stack, Typography } from '@wso2/oxygen-ui';
+import { BffError } from '../../api/_client';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
 import type { IntegrationLinks, LinkTarget } from '../../types/configuration';
@@ -87,7 +88,9 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
           severity="error"
           sx={{ mb: 1.5 }}
           action={
-            write.variables && (
+            // A refusal stays one; a write the platform didn't finish finishes when repeated.
+            write.variables &&
+            !(write.error instanceof BffError && write.error.status < 500) && (
               <Button size="small" color="inherit" onClick={() => change(write.variables!.target)}>
                 Try again
               </Button>
