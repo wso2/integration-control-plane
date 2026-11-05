@@ -37,6 +37,7 @@ import ScheduleDialog from '../../Overview/_shared/ScheduleDialog';
 import PromoteButton from '../../EnvironmentCard/PromoteButton';
 import DeployEnvironmentCardHeader from './DeployEnvironmentCardHeader';
 import DeployEnvironmentCardBody from './DeployEnvironmentCardBody';
+import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 import DeploymentHistoryDrawer from './DeploymentHistoryDrawer';
 import EndpointsDrawer from './EndpointsDrawer';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
@@ -350,6 +351,7 @@ export default function DeployEnvironmentCard({
             configurablesCount={configurablesCount}
             onEndpointsClick={showEndpoints ? () => setEndpointsOpen(true) : undefined}
           />
+          <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
         </CardContent>
 
         {showPromote && (
