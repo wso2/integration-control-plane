@@ -113,7 +113,9 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
   const connections = links.connections.map((c) => {
     const uses = editable ? c.link : release?.connections[c.id];
     const changed = c.link !== uses ? ` The link is now ${c.link ? name(c.link) : 'removed'}.` : '';
-    const note = editable ? undefined : `This release uses ${uses ? name(uses) : 'no resource'}.${changed} Change links in ${envName(first ?? '')}.`;
+    // What the section's fields receive in this release, by the connection's link or their own.
+    const received = [...new Set([...(uses ? [uses] : []), ...c.fields.flatMap((f) => release?.configurables[f.configurable]?.ref ?? [])])].map(name);
+    const note = editable ? undefined : `This release uses ${received.length ? received.join(', ') : 'no resource'}.${changed} Change links in ${envName(first ?? '')}.`;
     return { connection: c, ...(uses && { linked: resource(uses) }), ...(note && { note }) };
   });
 
