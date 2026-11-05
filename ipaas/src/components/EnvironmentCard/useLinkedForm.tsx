@@ -35,7 +35,8 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   const { data: links = noLinks } = useIntegrationLinks(projectId, componentId, open);
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
-  const view = useMemo(() => formLinkView(links, env, envName), [links, env, environments]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ids = fields.map(configurableId).join();
+  const view = useMemo(() => formLinkView(links, env, envName, ids ? ids.split(',') : []), [links, env, environments, ids]); // eslint-disable-line react-hooks/exhaustive-deps
   const write = useLinkWrite();
   const change = (target: LinkTarget) => write.mutateAsync({ projectId, componentId, target }).catch(() => undefined);
 
@@ -106,5 +107,8 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
     </>
   );
 
-  return { links, view, groups, fieldLinks, linkedKeys, top };
+  // Outside the first environment the form shows the release's build; with its schema unread, it shows no other build's.
+  const unread = links.environments.length > 0 && !view.editable ? `Couldn't read the configurables of the build ${envName(env)} runs.` : undefined;
+
+  return { links, view, groups, fieldLinks, linkedKeys, top, unread };
 }

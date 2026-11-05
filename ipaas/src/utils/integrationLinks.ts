@@ -69,8 +69,11 @@ export interface FormLinkView {
   orphaned: (OrphanedLink & { name: string })[];
 }
 
-/** The links of a Configure form in env: editable in the first environment, else what env's release uses, read-only. */
-export function formLinkView(links: IntegrationLinks, env: string, envName: (env: string) => string = (e) => e): FormLinkView {
+/**
+ * The links of a Configure form in env: editable in the first environment, else what env's release uses, read-only.
+ * `fields` are the configurable ids of the build env runs: outside the first environment its sections come from them.
+ */
+export function formLinkView(links: IntegrationLinks, env: string, envName: (env: string) => string = (e) => e, fields: string[] = []): FormLinkView {
   const first = links.environments[0]?.name;
   const editable = first === env;
   const release = links.environments.find((e) => e.name === env);
@@ -110,9 +113,19 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
     return { ...(s && { source: source(s, !!own && !!via) }), picker };
   };
 
-  const connections = links.connections.map((c) => {
-    const uses = editable ? c.link : release?.connections[c.id];
-    const changed = c.link !== uses ? ` The link is now ${c.link ? name(c.link) : 'removed'}.` : '';
+  // Outside the first environment, the release's build may name its connections otherwise than the Workload's build.
+  const releaseConnections = (): LinkConnection[] =>
+    [...new Set([...Object.keys(release?.connections ?? {}), ...links.connections.map((c) => c.id)])].sort().flatMap((id) => {
+      const own = connectionFields(fields, id);
+      const link = release?.connections[id];
+      return own.length ? [{ id, ...(link && { link }), suggestions: [], fields: own.map((configurable) => ({ configurable })) }] : [];
+    });
+
+  const connections = (editable ? links.connections : releaseConnections()).map((c) => {
+    const uses = c.link;
+    // A connection the Workload's build renamed has no link now to compare with.
+    const now = editable ? c : links.connections.find((x) => x.id === c.id);
+    const changed = now && now.link !== uses ? ` The link is now ${now.link ? name(now.link) : 'removed'}.` : '';
     // What the section's fields receive in this release, by the connection's link or their own.
     const received = [...new Set([...(uses ? [uses] : []), ...c.fields.flatMap((f) => release?.configurables[f.configurable]?.ref ?? [])])].map(name);
     const note = editable ? undefined : `This release uses ${received.length ? received.join(', ') : 'no resource'}.${changed} Change links in ${envName(first ?? '')}.`;
@@ -121,3 +134,6 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
 
   return { editable, connections, target, orphaned: links.orphaned.map((o) => ({ ...o, name: name(o.ref) })) };
 }
+
+/** A connection's configurables among fields: those named after it (`github` → `githubAuthToken`), as ipaas-service groups them. */
+const connectionFields = (fields: string[], connection: string) => fields.filter((f) => f.startsWith(connection) && /^[A-Z]/.test(f.slice(connection.length)));

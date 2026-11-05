@@ -49,6 +49,7 @@ const base: IntegrationLinks = {
 };
 const linked: IntegrationLinks = { ...base, connections: [{ ...base.connections[0], link: 'github-acme' }], used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken') } };
 const envName = (e: string) => e[0].toUpperCase() + e.slice(1);
+const ghdemoFields = [id('githubAuthToken'), id('githubTimeout')];
 
 describe('configurableId', () => {
   it('names a configurable by its module and name, a submodule joined to its package', () => {
@@ -88,7 +89,7 @@ describe('formLinkView', () => {
       connections: [{ ...base.connections[0], link: 'github-corp' }],
       environments: [environment('development'), environment('production', { connections: { [id('github')]: 'github-sandbox' }, configurables: { [id('githubAuthToken')]: { ref: 'github-sandbox', key: 'GITHUB_AUTH_TOKEN' } } })],
     };
-    const view = formLinkView(links, 'production', envName);
+    const view = formLinkView(links, 'production', envName, ghdemoFields);
     expect(view.editable).toBe(false);
     expect(view.connections[0].note).toBe('This release uses GitHub Sandbox. The link is now GitHub Corp. Change links in Development.');
     expect(view.target(id('githubAuthToken'))).toEqual({ source: { ref: 'github-sandbox', key: 'GITHUB_AUTH_TOKEN', name: 'GitHub Sandbox', noValues: true } });
@@ -99,8 +100,21 @@ describe('formLinkView', () => {
       ...base,
       environments: [environment('development'), environment('production', { configurables: { [id('githubAuthToken')]: { ref: 'github-sandbox', key: 'GITHUB_AUTH_TOKEN' }, [id('githubTimeout')]: { ref: 'orders-db', key: 'URL' } } })],
     };
-    expect(formLinkView(links, 'production', envName).connections[0].note).toBe('This release uses GitHub Sandbox, orders-db. Change links in Development.');
-    expect(formLinkView({ ...base, environments: [environment('development'), environment('production')] }, 'production', envName).connections[0].note).toBe('This release uses no resource. Change links in Development.');
+    expect(formLinkView(links, 'production', envName, ghdemoFields).connections[0].note).toBe('This release uses GitHub Sandbox, orders-db. Change links in Development.');
+    expect(formLinkView({ ...base, environments: [environment('development'), environment('production')] }, 'production', envName, ghdemoFields).connections[0].note).toBe('This release uses no resource. Change links in Development.');
+  });
+
+  it("builds another environment's sections from its release's build, where the Workload's build renamed a connection", () => {
+    // Development's build renamed github to gh and links gh; production still runs the build with github, linked to GitHub Acme.
+    const links: IntegrationLinks = {
+      ...base,
+      connections: [{ id: id('gh'), link: 'github-acme', suggestions: [], fields: [{ configurable: id('ghAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] }],
+      orphaned: [{ target: id('github'), kind: 'connection', ref: 'github-acme' }],
+      environments: [environment('development'), environment('production', { connections: { [id('github')]: 'github-acme' }, configurables: { [id('githubAuthToken')]: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN' } } })],
+    };
+    const view = formLinkView(links, 'production', envName, [id('githubAuthToken'), id('ordersDbUrl')]);
+    expect(view.connections.map((c) => [c.connection.id, c.connection.fields.map((f) => f.configurable), c.note])).toEqual([[id('github'), [id('githubAuthToken')], 'This release uses GitHub Acme. Change links in Development.']]);
+    expect(view.target(id('githubAuthToken')).source).toMatchObject({ ref: 'github-acme', name: 'GitHub Acme' });
   });
 
   it('names the resource of a link whose target the build lacks', () => {

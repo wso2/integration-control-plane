@@ -23,6 +23,7 @@ import { BffError } from '../../api/_client';
 import type { IntegrationLinks } from '../../types/configuration';
 import type { JSONSchema } from '../../types/schema';
 import { ConfigForm } from '../SchemaConfigForm/ConfigForm';
+import { schemaFields } from '../SchemaConfigForm/schemaUtils';
 import { useLinkedForm } from './useLinkedForm';
 
 // ipaas-service's answer: github linked to GitHub Acme; ordersDbUrl's link lost its target when the code renamed it.
@@ -42,9 +43,10 @@ const links: IntegrationLinks = {
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: false, connections: {}, configurables: {}, env: {} }],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined }));
 const failed = vi.hoisted(() => ({ current: undefined as { error: Error; variables: { target: unknown } } | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
-  useIntegrationLinks: () => ({ data: links }),
+  useIntegrationLinks: () => ({ data: answer.links ?? links }),
   useLinkWrite: () => ({ isPending: false, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useEnvironments', () => ({ useEnvironments: () => ({ data: [{ id: 'development', name: 'Development' }] }) }));
@@ -57,13 +59,19 @@ const schema = {
   },
 } as unknown as JSONSchema;
 
-function Form() {
-  const linked = useLinkedForm('default', 'ghdemo', 'development', true, ['acme.ghdemo.githubAuthToken', 'acme.ghdemo.ordersDatabaseUrl']);
+function Form({ env = 'development', form = schema }: { env?: string; form?: JSONSchema }) {
+  const linked = useLinkedForm(
+    'default',
+    'ghdemo',
+    env,
+    true,
+    schemaFields(form).map((f) => f.path),
+  );
   return (
     <>
       {linked.top}
       <ConfigForm
-        schema={schema}
+        schema={form}
         valueMap={new Map()}
         validationMap={new Map()}
         linkingMap={new Map()}
@@ -87,6 +95,7 @@ beforeEach(async () => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   writes.length = 0;
   failed.current = undefined;
+  answer.links = undefined;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -140,5 +149,42 @@ describe('the Configure form with links', () => {
     await act(async () => (Array.from(document.querySelectorAll('li')).find((li) => li.textContent === 'ordersDatabaseUrl') as HTMLElement).click());
     await act(async () => button('Move').click());
     expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
+  });
+
+  it("shows production's sections from the build it runs, not the Workload's renamed one", async () => {
+    // Development's build renamed github to gh; production runs the build with github and ordersDbUrl, linked to GitHub Acme.
+    answer.links = {
+      ...links,
+      used: { 'github-acme|GITHUB_AUTH_TOKEN': id('ghAuthToken') },
+      usedByOrphaned: {},
+      connections: [{ id: id('gh'), link: 'github-acme', suggestions: [], fields: [{ configurable: id('ghAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] }],
+      orphaned: [{ target: id('github'), kind: 'connection', ref: 'github-acme' }],
+      environments: [links.environments[0], { ...links.environments[0], name: 'production', connections: { [id('github')]: 'github-acme' }, configurables: { [id('githubAuthToken')]: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN' } } }],
+    };
+    const released = {
+      type: 'object',
+      requiredLevel: 3,
+      properties: { acme: { type: 'object', properties: { ghdemo: { type: 'object', required: ['githubAuthToken'], properties: { githubAuthToken: { type: 'string', description: '' }, ordersDbUrl: { type: 'string', description: '' } } } } } },
+    } as unknown as JSONSchema;
+    await act(async () => root.render(<Form env="production" form={released} />));
+    const titles = Array.from(container.querySelectorAll('.MuiTypography-subtitle2')).map((t) => t.textContent);
+    expect(titles).toEqual(['github', 'Other configurables']);
+    expect(container.textContent).toContain('This release uses GitHub Acme. Change links in Development.');
+    expect(container.textContent).not.toContain('The link is now');
+    // githubAuthToken sits in the github section, before Other configurables.
+    const [section, other] = ['github', 'Other configurables'].map((t) => Array.from(container.querySelectorAll('.MuiTypography-subtitle2')).find((x) => x.textContent === t)!);
+    const field = container.querySelector('input[aria-label="githubAuthToken is supplied by GitHub Acme"]') as HTMLInputElement;
+    expect(field.value).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
+    expect(section.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(field.compareDocumentPosition(other) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("says production's schema couldn't be read, naming the environment, and not the first environment's", async () => {
+    const Unread = ({ env }: { env: string }) => <>{useLinkedForm('default', 'ghdemo', env, true, []).unread ?? 'none'}</>;
+    answer.links = { ...links, environments: [links.environments[0], { ...links.environments[0], name: 'production' }] };
+    await act(async () => root.render(<Unread env="production" />));
+    expect(container.textContent).toBe("Couldn't read the configurables of the build production runs.");
+    await act(async () => root.render(<Unread env="development" />));
+    expect(container.textContent).toBe('none');
   });
 });
