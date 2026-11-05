@@ -16,23 +16,45 @@
  * under the License.
  */
 
-import { Box, Chip, Stack, TextField, Typography } from '@wso2/oxygen-ui';
-import { Link2 } from '@wso2/oxygen-ui-icons-react';
-import type { LinkedSource } from '../../utils/resourceLinks';
+import { Box, Chip, InputAdornment, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { FieldLinkPicker } from './FieldLinkPicker';
+import type { FieldLinkPicker as Picker, LinkedSource } from './linkedFrom';
 
 const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 
-export function LinkedElement({ title, source }: { title: string; source: LinkedSource }) {
-  const from = source.declared ? `from workload.yaml (${source.resource})` : `from ${source.resource}`;
+/** A field a link fills: read-only, saying where from, with the link icon to change it. */
+export function LinkedElement({ title, source, picker }: { title: string; source: LinkedSource; picker?: Picker }) {
+  const from = `from ${source.resource} · ${source.key}`;
   return (
     <Box sx={{ mt: 1.5 }}>
-      <Stack direction="row" alignItems="center" gap={0.75} sx={{ mb: 0.5 }}>
-        <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
-          {title}
-        </Typography>
-        <Chip icon={<Link2 size={12} />} label={source.declared ? 'declared' : 'linked'} size="small" variant="outlined" color={source.noValuesIn ? 'warning' : 'info'} sx={chipSx} />
-      </Stack>
-      <TextField fullWidth size="small" disabled value={source.noValuesIn ? `${from} · no values in ${source.noValuesIn}` : from} color={source.noValuesIn ? 'warning' : undefined} inputProps={{ 'aria-label': `${title} is supplied by ${source.resource}` }} />
+      <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 0.5 }}>
+        {title}
+      </Typography>
+      <TextField
+        fullWidth
+        size="small"
+        disabled
+        value={from}
+        inputProps={{ 'aria-label': `${title} is supplied by ${source.resource}` }}
+        InputProps={{
+          endAdornment: (source.overrides || picker) && (
+            <InputAdornment position="end">
+              {source.overrides && <Chip label="Overrides selected Link" size="small" color="info" variant="outlined" sx={chipSx} />}
+              {picker && <FieldLinkPicker field={title} picker={picker} />}
+            </InputAdornment>
+          ),
+        }}
+      />
+      {source.noValuesIn && (
+        <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.5 }}>
+          <Chip label={`No ${source.noValuesIn} values`} size="small" color="warning" variant="outlined" sx={chipSx} />
+          {source.valuesHref && (
+            <Link href={source.valuesHref} target="_blank" rel="noopener" variant="caption">
+              Add in WSO2 Cloud
+            </Link>
+          )}
+        </Stack>
+      )}
     </Box>
   );
 }

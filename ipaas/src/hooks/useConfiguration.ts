@@ -16,26 +16,9 @@
  * under the License.
  */
 
-import { useMemo } from 'react';
-import { useMutation, useMutationState, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import {
-  fetchCertificateGroups,
-  fetchConfigGroups,
-  fetchCertificateMappings,
-  fetchSchemaConfig,
-  fetchConfigMgt,
-  saveSchemaConfig,
-  postConfigMgt,
-  postCertificateMappings,
-  fetchResourceLinks,
-  fetchResourceLinkSuggestions,
-  fetchLinkWarnings,
-  createResourceLink,
-  deleteResourceLink,
-} from '../api/configuration';
-import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, CreateResourceLinkInput, DeleteResourceLinkInput, ResourceLink, ResourceLinkWrite } from '../types/configuration';
-import { linkedConfigurables, rollingOut, type Rollout } from '../utils/resourceLinks';
-import type { PromoteInput } from '../types/deployment';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings, fetchIntegrationLinks, writeLink } from '../api/configuration';
+import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, LinkWrite, LinkWriteInput } from '../types/configuration';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -118,96 +101,38 @@ export function usePostCertificateMappings() {
   });
 }
 
-export function useResourceLinks(projectId: string, componentId: string, enabled: boolean) {
+export function useIntegrationLinks(projectId: string, componentId: string, enabled: boolean) {
   const qc = useQueryClient();
   return useQuery({
-    queryKey: ['resourceLinks', projectId, componentId],
-    queryFn: () => fetchResourceLinks(projectId, componentId),
+    queryKey: ['integrationLinks', projectId, componentId],
+    queryFn: () => fetchIntegrationLinks(projectId, componentId),
     enabled: enabled && !!projectId && !!componentId,
     retry: false,
-    refetchInterval: (query) => (rollingOut(query.state.data, rollouts(qc, projectId, componentId)) ? ROLLOUT_POLL_MS : false),
+    refetchInterval: (query) => (query.state.data?.environments[0]?.linksNeedDeploy && rollingOut(qc, projectId, componentId) ? ROLLOUT_POLL_MS : false),
   });
 }
 
-export function useResourceLinkSuggestions(projectId: string, componentId: string, build: string | undefined, enabled: boolean) {
-  return useQuery({
-    queryKey: ['resourceLinkSuggestions', projectId, componentId, build],
-    queryFn: () => fetchResourceLinkSuggestions(projectId, componentId, build),
-    enabled: enabled && !!projectId && !!componentId,
-    retry: false,
-  });
-}
-
-export function useLinkWarnings(projectId: string, componentId: string, build: string, enabled: boolean) {
-  return useQuery({
-    queryKey: ['linkWarnings', projectId, componentId, build],
-    queryFn: () => fetchLinkWarnings(projectId, componentId, build),
-    enabled: enabled && !!projectId && !!componentId && !!build,
-    retry: false,
-  });
-}
-
-export function useCreateResourceLink() {
+export function useLinkWrite() {
   const qc = useQueryClient();
   return useMutation({
-    mutationKey: ['resourceLinkWrite', 'link'],
-    mutationFn: (input: CreateResourceLinkInput) => createResourceLink(input),
-    onSuccess: (_, vars) => invalidateLinks(qc, vars.projectId, vars.componentId),
+    mutationKey: ['linkWrite'],
+    mutationFn: (input: LinkWriteInput) => writeLink(input),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['integrationLinks', vars.projectId, vars.componentId] });
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+    },
   });
 }
-
-/** When the component's last successful unlink was submitted; 0 without one. */
-export function useLastUnlinkAt(componentId: string): number {
-  const submitted = useMutationState({
-    filters: { mutationKey: ['resourceLinkWrite', 'unlink'], status: 'success', predicate: (m) => (m.state.variables as DeleteResourceLinkInput).componentId === componentId },
-    select: (m) => m.state.submittedAt,
-  });
-  return Math.max(0, ...submitted);
-}
-
-export function useDeleteResourceLink() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationKey: ['resourceLinkWrite', 'unlink'],
-    mutationFn: (input: DeleteResourceLinkInput) => deleteResourceLink(input),
-    onSuccess: (_, vars) => invalidateLinks(qc, vars.projectId, vars.componentId),
-  });
-}
-
-// A link change rolls the integration out in development.
-const invalidateLinks = (qc: QueryClient, projectId: string, componentId: string) => {
-  qc.invalidateQueries({ queryKey: ['resourceLinks', projectId, componentId] });
-  qc.invalidateQueries({ queryKey: ['resourceLinkSuggestions', projectId, componentId] });
-  qc.invalidateQueries({ queryKey: ['linkWarnings', projectId, componentId] });
-  qc.invalidateQueries({ queryKey: ['componentDeployment'] });
-};
 
 const ROLLOUT_POLL_MS = 3000;
 const ROLLOUT_WINDOW_MS = 120_000;
 
-// The links report what each release carries, and OpenChoreo changes a release after the write: development's after a
-// link write that updates the Workload, the target's after a promote.
-const rollouts = (qc: QueryClient, projectId: string, componentId: string): Rollout[] =>
+// After a write that updates the Workload, OpenChoreo releases it to development; the links follow until the release has them.
+const rollingOut = (qc: QueryClient, projectId: string, componentId: string, now = Date.now()) =>
   qc
     .getMutationCache()
-    .findAll({ status: 'success', predicate: (m) => m.options.mutationKey?.[0] === 'resourceLinkWrite' || m.options.mutationKey?.[0] === 'promote' })
-    .flatMap((m): Rollout[] => {
-      const until = m.state.submittedAt + ROLLOUT_WINDOW_MS;
-      if (m.options.mutationKey?.[0] === 'promote') {
-        const p = m.state.variables as PromoteInput;
-        return p.componentId === componentId ? [{ source: p.sourceEnvironmentId, target: p.targetEnvironmentId, until }] : [];
-      }
-      const vars = m.state.variables as DeleteResourceLinkInput;
-      const w = m.state.data as ResourceLinkWrite;
-      if (vars.projectId !== projectId || vars.componentId !== componentId || w.workload !== 'updated') return [];
-      return [{ resourceType: w.resourceType, linked: m.options.mutationKey?.[1] === 'link', until }];
+    .findAll({ mutationKey: ['linkWrite'], status: 'success' })
+    .some((m) => {
+      const vars = m.state.variables as LinkWriteInput;
+      return vars.projectId === projectId && vars.componentId === componentId && (m.state.data as LinkWrite).workload === 'updated' && now < m.state.submittedAt + ROLLOUT_WINDOW_MS;
     });
-
-const noLinks: ResourceLink[] = [];
-
-/** The links of an open Configure form, and the configurables they supply in its environment. */
-export function useFormLinks(projectId: string, componentId: string, env: string, open: boolean) {
-  const { data: links = noLinks } = useResourceLinks(projectId, componentId, open);
-  const linkedFrom = useMemo(() => linkedConfigurables(links, env), [links, env]);
-  return { links, linkedFrom };
-}
