@@ -19,7 +19,7 @@
 import { Alert, Box, Button, Chip, CircularProgress, PageContent, Stack, Tab, Tabs, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useRef, useState, type JSX } from 'react';
-import { useLocation, useParams } from 'react-router';
+import { useLocation, useParams, useSearchParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useRoles } from '../hooks/useAuth';
 import { isContextEngineEnabled, useContextEngine, useDeleteContextEngine, useRouteEngineId } from '../hooks/useContextEngine';
@@ -102,7 +102,8 @@ export default function ContextEngineDetail(scope: OrgScope): JSX.Element {
   // Once an engine seen deleting answers 404, it was deleted rather than never there.
   const seenDeleting = useRef(false);
   if (deleting) seenDeleting.current = true;
-  const base = contextEnginesUrl(scope.org, engine?.environment);
+  const [params] = useSearchParams();
+  const base = contextEnginesUrl(scope.org, engine?.environment ?? (params.get('env') || undefined));
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
