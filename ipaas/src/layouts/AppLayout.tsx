@@ -51,6 +51,7 @@ import Logo from '../components/Logo';
 import NotFound from '../components/NotFound';
 import {
   Activity,
+  BookOpen,
   Boxes,
   ChartColumn,
   ChevronDown,
@@ -73,6 +74,7 @@ import {
   Server,
   Settings2,
   SlidersHorizontal,
+  Sparkles,
   Waypoints,
   Workflow,
   X,
@@ -743,6 +745,21 @@ export default function AppLayout(): JSX.Element {
                             <Gauge size={20} />
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      </Sidebar.Item>
+                    </Sidebar.Category>,
+
+                    <Sidebar.Category key="org-ai">
+                      <Sidebar.Item id="org-ai-services">
+                        <Sidebar.ItemIcon>
+                          <Sparkles size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>AI Services</Sidebar.ItemLabel>
+                        <Sidebar.Item id="org-knowledge-bases">
+                          <Sidebar.ItemIcon>
+                            <BookOpen size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       </Sidebar.Item>
                     </Sidebar.Category>,

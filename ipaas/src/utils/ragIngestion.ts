@@ -134,68 +134,50 @@ export function isFormComplete(form: RagIngestionForm): boolean {
  * platform-services API before calling this.
  */
 export function buildRagEnvVars(form: RagIngestionForm): Record<string, string> {
-  const env: Record<string, string> = {};
   const { vectorStore: vs, embedding: em, datasource: ds } = form;
+  return { ...(ds ? datasourceEnvVars(ds) : {}), ...(vs ? vectorStoreEnvVars(vs) : {}), ...(em ? embeddingEnvVars(em) : {}) };
+}
 
-  if (ds) {
-    env.DATASOURCE = ds.type;
-    if (ds.type === 'amazons3') {
-      env.AWS_ACCESS_KEY_ID = ds.accessKeyId;
-      env.AWS_SECRET_ACCESS_KEY = ds.secretAccessKey;
-      env.AWS_BUCKET_NAME = ds.bucketName;
-    } else {
-      env.GOOGLE_AUTH_TYPE = ds.authType;
-      if (ds.authType === 'api_Key') {
-        env.GOOGLE_APIKEY = ds.apiKey;
-      } else {
-        env.GOOGLE_CLIENT_ID = ds.clientId;
-        env.GOOGLE_CLIENT_SECRET = ds.clientSecret;
-        env.GOOGLE_REFRESH_TOKEN = ds.refreshToken;
-      }
-      env.GOOGLE_DRIVE_FOLDER_ID = ds.folderId;
-    }
+/** The data source's settings, as the ingestion image reads them. */
+export function datasourceEnvVars(ds: DatasourceConfig): Record<string, string> {
+  if (ds.type === 'amazons3') {
+    return { DATASOURCE: ds.type, AWS_ACCESS_KEY_ID: ds.accessKeyId, AWS_SECRET_ACCESS_KEY: ds.secretAccessKey, AWS_BUCKET_NAME: ds.bucketName };
   }
+  const auth: Record<string, string> = ds.authType === 'api_Key' ? { GOOGLE_APIKEY: ds.apiKey } : { GOOGLE_CLIENT_ID: ds.clientId, GOOGLE_CLIENT_SECRET: ds.clientSecret, GOOGLE_REFRESH_TOKEN: ds.refreshToken };
+  return { DATASOURCE: ds.type, GOOGLE_AUTH_TYPE: ds.authType, ...auth, GOOGLE_DRIVE_FOLDER_ID: ds.folderId };
+}
 
-  if (vs) {
-    env.VECTORDB_PROVIDER = vs.provider;
-    switch (vs.provider) {
-      case 'pinecone':
-        env.COLLECTION_NAME = vs.indexName;
-        env.PINECONE_APIKEY = vs.apiKey;
-        break;
-      case 'weaviate':
-        env.COLLECTION_NAME = vs.collectionName;
-        env.WEAVIATE_APIKEY = vs.apiKey;
-        env.WEAVIATE_URL = vs.clusterUrl;
-        break;
-      case 'chroma':
-        env.COLLECTION_NAME = vs.collectionName;
-        env.CHROMA_HOST = vs.host;
-        env.CHROMA_PORT = vs.port;
-        break;
-      case 'pgvector':
-      case 'pgvector-devant':
-        env.POSTGRES_HOST = vs.host;
-        env.POSTGRES_PORT = vs.port;
-        env.POSTGRES_USER = vs.user;
-        env.POSTGRES_PASSWORD = vs.password;
-        env.POSTGRES_DBNAME = vs.dbName;
-        env.POSTGRES_TABLE_NAME = vs.tableName;
-        env.COLLECTION_NAME = vs.tableName;
-        break;
-    }
+/** The vector store's settings, as the RAG images read them. */
+export function vectorStoreEnvVars(vs: VectorStoreConfig): Record<string, string> {
+  switch (vs.provider) {
+    case 'pinecone':
+      return { VECTORDB_PROVIDER: vs.provider, COLLECTION_NAME: vs.indexName, PINECONE_APIKEY: vs.apiKey };
+    case 'weaviate':
+      return { VECTORDB_PROVIDER: vs.provider, COLLECTION_NAME: vs.collectionName, WEAVIATE_APIKEY: vs.apiKey, WEAVIATE_URL: vs.clusterUrl };
+    case 'chroma':
+      return { VECTORDB_PROVIDER: vs.provider, COLLECTION_NAME: vs.collectionName, CHROMA_HOST: vs.host, CHROMA_PORT: vs.port };
+    case 'pgvector':
+    case 'pgvector-devant':
+      return {
+        VECTORDB_PROVIDER: vs.provider,
+        POSTGRES_HOST: vs.host,
+        POSTGRES_PORT: vs.port,
+        POSTGRES_USER: vs.user,
+        POSTGRES_PASSWORD: vs.password,
+        POSTGRES_DBNAME: vs.dbName,
+        POSTGRES_TABLE_NAME: vs.tableName,
+        COLLECTION_NAME: vs.tableName,
+      };
   }
+}
 
-  if (em) {
-    env.EMBEDDING_MODEL_PROVIDER = em.provider;
-    env.EMBEDDING_MODEL_APIKEY = em.apiKey;
-    env.EMBEDDING_MODEL = em.model;
-    if (em.provider === 'azure_openai') {
-      env.AZURE_OPENAI_APIVERSION = em.azureApiVersion;
-      env.AZURE_OPENAI_BASEURL = em.azureBaseUrl;
-    }
+/** The embedding model's settings, as the RAG images read them. */
+export function embeddingEnvVars(em: EmbeddingConfig): Record<string, string> {
+  const env: Record<string, string> = { EMBEDDING_MODEL_PROVIDER: em.provider, EMBEDDING_MODEL_APIKEY: em.apiKey, EMBEDDING_MODEL: em.model };
+  if (em.provider === 'azure_openai') {
+    env.AZURE_OPENAI_APIVERSION = em.azureApiVersion;
+    env.AZURE_OPENAI_BASEURL = em.azureBaseUrl;
   }
-
   return env;
 }
 

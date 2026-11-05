@@ -19,10 +19,11 @@
 import { Alert, Avatar, Box, Button, CircularProgress, Dialog, DialogContent, DialogTitle, InputBase, ListingTable, Stack, TablePagination, Typography } from '@wso2/oxygen-ui';
 import { Search, Send, User } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { useRagRetrievalService } from '../../../hooks/useRagRetrievalService';
-import { DEFAULT_RETRIEVAL_QUERY } from '../../../constants/ragIngestion';
-import { generateUUID } from '../../../utils/string';
-import type { RetrievedChunk, RetrieveResponse } from '../../../types/ragIngestion';
+import { useRetrieveFromKnowledgeBase } from '../../hooks/useKnowledgeBases';
+import { DEFAULT_RETRIEVAL_QUERY } from '../../constants/ragIngestion';
+import { httpStatusOf } from '../../utils/apiErrors';
+import { generateUUID } from '../../utils/string';
+import type { RetrievedChunk } from '../../types/ragIngestion';
 
 /** Inline chat shows only this many chunks; the rest open in a paginated modal. */
 const PREVIEW_ROWS = 3;
@@ -90,13 +91,12 @@ function ChunksModal({ chunks, onClose }: { chunks: RetrievedChunk[] | null; onC
   );
 }
 
-interface RagRetrievalChatProps {
-  /** The ingestion component — its id is sent as `rag_component_id`. */
-  ingestionComponentId: string;
-  orgHandler: string;
-  projectId: string;
-  envId: string;
-  envCritical: boolean;
+interface RetrievalChatProps {
+  knowledgeBase: string;
+  /** The integration the query is made from, sent as `rag_component_id`. */
+  componentId: string;
+  /** Why queries cannot be sent yet (e.g. the KB Service is still deploying); null when they can. */
+  unavailableReason: string | null;
 }
 
 interface ChatEntry {
@@ -107,72 +107,53 @@ interface ChatEntry {
   error?: string;
 }
 
+function retrieveErrorMessage(err: unknown): string {
+  // 503: the KB Service is not routed or still starting.
+  const status = httpStatusOf(err);
+  if (status === 503) return 'The knowledge base service is not ready yet. Try again in a moment.';
+  if (err instanceof DOMException && err.name === 'TimeoutError') return 'The knowledge base did not answer in time. Please try again.';
+  return 'Failed to retrieve chunks. Please try again.';
+}
+
 /**
- * The Retrieval tab: a chat window that queries the project's RAG Retrieval
- * Service for the chunks most relevant to a question. It POSTs only the
- * ingestion component id + query params — the service resolves the vector-store
- * and embedding configuration server-side. Mirrors devant's RAGChatWindow.
+ * A chat window that queries a knowledge base for the chunks most relevant to a
+ * question. The query goes through the BFF to the knowledge base's service,
+ * which embeds it with the knowledge base's own settings.
  */
-export default function RagRetrievalChat({ ingestionComponentId, orgHandler, projectId, envId, envCritical }: RagRetrievalChatProps): ReactNode {
-  const target = useRagRetrievalService(orgHandler, projectId, envId, envCritical);
+export default function RetrievalChat({ knowledgeBase, componentId, unavailableReason }: RetrievalChatProps): ReactNode {
+  const retrieve = useRetrieveFromKnowledgeBase(knowledgeBase, componentId);
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [input, setInput] = useState('');
-  const [isRetrieving, setIsRetrieving] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const [modalChunks, setModalChunks] = useState<RetrievedChunk[] | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  const isRetrieving = retrieve.isPending;
 
   useEffect(() => {
     if (threadRef.current) threadRef.current.scrollTop = threadRef.current.scrollHeight;
   }, [messages, isRetrieving]);
 
-  const canSend = target.canQuery && !isRetrieving;
+  const canQuery = !unavailableReason;
+  const canSend = canQuery && !isRetrieving;
 
-  const send = async () => {
+  const send = () => {
     const query = input.trim();
     if (!query || !canSend) return;
     setInput('');
     const id = generateUUID();
     setMessages((prev) => [...prev, { id, query, chunks: [], isPending: true }]);
-    setIsRetrieving(true);
-
-    const body = new URLSearchParams();
-    body.append('rag_component_id', ingestionComponentId);
-    body.append('user_query', query);
-    body.append('max_retrieve_chunks', String(DEFAULT_RETRIEVAL_QUERY.maxChunks));
-    body.append('min_similarity_threshold', String(DEFAULT_RETRIEVAL_QUERY.minSimilarity));
-
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30_000);
-    try {
-      const response = await fetch(`${target.invokeUrl.replace(/\/$/, '')}/retrieve`, {
-        method: 'POST',
-        headers: { 'test-key': target.apiKey ?? '', 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: body.toString(),
-        signal: controller.signal,
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = (await response.json()) as RetrieveResponse;
-      const chunks = data.retrieved_chunks ?? [];
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPending: false, chunks } : m)));
-    } catch (err) {
-      let message = 'Failed to retrieve chunks. Please try again.';
-      if (err instanceof DOMException && err.name === 'AbortError') message = 'The retrieval request timed out. Please try again.';
-      else if (err instanceof Error && err.message.includes('Failed to fetch')) message = 'The retrieval service is unreachable. Please try again.';
-      setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPending: false, error: message } : m)));
-    } finally {
-      clearTimeout(timeout);
-      setIsRetrieving(false);
-    }
+    retrieve.mutate(
+      { userQuery: query, maxChunks: DEFAULT_RETRIEVAL_QUERY.maxChunks, minSimilarity: DEFAULT_RETRIEVAL_QUERY.minSimilarity },
+      {
+        onSuccess: (chunks) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPending: false, chunks } : m))),
+        onError: (err) => setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, isPending: false, error: retrieveErrorMessage(err) } : m))),
+      },
+    );
   };
 
   return (
     <Stack gap={1.5} sx={{ width: '100%' }}>
-      {!target.canQuery && target.disabledReason && (
-        <Alert severity={target.serviceExists ? 'info' : 'warning'} icon={target.isResolving ? <CircularProgress size={16} /> : undefined}>
-          {target.disabledReason}
-        </Alert>
-      )}
+      {unavailableReason && <Alert severity="info">{unavailableReason}</Alert>}
 
       <Box
         ref={threadRef}
@@ -193,7 +174,7 @@ export default function RagRetrievalChat({ ingestionComponentId, orgHandler, pro
           <Stack alignItems="center" justifyContent="center" gap={1} sx={{ flex: 1, py: 4 }}>
             <Search size={24} style={{ opacity: 0.4 }} />
             <Typography variant="body2" color="text.secondary">
-              Type a query to retrieve the most relevant chunks from your vector store.
+              Type a query to retrieve the most relevant chunks from the knowledge base.
             </Typography>
           </Stack>
         )}
@@ -261,7 +242,7 @@ export default function RagRetrievalChat({ ingestionComponentId, orgHandler, pro
           fullWidth
           multiline
           maxRows={4}
-          placeholder={target.canQuery ? 'Type your query and press Enter…' : 'Retrieval unavailable'}
+          placeholder={canQuery ? 'Type your query and press Enter…' : 'Retrieval unavailable'}
           inputProps={{ 'aria-label': 'Query' }}
           value={input}
           onChange={(e) => setInput(e.target.value)}

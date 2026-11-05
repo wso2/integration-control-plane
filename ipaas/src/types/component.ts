@@ -29,6 +29,8 @@ export interface Component {
   repository?: { organizationApp?: string; nameApp?: string };
   componentType?: string;
   componentSubType: string | null;
+  /** The knowledge base a `kb-ingestion` integration feeds. */
+  knowledgeBase?: string;
   version: string;
   createdAt: string;
   lastBuildDate: string;

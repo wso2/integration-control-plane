@@ -96,6 +96,10 @@ export function getDisplayLabel(displayType: string, componentSubType: string | 
       return 'Webhook';
     case 'rag-ingestion':
       return 'RAG Ingestion';
+    case 'kb-ingestion':
+      return 'Knowledge Base Data Source';
+    case 'knowledge-base':
+      return 'Knowledge Base Service';
     case 'rag-retrieval-service':
     case 'rag-service':
       return 'Integration as API';

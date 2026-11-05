@@ -18,19 +18,21 @@
 
 import { Grid, MenuItem, Select, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { type JSX } from 'react';
-import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../../constants/ragIngestion';
-import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
-import SelectableCard from '../../Databases/create/SelectableCard';
+import { blankEmbedding, EMBEDDING_PROVIDERS, ragLogoUrl } from '../../../constants/ragIngestion';
+import { REQUIRED_FIELD_SX } from '../../../constants/styles';
+import SelectableCard from '../../common/SelectableCard';
 import SecretField from '../SecretField';
 import { fieldStackSx, stepHeadingSx, tileGridSx } from '../styles';
-import type { EmbeddingConfig } from '../../../../types/ragIngestion';
+import type { EmbeddingConfig } from '../../../types/ragIngestion';
 
 interface EmbeddingModelStepProps {
   value: EmbeddingConfig | null;
   onChange: (value: EmbeddingConfig) => void;
+  /** True when an API key is already stored; the field may then stay empty to keep it. */
+  apiKeyStored?: boolean;
 }
 
-export default function EmbeddingModelStep({ value, onChange }: EmbeddingModelStepProps): JSX.Element {
+export default function EmbeddingModelStep({ value, onChange, apiKeyStored = false }: EmbeddingModelStepProps): JSX.Element {
   const providerInfo = EMBEDDING_PROVIDERS.find((p) => p.id === value?.provider);
   const models = providerInfo?.models ?? [];
 
@@ -88,7 +90,7 @@ export default function EmbeddingModelStep({ value, onChange }: EmbeddingModelSt
             </>
           )}
 
-          <SecretField label="API Key" required value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
+          <SecretField label="API Key" required={!apiKeyStored} helperText={apiKeyStored ? 'Leave empty to keep the stored value.' : undefined} value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />
         </Stack>
       )}
     </>
