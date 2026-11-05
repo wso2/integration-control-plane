@@ -104,7 +104,6 @@ export interface ReleaseContainer {
   memory?: number;
   cpu_limit?: number;
   memory_limit?: number;
-  limit_disabled?: boolean;
   ports?: ContainerPort[] | null;
   image_pull_policy?: ImagePullPolicy;
   args?: string[] | null;
@@ -118,14 +117,19 @@ export interface ReleaseNamespace {
   name: string;
 }
 
-/** The PUT body for updating a release container: only the fields the edit form changes. */
-export interface ContainerWriteData {
-  image_pull_policy: ImagePullPolicy;
+/** A container's CPU (milli-CPU) and memory (Mi) requests and limits. */
+export interface ContainerSizes {
   cpu: number;
   cpu_limit: number;
   memory: number;
   memory_limit: number;
 }
+
+/**
+ * The PUT body for updating a release container. A field left out keeps its current value, and the
+ * four sizes go together or not at all, since ipaas-service replaces the sizing as a whole.
+ */
+export type ContainerWriteData = { image_pull_policy?: ImagePullPolicy } & (ContainerSizes | { [K in keyof ContainerSizes]?: never });
 
 /** Subset of the devops release (app-environment) record we consume. */
 export interface ReleaseDetails {

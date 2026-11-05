@@ -20,29 +20,36 @@ import { useQuery } from '@tanstack/react-query';
 import { fetchBillingOrg, fetchBillingPlan } from '../api/billing';
 import type { BillingOrg, BillingPlan } from '../types/billing';
 
+/** A billing read. `isError` tells a failed read apart from a missing record, which both leave the value null. */
+interface BillingRead {
+  isLoading: boolean;
+  isError: boolean;
+  refetch: () => void;
+}
+
 /** Billing org record for the subscription/trial chip. */
-export function useBillingOrg(product: string): { org: BillingOrg | null; isLoading: boolean } {
-  const { data, isLoading } = useQuery({
+export function useBillingOrg(product: string): { org: BillingOrg | null } & BillingRead {
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['billingOrg', product],
     queryFn: (): Promise<BillingOrg> => fetchBillingOrg(product),
     enabled: !!product,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
-  return { org: data ?? null, isLoading };
+  return { org: data ?? null, isLoading, isError, refetch: () => void refetch() };
 }
 
 /**
  * A plan of the billing catalog, read by its code to learn whether it is paid. Plans change only
  * with a catalog release, so the result is kept for the session rather than refetched.
  */
-export function useBillingPlan(code: string | undefined): { plan: BillingPlan | null; isLoading: boolean } {
-  const { data, isLoading } = useQuery({
+export function useBillingPlan(code: string | undefined): { plan: BillingPlan | null } & BillingRead {
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['billingPlan', code],
     queryFn: (): Promise<BillingPlan> => fetchBillingPlan(code ?? ''),
     enabled: !!code,
     staleTime: Infinity,
     retry: false,
   });
-  return { plan: data ?? null, isLoading };
+  return { plan: data ?? null, isLoading, isError, refetch: () => void refetch() };
 }

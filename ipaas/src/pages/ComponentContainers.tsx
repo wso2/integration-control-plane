@@ -32,7 +32,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
-import { isPaidPlan } from '../utils/billing';
+import { isPaidPlan, type PlanAccess } from '../utils/billing';
 import type { ComponentScope } from '../nav';
 
 export default function ComponentContainers({ org, project, component }: ComponentScope): JSX.Element {
@@ -56,10 +56,13 @@ export default function ComponentContainers({ org, project, component }: Compone
 
   // Changing CPU and memory is a paid feature, and ipaas-service refuses it on other plans. The plan
   // summary on the billing org carries no type, so the plan itself is read for whether it is paid.
-  const { org: billingOrg, isLoading: loadingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
-  const { plan, isLoading: loadingPlanType } = useBillingPlan(billingOrg?.subscription?.plan?.code);
-  const loadingPlan = loadingOrg || loadingPlanType;
-  const paid = isPaidPlan(billingOrg, plan);
+  const billingOrgRead = useBillingOrg(BILLING_PRODUCT_CODE);
+  const billingPlanRead = useBillingPlan(billingOrgRead.org?.subscription?.plan?.code);
+  const loadingPlan = billingOrgRead.isLoading || billingPlanRead.isLoading;
+  // A failed read is not a free plan: the sizes stay locked, but the user is told why and can retry.
+  // The plan is read only once the org is, so an org failure is retried first.
+  const planAccess: PlanAccess =
+    billingOrgRead.isError || billingPlanRead.isError ? { state: 'unavailable', retry: billingOrgRead.isError ? billingOrgRead.refetch : billingPlanRead.refetch } : { state: isPaidPlan(billingOrgRead.org, billingPlanRead.plan) ? 'paid' : 'free' };
 
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   useEffect(() => setAlert(null), [trackId, envId]);
@@ -99,7 +102,7 @@ export default function ComponentContainers({ org, project, component }: Compone
               componentId={comp.id}
               releaseId={releaseId}
               deploymentTrackId={trackId}
-              paid={paid}
+              plan={planAccess}
               canManage={canManage}
               onSaved={(message) => setAlert({ type: 'success', message })}
               onError={(message) => setAlert({ type: 'error', message })}

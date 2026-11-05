@@ -16,19 +16,19 @@
  * under the License.
  */
 
-import type { ContainerWriteData, ReleaseContainer } from '../types/devopsConfigs';
+import type { ContainerWriteData, ImagePullPolicy, ReleaseContainer } from '../types/devopsConfigs';
 
-// Resource bounds mirror Devant's containerUtils. CPU is in whole CPUs at the
-// UI layer (0.01–4) and converted to milli-CPU (×1000) on the wire; memory is Mi.
-// ipaas-service rejects sizes outside the same bounds, so change both together.
-export const CPU_MIN = 0.01;
-export const CPU_MAX = 4;
-export const CPU_STEP = 0.01;
+// Resource bounds. CPU is in milli-CPU, the unit on the wire, and shown in whole
+// CPUs only through formatCpu; memory is Mi. ipaas-service rejects sizes outside
+// the same bounds, so change both together.
+export const CPU_MIN = 10;
+export const CPU_MAX = 4000;
+export const CPU_STEP = 10;
 export const MEMORY_MIN = 20;
 export const MEMORY_MAX = 8192;
 export const MEMORY_STEP = 10;
 /** Minimum gap enforced between a resource's request and limit. */
-export const MIN_GAP_CPU = 0.01;
+export const MIN_GAP_CPU = 10;
 export const MIN_GAP_MEMORY = 10;
 
 /** A container built from a user-supplied image (no platform build) has `custom_image`. */
@@ -45,21 +45,15 @@ export function isMainContainer(c: Pick<ReleaseContainer, 'type'>): boolean {
   return c.type === 'MAIN';
 }
 
-/** milli-CPU (wire) → CPU (display). */
-export function milliToCpu(milli: number): number {
-  return milli / 1000;
+/** milli-CPU → whole CPUs for display, e.g. 125 → "0.125". */
+export function formatCpu(milli: number): string {
+  return String(milli / 1000);
 }
 
-/** CPU (display) → milli-CPU (wire), rounded to the CPU step. */
-export function cpuToMilli(cpu: number): number {
-  return (Math.round((cpu + Number.EPSILON) * 100) / 100) * 1000;
-}
-
-/** The editable form state for a container. */
+/** The editable form state for a container, in the wire's units. */
 export interface ContainerFormState {
-  imagePullPolicy: ContainerWriteData['image_pull_policy'];
-  limitsEnabled: boolean;
-  /** CPU request/limit in whole CPUs. */
+  imagePullPolicy: ImagePullPolicy;
+  /** CPU request/limit in milli-CPU. */
   cpuRequest: number;
   cpuLimit: number;
   /** Memory request/limit in Mi. */
@@ -67,30 +61,24 @@ export interface ContainerFormState {
   memLimit: number;
 }
 
-/** Seed the edit form from a container. When limits are disabled the API stores
- *  `0` for the limits, so we synthesise a sensible limit one step above the request. */
+/** Seed the edit form from a container. */
 export function containerToForm(c: ReleaseContainer): ContainerFormState {
-  const limitsEnabled = !(c.limit_disabled ?? false);
-  const cpuRequest = milliToCpu(c.cpu ?? 0);
-  const memRequest = c.memory ?? 0;
   return {
     imagePullPolicy: c.image_pull_policy ?? 'IfNotPresent',
-    limitsEnabled,
-    cpuRequest,
-    cpuLimit: c.limit_disabled ? cpuRequest + CPU_STEP : milliToCpu(c.cpu_limit ?? 0),
-    memRequest,
-    memLimit: c.limit_disabled ? memRequest + MEMORY_STEP : (c.memory_limit ?? 0),
+    cpuRequest: c.cpu ?? 0,
+    cpuLimit: c.cpu_limit ?? 0,
+    memRequest: c.memory ?? 0,
+    memLimit: c.memory_limit ?? 0,
   };
 }
 
-/** Build the PUT body from form state. ipaas-service rejects any field it does not model, so the
- *  body carries only what the form edits. */
-export function formToWriteData(form: ContainerFormState): ContainerWriteData {
-  return {
-    image_pull_policy: form.imagePullPolicy,
-    cpu: cpuToMilli(form.cpuRequest),
-    cpu_limit: form.limitsEnabled ? cpuToMilli(form.cpuLimit) : 0,
-    memory: form.memRequest,
-    memory_limit: form.limitsEnabled ? form.memLimit : 0,
-  };
+/**
+ * Build the PUT body from what changed since the form was seeded. Sending the sizes needs a paid
+ * plan, so a pull-policy-only change leaves them out, and ipaas-service keeps the current ones.
+ */
+export function formToWriteData(form: ContainerFormState, initial: ContainerFormState): ContainerWriteData {
+  const policy = form.imagePullPolicy !== initial.imagePullPolicy ? { image_pull_policy: form.imagePullPolicy } : {};
+  const sizesChanged = form.cpuRequest !== initial.cpuRequest || form.cpuLimit !== initial.cpuLimit || form.memRequest !== initial.memRequest || form.memLimit !== initial.memLimit;
+  if (!sizesChanged) return policy;
+  return { ...policy, cpu: form.cpuRequest, cpu_limit: form.cpuLimit, memory: form.memRequest, memory_limit: form.memLimit };
 }
