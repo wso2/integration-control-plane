@@ -31,9 +31,14 @@ const links: IntegrationLinks = {
   resources: [
     { id: 'github-acme', displayName: 'GitHub Acme', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
     { id: 'orders-db', displayName: 'orders-db', keys: [{ name: 'URL', secret: false }], valuesIn: ['development'] },
+    { id: 'github-sandbox', displayName: 'GitHub Sandbox', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
+    { id: 'github-corp', displayName: 'GitHub Corp', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
   ],
-  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken'), 'orders-db|URL': id('ordersDbUrl') },
-  connections: [{ id: id('github'), link: 'github-acme', suggestions: [], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] }],
+  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken'), 'orders-db|URL': id('ordersDbUrl'), 'github-corp|GITHUB_AUTH_TOKEN': id('otherToken') },
+  connections: [
+    { id: id('github'), link: 'github-acme', suggestions: ['github-acme', 'github-sandbox', 'github-corp'], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] },
+    { id: id('backup'), suggestions: ['github-sandbox', 'github-corp'], fields: [{ configurable: id('backupToken'), key: 'GITHUB_AUTH_TOKEN' }] },
+  ],
   fieldLinks: {},
   orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL' }],
   env: {},
@@ -51,12 +56,21 @@ const schema = {
   type: 'object',
   requiredLevel: 3,
   properties: {
-    acme: { type: 'object', properties: { ghdemo: { type: 'object', required: ['githubAuthToken', 'ordersDatabaseUrl'], properties: { githubAuthToken: { type: 'string', description: '' }, ordersDatabaseUrl: { type: 'string', description: '' } } } } },
+    acme: {
+      type: 'object',
+      properties: {
+        ghdemo: {
+          type: 'object',
+          required: ['githubAuthToken', 'ordersDatabaseUrl'],
+          properties: { githubAuthToken: { type: 'string', description: '' }, ordersDatabaseUrl: { type: 'string', description: '' }, backupToken: { type: 'string', description: '' } },
+        },
+      },
+    },
   },
 } as unknown as JSONSchema;
 
 function Form() {
-  const linked = useLinkedForm('default', 'ghdemo', 'development', true, ['acme.ghdemo.githubAuthToken', 'acme.ghdemo.ordersDatabaseUrl']);
+  const linked = useLinkedForm('default', 'ghdemo', 'development', true, ['acme.ghdemo.githubAuthToken', 'acme.ghdemo.ordersDatabaseUrl', 'acme.ghdemo.backupToken']);
   return (
     <>
       {linked.top}
@@ -101,6 +115,19 @@ describe('the Configure form with links', () => {
     expect((container.querySelector('input[aria-label="githubAuthToken is supplied by GitHub Acme"]') as HTMLInputElement).value).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
     await act(async () => button('Unlink github').click());
     expect(writes).toEqual([{ connection: id('github') }]);
+  });
+
+  it('offers the resources that suit a connection in its title bar, except one whose key another target uses', async () => {
+    const select = container.querySelector('[aria-label="Link backup"]') as HTMLElement;
+    expect(select.textContent).toBe('Link… (2 match)');
+    await act(async () => select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    const options = Array.from(document.querySelectorAll('[role="option"]'));
+    expect(options.map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+      ['GitHub Sandbox', null],
+      ['GitHub Corp (key in use)', 'true'],
+    ]);
+    await act(async () => (options[0] as HTMLElement).click());
+    expect(writes).toEqual([{ connection: id('backup'), ref: 'github-sandbox' }]);
   });
 
   it('links a field to the key picked from its link icon', async () => {

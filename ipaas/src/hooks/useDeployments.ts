@@ -181,8 +181,6 @@ export function useDeployDeploymentTrack() {
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId, input.id] });
       qc.invalidateQueries({ queryKey: ['executionConfigs', input.componentId] });
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
-      // A deploy applies the names the build reads.
-      qc.invalidateQueries({ queryKey: ['linkWarnings'] });
     },
   });
 }

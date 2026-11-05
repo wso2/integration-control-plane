@@ -173,7 +173,7 @@ export default function Component(scope: ComponentScope): JSX.Element {
           {/* Latest build card */}
           {!hasCustomOverview && showBuildCard && (
             <>
-              <BuildCard projectId={projectId} componentId={component.id} versionId={versionId} firstEnvId={environments[0]?.id ?? ''} deploymentPipelineId={project?.defaultDeploymentPipelineId ?? ''} commits={commits} />
+              <BuildCard componentId={component.id} versionId={versionId} commits={commits} />
             </>
           )}
 
