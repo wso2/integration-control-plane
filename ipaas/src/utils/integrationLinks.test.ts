@@ -94,6 +94,15 @@ describe('formLinkView', () => {
     expect(view.target(id('githubAuthToken'))).toEqual({ source: { ref: 'github-sandbox', key: 'GITHUB_AUTH_TOKEN', name: 'GitHub Sandbox', noValues: true } });
   });
 
+  it("names the resources a section's fields receive through their own links in another environment's release", () => {
+    const links: IntegrationLinks = {
+      ...base,
+      environments: [environment('development'), environment('production', { configurables: { [id('githubAuthToken')]: { ref: 'github-sandbox', key: 'GITHUB_AUTH_TOKEN' }, [id('githubTimeout')]: { ref: 'orders-db', key: 'URL' } } })],
+    };
+    expect(formLinkView(links, 'production', envName).connections[0].note).toBe('This release uses GitHub Sandbox, orders-db. Change links in Development.');
+    expect(formLinkView({ ...base, environments: [environment('development'), environment('production')] }, 'production', envName).connections[0].note).toBe('This release uses no resource. Change links in Development.');
+  });
+
   it('names the resource of a link whose target the build lacks', () => {
     const view = formLinkView({ ...base, orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL' }] }, 'development', envName);
     expect(view.orphaned).toEqual([{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL', name: 'orders-db' }]);
