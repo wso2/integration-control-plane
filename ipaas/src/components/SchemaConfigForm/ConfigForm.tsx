@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { type Dispatch, type ReactNode, type SetStateAction } from 'react';
-import { Box, Stack, Typography } from '@wso2/oxygen-ui';
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
+import { Box, Collapse, Stack, Typography } from '@wso2/oxygen-ui';
+import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../types/schema';
-import { type LinkingInfo, type SchemaField, schemaFields } from './schemaUtils';
+import { type LinkingInfo, type SchemaField, ownPackage, schemaFields } from './schemaUtils';
 import { ConfigElement } from './FormElements/ConfigElement';
 import { FieldLinkContext, type FieldLinks, noFieldLinks } from './linkedFrom';
 
@@ -65,8 +66,10 @@ const requiredFirst = (fields: SchemaField[]) => [...fields.filter((f) => f.requ
 export function ConfigForm({ schema, valueMap, handleValueChange, validationMap, handleValidationChange, linkingMap, setLinkingMap, sensitiveMap, setSensitiveMap, configGroups, groups = [], fieldLinks = noFieldLinks }: ConfigFormProps) {
   const targetLevel = schema.requiredLevel || 1;
   const fields = schemaFields(schema);
+  const own = ownPackage(fields);
   const grouped = new Set(groups.flatMap((g) => g.keys));
-  const other = fields.filter((f) => !grouped.has(f.path));
+  const other = fields.filter((f) => f.pkg === own && !grouped.has(f.path));
+  const libraries = [...new Set(fields.filter((f) => f.pkg !== own).map((f) => f.pkg))];
 
   const renderField = (f: SchemaField) => (
     <ConfigElement
@@ -126,6 +129,32 @@ export function ConfigForm({ schema, valueMap, handleValueChange, validationMap,
           null,
           other,
         )}
+      {libraries.map((pkg) => {
+        const list = fields.filter((f) => f.pkg === pkg);
+        return (
+          <LibraryBox key={pkg} title={pkg.replace('.', '/')} expanded={list.some((f) => f.required)}>
+            {requiredFirst(list).map(renderField)}
+          </LibraryBox>
+        );
+      })}
     </FieldLinkContext.Provider>
+  );
+}
+
+/** A library package's configurables, as tuning: collapsed unless one is required. */
+function LibraryBox({ title, expanded, children }: { title: string; expanded: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(expanded);
+  return (
+    <Box sx={groupSx}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" onClick={() => setOpen((o) => !o)} sx={{ ...headSx, cursor: 'pointer', borderBottom: open ? 1 : 0 }} role="button" aria-expanded={open}>
+        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+          {title}
+        </Typography>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </Stack>
+      <Collapse in={open}>
+        <Box sx={{ px: 2, pt: 0.5, pb: 1 }}>{children}</Box>
+      </Collapse>
+    </Box>
   );
 }
