@@ -24,9 +24,8 @@ import { engineMessage } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
 import { mutedSx } from '../styles';
+import { createdKeySx, createRowSx, headingSx, maskedKeySx, nameFieldSx, noticeSx, revokeErrorSx, sectionSx, tableSx } from './ApiKeysSection.styles';
 import type { ContextApiKey } from '../../../types/contextEngine';
-
-const tableSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' } as const;
 
 /** Keys for the engine's public API and MCP endpoint: create one (shown once), see them masked, revoke them. */
 export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.Element {
@@ -88,7 +87,7 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
             {keys.data.map((k) => (
               <ListingTable.Row key={k.name}>
                 <ListingTable.Cell>{k.displayName || k.name}</ListingTable.Cell>
-                <ListingTable.Cell sx={{ fontFamily: 'monospace' }}>{k.maskedKey}</ListingTable.Cell>
+                <ListingTable.Cell sx={maskedKeySx}>{k.maskedKey}</ListingTable.Cell>
                 <ListingTable.Cell>{k.expiresAt ? `${k.status} · expires ${new Date(k.expiresAt).toLocaleString()}` : k.status}</ListingTable.Cell>
                 <ListingTable.Cell align="right">
                   <Tooltip title="Revoke">
@@ -106,25 +105,25 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
   };
 
   return (
-    <Box sx={{ mb: 3 }}>
-      <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+    <Box sx={sectionSx}>
+      <Typography variant="subtitle2" sx={headingSx}>
         API keys
       </Typography>
-      <Stack direction="row" gap={1.5} alignItems="center" sx={{ mb: 2 }}>
-        <TextField size="small" label="Key name" placeholder="e.g. support-bot" value={name} onChange={(e) => setName(e.target.value)} sx={{ minWidth: 260 }} />
+      <Stack direction="row" gap={1.5} alignItems="center" sx={createRowSx}>
+        <TextField size="small" label="Key name" placeholder="e.g. support-bot" value={name} onChange={(e) => setName(e.target.value)} sx={nameFieldSx} />
         <Button variant="outlined" startIcon={create.isPending ? <CircularProgress size={14} color="inherit" /> : <Plus size={16} />} disabled={create.isPending} onClick={submit}>
           Create key
         </Button>
       </Stack>
       {create.isError && (
-        <Alert severity="error" variant="outlined" sx={{ mb: 2 }}>
+        <Alert severity="error" variant="outlined" sx={noticeSx}>
           {`Couldn't create the key: ${engineMessage(create.error, 'please try again')}`}
         </Alert>
       )}
       {created && (
-        <Alert severity="success" variant="outlined" icon={<KeyRound size={18} />} onClose={() => setCreated(null)} sx={{ mb: 2 }}>
+        <Alert severity="success" variant="outlined" icon={<KeyRound size={18} />} onClose={() => setCreated(null)} sx={noticeSx}>
           Copy this key now: it is not shown again.
-          <Box sx={{ mt: 1 }}>
+          <Box sx={createdKeySx}>
             <CodeViewer language="text" code={created} showCopyButton showLineNumbers={false} />
           </Box>
         </Alert>
@@ -142,7 +141,7 @@ export default function ApiKeysSection({ engineId }: { engineId: string }): JSX.
             Apps and agents using this key stop getting answers at once.
           </Typography>
           {revoke.isError && (
-            <Alert severity="error" variant="outlined" sx={{ mt: 2 }}>
+            <Alert severity="error" variant="outlined" sx={revokeErrorSx}>
               {`Couldn't revoke the key: ${engineMessage(revoke.error, 'please try again')}`}
             </Alert>
           )}
