@@ -48,6 +48,17 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + TEST_KEY_LIFETIME_MS).toISOString() });
   const selected = configs.find((c) => c.id === client) ?? configs[0];
 
+  if (!engine.publicApiUrl) {
+    return (
+      <Box sx={readableSx}>
+        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." />
+        <Alert severity="info" variant="outlined">
+          The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
+        </Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box>
       <Box sx={readableSx}>
