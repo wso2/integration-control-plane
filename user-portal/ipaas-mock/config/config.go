@@ -29,8 +29,9 @@ import (
 	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/env"
 )
 
-// PortalClientPrefix marks a Platform IdP client as a portal client.
-const PortalClientPrefix = "ipaas-portal-"
+// PortalClientPrefix starts a portal client's ID, which is this prefix and its org's UUID,
+// as core's UserPortalClientID names it.
+const PortalClientPrefix = "wc-user-portal-"
 
 type Config struct {
 	Org Org
@@ -136,8 +137,10 @@ func Load(ctx context.Context) (Config, error) {
 	}
 	cfg.Org.UUID = id
 
-	if !strings.HasPrefix(cfg.IdP.ClientID, PortalClientPrefix) {
-		return Config{}, fmt.Errorf("config:Load: MOCK_PORTAL_CLIENT_ID must start with %q", PortalClientPrefix)
+	// iPaaS-Service admits only the org's own portal client, so any other ID would get 403
+	// on every call.
+	if want := PortalClientPrefix + orgUUID; cfg.IdP.ClientID != want {
+		return Config{}, fmt.Errorf("config:Load: MOCK_PORTAL_CLIENT_ID must be %q", want)
 	}
 
 	cfg.Gateway.URL = strings.TrimSuffix(cfg.Gateway.URL, "/")

@@ -256,11 +256,14 @@ mock gateway on `:9200` makes the same checks (see below).
 
 ## iPaaS-Service portal routes (`ipaas-mock`, `:9090`)
 
-Base `/api/v1/portal/orgs/{orgUuid}/environments/{envId}`, where `{envId}` is the environment's
-UUID: UP-DP's `ENVIRONMENT_ID`. The portal can be enabled in more than one environment, and an
-integration is published in each separately. Every call needs a bearer token from the Platform
-IdP (below), issued to a portal client: `client_id` must start with the portal prefix, and the
-token's `ouId` must equal `{orgUuid}`. The token is not tied to an environment. Only integrations
+Base `/user-portal/orgs/{orgUuid}/environments/{envId}`, where `{envId}` is the environment's
+UUID: UP-DP's `ENVIRONMENT_ID`. UP-DP's `IPAAS_BASE_URL` is everything before `/orgs`:
+iPaaS-Service's public address with `/user-portal`, or `http://localhost:9090/user-portal` for the
+mock. The portal can be enabled in more than one environment, and an integration is published
+in each separately. Every call needs a bearer token from the Platform IdP (below), issued to the
+org's portal client: `client_id` must be exactly `wc-user-portal-{orgUuid}`, and the token's
+`ouId` must equal `{orgUuid}`. iPaaS-Service refuses that client on every other route. The token
+is not tied to an environment. Only integrations
 published in `{envId}` are visible; an unknown `{envId}` gets 404. UP-DP calls as the portal: no
 end user's identity is sent.
 
