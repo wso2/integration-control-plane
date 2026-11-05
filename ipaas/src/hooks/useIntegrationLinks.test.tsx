@@ -31,6 +31,7 @@ const links = (): IntegrationLinks => ({
   kind: 'ballerina',
   resources: [],
   used: {},
+  usedByOrphaned: {},
   connections: [],
   fieldLinks: server.linked ? { [target]: ref } : {},
   orphaned: [],

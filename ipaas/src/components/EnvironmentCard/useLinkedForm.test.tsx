@@ -35,7 +35,8 @@ const links: IntegrationLinks = {
     { id: 'github-sandbox', displayName: 'GitHub Sandbox', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
     { id: 'github-corp', displayName: 'GitHub Corp', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
   ],
-  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken'), 'orders-db|URL': id('ordersDbUrl'), 'github-corp|GITHUB_AUTH_TOKEN': id('otherToken') },
+  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken'), 'github-corp|GITHUB_AUTH_TOKEN': id('otherToken') },
+  usedByOrphaned: { 'orders-db|URL': id('ordersDbUrl') },
   connections: [
     { id: id('github'), link: 'github-acme', suggestions: ['github-acme', 'github-sandbox', 'github-corp'], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] },
     { id: id('backup'), suggestions: ['github-sandbox', 'github-corp'], fields: [{ configurable: id('backupToken'), key: 'GITHUB_AUTH_TOKEN' }] },
