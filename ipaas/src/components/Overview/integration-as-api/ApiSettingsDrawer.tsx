@@ -26,6 +26,7 @@ import type { CorsConfig, RateLimitConfig } from '../../../types/policy';
 import { configToPolicy, policyToConfig, toRateLimitOperations } from '../../../utils/endpointPolicy';
 import { isRateLimitValid } from '../../../utils/policy';
 import { endpointLoadNotice, friendlyApiError } from '../../../utils/apiSecurity';
+import { isPermissionError } from '../../../utils/apiErrors';
 import CorsSection from '../../Policies/CorsSection';
 import RateLimitingSection from '../../Policies/RateLimitingSection';
 import { useEndpointDrawer } from './useEndpointDrawer';
@@ -97,7 +98,7 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
       await setPolicies.mutateAsync(configToPolicy(cors, rateLimit));
       onClose();
     } catch (err) {
-      setError(friendlyApiError(err, 'Could not save the API settings.'));
+      if (!isPermissionError(err)) setError(friendlyApiError(err, 'Could not save the API settings.'));
     }
   };
 

@@ -20,14 +20,25 @@ import { Alert, Snackbar } from '@wso2/oxygen-ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import type { JSX } from 'react';
-import { isPermissionError } from '../utils/apiErrors';
+import { Scopes } from '../constants/permissions';
+import { isPermissionError, refusedScope } from '../utils/apiErrors';
 
 const ANCHOR = { vertical: 'bottom', horizontal: 'right' } as const;
 
-/**
- * Says so when ipaas-service refuses a change because the user's role lacks a scope, wherever the
- * change was made: some actions report their own failures, others fail silently.
- */
+/** What a refused scope stops the role from doing, for the refusals whose screens leave the message to this notice. */
+const REFUSED_ACTION: Record<string, string> = {
+  [Scopes.ENDPOINT_TEST]: 'create test keys',
+  [Scopes.ENDPOINT_UPDATE]: "change an API's security or settings",
+  [Scopes.APPLICATION_MANAGE]: 'manage consumer applications',
+  [Scopes.ENDPOINT_API_KEY_MANAGE]: 'manage API keys',
+};
+
+const refusalText = (error: Error): string => {
+  const action = REFUSED_ACTION[refusedScope(error) ?? ''];
+  return action ? `Your role can't ${action}.` : `Your role doesn't allow this (${error.message}).`;
+};
+
+/** Says so when ipaas-service refuses a change because the user's role lacks a scope, wherever the change was made. */
 export default function PermissionDeniedNotice(): JSX.Element {
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
@@ -37,7 +48,7 @@ export default function PermissionDeniedNotice(): JSX.Element {
       queryClient.getMutationCache().subscribe((event) => {
         if (event.type !== 'updated' || event.action.type !== 'error') return;
         const { error } = event.mutation.state;
-        if (error instanceof Error && isPermissionError(error)) setMessage(error.message);
+        if (error instanceof Error && isPermissionError(error)) setMessage(refusalText(error));
       }),
     [queryClient],
   );
@@ -46,7 +57,7 @@ export default function PermissionDeniedNotice(): JSX.Element {
   return (
     <Snackbar open={message !== null} autoHideDuration={8000} onClose={close} anchorOrigin={ANCHOR}>
       <Alert onClose={close} severity="warning" variant="filled">
-        Your role doesn't allow this ({message}).
+        {message}
       </Alert>
     </Snackbar>
   );

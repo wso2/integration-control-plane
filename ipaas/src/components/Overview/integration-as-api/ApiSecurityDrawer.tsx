@@ -24,6 +24,7 @@ import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 import type { EndpointOption, SecurityConfig, SecurityMode } from '../../../types/consumers';
 import { endpointLoadNotice, friendlyApiError } from '../../../utils/apiSecurity';
+import { isPermissionError } from '../../../utils/apiErrors';
 import { useEndpointDrawer } from './useEndpointDrawer';
 import * as styles from './apiConsumption.styles';
 import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
@@ -96,7 +97,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
       await setSecurityMutation.mutateAsync(cfg);
       onClose();
     } catch (err) {
-      setError(friendlyApiError(err, 'Could not save the security configuration.'));
+      if (!isPermissionError(err)) setError(friendlyApiError(err, 'Could not save the security configuration.'));
     }
   };
 

@@ -26,6 +26,7 @@ import { useConsumers, useDeleteConsumer, useEndpointSecurity } from '../../../h
 import type { Consumer, EndpointOption, EndpointRef } from '../../../types/consumers';
 import { consumerSummary } from '../../../utils/apiConsumption';
 import { friendlyApiError } from '../../../utils/apiSecurity';
+import { isPermissionError } from '../../../utils/apiErrors';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
 import ApiSecurityDrawer from './ApiSecurityDrawer';
 import ConsumerDrawer from './ConsumerDrawer';
@@ -76,7 +77,7 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
       await deleteMutation.mutateAsync(pendingDelete);
       setPendingDelete(null);
     } catch (err) {
-      setDeleteError(friendlyApiError(err, `Could not delete “${pendingDelete.displayName}”.`));
+      if (!isPermissionError(err)) setDeleteError(friendlyApiError(err, `Could not delete “${pendingDelete.displayName}”.`));
     }
   };
 

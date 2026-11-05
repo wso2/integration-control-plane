@@ -21,7 +21,7 @@ import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
 import { useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
 import type { EndpointRef, SecurityMode } from '../types/consumers';
 import { friendlyApiError } from '../utils/apiSecurity';
-import { isApiKeyAuthRequired } from '../utils/apiErrors';
+import { isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
 
@@ -139,7 +139,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
         return key;
       } catch (err) {
         if (isApiKeyAuthRequired(err)) setApiKeyRequiredFor(targetKey);
-        else setFailure({ refKey: targetKey, message: friendlyApiError(err, MINT_FAILED) });
+        else if (!isPermissionError(err)) setFailure({ refKey: targetKey, message: friendlyApiError(err, MINT_FAILED) });
         return null;
       }
     },
@@ -186,7 +186,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
       setApiKeyRequiredFor((current) => (current === targetKey ? null : current));
       return await mintFor(target);
     } catch (err) {
-      setFailure({ refKey: targetKey, message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
+      if (!isPermissionError(err)) setFailure({ refKey: targetKey, message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
       return null;
     } finally {
       if (mintingFor.current === targetKey) mintingFor.current = null;
