@@ -138,11 +138,11 @@ function RowsSkeleton(): JSX.Element {
 export default function OrgOverview(scope: OrgScope): JSX.Element {
   const dbAvailability = useDatabaseAvailability();
   const databasesAvailable = dbAvailability.data?.available === true;
-  const databasesUnavailableReason = dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
   const navigate = useAppNavigate();
   const [pickingProject, setPickingProject] = useState(false);
   const { displayName, username } = useAuth();
   const { hasOrgPermission } = useAccessControl();
+  const databaseDeniedReason = !hasOrgPermission(Scopes.CONFIG_MANAGE) ? 'You do not have permission to create databases.' : dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
   const { data: projects = [], isLoading, isError, refetch } = useProjects();
   // The BFF returns projects unordered, so the most recently updated are picked here.
   const listed = [...projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, LIST_SIZE);
@@ -221,7 +221,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           description="Provision managed databases for your integrations to store and query data."
           actionLabel="Create a database"
           onAction={databasesAvailable ? () => navigate(newDatabaseUrl(scope, 'postgres')) : undefined}
-          disabledReason={databasesUnavailableReason}
+          disabledReason={databaseDeniedReason}
         />
       </Box>
 
