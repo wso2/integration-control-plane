@@ -213,7 +213,9 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const showOpenInEditor = hasSource && !isSamplesPending && !isSample && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
   const HeaderActions = module?.HeaderActions;
 
-  const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;
+  // An integration without source (a voice agent, a proxy) can still be reported with an empty
+  // repository record, whose missing org and name would crash the URL builder.
+  const repoUrl = hasSource && repository ? buildRepoBrowseUrl(repository) : null;
   const ProviderIcon = getGitProviderIcon(repository?.gitProvider);
 
   const orgUuidFromToken = useOrgUuid() ?? '';
