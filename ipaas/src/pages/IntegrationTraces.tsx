@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, PageContent, Typography } from '@wso2/oxygen-ui';
+import { PageContent, Typography } from '@wso2/oxygen-ui';
 import { Waypoints } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useOrgs } from '../hooks/useOrg';
@@ -28,6 +28,7 @@ import { spanSeriesByService, summarizeServiceTraces, traceStats } from '../util
 import type { ComponentTracesRequest, TraceRow } from '../types/integrationTraces';
 import EmptyListing from '../components/EmptyListing';
 import NotFound from '../components/NotFound';
+import TracesError from '../components/IntegrationTraces/TracesError';
 import TracesToolbar from '../components/IntegrationTraces/TracesToolbar';
 import TraceStatCards from '../components/IntegrationTraces/TraceStatCards';
 import TraceSection from '../components/IntegrationTraces/TraceSection';
@@ -78,11 +79,7 @@ function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.El
     );
   }
   if (traces.isError) {
-    return (
-      <Alert severity="error" action={<Button onClick={() => void traces.refetch()}>Retry</Button>}>
-        Couldn&apos;t load traces.
-      </Alert>
-    );
+    return <TracesError title="Couldn't load traces" onRetry={() => void traces.refetch()} />;
   }
   if (traces.data.traces.length === 0) {
     return <EmptyListing icon={<Waypoints size={48} />} title="No traces in this time range" description="Traces appear once the integration handles requests with tracing enabled in this environment. Try a wider time range." />;
@@ -91,9 +88,7 @@ function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.El
   const sections = sampled.isPending ? (
     <TraceSectionsSkeleton />
   ) : sampled.isError ? (
-    <Alert severity="error" action={<Button onClick={() => void sampled.refetch()}>Retry</Button>}>
-      Couldn&apos;t load the spans of these traces.
-    </Alert>
+    <TracesError title="Couldn't load the spans of these traces" onRetry={() => void sampled.refetch()} />
   ) : (
     <ServiceSections sampled={sampled.data} traces={traces.data.traces} request={request} />
   );

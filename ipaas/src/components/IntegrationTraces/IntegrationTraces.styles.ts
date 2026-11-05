@@ -24,6 +24,15 @@ export const kpiGrid = { display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 
 
 export const card = { p: 2.5, mb: 3 } as const;
 
+/** The Runtime Logs page's error state (LogsPanel), so both observability pages fail the same way. */
+export const errorState = { alignItems: 'center', gap: 1.5, py: 8 } as const;
+
+export const errorIcon = { opacity: 0.35 } as const;
+
+export const errorDescription = { maxWidth: 420 } as const;
+
+export const errorRetry = { mt: 0.5 } as const;
+
 export const cardHeader = { mb: 2 } as const;
 
 export const cardTitle = { fontWeight: 600 } as const;
