@@ -23,6 +23,7 @@ import GitLogoIcon from '../../assets/icons/GitLogoIcon';
 import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../../constants/import';
 import type { useGitRepoSource } from '../../hooks/useGitRepoSource';
 import { external } from '../../paths';
+import { parseGitHubUrl } from '../../utils/github';
 import DirectoryPickerField from '../DirectoryPicker';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems } from '../Import/gitHubSelectActions';
 
@@ -44,6 +45,7 @@ export default function RepoSourceFields({ source, directoryHint }: RepoSourceFi
     setRepoUrl,
     urlError,
     parsedOrg,
+    parsedRepo,
     selectedBranch,
     setSelectedBranch,
     subPath,
@@ -80,8 +82,9 @@ export default function RepoSourceFields({ source, directoryHint }: RepoSourceFi
             value={repoUrl}
             onChange={(e) => {
               setRepoUrl(e.target.value);
-              // The URL is parsed after a debounce; until then the old repository's branch must not stay selectable.
-              setSelectedBranch('');
+              // Parsing is debounced, so a URL naming another repository drops the old branch now.
+              const next = parseGitHubUrl(e.target.value);
+              if (next && (next.org !== parsedOrg || next.repo !== parsedRepo)) setSelectedBranch('');
             }}
             fullWidth
             error={!!urlError}
