@@ -36,6 +36,8 @@ interface SetupProgressProps {
   engineId: string;
   engineName: string;
   phase: SetupPhase;
+  /** The last status check failed; the wizard keeps polling. */
+  statusUnknown?: boolean;
   sourceCount: number;
   roleCount: number;
   /** Steps the engine refused. */
@@ -103,7 +105,7 @@ function UploadSource({ engineId, source }: { engineId: string; source: SetupUpl
 }
 
 /** What the wizard shows after Create: the engine starting, then its sources, grants and files being handed to it. */
-export default function SetupProgress({ engineId, engineName, phase, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
+export default function SetupProgress({ engineId, engineName, phase, statusUnknown = false, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
   const failedTo = (pattern: RegExp) => warnings.find((w) => pattern.test(w));
   const sourceFailures = warnings.filter((w) => w.startsWith('Register source')).length;
   const roleFailures = warnings.filter((w) => w.startsWith('Grant query access')).length;
@@ -120,7 +122,9 @@ export default function SetupProgress({ engineId, engineName, phase, sourceCount
       <Box sx={{ mt: 2 }}>
         <Step tone="done">Engine created</Step>
         {phase === 'starting' && (
-          <Step tone="running">Starting the engine</Step>
+          <Step tone="running" aside={statusUnknown ? "Couldn't check the engine's status. Trying again…" : undefined}>
+            Starting the engine
+          </Step>
         )}
         {phase === 'failed' && (
           <Step tone="failed">The engine failed to start</Step>

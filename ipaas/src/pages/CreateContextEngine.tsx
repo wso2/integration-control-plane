@@ -98,7 +98,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
   const [leaveOpen, setLeaveOpen] = useState(false);
   const create = useCreateContextEngine();
   const setUp = useSetUpContextEngine();
-  const live = useContextEngine(created?.id ?? '');
+  const live = useContextEngine(created?.id ?? '', { pollOnError: true });
   const setupStarted = useRef(false);
   const [params] = useSearchParams();
   const environments = useAllEnvironments();
@@ -227,6 +227,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
             engineId={created.id}
             engineName={created.name}
             phase={phase}
+            statusUnknown={live.isError}
             sourceCount={created.sources.length}
             roleCount={created.roles.length}
             warnings={result?.warnings ?? []}

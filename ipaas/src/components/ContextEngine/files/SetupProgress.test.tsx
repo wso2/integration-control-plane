@@ -42,7 +42,7 @@ vi.mock('@wso2/oxygen-ui-icons-react', () => ({ Check: () => null, CircleAlert: 
 vi.mock('../../../hooks/contextUploads', () => ({ retryUpload: vi.fn(), useAnySending: () => false, useSourceUploads: () => [] }));
 vi.mock('./UploadStatusChip', () => ({ default: () => null }));
 
-const render = (phase: SetupPhase) => renderToStaticMarkup(<SetupProgress engineId="e1" engineName="Docs" phase={phase} sourceCount={1} roleCount={0} warnings={[]} uploads={[]} onOpen={() => undefined} />);
+const render = (phase: SetupPhase, statusUnknown = false) => renderToStaticMarkup(<SetupProgress engineId="e1" engineName="Docs" phase={phase} statusUnknown={statusUnknown} sourceCount={1} roleCount={0} warnings={[]} uploads={[]} onOpen={() => undefined} />);
 
 const openButton = (html: string) => html.match(/<button[^>]*>Open engine<\/button>/)?.[0] ?? '';
 
@@ -58,5 +58,10 @@ describe('SetupProgress', () => {
     expect(openButton(html)).not.toContain('disabled');
     expect(openButton(html)).toContain('data-variant="contained"');
     expect(html).not.toContain('data-tooltip');
+  });
+
+  it('says it is still trying when the status check fails', () => {
+    expect(render('starting', true)).toContain('Couldn&#x27;t check the engine&#x27;s status. Trying again…');
+    expect(render('starting')).not.toContain('Trying again');
   });
 });

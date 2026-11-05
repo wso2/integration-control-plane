@@ -146,13 +146,14 @@ export function useSeenOnScreen<T extends Element>(): [(el: T | null) => void, b
 }
 
 /** One engine; checked again while it starts or is being deleted. */
-export function useContextEngine(engineId: string) {
+export function useContextEngine(engineId: string, { pollOnError = false }: { pollOnError?: boolean } = {}) {
   return useQuery({
     queryKey: [ROOT_KEY, 'detail', engineId],
     queryFn: () => getContextEngine(engineId),
     enabled: isContextEngineEnabled() && !!engineId,
     retry: false,
     refetchInterval: (query) => {
+      if (pollOnError && query.state.status === 'error') return ENGINE_STATUS_POLL_MS;
       const state = query.state.data?.state;
       if (state === 'deleting') return DELETION_POLL_MS;
       return state && TRANSIENT_STATES.has(state) ? ENGINE_STATUS_POLL_MS : false;
