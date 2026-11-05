@@ -116,6 +116,83 @@ describe('authenticatedFetch', () => {
   });
 });
 
+describe('authenticatedFetch without a cookie session', () => {
+  it('ends the session on a 401 for an expired token from any host, and adds no X-Requested-With', async () => {
+    connectWith(EXPIRED);
+    fetchMock.mockResolvedValue(new Response('', { status: 401 }));
+    await authenticatedFetch('https://obs.example/logs');
+    await authenticatedFetch('/api/x');
+    expect(onExpired).toHaveBeenCalledTimes(2);
+    expect(new Headers((fetchMock.mock.calls[1][1] as RequestInit).headers).has('X-Requested-With')).toBe(false);
+  });
+});
+
+describe('authenticatedFetch with a cookie session (BFF)', () => {
+  let checkSession: Mock<() => Promise<boolean>>;
+  const sentHeader = (call: number): string | null => new Headers((fetchMock.mock.calls[call][1] as RequestInit).headers).get('X-Requested-With');
+
+  beforeEach(() => {
+    checkSession = vi.fn(async () => false);
+    connect({ session: SESSION, getAccessToken: () => Promise.resolve(''), onExpired, checkSession });
+    fetchMock.mockResolvedValue(new Response('', { status: 401 }));
+  });
+
+  it('marks same-origin requests with X-Requested-With and leaves cross-origin ones alone', async () => {
+    fetchMock.mockResolvedValue(new Response('ok'));
+    await authenticatedFetch('/_api/integration/projects', { headers: { Accept: 'application/json' } });
+    await authenticatedFetch(`${window.location.origin}/_api/billing/api/v1/x`);
+    await authenticatedFetch('https://cloud-obs-proxy.obs.dp.example/logs');
+    expect(sentHeader(0)).toBe('XMLHttpRequest');
+    expect(new Headers((fetchMock.mock.calls[0][1] as RequestInit).headers).get('Accept')).toBe('application/json');
+    expect(sentHeader(1)).toBe('XMLHttpRequest');
+    expect(sentHeader(2)).toBeNull();
+    expect(sentAuth(0)).toBeNull();
+  });
+
+  it('keeps the session on a 401 from another host, without asking the gateway', async () => {
+    const res = await authenticatedFetch('https://cloud-obs-proxy.obs.dp.example/logs');
+    expect(res.status).toBe(401);
+    expect(checkSession).not.toHaveBeenCalled();
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  it('counts a protocol-relative URL and another port as other hosts', async () => {
+    const { protocol, hostname } = window.location;
+    await authenticatedFetch(`//cloud-obs-proxy.obs.dp.example/logs`);
+    await authenticatedFetch(`${protocol}//${hostname}:1/_api/x`);
+    expect(sentHeader(0)).toBeNull();
+    expect(sentHeader(1)).toBeNull();
+    expect(checkSession).not.toHaveBeenCalled();
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  it('ends the session on a same-origin 401 once the gateway says it is signed out', async () => {
+    const res = await authenticatedFetch('/_api/integration/projects');
+    expect(res.status).toBe(401);
+    expect(checkSession).toHaveBeenCalledTimes(1);
+    expect(onExpired).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps a live session on a same-origin 401 and retries the request once', async () => {
+    checkSession.mockResolvedValue(true);
+    fetchMock.mockResolvedValueOnce(new Response('', { status: 401 })).mockResolvedValueOnce(new Response('ok'));
+    const res = await authenticatedFetch('/_api/integration/projects', { method: 'POST', body: '{}' });
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect((fetchMock.mock.calls[1][1] as RequestInit).method).toBe('POST');
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+
+  it('returns a second same-origin 401 from a live session to the caller', async () => {
+    checkSession.mockResolvedValue(true);
+    const res = await authenticatedFetch('/_api/integration/projects');
+    expect(res.status).toBe(401);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(onExpired).not.toHaveBeenCalled();
+  });
+});
+
 describe('getAccessToken', () => {
   it('returns the SDK token, or null when there is none', async () => {
     expect(await getAccessToken()).toBeNull();

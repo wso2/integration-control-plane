@@ -17,7 +17,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { signInParams, thunderConfig, THUNDER_INSTANCE_ID } from './thunderConfig';
+import { bffSignInUrl, signInParams, thunderConfig, THUNDER_INSTANCE_ID } from './thunderConfig';
 
 beforeEach(() => {
   window.API_CONFIG = {
@@ -119,5 +119,21 @@ describe('thunderConfig on the gateway (BFF)', () => {
     expect(config.preferences?.user?.fetchUserProfile).toBe(false);
     expect(config.clientId).toBeUndefined();
     expect(config.session?.silentSignIn).toBeUndefined();
+  });
+
+  it('starts sign-in at the context’s signin, returning to the page', () => {
+    const url = new URL(bffSignInUrl('/projects?a=1&b=2'), window.location.origin);
+    expect(url.pathname).toBe('/_auth/integration/signin');
+    expect(url.searchParams.get('returnTo')).toBe('/projects?a=1&b=2');
+  });
+
+  it('nests the page inside AUTH_BFF_SIGN_IN_URL’s returnTo, so its query survives both hops', () => {
+    window.API_CONFIG.authBffSignInUrl = '/_auth/cloud/login?returnTo=%2F_auth%2Fintegration%2Fsignin';
+    const outer = new URL(bffSignInUrl('/projects?a=1&b=2'), window.location.origin);
+    expect(outer.pathname).toBe('/_auth/cloud/login');
+    expect([...outer.searchParams.keys()]).toEqual(['returnTo']);
+    const inner = new URL(outer.searchParams.get('returnTo') ?? '', window.location.origin);
+    expect(inner.pathname).toBe('/_auth/integration/signin');
+    expect(inner.searchParams.get('returnTo')).toBe('/projects?a=1&b=2');
   });
 });

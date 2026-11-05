@@ -187,6 +187,8 @@ const DEFAULT_CONFIG: ApiConfig = {
   trackingEnv: 'dev',
 };
 
+const localPath = (value: string | undefined): string | undefined => (value && /^\/(?![/\\])/.test(value) ? value : undefined);
+
 /**
  * Load configuration from /config.json.
  * This allows modifying URLs after build without rebuilding the app.
@@ -210,8 +212,8 @@ export async function loadConfig(): Promise<void> {
       asgardeoSignInRedirectUrl: config.ASGARDEO_SIGN_IN_REDIRECT_URL || DEFAULT_CONFIG.asgardeoSignInRedirectUrl,
       asgardeoScope: config.ASGARDEO_SCOPE || DEFAULT_CONFIG.asgardeoScope,
       asgardeoResource: config.ASGARDEO_RESOURCE?.trim() || undefined,
-      authBffContext: config.AUTH_BFF_CONTEXT ? trim(config.AUTH_BFF_CONTEXT.trim()) || undefined : undefined,
-      authBffSignInUrl: config.AUTH_BFF_SIGN_IN_URL?.trim() || undefined,
+      authBffContext: localPath(config.AUTH_BFF_CONTEXT ? trim(config.AUTH_BFF_CONTEXT.trim()) : undefined),
+      authBffSignInUrl: localPath(config.AUTH_BFF_SIGN_IN_URL?.trim()),
       authBffProxyContext: config.AUTH_BFF_PROXY_CONTEXT ? trim(config.AUTH_BFF_PROXY_CONTEXT.trim()) || undefined : undefined,
       choreoBaseApiUrl: choreoBase,
       choreoOrgApiUrl: `${choreoBase}/orgs/1.0.0`,

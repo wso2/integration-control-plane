@@ -25,9 +25,9 @@ import { oidcCallbackUrl } from '../paths';
 import { editorSignInForwardUrl } from '../utils/vscodeCallback';
 import type { AuthContextValue } from './types';
 import { decodeJwtPayload, isExpired, stringClaim } from './jwt';
-import { clearLegacySession } from './legacySession';
+import { clearBrowserSignInSession, clearLegacySession } from './legacySession';
 import { connect, disconnect, type CloudSession, type CloudUser } from './session';
-import { THUNDER_INSTANCE_ID, isBffAuth, signInParams, thunderConfig } from './thunderConfig';
+import { THUNDER_INSTANCE_ID, bffSignInUrl, gatewaySignedIn, isBffAuth, signInParams, thunderConfig } from './thunderConfig';
 import { stripBase } from '../utils/basePath';
 import { local, session as browserSession } from '../utils/storage';
 
@@ -123,6 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
   useEffect(() => {
     clearLegacySession();
+    if (isBffAuth()) clearBrowserSignInSession();
   }, []);
 
   useEffect(() => {
@@ -179,7 +180,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       const session = toSession(idClaims, idClaims);
       if (!session) return endSession(MISSING_ORG);
 
-      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), cookieSession: true });
+      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), checkSession: gatewaySignedIn });
       local.set(ORG_HANDLE_KEY, session.orgHandle);
       setStatus({ kind: 'signedIn', session });
     };
@@ -222,6 +223,16 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
     };
   }, [status.kind, bff, hasCode, silent, isInitialized, isLoading, isSignedIn, recheck, waitFrom, getAccessToken, getDecodedIdToken, endSession]);
 
+  const sdkSignedIn = useRef(false);
+  useEffect(() => {
+    if (!bff || status.kind !== 'signedIn') return;
+    if (isSignedIn) sdkSignedIn.current = true;
+    else if (sdkSignedIn.current) {
+      sdkSignedIn.current = false;
+      endSession(null);
+    }
+  }, [bff, status.kind, isSignedIn, endSession]);
+
   // Read once in the initialiser above; cleared here, not there, so StrictMode's second call agrees.
   useEffect(() => {
     browserSession.remove(SKIP_SILENT_KEY);
@@ -249,9 +260,10 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   const loginWithOIDC = useCallback(
     async (fidp?: string) => {
+      if (bff) return window.location.assign(bffSignInUrl(`${window.location.pathname}${window.location.search}`));
       await signIn(signInParams(fidp));
     },
-    [signIn],
+    [bff, signIn],
   );
 
   const completeSignIn = useCallback(

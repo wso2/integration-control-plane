@@ -47,7 +47,7 @@ interface Connection {
   getAccessToken: () => Promise<string>;
   /** Ends the session locally once the token has expired anyway. */
   onExpired: () => void;
-  cookieSession?: boolean;
+  checkSession?: () => Promise<boolean>;
 }
 
 let connection: Connection | null = null;
@@ -66,6 +66,7 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  if (connection?.checkSession) return cookieFetch(url, options, connection.checkSession);
   const token = await getAccessToken();
   const headers = new Headers(options.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -75,9 +76,24 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
   // The SDK refreshes ahead of expiry, so there is no refresh-and-retry here.
   // A 401 for an expired (or missing) token means the session is over; one for
   // a live token is the API's own answer and goes back to the caller.
-  if (res.status === 401 && (!token || isExpired(token)) && (!connection?.cookieSession || isSameOrigin(url))) {
+  if (res.status === 401 && (!token || isExpired(token))) {
     connection?.onExpired();
   }
+  return res;
+}
+
+async function cookieFetch(url: string, options: RequestInit, checkSession: () => Promise<boolean>): Promise<Response> {
+  const sameOrigin = isSameOrigin(url);
+  const send = (): Promise<Response> => {
+    const headers = new Headers(options.headers);
+    if (sameOrigin) headers.set('X-Requested-With', 'XMLHttpRequest');
+    return fetch(url, { ...options, headers });
+  };
+
+  const res = await send();
+  if (res.status !== 401 || !sameOrigin) return res;
+  if (await checkSession()) return send();
+  connection?.onExpired();
   return res;
 }
 

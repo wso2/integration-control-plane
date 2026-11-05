@@ -52,7 +52,9 @@ With `AUTH_BFF_CONTEXT` set, the WSO2 API Platform gateway signs the user in and
 - API calls go to a same-origin `CHOREO_BASE_API_URL` (`/_api/integration`) with the cookie and no `Authorization` header; the gateway puts the session's token on them. `BILLING_API_BASE_URL` goes the same way, on the cloud console's session (`/_api/billing/api/v1`).
 - The org and profile come from the session's ID token claims (`ouHandle`, `ouId`, `ouName`).
 - There is no silent sign-in: the gateway's session check joins the cloud console's session itself.
-- Calls to other hosts with the user's token (`VITE_OBSERVABILITY_URL`, the AI Integration Builder copilot) get no token in this mode. Their 401s go back to the caller; only a same-origin 401 ends the session.
+- Calls to other hosts with the user's token (`VITE_OBSERVABILITY_URL`, the AI Integration Builder copilot) get no token in this mode. Their 401s go back to the caller and never end the session. A same-origin 401 ends it only when `<AUTH_BFF_CONTEXT>/checksession` reports signed out; otherwise the request is retried once.
+- Same-origin requests carry `X-Requested-With: XMLHttpRequest`, so the gateway can require it against CSRF.
+- `AUTH_BFF_CONTEXT` and `AUTH_BFF_SIGN_IN_URL` must be paths on the console origin (start with a single `/`); anything else is ignored.
 
 Unset, the browser signs in itself with PKCE, as before.
 

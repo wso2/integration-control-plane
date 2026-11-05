@@ -81,9 +81,6 @@ function bffConfig(): ThunderIDProviderProps {
     baseUrl: window.location.origin,
     endpoints: {
       backend: {
-        // AUTH_BFF_SIGN_IN_URL lets sign-in start at the cloud console's login, with a returnTo back to
-        // this context's signin. The SDK appends ?returnTo=<page>; with a query already there it lands
-        // inside the outer returnTo, so the page is passed on to this context's signin, which returns to it.
         signIn: authBffSignInUrl ?? `${authBffContext}/signin`,
         // The policy names this one userinfoPath.
         session: `${authBffContext}/userinfo`,
@@ -106,6 +103,35 @@ function bffConfig(): ThunderIDProviderProps {
       i18n: { storageStrategy: 'none' },
     },
   };
+}
+
+export function bffSignInUrl(returnTo: string): string {
+  const { authBffContext, authBffSignInUrl } = window.API_CONFIG;
+  const base = 'https://console.invalid';
+  const url = new URL(authBffSignInUrl ?? `${authBffContext}/signin`, base);
+  const outer = url.searchParams.get('returnTo');
+  if (outer) {
+    const inner = new URL(outer, base);
+    inner.searchParams.set('returnTo', returnTo);
+    url.searchParams.set('returnTo', `${inner.pathname}${inner.search}`);
+  } else {
+    url.searchParams.set('returnTo', returnTo);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+export async function gatewaySignedIn(): Promise<boolean> {
+  try {
+    const res = await fetch(`${window.API_CONFIG.authBffContext}/checksession`, {
+      credentials: 'include',
+      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!res.ok) return true;
+    const { isSignedIn } = (await res.json()) as { isSignedIn?: boolean };
+    return isSignedIn !== false;
+  } catch {
+    return true;
+  }
 }
 
 /**
