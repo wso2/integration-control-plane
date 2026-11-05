@@ -135,7 +135,8 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     credential.current = { authHeader, apiKey };
   }, [authHeader, apiKey]);
 
-  const client = useMemo(() => (baseUrl ? createWorkflowClient({ baseUrl, getHeaders: async () => workflowRequestHeaders(credential.current, await getAccessToken()) }) : null), [baseUrl]);
+  const getHeaders = useCallback(async () => workflowRequestHeaders(credential.current, await getAccessToken()), []);
+  const client = useMemo(() => (baseUrl ? createWorkflowClient({ baseUrl, getHeaders }) : null), [baseUrl, getHeaders]);
 
   const probe = useQuery({
     queryKey: workflowKeys.runtime(scopeId),
@@ -189,6 +190,24 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     });
   }, [queryClient, scopeId, renew]);
 
+  // The client the pages get lists and counts only this integration's task queue: every integration
+  // in an environment shares one namespace, and the API otherwise answers for all of them. The lists
+  // only run once the probe has answered, so they are limited from the first read.
+  const taskQueue = probe.data?.taskQueue ?? null;
+  const scopedClient = useMemo(() => (baseUrl && taskQueue ? createWorkflowClient({ baseUrl, getHeaders, taskQueue }) : client), [baseUrl, getHeaders, taskQueue, client]);
+  // A redeploy can move the worker to another queue while a page is open: what was read for the old
+  // queue is someone else's runs now, so drop it rather than show it until the next poll. The probe
+  // itself is kept, or the connection would drop back to connecting.
+  const readForQueue = useRef(taskQueue);
+  useEffect(() => {
+    if (readForQueue.current === taskQueue) return;
+    const hadQueue = readForQueue.current !== null;
+    readForQueue.current = taskQueue;
+    if (!hadQueue || !scopeId) return;
+    const runtimeKey = workflowKeys.runtime(scopeId);
+    void queryClient.resetQueries({ predicate: (query) => isScopedWorkflowKey(query.queryKey, scopeId) && query.queryKey[2] !== runtimeKey[2] });
+  }, [taskQueue, scopeId, queryClient]);
+
   if (!deployment) {
     // Not a failure: the pages tell the reader to deploy, as the Test Console does.
     return isDeploymentLoading ? LOADING : { status: 'not-deployed', deploymentStatus: null };
@@ -212,7 +231,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   if (!client || !access.isAuthorized) return LOADING;
   // Data held from an earlier probe keeps the connection up through a failed background refetch.
   if (probe.data !== undefined) {
-    return { status: 'ready', client, baseUrl, scopeId, runtime: probe.data ?? { taskQueue: null }, endpointName, renewCredential: renew };
+    return { status: 'ready', client: scopedClient ?? client, baseUrl, scopeId, runtime: probe.data ?? { taskQueue: null }, endpointName, renewCredential: renew };
   }
   const { error } = probe;
   if (error) {

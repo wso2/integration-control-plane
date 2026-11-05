@@ -83,11 +83,21 @@ export interface WorkflowClientConnection {
    * and the caller's current access token, which the session may have refreshed since the last call.
    */
   getHeaders: () => Promise<Record<string, string>>;
+  /**
+   * The task queue this integration's worker polls, as `GET /runtime` reports it: the platform names
+   * it after the integration's release binding, so it is unique to the integration, its track and its
+   * environment. Every integration in an environment shares one namespace, and without a queue the
+   * management API lists and counts every queue in it, so each list and count here is limited to this
+   * one, whatever its caller passes. Unset (or null), they are not limited.
+   */
+  taskQueue?: string | null;
 }
 
-export function createWorkflowClient({ baseUrl, getHeaders }: WorkflowClientConnection) {
+export function createWorkflowClient({ baseUrl, getHeaders, taskQueue }: WorkflowClientConnection) {
   const get = async <T>(path: string) => workflowFetch<T>(`${baseUrl}${path}`, { headers: await getHeaders() });
   const post = async <T>(path: string, body?: unknown) => workflowFetch<T>(`${baseUrl}${path}`, { method: 'POST', headers: await getHeaders(), body });
+  /** Limits a list's filters to this integration's task queue, when it has one. */
+  const scoped = <F extends { taskQueue?: string }>(filters: F): F => (taskQueue ? { ...filters, taskQueue } : filters);
 
   return {
     runtime: {
@@ -108,7 +118,7 @@ export function createWorkflowClient({ baseUrl, getHeaders }: WorkflowClientConn
       list: (filters: WorkflowListFilters = {}) =>
         get<Page<WorkflowInstanceSummary>>(
           `/workflows${buildQuery({
-            ...filters,
+            ...scoped(filters),
             limit: clampLimit(filters.limit),
           })}`,
         ),
@@ -139,12 +149,12 @@ export function createWorkflowClient({ baseUrl, getHeaders }: WorkflowClientConn
       list: (filters: HumanTaskListFilters = {}) =>
         get<Page<HumanTaskSummary>>(
           `/human-tasks${buildQuery({
-            ...filters,
+            ...scoped(filters),
             limit: clampLimit(filters.limit),
           })}`,
         ),
 
-      pendingCount: async (taskQueue?: string) => (await get<{ count: number }>(`/human-tasks/pending-count${buildQuery({ taskQueue })}`))?.count ?? 0,
+      pendingCount: async (queue?: string) => (await get<{ count: number }>(`/human-tasks/pending-count${buildQuery(scoped({ taskQueue: queue }))}`))?.count ?? 0,
 
       get: (taskId: string) => get<HumanTaskInfo>(`/human-tasks/${encodeURIComponent(taskId)}`),
 
@@ -170,7 +180,7 @@ export function createWorkflowClient({ baseUrl, getHeaders }: WorkflowClientConn
       list: (filters: ReviewListFilters = {}) =>
         get<Page<ReviewActivitySummary>>(
           `/review-activities${buildQuery({
-            ...filters,
+            ...scoped(filters),
             limit: clampLimit(filters.limit),
           })}`,
         ),

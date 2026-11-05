@@ -188,6 +188,35 @@ describe('useWorkflowConnection', () => {
     expect(sentTo(`${GATEWAY_URL}/definitions`)[0]['X-JWT-Assertion']).toBe('Bearer user-token-2');
   });
 
+  it('lists only the task queue the integration reports, since every integration in an environment shares its namespace', async () => {
+    mount();
+    await vi.waitFor(() => expect(status()).toBe('ready'));
+
+    fetchMock.mockResolvedValueOnce(json({ items: [] }));
+    await readyClient().instances.list({ status: 'RUNNING' });
+    const listed = fetchMock.mock.calls.map(([to]) => String(to)).find((to) => to.startsWith(`${GATEWAY_URL}/workflows`)) ?? '';
+    expect(new URL(listed).searchParams.get('taskQueue')).toBe('orders-queue');
+  });
+
+  it('drops what was read for the old task queue when a redeploy moves the worker to another', async () => {
+    mount();
+    await vi.waitFor(() => expect(status()).toBe('ready'));
+    const runsKey = workflowKeys.instances(SCOPE, { status: 'RUNNING' });
+    queryClient.setQueryData(runsKey, { items: ['a run on the old queue'] });
+
+    queryClient.setQueryData(workflowKeys.runtime(SCOPE), { taskQueue: 'moved-queue' });
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ runtime: { taskQueue: 'moved-queue' } }));
+    await vi.waitFor(() => expect(queryClient.getQueryData(runsKey)).toBeUndefined());
+    // The probe itself is kept, so the connection stays up.
+    expect(status()).toBe('ready');
+
+    fetchMock.mockClear();
+    fetchMock.mockResolvedValueOnce(json({ items: [] }));
+    await readyClient().reviews.list({});
+    const listed = fetchMock.mock.calls.map(([to]) => String(to)).find((to) => to.startsWith(`${GATEWAY_URL}/review-activities`)) ?? '';
+    expect(new URL(listed).searchParams.get('taskQueue')).toBe('moved-queue');
+  });
+
   it('sends only the caller’s token to an endpoint the gateway leaves open', async () => {
     access.reset(keyAccess({ mode: 'none', apiKey: null }));
     mount();
