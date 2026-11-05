@@ -17,9 +17,19 @@
  */
 
 import { createContext, useContext } from 'react';
-import type { LinkedSource } from '../../utils/resourceLinks';
 
-export type { LinkedSource };
+/** Where a linked field's value comes from in the form's environment. */
+export interface LinkedSource {
+  /** The resource's display name. */
+  resource: string;
+  key: string;
+  /** The field's own link beats its connection's. */
+  overrides?: boolean;
+  /** The environment the resource has no values in. */
+  noValuesIn?: string;
+  /** Where to add the missing values. */
+  valuesHref?: string;
+}
 
 /** A resource key the picker offers, and the field that uses it already. */
 export interface PickerKey {

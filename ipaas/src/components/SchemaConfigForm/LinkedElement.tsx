@@ -24,7 +24,7 @@ const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 
 /** A field a link fills: read-only, saying where from, with the link icon to change it. */
 export function LinkedElement({ title, source, picker }: { title: string; source: LinkedSource; picker?: Picker }) {
-  const from = source.declared ? `from workload.yaml (${source.resource})` : `from ${source.resource}${source.key ? ` · ${source.key}` : ''}`;
+  const from = `from ${source.resource} · ${source.key}`;
   return (
     <Box sx={{ mt: 1.5 }}>
       <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 0.5 }}>

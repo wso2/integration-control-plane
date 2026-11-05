@@ -130,68 +130,77 @@ export interface PostConfigMgtInput {
   configs: ConfigMgtSaveItem[];
 }
 
-/**
- * A resource linked to an integration, with what it delivers in each environment, in pipeline order. `connection` is
- * the config key prefix the integration's names follow, absent for a link made only on WSO2 Cloud. `namesFromWso2Cloud`
- * is set when WSO2 Cloud set names for the link, which take precedence; `sourceDefined` when the integration's Workload
- * comes from its workload.yaml, which takes precedence, so the link is recorded but not applied. `linked` is false for
- * a resource only an environment's release still delivers.
- */
-export interface ResourceLink {
-  resourceType: string;
-  displayName?: string;
-  /** The Ballerina package the resource's preset is for. */
-  package?: string;
-  connection?: string;
-  namesFromWso2Cloud?: true;
-  sourceDefined?: true;
-  linked: boolean;
-  environments: ResourceLinkEnvironment[];
+/** A key of a resource, as the source of one target. */
+export interface KeyRef {
+  ref: string;
+  key: string;
 }
 
-/**
- * What a link delivers in one environment: `state` (`linked` once the environment's release carries what the Workload
- * does; `in_release` on a row that isn't linked), whether the release carries the link at all, the configurables of
- * that release's build it sets (config key → resource key), whether the resource has values there, and the connection
- * the release's names follow: not the link's while the environment runs a release from before a Change link.
- */
-export interface ResourceLinkEnvironment {
-  name: string;
-  state: 'linked' | 'next_release' | 'not_deployed' | 'in_release';
-  inRelease: boolean;
-  configurables: Record<string, string>;
-  hasValues: boolean;
-  connection?: string;
-}
-
-/**
- * What linking, changing or unlinking did to the integration's Workload: `updated` (development gets it now),
- * `next_deploy`, `unchanged` or `no_workload` (the integration's first deploy applies it); and where the resource has no
- * values yet.
- */
-export interface ResourceLinkWrite {
-  resourceType: string;
-  connection?: string;
-  workload: 'updated' | 'next_deploy' | 'unchanged' | 'no_workload';
-  environmentsWithoutValues: string[];
-}
-
-/** A resource the integration could link, with the connections (config key prefixes) named after its keys, best match first. */
-export interface ResourceLinkOption {
-  resourceType: string;
+/** A resource the integration can link: its keys, and the environments where it has values. */
+export interface LinkableResource {
+  id: string;
   displayName: string;
-  connections: string[];
+  /** The Ballerina package its preset is for. */
+  package?: string;
+  keys: { name: string; secret: boolean }[];
+  valuesIn: string[];
 }
 
-export interface CreateResourceLinkInput {
-  projectId: string;
-  componentId: string;
-  resourceType: string;
-  connection: string;
+/** A connection in the Workload's build: its link, the resources that suit it, and the key the link gives each of its configurables. */
+export interface LinkConnection {
+  id: string;
+  link?: string;
+  suggestions: string[];
+  fields: { configurable: string; key?: string }[];
 }
 
-export interface DeleteResourceLinkInput {
+/** A link whose target the Workload's build lacks. */
+export interface OrphanedLink {
+  target: string;
+  kind: 'configurable' | 'connection';
+  ref: string;
+  key?: string;
+}
+
+/** What one environment's release uses. */
+export interface EnvironmentLinks {
+  name: string;
+  deployed: boolean;
+  resources: { ref: string; state: 'in_use' | 'needs_restart' }[];
+  valuesChanged: boolean;
+  /** First environment only: the integration's links differ from its release's. */
+  linksNeedDeploy: boolean;
+  connections: Record<string, string>;
+  /** Configurable id → the key it receives, by any source. */
+  configurables: Record<string, KeyRef>;
+  env: Record<string, KeyRef>;
+}
+
+/**
+ * An integration's links. A configurable is `<org>/<module>:<name>`, a connection `<org>/<module>:<connection>`.
+ * `used` is `<resource>|<KEY>` → the target it feeds.
+ */
+export interface IntegrationLinks {
+  kind: 'ballerina' | 'mi';
+  resources: LinkableResource[];
+  used: Record<string, string>;
+  connections: LinkConnection[];
+  fieldLinks: Record<string, KeyRef>;
+  orphaned: OrphanedLink[];
+  env: Record<string, KeyRef>;
+  environments: EnvironmentLinks[];
+}
+
+/** One link change: a target, and its source; without `ref` the target's own link goes. */
+export type LinkTarget = { connection: string; ref?: string } | { configurable: string; ref?: string; key?: string } | { env: string; ref?: string; key?: string };
+
+export interface LinkWriteInput {
   projectId: string;
   componentId: string;
-  resourceType: string;
+  target: LinkTarget;
+}
+
+/** What a link change did to the Workload: `updated` (development gets it now), `next_deploy`, `unchanged` or `no_workload`. */
+export interface LinkWrite {
+  workload: 'updated' | 'next_deploy' | 'unchanged' | 'no_workload';
 }
