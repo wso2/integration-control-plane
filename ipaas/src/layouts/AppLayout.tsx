@@ -56,6 +56,7 @@ import {
   ChartColumn,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
   Database,
   FileLock,
   FlaskConical,
@@ -89,24 +90,7 @@ import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { useAuth } from '../auth';
 import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
-import {
-  useScope,
-  broaden,
-  narrow,
-  newProjectUrl,
-  newComponentUrl,
-  hasProject,
-  hasComponent,
-  settingsCrossScopeUrl,
-  resolveActiveNavId,
-  parentGroupId,
-  navUrl,
-  overviewUrl,
-  navScopeSwitchUrl,
-  resolveResourceKey,
-  GENERIC_ONLY_COMPONENT_KEYS,
-  type Scope,
-} from '../nav';
+import { useScope, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, settingsCrossScopeUrl, resolveActiveNavId, parentGroupId, navUrl, overviewUrl, navScopeSwitchUrl, resolveResourceKey, componentKeepsPage, type Scope } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { trackEvent } from '../services/tracking/tracking';
 import { billingUpgradeUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
@@ -556,9 +540,11 @@ export default function AppLayout(): JSX.Element {
                             setComponentMenuAnchor(null);
                             setComponentSearch('');
                             const newScope = narrow({ level: 'projects', org: scope.org, project: scope.project }, c.handler);
-                            // A generic-only tab (Lifecycle, API Info, Plans, …) can't survive a switch to a non-generic integration.
+                            // A generic-only tab (Lifecycle, API Info, Plans, …) can't survive a switch to a non-generic integration,
+                            // nor a workflow-only one (Workflows, Human Tasks) a switch to an integration that runs no workflows.
                             const currentKey = resolveResourceKey(pathname, scope);
-                            if (GENERIC_ONLY_COMPONENT_KEYS.has(currentKey) && !GENERIC_SERVICE_TYPES.has(c.displayType)) {
+                            const target = { isGenericService: GENERIC_SERVICE_TYPES.has(c.displayType), isWorkflow: identifyIntegration(c.displayType, c.componentSubType ?? null).type === 'workflow' };
+                            if (!componentKeepsPage(currentKey, target)) {
                               navigateTo(componentOverviewUrl(scope.org, scope.project, c.handler));
                               return;
                             }
@@ -783,6 +769,8 @@ export default function AppLayout(): JSX.Element {
                       const integrationType = identifyIntegration(currentComponent?.displayType ?? '', currentComponent?.componentSubType ?? null).type;
                       const runtimeLogsType = ['file-integration', 'event-integration'].includes(integrationType);
                       const aiAgentType = integrationType === 'ai-agent';
+                      // A workflow integration's runs and the human tasks they wait on.
+                      const workflowType = integrationType === 'workflow';
                       // MCP (server + proxy): a single Test tab → the MCP playground
                       // (@wso2-org/mcp-playground). No Console/API-Chat sub-items.
                       const mcpType = integrationType === 'mcp-server' || integrationType === 'mcp-proxy';
@@ -871,6 +859,22 @@ export default function AppLayout(): JSX.Element {
                               <Wrench size={20} />
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Operate</Sidebar.ItemLabel>
+                            {workflowType && (
+                              <Sidebar.Item id="workflows">
+                                <Sidebar.ItemIcon>
+                                  <Waypoints size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Workflows</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
+                            {workflowType && (
+                              <Sidebar.Item id="human-tasks">
+                                <Sidebar.ItemIcon>
+                                  <ClipboardCheck size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Human Tasks</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
                             <Sidebar.Item id="runtime">
                               <Sidebar.ItemIcon>
                                 <Server size={20} />
