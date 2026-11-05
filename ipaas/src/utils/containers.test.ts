@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { containerImageName, containerToForm, cpuToMilli, encodeArrayItems, encodeBase64, formToWriteData, hasCustomImage, isMainContainer, milliToCpu } from './containers';
+import { containerImageName, containerToForm, cpuToMilli, formToWriteData, hasCustomImage, isMainContainer, milliToCpu } from './containers';
 import type { ReleaseContainer } from '../types/devopsConfigs';
 
 const baseContainer: ReleaseContainer = {
@@ -34,26 +34,6 @@ const baseContainer: ReleaseContainer = {
   args: ['hiii'],
   ports: [],
 };
-
-describe('encodeBase64 / encodeArrayItems', () => {
-  it('encodes ASCII the same way btoa would', () => {
-    expect(encodeBase64('some')).toBe('c29tZQ==');
-    expect(encodeBase64('one')).toBe('b25l');
-    expect(encodeBase64('hiii')).toBe('aGlpaQ==');
-  });
-
-  it('round-trips UTF-8 through decodeURIComponent(escape(atob()))', () => {
-    const encoded = encodeBase64('café');
-    expect(decodeURIComponent(escape(atob(encoded)))).toBe('café');
-  });
-
-  it('encodes each item and tolerates non-arrays', () => {
-    expect(encodeArrayItems(['some', 'one'])).toEqual(['c29tZQ==', 'b25l']);
-    expect(encodeArrayItems([])).toEqual([]);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    expect(encodeArrayItems(undefined as any)).toEqual([]);
-  });
-});
 
 describe('cpu conversions', () => {
   it('converts milli-CPU to CPU and back', () => {
@@ -87,8 +67,6 @@ describe('containerToForm / formToWriteData', () => {
       cpuLimit: 0.5,
       memRequest: 350,
       memLimit: 1024,
-      command: ['some', 'one'],
-      args: ['hiii'],
     });
   });
 
@@ -99,28 +77,24 @@ describe('containerToForm / formToWriteData', () => {
     expect(form.memLimit).toBe(360);
   });
 
-  it('builds the PUT body, encoding command/args and scaling CPU to milli', () => {
-    const form = containerToForm(baseContainer);
-    const body = formToWriteData(form, []);
+  it('builds the PUT body from the edited fields only, scaling CPU to milli', () => {
+    const container: ReleaseContainer = { ...baseContainer, ports: [{ name: 'endpoint-9090', port: 9090, service_port: 9090, protocol: 'TCP' }] };
+    const body = formToWriteData(containerToForm(container));
+    // The container's command, args and ports are not sent.
     expect(body).toEqual({
       image_pull_policy: 'IfNotPresent',
-      args: ['aGlpaQ=='],
-      command: ['c29tZQ==', 'b25l'],
-      ports: [],
       cpu: 210,
       cpu_limit: 500,
       memory: 350,
       memory_limit: 1024,
-      limit_disabled: false,
     });
   });
 
-  it('zeroes the limits and sets limit_disabled when limits are off', () => {
+  it('zeroes the limits when limits are off', () => {
     const form = { ...containerToForm(baseContainer), limitsEnabled: false };
-    const body = formToWriteData(form, []);
+    const body = formToWriteData(form);
     expect(body.cpu_limit).toBe(0);
     expect(body.memory_limit).toBe(0);
-    expect(body.limit_disabled).toBe(true);
     // request values still sent
     expect(body.cpu).toBe(210);
     expect(body.memory).toBe(350);

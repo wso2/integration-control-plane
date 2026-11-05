@@ -54,7 +54,7 @@ export default function ContainerEditForm({ container, projectId, componentId, r
 
   const onSubmit = (): void => {
     update.mutate(
-      { containerId: container.ID, data: formToWriteData(form, container.ports ?? []) },
+      { containerId: container.ID, data: formToWriteData(form) },
       {
         onSuccess: () => onSaved('Container updated.'),
         onError: (e) => onError(e instanceof Error ? e.message : 'Failed to update the container.'),

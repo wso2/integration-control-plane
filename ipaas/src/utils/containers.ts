@@ -31,17 +31,6 @@ export const MEMORY_STEP = 10;
 export const MIN_GAP_CPU = 0.01;
 export const MIN_GAP_MEMORY = 10;
 
-/** UTF-8-safe base64 encode (matches Devant's `encodeToBase64`). */
-export function encodeBase64(str: string): string {
-  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_m, p1) => String.fromCharCode(parseInt(p1, 16))));
-}
-
-/** Base64-encode every item of a command/args array (matches Devant's `encodeArrayItems`). */
-export function encodeArrayItems(arr: string[]): string[] {
-  if (!Array.isArray(arr)) return [];
-  return arr.map((item) => encodeBase64(item));
-}
-
 /** A container built from a user-supplied image (no platform build) has `custom_image`. */
 export function hasCustomImage(c: Pick<ReleaseContainer, 'custom_image'>): boolean {
   return Boolean(c.custom_image);
@@ -76,8 +65,6 @@ export interface ContainerFormState {
   /** Memory request/limit in Mi. */
   memRequest: number;
   memLimit: number;
-  command: string[];
-  args: string[];
 }
 
 /** Seed the edit form from a container. When limits are disabled the API stores
@@ -93,22 +80,17 @@ export function containerToForm(c: ReleaseContainer): ContainerFormState {
     cpuLimit: c.limit_disabled ? cpuRequest + CPU_STEP : milliToCpu(c.cpu_limit ?? 0),
     memRequest,
     memLimit: c.limit_disabled ? memRequest + MEMORY_STEP : (c.memory_limit ?? 0),
-    command: [...(c.command ?? [])],
-    args: [...(c.args ?? [])],
   };
 }
 
-/** Build the PUT body from form state + the container's (unedited) ports. */
-export function formToWriteData(form: ContainerFormState, ports: ContainerWriteData['ports']): ContainerWriteData {
+/** Build the PUT body from form state. ipaas-service rejects any field it does not model, so the
+ *  body carries only what the form edits. */
+export function formToWriteData(form: ContainerFormState): ContainerWriteData {
   return {
     image_pull_policy: form.imagePullPolicy,
-    args: encodeArrayItems(form.args),
-    command: encodeArrayItems(form.command),
-    ports,
     cpu: cpuToMilli(form.cpuRequest),
     cpu_limit: form.limitsEnabled ? cpuToMilli(form.cpuLimit) : 0,
     memory: form.memRequest,
     memory_limit: form.limitsEnabled ? form.memLimit : 0,
-    limit_disabled: !form.limitsEnabled,
   };
 }

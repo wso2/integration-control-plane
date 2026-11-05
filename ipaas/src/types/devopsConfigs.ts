@@ -118,17 +118,13 @@ export interface ReleaseNamespace {
   name: string;
 }
 
-/** The PUT body for updating a release container. `args`/`command` are base64-encoded. */
+/** The PUT body for updating a release container: only the fields the edit form changes. */
 export interface ContainerWriteData {
   image_pull_policy: ImagePullPolicy;
-  args: string[];
-  command: string[];
-  ports: ContainerPort[];
   cpu: number;
   cpu_limit: number;
   memory: number;
   memory_limit: number;
-  limit_disabled: boolean;
 }
 
 /** Subset of the devops release (app-environment) record we consume. */
