@@ -139,7 +139,7 @@ export default function AppLayout(): JSX.Element {
   const { hasAnyPermission } = useAccessControl();
   const can = useCan();
   const canReadLogs = can(Scopes.LOG_READ);
-  const canReadServices = can(Scopes.INTEGRATION_READ);
+  const canReadIntegrations = can(Scopes.INTEGRATION_READ);
   const apiInsightsEnabled = configuredMoesifOrigin() !== null;
 
   // Billing trial indicator shown in the header.
@@ -756,18 +756,20 @@ export default function AppLayout(): JSX.Element {
                           <Sparkles size={20} />
                         </Sidebar.ItemIcon>
                         <Sidebar.ItemLabel>AI Services</Sidebar.ItemLabel>
-                        <Sidebar.Item id="org-knowledge-bases">
-                          <Sidebar.ItemIcon>
-                            <BookOpen size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
-                        </Sidebar.Item>
+                        {canReadIntegrations && (
+                          <Sidebar.Item id="org-knowledge-bases">
+                            <Sidebar.ItemIcon>
+                              <BookOpen size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        )}
                       </Sidebar.Item>
                     </Sidebar.Category>,
 
                     <Sidebar.Category key="org-infra">
                       {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
-                      {canReadServices && (
+                      {canReadIntegrations && (
                         <Sidebar.Item id="org-platform-services">
                           <Sidebar.ItemIcon>
                             <Database size={20} />
@@ -918,7 +920,7 @@ export default function AppLayout(): JSX.Element {
 
                         <Sidebar.Category key="int-infra">
                           {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
-                          {canReadServices && (
+                          {canReadIntegrations && (
                             <Sidebar.Item id="org-platform-services">
                               <Sidebar.ItemIcon>
                                 <Database size={20} />
@@ -992,7 +994,7 @@ export default function AppLayout(): JSX.Element {
 
                       <Sidebar.Category key="proj-infra">
                         {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
-                        {canReadServices && (
+                        {canReadIntegrations && (
                           <Sidebar.Item id="org-platform-services">
                             <Sidebar.ItemIcon>
                               <Database size={20} />
