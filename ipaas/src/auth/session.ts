@@ -47,6 +47,7 @@ interface Connection {
   getAccessToken: () => Promise<string>;
   /** Ends the session locally once the token has expired anyway. */
   onExpired: () => void;
+  cookieSession?: boolean;
 }
 
 let connection: Connection | null = null;
@@ -74,10 +75,14 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
   // The SDK refreshes ahead of expiry, so there is no refresh-and-retry here.
   // A 401 for an expired (or missing) token means the session is over; one for
   // a live token is the API's own answer and goes back to the caller.
-  if (res.status === 401 && (!token || isExpired(token))) {
+  if (res.status === 401 && (!token || isExpired(token)) && (!connection?.cookieSession || isSameOrigin(url))) {
     connection?.onExpired();
   }
   return res;
+}
+
+function isSameOrigin(url: string): boolean {
+  return new URL(url, window.location.href).origin === window.location.origin;
 }
 
 export function getOrgUuidFromToken(): string | null {

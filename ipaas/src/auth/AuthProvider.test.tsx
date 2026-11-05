@@ -507,4 +507,25 @@ describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
     expect(new Headers((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers).has('Authorization')).toBe(false);
     expect(screen()).toBe('signed-out');
   });
+
+  it('keeps the session on a 401 from another host, which never gets the session cookie', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => new Response('', { status: 401 })),
+    );
+    await act(async () => {
+      const res = await authenticatedFetch('https://cloud-obs-proxy.obs.dp.example/wso2cloud-obs/api/v1/logs/query');
+      expect(res.status).toBe(401);
+    });
+    expect(screen()).toBe('signed-in');
+    expect(getOrgUuidFromToken()).toBe('org-uuid');
+
+    await act(async () => {
+      await authenticatedFetch(`${window.location.origin}/_auth/integration/userinfo`);
+    });
+    expect(screen()).toBe('signed-out');
+  });
 });

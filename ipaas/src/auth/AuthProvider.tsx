@@ -179,7 +179,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       const session = toSession(idClaims, idClaims);
       if (!session) return endSession(MISSING_ORG);
 
-      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null) });
+      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), cookieSession: true });
       local.set(ORG_HANDLE_KEY, session.orgHandle);
       setStatus({ kind: 'signedIn', session });
     };
