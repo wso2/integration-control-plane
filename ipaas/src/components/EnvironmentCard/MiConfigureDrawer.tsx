@@ -16,18 +16,22 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, DrawerPanel, IconButton, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, DrawerPanel, IconButton, InputAdornment, Link, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
+import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
 import { useEnvEndpoints } from '../../hooks/useDeployments';
+import { useEnvironments } from '../../hooks/useEnvironments';
 import { useMiConfig, useSaveMiConfig } from '../../hooks/useMiConfig';
 import { navUrl, useScope } from '../../nav';
 import type { EnvEndpoint } from '../../types/component';
 import type { MiConfig, MiConfigDraft } from '../../types/envGroups';
 import { toEndpointOptions } from '../../utils/endpoints';
+import { formLinkView, type TargetView } from '../../utils/integrationLinks';
 import { isEmptyMiConfigSavePlan, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
 import { EndpointCard } from '../EndpointCard';
+import { FieldLinkPicker } from '../SchemaConfigForm/FieldLinkPicker';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 
@@ -83,6 +87,15 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const [settingsEp, setSettingsEp] = useState<EnvEndpoint | null>(null);
   const nextId = useRef(0);
   const seededRef = useRef(false);
+  const { data: links } = useIntegrationLinks(projectId, componentId, open);
+  const linkWrite = useLinkWrite();
+  const { data: environments = [] } = useEnvironments('', projectId);
+  const envName = (id = '') => environments.find((e) => e.id === id)?.name ?? id;
+  const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
+  const linkOf = (name: string): TargetView => (name && linkView ? linkView.target(name) : {});
+  // Links apply to all environments: a linked name the form has no value for still gets a row.
+  const linkedNames = useMemo(() => Object.keys((linkView?.editable ? links?.env : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
+  const linkedOnly = linkedNames.filter((n) => ![...envVars, ...secrets].some((r) => r.key.trim() === n));
 
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
@@ -113,15 +126,17 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     setManagingEp(null);
   }, [open]);
 
-  const draft: MiConfigDraft = useMemo(
+  const named: MiConfigDraft = useMemo(
     () => ({
       envVars: envVars.map(({ key, value }) => ({ key: key.trim(), value })),
       secrets: secrets.map(({ key, value }) => ({ key: key.trim(), value })),
     }),
     [envVars, secrets],
   );
-  const storedSecrets = useMemo(() => secrets.filter((s) => s.stored).map((s) => s.key), [secrets]);
-  const errors = useMemo(() => validateMiConfigDraft(draft, storedSecrets), [draft, storedSecrets]);
+  // A linked name needs no value of its own; one it has stays for when the link goes.
+  const draft = useMemo(() => ({ ...named, envVars: named.envVars.filter((e) => e.value !== '' || !linkedNames.includes(e.key)) }), [named, linkedNames]);
+  const storedSecrets = useMemo(() => [...secrets.filter((s) => s.stored).map((s) => s.key), ...linkedNames], [secrets, linkedNames]);
+  const errors = useMemo(() => validateMiConfigDraft(named, storedSecrets), [named, storedSecrets]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
 
@@ -168,25 +183,83 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   const configsUrl = navUrl(scope, 'configs-secrets');
 
+  const link = (env: string, pick: { resource: string; key: string } | null) => linkWrite.mutate({ projectId, componentId, target: pick ? { env, ref: pick.resource, key: pick.key } : { env } });
+
+  // The value box's link icon: Enter a value, or a resource key.
+  const renderValue = (name: string, view: TargetView, box: JSX.Element) => {
+    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, onPick: (pick) => link(name, pick) }} />;
+    if (!view.source)
+      return picker ? (
+        <Stack direction="row" alignItems="flex-start" sx={{ flex: 1 }}>
+          {box}
+          <Box sx={{ mt: 0.75 }}>{picker}</Box>
+        </Stack>
+      ) : (
+        box
+      );
+    return (
+      <Box sx={{ flex: 1 }}>
+        <TextField
+          fullWidth
+          size="small"
+          disabled
+          value={`from ${view.source.name} · ${view.source.key}`}
+          inputProps={{ 'aria-label': `${name} is supplied by ${view.source.name}` }}
+          InputProps={{ endAdornment: picker && <InputAdornment position="end">{picker}</InputAdornment> }}
+        />
+        {view.source.noValues && <Chip label={`No ${envName(envId)} values`} size="small" color="warning" variant="outlined" sx={{ mt: 0.5, height: 18, fontSize: '0.65rem' }} />}
+      </Box>
+    );
+  };
+
   const renderRows = (rows: Row[], setRows: typeof setEnvVars, kind: 'env' | 'secret') =>
     rows.map((r, i) => {
       const keyErr = errorFor(`${kind}:${i}`, r.key);
+      const name = r.key.trim();
+      const rowLink = keyErr ? {} : linkOf(name);
       return (
         <Stack key={r.id} direction="row" gap={1} alignItems="flex-start">
           <TextField size="small" placeholder="Key" value={r.key} disabled={r.stored} autoComplete="off" onChange={(e) => updateRow(setRows, r.id, { key: e.target.value })} error={!!keyErr} helperText={keyErr || ' '} sx={{ flex: 1 }} />
-          <TextField
+          {renderValue(
+            name,
+            rowLink,
+            <TextField
+              size="small"
+              placeholder={r.stored ? 'Unchanged' : 'Value'}
+              type={kind === 'secret' ? 'password' : 'text'}
+              // A key field followed by a password field looks like a login form: without this,
+              // a password manager fills in the user's own password and Save stores it as the secret.
+              autoComplete={kind === 'secret' ? 'new-password' : 'off'}
+              value={r.value}
+              onChange={(e) => updateRow(setRows, r.id, { value: e.target.value })}
+              helperText={r.stored ? 'Enter a value to replace the secret' : ' '}
+              sx={{ flex: 1 }}
+            />,
+          )}
+          <IconButton
             size="small"
-            placeholder={r.stored ? 'Unchanged' : 'Value'}
-            type={kind === 'secret' ? 'password' : 'text'}
-            // A key field followed by a password field looks like a login form: without this,
-            // a password manager fills in the user's own password and Save stores it as the secret.
-            autoComplete={kind === 'secret' ? 'new-password' : 'off'}
-            value={r.value}
-            onChange={(e) => updateRow(setRows, r.id, { value: e.target.value })}
-            helperText={r.stored ? 'Enter a value to replace the secret' : ' '}
-            sx={{ flex: 1 }}
-          />
-          <IconButton size="small" color="error" aria-label={`Remove ${r.key || 'row'}`} onClick={() => removeRow(setRows, r.id)} sx={{ mt: 0.5 }}>
+            color="error"
+            aria-label={`Remove ${r.key || 'row'}`}
+            disabled={!!rowLink.source && !rowLink.picker}
+            onClick={() => {
+              if (rowLink.source) link(name, null);
+              removeRow(setRows, r.id);
+            }}
+            sx={{ mt: 0.5 }}>
+            <Trash2 size={16} />
+          </IconButton>
+        </Stack>
+      );
+    });
+
+  const renderLinkedOnly = () =>
+    linkedOnly.map((name) => {
+      const l = linkOf(name);
+      return (
+        <Stack key={name} direction="row" gap={1} alignItems="flex-start" sx={{ mb: 2.5 }}>
+          <TextField size="small" value={name} disabled sx={{ flex: 1 }} />
+          {renderValue(name, l, <></>)}
+          <IconButton size="small" color="error" aria-label={`Remove ${name}`} disabled={!l.picker} onClick={() => link(name, null)} sx={{ mt: 0.5 }}>
             <Trash2 size={16} />
           </IconButton>
         </Stack>
@@ -201,7 +274,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
         {description}
       </Typography>
-      {rows.length === 0 ? (
+      {kind === 'env' && renderLinkedOnly()}
+      {rows.length === 0 && (kind === 'secret' || linkedOnly.length === 0) ? (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
           None added.
         </Typography>
@@ -211,6 +285,16 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       <Button size="small" startIcon={<Plus size={14} />} onClick={() => addRow(setRows)}>
         {addLabel}
       </Button>
+      {kind === 'env' && (
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+          {linkView?.editable === false ? `Links apply to all environments. Change links in ${envName(links?.environments[0]?.name)}.` : 'Links apply to all environments; values are per environment.'}
+        </Typography>
+      )}
+      {kind === 'env' && linkWrite.isError && (
+        <Alert severity="error" sx={{ mt: 1 }}>
+          {linkWrite.error instanceof Error ? linkWrite.error.message : "Linking didn't finish."}
+        </Alert>
+      )}
     </Box>
   );
 
