@@ -125,13 +125,16 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
     else clearDraft();
   }, [form, dirty, create.isSuccess, saveDraft, clearDraft]);
 
-  // Staged files live only in this page until the engine runs; warn before the tab closes on them.
+  // The sources, roles and staged files live only in this page until the engine runs.
+  const settingUp = !!created && !result && phase !== 'failed';
+
+  // Warn before the tab closes on them.
   useEffect(() => {
-    if (!created || result || phase === 'failed') return;
+    if (!settingUp) return;
     const warn = (e: BeforeUnloadEvent) => e.preventDefault();
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
-  }, [created, result, phase]);
+  }, [settingUp]);
 
   // Once the new engine runs, hand it the creator's grant, the sources and the roles, then the staged files.
   useEffect(() => {
@@ -214,7 +217,7 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
 
   return (
     <PageContent sx={wrapSx}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (dirty && !created ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => (settingUp || (dirty && !created) ? setLeaveOpen(true) : navigate(base))} sx={{ mb: 2 }}>
         Back to context engines
       </Button>
       <PageTitle>
@@ -316,7 +319,19 @@ export default function CreateContextEngine(scope: OrgScope): JSX.Element {
         </Stack>
       )}
 
-      <Dialog open={leaveOpen} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
+      <Dialog open={leaveOpen && settingUp} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Leave before setup finishes?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>The engine is created, but its sources and access are not added yet. If you leave, add them from the engine&apos;s page.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setLeaveOpen(false)}>Stay</Button>
+          <Button variant="contained" color="error" onClick={() => leave(false)}>
+            Leave
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Dialog open={leaveOpen && !settingUp} onClose={() => setLeaveOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Leave without creating?</DialogTitle>
         <DialogContent>
           <DialogContentText>Your draft is kept for this tab. API keys and tokens are not.</DialogContentText>
