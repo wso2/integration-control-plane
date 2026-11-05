@@ -48,9 +48,9 @@ export function FieldLinkPicker({ field, picker }: { field: string; picker: Pick
             ...r.keys.map((k) => (
               <MenuItem key={`${r.id}|${k.key}`} selected={picker.selected === `${r.id}|${k.key}`} disabled={!!k.usedBy} onClick={() => pick({ resource: r.id, key: k.key })}>
                 {k.key}
-                {k.usedBy && (
+                {(k.usedBy || k.orphanOf) && (
                   <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                    used by {k.usedBy}
+                    {k.usedBy ? `used by ${k.usedBy}` : `from ${k.orphanOf}, no longer in the code`}
                   </Typography>
                 )}
               </MenuItem>

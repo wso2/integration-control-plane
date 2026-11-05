@@ -99,7 +99,7 @@ describe('ConfigForm with links', () => {
     const handleValidationChange = vi.fn();
     const sources: Record<string, FieldLink> = {
       'wso2.sfdemo.sfSalesBaseUrl': { source: { resource: 'Salesforce Sales', key: 'SALESFORCE_BASE_URL', overrides: true } },
-      'wso2.sfdemo.support.sfSupportBaseUrl': { source: { resource: 'salesforce-support', key: 'SALESFORCE_BASE_URL', noValuesIn: 'Production', valuesHref: 'https://cloud/resources/salesforce-support' } },
+      'wso2.sfdemo.support.sfSupportBaseUrl': { source: { resource: 'salesforce-support', key: 'SALESFORCE_BASE_URL', noValuesIn: 'Production' } },
     };
     await render({ handleValidationChange, fieldLinks: (path) => sources[path] });
 
@@ -109,8 +109,7 @@ describe('ConfigForm with links', () => {
       ['support.sfSupportBaseUrl is supplied by salesforce-support', 'from salesforce-support · SALESFORCE_BASE_URL', true],
     ]);
     expect(container.textContent).toContain('Overrides selected Link');
-    expect(container.textContent).toContain('No Production values');
-    expect(container.querySelector('a')?.getAttribute('href')).toBe('https://cloud/resources/salesforce-support');
+    expect(container.textContent).toContain('No Production values. Add them in WSO2 Cloud.');
     const validated = handleValidationChange.mock.calls.map(([key]) => key);
     expect(validated).not.toContain('wso2.sfdemo.sfSalesBaseUrl');
     expect(validated).not.toContain('wso2.sfdemo.support.sfSupportBaseUrl');

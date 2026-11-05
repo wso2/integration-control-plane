@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Chip, InputAdornment, Link, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Box, Chip, InputAdornment, TextField, Typography } from '@wso2/oxygen-ui';
 import { FieldLinkPicker } from './FieldLinkPicker';
 import type { FieldLinkPicker as Picker, LinkedSource } from './linkedFrom';
 
@@ -46,14 +46,9 @@ export function LinkedElement({ title, source, picker }: { title: string; source
         }}
       />
       {source.noValuesIn && (
-        <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 0.5 }}>
-          <Chip label={`No ${source.noValuesIn} values`} size="small" color="warning" variant="outlined" sx={chipSx} />
-          {source.valuesHref && (
-            <Link href={source.valuesHref} target="_blank" rel="noopener" variant="caption">
-              Add in WSO2 Cloud
-            </Link>
-          )}
-        </Stack>
+        <Typography variant="caption" color="warning.main" sx={{ display: 'block', mt: 0.5 }}>
+          No {source.noValuesIn} values. Add them in WSO2 Cloud.
+        </Typography>
       )}
     </Box>
   );
