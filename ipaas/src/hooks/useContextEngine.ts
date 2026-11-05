@@ -490,7 +490,7 @@ export function useContextIntegrations(engineId: string, enabled = true) {
     queryFn: () => listContextIntegrations(engineId),
     enabled: isContextEngineEnabled() && !!engineId && enabled,
     retry: false,
-    refetchInterval: (query) => (query.state.data?.some((i) => i.status === 'provisioning' || i.status === 'removing') ? ENGINE_STATUS_POLL_MS : false),
+    refetchInterval: (query) => (query.state.status === 'error' || query.state.data?.some((i) => i.status === 'provisioning' || i.status === 'removing') ? ENGINE_STATUS_POLL_MS : false),
   });
 }
 

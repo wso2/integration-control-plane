@@ -201,6 +201,12 @@ export default function SourcesProgressCard({ id, engineId, running, sources, on
         </Alert>
       )}
 
+      {integrations.isError && (
+        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1.5 }}>
+          Couldn&apos;t load integration status. Trying again…
+        </Typography>
+      )}
+
       {summary && overall && visible > 1 && (
         <Box sx={progressOverallSx}>
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
