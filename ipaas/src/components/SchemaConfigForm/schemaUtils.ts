@@ -106,26 +106,38 @@ export const getSchemasAtLevel = (schema: JSONSchema, targetLevel: number, curre
   return schemas.reverse();
 };
 
-/** A configurable at the schema's required level: its config key, its key in its module's schema, and a label relative to the root module. */
+/** A configurable at the schema's required level: its config key, its key in its module's schema, its package (`<org>.<package>`), and a label relative to that package. */
 export interface SchemaField {
   path: string;
   key: string;
+  pkg: string;
   label: string;
   schema: JSONSchema;
   required: boolean;
 }
 
-/** Every configurable at the schema's required level, labelled relative to the root module. */
+/** Every configurable at the schema's required level, labelled relative to its package: a submodule's as `<module>.<name>`. */
 export const schemaFields = (schema: JSONSchema): SchemaField[] => {
-  const levels = getSchemasAtLevel(schema, schema.requiredLevel || 1);
-  const root = levels.map((l) => l.path).reduce((a, b) => (a.length <= b.length ? a : b), levels[0]?.path ?? '');
-  return levels.flatMap(({ schema: level, path }) =>
+  const targetLevel = schema.requiredLevel || 1;
+  return getSchemasAtLevel(schema, targetLevel).flatMap(({ schema: level, path }) =>
     Object.keys(level.properties ?? {}).map((key) => {
       const fullPath = path ? `${path}.${key}` : key;
-      return { path: fullPath, key, label: root ? fullPath.slice(root.length + 1) : fullPath, schema: level, required: (level.required ?? []).includes(key) };
+      const pkg =
+        targetLevel > 1
+          ? path
+              .split('.')
+              .slice(0, targetLevel - 1)
+              .join('.')
+          : '';
+      return { path: fullPath, key, pkg, label: pkg ? fullPath.slice(pkg.length + 1) : fullPath, schema: level, required: (level.required ?? []).includes(key) };
     }),
   );
 };
+
+const LIBRARY_ORGS = ['ballerina', 'ballerinax', 'ballerinai'];
+
+/** The integration's own package among the fields': the first not from a library org. */
+export const ownPackage = (fields: SchemaField[]): string => (fields.find((f) => !LIBRARY_ORGS.includes(f.pkg.split('.')[0])) ?? fields[0])?.pkg ?? '';
 
 export function getRequiredPathsAtLevel(schema: JSONSchema): string[] {
   const schemas = getSchemasAtLevel(schema, schema.requiredLevel || 1);

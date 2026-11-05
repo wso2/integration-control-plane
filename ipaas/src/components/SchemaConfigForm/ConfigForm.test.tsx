@@ -24,7 +24,7 @@ import type { FieldLink, FieldLinkPicker } from './linkedFrom';
 import type { JSONSchema } from '../../types/schema';
 
 // The schema the BFF serves for package wso2/sfdemo: root-module configurables
-// beside module sfdemo.support's, under the package.
+// beside module sfdemo.support's, under the package, and the ballerina/http library's.
 const schema = {
   type: 'object',
   requiredLevel: 3,
@@ -46,6 +46,10 @@ const schema = {
           },
         },
       },
+    },
+    ballerina: {
+      type: 'object',
+      properties: { http: { type: 'object', properties: { maxActiveConnections: { type: 'integer', description: '' } } } },
     },
   },
 } as unknown as JSONSchema;
@@ -92,6 +96,16 @@ describe('ConfigForm', () => {
     expect(box('sfSales').textContent).toContain('Unlink');
     expect(labels(box('Other configurables'))).toEqual(['greeting', 'support.sfSupportBaseUrl', 'support.sfSupportRegion']);
   });
+
+  it("keeps a library's configurables in their package's box, collapsed", async () => {
+    await render();
+    const http = Array.from(container.querySelectorAll('[role="button"]')).find((b) => b.textContent === 'ballerina/http') as HTMLElement;
+    expect(http.getAttribute('aria-expanded')).toBe('false');
+    expect(labels(box('Configurables'))).not.toContain('maxActiveConnections');
+    await act(async () => http.click());
+    expect(http.getAttribute('aria-expanded')).toBe('true');
+    expect(labels(http.parentElement!)).toEqual(['ballerina/http', 'maxActiveConnections']);
+  });
 });
 
 describe('ConfigForm with links', () => {
@@ -113,7 +127,7 @@ describe('ConfigForm with links', () => {
     const validated = handleValidationChange.mock.calls.map(([key]) => key);
     expect(validated).not.toContain('wso2.sfdemo.sfSalesBaseUrl');
     expect(validated).not.toContain('wso2.sfdemo.support.sfSupportBaseUrl');
-    expect(Array.from(container.querySelectorAll('input')).filter((i) => !i.disabled)).toHaveLength(2);
+    expect(Array.from(box('Configurables').querySelectorAll('input')).filter((i) => !i.disabled)).toHaveLength(2);
   });
 
   it("offers a field's sources from its link icon, a key in use disabled, and links the one picked", async () => {
