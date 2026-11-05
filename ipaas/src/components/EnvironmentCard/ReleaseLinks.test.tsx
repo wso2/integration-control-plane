@@ -28,6 +28,7 @@ const links: IntegrationLinks = {
   kind: 'ballerina',
   resources: [{ id: 'orders-db', displayName: 'Orders DB', keys: [], valuesIn: ['development', 'production'] }],
   used: {},
+  usedByOrphaned: {},
   connections: [],
   fieldLinks: {},
   orphaned: [],

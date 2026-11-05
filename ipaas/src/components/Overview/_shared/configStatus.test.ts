@@ -45,6 +45,7 @@ const link = (configurables: Record<string, string>, hasValues = true): Integrat
   kind: 'ballerina',
   resources: [{ id: 'salesforce-sales', displayName: 'salesforce-sales', keys: [], valuesIn: hasValues ? ['development'] : [] }],
   used: {},
+  usedByOrphaned: {},
   connections: [],
   fieldLinks: {},
   orphaned: [],

@@ -32,6 +32,7 @@ const links: IntegrationLinks = {
     { id: 'orders-db', displayName: 'orders-db', keys: [{ name: 'URL', secret: false }], valuesIn: ['development'] },
   ],
   used: { 'github-acme|GITHUB_AUTH_TOKEN': 'GITHUB_TOKEN' },
+  usedByOrphaned: {},
   connections: [],
   fieldLinks: {},
   orphaned: [],

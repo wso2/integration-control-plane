@@ -39,7 +39,7 @@ const environment = (name: string, linked: boolean): EnvironmentLinks => ({
 vi.mock('../api/configuration', () => ({
   fetchIntegrationLinks: async () => {
     server.reads++;
-    return { kind: 'ballerina', resources: [], used: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [environment('development', true), environment('production', server.productionPromoted)] };
+    return { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [environment('development', true), environment('production', server.productionPromoted)] };
   },
 }));
 vi.mock('../api/deployments', () => ({ promote: async () => 'promoted' }));
