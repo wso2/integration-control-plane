@@ -82,7 +82,13 @@ function TracesContent({ request }: { request: ComponentTracesRequest }): JSX.El
     return <TracesError title="Couldn't load traces" onRetry={() => void traces.refetch()} />;
   }
   if (traces.data.traces.length === 0) {
-    return <EmptyListing icon={<Waypoints size={48} />} title="No traces in this time range" description="Traces appear once the integration handles requests with tracing enabled in this environment. Try a wider time range." />;
+    return (
+      <EmptyListing
+        icon={<Waypoints size={48} />}
+        title="No traces in this time range"
+        description="Traces appear once the integration handles requests. They are collected for integrations built with Ballerina 2201.14 or later, from their next deploy. Try a wider time range."
+      />
+    );
   }
 
   const sections = sampled.isPending ? (
