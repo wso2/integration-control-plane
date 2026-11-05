@@ -74,7 +74,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
     () => (component && selectedEnv && activeEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: activeEndpoint.id, deploymentTrackId: selectedTrackId } : null),
     [projectId, component, selectedEnv, activeEndpoint, selectedTrackId],
   );
-  const access = useEndpointTestAccess(accessRef, !!accessRef && isActive);
+  const access = useEndpointTestAccess(accessRef, { enabled: !!accessRef && isActive });
 
   // No gateway URL means nothing is testable: the endpoint's own route has no policy engine in its path.
   const baseUrl = access.gatewayUrl;
@@ -85,7 +85,7 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
   const regenerate = () => void access.mintKey();
   // Not offered for an open endpoint: the test-key route switches enforcement to api-key, so
   // minting would secure an endpoint whose api-key scheme the user turned off.
-  const canMint = access.mode === 'api-key';
+  const canMint = access.canCreateKey && access.mode === 'api-key';
 
   // Non-MCP components keep this route's previous Coming Soon behaviour.
   if (component && !isMcp) {

@@ -22,6 +22,7 @@ import ApiKeyAuthOffer from './ApiKeyAuthOffer';
 import { BffError } from '../api/_client';
 import { createEndpointTestKey, getEndpointSecurity, setEndpointApiKeyAuth } from '../api/consumers';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
+import { Scopes } from '../constants/permissions';
 import { button, flush, renderWithScopes } from '../test/renderWithScopes';
 import { DEVELOPER, VIEWER } from '../test/roles';
 import type { EndpointRef } from '../types/consumers';
@@ -72,9 +73,15 @@ describe('ApiKeyAuthOffer', () => {
     expect(button(c, 'Switch to API key')).toBeUndefined();
   });
 
-  it('only explains to a Viewer', async () => {
-    const c = await refusedTestKey(VIEWER);
+  it('only explains to a role that may test the endpoint but not change its security', async () => {
+    const c = await refusedTestKey(DEVELOPER.filter((s) => s !== Scopes.ENDPOINT_UPDATE));
     expect(document.body.textContent).toContain("can't issue a test key");
     expect(button(c, 'Switch to API key')).toBeUndefined();
+  });
+
+  it('asks nothing for a Viewer, who may not create test keys', async () => {
+    await refusedTestKey(VIEWER);
+    expect(createEndpointTestKey).not.toHaveBeenCalled();
+    expect(document.body.textContent).not.toContain("can't issue a test key");
   });
 });

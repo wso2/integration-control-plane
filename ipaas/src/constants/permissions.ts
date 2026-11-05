@@ -70,6 +70,7 @@ export const Scopes = {
   ENVIRONMENT_MANAGE: 'cloud:environment:manage',
   DEPLOYMENT_PIPELINE_MANAGE: 'cloud:deployment-pipeline:manage',
   ENDPOINT_UPDATE: 'ipaas:endpoint:update',
+  ENDPOINT_TEST: 'ipaas:endpoint:test',
   ENDPOINT_EXPOSE: 'ipaas:endpoint:expose',
   ENDPOINT_API_KEY_MANAGE: 'ipaas:endpoint:api-key-manage',
   APPLICATION_MANAGE: 'ipaas:application:manage',
@@ -78,4 +79,5 @@ export const Scopes = {
   AGENT_CREATE: 'amp:agent:create',
   AGENT_UPDATE: 'amp:agent:update',
   AGENT_DELETE: 'amp:agent:delete',
+  AGENT_API_KEY_MANAGE: 'amp:agent:api-key-manage',
 } as const;
