@@ -56,6 +56,7 @@ export default function FileEventHeader({
   requestPoll,
   isRefreshing,
   onRefresh,
+  deployAction,
 }: CustomHeaderProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
   const stopMutation = useStopDeployment();
@@ -155,7 +156,7 @@ export default function FileEventHeader({
         )}
       </Stack>
 
-      {/* Right: Stop / Start + Refresh */}
+      {/* Right: Stop / Start / Deploy + Refresh */}
       <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
         {(canStop || isInProgress) && (
           <Tooltip title="Stop deployment">
@@ -184,6 +185,7 @@ export default function FileEventHeader({
             </span>
           </Tooltip>
         )}
+        {deployAction}
         <Tooltip title="Refresh">
           <IconButton size="small" disabled={isRefreshing} aria-label="Refresh" onClick={onRefresh}>
             <RefreshCw size={16} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none', transformOrigin: 'center' }} />
