@@ -25,7 +25,7 @@ import { TIME_PRESETS, downloadLogs, toLocalInput } from '../../utils/logs';
 import { describeAppliedFilters, type AppliedFilter } from '../../utils/logsView';
 import SearchField from '../SearchField';
 import LogsFilterMenu from './LogsFilterMenu';
-import { appliedRowSx, customRangeSx, refreshIconSx, searchFieldSx, sourceSelectSx, timeSelectSx, toolbarRowSx, toolbarSx, toolButtonSx } from './LogsToolbar.styles';
+import { appliedRowSx, customRangeSx, refreshIconSx, searchFieldSx, sourceSelectSx, timeSelectSx, toolbarActionsSx, toolbarRowSx, toolbarSx, toolButtonSx } from './LogsToolbar.styles';
 
 export interface LogsToolbarProps {
   filters: LogsFiltersState;
@@ -83,57 +83,59 @@ export default function LogsToolbar({ filters, environments, endpoints = [], log
   return (
     <Box sx={toolbarSx}>
       <Box sx={toolbarRowSx}>
-        <SearchField value={searchPhrase} onChange={setSearchPhrase} placeholder="Search logs" sx={searchFieldSx} />
-        <Badge badgeContent={applied.length} color="primary" invisible={applied.length === 0}>
-          <Button variant="outlined" startIcon={<ListFilter size={16} />} onClick={(e) => setMenuAnchor(e.currentTarget)} aria-haspopup="dialog" aria-expanded={!!menuAnchor} sx={toolButtonSx}>
-            Filters
-          </Button>
-        </Badge>
-        <Select
-          value={timePreset || 'Past 30 days'}
-          onChange={(e) => {
-            const v = e.target.value as string;
-            setTimePreset(v);
-            if (v === 'custom') {
-              setCustomEnd(toLocalInput(new Date()));
-              setCustomStart(toLocalInput(new Date(Date.now() - 24 * 3600_000)));
-            }
-          }}
-          size="small"
-          startAdornment={<Clock size={16} />}
-          sx={timeSelectSx}
-          inputProps={{ 'aria-label': 'Time range' }}>
-          {TIME_PRESETS.map((p) => (
-            <MenuItem key={p.label} value={p.label}>
-              {p.label}
-            </MenuItem>
-          ))}
-          <MenuItem value="custom">Custom range</MenuItem>
-        </Select>
-        {extraFilters}
-        {sourceControls ? (
-          <Select value={filters.sourceFilter} onChange={(e) => filters.setSourceFilter(e.target.value as LogSourceFilter)} size="small" sx={sourceSelectSx} inputProps={{ 'aria-label': 'Log source' }}>
-            <MenuItem value="all">All logs</MenuItem>
-            <MenuItem value="component">Application logs</MenuItem>
-            <MenuItem value="gateway">Gateway logs</MenuItem>
+        <SearchField value={searchPhrase} onChange={setSearchPhrase} placeholder="Search logs" width="standard" sx={searchFieldSx} />
+        <Box sx={toolbarActionsSx}>
+          <Badge badgeContent={applied.length} color="primary" invisible={applied.length === 0}>
+            <Button variant="outlined" startIcon={<ListFilter size={16} />} onClick={(e) => setMenuAnchor(e.currentTarget)} aria-haspopup="dialog" aria-expanded={!!menuAnchor} sx={toolButtonSx}>
+              Filters
+            </Button>
+          </Badge>
+          <Select
+            value={timePreset || 'Past 30 days'}
+            onChange={(e) => {
+              const v = e.target.value as string;
+              setTimePreset(v);
+              if (v === 'custom') {
+                setCustomEnd(toLocalInput(new Date()));
+                setCustomStart(toLocalInput(new Date(Date.now() - 24 * 3600_000)));
+              }
+            }}
+            size="small"
+            startAdornment={<Clock size={16} />}
+            sx={timeSelectSx}
+            inputProps={{ 'aria-label': 'Time range' }}>
+            {TIME_PRESETS.map((p) => (
+              <MenuItem key={p.label} value={p.label}>
+                {p.label}
+              </MenuItem>
+            ))}
+            <MenuItem value="custom">Custom range</MenuItem>
           </Select>
-        ) : null}
-        <Tooltip title={refreshing ? 'Refreshing…' : 'Refresh'}>
-          <span>
-            <IconButton aria-label={refreshing ? 'Refreshing logs' : 'Refresh logs'} aria-busy={refreshing} onClick={() => void refresh()} disabled={!canRefresh || refreshing} sx={toolButtonSx}>
-              <Box component="span" sx={refreshIconSx(refreshing)}>
-                <RefreshCw size={17} />
-              </Box>
-            </IconButton>
-          </span>
-        </Tooltip>
-        <Tooltip title="Download the lines on screen">
-          <span>
-            <IconButton aria-label="Download logs" onClick={() => downloadLogs(logs)} disabled={logs.length === 0} sx={toolButtonSx}>
-              <Download size={17} />
-            </IconButton>
-          </span>
-        </Tooltip>
+          {extraFilters}
+          {sourceControls ? (
+            <Select value={filters.sourceFilter} onChange={(e) => filters.setSourceFilter(e.target.value as LogSourceFilter)} size="small" sx={sourceSelectSx} inputProps={{ 'aria-label': 'Log source' }}>
+              <MenuItem value="all">All logs</MenuItem>
+              <MenuItem value="component">Application logs</MenuItem>
+              <MenuItem value="gateway">Gateway logs</MenuItem>
+            </Select>
+          ) : null}
+          <Tooltip title={refreshing ? 'Refreshing…' : 'Refresh'}>
+            <span>
+              <IconButton aria-label={refreshing ? 'Refreshing logs' : 'Refresh logs'} aria-busy={refreshing} onClick={() => void refresh()} disabled={!canRefresh || refreshing} sx={toolButtonSx}>
+                <Box component="span" sx={refreshIconSx(refreshing)}>
+                  <RefreshCw size={17} />
+                </Box>
+              </IconButton>
+            </span>
+          </Tooltip>
+          <Tooltip title="Download the lines on screen">
+            <span>
+              <IconButton aria-label="Download logs" onClick={() => downloadLogs(logs)} disabled={logs.length === 0} sx={toolButtonSx}>
+                <Download size={17} />
+              </IconButton>
+            </span>
+          </Tooltip>
+        </Box>
       </Box>
 
       {timePreset === 'custom' ? (

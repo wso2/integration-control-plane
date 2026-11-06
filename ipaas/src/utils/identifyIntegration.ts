@@ -112,6 +112,8 @@ export function identifyIntegration(displayType: string, componentSubType: strin
       return { type: 'event-integration', runtime: 'ballerina', raw };
     case 'miEventHandler':
       return { type: 'event-integration', runtime: 'mi', raw };
+    case 'ballerinaWorkflow':
+      return { type: 'workflow', runtime: 'ballerina', raw };
     default:
       return { type: 'unsupported', runtime: 'unknown', raw };
   }

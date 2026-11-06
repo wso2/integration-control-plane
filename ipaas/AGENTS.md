@@ -128,6 +128,8 @@ Read the guideline for the kind of UI you are changing before you change it. Whe
 - **Search:** search is always visible.
   - Its placeholder names what is searched ("Search projects", "Search by name"). Never use a bare "Search" or a trailing ellipsis.
   - The placeholder doubles as the field's `aria-label` (see `SearchField`).
+  - A list or grid page search uses `width="standard"`: 400px, shrinking in narrower containers. Never stretch it across the page.
+  - Searches inside a drawer, dialog, menu or side panel fill their container with `fullWidth`.
 - **Inputs and forms:** use `TextField` with `labelPlacement="top"`, and mark optional fields with `optional`. Required asterisks are hidden globally.
   - Show validation with `error` and `helperText`.
   - Group long forms into titled sections.
@@ -138,8 +140,15 @@ Read the guideline for the kind of UI you are changing before you change it. Whe
   - A destructive modal confirms with danger styling. A high-impact delete also asks for the resource name (`ConfirmDeleteDialog`).
   - Never nest modals, stack drawers or use `window.confirm`, `alert` or `prompt`.
 - **Toolbars:** keep this order: scope, search, filters, then view toggles, utility icons, secondary actions and one filled primary action at the right.
+  - Lay the row out `space-between`: search on the left, the other controls grouped on the right (see `LogsToolbar`).
   - Put the result count in the footer.
   - Every icon button has a `Tooltip` and an `aria-label`.
+- **Page layout:** wrap every page, including its loading, error and not-found states, in `<PageContent fullWidth>`.
+  - Head the page with `PageTitle` (`PageTitle.Header`, with `PageTitle.Actions` for the page's main actions), never a hand-sized `Typography`.
+  - A page reached from another one starts with a text Back button above the title, labelled with where it goes: "Back to project", "Back to projects".
+- **Form actions:** put the buttons in a row below the form: Cancel first, then the primary action to its right ("Create", "Update project").
+  - Cancel is `variant="outlined" color="inherit"`, so it stays neutral; only the primary action uses the primary colour.
+  - Disable both while the request runs, and show a `CircularProgress` with a verb in progress ("Creating…") on the primary button.
 
 ## Boundaries
 

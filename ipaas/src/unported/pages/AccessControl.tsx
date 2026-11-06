@@ -26,7 +26,7 @@ import { componentAccessControlUrl } from '../../paths';
 import { useProjectByHandler } from '../../hooks/useProjects';
 import { useComponentByHandler } from '../../hooks/useComponents';
 import type { ComponentScope } from '../../nav';
-import OrgSettingsTabs from '../../components/Settings/OrgSettingsTabs';
+import OrgSettingsTabs from '../../components/Settings/OrgConfigureTabs';
 import ProjectSettingsTabs from '../components/Settings/ProjectSettingsTabs';
 import OrgInfoHeader from '../../components/Settings/AccessControl/OrgInfoHeader';
 import { Loading } from '../../components/Settings/AccessControl/shared';

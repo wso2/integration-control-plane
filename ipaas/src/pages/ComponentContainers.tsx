@@ -23,7 +23,7 @@ import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import ContainerCardSkeleton from '../components/Containers/ContainerCardSkeleton';
 import ContainerInfoCard from '../components/Containers/ContainerInfoCard';
 import { useAccessControl } from '../contexts/AccessControlContext';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { useBillingOrg, useBillingPlan } from '../hooks/useBillingOrg';
 import { useRelease } from '../hooks/useDevopsConfigs';
@@ -41,7 +41,7 @@ export default function ComponentContainers({ org, project, component }: Compone
   const { projectId } = useProjectId(project);
   const { hasPermission } = useAccessControl();
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
-  const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, comp?.id);
+  const canManage = hasPermission(Scopes.INTEGRATION_UPDATE, projectId, comp?.id);
 
   const { tracks, trackId } = useSelectedTrack(comp);
 

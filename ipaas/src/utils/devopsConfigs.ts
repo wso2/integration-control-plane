@@ -34,11 +34,26 @@ const ENV_KEY_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 // Absolute mount path (Devant): no `//`, no `..`, no trailing slash.
 const MOUNT_PATH_RE = /^\/(?!\/)(?!.*\/\.\.)(?!.*\/$)[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
 
+// A Ballerina config save rebuilds these env vars and drops any other entry with
+// their names, so an env-var group can't use them (the BFF rejects them too).
+export const isBallerinaConfigKey = (key: string): boolean => key === 'BAL_CONFIG_FILES' || key.startsWith('BAL_CONFIG_VAR_');
+
 export function validateConfigKey(key: string): string {
   if (!key.trim()) return 'Key is required.';
   if (key.length > 250) return 'Key must be 250 characters or fewer.';
   if (!ENV_KEY_RE.test(key)) return 'Use letters, numbers, and underscores; must start with a letter or underscore.';
+  if (isBallerinaConfigKey(key)) return `"${key}" is reserved for Ballerina configuration.`;
   return '';
+}
+
+/**
+ * The error for a key that another env-var group already sets, or ''. All groups'
+ * keys go into the same container env, so a key can belong to one group only; the
+ * BFF rejects a second one. `otherGroupKeys` maps each such key to its group's name.
+ */
+export function keyInOtherGroupError(key: string, otherGroupKeys: ReadonlyMap<string, string>): string {
+  const group = otherGroupKeys.get(key);
+  return group === undefined ? '' : `"${key}" is already set by the "${group}" config.`;
 }
 
 export function validateMountPath(path: string): string {
@@ -54,8 +69,9 @@ export function validateDisplayName(name: string): string {
   return '';
 }
 
-// The MI configure drawer owns env-var groups named `mi-env-vars` and `mi-secret-<KEY>`
-// (miConfigs.ts) and would adopt, and may delete, a user's group with such a name.
+// The MI configure drawer owns env-var groups named `mi-env-vars`, `mi-secrets` and the
+// older `mi-secret-<KEY>` (miConfigs.ts) and would adopt, and may delete, a user's group
+// with such a name.
 const MI_GROUP_PREFIX = 'mi-';
 
 /** `validateDisplayName` for a new env-var group, whose display name becomes its group name. */

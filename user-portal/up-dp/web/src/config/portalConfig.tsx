@@ -35,7 +35,7 @@ export const FALLBACK_CONFIG: PortalConfig = {
   theme: '',
   links: {},
   logo: BUNDLED_LOGO,
-  auth: { issuer: '', clientId: '' },
+  auth: { issuer: '', clientId: '', resource: '' },
 };
 
 declare global {

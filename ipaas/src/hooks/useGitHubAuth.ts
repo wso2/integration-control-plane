@@ -22,9 +22,13 @@ import { GITHUB_AUTH } from '../constants/github';
 import { buildGitHubAppInstallUrl, buildGitHubOAuthUrl } from '../paths';
 import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth';
 import type { AuthStatus } from '../types/import';
+import { Scopes } from '../constants/permissions';
+import { useCan } from './useCan';
 
 export interface UseGitHubAuthReturn {
   authStatus: AuthStatus;
+  /** The role may connect a GitHub account (`ipaas:repository:connect`); without it, authorizing and installing do nothing. */
+  canConnect: boolean;
   /** Opens the GitHub OAuth popup. `onSuccess` is called when the token exchange succeeds. */
   startGitHubAuth: (onSuccess?: () => void) => void;
   /** Exchanges a raw OAuth auth code for a token (used when code arrives via location state). */
@@ -51,6 +55,7 @@ export interface UseGitHubAuthReturn {
 export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuthReturn {
   const [authStatus, setAuthStatus] = useState<AuthStatus>(initialStatus);
   const obtainToken = useObtainGithubToken();
+  const canConnect = useCan()(Scopes.REPOSITORY_CONNECT);
 
   // GitHub-App flow: the user authorized the App but has not installed
   // it on any account (exchange returns needsInstallation, a bind 409 —
@@ -73,7 +78,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
 
   const startGitHubAppInstall = (onClosed?: () => void): void => {
     const slug = window.API_CONFIG.githubAppSlug;
-    if (!slug) return;
+    if (!slug || !canConnect) return;
     const popup = window.open(buildGitHubAppInstallUrl(slug), 'github-app-install', GITHUB_AUTH.POPUP_DIMENSIONS);
     if (!popup) {
       // Popup blocked: keep the Install CTA on screen so the user can allow
@@ -131,7 +136,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
 
   const startGitHubAuth = (onSuccess?: () => void): void => {
     const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
-    if (!githubAppClientId) return;
+    if (!githubAppClientId || !canConnect) return;
     setAuthStatus('authenticating');
     const state = generateAndSaveGitHubState();
     const url = buildGitHubOAuthUrl(githubAppAuthRedirectUrl ?? '', githubAppClientId, state);
@@ -167,5 +172,5 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
 
   const githubInstallUrl = window.API_CONFIG.githubAppSlug ? buildGitHubAppInstallUrl(window.API_CONFIG.githubAppSlug) : '';
 
-  return { authStatus, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl };
+  return { authStatus, canConnect, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl };
 }

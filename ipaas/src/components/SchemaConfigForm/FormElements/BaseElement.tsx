@@ -16,11 +16,12 @@
  * under the License.
  */
 
-import { useEffect, useMemo, useState, type Dispatch, type MouseEvent, type SetStateAction } from 'react';
+import { useContext, useEffect, useMemo, useState, type Dispatch, type MouseEvent, type SetStateAction } from 'react';
 import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack, Switch, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff, Link2, Link2Off, Lock, Pencil, Unlock } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
 import { type LinkingInfo, isNumberType, typeDisplayName } from '../schemaUtils';
+import { ManagedConfigContext } from '../managedConfig';
 
 interface ConfigGroup {
   groupUuid: string;
@@ -89,6 +90,7 @@ export function BaseElement({
   const linked = useMemo(() => linkingMap?.has(jsonPath) || false, [linkingMap, jsonPath]);
   const linkedInfo = linkingMap?.get(jsonPath);
   const isSensitive = useMemo(() => sensitiveMap?.get(jsonPath) || false, [sensitiveMap, jsonPath]);
+  const isManaged = useContext(ManagedConfigContext).has(jsonPath);
   const isExistingSensitiveConfig = useMemo(() => isSensitive && valueMap.has(jsonPath) && !valueMap.get(jsonPath), [isSensitive, valueMap, jsonPath]);
 
   useEffect(() => {
@@ -209,6 +211,21 @@ export function BaseElement({
     setSelectedKeyId('');
     setLinkAnchorEl(null);
   };
+
+  // The platform sets these, and a save leaves them as they are, so they are shown, not edited.
+  if (isManaged) {
+    return (
+      <Box sx={{ mt: 1.5 }}>
+        <Stack direction="row" alignItems="center" gap={1}>
+          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+            {title}
+          </Typography>
+          <Chip label="managed" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
+        </Stack>
+        <TextField fullWidth size="small" value={isSensitive ? '••••••••' : String(valueMap.get(jsonPath) ?? '')} disabled helperText="Set by the integration platform" sx={{ mt: 0.5 }} />
+      </Box>
+    );
+  }
 
   const selectedGroup = configGroups?.find((g) => g.groupUuid === selectedGroupId) ?? null;
   const sensitiveAdornment = (

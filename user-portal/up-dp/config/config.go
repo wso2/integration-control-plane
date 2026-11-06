@@ -73,6 +73,7 @@ type Logo struct {
 type OIDC struct {
 	Issuer   string
 	ClientID string
+	Resource string
 	Scopes   string
 }
 
@@ -117,10 +118,11 @@ func Load(ctx context.Context) (Config, error) {
 		OIDC: OIDC{
 			Issuer:   l.String("OIDC_ISSUER"),
 			ClientID: l.String("OIDC_CLIENT_ID"),
+			Resource: l.String("OIDC_RESOURCE"),
 			Scopes:   l.String("OIDC_SCOPES", "openid profile email roles"),
 		},
 		IPaaS: ipaasportal.Config{
-			BaseURL:      strings.TrimSuffix(l.String("IPAAS_BASE_URL", "http://localhost:9090/api/v1/portal"), "/"),
+			BaseURL:      strings.TrimSuffix(l.String("IPAAS_BASE_URL", "http://localhost:9090/user-portal"), "/"),
 			TokenURL:     l.String("IPAAS_TOKEN_URL", "http://localhost:9100/oauth2/token"),
 			ClientID:     l.String("IPAAS_CLIENT_ID"),
 			ClientSecret: l.String("IPAAS_CLIENT_SECRET"),

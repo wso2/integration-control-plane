@@ -40,7 +40,7 @@ interface EnvironmentCardHeaderProps {
   isRefreshing: boolean;
   deployTrackIsPending: boolean;
   scheduleButtonProps?: ScheduleButtonProps;
-  onRun: () => void;
+  onRun?: () => void;
   onRunWithArgs: () => void;
   onRefresh: () => void;
   onConfigure?: () => void;
@@ -128,7 +128,7 @@ export default function EnvironmentCardHeader({
                 View logs
               </Button>
             )}
-            {(canStop || isInProgress) && (
+            {onStop && (canStop || isInProgress) && (
               <Tooltip title="Stop deployment">
                 <span>
                   <Button variant="outlined" size="small" color="error" startIcon={<Square size={14} />} onClick={onStop} disabled={isActionPending || isInProgress}>
@@ -137,7 +137,7 @@ export default function EnvironmentCardHeader({
                 </span>
               </Tooltip>
             )}
-            {canStart && (
+            {onRedeploy && canStart && (
               <Tooltip title="Start deployment">
                 <span>
                   <Button variant="outlined" size="small" color="success" startIcon={<RotateCw size={14} />} onClick={onRedeploy} disabled={isActionPending}>
@@ -146,7 +146,7 @@ export default function EnvironmentCardHeader({
                 </span>
               </Tooltip>
             )}
-            {hasError && (
+            {onRedeploy && hasError && (
               <Tooltip title="Redeploy">
                 <span>
                   <Button variant="outlined" size="small" color="error" startIcon={<RotateCw size={14} />} onClick={onRedeploy} disabled={isActionPending}>
@@ -168,7 +168,7 @@ export default function EnvironmentCardHeader({
               </Stack>
             )}
             {scheduleButtonProps && <ScheduleButton {...scheduleButtonProps} disabled={hasMissingConfigs || buildDisabled} />}
-            <RunButton envCritical={envCritical} disabled={hasMissingConfigs || buildDisabled} pending={deployTrackIsPending} onRun={onRun} onRunWithArgs={onRunWithArgs} />
+            {onRun && <RunButton envCritical={envCritical} disabled={hasMissingConfigs || buildDisabled} pending={deployTrackIsPending} onRun={onRun} onRunWithArgs={onRunWithArgs} />}
           </>
         )}
         <Tooltip title="Refresh">

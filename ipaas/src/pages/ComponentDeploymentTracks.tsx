@@ -19,12 +19,12 @@
 import { Alert, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, InputAdornment, ListingTable, MenuItem, PageContent, Skeleton, Stack, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { GitBranch, Pencil, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import Authorized from '../components/Authorized';
 import EmptyListing from '../components/EmptyListing';
 import NotFound from '../components/NotFound';
 import ComponentSettingsTabs from '../components/Settings/ComponentSettingsTabs';
 import TrackDeleteButton from '../components/Settings/TrackDeleteButton';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useComponentByHandler, useCreateDeploymentTrack, useUpdateDeploymentTrack } from '../hooks/useComponents';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
@@ -218,6 +218,9 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
   const { data: repository = null } = useComponentRepository(projectId, scope.component);
   const [dialog, setDialog] = useState<{ track?: DeploymentTrack } | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const can = useCan();
+  const editable = deploymentTracksEnabled && can(Scopes.INTEGRATION_UPDATE);
+  const deletable = deploymentTracksEnabled && can(Scopes.INTEGRATION_DELETE);
 
   return (
     <>
@@ -228,13 +231,13 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
       )}
 
       {deploymentTracksEnabled ? (
-        <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
-          <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
+        editable && (
+          <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
             <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setDialog({})} disabled={!orgUuid}>
               Create deployment track
             </Button>
-          </Authorized>
-        </Stack>
+          </Stack>
+        )
       ) : (
         <Alert severity="info" sx={{ mb: 2 }}>
           This integration builds and deploys a single branch, its default deployment track.
@@ -253,7 +256,7 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
                 <ListingTable.Cell>Description</ListingTable.Cell>
                 <ListingTable.Cell>Auto deploy</ListingTable.Cell>
                 <ListingTable.Cell>Environments</ListingTable.Cell>
-                {deploymentTracksEnabled && <ListingTable.Cell align="right">Actions</ListingTable.Cell>}
+                {(editable || deletable) && <ListingTable.Cell align="right">Actions</ListingTable.Cell>}
               </ListingTable.Row>
             </ListingTable.Head>
             <ListingTable.Body>
@@ -272,18 +275,18 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
                   <ListingTable.Cell>
                     <TrackEnvironments track={t} environments={environments} />
                   </ListingTable.Cell>
-                  {deploymentTracksEnabled && (
+                  {(editable || deletable) && (
                     <ListingTable.Cell align="right">
-                      <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
-                        <Stack direction="row" justifyContent="flex-end" gap={0.5}>
-                          {/* The default track is the integration itself: its branch, API and description are the integration's. */}
-                          {!t.latest && (
-                            <Tooltip title="Edit">
-                              <IconButton size="small" aria-label={`Edit ${t.branch || 'deployment track'}`} onClick={() => setDialog({ track: t })}>
-                                <Pencil size={16} />
-                              </IconButton>
-                            </Tooltip>
-                          )}
+                      <Stack direction="row" justifyContent="flex-end" gap={0.5}>
+                        {/* The default track is the integration itself: its branch, API and description are the integration's. */}
+                        {editable && !t.latest && (
+                          <Tooltip title="Edit">
+                            <IconButton size="small" aria-label={`Edit ${t.branch || 'deployment track'}`} onClick={() => setDialog({ track: t })}>
+                              <Pencil size={16} />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {deletable && (
                           <TrackDeleteButton
                             orgHandler={scope.org}
                             projectId={projectId}
@@ -300,8 +303,8 @@ function TracksBody({ scope, projectId, componentId, tracks, deploymentTracksEna
                             }
                             onResult={setNotice}
                           />
-                        </Stack>
-                      </Authorized>
+                        )}
+                      </Stack>
                     </ListingTable.Cell>
                   )}
                 </ListingTable.Row>

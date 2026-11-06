@@ -42,7 +42,7 @@ interface CloudReplicasProps {
   deploymentTrackId: string;
   orgHandler: string;
   projectHandler: string;
-  canManage: boolean;
+  canReadLogs: boolean;
 }
 
 /**
@@ -50,7 +50,7 @@ interface CloudReplicasProps {
  * the Runtime page's own table and cards, which already account for cloud having no per-pod
  * metrics: usage is only known summed across the release's pods.
  */
-export default function CloudReplicas({ projectId, componentId, componentHandler, releaseId, environmentId, deploymentTrackId, orgHandler, projectHandler, canManage }: CloudReplicasProps): JSX.Element | null {
+export default function CloudReplicas({ projectId, componentId, componentHandler, releaseId, environmentId, deploymentTrackId, orgHandler, projectHandler, canReadLogs }: CloudReplicasProps): JSX.Element | null {
   // Same queries as the Runtime page, so both pages share one cache entry per release.
   const { data: release } = useReleaseDetails(projectId, componentHandler, releaseId);
   const { data: autoscaling } = useAutoscaling(projectId, componentId, environmentId, deploymentTrackId);
@@ -90,7 +90,7 @@ export default function CloudReplicas({ projectId, componentId, componentHandler
           void metrics.refetch();
         }}
         scope={scope}
-        canManage={canManage}
+        canReadLogs={canReadLogs}
         replicasControl={
           <Typography variant="subtitle1" sx={titleSx}>
             Replicas

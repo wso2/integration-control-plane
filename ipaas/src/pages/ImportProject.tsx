@@ -16,28 +16,27 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, IconButton, InputAdornment, MenuItem, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
-import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../constants/import';
-import { ArrowLeft, Building2, Check, CheckCircle2, Edit, GitHub, GitBranch } from '@wso2/oxygen-ui-icons-react';
-import GitLogoIcon from '../assets/icons/GitLogoIcon';
+import { Alert, Box, Button, CircularProgress, Grid, IconButton, InputAdornment, PageContent, PageTitle, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
+import { ArrowLeft, Check, CheckCircle2, Edit } from '@wso2/oxygen-ui-icons-react';
 import GitProviderCards from '../components/ProjectCreate/GitProviderCards';
 import GitHubAuthArea from '../components/Import/GitHubAuthArea';
 import { useState, useLayoutEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateMonoRepoProject } from '../hooks/useProjects';
 import { useCreateComponent } from '../hooks/useComponents';
 import { useOrgs, useOrgComponentLimits, useOrgSubscriptions } from '../hooks/useOrg';
 import type { Project } from '../types/project';
 import { useOrgUuid } from '../hooks/useOrgUuid';
-import DirectoryPickerField from '../components/DirectoryPicker';
+import RepoSourceFields from '../components/ProjectCreate/RepoSourceFields';
 import WorkspaceModuleTable from '../components/ProjectCreate/WorkspaceModuleTable';
 import { FREE_COMPONENT_LIMIT } from '../constants/project';
 import { useProjectHandler } from '../hooks/useProjectHandler';
 import { resourceUrl, narrow, type OrgScope } from '../nav';
-import { external } from '../paths';
-import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems } from '../components/Import/gitHubSelectActions';
+import { orgProjectsUrl } from '../paths';
 import { toHandler } from '../utils/string';
 import { validateProjectName, validateProjectHandler, normalizeProjectError } from '../utils/projectValidation';
 import { buildRepoUrl } from '../utils/gitProviderUrl';
@@ -53,50 +52,33 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   const [isImporting, setIsImporting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  const source = useGitRepoSource();
   const {
     gitProvider,
     isPublicRepo,
     providerSelected,
-    selectedOrg,
-    setSelectedOrg,
     selectedRepo,
-    setSelectedRepo,
     repoUrl,
-    setRepoUrl,
-    urlError,
-    parsedOrg,
     selectedBranch,
-    setSelectedBranch,
     subPath,
-    setSubPath,
     activeOrg,
     activeRepo,
-    showBranchAndSubPath,
     pathReady,
     isWorkspace,
     workspaceModules,
     setWorkspaceModules,
-    userRepos,
-    isReposLoading,
     refetchRepos,
     isAuthenticated,
-    branches,
-    isBranchesLoading,
     repoContents,
     isContentsLoading,
     isContentsError,
-    refetchContents,
     authStatus,
+    canConnect,
     startGitHubAuth,
     startGitHubAppInstall,
-    openGitHubManage,
-    githubInstallUrl,
     isCheckingAuth,
     handleProviderSelect,
-  } = useGitRepoSource();
-
-  // Hold the repo pickers at md:3 so Organization/Repository keep their width when branch/subpath appear.
-  const colSize = isPublicRepo ? 4 : 3;
+  } = source;
 
   const { data: orgs = [] } = useOrgs();
   const orgUuid = useOrgUuid() ?? orgs.find((o) => o.handle === scope.org)?.uuid ?? '';
@@ -108,8 +90,9 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
 
   const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, handlerTaken: isHandlerTaken, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createMonoRepoProject = useCreateMonoRepoProject();
+  const canCreate = useCan()(Scopes.PROJECT_CREATE);
   const createComponent = useCreateComponent();
-  const orgHomeUrl = resourceUrl(scope, 'overview');
+  const projectsUrl = orgProjectsUrl(scope.org);
   // The provider choice and the auto-selected GitHub org are not input the user would lose.
   const allowLeave = useUnsavedChanges(displayName !== '' || description !== '' || effectiveHandler !== '' || repoUrl !== '' || selectedRepo !== '');
 
@@ -126,7 +109,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   const handlerTaken = isHandlerTaken ? 'This project id is already taken.' : null;
 
   const availabilityReady = !effectiveHandler || effectiveHandler.length < 2 || availability !== undefined || availabilityError;
-  const canSubmit = !!displayName.trim() && !nameError && !!effectiveHandler && !handlerError && !handlerTaken && !isCheckingAvailability && availabilityReady && pathReady && isWorkspace && workspaceModules.length > 0;
+  const canSubmit = canCreate && !!displayName.trim() && !nameError && !!effectiveHandler && !handlerError && !handlerTaken && !isCheckingAvailability && availabilityReady && pathReady && isWorkspace && workspaceModules.length > 0;
 
   const handleImport = async () => {
     setIsImporting(true);
@@ -171,6 +154,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             repositoryBranch: selectedBranch,
             repositorySubPath: module.path,
             isPublicRepo,
+            creation: { method: 'import-repo' },
           }),
         ),
       );
@@ -192,188 +176,31 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
     return undefined;
   };
 
-  const orgOptions = userRepos?.map((o) => o.orgName) ?? [];
-  const reposForOrg = userRepos?.find((o) => o.orgName === selectedOrg)?.repositories.map((r) => r.name) ?? [];
-
-  const renderRepoPickers = () => (
-    <Grid container spacing={3} sx={{ mb: 3 }}>
-      {isPublicRepo ? (
-        <Grid size={{ xs: 12, md: colSize }}>
-          <TextField
-            labelPlacement="top"
-            label="Repository URL"
-            required
-            value={repoUrl}
-            onChange={(e) => setRepoUrl(e.target.value)}
-            fullWidth
-            error={!!urlError}
-            placeholder={PUBLIC_REPO_URL_PLACEHOLDER}
-            helperText={urlError || PUBLIC_REPO_URL_HELP}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <GitLogoIcon size={16} />
-                  </InputAdornment>
-                ),
-                endAdornment:
-                  isBranchesLoading && parsedOrg ? (
-                    <InputAdornment position="end">
-                      <CircularProgress size={16} />
-                    </InputAdornment>
-                  ) : undefined,
-              },
-            }}
-          />
-        </Grid>
-      ) : (
-        <>
-          <Grid size={{ xs: 12, md: colSize }}>
-            <TextField
-              labelPlacement="top"
-              label="Organization"
-              select
-              required
-              value={selectedOrg}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === GH_SELECT_ACTION.addOrg) {
-                  openGitHubManage(githubInstallUrl, refetchRepos);
-                  return;
-                }
-                setSelectedOrg(v);
-                setSelectedRepo('');
-                setSelectedBranch('');
-              }}
-              fullWidth
-              disabled={!isAuthenticated || isReposLoading}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Building2 size={18} />
-                    </InputAdornment>
-                  ),
-                },
-              }}>
-              {organizationActionItems(!!githubInstallUrl)}
-              {orgOptions.map((org) => (
-                <MenuItem key={org} value={org}>
-                  {org}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-          <Grid size={{ xs: 12, md: colSize }}>
-            <TextField
-              labelPlacement="top"
-              label="Repository"
-              select
-              required
-              value={selectedRepo}
-              onChange={(e) => {
-                const v = e.target.value;
-                if (v === GH_SELECT_ACTION.connectRepos) {
-                  openGitHubManage(githubInstallUrl, refetchRepos);
-                  return;
-                }
-                if (v === GH_SELECT_ACTION.createRepo) {
-                  openGitHubManage(external.githubNew, refetchRepos);
-                  return;
-                }
-                setSelectedRepo(v);
-              }}
-              fullWidth
-              disabled={!selectedOrg || isReposLoading}
-              slotProps={{
-                input: {
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <Box sx={{ color: 'text.primary', display: 'flex' }}>
-                        <GitHub size={16} />
-                      </Box>
-                    </InputAdornment>
-                  ),
-                },
-              }}>
-              {repositoryActionItems(!!githubInstallUrl)}
-              {reposForOrg.map((repo) => (
-                <MenuItem key={repo} value={repo}>
-                  {repo}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-        </>
-      )}
-
-      {showBranchAndSubPath && (
-        <Grid size={{ xs: 12, md: colSize }}>
-          <TextField
-            labelPlacement="top"
-            label="Branch"
-            select
-            required
-            value={selectedBranch}
-            onChange={(e) => setSelectedBranch(e.target.value)}
-            fullWidth
-            disabled={!activeRepo || isBranchesLoading}
-            slotProps={{
-              input: {
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <GitBranch size={18} />
-                  </InputAdornment>
-                ),
-              },
-            }}>
-            {(branches ?? []).map((b) => (
-              <MenuItem key={b.name} value={b.name}>
-                {b.name}
-                {b.isDefault ? ' (default)' : ''}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Grid>
-      )}
-
-      {showBranchAndSubPath && (
-        <Grid size={{ xs: 12, md: colSize }}>
-          <DirectoryPickerField
-            repo={activeRepo}
-            value={subPath}
-            onChange={(path) => setSubPath(path)}
-            isError={isContentsError}
-            contents={repoContents}
-            isFetching={isContentsLoading}
-            onRefetch={refetchContents}
-            disabled={!selectedBranch}
-            reserveErrorSpace={false}
-          />
-          {isWorkspace && pathReady && !isContentsLoading && (
-            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.75, ml: 1.5 }}>
-              <Box sx={{ color: 'success.main', display: 'flex' }}>
-                <CheckCircle2 size={14} />
-              </Box>
-              <Typography variant="caption" color="success.main" fontWeight={500}>
-                Ballerina workspace detected
-              </Typography>
-            </Stack>
-          )}
-        </Grid>
-      )}
-    </Grid>
-  );
+  const workspaceHint =
+    isWorkspace && pathReady && !isContentsLoading ? (
+      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.75, ml: 1.5 }}>
+        <Box sx={{ color: 'success.main', display: 'flex' }}>
+          <CheckCircle2 size={14} />
+        </Box>
+        <Typography variant="caption" color="success.main" fontWeight={500}>
+          WSO2 Integrator: Default workspace detected
+        </Typography>
+      </Stack>
+    ) : null;
 
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>
-      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgHomeUrl)} sx={{ mb: 2 }}>
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(projectsUrl)} sx={{ mb: 2 }}>
         Back to projects
       </Button>
 
-      <Typography variant="h1" sx={{ mb: 4 }}>
-        Import a project
-      </Typography>
+      <PageTitle>
+        <PageTitle.Header>Import a project</PageTitle.Header>
+      </PageTitle>
+
+      <Alert severity="info" sx={{ mb: 3 }}>
+        Import currently supports WSO2 Integrator: Default projects only.
+      </Alert>
 
       {submitError && (
         <Alert severity="error" role="alert" sx={{ mb: 3 }} onClose={() => setSubmitError(null)}>
@@ -395,11 +222,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           </Box>
         ) : (
           <Box sx={{ mb: 1 }}>
-            {gitProvider === 'github' && <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />}
-            {renderRepoPickers()}
+            {gitProvider === 'github' && (
+              <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} canConnect={canConnect} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />
+            )}
+            <RepoSourceFields source={source} directoryHint={workspaceHint} />
             {pathReady && !isContentsLoading && !isContentsError && !isWorkspace && (
               <Alert severity="info" sx={{ mb: 3 }}>
-                No Ballerina workspace detected in the selected directory. Select a directory that contains a Ballerina workspace (a root <code>Ballerina.toml</code> with subdirectories that each have their own <code>Ballerina.toml</code>).
+                No WSO2 Integrator: Default workspace detected in the selected directory. Select a directory that contains a WSO2 Integrator: Default workspace.
               </Alert>
             )}
           </Box>
@@ -479,7 +308,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           color="inherit"
           onClick={() => {
             allowLeave();
-            navigate(orgHomeUrl);
+            navigate(projectsUrl);
           }}
           disabled={isImporting}>
           Cancel

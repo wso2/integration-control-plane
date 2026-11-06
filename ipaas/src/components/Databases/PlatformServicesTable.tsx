@@ -29,6 +29,8 @@ import type { TemporalPlan, TemporalServer } from '../../types/temporal';
 import DeleteDatabaseDialog from './DeleteDatabaseDialog';
 import DeleteTemporalDialog from '../Temporal/DeleteTemporalDialog';
 import ServicePlanCell from './ServicePlanCell';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 
 /** One listed platform service, of whichever type. */
 export type ServiceRow = { kind: 'postgres'; server: DatabaseServer } | { kind: 'temporal'; server: TemporalServer };
@@ -74,6 +76,7 @@ interface PlatformServicesTableProps {
 
 export default function PlatformServicesTable({ rows, databasePlans, temporalPlans, onOpen }: PlatformServicesTableProps): JSX.Element {
   const [deleting, setDeleting] = useState<ServiceRow | null>(null);
+  const canDelete = useCan()(Scopes.CONFIG_MANAGE);
   return (
     <ListingTable.Container disablePaper>
       <ListingTable variant="card" density="compact" sx={CARD_TABLE_SX}>
@@ -115,9 +118,16 @@ export default function PlatformServicesTable({ rows, databasePlans, temporalPla
                   <Stack direction="row" alignItems="center" gap={1.5}>
                     {row.kind === 'temporal' ? <Workflow size={20} /> : <Database size={20} />}
                     <Box>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {server.name}
-                      </Typography>
+                      <Stack direction="row" alignItems="center" gap={1}>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {server.name}
+                        </Typography>
+                        {row.kind === 'temporal' && row.server.managed && (
+                          <Tooltip title="Runs your workflow integrations. The integration platform created it.">
+                            <Chip label="Managed" size="small" variant="outlined" sx={badgeSx} />
+                          </Tooltip>
+                        )}
+                      </Stack>
                       {row.kind === 'temporal' && row.server.namespace && (
                         <Typography variant="caption" color="text.secondary">
                           Namespace {row.server.namespace}
@@ -155,7 +165,7 @@ export default function PlatformServicesTable({ rows, databasePlans, temporalPla
                 </ListingTable.Cell>
                 <ListingTable.Cell align="right">
                   {/* A service being torn down is already on its way out. */}
-                  {openable && (
+                  {openable && canDelete && (
                     <Tooltip title="Delete">
                       <IconButton
                         size="small"
