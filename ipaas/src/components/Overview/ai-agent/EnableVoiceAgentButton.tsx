@@ -16,10 +16,12 @@
  * under the License.
  */
 
-import { Button } from '@wso2/oxygen-ui';
+import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { CircleCheck, Mic } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
+import { useDeploymentStatus } from '../../../hooks/useDeployments';
+import { useSelectedTrack } from '../../../hooks/useSelectedTrack';
 import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
 import { useScope } from '../../../nav';
 import { componentOverviewUrl, createVoiceAgentUrl } from '../../../paths';
@@ -34,11 +36,16 @@ interface EnableVoiceAgentButtonProps {
 /**
  * AI agent overview action: opens the voice agent wizard with this agent fixed as the target,
  * or, once a voice agent speaks for it, links to that voice agent (Devant's EnableVoiceAgentButton).
+ * It is offered only once the agent's latest build has succeeded: a voice agent needs a running
+ * agent to talk to.
  */
 export default function EnableVoiceAgentButton({ component, orgHandler, projectId }: EnableVoiceAgentButtonProps): JSX.Element | null {
   const navigate = useAppNavigate();
   const scope = useScope();
   const { voiceAgent, isLoading, isError } = useLinkedVoiceAgent(orgHandler, projectId, component.handler);
+  const { trackId } = useSelectedTrack(component);
+  const { data: builds, isPending: loadingBuilds } = useDeploymentStatus(component.id, trackId);
+  const latest = builds?.[0];
 
   // A failed lookup is not "no voice agent": offering to create one could make a duplicate.
   if (scope.level !== 'components' || isLoading || isError) return null;
@@ -51,9 +58,28 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
       </Button>
     );
   }
+  const buildSucceeded = latest?.status === 'completed' && latest.conclusion === 'success';
+  const blockedReason = loadingBuilds
+    ? 'Checking the latest build…'
+    : !latest
+      ? 'Build this agent first. Voice agents can be enabled once a build succeeds.'
+      : latest.status !== 'completed'
+        ? 'Available once the running build succeeds.'
+        : !buildSucceeded
+          ? "The latest build failed. Fix it and rebuild to enable voice agents."
+          : '';
   return (
-    <Button variant="text" size="small" startIcon={<Mic size={16} />} onClick={() => navigate(createVoiceAgentUrl(orgHandler, projectHandler, { handler: component.handler, name: component.displayName || component.handler }))}>
-      Enable voice agents
-    </Button>
+    <Tooltip title={blockedReason} placement="left">
+      <span>
+        <Button
+          variant="text"
+          size="small"
+          startIcon={<Mic size={16} />}
+          disabled={!buildSucceeded}
+          onClick={() => navigate(createVoiceAgentUrl(orgHandler, projectHandler, { handler: component.handler, name: component.displayName || component.handler }))}>
+          Enable voice agents
+        </Button>
+      </span>
+    </Tooltip>
   );
 }
