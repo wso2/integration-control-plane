@@ -32,11 +32,13 @@ export function FieldLinkPicker({ field, picker }: { field: string; picker: Pick
   return (
     <>
       <Tooltip title="Link">
-        <IconButton size="small" aria-label={`Link ${field}`} color={anchor ? 'primary' : 'default'} onClick={(e) => setAnchor(e.currentTarget)} sx={{ p: 0.25 }}>
-          <Link2 size={14} />
-        </IconButton>
+        <span>
+          <IconButton size="small" aria-label={`Link ${field}`} color={anchor ? 'primary' : 'default'} disabled={picker.disabled} onClick={(e) => setAnchor(e.currentTarget)} sx={{ p: 0.25 }}>
+            <Link2 size={14} />
+          </IconButton>
+        </span>
       </Tooltip>
-      <Popover open={!!anchor} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
+      <Popover open={!!anchor && !picker.disabled} anchorEl={anchor} onClose={() => setAnchor(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <MenuList dense aria-label={`Source of ${field}`} sx={{ minWidth: 280, maxHeight: 320, overflow: 'auto' }}>
           <MenuItem selected={picker.selected === picker.first} onClick={() => pick(null)}>
             {picker.first}

@@ -134,6 +134,11 @@ export const schemaFields = (schema: JSONSchema): SchemaField[] => {
   );
 };
 
+const SIMPLE_TYPES = ['string', 'integer', 'number', 'float', 'boolean'];
+
+/** The config keys a link can fill: the build's simple-typed configurables, not records, maps, arrays or their members. */
+export const linkableFields = (schema: JSONSchema): string[] => schemaFields(schema).flatMap((f) => (SIMPLE_TYPES.includes(f.schema.properties?.[f.key]?.type ?? '') ? [f.path] : []));
+
 const LIBRARY_ORGS = ['ballerina', 'ballerinax', 'ballerinai'];
 
 /** The integration's own package among the fields': the first not from a library org. */
