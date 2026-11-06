@@ -75,7 +75,7 @@ export function thunderConfig(): ThunderIDProviderProps {
  * would fail; the profile comes from the session's ID token claims.
  */
 function bffConfig(): ThunderIDProviderProps {
-  const { authBffContext, authBffSignInUrl, authBffProxyContext, asgardeoSignInRedirectUrl } = window.API_CONFIG;
+  const { authBffContext, authBffSignInUrl, authBffProxyContext, asgardeoSignInRedirectUrl, observabilityUrl } = window.API_CONFIG;
   return {
     instanceId: THUNDER_INSTANCE_ID,
     baseUrl: window.location.origin,
@@ -89,8 +89,8 @@ function bffConfig(): ThunderIDProviderProps {
         signOut: `${authBffContext}/logout`,
         // The gateway's API root, under which each product's oauth2-session-proxy sits.
         proxy: authBffProxyContext ?? '/_api',
-        // No gateway operation answers it: the browser is never meant to hold a token, so a stray call 404s.
         token: `${authBffContext}/token`,
+        bypass: { urls: observabilityUrl ? [observabilityUrl] : [] },
       },
     },
     afterSignInUrl: asgardeoSignInRedirectUrl,
