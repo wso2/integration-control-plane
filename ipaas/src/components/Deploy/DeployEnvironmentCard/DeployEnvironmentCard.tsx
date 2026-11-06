@@ -40,6 +40,8 @@ import DeployEnvironmentCardBody from './DeployEnvironmentCardBody';
 import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 import DeploymentHistoryDrawer from './DeploymentHistoryDrawer';
 import EndpointsDrawer from './EndpointsDrawer';
+import WorkflowRuntimeRow from './WorkflowRuntimeRow';
+import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
 
 export default function DeployEnvironmentCard({
@@ -52,6 +54,7 @@ export default function DeployEnvironmentCard({
   flags,
   hideEndpoints = false,
   displayType,
+  isWorkflow = false,
   env,
   componentName,
   projectHandler,
@@ -307,6 +310,8 @@ export default function DeployEnvironmentCard({
   // offer the recovery action instead, and hold it through the redeploy.
   const showRedeploy = !flags.isAutomation && isError && hasRelease && !isStopPending;
   const showPromote = !!nextEnvId;
+  const { data: workflowRuntime } = useWorkflowRuntime(isWorkflow);
+  const workflowRuntimeBlocked = isWorkflow && workflowRuntime?.status !== 'READY';
 
   return (
     <>
@@ -351,6 +356,7 @@ export default function DeployEnvironmentCard({
             configurablesCount={configurablesCount}
             onEndpointsClick={showEndpoints ? () => setEndpointsOpen(true) : undefined}
           />
+          {isWorkflow && <WorkflowRuntimeRow environment={env.id} />}
           <ReleaseLinks projectId={projectId} componentId={componentId} env={envTemplateId} />
         </CardContent>
 
@@ -360,6 +366,7 @@ export default function DeployEnvironmentCard({
               <Tooltip title={!hasRelease ? 'No deployment to promote' : ''}>
                 <span>
                   <PromoteButton
+                    blockedReason={workflowRuntimeBlocked ? 'Preparing workflow runtime' : undefined}
                     orgHandler={orgHandler}
                     projectId={projectId}
                     componentId={componentId}

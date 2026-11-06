@@ -46,7 +46,7 @@ export default function DirectoryPickerField({ repo, value, onChange, statusIcon
     <>
       <TextField
         labelPlacement="top"
-        label="Repository Sub Path"
+        label="Repository sub path"
         optional
         value={value}
         fullWidth

@@ -26,6 +26,7 @@ import type { Component } from '../../../types/component';
 import type { Environment } from '../../../types/environment';
 import type { EnvCardNotification, EnvCardSlotProps, IntegrationModule } from '../../../types/integration';
 import { deploymentPollIntervalUntil, REQUESTED_POLL_WINDOW_MS } from '../../../utils/deploymentStatus';
+import DeployButton from './DeployButton';
 import EnvCardHeader from './EnvCardHeader';
 import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 
@@ -134,13 +135,16 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
     onTrigger,
   };
 
-  const { CustomHeader, HeaderStatus, EnvCardActions, EnvCardBody, EnvCardFooter } = module;
+  const { CustomHeader, HeaderStatus, EnvCardActions, EnvCardBody, EnvCardFooter, DeployAction = DeployButton } = module;
+  // With auto deploy off a build reaches no environment by itself, so the first one offers to deploy it.
+  const autoDeployEnabled = component.deploymentTracks?.find((t) => t.id === versionId)?.autoDeployEnabled ?? false;
+  const deployAction = !prevEnv && !autoDeployEnabled && !loadingDeployment ? <DeployAction {...slotProps} /> : undefined;
 
   return (
     <Card sx={{ mb: 3 }}>
       <CardContent sx={{ pb: (theme) => `${theme.spacing(2)} !important` }}>
         {CustomHeader ? (
-          <CustomHeader {...slotProps} isRefreshing={isRefreshing} onRefresh={handleRefresh} />
+          <CustomHeader {...slotProps} isRefreshing={isRefreshing} onRefresh={handleRefresh} deployAction={deployAction} />
         ) : (
           <EnvCardHeader
             envName={env.name}
@@ -151,7 +155,16 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
             // Held back while loading so the card settles in one go: the bodies
             // already skeleton, and these would otherwise render off a null status.
             status={HeaderStatus && !loadingDeployment ? <HeaderStatus {...slotProps} /> : undefined}
-            actions={EnvCardActions && !loadingDeployment ? <EnvCardActions {...slotProps} /> : undefined}
+            actions={
+              EnvCardActions && !loadingDeployment ? (
+                <>
+                  <EnvCardActions {...slotProps} />
+                  {deployAction}
+                </>
+              ) : (
+                deployAction
+              )
+            }
           />
         )}
 

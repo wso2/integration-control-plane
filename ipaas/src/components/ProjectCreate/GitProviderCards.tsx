@@ -80,7 +80,7 @@ export default function GitProviderCards({ onGitHubSelect, onPublicSelect }: Git
   return (
     <Box sx={providerGridSx}>
       {/* Public Git Repository — first, since it needs no authorization */}
-      <InfoCard icon={<GitLogoIcon size={ICON_SIZE} />} title="Connect a Public GitHub Repository" tooltip="Import from a public GitHub repository" onClick={onPublicSelect} />
+      <InfoCard icon={<GitLogoIcon size={ICON_SIZE} />} title="Connect a public GitHub repository" tooltip="Import from a public GitHub repository" onClick={onPublicSelect} />
 
       {/* GitHub */}
       {gitHubEnabled ? (

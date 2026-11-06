@@ -92,10 +92,10 @@ export default function AutomationInsights({ releaseId, executionScope }: Automa
     <>
       <Divider sx={{ mt: 2, mb: 1.5 }} />
       <Stack direction="row" gap={2} flexWrap="wrap">
-        <MetricTile icon={<AlertTriangle size={16} />} label="Error Rate" value={errorRate} unit="%" loading={execLoading} />
-        <MetricTile icon={<Clock size={16} />} label="Avg Duration" value={avgDuration} unit="s" loading={execLoading} />
-        <MetricTile icon={<Activity size={16} />} label="99th Percentile Latency" value={p99Duration} unit="s" loading={execLoading} />
-        <MetricTile icon={<TrendingUp size={16} />} label="Total Executions" value={count ?? null} loading={countLoading} />
+        <MetricTile icon={<AlertTriangle size={16} />} label="Error rate" value={errorRate} unit="%" loading={execLoading} />
+        <MetricTile icon={<Clock size={16} />} label="Avg duration" value={avgDuration} unit="s" loading={execLoading} />
+        <MetricTile icon={<Activity size={16} />} label="99th percentile latency" value={p99Duration} unit="s" loading={execLoading} />
+        <MetricTile icon={<TrendingUp size={16} />} label="Total executions" value={count ?? null} loading={countLoading} />
       </Stack>
     </>
   );

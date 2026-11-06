@@ -82,7 +82,7 @@ export default function DeploymentTrackBar({ component, extra }: DeploymentTrack
           <>
             <Stack direction="row" alignItems="center" gap={0.5}>
               <Typography variant="body2" color="text.secondary" sx={barCaptionSx}>
-                Deployment Track
+                Deployment track
               </Typography>
               <Tooltip title={TOOLTIP_TEXT} placement="right">
                 <Box role="img" aria-label={TOOLTIP_TEXT} sx={tooltipAnchorSx}>
@@ -102,7 +102,7 @@ export default function DeploymentTrackBar({ component, extra }: DeploymentTrack
                 const track = tracks.find((t) => t.id === value);
                 return track ? <TrackLabel track={track} /> : null;
               }}
-              inputProps={{ 'aria-label': 'Deployment Track' }}
+              inputProps={{ 'aria-label': 'Deployment track' }}
               sx={{ ...PILL_SELECT_SX, minWidth: 160 }}>
               {tracksUrl && (
                 <MenuItem value={MANAGE_TRACKS} sx={manageTracksItemSx}>

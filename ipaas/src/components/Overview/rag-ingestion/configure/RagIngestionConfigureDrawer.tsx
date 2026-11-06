@@ -36,10 +36,10 @@ import ImageStep from './ImageStep';
 export type ConfigureStep = 'envVars' | 'fileMount' | 'schedule' | 'image';
 
 const STEP_LABELS: Record<ConfigureStep, string> = {
-  envVars: 'Environment Variables',
-  fileMount: 'Configuration File',
+  envVars: 'Environment variables',
+  fileMount: 'Configuration file',
   schedule: 'Schedule',
-  image: 'Update Image',
+  image: 'Update image',
 };
 
 /** Full step set for a RAG ingestion (BYOI scheduled task). */

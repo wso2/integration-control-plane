@@ -35,6 +35,7 @@ import { FieldLinkPicker } from '../SchemaConfigForm/FieldLinkPicker';
 import { fromText } from '../SchemaConfigForm/linkedFrom';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 const STEPS = ['Configurations', 'Endpoints'];
 
@@ -140,6 +141,9 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const errors = useMemo(() => validateMiConfigDraft(named, storedSecrets), [named, storedSecrets]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
+  useUnsavedChanges(open && hasChanges);
+  const guardNavigation = useLeaveGuard();
+  const requestClose = () => guardNavigation(handleClose);
 
   // Errors on blank rows only show after a save attempt, so a just-added row is not red.
   const errorFor = (id: string, key: string): string => {
@@ -358,10 +362,10 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           The integration reads these as <code>{'${configs.<key>}'}</code>. To mount files, go to{' '}
           {configsUrl ? (
             <Link component={RouterLink} to={configsUrl}>
-              Configs &amp; Secrets
+              Configs &amp; secrets
             </Link>
           ) : (
-            'Configs & Secrets'
+            'Configs & secrets'
           )}
           .
         </Alert>
@@ -370,7 +374,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
             Links come from workload.yaml in the repository.
           </Typography>
         )}
-        {renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')}
+        {renderSection('Environment variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')}
         {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')}
         {showErrors && errors.size > 0 && <Alert severity="error">Fix the highlighted keys before saving.</Alert>}
       </>
@@ -385,7 +389,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   return (
     <>
-      <DrawerPanel open={open} onClose={handleClose}>
+      <DrawerPanel open={open} onClose={requestClose}>
         <DrawerPanel.Header>
           <DrawerPanel.Title>Configurations</DrawerPanel.Title>
           <DrawerPanel.Actions>
@@ -406,7 +410,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         {/* ManageEndpoint has its own Cancel/Update. */}
         {!(step === 2 && managingEp) && (
           <DrawerPanel.Footer>
-            <Button variant="outlined" color="inherit" onClick={step === 2 ? () => setStep(1) : handleClose}>
+            <Button variant="outlined" color="inherit" onClick={step === 2 ? () => setStep(1) : requestClose}>
               {step === 2 ? 'Back' : 'Cancel'}
             </Button>
             {step < lastStep ? (

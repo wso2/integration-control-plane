@@ -17,16 +17,12 @@
  */
 
 export const sectionSx = {
-  mt: 8,
+  mt: 5,
 } as const;
 
 export const headingSx = {
   fontWeight: 600,
   mb: 1.5,
-} as const;
-
-export const cardSx = {
-  boxShadow: 'none',
 } as const;
 
 export const cardContentSx = {

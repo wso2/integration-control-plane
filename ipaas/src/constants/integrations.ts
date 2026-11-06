@@ -46,6 +46,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
   'miCronjob',
   'miJob',
   'miWebhook',
+  'ballerinaWorkflow',
   'byocWebhook',
   'buildpackWebhook',
   'ballerinaEventHandler',
@@ -96,6 +97,10 @@ export function getDisplayLabel(displayType: string, componentSubType: string | 
       return 'Webhook';
     case 'rag-ingestion':
       return 'RAG Ingestion';
+    case 'kb-ingestion':
+      return 'Knowledge Base Data Source';
+    case 'knowledge-base':
+      return 'Knowledge Base Service';
     case 'rag-retrieval-service':
     case 'rag-service':
       return 'Integration as API';
@@ -119,6 +124,8 @@ export function getDisplayLabel(displayType: string, componentSubType: string | 
       return 'Automation';
     case 'manualTrigger':
       return 'Manual Trigger';
+    case 'ballerinaWorkflow':
+      return 'Workflow';
     case 'proxy':
     case 'gitProxy':
       return 'REST API Proxy';
@@ -169,6 +176,7 @@ export const COMPONENT_TYPE_LABELS: Record<string, string> = {
   'ai-agent': 'AI Agent',
   'event-handler': 'Event Integration',
   'file-integration': 'File Integration',
+  workflow: 'Workflow',
   'test-runner': 'Test Runner',
   'web-application': 'Web Application',
 };
@@ -228,9 +236,15 @@ export function componentSubTypeFromSample(componentType: string, buildPack: str
   return undefined;
 }
 
+/** Product names of the two runtimes, shown wherever the user picks or reads an integration's technology. */
+export const TECHNOLOGY_LABELS = {
+  BI: 'WSO2 Integrator',
+  MI: 'WSO2 Integrator: MI',
+} as const;
+
 export const BUILDPACK_LABELS: Record<string, string> = {
-  ballerina: 'Ballerina',
-  'wso2-mi': 'WSO2 MI',
+  ballerina: TECHNOLOGY_LABELS.BI,
+  [MI_BUILDPACK]: TECHNOLOGY_LABELS.MI,
 };
 
 export function formatBuildPack(buildPack: string): string {

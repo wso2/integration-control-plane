@@ -24,17 +24,11 @@ export const bandSx = {
   backdropFilter: 'blur(3px)',
 } as const;
 
-/**
- * Inner row, matching PageContent's centred 1400px box so the environment selector's
- * left edge lands on the PageTitle's start point at every viewport width.
- */
+// Same side padding as the full-width PageContent below, so the selector lines up with the PageTitle.
 export const barSx = {
   display: 'flex',
   alignItems: 'center',
   gap: 2,
-  width: '100%',
-  maxWidth: 1400,
-  mx: 'auto',
   px: 8,
   minHeight: 48,
 } as const;

@@ -27,6 +27,7 @@ import { friendlyApiError } from '../../../utils/apiSecurity';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
 import CopyButton from './CopyButton';
 import * as styles from './apiConsumption.styles';
+import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 
 type ConfirmAction = 'regenerate' | 'revoke';
 
@@ -117,15 +118,18 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
   const hasCredentials = !!consumerInView;
   const isRevoked = consumerInView?.status === 'revoked';
 
+  useUnsavedChanges(open && !hasCredentials && appName.trim() !== '');
+  const guardNavigation = useLeaveGuard();
+
   const handleClose = () => {
-    if (!busy) onClose();
+    if (!busy) guardNavigation(onClose);
   };
 
   return (
     <DrawerPanel open={open} onClose={handleClose}>
       <DrawerPanel.Header>
         <Stack direction="row" alignItems="center" gap={1.25} sx={{ flex: 1, minWidth: 0 }}>
-          <DrawerPanel.Title sx={{ flex: '0 1 auto' }}>{hasCredentials ? consumerInView.displayName : 'New Consumer Application'}</DrawerPanel.Title>
+          <DrawerPanel.Title sx={{ flex: '0 1 auto' }}>{hasCredentials ? consumerInView.displayName : 'New consumer application'}</DrawerPanel.Title>
           <Chip label={envLabel} size="small" color="success" variant="outlined" sx={styles.envChip} />
         </Stack>
         <DrawerPanel.Actions>
@@ -142,7 +146,7 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
 
         <TextField
           labelPlacement="top"
-          label="Consumer Application Name"
+          label="Consumer application name"
           value={hasCredentials ? consumerInView.displayName : appName}
           onChange={(e) => setAppName(e.target.value)}
           placeholder="e.g. my-greeting-client"
@@ -172,14 +176,14 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
               <CopyButton value={DEFAULT_API_KEY_HEADER} label="Copy header name" />
             </Box>
 
-            <Typography sx={styles.nextFieldLabel}>API Key</Typography>
+            <Typography sx={styles.nextFieldLabel}>API key</Typography>
             {token ? (
               <Box sx={styles.credField}>
                 <Typography component="span" sx={styles.credValue}>
                   {revealToken ? token : TOKEN_MASK}
                 </Typography>
                 <Tooltip title={revealToken ? 'Hide' : 'Reveal'}>
-                  <IconButton size="small" onClick={() => setRevealToken((v) => !v)} sx={styles.credIconButton}>
+                  <IconButton aria-label={revealToken ? 'Hide API key' : 'Reveal API key'} size="small" onClick={() => setRevealToken((v) => !v)} sx={styles.credIconButton}>
                     {revealToken ? <EyeOff size={15} /> : <Eye size={15} />}
                   </IconButton>
                 </Tooltip>
@@ -210,7 +214,7 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
           </>
         ) : (
           <>
-            <Button variant="outlined" color="inherit" onClick={onClose} disabled={busy}>
+            <Button variant="outlined" color="inherit" onClick={handleClose} disabled={busy}>
               Cancel
             </Button>
             <Button variant="contained" onClick={() => void handleGenerate()} disabled={!appName.trim() || nameTaken || busy} startIcon={createMutation.isPending ? <CircularProgress size={14} color="inherit" /> : undefined}>

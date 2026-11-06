@@ -24,6 +24,7 @@ import type { EndpointOption, SecurityConfig, SecurityMode } from '../../../type
 import { endpointLoadNotice, friendlyApiError } from '../../../utils/apiSecurity';
 import { useEndpointDrawer } from './useEndpointDrawer';
 import * as styles from './apiConsumption.styles';
+import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
 
 interface ApiSecurityDrawerProps {
   open: boolean;
@@ -41,7 +42,7 @@ interface ApiSecurityDrawerProps {
 }
 
 /**
- * Cloud-only "Configure Security" drawer for one exposed endpoint API. Mirrors
+ * Cloud-only "Configure security" drawer for one exposed endpoint API. Mirrors
  * the APIM SecurityDrawer's layout (endpoint selector + security-scheme table)
  * minus the Resources section, which has no cloud equivalent.
  */
@@ -96,15 +97,20 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
     }
   };
 
-  const handleCancel = () => {
-    setError(null);
-    onClose();
-  };
+  const savedHeader = security?.apiKey?.header || DEFAULT_API_KEY_HEADER;
+  useUnsavedChanges(open && !!security && (mode !== security.mode || (isApiKey && apiKeyHeader.trim() !== savedHeader)));
+  const guardNavigation = useLeaveGuard();
+
+  const handleCancel = () =>
+    guardNavigation(() => {
+      setError(null);
+      onClose();
+    });
 
   return (
     <DrawerPanel open={open} onClose={handleCancel}>
       <DrawerPanel.Header>
-        <DrawerPanel.Title>Configure Security</DrawerPanel.Title>
+        <DrawerPanel.Title>Configure security</DrawerPanel.Title>
         <DrawerPanel.Actions>
           <DrawerPanel.CloseButton />
         </DrawerPanel.Actions>
@@ -122,7 +128,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
               <Typography variant="body2" fontWeight={500}>
                 Endpoints:
               </Typography>
-              <Select size="small" value={selectedIdx} onChange={(e) => selectEndpoint(Number(e.target.value))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
+              <Select size="small" value={selectedIdx} onChange={(e) => guardNavigation(() => selectEndpoint(Number(e.target.value)))} disabled={endpoints.length <= 1} sx={styles.endpointSelect}>
                 {endpoints.map((ep, i) => (
                   <MenuItem key={ep.name} value={i}>
                     {ep.displayName}
@@ -140,14 +146,14 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={styles.tableHeadCell}>Security Scheme</TableCell>
-                      <TableCell sx={styles.tableHeadCell}>Security Header</TableCell>
+                      <TableCell sx={styles.tableHeadCell}>Security scheme</TableCell>
+                      <TableCell sx={styles.tableHeadCell}>Security header</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     <TableRow>
                       <TableCell sx={styles.schemeCell}>
-                        <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => selectScheme('api-key')} size="small" />} label="API Key" />
+                        <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => selectScheme('api-key')} size="small" />} label="API key" />
                       </TableCell>
                       <TableCell>
                         <TextField size="small" value={apiKeyHeader} onChange={(e) => setApiKeyHeader(e.target.value)} disabled={!isApiKey} fullWidth />

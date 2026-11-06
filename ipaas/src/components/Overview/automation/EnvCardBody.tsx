@@ -27,6 +27,7 @@ import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import AutomationExecutions from '../../AutomationExecutions';
 import DeploymentNotice from '../../DeploymentNotice';
 import AutomationInsights from './AutomationInsights';
+import { ENV_CARD_INSIGHTS_ENABLED } from '../../../constants/insights';
 
 /**
  * Automation's content-only body: a schedule-description banner, the executions
@@ -55,7 +56,7 @@ export default function EnvCardBody({
   const { data: scheduleConfig } = useExecutionConfigs(component.id, releaseId, env.id);
   const hasSchedule = !!scheduleConfig?.cronjobFrequency;
   const scheduleDescription = hasSchedule ? `${describeCron(scheduleConfig!.cronjobFrequency!)}, in time zone ${scheduleConfig?.cronjobTimezone || 'UTC'}` : 'This automation doesn’t have an active schedule. Add one to run it automatically.';
-  const showInsights = !!env.critical && !!releaseId;
+  const showInsights = ENV_CARD_INSIGHTS_ENABLED && !!env.critical && !!releaseId;
 
   if (loadingDeployment) return <EnvCardSkeleton />;
 

@@ -43,6 +43,8 @@ export interface BuildAreaProps {
    * user-configurable endpoints (devant only shows endpoint config for generic
    * services / MCP). Resolved by `identifyIntegration` in Deploy.tsx.
    */
+  /** A workflow integration, which deploys only once the platform's workflow runtime is ready. */
+  isWorkflow?: boolean;
   hideEndpoints?: boolean;
 }
 
@@ -63,6 +65,8 @@ export interface DeployEnvironmentCardProps {
   hideEndpoints?: boolean;
   /** The component's real `displayType`; the configure drawer picks its view (e.g. MI) from it. */
   displayType?: string;
+  /** A workflow integration: shows the workflow runtime it runs on, and promotes only once the runtime is ready. */
+  isWorkflow?: boolean;
   env: Environment;
   branch: string;
   componentName: string;

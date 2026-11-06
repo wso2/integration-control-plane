@@ -37,7 +37,7 @@ export default function BuildStatusLabel({ status, conclusion }: BuildStatusLabe
     return (
       <Stack direction="row" alignItems="center" gap={0.75}>
         <InProgressIcon size={16} />
-        <Typography variant="body2">In Progress</Typography>
+        <Typography variant="body2">In progress</Typography>
       </Stack>
     );
   }

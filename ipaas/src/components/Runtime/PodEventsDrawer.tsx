@@ -37,7 +37,7 @@ export default function PodEventsDrawer({ open, onClose, onExited, pod, scope }:
   const { data: events, isLoading, isError } = usePodEvents(scope.projectId, scope.componentHandler, scope.releaseId, podName, open);
 
   return (
-    <PodDrawerShell open={open} onClose={onClose} onExited={onExited} title={`Pod Conditions and Events for ${podName}`}>
+    <PodDrawerShell open={open} onClose={onClose} onExited={onExited} title={`Pod conditions and events for ${podName}`}>
       <PodConditionsStepper pod={pod} />
       <PodEventsTable events={events} isLoading={isLoading} isError={isError} />
     </PodDrawerShell>

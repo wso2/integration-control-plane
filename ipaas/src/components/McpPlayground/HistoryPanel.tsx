@@ -20,6 +20,7 @@ import { Box, Button, Chip, Collapse, Stack, Typography } from '@wso2/oxygen-ui'
 import { Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type KeyboardEvent } from 'react';
 import type { McpHistoryEvent, McpHistoryEventType } from '../../types/mcp';
+import { capitalize } from '../../utils/string';
 
 const TYPE_COLOR: Record<McpHistoryEventType, 'info' | 'success' | 'error' | 'default'> = {
   request: 'info',
@@ -65,7 +66,7 @@ function HistoryRow({ event }: { event: McpHistoryEvent }): JSX.Element {
   return (
     <Box sx={{ borderTop: '1px solid', borderColor: 'divider', px: 1.5, py: 0.75 }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ cursor: hasDetails ? 'pointer' : 'default' }} {...interactiveProps}>
-        <Chip label={event.type} size="small" color={TYPE_COLOR[event.type]} variant="outlined" sx={{ height: 18, fontSize: 10, textTransform: 'uppercase' }} />
+        <Chip label={capitalize(event.type)} size="small" color={TYPE_COLOR[event.type]} variant="outlined" sx={{ height: 18, fontSize: 10 }} />
         <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', flexShrink: 0 }}>
           {new Date(event.timestamp).toLocaleTimeString()}
         </Typography>
@@ -98,7 +99,7 @@ export default function HistoryPanel({ history, onClear }: { history: McpHistory
     <Stack sx={{ height: '100%', minHeight: 0 }}>
       <Stack direction="row" alignItems="center" gap={1} sx={{ px: 2, py: 1, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
         <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-          Activity History
+          Activity history
         </Typography>
         <Chip label={history.length} size="small" variant="outlined" sx={{ height: 18, fontSize: 10 }} />
         <Box sx={{ flex: 1 }} />

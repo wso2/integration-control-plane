@@ -38,9 +38,11 @@ interface PromoteButtonProps {
   icon?: ReactNode;
   onPromoteStarted?: () => void;
   onPromoteSettled?: () => void;
+  /** Why the promote cannot run yet, when something outside this deployment holds it back. */
+  blockedReason?: string;
 }
 
-export default function PromoteButton({ orgHandler, projectId, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled }: PromoteButtonProps) {
+export default function PromoteButton({ orgHandler, projectId, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
@@ -56,7 +58,7 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const alreadyPromoted = !deploymentsLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
 
   const missingPipeline = !deploymentPipelineId;
-  const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted;
+  const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted && !blockedReason;
 
   // The target starts the release with the resources it carries: decide on a read made now, not on a cached or pending one.
   const checkThenPromote = async () => {
@@ -86,7 +88,8 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
     );
   };
 
-  const tooltipTitle = !buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : '';
+  const tooltipTitle =
+    blockedReason ?? (!buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : promote.isError ? promote.error.message : '');
 
   return (
     <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>

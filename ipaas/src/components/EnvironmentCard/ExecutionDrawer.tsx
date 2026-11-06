@@ -23,6 +23,7 @@ import { useExecutionArguments } from '../../hooks/useExecutions';
 import type { TaskExecution } from '../../types/executions';
 import { executionIdTail } from '../../utils/executionStatus';
 import { useTriggerComponent } from '../../hooks/useExecutions';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 interface ExecutionDrawerProps {
   execution: TaskExecution | null;
@@ -54,10 +55,19 @@ function isTerminal(status: string): boolean {
   return v === 'succeeded' || v === 'success' || v === 'failed' || v === 'failure';
 }
 
-function StatusIcon({ status }: { status: string }) {
+function isSucceeded(status: string): boolean {
   const v = status?.toLowerCase();
+  return v === 'succeeded' || v === 'success';
+}
+
+// A finished run that did not succeed; the status icon and the failure alert agree on this.
+function isFailed(status: string): boolean {
+  return isTerminal(status) && !isSucceeded(status);
+}
+
+function StatusIcon({ status }: { status: string }) {
   if (!isTerminal(status)) return <CircularProgress size={16} />;
-  if (v === 'succeeded' || v === 'success') return <CheckCircle2 size={16} color="green" />;
+  if (isSucceeded(status)) return <CheckCircle2 size={16} color="green" />;
   return <XCircle size={16} color="red" />;
 }
 
@@ -76,12 +86,12 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
 
   const { data: fetchedArgs, isLoading: argsLoading } = useExecutionArguments(execution?.runId ?? '', componentId, releaseId, open && !!execution?.runId);
 
-  // Populate editable args from fetched data
+  // Re-seeded on every open: a cached run returns the same args object, so a close-reset would otherwise stick.
   useEffect(() => {
-    if (fetchedArgs) {
+    if (open && fetchedArgs) {
       setArgs(fetchedArgs.length > 0 ? fetchedArgs.map((a) => a.argumentValue) : ['']);
     }
-  }, [fetchedArgs]);
+  }, [open, fetchedArgs]);
 
   // Reset state when drawer closes
   useEffect(() => {
@@ -90,6 +100,11 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
       setRunError(null);
     }
   }, [open]);
+
+  const savedArgs = fetchedArgs && fetchedArgs.length > 0 ? fetchedArgs.map((a) => a.argumentValue) : [''];
+  useUnsavedChanges(open && !argsLoading && JSON.stringify(args) !== JSON.stringify(savedArgs));
+  const guardNavigation = useLeaveGuard();
+  const requestClose = () => guardNavigation(handleClose);
 
   const handleCopy = () => {
     if (!execution?.revisionId) return;
@@ -124,7 +139,7 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
   };
 
   return (
-    <DrawerPanel open={open} onClose={handleClose} width={680}>
+    <DrawerPanel open={open} onClose={requestClose} width={680}>
       <DrawerPanel.Header>
         <Stack direction="row" alignItems="center" gap={0.5} sx={{ flex: 1, minWidth: 0 }}>
           <DrawerPanel.Title sx={{ flex: '0 1 auto' }}>{execution ? `Execution: ${executionIdTail(execution.id)}` : 'Execution'}</DrawerPanel.Title>
@@ -176,6 +191,12 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
                   </Box>
                 </Stack>
               </Box>
+              {/* A run that recovered on a retry can still carry the reason its first attempt failed. */}
+              {execution.failedReason && isFailed(execution.status) && (
+                <Alert severity="error" sx={{ mt: 1.5 }}>
+                  {execution.failedReason}
+                </Alert>
+              )}
             </Box>
 
             {/* Tabs */}
@@ -231,7 +252,7 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
           {/* Footer */}
           {!argsLoading && (
             <DrawerPanel.Footer>
-              <Button variant="outlined" color="inherit" onClick={onClose}>
+              <Button variant="outlined" color="inherit" onClick={requestClose}>
                 Cancel
               </Button>
               <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>

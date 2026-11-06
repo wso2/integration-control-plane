@@ -29,7 +29,6 @@ export const cardSx = {
 export const placeholderTitleSx = (hasSubtitle: boolean) =>
   ({
     fontWeight: 600,
-    textTransform: 'capitalize',
     mb: hasSubtitle ? 1 : 0,
   }) as const;
 

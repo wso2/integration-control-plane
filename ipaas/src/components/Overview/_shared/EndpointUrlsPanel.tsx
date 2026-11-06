@@ -90,7 +90,7 @@ export default function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, ex
       download={
         <Tooltip title={canDownload ? 'Download API specification' : 'No API specification published for this endpoint'}>
           <span>
-            <IconButton size="small" disabled={!canDownload} onClick={() => void handleDownload()}>
+            <IconButton aria-label="Download API specification" size="small" disabled={!canDownload} onClick={() => void handleDownload()}>
               <Download size={16} />
             </IconButton>
           </span>

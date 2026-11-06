@@ -18,6 +18,7 @@
 
 import { Box, Tooltip, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
+import { START_QUICKLY_CARD_MIN_HEIGHT } from '../constants/styles';
 import type { PrebuiltIntegration } from '../types/prebuilt';
 import AppIconsRow from './AppIconsRow';
 
@@ -30,7 +31,9 @@ export default function PrebuiltCard({ integration, onClick, disabled, disabledT
           display: 'flex',
           alignItems: 'center',
           width: '100%',
-          p: 1.5,
+          minHeight: START_QUICKLY_CARD_MIN_HEIGHT,
+          py: 2.4,
+          px: 1.5,
           border: '1px solid',
           borderColor: 'divider',
           borderRadius: 1.5,

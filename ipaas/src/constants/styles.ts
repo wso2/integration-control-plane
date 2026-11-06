@@ -25,6 +25,26 @@ export const CARD_HOVER_SX = {
   },
 } as const;
 
+// Tall enough for PrebuiltCard's padded app-icon row, so both Start quickly tabs list cards of one height.
+export const START_QUICKLY_CARD_MIN_HEIGHT = 90;
+
+type PrimaryTheme = { palette: { primary: { main: string } } };
+
+export const primaryTint = (percent: number) => (t: PrimaryTheme) => `color-mix(in srgb, ${t.palette.primary.main} ${percent}%, transparent)`;
+
+/** An icon tile lit by a soft primary glow from its top-left. Size it where it is used. */
+export const LIT_ICON_SX = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0,
+  borderRadius: 1,
+  border: 1,
+  borderColor: primaryTint(35),
+  background: (t: PrimaryTheme) => `radial-gradient(circle at 30% 25%, ${primaryTint(28)(t)}, ${primaryTint(8)(t)} 70%)`,
+  color: 'primary.main',
+} as const;
+
 export const PROVIDER_ICON_SX = {
   width: 40,
   height: 40,
@@ -73,4 +93,7 @@ export const CARD_TABLE_SX = {
 } as const;
 
 /** The shared minimum width lines up the commit that follows each card title. */
-export const CARD_HEADER_TITLE_SX = { fontWeight: 600, textTransform: 'capitalize', flexShrink: 0, minWidth: '7em' } as const;
+export const CARD_HEADER_TITLE_SX = { fontWeight: 600, flexShrink: 0, minWidth: '7em' } as const;
+
+// Oxygen 0.20's SearchBar `width="standard"`; pass the prop through once the console is on 0.20.
+export const SEARCH_STANDARD_WIDTH_SX = { width: '100%', maxWidth: 400 } as const;

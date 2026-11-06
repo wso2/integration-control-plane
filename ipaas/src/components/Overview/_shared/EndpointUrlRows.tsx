@@ -43,7 +43,7 @@ function CopyButton({ url }: { url: string }): JSX.Element {
 
   return (
     <Tooltip title={copied ? 'Copied!' : 'Copy URL'}>
-      <IconButton size="small" onClick={handleCopy} sx={copySx}>
+      <IconButton aria-label="Copy URL" size="small" onClick={handleCopy} sx={copySx}>
         {copied ? <Check size={13} /> : <Copy size={13} />}
       </IconButton>
     </Tooltip>

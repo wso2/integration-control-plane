@@ -83,27 +83,29 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   }
 
   if (component.isPrebuilt) {
-    return <ComingSoon title="Deploy Not Available for Prebuilt Integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
+    return <ComingSoon title="Deploy not available for prebuilt integrations" description="Prebuilt integrations are deployed automatically during setup — manual deploy management is not available here." />;
   }
 
-  const flags = getComponentTypeFlags(component.displayType ?? '', component.componentSubType);
   const displayLabel = getDisplayLabel(component.displayType ?? '', component.componentSubType ?? null);
   // Type identified once, via the canonical resolver — NOT re-derived in
   // `getComponentTypeFlags` (which keys only on displayType). File and event
   // integrations share a service displayType + build pipeline, so they deploy
   // like a service; only their (non-existent) endpoint UI is suppressed below.
   const integrationType = identifyIntegration(component.displayType ?? '', component.componentSubType ?? null).type;
+  // A workflow builds and runs as a Ballerina service, so it deploys like one.
+  const isWorkflow = integrationType === 'workflow';
+  const flags = getComponentTypeFlags(isWorkflow ? 'ballerinaService' : (component.displayType ?? ''), component.componentSubType);
   // File/event/AI-agent integrations share a service displayType but expose no
   // user-configurable endpoints — devant opens the endpoint-less
   // ConfigurationWizard for all three. Suppress the endpoint UI accordingly.
   const hideEndpoints = integrationType === 'file-integration' || integrationType === 'event-integration' || integrationType === 'ai-agent';
 
   if (flags.isProxy) {
-    return <ComingSoon title="Proxy Deploy Coming Soon" description="Deploy management for REST API Proxy components will be available in a future release." />;
+    return <ComingSoon title="Proxy deploy coming soon" description="Deploy management for REST API proxy integrations will be available in a future release." />;
   }
 
   if (!flags.isDeployable && !hideEndpoints) {
-    return <ComingSoon title="Deploy Not Yet Supported" description={`Deploy management for ${displayLabel} components is coming soon.`} />;
+    return <ComingSoon title="Deploy not yet supported" description={`Deploy management for ${displayLabel} components is coming soon.`} />;
   }
 
   return (
@@ -134,6 +136,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
               projectHandler={project?.handler ?? ''}
               displayType={component.displayType}
               hideEndpoints={hideEndpoints}
+              isWorkflow={isWorkflow}
             />
           </Box>
 
@@ -156,6 +159,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
                     flags={flags}
                     hideEndpoints={hideEndpoints}
                     displayType={component.displayType}
+                    isWorkflow={isWorkflow}
                     env={env}
                     branch={branch}
                     componentName={component.name}

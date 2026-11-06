@@ -47,7 +47,7 @@ export default function RuntimeLogsOrg(): JSX.Element {
 
   return (
     <LogsPageLayout
-      title="Runtime Logs"
+      title="Runtime logs"
       filtersElement={<LogsToolbar filters={filters} environments={[]} logs={logs} canRefresh onRefetch={refetch} gatewayControls />}
       logPanelElement={
         <LogsViewer

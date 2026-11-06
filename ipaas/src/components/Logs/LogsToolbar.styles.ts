@@ -23,12 +23,19 @@ export const toolbarSx = {
 export const toolbarRowSx = {
   display: 'flex',
   alignItems: 'center',
+  justifyContent: 'space-between',
+  flexWrap: 'wrap',
+  gap: 1.25,
+} as const;
+
+export const toolbarActionsSx = {
+  display: 'flex',
+  alignItems: 'center',
   flexWrap: 'wrap',
   gap: 1.25,
 } as const;
 
 export const searchFieldSx = {
-  flex: 1,
   minWidth: 240,
 } as const;
 
@@ -88,8 +95,6 @@ export const menuSx = {
 export const menuSectionTitleSx = {
   fontSize: 11.5,
   fontWeight: 600,
-  letterSpacing: '0.05em',
-  textTransform: 'uppercase',
   color: 'text.secondary',
 } as const;
 
