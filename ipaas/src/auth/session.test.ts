@@ -153,8 +153,8 @@ describe('authenticatedFetch with a cookie session (BFF)', () => {
   it('sends the gateway token as a Bearer token to the observability host only', async () => {
     const saved = window.API_CONFIG;
     window.API_CONFIG = { ...saved, observabilityUrl: 'https://cloud-obs-proxy.obs.dp.example/' };
-    const bypassToken = vi.fn(async () => 'obs-token');
-    connect({ session: SESSION, getAccessToken: () => Promise.resolve(''), onExpired, checkSession, bypassToken });
+    const observabilityToken = vi.fn(async () => 'obs-token');
+    connect({ session: SESSION, getAccessToken: () => Promise.resolve(''), onExpired, checkSession, observabilityToken });
     fetchMock.mockResolvedValue(new Response('ok'));
     await authenticatedFetch('https://cloud-obs-proxy.obs.dp.example/wso2cloud-obs/api/v1/logs/query', { method: 'POST' });
     await authenticatedFetch('https://cloud-obs-proxy.obs.dp.example.other/x');
@@ -165,7 +165,7 @@ describe('authenticatedFetch with a cookie session (BFF)', () => {
     expect(sentAuth(1)).toBeNull();
     expect(sentAuth(2)).toBeNull();
     expect(sentAuth(3)).toBeNull();
-    expect(bypassToken).toHaveBeenCalledTimes(1);
+    expect(observabilityToken).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the session on a 401 from another host, without asking the gateway', async () => {

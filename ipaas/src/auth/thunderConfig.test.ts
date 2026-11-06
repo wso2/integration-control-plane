@@ -83,7 +83,6 @@ describe('signInParams', () => {
 describe('thunderConfig on the gateway (BFF)', () => {
   beforeEach(() => {
     window.API_CONFIG.authBffContext = '/_auth/integration';
-    window.API_CONFIG.observabilityUrl = 'https://cloud-obs-proxy.obs.dp.example';
   });
 
   it('points the SDK at the gateway’s session endpoints and API root', () => {
@@ -100,7 +99,6 @@ describe('thunderConfig on the gateway (BFF)', () => {
           signOut: '/_auth/integration/logout',
           proxy: '/_api',
           token: '/_auth/integration/token',
-          bypass: { urls: ['https://cloud-obs-proxy.obs.dp.example'] },
         },
       },
     });

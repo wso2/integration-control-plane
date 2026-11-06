@@ -50,7 +50,7 @@ interface Connection {
   /** Ends the session locally once the token has expired anyway. */
   onExpired: () => void;
   checkSession?: () => Promise<boolean>;
-  bypassToken?: () => Promise<string>;
+  observabilityToken?: () => Promise<string>;
 }
 
 let connection: Connection | null = null;
@@ -87,7 +87,7 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
 
 async function cookieFetch(url: string, options: RequestInit, checkSession: () => Promise<boolean>): Promise<Response> {
   const sameOrigin = isSameOrigin(url);
-  const bearer = !sameOrigin && isBypassed(url) ? await connection?.bypassToken?.() : undefined;
+  const bearer = isObservability(url) ? await connection?.observabilityToken?.() : undefined;
   const send = (): Promise<Response> => {
     const headers = new Headers(options.headers);
     if (sameOrigin) headers.set('X-Requested-With', 'XMLHttpRequest');
@@ -102,7 +102,7 @@ async function cookieFetch(url: string, options: RequestInit, checkSession: () =
   return res;
 }
 
-function isBypassed(url: string): boolean {
+function isObservability(url: string): boolean {
   const base = window.API_CONFIG?.observabilityUrl?.replace(/\/+$/, '');
   return !!base && (url === base || url.startsWith(`${base}/`) || url.startsWith(`${base}?`));
 }
