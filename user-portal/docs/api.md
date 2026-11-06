@@ -55,6 +55,7 @@ interface PortalConfig {
   auth: {
     issuer: string;     // OIDC_ISSUER
     clientId: string;   // OIDC_CLIENT_ID: a public client
+    resource: string;   // OIDC_RESOURCE: the portal's API resource, which every token is for
   };
 }
 ```
@@ -89,6 +90,8 @@ UP-DP takes no part. The SPA is the WIdP-DP's public client:
   `${window.location.origin}/`, so a sign-in begins and ends on the origin the browser is on.
 - Every sign-in first reads `/api/v1/auth/scopes` and asks for exactly those scopes. If UP-DP
   doesn't answer, the tab asks for the scopes it asked for last, or fails as `unavailable`.
+- The authorize, code and refresh requests all send `resource=${auth.resource}` (RFC 8707). The
+  WIdP-DP issues a token for one API resource, and without it picks a default one or refuses.
 - A tab with no tokens goes to the authorize endpoint with PKCE, `state`, `nonce` and
   `prompt=none`. The WIdP-DP's own session answers without a page; `login_required` (or another
   interaction error) sends the tab again without `prompt`.
@@ -242,7 +245,7 @@ gateway can reach it: a network policy outside this repository enforces that. Th
 | Setting | Value |
 |---|---|
 | Signature, issuer and expiry | checked with the `ThunderKeyManager` key manager |
-| `audiences` | the portal's API resource |
+| `audiences` | the portal's API resource, `OIDC_RESOURCE` |
 | `claims.anyOf` | `grant_type` is `authorization_code` or `refresh_token`, so a client-credentials token is refused |
 | `forwardToken` | `true` |
 | `forwardedTokenHeader` | `Authorization` |
@@ -253,11 +256,14 @@ mock gateway on `:9200` makes the same checks (see below).
 
 ## iPaaS-Service portal routes (`ipaas-mock`, `:9090`)
 
-Base `/api/v1/portal/orgs/{orgUuid}/environments/{envId}`, where `{envId}` is the environment's
-UUID: UP-DP's `ENVIRONMENT_ID`. The portal can be enabled in more than one environment, and an
-integration is published in each separately. Every call needs a bearer token from the Platform
-IdP (below), issued to a portal client: `client_id` must start with the portal prefix, and the
-token's `ouId` must equal `{orgUuid}`. The token is not tied to an environment. Only integrations
+Base `/user-portal/orgs/{orgUuid}/environments/{envId}`, where `{envId}` is the environment's
+UUID: UP-DP's `ENVIRONMENT_ID`. UP-DP's `IPAAS_BASE_URL` is everything before `/orgs`:
+iPaaS-Service's public address with `/user-portal`, or `http://localhost:9090/user-portal` for the
+mock. The portal can be enabled in more than one environment, and an integration is published
+in each separately. Every call needs a bearer token from the Platform IdP (below), issued to the
+org's portal client: `client_id` must be exactly `wc-user-portal-{orgUuid}`, and the token's
+`ouId` must equal `{orgUuid}`. iPaaS-Service refuses that client on every other route. The token
+is not tied to an environment. Only integrations
 published in `{envId}` are visible; an unknown `{envId}` gets 404. UP-DP calls as the portal: no
 end user's identity is sent.
 

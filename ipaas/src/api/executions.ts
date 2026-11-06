@@ -42,6 +42,7 @@ interface BffExecution {
   startTime?: string;
   completionTime?: string;
   revisionId?: string;
+  failedReason?: string;
 }
 
 // BFF Schedule (CronJob spec) from GET /components/{name}/schedules/{envId}.
@@ -62,7 +63,7 @@ function toUnixSeconds(iso?: string): string {
   return Number.isNaN(t) ? '' : String(Math.floor(t / 1000));
 }
 
-function toTaskExecution(e: BffExecution): TaskExecution {
+export function toTaskExecution(e: BffExecution): TaskExecution {
   const jobId = e.jobId ?? '';
   return {
     id: jobId,
@@ -70,7 +71,7 @@ function toTaskExecution(e: BffExecution): TaskExecution {
     startTime: toUnixSeconds(e.startTime),
     completionTime: toUnixSeconds(e.completionTime),
     revisionId: e.revisionId ?? '',
-    failedReason: '',
+    failedReason: e.failedReason ?? '',
     status: e.status ?? '',
     arguments: null,
   };

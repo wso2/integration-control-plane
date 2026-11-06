@@ -66,6 +66,7 @@ import { parseGitHubUrl } from '../utils/github';
 import { detectTechnology } from '../utils/technologyDetection';
 import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
+import { useWorkflowRuntime } from '../hooks/useWorkflowRuntime';
 
 // One Moesif event per selectable integration type. A type added later without an entry here still
 // reaches Moesif through the generic 'component-create-select-type', with `integrationType` set.
@@ -111,7 +112,13 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const [description, setDescription] = useState('');
   const [detectedMode, setDetectedMode] = useState<DetectedMode>(null);
   const [selectedTechnology, setSelectedTechnology] = useState<'MI' | 'BI' | null>(null);
-  const [selectedIntegrationType, setSelectedIntegrationType] = useState<IntegrationType | null>(null);
+  const [pickedIntegrationType, setSelectedIntegrationType] = useState<IntegrationType | null>(null);
+  // Workflows are Ballerina only and need the platform's workflow runtime, and
+  // AI agents cannot be created from Azure DevOps. A pick that a later source or
+  // technology change hides no longer counts as selected.
+  const { data: workflowRuntime } = useWorkflowRuntime();
+  const hiddenIntegrationTypes: IntegrationType[] = [...(isAzureDevOps ? (['ai-agent'] as const) : []), ...(selectedTechnology === 'MI' || workflowRuntime?.status === 'NOT_CONFIGURED' ? (['workflow'] as const) : [])];
+  const selectedIntegrationType = pickedIntegrationType && !hiddenIntegrationTypes.includes(pickedIntegrationType) ? pickedIntegrationType : null;
   const [ballerinaTokenInput, setBallerinaTokenInput] = useState('');
   const [ballerinaDrawerOpen, setBallerinaDrawerOpen] = useState(false);
   const { data: ballerinaTokenStatus } = useBallerinaCentralToken();
@@ -365,6 +372,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     if (selectedTechnology === 'BI') {
       if (selectedIntegrationType === 'automation') return 'scheduledTask';
       if (selectedIntegrationType === 'event-integration') return 'ballerinaEventHandler';
+      if (selectedIntegrationType === 'workflow') return 'ballerinaWorkflow';
       return 'ballerinaService';
     }
     if (selectedIntegrationType === 'automation') return 'miCronjob';
@@ -411,6 +419,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         repositoryBranch: selectedBranch,
         repositorySubPath: subPath || '/',
         isPublicRepo,
+        creation: { method: 'import-repo' },
         // Private repos build through the GitHub App installation that grants access.
         ...(isPublicRepo ? { enableAutoDeploy: true } : isAzureDevOps ? { azureDevOps: { organization: activeOrg, project: selectedAdoProject, repo: activeRepo } } : { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId }),
       },
@@ -570,7 +579,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const renderRepoPickers = () => (
     <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
       {isPublicRepo ? (
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <TextField
             labelPlacement="top"
             label="Repository URL"
@@ -602,7 +611,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         <>
           {isAzureDevOps && (
             <>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <TextField
                   labelPlacement="top"
                   label="Organization"
@@ -633,7 +642,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   ))}
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <TextField
                   labelPlacement="top"
                   label="Project"
@@ -657,7 +666,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                   ))}
                 </TextField>
               </Grid>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <TextField
                   labelPlacement="top"
                   label="Repository"
@@ -687,7 +696,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           )}
           {!isAzureDevOps && (
             <>
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   <TextField
                     labelPlacement="top"
@@ -737,7 +746,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                 </Stack>
               </Grid>
 
-              <Grid size={{ xs: 12, md: 3 }}>
+              <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
                 <Stack direction="row" alignItems="center" spacing={0.5}>
                   <TextField
                     labelPlacement="top"
@@ -792,7 +801,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       )}
 
       {showBranchAndSubPath && (
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Stack direction="row" alignItems="center" spacing={0.5}>
             <TextField
               labelPlacement="top"
@@ -831,7 +840,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
       )}
 
       {showBranchAndSubPath && (
-        <Grid size={{ xs: 12, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Stack direction="row" gap={0.5}>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <DirectoryPickerField
@@ -909,7 +918,9 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
               ? 'AI Agent'
               : selectedIntegrationType === 'mcp-server'
                 ? 'MCP Server'
-                : 'Integration as API';
+                : selectedIntegrationType === 'workflow'
+                  ? 'Workflow'
+                  : 'Integration as API';
     return (
       <PageContent fullWidth sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
@@ -952,7 +963,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
           {/* Row 2 — Integration Name + auto-generated Integration Id */}
           <Grid container columnSpacing={3} rowSpacing={1} sx={{ mt: 2, mb: 1 }}>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
               <TextField
                 labelPlacement="top"
                 label="Integration name"
@@ -968,7 +979,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
               />
             </Grid>
 
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
               <TextField
                 labelPlacement="top"
                 label="Integration ID"
@@ -990,7 +1001,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
 
           {/* Row 3 — Description */}
           <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 1 }}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, lg: 6 }}>
               <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} />
             </Grid>
           </Grid>
@@ -1025,7 +1036,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
             </Typography>
             <IntegrationTypeSelector
               selected={selectedIntegrationType}
-              excludedTypes={isAzureDevOps ? ['ai-agent'] : []}
+              excludedTypes={hiddenIntegrationTypes}
               onSelect={(type) => {
                 trackEvent(INTEGRATION_TYPE_TRACK_EVENT[type] ?? 'component-create-select-type', { org: scope.org, project: scope.project, integrationType: type });
                 setSelectedIntegrationType(type);

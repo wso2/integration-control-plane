@@ -20,7 +20,6 @@ import { type RouteProps, Navigate, Outlet } from 'react-router';
 import { cookiePolicyUrl, loginUrl, signupUrl } from '../paths';
 import { ScopeResolver, generateMatrixRoutes, withScope, type Matrix } from '../nav';
 import HiddenPageRedirect from '../components/HiddenPageRedirect';
-import LegacyNewProjectRedirect from '../components/LegacyNewProjectRedirect';
 import UnknownRoute from '../components/UnknownRoute';
 import Logout from '../pages/Logout';
 import { createElement } from 'react';
@@ -58,8 +57,6 @@ const AiIntegrationBuilderView = lazyPage(() => import('../pages/AiIntegrationBu
 const ImportIntegration = lazyPage(() => import('../pages/ImportIntegration'));
 const McpProxyFromApi = lazyPage(() => import('../pages/McpProxyFromApi'));
 const ComponentTest = lazyPage(() => import('../pages/ComponentTest'));
-const OrgCdPipelines = lazyPage(() => import('../pages/OrgCdPipelines'));
-const ProjectCdPipelines = lazyPage(() => import('../pages/ProjectCdPipelines'));
 const OrgDataPlanes = lazyPage(() => import('../pages/OrgDataPlanes'));
 const OrgDatabases = lazyPage(() => import('../pages/OrgDatabases'));
 const CreateDatabaseServer = lazyPage(() => import('../pages/CreateDatabaseServer'));
@@ -73,7 +70,6 @@ const ComponentHealthChecks = lazyPage(() => import('../pages/ComponentHealthChe
 const ComponentScaling = lazyPage(() => import('../pages/ComponentScaling'));
 const ComponentDeploymentTracks = lazyPage(() => import('../pages/ComponentDeploymentTracks'));
 const ComponentSettings = lazyPage(() => import('../pages/ComponentSettings'));
-const CdPipelineEditor = lazyPage(() => import('../pages/CdPipelineEditor'));
 const OrgSettings = lazyPage(() => import('../pages/OrgSettings'));
 const BrowseSamples = lazyPage(() => import('../pages/BrowseSamples'));
 const BrowsePrebuiltIntegrations = lazyPage(() => import('../pages/BrowsePrebuiltIntegrations'));
@@ -89,15 +85,16 @@ const ProjectDeploy = lazyPage(() => import('../pages/ProjectDeploy'));
 const Deploy = lazyPage(() => import('../pages/Deploy'));
 const TestConsole = lazyPage(() => import('../pages/TestConsole'));
 const AgentChatTestRoute = lazyPage(() => import('../pages/ComponentTest').then((m) => ({ default: m.AgentChatTestRoute })));
-const Environments = lazyPage(() => import('../pages/Environments'));
-const CreateEnvironment = lazyPage(() => import('../pages/CreateEnvironment'));
-const EditEnvironment = lazyPage(() => import('../pages/EditEnvironment'));
 const RuntimeLogsOrg = lazyPage(() => import('../pages/RuntimeLogsOrg'));
 const RuntimeLogsProject = lazyPage(() => import('../pages/RuntimeLogsProject'));
 const RuntimeLogsIntegration = lazyPage(() => import('../pages/RuntimeLogsIntegration'));
 const AgentTraces = lazyPage(() => import('../pages/AgentTraces'));
 const ApiInsights = lazyPage(() => import('../pages/ApiInsights'));
 const ComingSoon = lazyPage(() => import('../pages/ComingSoon'));
+const KnowledgeBases = lazyPage(() => import('../pages/KnowledgeBases'));
+const CreateKnowledgeBase = lazyPage(() => import('../pages/CreateKnowledgeBase'));
+const KnowledgeBaseDetails = lazyPage(() => import('../pages/KnowledgeBaseDetails'));
+const AddKnowledgeBaseDataSource = lazyPage(() => import('../pages/AddKnowledgeBaseDataSource'));
 
 export interface AppRoute extends Omit<RouteProps, 'children'> {
   children?: AppRoute[];
@@ -109,8 +106,6 @@ const MATRIX: Matrix = {
   deploy: { segment: 'deploy', pages: { organizations: OrgDeploy, projects: ProjectDeploy, components: Deploy } },
   // Logs come from the wso2cloud observability proxy, not the BFF.
   logs: { segment: 'logs', pages: { organizations: RuntimeLogsOrg, projects: RuntimeLogsProject, components: RuntimeLogsIntegration } },
-
-  environments: { segment: 'environments', pages: { organizations: Environments, projects: Environments } },
 };
 
 const routes: AppRoute[] = [
@@ -146,10 +141,11 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/test', element: createElement(withScope(OrgTest, ['organizations'])) },
               { path: 'organizations/:orgHandler/insights', element: createElement(withScope(ApiInsights, ['organizations'])) },
               { path: 'organizations/:orgHandler/metrics', element: <ComingSoon description="One view of throughput, latency and errors for every integration you run." /> },
-              { path: 'organizations/:orgHandler/admin/cd-pipelines', element: createElement(withScope(OrgCdPipelines, ['organizations'])) },
-              { path: 'organizations/:orgHandler/admin/cd-pipelines/new', element: <CdPipelineEditor /> },
-              { path: 'organizations/:orgHandler/admin/cd-pipelines/:pipelineId/edit', element: <CdPipelineEditor /> },
               { path: 'organizations/:orgHandler/admin/data-planes', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDataPlanes, ['organizations']))) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases', element: createElement(withScope(KnowledgeBases, ['organizations'])) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases/new', element: createElement(withScope(CreateKnowledgeBase, ['organizations'])) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases/:knowledgeBase', element: createElement(withScope(KnowledgeBaseDetails, ['organizations'])) },
+              { path: 'organizations/:orgHandler/ai-services/knowledge-bases/:knowledgeBase/data-sources/new', element: createElement(withScope(AddKnowledgeBaseDataSource, ['organizations'])) },
               { path: 'organizations/:orgHandler/platform-services', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgDatabases, ['organizations']))) },
               { path: 'organizations/:orgHandler/platform-services/new', element: createElement(RouteErrorBoundary, null, createElement(withScope(CreateDatabaseServer, ['organizations']))) },
               { path: 'organizations/:orgHandler/platform-services/:dbServerId', element: createElement(RouteErrorBoundary, null, createElement(withScope(DatabaseServerDetail, ['organizations']))) },
@@ -165,8 +161,6 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects/:projectHandler/metrics', element: <ComingSoon title="Coming soon" description="Metrics are currently under development." /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/runtimelogs', element: createElement(withScope(RuntimeLogsProject, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/observe/metrics', element: <ComingSoon description="Throughput, latency and errors for every integration in the project." /> },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/admin/cd-pipelines', element: createElement(withScope(ProjectCdPipelines, ['projects'])) },
-              { path: 'organizations/:orgHandler/projects/:projectHandler/devops/environments', element: createElement(withScope(Environments, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/edit', element: createElement(withScope(EditProject, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/link-repository', element: createElement(withScope(LinkRepository, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/redirect', element: <ProjectsRedirect /> },
@@ -174,16 +168,13 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/projects', element: createElement(withScope(Projects, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/home', element: createElement(withScope(Project, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/:componentHandler/overview', element: createElement(withScope(Component, ['components'])) },
-              { path: 'organizations/:orgHandler/new', element: createElement(withScope(CreateProject, ['organizations'])) },
-              { path: 'organizations/:orgHandler/projects/new', element: createElement(withScope(LegacyNewProjectRedirect, ['organizations'])) },
-              { path: 'organizations/:orgHandler/projects/import', element: createElement(withScope(ImportProject, ['organizations'])) },
+              { path: 'organizations/:orgHandler/create-project', element: createElement(withScope(CreateProject, ['organizations'])) },
+              { path: 'organizations/:orgHandler/import-project', element: createElement(withScope(ImportProject, ['organizations'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new', element: createElement(withScope(CreateIntegrationOptions, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/ai-builder', element: createElement(withScope(AiIntegrationBuilderView, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/import', element: createElement(withScope(ImportIntegration, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/samples', element: createElement(withScope(BrowseSamples, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/components/new/generate-mcp', element: createElement(withScope(McpProxyFromApi, ['projects'])) },
-              { path: 'organizations/:orgHandler/environments/new', element: createElement(withScope(CreateEnvironment, ['organizations'])) },
-              { path: 'organizations/:orgHandler/environments/:envId/edit', element: <EditEnvironment /> },
               { path: 'organizations/:orgHandler/projects/:projectHandler/prebuilt-integrations', element: createElement(withScope(BrowsePrebuiltIntegrations, ['projects'])) },
               {
                 element: (

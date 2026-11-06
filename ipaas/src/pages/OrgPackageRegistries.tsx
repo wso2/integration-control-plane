@@ -21,7 +21,7 @@ import { ChevronRight } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import ballerinaIcon from '../assets/icons/packageRegistries/ballerina.svg';
 import BallerinaCentralPanel from '../components/Settings/PackageRegistries/BallerinaCentralPanel';
-import OrgSettingsTabs from '../components/Settings/OrgSettingsTabs';
+import OrgSettingsTabs from '../components/Settings/OrgConfigureTabs';
 import { BALLERINA_CENTRAL_ID, PACKAGE_REGISTRIES } from '../constants/packageRegistries';
 import { useBallerinaCentralToken } from '../hooks/useBallerinaCentralToken';
 import type { PackageRegistryCatalogEntry } from '../types/packageRegistries';
@@ -63,7 +63,7 @@ export default function OrgPackageRegistries(_scope: OrgScope): JSX.Element {
                       {service.description}
                     </Typography>
                     <Button variant="contained" endIcon={<ChevronRight size={16} />} onClick={() => setView({ kind: 'ballerina-central' })}>
-                      Configure
+                      Connect
                     </Button>
                   </Card>
                 </Grid>

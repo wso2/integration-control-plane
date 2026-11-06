@@ -51,7 +51,7 @@ function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: stri
         updatedTooltip={deleting ? undefined : formatDateTime(project.updatedAt)}
         onClick={deleting ? undefined : onClick}
         aria-disabled={deleting || undefined}
-        sx={deleting ? styles.cardDeleting : undefined}
+        sx={deleting ? styles.cardDeleting : styles.card}
         onMouseEnter={() => setArmed(true)}
         onFocus={() => setArmed(true)}
         actions={
@@ -130,7 +130,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
         </PageTitle.Actions>
       </PageTitle>
 
-      <SearchField value={query} onChange={setQuery} placeholder="Search projects" fullWidth sx={styles.searchSx} />
+      <SearchField value={query} onChange={setQuery} placeholder="Search projects" width="standard" sx={styles.searchSx} />
 
       {alert && (
         <Alert severity="success" onClose={() => setAlert(null)} sx={{ mb: 3 }}>

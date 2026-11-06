@@ -37,6 +37,7 @@ type pageConfig struct {
 type authConfig struct {
 	Issuer   string `json:"issuer"`
 	ClientID string `json:"clientId"`
+	Resource string `json:"resource"`
 }
 
 type ConfigScript struct {
@@ -57,7 +58,7 @@ func NewConfigScript(portal config.Portal, org config.Org, oidc config.OIDC) *Co
 		Portal:    portal,
 		OrgHandle: org.Handle,
 		OrgName:   org.Name,
-		Auth:      authConfig{Issuer: oidc.Issuer, ClientID: oidc.ClientID},
+		Auth:      authConfig{Issuer: oidc.Issuer, ClientID: oidc.ClientID, Resource: oidc.Resource},
 	})
 	if err != nil {
 		raw = []byte("{}")

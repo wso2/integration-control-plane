@@ -17,6 +17,7 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   ButtonGroup,
@@ -46,6 +47,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { useWorkflowRuntime } from '../../hooks/useWorkflowRuntime';
 import { useUpdateAutoDeployEnabled } from '../../hooks/useComponents';
 import { useComponentDeployment, useDeploymentStatus, useDeploymentTrackImages } from '../../hooks/useDeployments';
 import type { DeploymentTrackImage } from '../../types/deployment';
@@ -73,6 +75,7 @@ export default function BuildArea({
   projectHandler,
   displayType,
   hideEndpoints = false,
+  isWorkflow = false,
 }: BuildAreaProps): JSX.Element {
   // Determine build-in-progress state first so images can poll faster during active builds
   const { data: builds = [] } = useDeploymentStatus(componentId, versionId);
@@ -82,7 +85,7 @@ export default function BuildArea({
   const isBuildRunning = pendingBuild?.status === 'in_progress';
   const buildingCommit = pendingBuild ? (commits.find((c) => c.sha === pendingBuild.sha) ?? null) : null;
 
-  const { data: images = [], isLoading: imagesLoading } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
+  const { data: images = [], isLoading: imagesLoading, isSuccess: imagesLoaded, isError: imagesFailed, refetch: refetchImages } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
   const { data: firstEnvDeployment } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, firstEnvId);
   const firstEnvReleaseId = firstEnvDeployment?.releaseId ?? '';
 
@@ -130,14 +133,24 @@ export default function BuildArea({
 
   const isLatest = selectedImage?.imageId === images[0]?.imageId;
   const isDeploying = deployTrack.isPending;
-  const canDeploy = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId) && !!firstEnvId && !isDeploying && !isBuildPending;
+  // Image-only components (e.g. knowledge base data sources) have no builds, so there is
+  // no image to pick. Once deployed they can still be redeployed: an empty imageId makes
+  // the BFF cut a new release from the current workload, picking up component changes.
+  // Only once the images have loaded: a failed fetch is not the same as having none.
+  const redeployCurrent = imagesLoaded && images.length === 0 && !!firstEnvReleaseId;
+  // A picked image must still be in the loaded list, so a stale pick is not deployed.
+  const imagePicked = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId);
+  const { data: workflowRuntime } = useWorkflowRuntime(isWorkflow);
+  // A workflow's worker needs the runtime to connect to; the environment card says why it is not ready.
+  const workflowRuntimeBlocked = isWorkflow && workflowRuntime?.status !== 'READY';
+  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending && !workflowRuntimeBlocked;
 
   const handleDeploy = () => {
     if (!canDeploy) return;
     deployTrack.mutate({
       componentId,
       id: versionId,
-      imageId: selectedImage!.imageId,
+      imageId: selectedImage?.imageId ?? '',
       environmentId: firstEnvId,
       deploymentPipelineId,
     });
@@ -231,16 +244,27 @@ export default function BuildArea({
                 variant="detail"
               />
             </Box>
+          ) : imagesFailed ? (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => refetchImages()}>
+                  Retry
+                </Button>
+              }>
+              Could not load the build images.
+            </Alert>
           ) : images.length === 0 ? (
             <Box sx={{ py: 2 }}>
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, color: 'text.secondary' }}>
                 <Rocket size={16} />
                 <Typography variant="body2" color="text.secondary">
-                  No images available yet.
+                  {redeployCurrent ? 'No build images for this component.' : 'No images available yet.'}
                 </Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary">
-                Trigger a build from the Build page first.
+                {redeployCurrent ? 'Deploy redeploys the current image with the latest component settings.' : 'Trigger a build from the Build page first.'}
               </Typography>
             </Box>
           ) : (
@@ -280,7 +304,7 @@ export default function BuildArea({
                 startIcon={isDeploying || isBuildRunning ? <CircularProgress color="inherit" size={14} /> : selectedDeployAction === 'deploy' ? <Rocket size={14} /> : <Settings size={14} />}
                 onClick={handleMainButtonClick}
                 sx={{ whiteSpace: 'nowrap', flex: 1 }}>
-                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
+                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : workflowRuntimeBlocked ? 'Preparing workflow runtime' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
               </Button>
               <Button size="small" sx={{ px: 0.5 }} aria-label="More deploy options" aria-expanded={splitOpen} onClick={() => setSplitOpen((prev) => !prev)}>
                 <ChevronDown size={14} />
@@ -311,6 +335,11 @@ export default function BuildArea({
               )}
             </Popper>
           </Box>
+          {deployTrack.isError && (
+            <Alert severity="error" sx={{ mt: 1.5 }}>
+              {deployTrack.error.message}
+            </Alert>
+          )}
         </CardContent>
       </Card>
 

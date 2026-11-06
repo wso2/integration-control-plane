@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import type { ExecutionConfigs } from '../types/executions';
 import type { AutomationConfig, ChunkingConfig, ChunkingStrategy, DatasourceConfig, DatasourceType, EmbeddingConfig, EmbeddingProvider, GdriveAuthType, VectorStoreConfig, VectorStoreProvider } from '../types/ragIngestion';
 
 const RAG_LOGO_BASE = 'assets/images/rag/';
@@ -94,6 +95,12 @@ export const CHUNKING_STRATEGIES: { value: ChunkingStrategy; label: string }[] =
 
 export const DEFAULT_CHUNKING: ChunkingConfig = { strategy: 'recursive', maxSegmentSize: 1000, maxOverlapSize: 200 };
 
+/**
+ * Ingestion re-reads the whole source, so a new data source starts daily rather than at the every-minute schedule default.
+ * Written as the interval form ("every 1 day") so the schedule form opens on By Interval; `0 0 * * *` would open on By Cron.
+ */
+export const DAILY_INGESTION: ExecutionConfigs = { cronjobFrequency: '0 0 */1 * *', cronjobTimezone: 'UTC' };
+
 // ── Retrieval ───────────────────────────────────────────────────────────────
 
 export const DEFAULT_RERANKER_MODEL = 'rerank-english-v3.0';
@@ -155,12 +162,17 @@ export const RAG_RETRIEVAL_SERVICE_NAME = 'rag-retrieval-service';
 export const RAG_RETRIEVAL_SERVICE_DISPLAY_NAME = 'RAG Retrieval Service';
 export const RAG_RETRIEVAL_SERVICE_DEFAULT_IMAGE = 'choreoanonymouspullable.azurecr.io/devant/devant-rag-retrieval-service:rag-retrieval-service-0.1.1';
 
+/** A knowledge base's service: the BFF deploys it, and it is the knowledge base. */
+export const KB_SERVICE_SUBTYPE = 'knowledge-base';
+/** A knowledge base's data source: an ingestion job the BFF deploys for it. */
+export const KB_INGESTION_SUBTYPE = 'kb-ingestion';
+
 /**
  * Component subtypes that are RAG-provisioned and have no source repo, commit,
  * or build step — the overview hides Source/Commit + the Build card, and the
  * Build tab shows "not available".
  */
-export const RAG_NO_SOURCE_SUBTYPES: ReadonlySet<string> = new Set([RAG_INGESTION_SUBTYPE, RAG_RETRIEVAL_SERVICE_SUBTYPE, RAG_SERVICE_SUBTYPE]);
+export const RAG_NO_SOURCE_SUBTYPES: ReadonlySet<string> = new Set([RAG_INGESTION_SUBTYPE, RAG_RETRIEVAL_SERVICE_SUBTYPE, RAG_SERVICE_SUBTYPE, KB_SERVICE_SUBTYPE, KB_INGESTION_SUBTYPE]);
 
 /**
  * Env-var keys whose values are sensitive and must be stored as a Secret rather

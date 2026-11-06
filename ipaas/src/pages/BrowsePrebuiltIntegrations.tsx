@@ -485,7 +485,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
 
         {wizardStep <= 1 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            <SearchField value={appSearch} onChange={setAppSearch} placeholder="Search applications" fullWidth sx={{ mb: 3 }} />
+            <SearchField value={appSearch} onChange={setAppSearch} placeholder="Search applications" width="standard" sx={{ mb: 3 }} />
             {displayedApps.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 No applications found{appSearch ? ` for "${appSearch}"` : ''}.
@@ -507,7 +507,7 @@ export default function BrowsePrebuiltIntegrations(scope: ProjectScope): JSX.Ele
 
         {wizardStep === 2 && (
           <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-            {filteredIntegrations.length > 4 && <SearchField value={integrationSearch} onChange={setIntegrationSearch} placeholder="Search integrations" fullWidth sx={{ mb: 2 }} />}
+            {filteredIntegrations.length > 4 && <SearchField value={integrationSearch} onChange={setIntegrationSearch} placeholder="Search integrations" width="standard" sx={{ mb: 2 }} />}
             {filteredIntegrations.length === 0 ? (
               <Typography variant="body2" color="text.secondary">
                 No integrations found for {firstApp} and {secondApp}.

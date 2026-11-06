@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Grid, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
+import { Alert, Button, CircularProgress, Grid, PageContent, PageTitle, Stack, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -26,6 +26,7 @@ import EditProjectSkeleton from '../components/EditProjectSkeleton';
 import PageNotFound from './PageNotFound';
 import { useProjectId, useProjects, useUpdateProject } from '../hooks/useProjects';
 import { resourceUrl, type ProjectScope } from '../nav';
+import { orgProjectsUrl } from '../paths';
 import type { Project } from '../types/project';
 import { validateProjectName } from '../utils/projectValidation';
 import { DESCRIPTION_MAX_LENGTH, toSingleLineDescription } from '../utils/description';
@@ -148,7 +149,7 @@ export default function EditProject(scope: ProjectScope): JSX.Element {
         </Alert>
       </PageContent>
     );
-  if (!project) return <PageNotFound title="Project not found" actionTo={resourceUrl({ level: 'organizations', org: scope.org }, 'overview')} actionLabel="Back to projects" />;
+  if (!project) return <PageNotFound title="Project not found" actionTo={orgProjectsUrl(scope.org)} actionLabel="Back to projects" />;
 
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>
@@ -156,9 +157,9 @@ export default function EditProject(scope: ProjectScope): JSX.Element {
         Back to project
       </Button>
 
-      <Typography variant="h1" sx={{ mb: 4 }}>
-        Edit project
-      </Typography>
+      <PageTitle>
+        <PageTitle.Header>Manage project</PageTitle.Header>
+      </PageTitle>
 
       <EditProjectForm key={project.id} scope={scope} project={project} />
     </PageContent>

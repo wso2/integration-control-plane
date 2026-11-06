@@ -23,12 +23,19 @@ export const toolbarSx = {
 export const toolbarRowSx = {
   display: 'flex',
   alignItems: 'center',
+  justifyContent: 'space-between',
+  flexWrap: 'wrap',
+  gap: 1.25,
+} as const;
+
+export const toolbarActionsSx = {
+  display: 'flex',
+  alignItems: 'center',
   flexWrap: 'wrap',
   gap: 1.25,
 } as const;
 
 export const searchFieldSx = {
-  flex: 1,
   minWidth: 240,
 } as const;
 

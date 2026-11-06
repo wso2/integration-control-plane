@@ -29,6 +29,11 @@ describe('identifyIntegration — RAG types', () => {
     expect(identifyIntegration('byoiService', 'rag-service').type).toBe('integration-as-api');
   });
 
+  it('maps a knowledge base data source to rag-ingestion and its service to integration-as-api', () => {
+    expect(identifyIntegration('automation', 'kb-ingestion').type).toBe('rag-ingestion');
+    expect(identifyIntegration('service', 'knowledge-base').type).toBe('integration-as-api');
+  });
+
   it('leaves a plain byoi service (no RAG subtype) unsupported', () => {
     expect(identifyIntegration('byoiService', null).type).toBe('unsupported');
   });
@@ -39,5 +44,11 @@ describe('identifyIntegration — existing types still resolve', () => {
     expect(identifyIntegration('ballerinaService', null).type).toBe('integration-as-api');
     expect(identifyIntegration('scheduledTask', null).type).toBe('automation');
     expect(identifyIntegration('ballerinaService', 'tailscale').type).toBe('tailscale-vpn');
+  });
+});
+
+describe('identifyIntegration — workflow', () => {
+  it('resolves the workflow display type to a Ballerina workflow', () => {
+    expect(identifyIntegration('ballerinaWorkflow', null)).toMatchObject({ type: 'workflow', runtime: 'ballerina' });
   });
 });

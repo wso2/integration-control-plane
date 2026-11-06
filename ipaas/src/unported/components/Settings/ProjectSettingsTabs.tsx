@@ -23,7 +23,7 @@ import { isSettingsSectionVisible } from '../../../constants/orgSettingsSections
 import { PROJECT_SETTINGS_SECTIONS } from '../../constants/projectSettingsSections';
 import { useProjectId } from '../../../hooks/useProjects';
 import { hasProject, projectSettingsSectionUrl, useScope } from '../../../nav';
-import SettingsTabs from '../../../components/Settings/SettingsTabs';
+import SettingsTabs from '../../../components/Settings/ConfigureTabs';
 
 /** The project Settings header — resolves the visible sections and delegates chrome to `SettingsTabs`. */
 export default function ProjectSettingsTabs({ active }: { active: string }): JSX.Element {

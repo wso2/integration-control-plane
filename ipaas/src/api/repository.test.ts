@@ -27,7 +27,7 @@ vi.mock('./_client', async (importOriginal) => {
   return { ...actual, bff: { ...actual.bff, get, post, put } };
 });
 
-import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, markAzureDevOpsDefaultBranch, updateBuildpackConfigs } from './repository';
+import { connectAzureDevOps, fetchAzureDevOpsBranches, fetchAzureDevOpsOrganizations, fetchAzureDevOpsProjects, fetchAzureDevOpsRepositories, markAzureDevOpsDefaultBranch, toRepository, updateBuildpackConfigs } from './repository';
 import type { UpdateBuildpackConfigsInput } from '../types/build';
 
 const baseInput: UpdateBuildpackConfigsInput = {
@@ -77,6 +77,20 @@ describe('updateBuildpackConfigs', () => {
 
     const body = put.mock.calls[0][1] as Record<string, unknown>;
     expect(JSON.parse(JSON.stringify(body))).toEqual({ isUnitTestEnabled: true, pullLatestSubmodules: false });
+  });
+});
+
+describe('toRepository', () => {
+  it('keeps a repository that names its org and repo', () => {
+    const repo = { gitProvider: 'github', organizationApp: 'wso2', nameApp: 'demo', branch: 'main', appSubPath: '' };
+    expect(toRepository(repo)).toEqual(repo);
+  });
+
+  it('treats a repo-less component as having no repository', () => {
+    expect(toRepository(null)).toBeNull();
+    expect(toRepository({})).toBeNull();
+    expect(toRepository({ gitProvider: '', branch: '' })).toBeNull();
+    expect(toRepository({ organizationApp: 'wso2', nameApp: '' })).toBeNull();
   });
 });
 

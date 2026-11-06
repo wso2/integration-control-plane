@@ -38,7 +38,7 @@ import GitLabIcon from '../assets/icons/GitLabIcon';
 import BitbucketIcon from '../assets/icons/BitbucketIcon';
 import AzureDevOpsIcon from '../assets/icons/AzureDevOpsIcon';
 import { GitProvider } from '../types/credentials';
-import { componentSubTypeFromSample, displayTypeFromSample } from '../constants/integrations';
+import { componentSubTypeFromSample, displayTypeFromSample, sampleId } from '../constants/integrations';
 import { GITHUB_AUTH } from '../constants/github';
 import { PROVIDER_ICON_SX, GITHUB_ICON_SX, SECTION_LABEL_SX } from '../constants/styles';
 import { resourceUrl, narrow, type ProjectScope } from '../nav';
@@ -203,6 +203,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
         repositoryBranch: sample.branch ?? 'main',
         isPublicRepo: true,
         enableAutoDeploy: true,
+        creation: { method: 'from-sample', sampleId: sampleId(sample) },
       },
       {
         onSuccess: (component) => navigate(resourceUrl(narrow(scope, component.handler), 'overview')),

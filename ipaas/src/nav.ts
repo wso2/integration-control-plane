@@ -22,6 +22,7 @@ import { capitalize } from './utils/string';
 import { SETTINGS_SECTIONS, type SettingsSectionDef } from './constants/orgSettingsSections';
 import { COMPONENT_SETTINGS_SECTIONS } from './constants/componentSettingsSections';
 import { local } from './utils/storage';
+import type { PlatformServiceKind } from './constants/databases';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -36,7 +37,7 @@ export type Scope = OrgScope | ProjectScope | ComponentScope;
 
 export type ScopeForLevel = { organizations: OrgScope; projects: ProjectScope; components: ComponentScope };
 
-export type Resource = 'overview' | 'logs' | 'environments' | 'build' | 'deploy';
+export type Resource = 'overview' | 'logs' | 'build' | 'deploy';
 
 export type Matrix = { [R in Resource]: { segment: string; pages: Partial<{ [L in Level]: FC<ScopeForLevel[L]> }> } };
 
@@ -168,7 +169,7 @@ export function sidebarItems(scope: Scope, currentResource: Resource | null): Si
 }
 
 export function newProjectUrl(scope: { org: string }): string {
-  return `/organizations/${scope.org}/new`;
+  return `/organizations/${scope.org}/create-project`;
 }
 
 export function editProjectUrl(scope: { org: string; project: string }): string {
@@ -180,27 +181,33 @@ export function linkRepositoryUrl(scope: { org: string; project: string }): stri
 }
 
 export function importProjectUrl(scope: { org: string }): string {
-  return `/organizations/${scope.org}/projects/import`;
+  return `/organizations/${scope.org}/import-project`;
 }
 
-export function newEnvironmentUrl(scope: { org: string }): string {
-  return `/organizations/${scope.org}/environments/new`;
+/** The org's RAG knowledge bases. */
+export function knowledgeBasesUrl(scope: { org: string }): string {
+  return `/organizations/${scope.org}/ai-services/knowledge-bases`;
 }
 
-export function editEnvironmentUrl(scope: { org: string }, envId: string): string {
-  return `/organizations/${scope.org}/environments/${envId}/edit`;
+export function newKnowledgeBaseUrl(scope: { org: string }): string {
+  return `${knowledgeBasesUrl(scope)}/new`;
 }
 
-export function orgCdPipelinesUrl(scope: { org: string }): string {
-  return `/organizations/${scope.org}/admin/cd-pipelines`;
+export function knowledgeBaseUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBasesUrl(scope)}/${encodeURIComponent(name)}`;
+}
+
+export function newKnowledgeBaseDataSourceUrl(scope: { org: string }, name: string): string {
+  return `${knowledgeBaseUrl(scope, name)}/data-sources/new`;
 }
 
 export function orgDatabasesUrl(scope: { org: string }): string {
   return `/organizations/${scope.org}/platform-services`;
 }
 
-export function newDatabaseUrl(scope: { org: string }): string {
-  return `${orgDatabasesUrl(scope)}/new`;
+/** With a `kind`, the create wizard opens on that service's details step. */
+export function newDatabaseUrl(scope: { org: string }, kind?: PlatformServiceKind): string {
+  return `${orgDatabasesUrl(scope)}/new${kind ? `?type=${kind}` : ''}`;
 }
 
 /** A database's detail page, on one of its tabs. */
@@ -236,12 +243,6 @@ export function componentSettingsUrl(scope: { org: string; project: string; comp
 /** A specific integration Settings section (suffix after `/settings/`, may include a sub-tab). */
 export function componentSettingsSectionUrl(scope: { org: string; project: string; component: string }, sectionPath: string): string {
   return `/organizations/${scope.org}/projects/${scope.project}/components/${scope.component}/settings/${sectionPath}`;
-}
-
-/** The org-level CD pipeline create/edit flow (edit when a `pipelineId` is given). */
-export function cdPipelineEditorUrl(scope: { org: string }, pipelineId?: string): string {
-  const base = orgCdPipelinesUrl(scope);
-  return pipelineId ? `${base}/${pipelineId}/edit` : `${base}/new`;
 }
 
 export function newComponentUrl(scope: { org: string; project: string }): string {
@@ -296,6 +297,7 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'metrics', navId: 'org-metrics', segment: 'metrics', parent: 'org-observability' },
     { key: 'cd-pipelines', navId: 'org-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'org-admin' },
     { key: 'environments', navId: 'org-environments', segment: 'environments', parent: 'org-admin' },
+    { key: 'knowledge-bases', navId: 'org-knowledge-bases', segment: 'ai-services/knowledge-bases', parent: 'org-ai-services' },
     { key: 'platform-services', navId: 'org-platform-services', segment: 'platform-services' },
     { key: 'settings', navId: 'org-settings', segment: 'settings' },
   ],
@@ -306,7 +308,6 @@ const NAV: Record<Level, NavEntry[]> = {
     { key: 'test', navId: 'proj-test', segment: 'test' },
     { key: 'logs', navId: 'proj-logs', segment: 'observe/runtimelogs', parent: 'proj-observability' },
     { key: 'metrics', navId: 'proj-metrics', segment: 'observe/metrics', parent: 'proj-observability' },
-    { key: 'cd-pipelines', navId: 'proj-cd-pipelines', segment: 'admin/cd-pipelines', parent: 'proj-admin' },
   ],
   components: [
     { key: 'overview', navId: 'overview', segment: 'overview' },
@@ -397,16 +398,13 @@ function toOrgScope(scope: Scope): Scope {
 /**
  * Sidebar ids shown at a level that owns no such page — they link to the level that does.
  * Deliberately not NAV entries: scope switching resolves the *same key* at the target level,
- * and a project has no environments page to land on, so it must still fall back to overview.
+ * and a lower level has no such page to land on, so it must still fall back to overview.
  */
 const CROSS_SCOPE_NAV_URL: Partial<Record<Level, Record<string, (scope: Scope) => string>>> = {
   projects: {
-    'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
     'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
   components: {
-    'org-environments': (scope) => buildUrl(toOrgScope(scope), 'environments'),
-    'proj-cd-pipelines': (scope) => buildUrl(broaden(scope)!, 'admin/cd-pipelines'),
     'org-platform-services': (scope) => buildUrl(toOrgScope(scope), 'platform-services'),
   },
 };
