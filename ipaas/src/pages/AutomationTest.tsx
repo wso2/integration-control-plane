@@ -41,8 +41,8 @@ import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { useCan } from '../hooks/useCan';
 import { Scopes } from '../constants/permissions';
-import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validateRequiredFields } from '../utils/runtimeArguments';
-import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
+import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validatePositionalOrder, validateRequiredFields } from '../utils/runtimeArguments';
+import { httpStatusOf, isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { isTerminalStatus } from '../utils/executionStatus';
 import type { DynamicFormData, DynamicFormFieldValue, DynamicFormValidationErrors, TaskExecution } from '../types/executions';
@@ -213,7 +213,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
 
   const handleRun = async () => {
     setRunError(null);
-    const errors = validateRequiredFields(formFields, formData);
+    const errors = { ...validatePositionalOrder(runtimeArguments, formData), ...validateRequiredFields(formFields, formData) };
     if (Object.keys(errors).length > 0) {
       setValidationErrors(errors);
       setShowErrors(true);
@@ -244,8 +244,9 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     );
   };
 
-  // A 404 means "no schema" and a not-implemented stub means the product has no
-  // runtime-arguments API at all. Neither is a failure — both mean trigger-only.
+  // A 404 means the integration is gone from under the page, and a not-implemented stub
+  // means a build with no runtime-arguments API. Neither is the form's failure — both
+  // fall back to trigger-only.
   const argsUnavailable = argsError && (isNotFoundError(argsErr) || isUnsupportedError(argsErr));
   const hardArgsError = argsError && !argsUnavailable;
   const hasFormData = hasAnyFormData(formData);
@@ -412,6 +413,8 @@ export default function AutomationTest({ org, project, component }: ComponentSco
     // A loaded integration always resolves a track; the check narrows the type for what follows.
     if (trackId === undefined) return renderNotice(<CircularProgress />);
     if (!deployment || !releaseId) return renderNotice(<NotDeployedAlert status={deployment?.deploymentStatusV2} />);
+    // 424: the platform cannot read the source at all, so retrying will not help.
+    if (hardArgsError && httpStatusOf(argsErr) === 424) return renderNotice(<Alert severity="warning">This automation&apos;s runtime arguments cannot be read from its source. Run it with arguments from its environment card, entering them in order.</Alert>);
     if (hardArgsError) return renderNotice(<Alert severity="error">Could not load this automation&apos;s runtime arguments. Retry in a moment; if it persists, the automation can still be triggered from its environment card.</Alert>);
     // Deployed but not usable yet — say so instead of offering a Run button with
     // no workload behind it.

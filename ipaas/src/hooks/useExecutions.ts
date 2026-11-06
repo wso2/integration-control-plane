@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { keepPreviousData, useMutation, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
+import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
 import { fetchExecutionConfigs, fetchTaskExecutions, fetchRuntimeArguments, fetchExecutionArguments, fetchExecutionLogs, fetchTaskExecutionCount, updateJobConfigs, stopSchedule, triggerTask, triggerComponentRun } from '../api/executions';
 import type { StopScheduleInput, TaskExecution, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
@@ -44,16 +44,17 @@ export function useTaskExecutions(releaseId: string, componentId = '', envId = '
 }
 
 /**
- * The automation's runtime-argument schema, keyed by the deployed commit. An empty
- * array means "no declared args" — the Test page then shows a trigger-only form.
- * `retry: false` so a 404 (no schema for this component) surfaces promptly to the
- * caller, which treats it the same as an empty schema.
+ * The automation's runtime-argument schema, read from its source at the deployed commit.
+ * An empty array means "no declared args" — the Test page then shows a trigger-only form.
+ * `retry: false` so a failure (404: unknown integration; 502 or 424: the source could
+ * not be read, retryable or not) surfaces promptly, and the caller offers free-form
+ * arguments instead.
  */
-export function useRuntimeArguments(componentId: string, deploymentTrackId: string | undefined, commitHash: string, enabled = true) {
+export function useRuntimeArguments(componentId: string, deploymentTrackId: string | undefined, commitHash: string | undefined, enabled = true) {
   return useQuery<RuntimeArgument[]>({
     queryKey: ['runtimeArguments', componentId, deploymentTrackId, commitHash],
-    queryFn: () => fetchRuntimeArguments(componentId, deploymentTrackId!, commitHash),
-    enabled: enabled && !!componentId && !!deploymentTrackId && !!commitHash,
+    // Without a track or a deployed commit there is nothing to read the arguments at.
+    queryFn: enabled && componentId && deploymentTrackId && commitHash ? () => fetchRuntimeArguments(componentId, deploymentTrackId, commitHash) : skipToken,
     retry: false,
     staleTime: 5 * 60 * 1000,
   });
