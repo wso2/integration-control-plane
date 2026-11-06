@@ -17,19 +17,21 @@
  */
 
 import { Button, Tooltip } from '@wso2/oxygen-ui';
-import { List, RotateCw, Square } from '@wso2/oxygen-ui-icons-react';
+import { Lightbulb, List, RotateCw, Square } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import ServiceLogsDrawer from '../integration-as-api/ServiceLogsDrawer';
+import HowToConnectDrawer from './HowToConnectDrawer';
 
 /**
- * View logs and Stop/Start. There is no Test action: the voice tester sits in
- * the card body, next to the token service it calls.
+ * How to connect, View logs and Stop/Start. There is no Test action here: the
+ * voice tester sits in the card body.
  */
 export default function EnvCardActions({ component, env, versionId, releaseId, orgHandler, componentHandler, projectId, hasDeployment, deploymentStatusV2, releaseMgtReleaseId, releaseMgtDeploymentId, onNotify, requestPoll }: EnvCardActionsProps): ReactNode {
   const [logsOpen, setLogsOpen] = useState(false);
+  const [connectOpen, setConnectOpen] = useState(false);
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
   const isActionPending = stopMutation.isPending || redeployMutation.isPending;
@@ -67,6 +69,9 @@ export default function EnvCardActions({ component, env, versionId, releaseId, o
 
   return (
     <>
+      <Button variant="text" size="small" startIcon={<Lightbulb size={14} />} onClick={() => setConnectOpen(true)} disabled={!hasDeployment}>
+        How to connect
+      </Button>
       {hasDeployment && (
         <Button variant="text" size="small" startIcon={<List size={14} />} onClick={() => setLogsOpen(true)}>
           View logs
@@ -99,6 +104,7 @@ export default function EnvCardActions({ component, env, versionId, releaseId, o
           </span>
         </Tooltip>
       )}
+      {hasDeployment && <HowToConnectDrawer open={connectOpen} onClose={() => setConnectOpen(false)} envName={env.name} componentId={component.id} versionId={versionId} releaseId={releaseId} />}
       <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} projectId={projectId} componentHandler={componentHandler} env={env} versionId={versionId} />
     </>
   );

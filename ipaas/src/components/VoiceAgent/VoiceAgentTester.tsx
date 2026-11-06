@@ -16,84 +16,84 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Paper, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Avatar, Box, Button, Chip, Paper, Stack, Typography } from '@wso2/oxygen-ui';
 import { Mic, PhoneOff } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useVoiceTesterSession, type VoiceTesterStatus } from '../../hooks/useVoiceTesterSession';
+import * as styles from './VoiceAgentTester.styles';
 
-const STATUS_LABEL: Record<VoiceTesterStatus, string> = {
-  idle: 'Not connected',
-  connecting: 'Connecting',
-  connected: 'Live',
-  error: 'Failed',
-};
-
-const STATUS_COLOR: Record<VoiceTesterStatus, 'default' | 'warning' | 'success' | 'error'> = {
-  idle: 'default',
-  connecting: 'warning',
-  connected: 'success',
-  error: 'error',
-};
-
-const TRANSCRIPT_SX = { maxHeight: 280, overflowY: 'auto', p: 2 } as const;
-const HIDDEN_SX = { display: 'none' } as const;
+const STATUS_LABEL: Record<VoiceTesterStatus, string> = { idle: 'Offline', connecting: 'Connecting', connected: 'Live', error: 'Failed' };
+const STATUS_COLOR: Record<VoiceTesterStatus, 'default' | 'warning' | 'success' | 'error'> = { idle: 'default', connecting: 'warning', connected: 'success', error: 'error' };
 
 interface VoiceAgentTesterProps {
-  tokenServiceUrl: string;
-  /** The deployment is not serving, so a call cannot reach the worker. */
-  disabled: boolean;
+  /** The token service URL, or null when the voice agent publishes none here. */
+  tokenServiceUrl: string | null;
+  /** Why a call cannot start in this environment; shown in place of the hint and disables Start session. */
+  unavailableReason?: string;
 }
 
-/** Talk to the deployed voice agent from the browser, with a live transcript of both sides. */
-export default function VoiceAgentTester({ tokenServiceUrl, disabled }: VoiceAgentTesterProps): JSX.Element {
-  const { status, error, transcript, start, stop, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl);
+/** The env card's voice tester: one row to call the deployed voice agent, with the transcript below while it runs. */
+export default function VoiceAgentTester({ tokenServiceUrl, unavailableReason }: VoiceAgentTesterProps): JSX.Element {
+  const { status, error, transcript, start, stop, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl ?? '');
   const inCall = status === 'connecting' || status === 'connected';
+  const canStart = !!tokenServiceUrl && !unavailableReason;
+  const hint = unavailableReason
+    ? `Not available — ${unavailableReason}`
+    : status === 'connected'
+      ? 'Live — speak, and the conversation appears below.'
+      : status === 'connecting'
+        ? 'Connecting to the voice agent…'
+        : 'Click "Start session" to talk to the deployed voice agent.';
 
   return (
-    <Stack gap={1.5}>
-      <Stack direction="row" alignItems="center" gap={1.5}>
-        <Typography variant="subtitle2">Try it</Typography>
-        <Chip size="small" label={STATUS_LABEL[status]} color={STATUS_COLOR[status]} />
-        <Box sx={{ flex: 1 }} />
+    <Box>
+      <Box sx={styles.rowSx}>
+        <Avatar sx={styles.orbSx(status === 'connected')}>
+          <Mic size={20} />
+        </Avatar>
+        <Box sx={styles.textSx}>
+          <Stack direction="row" alignItems="center" gap={1}>
+            <Typography variant="subtitle1" fontWeight={600}>
+              Voice tester
+            </Typography>
+            <Chip size="small" variant="outlined" label={STATUS_LABEL[status]} color={STATUS_COLOR[status]} />
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            {hint}
+          </Typography>
+        </Box>
         {inCall ? (
-          <Button variant="outlined" color="error" size="small" startIcon={<PhoneOff size={14} />} onClick={stop}>
-            End call
+          <Button variant="outlined" color="error" startIcon={<PhoneOff size={16} />} onClick={stop}>
+            End session
           </Button>
         ) : (
-          <Button variant="contained" size="small" startIcon={<Mic size={14} />} onClick={start} disabled={disabled}>
-            Start call
+          <Button variant="contained" startIcon={<Mic size={16} />} onClick={start} disabled={!canStart}>
+            Start session
           </Button>
         )}
-      </Stack>
-      {disabled && !inCall && (
-        <Typography variant="caption" color="text.secondary">
-          Start the voice agent to try it.
-        </Typography>
+      </Box>
+      {error && (
+        <Alert severity="error" sx={{ mt: 1.5 }}>
+          {error}
+        </Alert>
       )}
-      {error && <Alert severity="error">{error}</Alert>}
-      {(inCall || transcript.length > 0) && (
-        <Paper variant="outlined" sx={TRANSCRIPT_SX}>
-          {transcript.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              {status === 'connected' ? 'Say something. The conversation appears here.' : 'Connecting to the voice agent.'}
-            </Typography>
-          ) : (
-            <Stack gap={1}>
-              {transcript.map((m) => (
-                <Box key={m.id}>
-                  <Typography variant="caption" color="text.secondary">
-                    {m.role === 'user' ? 'You' : 'Agent'}
-                    {m.interrupted ? ' (interrupted)' : ''}
-                  </Typography>
-                  <Typography variant="body2">{m.text}</Typography>
-                </Box>
-              ))}
-            </Stack>
-          )}
+      {transcript.length > 0 && (
+        <Paper variant="outlined" sx={styles.transcriptSx}>
+          <Stack gap={1}>
+            {transcript.map((m) => (
+              <Box key={m.id}>
+                <Typography variant="caption" color="text.secondary">
+                  {m.role === 'user' ? 'You' : 'Agent'}
+                  {m.interrupted ? ' (interrupted)' : ''}
+                </Typography>
+                <Typography variant="body2">{m.text}</Typography>
+              </Box>
+            ))}
+          </Stack>
         </Paper>
       )}
       {/* The agent's audio plays from elements LiveKit attaches here. */}
-      <Box ref={audioContainerRef} sx={HIDDEN_SX} />
-    </Stack>
+      <Box ref={audioContainerRef} sx={styles.hiddenSx} />
+    </Box>
   );
 }
