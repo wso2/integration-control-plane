@@ -73,6 +73,7 @@ import { useChoreoSampleImages, useComponentRepositories } from '../hooks/useRep
 import type { Component, ComponentDeletionError, ComponentSubscription, SubscriptionInfo } from '../types/component';
 import { useDeleteComponent } from '../hooks/useComponents';
 import DeleteIntegrationButton from '../components/DeleteIntegrationButton';
+import { useLinkedVoiceAgent } from '../hooks/useVoiceAgents';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
 import { newComponentUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
@@ -147,7 +148,11 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [subscribers, setSubscribers] = useState<{ internal: ComponentSubscription[]; external: ComponentSubscription[] } | null>(null);
   const mutation = useDeleteComponent();
+  const voiceDelete = useDeleteComponent();
   const confirmed = confirmation === component.displayName;
+  // An AI agent's voice agent cannot work without it, so it goes too (as in Devant).
+  const isAiAgent = identifyIntegration(component.displayType, component.componentSubType).type === 'ai-agent';
+  const { voiceAgent } = useLinkedVoiceAgent(scope.org, isAiAgent ? projectId : '', component.handler);
 
   // Escape and backdrop bypass the disabled Cancel button, so gate them too.
   const handleClose = () => {
@@ -161,7 +166,17 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
       {
         onSuccess: (result) => {
           if (result.canDelete) {
-            onDeleted();
+            if (!voiceAgent) {
+              onDeleted();
+              return;
+            }
+            voiceDelete.mutate(
+              { orgHandler: scope.org, componentId: voiceAgent.id, projectId },
+              {
+                onSuccess: (voiceResult) => (voiceResult.canDelete ? onDeleted() : setDeleteError(`The AI agent was deleted, but its voice agent '${voiceAgent.displayName}' was not: ${voiceResult.message || 'delete it from its own page.'}`)),
+                onError: (e) => setDeleteError(`The AI agent was deleted, but its voice agent '${voiceAgent.displayName}' was not: ${e instanceof Error ? e.message : 'delete it from its own page.'}`),
+              },
+            );
             return;
           }
           // The backend blocks deletion (e.g. active API subscribers) without throwing — canDelete must be checked explicitly.
@@ -231,6 +246,11 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         Are you sure you want to remove the integration &lsquo;<strong>{component.displayName}</strong>&rsquo; ?
       </DialogTitle>
       <DialogContent>
+        {voiceAgent && (
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            This AI agent is connected to the voice agent <strong>{voiceAgent.displayName || voiceAgent.handler}</strong>. Deleting it will also delete the voice agent.
+          </Alert>
+        )}
         <DialogContentText sx={{ mb: 2 }}>This action will be irreversible and all related details will be lost. Please type in the integration name below to confirm.</DialogContentText>
         {deleteError && (
           <Alert severity="error" sx={{ mb: 2 }}>
@@ -243,7 +263,7 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
         <Button variant="outlined" color="inherit" onClick={handleClose} disabled={mutation.isPending}>
           Cancel
         </Button>
-        <Button variant="contained" color="error" disabled={!confirmed || mutation.isPending} startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
+        <Button variant="contained" color="error" disabled={!confirmed || mutation.isPending || voiceDelete.isPending} startIcon={mutation.isPending || voiceDelete.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={handleDelete}>
           {mutation.isPending ? 'Deleting...' : 'Delete'}
         </Button>
       </DialogActions>
