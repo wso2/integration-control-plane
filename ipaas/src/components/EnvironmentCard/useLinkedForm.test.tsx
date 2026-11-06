@@ -180,6 +180,18 @@ describe('the Configure form with links', () => {
     expect(Array.from(container.querySelectorAll('button[aria-label^="Link "]')).map((b) => b.getAttribute('aria-label'))).toEqual(['Link ordersDatabaseUrl']);
   });
 
+  it('links a boolean configurable from its link icon', async () => {
+    const withBoolean = {
+      type: 'object',
+      requiredLevel: 3,
+      properties: { acme: { type: 'object', properties: { ghdemo: { type: 'object', required: ['ordersVerbose'], properties: { ordersVerbose: { type: 'boolean', description: '' } } } } } },
+    } as unknown as JSONSchema;
+    await act(async () => root.render(<Form form={withBoolean} />));
+    await act(async () => button('Link ordersVerbose').click());
+    await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersVerbose"] li')).find((li) => li.textContent?.startsWith('URL')) as HTMLElement).click());
+    expect(writes).toEqual([{ configurable: id('ordersVerbose'), ref: 'orders-db', key: 'URL' }]);
+  });
+
   it('links a field to the key picked from its link icon', async () => {
     await act(async () => button('Link ordersDatabaseUrl').click());
     await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent === 'Enter a value') as HTMLElement).click());
