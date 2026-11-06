@@ -18,6 +18,7 @@
 
 import { getRequiredPathsAtLevel } from '../../SchemaConfigForm/schemaUtils';
 import type { SchemaConfigData } from '../../../types/configuration';
+import { hasPersistedSchemaConfigValue } from '../../../utils/schemaConfig';
 
 /**
  * True when the schema declares required configuration keys that have no value
@@ -33,7 +34,7 @@ export function hasMissingRequiredConfigs(schemaConfig: SchemaConfigData | null 
     const schema = JSON.parse(atob(schemaConfig.jsonSchema));
     const allRequired = getRequiredPathsAtLevel(schema).filter((p) => !p.includes('[*]') && !p.includes('.*'));
     if (allRequired.length === 0) return false;
-    const filledKeys = new Set((schemaConfig.configurations ?? []).filter((c) => c.values?.[0]?.value).map((c) => c.key));
+    const filledKeys = new Set((schemaConfig.configurations ?? []).filter(hasPersistedSchemaConfigValue).map((c) => c.key));
     return allRequired.some((k) => !filledKeys.has(k));
   } catch {
     return false;

@@ -27,7 +27,6 @@ import { useExecutionConfigs } from '../../hooks/useExecutions';
 import { useSchemaConfig } from '../../hooks/useConfiguration';
 import type { Environment } from '../../types/environment';
 import type { EnvEndpoint } from '../../types/component';
-import { getRequiredPathsAtLevel } from '../SchemaConfigForm/schemaUtils';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useTriggerComponent } from '../../hooks/useExecutions';
 import { useStopDeployment, useRedeployDeployment } from '../../hooks/useDeployments';
@@ -39,6 +38,7 @@ import EnvironmentCardBody from './EnvironmentCardBody';
 import RunWithArgsDialog from '../Overview/automation/RunWithArgsDialog';
 import ConfigureDrawer from './ConfigureDrawer';
 import ServiceLogsDrawer from '../Overview/integration-as-api/ServiceLogsDrawer';
+import { hasMissingRequiredConfigs } from '../Overview/_shared/configStatus';
 
 interface EnvironmentProps {
   env: Environment;
@@ -108,18 +108,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
   const deployedCommitSha = envDeployment?.build?.commit?.sha;
   const { data: schemaConfig } = useSchemaConfig(isAutomation ? projectId : '', isAutomation ? componentId : '', isAutomation ? envTemplateId : '', isAutomation ? versionId : '', isAutomation ? deployedCommitSha : undefined);
 
-  const hasMissingConfigs = useMemo(() => {
-    if (!schemaConfig?.jsonSchema) return false;
-    try {
-      const schema = JSON.parse(atob(schemaConfig.jsonSchema));
-      const allRequired = getRequiredPathsAtLevel(schema).filter((p) => !p.includes('[*]') && !p.includes('.*'));
-      if (allRequired.length === 0) return false;
-      const filledKeys = new Set((schemaConfig.configurations ?? []).filter((c) => c.values?.[0]?.value).map((c) => c.key));
-      return allRequired.some((k) => !filledKeys.has(k));
-    } catch {
-      return false;
-    }
-  }, [schemaConfig]);
+  const hasMissingConfigs = useMemo(() => hasMissingRequiredConfigs(schemaConfig), [schemaConfig]);
 
   const [nextRunLabel, setNextRunLabel] = useState<string | null>(null);
   const cronFreq = scheduleConfig?.cronjobFrequency ?? null;

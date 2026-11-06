@@ -35,9 +35,31 @@ import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
+import { persistedSchemaConfigValue } from '../../utils/schemaConfig';
 
 // Keys the platform sets (a workflow integration's runtime connection), shown read-only.
 const managedConfigKeys = (configurations: SchemaConfigItem[] | undefined): ReadonlySet<string> => new Set((configurations ?? []).filter((c) => c.isManaged).map((c) => c.key));
+
+const initialConfigState = (configurations: SchemaConfigItem[] | undefined) => {
+  const values = new Map<string, BaseType>();
+  const sensitive = new Map<string, boolean>();
+  const linking = new Map<string, LinkingInfo>();
+
+  for (const configuration of configurations ?? []) {
+    const value = persistedSchemaConfigValue(configuration);
+    if (value !== undefined) values.set(configuration.key, value);
+    if (configuration.isSensitive) sensitive.set(configuration.key, true);
+    if (configuration.configGroupId || configuration.configKeyId || configuration.isDynamic) {
+      linking.set(configuration.key, {
+        configGroupId: configuration.configGroupId,
+        configKeyId: configuration.configKeyId,
+        isDynamic: configuration.isDynamic,
+      });
+    }
+  }
+
+  return { values, sensitive, linking };
+};
 
 const SERVICE_STEPS = ['Configurations', 'Certificate mount', 'Endpoints'];
 const AUTOMATION_STEPS = ['Configurations', 'Certificate mount'];
@@ -336,21 +358,11 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     certSeededRef.current = false;
     setLinkedCerts([]);
     if (data !== undefined) {
-      const initValues = new Map<string, BaseType>();
-      const initSensitive = new Map<string, boolean>();
-      const initLinking = new Map<string, LinkingInfo>();
-      for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
-        if (cfg.isSensitive) initSensitive.set(cfg.key, true);
-        if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
-          initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
-        }
-      }
-      setValueMap(initValues);
+      const initial = initialConfigState(data?.configurations);
+      setValueMap(initial.values);
       setValidationMap(new Map());
-      setSensitiveMap(initSensitive);
-      setLinkingMap(initLinking);
+      setSensitiveMap(initial.sensitive);
+      setLinkingMap(initial.linking);
       seededRef.current = true;
     } else {
       seededRef.current = false;
@@ -360,21 +372,11 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
 
   useEffect(() => {
     if (!open || seededRef.current || data === undefined) return;
-    const initValues = new Map<string, BaseType>();
-    const initSensitive = new Map<string, boolean>();
-    const initLinking = new Map<string, LinkingInfo>();
-    for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
-      if (cfg.isSensitive) initSensitive.set(cfg.key, true);
-      if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
-        initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
-      }
-    }
-    setValueMap(initValues);
+    const initial = initialConfigState(data?.configurations);
+    setValueMap(initial.values);
     setValidationMap(new Map());
-    setSensitiveMap(initSensitive);
-    setLinkingMap(initLinking);
+    setSensitiveMap(initial.sensitive);
+    setLinkingMap(initial.linking);
     seededRef.current = true;
   }, [open, data]);
 
@@ -437,20 +439,10 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
 
   const handleClearToml = () => {
     setImportedFileName(null);
-    const initValues = new Map<string, BaseType>();
-    const initSensitive = new Map<string, boolean>();
-    const initLinking = new Map<string, LinkingInfo>();
-    for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
-      if (cfg.isSensitive) initSensitive.set(cfg.key, true);
-      if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
-        initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
-      }
-    }
-    setValueMap(initValues);
-    setSensitiveMap(initSensitive);
-    setLinkingMap(initLinking);
+    const initial = initialConfigState(data?.configurations);
+    setValueMap(initial.values);
+    setSensitiveMap(initial.sensitive);
+    setLinkingMap(initial.linking);
   };
 
   const handleNext = () => {
@@ -794,21 +786,11 @@ function GenericServiceConfigureDrawer({
     certSeededRef.current = false;
     setLinkedCerts([]);
     if (data !== undefined) {
-      const initValues = new Map<string, BaseType>();
-      const initSensitive = new Map<string, boolean>();
-      const initLinking = new Map<string, LinkingInfo>();
-      for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
-        if (cfg.isSensitive) initSensitive.set(cfg.key, true);
-        if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
-          initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
-        }
-      }
-      setValueMap(initValues);
+      const initial = initialConfigState(data?.configurations);
+      setValueMap(initial.values);
       setValidationMap(new Map());
-      setSensitiveMap(initSensitive);
-      setLinkingMap(initLinking);
+      setSensitiveMap(initial.sensitive);
+      setLinkingMap(initial.linking);
       seededRef.current = true;
     } else {
       seededRef.current = false;
@@ -819,21 +801,11 @@ function GenericServiceConfigureDrawer({
   // Seed when data arrives after drawer opens.
   useEffect(() => {
     if (!open || seededRef.current || data === undefined) return;
-    const initValues = new Map<string, BaseType>();
-    const initSensitive = new Map<string, boolean>();
-    const initLinking = new Map<string, LinkingInfo>();
-    for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
-      if (cfg.isSensitive) initSensitive.set(cfg.key, true);
-      if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
-        initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
-      }
-    }
-    setValueMap(initValues);
+    const initial = initialConfigState(data?.configurations);
+    setValueMap(initial.values);
     setValidationMap(new Map());
-    setSensitiveMap(initSensitive);
-    setLinkingMap(initLinking);
+    setSensitiveMap(initial.sensitive);
+    setLinkingMap(initial.linking);
     seededRef.current = true;
   }, [open, data]);
 
@@ -892,20 +864,10 @@ function GenericServiceConfigureDrawer({
 
   const handleClearToml = () => {
     setImportedFileName(null);
-    const initValues = new Map<string, BaseType>();
-    const initSensitive = new Map<string, boolean>();
-    const initLinking = new Map<string, LinkingInfo>();
-    for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
-      if (cfg.isSensitive) initSensitive.set(cfg.key, true);
-      if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
-        initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
-      }
-    }
-    setValueMap(initValues);
-    setSensitiveMap(initSensitive);
-    setLinkingMap(initLinking);
+    const initial = initialConfigState(data?.configurations);
+    setValueMap(initial.values);
+    setSensitiveMap(initial.sensitive);
+    setLinkingMap(initial.linking);
   };
 
   const handleApply = () => {
