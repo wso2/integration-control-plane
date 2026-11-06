@@ -59,7 +59,7 @@ export function schemaConfigurationsForSave(
     const existing = existingByKey.get(key);
     const value = valueMap.get(key);
     const linking = linkingMap.get(key);
-    const isSensitive = sensitiveMap.get(key) || existing?.isSensitive || false;
+    const isSensitive = sensitiveMap.get(key) ?? existing?.isSensitive ?? false;
 
     return {
       key,

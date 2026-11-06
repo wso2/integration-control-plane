@@ -75,4 +75,17 @@ describe('schemaConfigurationsForSave', () => {
     expect(result[0]?.values).toEqual([{ environmentUuid: 'development', value: '' }]);
     expect(result[0]?.isSensitive).toBeUndefined();
   });
+
+  it('allows an existing secret to be changed to non-sensitive', () => {
+    const result = schemaConfigurationsForSave(
+      [{ key: 'configValue', values: [{ value: '' }], isSensitive: true }],
+      new Map([['configValue', 'visible value']]),
+      new Map([['configValue', false]]),
+      new Map(),
+      'development',
+    );
+
+    expect(result[0]?.values).toEqual([{ environmentUuid: 'development', value: 'visible value' }]);
+    expect(result[0]?.isSensitive).toBeUndefined();
+  });
 });
