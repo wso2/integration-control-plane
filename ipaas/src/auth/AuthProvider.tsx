@@ -169,8 +169,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    // getDecodedIdToken waits for the gateway's session and rejects when there is none. The SDK's own
-    // getAccessToken would ask the gateway for a token it never hands out.
+    // getDecodedIdToken waits for the gateway's session and rejects when there is none.
     const settleOnGateway = async (): Promise<void> => {
       const idClaims = await getDecodedIdToken().then(
         (claims) => claims as Record<string, unknown>,
@@ -183,7 +182,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       // The gateway keeps the access token, so the browser has no scopes to gate on.
       const session = { ...claimed, scopes: [] };
 
-      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), checkSession: gatewaySignedIn });
+      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), checkSession: gatewaySignedIn, observabilityToken: getAccessToken });
       local.set(ORG_HANDLE_KEY, session.orgHandle);
       setStatus({ kind: 'signedIn', session });
     };
