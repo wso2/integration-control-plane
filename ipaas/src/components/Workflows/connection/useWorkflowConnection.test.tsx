@@ -89,6 +89,8 @@ const SCOPE = 'orders|release-1|development';
 function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess {
   return {
     gatewayUrl: GATEWAY_URL,
+    aiGateway: null,
+    mcpUrl: `${GATEWAY_URL}/mcp`,
     mode: 'api-key',
     authHeader: 'X-API-Key',
     apiKey: 'key-1',
