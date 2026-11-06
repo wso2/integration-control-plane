@@ -16,162 +16,92 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, IconButton, MenuItem, Stack, TextField, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, FormControlLabel, IconButton, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
 import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
-import { CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, EMBEDDING_LOGO_DARK, LLM_PROVIDERS } from '../../../constants/contextEngine';
-import { engineMessage, isSameModel, modelDraftError, modelProviderName, toModelInput } from '../../../utils/contextEngine';
-import { formatDistanceToNow } from '../../../utils/time';
+import { useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
+import { blankLlm, CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, EMBEDDING_LOGO_DARK, LLM_PROVIDERS } from '../../../constants/contextEngine';
+import { engineMessage, isModelProviderUnavailable, modelProviderName, modelsDraftErrors, modelsDraftOf, modelsUpdate } from '../../../utils/contextEngine';
 import { HttpError } from '../../../types/http';
-import SelectableCard from '../../common/SelectableCard';
 import SecretField from '../../common/SecretField';
-import { drawerBodySx, drawerFooterSx, drawerHeaderSx, filesDrawerSx, modelTileGridSx, mutedSx, summaryCardSx } from '../styles';
-import type { ContextEngineModels, ContextModelSummary, ModelDraft } from '../../../types/contextEngine';
+import ModelProviderColumn, { type ProviderOption } from '../steps/ModelProviderColumn';
+import { drawerBodySx, drawerFooterSx, drawerHeaderSx, filesDrawerSx, modelColumnSx, mutedSx } from '../styles';
+import type { ContextEngineModels, ContextModelSummary, LlmConfig, LlmProvider, ModelsDraft } from '../../../types/contextEngine';
 
 interface EditModelsDrawerProps {
   engineId: string;
-  models: ContextEngineModels;
+  models: ContextEngineModels & { llm: ContextModelSummary };
+  /** The engine writes answers, so its answer model can be chosen. */
+  answersEnabled: boolean;
+  /** Open on the embedding model's key field, to replace the key. */
+  focusEmbeddingKey?: boolean;
   open: boolean;
   onClose: () => void;
 }
 
-interface ProviderInfo {
-  id: string;
-  name: string;
-  logo: string;
-  logoDark?: string;
-  models: string[];
-}
+const LLM_OPTIONS: ProviderOption[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models, unavailable: isModelProviderUnavailable(p.id) }));
 
-/** Provider tiles with logos resolved against the app base, as the create wizard shows them. */
-const EMBEDDING_OPTIONS: ProviderInfo[] = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]), models: p.models }));
-const LLM_OPTIONS: ProviderInfo[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
+const KEEP_KEY_TEXT = 'Leave empty to keep the current key';
+const RESTART_TEXT = 'Saving restarts the engine. It is unavailable for about a minute; ingestion in progress resumes after it restarts.';
 
-const draftOf = (m: ContextModelSummary | null): ModelDraft | null =>
-  m ? { provider: m.provider, model: m.model, baseUrl: m.baseUrl ?? '', apiVersion: m.apiVersion ?? '', dimensions: m.dimensions, keyMode: m.keyKind === 'reference' ? 'ref' : 'key', apiKey: '', apiKeyRef: '' } : null;
+const lockRowSx = { p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
+const infoIconStyle = { marginTop: 2, flexShrink: 0 } as const;
 
-const blankDraft = (provider: string): ModelDraft => ({
-  provider,
-  model: '',
-  baseUrl: '',
-  apiVersion: '',
-  keyMode: 'key',
-  apiKey: '',
-  apiKeyRef: '',
-});
-
-const keyKindText = (m: ContextModelSummary | null): string => (m?.keyKind === 'reference' ? 'From a secret reference' : m?.keyKind === 'encrypted' ? 'Stored and encrypted by the engine' : 'Stored by the engine');
-
-function KeyFields({ draft, current, onChange, idPrefix }: { draft: ModelDraft; current: ContextModelSummary | null; onChange: (d: ModelDraft) => void; idPrefix: string }): JSX.Element {
-  const unchanged = isSameModel(current, draft);
-  return (
-    <Stack gap={1.25}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-        <Typography variant="body2" sx={{ fontWeight: 500 }} id={`${idPrefix}-key-label`}>
-          API key
-        </Typography>
-        <ToggleButtonGroup exclusive size="small" value={draft.keyMode} onChange={(_e, mode: ModelDraft['keyMode'] | null) => mode && onChange({ ...draft, keyMode: mode })} aria-labelledby={`${idPrefix}-key-label`}>
-          <ToggleButton value="key">Type a key</ToggleButton>
-          <ToggleButton value="ref">Key reference</ToggleButton>
-        </ToggleButtonGroup>
-      </Stack>
-      {draft.keyMode === 'key' ? (
-        <Box>
-          <SecretField label="API key" value={draft.apiKey} onChange={(v) => onChange({ ...draft, apiKey: v })} />
-          <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mt: 0.5, ml: 1.75 }}>
-            {unchanged ? `${keyKindText(current)}. Leave empty to keep it.` : 'A different model needs its own key.'}
-          </Typography>
-        </Box>
-      ) : (
-        <TextField
-          size="small"
-          fullWidth
-          label="Reference"
-          value={draft.apiKeyRef}
-          placeholder={unchanged && current?.keyKind === 'reference' ? 'Leave empty to keep the current reference' : 'env:OPENAI_API_KEY'}
-          onChange={(e) => onChange({ ...draft, apiKeyRef: e.target.value })}
-          helperText="env:NAME for an engine variable. cp:ID for a control plane secret."
-          inputProps={{ style: { fontFamily: 'monospace' } }}
-        />
-      )}
-    </Stack>
-  );
-}
-
-function ModelEditor({ kind, providers, draft, current, onChange }: { kind: 'embedding' | 'llm'; providers: ProviderInfo[]; draft: ModelDraft | null; current: ContextModelSummary | null; onChange: (d: ModelDraft) => void }): JSX.Element {
-  const info = providers.find((p) => p.id === draft?.provider);
-  return (
-    <Stack gap={2}>
-      <Box sx={modelTileGridSx}>
-        {providers.map((p) => (
-          <SelectableCard key={p.id} title={p.name} logo={p.logo} logoDark={p.logoDark} selected={draft?.provider === p.id} onSelect={() => onChange(current?.provider === p.id ? draftOf(current)! : blankDraft(p.id))} />
-        ))}
-      </Box>
-      {draft && (
-        <>
-          {info && info.models.length > 0 ? (
-            <TextField select size="small" fullWidth label="Model" value={draft.model} onChange={(e) => onChange({ ...draft, model: e.target.value })}>
-              {!info.models.includes(draft.model) && draft.model && <MenuItem value={draft.model}>{draft.model}</MenuItem>}
-              {info.models.map((m) => (
-                <MenuItem key={m} value={m}>
-                  {m}
-                </MenuItem>
-              ))}
-            </TextField>
-          ) : (
-            <TextField size="small" fullWidth label="Deployment Id" value={draft.model} onChange={(e) => onChange({ ...draft, model: e.target.value })} />
-          )}
-          {draft.provider === 'azure_openai' && (
-            <>
-              <TextField size="small" fullWidth label="Base URL" value={draft.baseUrl} placeholder="https://<resource>.openai.azure.com" onChange={(e) => onChange({ ...draft, baseUrl: e.target.value })} />
-              <TextField size="small" fullWidth label="API Version" value={draft.apiVersion} onChange={(e) => onChange({ ...draft, apiVersion: e.target.value })} />
-            </>
-          )}
-          <KeyFields draft={draft} current={current} onChange={onChange} idPrefix={kind} />
-        </>
-      )}
-    </Stack>
-  );
-}
-
-/** Why the engine refused the save, in words; null when it saved. */
-function saveFailure(e: unknown): { title: string; body: string } | null {
-  if (!e) return null;
-  if (e instanceof HttpError && e.status === 409) return { title: "The embedding model can't change now", body: 'Items were indexed while you edited, which fixes the embedding model. Keep the current one and save again.' };
-  if (e instanceof HttpError && e.status === 503) return { title: "This engine can't store typed keys", body: 'It has no secrets key to encrypt them with, so nothing was saved. Use a key reference, or ask whoever runs the engine to set a secrets key.' };
+/** Why the save failed, in words. */
+function saveFailure(e: Error): { title: string; body: string } {
   if (e instanceof HttpError && e.status === 403) return { title: "You can't change this engine's models", body: 'Changing models needs the manage permission on this engine.' };
   return { title: "Couldn't save the models", body: engineMessage(e, 'Please try again.') };
 }
 
-/**
- * Change a running engine's models. Both are sent on every save, because the
- * engine drops a model that is left out; one sent without a key keeps its
- * stored key. Once the engine holds indexed items the embedding model is fixed,
- * since stored vectors only match the model that made them, but its key can
- * still be replaced.
- */
-export default function EditModelsDrawer({ engineId, models, open, onClose }: EditModelsDrawerProps): JSX.Element {
-  const locked = !!models.embeddingLocked;
-  const [embedding, setEmbedding] = useState<ModelDraft | null>(() => draftOf(models.embedding));
-  const [llm, setLlm] = useState<ModelDraft | null>(() => draftOf(models.llm));
-  const save = useUpdateContextModels(engineId);
-  const embeddingError = embedding ? modelDraftError(embedding, models.embedding) : '';
-  const llmError = llm ? modelDraftError(llm, models.llm) : '';
-  const changed = !isSameModel(models.embedding, embedding) || !isSameModel(models.llm, llm) || !!embedding?.apiKey || !!embedding?.apiKeyRef || !!llm?.apiKey || !!llm?.apiKeyRef;
-  const canSave = changed && !embeddingError && !llmError && (!!embedding || !!llm) && !save.isPending;
-  const failure = saveFailure(save.error);
-  const embeddingProvider = EMBEDDING_OPTIONS.find((p) => p.id === models.embedding?.provider);
+const focusKeyField = (el: HTMLElement | null): void => {
+  if (!el) return;
+  el.scrollIntoView({ block: 'center' });
+  el.querySelector('input')?.focus();
+};
 
-  const submit = () => save.mutate({ embedding: embedding ? toModelInput(embedding) : null, llm: llm ? toModelInput(llm) : null }, { onSuccess: onClose });
+/** A provider's blank config, or the current model when the current provider is picked again. */
+const blankFor =
+  (current: ContextModelSummary | null | undefined) =>
+  (id: string): LlmConfig =>
+    current?.provider === id ? { ...blankLlm(id as LlmProvider), model: current.model } : blankLlm(id as LlmProvider);
+
+/**
+ * Change a running engine's language models and their keys, laid out as the create wizard lays them
+ * out. An empty key keeps the stored one. The embedding model is shown but never changes: every
+ * stored vector came from it. Saving restarts the engine, so it asks first.
+ */
+export default function EditModelsDrawer({ engineId, models, answersEnabled, focusEmbeddingKey = false, open, onClose }: EditModelsDrawerProps): JSX.Element {
+  const [draft, setDraft] = useState<ModelsDraft>(() => modelsDraftOf(models));
+  const [confirming, setConfirming] = useState(false);
+  const save = useUpdateContextModels(engineId);
+  const errors = modelsDraftErrors(models, draft, answersEnabled);
+  const update = modelsUpdate(models, draft, answersEnabled);
+  const allowLeave = useUnsavedChanges(open && !!update && !save.isSuccess);
+  const canSave = !!update && !errors.llm && !errors.answer && !save.isPending;
+  const failure = save.error ? saveFailure(save.error) : null;
+  const embedding = models.embedding;
+  const embeddingProvider = CONTEXT_EMBEDDING_PROVIDERS.find((p) => p.id === embedding?.provider);
+  const canShareKey = embedding?.provider === draft.llm.provider;
+  const keyShared = canShareKey && draft.shareKey;
+  const set = (patch: Partial<ModelsDraft>) => setDraft((d) => ({ ...d, ...patch }));
+
+  const close = () => {
+    allowLeave();
+    onClose();
+  };
+  const submit = () => {
+    setConfirming(false);
+    if (update) save.mutate(update, { onSuccess: close });
+  };
 
   return (
-    <Drawer anchor="right" open={open} onClose={save.isPending ? undefined : onClose} variant="temporary" sx={filesDrawerSx}>
+    <Drawer anchor="right" open={open} onClose={save.isPending ? undefined : close} variant="temporary" sx={filesDrawerSx} disableAutoFocus={focusEmbeddingKey}>
       <Box sx={drawerHeaderSx}>
         <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          Edit models
+          Change models
         </Typography>
-        <IconButton size="small" aria-label="Close" onClick={onClose} disabled={save.isPending}>
+        <IconButton size="small" aria-label="Close" onClick={close} disabled={save.isPending}>
           <X size={18} />
         </IconButton>
       </Box>
@@ -185,74 +115,97 @@ export default function EditModelsDrawer({ engineId, models, open, onClose }: Ed
             {failure.body}
           </Alert>
         )}
-        <Box sx={{ ...summaryCardSx, height: 'auto' }}>
+
+        <Box sx={modelColumnSx}>
           <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={2}>
             <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
               Embedding model
             </Typography>
-            {locked && <Chip size="small" variant="outlined" icon={<Lock size={13} />} label="Locked" />}
+            <Chip size="small" variant="outlined" icon={<Lock size={13} />} label="Locked" />
           </Stack>
-          <Box sx={{ mt: 2 }}>
-            {locked ? (
-              <Stack gap={1.75}>
-                <Stack direction="row" alignItems="center" gap={1.5} sx={{ p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
-                  {embeddingProvider && <ColorSchemeImage src={{ light: embeddingProvider.logo, dark: embeddingProvider.logoDark ?? embeddingProvider.logo }} alt="" width={28} height={28} />}
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                      {models.embedding ? modelProviderName('embedding', models.embedding.provider) : 'Engine default'}
-                    </Typography>
-                    {models.embedding && (
-                      <Typography variant="caption" sx={mutedSx}>
-                        {[models.embedding.model, models.embedding.dimensions ? `${models.embedding.dimensions} dimensions` : ''].filter(Boolean).join(' · ')}
-                      </Typography>
-                    )}
-                  </Box>
-                </Stack>
-                <Stack direction="row" gap={1} sx={mutedSx}>
-                  <Info size={16} aria-hidden style={{ marginTop: 2, flexShrink: 0 }} />
-                  <Typography variant="body2">Can&apos;t change after indexing.{models.embedding ? ' You can still replace its key.' : ''}</Typography>
-                </Stack>
-                {embedding && <KeyFields draft={embedding} current={models.embedding} onChange={setEmbedding} idPrefix="embedding" />}
-              </Stack>
-            ) : (
-              <ModelEditor kind="embedding" providers={EMBEDDING_OPTIONS} draft={embedding} current={models.embedding} onChange={setEmbedding} />
-            )}
-            {embeddingError && embedding && (
-              <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-                {embeddingError}
+          <Stack direction="row" alignItems="center" gap={1.5} sx={lockRowSx}>
+            {embeddingProvider && <ColorSchemeImage src={{ light: contextLogoUrl(embeddingProvider.logo), dark: contextLogoUrl(EMBEDDING_LOGO_DARK[embeddingProvider.id] ?? embeddingProvider.logo) }} alt="" width={28} height={28} />}
+            <Box sx={{ flex: 1 }}>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                {embedding ? modelProviderName('embedding', embedding.provider) : 'Engine default'}
               </Typography>
-            )}
+              {embedding && (
+                <Typography variant="caption" sx={mutedSx}>
+                  {[embedding.model, embedding.dimensions ? `${embedding.dimensions} dimensions` : ''].filter(Boolean).join(' · ')}
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+          <Stack direction="row" gap={1} sx={mutedSx}>
+            <Info size={16} aria-hidden style={infoIconStyle} />
+            <Typography variant="body2">The embedding model can&apos;t change.</Typography>
+          </Stack>
+          <Box ref={focusEmbeddingKey ? focusKeyField : undefined}>
+            <SecretField label="API Key" value={draft.embeddingKey} onChange={(embeddingKey) => set({ embeddingKey })} helperText={KEEP_KEY_TEXT} error={keyShared ? errors.llm : undefined} />
           </Box>
         </Box>
 
-        <Box sx={{ ...summaryCardSx, height: 'auto' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            Ingestion language model
-          </Typography>
-          <Box sx={{ mt: 2 }}>
-            <ModelEditor kind="llm" providers={LLM_OPTIONS} draft={llm} current={models.llm} onChange={setLlm} />
-            {llmError && llm && (
-              <Typography variant="caption" color="error" sx={{ display: 'block', mt: 1 }}>
-                {llmError}
-              </Typography>
-            )}
-          </Box>
-        </Box>
+        <ModelProviderColumn<LlmConfig>
+          title="Ingestion language model"
+          purpose={answersEnabled && draft.answerChoice === 'same' ? 'Builds the graph and writes answers.' : 'Builds the graph.'}
+          providers={LLM_OPTIONS}
+          value={draft.llm}
+          onChange={(llm) => set({ llm })}
+          blank={blankFor(models.llm)}
+          modelLabel="Ingestion language model"
+          shareKey={{ available: canShareKey, checked: draft.shareKey, onChange: (shareKey) => set({ shareKey }) }}
+          keyHelperText={KEEP_KEY_TEXT}
+          keyError={keyShared ? undefined : errors.llm}
+        />
+
+        {answersEnabled && (
+          <ModelProviderColumn<LlmConfig>
+            key={draft.answerChoice}
+            title="Answer language model"
+            purpose="Writes the cited answers."
+            providers={LLM_OPTIONS}
+            value={draft.answer}
+            onChange={(answer) => set({ answer })}
+            blank={blankFor(models.answer)}
+            modelLabel="Answer language model"
+            showProviders={draft.answerChoice === 'different'}
+            keyHelperText={KEEP_KEY_TEXT}
+            keyError={errors.answer}
+            choice={
+              <RadioGroup value={draft.answerChoice} onChange={(_e, value) => set({ answerChoice: value as ModelsDraft['answerChoice'] })} aria-label="Answer language model">
+                <FormControlLabel value="same" control={<Radio size="small" />} label={<Typography variant="body2">Same as the ingestion model</Typography>} />
+                <FormControlLabel value="different" control={<Radio size="small" />} label={<Typography variant="body2">A different model</Typography>} />
+              </RadioGroup>
+            }
+          />
+        )}
       </Box>
 
-      <Box sx={{ ...drawerFooterSx, justifyContent: 'space-between' }}>
-        <Typography variant="caption" sx={mutedSx}>
-          {models.updatedAt ? `Last changed ${formatDistanceToNow(models.updatedAt).toLowerCase()}${models.version ? ` · version ${models.version}` : ''}` : ''}
-        </Typography>
+      <Box sx={{ ...drawerFooterSx, justifyContent: 'flex-end' }}>
         <Stack direction="row" gap={1.5}>
-          <Button variant="outlined" onClick={onClose} disabled={save.isPending}>
+          <Button variant="outlined" onClick={close} disabled={save.isPending}>
             Cancel
           </Button>
-          <Button variant="contained" disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={submit}>
+          <Button variant="contained" disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={() => setConfirming(true)}>
             {save.isPending ? 'Saving…' : 'Save models'}
           </Button>
         </Stack>
       </Box>
+
+      {confirming && (
+        <Dialog open onClose={() => setConfirming(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Restart the engine?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>{RESTART_TEXT}</DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirming(false)}>Keep editing</Button>
+            <Button variant="contained" onClick={submit}>
+              Save and restart
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
     </Drawer>
   );
 }
