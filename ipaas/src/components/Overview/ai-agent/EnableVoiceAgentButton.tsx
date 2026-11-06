@@ -33,12 +33,6 @@ interface EnableVoiceAgentButtonProps {
   projectId: string;
 }
 
-/**
- * AI agent overview action: opens the voice agent wizard with this agent fixed as the target,
- * or, once a voice agent speaks for it, links to that voice agent (Devant's EnableVoiceAgentButton).
- * It is offered only once the agent's latest build has succeeded: a voice agent needs a running
- * agent to talk to.
- */
 export default function EnableVoiceAgentButton({ component, orgHandler, projectId }: EnableVoiceAgentButtonProps): JSX.Element | null {
   const navigate = useAppNavigate();
   const scope = useScope();
@@ -47,7 +41,6 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
   const { data: builds, isPending: loadingBuilds } = useDeploymentStatus(component.id, trackId);
   const latest = builds?.[0];
 
-  // A failed lookup is not "no voice agent": offering to create one could make a duplicate.
   if (scope.level !== 'components' || isLoading || isError) return null;
   const projectHandler = scope.project;
 

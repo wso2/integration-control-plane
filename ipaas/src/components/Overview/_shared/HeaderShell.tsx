@@ -215,8 +215,6 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const HeaderActions = module?.HeaderActions;
   const isAiAgent = identifyIntegration(displayType, component.componentSubType ?? null).type === 'ai-agent';
 
-  // An integration without source (a voice agent, a proxy) can still be reported with an empty
-  // repository record, whose missing org and name would crash the URL builder.
   const repoUrl = hasSource && repository ? buildRepoBrowseUrl(repository) : null;
   const ProviderIcon = getGitProviderIcon(repository?.gitProvider);
 

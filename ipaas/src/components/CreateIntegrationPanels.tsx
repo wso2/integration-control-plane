@@ -386,7 +386,6 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             </Card>
           </Box>
 
-          {/* Voice agent: a prebuilt voice front end for an existing agent, so it is created by a form rather than from source. */}
           <Box sx={{ flex: '0 0 auto' }}>
             <Card sx={{ boxShadow: 'none', ...(creationBlocked ? { pointerEvents: 'none', opacity: 0.5 } : {}) }}>
               <CardContent sx={VOICE_AGENT_CARD_SX}>

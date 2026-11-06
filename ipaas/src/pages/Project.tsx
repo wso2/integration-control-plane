@@ -150,7 +150,6 @@ function DeleteDialog({ component, scope, projectId, onClose, onDeleted }: { com
   const mutation = useDeleteComponent();
   const voiceDelete = useDeleteComponent();
   const confirmed = confirmation === component.displayName;
-  // An AI agent's voice agent cannot work without it, so it goes too (as in Devant).
   const isAiAgent = identifyIntegration(component.displayType, component.componentSubType).type === 'ai-agent';
   const { voiceAgent } = useLinkedVoiceAgent(scope.org, isAiAgent ? projectId : '', component.handler);
 

@@ -22,13 +22,6 @@ import EnvCardActions from './EnvCardActions';
 import EnvCardBody from './EnvCardBody';
 import HeaderStatus from './HeaderStatus';
 
-/**
- * Voice agent integration module.
- *
- * A voice agent is a prebuilt LiveKit agents worker wrapping another agent: no
- * build, no API to try, no config schema. Its card shows the rollout status, the
- * token service URL and an in-browser voice tester.
- */
 const voiceAgentModule: IntegrationModule = {
   ...INTEGRATION_TYPE_INFO['voice-agent'],
   HeaderStatus,

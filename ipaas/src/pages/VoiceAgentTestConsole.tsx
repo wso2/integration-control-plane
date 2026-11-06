@@ -35,10 +35,6 @@ import { tokenServiceUrlOf } from '../utils/voiceAgent';
 const ROOT_SX = { display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 } as const;
 const CONTENT_SX = { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column', gap: 2 } as const;
 
-/**
- * Full-page Test surface for voice agents (`test/voice-agent`): pick an environment, then
- * talk to the voice agent deployed there through its token service.
- */
 export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
   const { projectId } = useProjectId(scope.project);
@@ -46,7 +42,6 @@ export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Elemen
   const { data: environments = [] } = useEnvironments(scope.org, projectId);
   const { trackId } = useSelectedTrack(component);
 
-  // The chosen environment, or the first one until the user picks.
   const [pickedEnvId, setPickedEnvId] = useState('');
   const env = environments.find((e) => e.id === pickedEnvId) ?? environments[0];
 
@@ -82,7 +77,6 @@ export default function VoiceAgentTestConsole(scope: ComponentScope): JSX.Elemen
     const tokenServiceUrl = tokenServiceUrlOf(endpoints);
     return (
       <VoiceAgentTestPanel
-        // A new environment is a different agent: drop the old call and transcript.
         key={env?.id}
         agentName={component.displayName || component.name}
         tokenServiceUrl={tokenServiceUrl}

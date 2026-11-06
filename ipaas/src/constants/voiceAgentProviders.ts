@@ -18,11 +18,8 @@
 
 import type { SttProvider, TtsProvider } from '../types/voiceAgent';
 
-/** The `ttsVoiceId` value that switches the form to a free-text voice id. */
 export const CUSTOM_VOICE_ID = 'custom';
 
-// Provider and model ids are the voice-agent image's own identifiers: the worker
-// passes them to LiveKit agents as `<provider>/<model>`, so they must not be renamed.
 export const STT_PROVIDERS: SttProvider[] = [
   {
     id: 'deepgram',

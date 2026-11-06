@@ -47,11 +47,6 @@ function Section({ title, children }: { title: string; children: ReactNode }): J
   );
 }
 
-/**
- * How an application talks to the voice agent, after Devant's "Connect your application" dialog: a
- * backend fetches a LiveKit room token from the token service and the application joins the room.
- * A centred dialog, as in Devant, since it is a guide to read rather than a form beside the page.
- */
 export default function HowToConnectDialog({ open, onClose, envName, componentId, versionId, releaseId }: HowToConnectDialogProps): JSX.Element {
   const { data: endpoints, isLoading, isError } = useEnvEndpoints(componentId, versionId, releaseId);
   const tokenServiceUrl = tokenServiceUrlOf(endpoints);

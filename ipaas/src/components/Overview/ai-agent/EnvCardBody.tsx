@@ -31,7 +31,6 @@ import { useSelectedAgentEndpoint } from './selectedEndpoint';
 export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
-  // Shared with the header actions, which offer Test or Test voice for the endpoint picked here.
   const [selectedId, setSelectedId] = useSelectedAgentEndpoint(component.id, env.id);
   const selectedEpIdx = Math.max(0, endpoints.findIndex((e) => e.id === selectedId));
   const selectedEndpoint = endpoints[selectedEpIdx];
@@ -72,7 +71,6 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
       <Divider sx={{ my: 2 }} />
       {showEndpoints && <EndpointUrlsPanel endpoints={endpointsForPanel} selectedIdx={selectedEpIdx} onSelect={(i) => setSelectedId(endpoints[i].id)} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
       {isVoiceEndpoint(selectedEndpoint) ? (
-        // The voice endpoint speaks WebSocket to a voice agent, not chat: point to Test voice instead.
         <Alert severity="info" sx={{ mt: 2 }}>
           This is the voice endpoint of the agent. Enable a voice agent, then click <strong>Test voice</strong> to talk to the agent.
         </Alert>

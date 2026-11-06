@@ -26,7 +26,6 @@ export const rowSx = {
   bgcolor: 'action.hover',
 } as const;
 
-/** The orb avatar; `live` tints and pulses it while a call is connected. */
 export const orbSx = (live: boolean) =>
   ({
     width: 44,

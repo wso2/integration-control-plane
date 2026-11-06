@@ -21,18 +21,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchVoiceAgentRoomToken } from '../api/voiceAgents';
 import { applyTranscriptEvent, type VoiceTranscriptMessage } from '../utils/voiceAgent';
 
-/** The worker publishes transcripts on this data topic (backend/worker.py). */
 const TRANSCRIPT_TOPIC = 'voice-text';
 
 export type VoiceTesterStatus = 'idle' | 'connecting' | 'connected' | 'error';
 
-/**
- * A browser call to a deployed voice agent through LiveKit: a room token from the
- * agent's token service, the microphone published, the agent's audio played into
- * `audioContainerRef`, and its transcript collected. The room is the external
- * system this hook synchronises with, so every path out of a call — Stop, a
- * remote disconnect, unmount — tears it down.
- */
 export function useVoiceTesterSession(tokenServiceUrl: string) {
   const [status, setStatus] = useState<VoiceTesterStatus>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +54,6 @@ export function useVoiceTesterSession(tokenServiceUrl: string) {
     roomRef.current = room;
     try {
       const { token, url } = await fetchVoiceAgentRoomToken(tokenServiceUrl, `voice-tester-${Date.now()}`, 'console-tester');
-      // Stopped while the token was being fetched.
       if (roomRef.current !== room) return;
       room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
         if (track.kind === Track.Kind.Audio) audioContainerRef.current?.appendChild(track.attach());

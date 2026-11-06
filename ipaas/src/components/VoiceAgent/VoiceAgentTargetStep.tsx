@@ -34,16 +34,13 @@ export interface VoiceAgentTargetStepProps extends VoiceAgentStepProps {
   projects: Project[];
   projectId: string;
   onProjectChange: (projectId: string) => void;
-  /** Opened inside a project: the voice agent is created there, so the project is fixed. */
   lockProject: boolean;
 }
 
-/** Keeps an error message reserved, so the form does not shift as errors come and go. */
 const help = (error: string | undefined, hint = ' '): string => error ?? hint;
 
 const isAiAgent = (c: Component): boolean => !c.deleting && identifyIntegration(c.displayType, c.componentSubType).type === 'ai-agent';
 
-/** Step 1: where the voice agent lives, which agent it speaks for, and its name. */
 export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHandler, projects, projectId, onProjectChange, lockProject }: VoiceAgentTargetStepProps): JSX.Element {
   const [editingName, setEditingName] = useState(!!settings.name);
   const { data: components, isLoading: loadingAgents } = useComponents(orgHandler, projectId);
@@ -52,7 +49,6 @@ export default function VoiceAgentTargetStep({ settings, errors, onChange, orgHa
 
   const chooseMode = (targetMode: VoiceTargetMode) => {
     if (targetMode === settings.targetMode) return;
-    // The URL belongs to one mode: a typed one is not the agent's, and a resolved one is re-resolved.
     onChange({ targetMode, targetAgentHandler: '', targetAgentWsUrl: '' });
   };
 
@@ -225,15 +221,10 @@ interface AgentEndpointProps {
   onResolved: (url: string) => void;
 }
 
-/**
- * Resolves the WebSocket URL of the selected AI agent in the project's first environment, the
- * one the voice agent is deployed to, and reports it into the settings.
- */
 function AgentEndpoint({ orgHandler, projectId, agent, url, onResolved }: AgentEndpointProps): JSX.Element {
   const state = useAgentVoiceEndpoint(orgHandler, projectId, agent);
   const resolved = state.status === 'ready' ? state.url : '';
 
-  // The settings hold the URL the deploy sends, so they follow what the agent publishes.
   useEffect(() => {
     if (state.status !== 'loading' && resolved !== url) onResolved(resolved);
   }, [state.status, resolved, url, onResolved]);
@@ -241,30 +232,15 @@ function AgentEndpoint({ orgHandler, projectId, agent, url, onResolved }: AgentE
   return <AgentEndpointStatus state={state} agentName={agent.displayName || agent.handler} />;
 }
 
-/** One line on where a platform-hosted target stands: its URL, or why it has none yet. */
-export function AgentEndpointStatus({ state, agentName }: { state: AgentVoiceEndpointState; agentName: string }): JSX.Element {
+export function AgentEndpointStatus({ state, agentName }: { state: AgentVoiceEndpointState; agentName: string }): JSX.Element | null {
   switch (state.status) {
-    case 'loading':
-      return (
-        <Typography variant="body2" color="text.secondary">
-          Looking up the agent&apos;s endpoint…
-        </Typography>
-      );
     case 'no-environment':
       return <Alert severity="warning">This project has no environment to deploy the voice agent to.</Alert>;
     case 'not-deployed':
       return <Alert severity="warning">{`${agentName} is not deployed in ${state.env.name}. Build and deploy it, then come back.`}</Alert>;
     case 'no-endpoint':
       return <Alert severity="warning">{`${agentName} has no WebSocket endpoint in ${state.env.name}.`}</Alert>;
-    case 'ready':
-      return (
-        <Typography variant="body2" color="text.secondary">
-          Connects to{' '}
-          <Box component="span" sx={styles.urlTextSx}>
-            {state.url}
-          </Box>{' '}
-          in {state.env.name}.
-        </Typography>
-      );
+    default:
+      return null;
   }
 }

@@ -18,9 +18,6 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 
-// The endpoint picked in an AI agent's env card. The card body (the picker) and its header
-// actions (Test or Test voice) are separate module slots, so they share the choice here,
-// keyed by integration and environment.
 const selected = new Map<string, string>();
 const listeners = new Set<() => void>();
 
@@ -29,7 +26,6 @@ const subscribe = (listener: () => void) => {
   return () => listeners.delete(listener);
 };
 
-/** The selected endpoint id for one env card (null until the user picks one) and its setter. */
 export function useSelectedAgentEndpoint(componentId: string, envId: string): [string | null, (endpointId: string) => void] {
   const key = `${componentId}:${envId}`;
   const value = useSyncExternalStore(subscribe, () => selected.get(key) ?? null);

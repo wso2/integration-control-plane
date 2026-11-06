@@ -26,7 +26,6 @@ export const modeGridSx = {
   gap: 2,
 } as const;
 
-/** A target-mode choice; `selected` outlines it in the primary colour. */
 export const modeCardSx = (selected: boolean) =>
   ({
     borderColor: selected ? 'primary.main' : 'divider',
@@ -43,5 +42,3 @@ export const nameRowSx = {
   gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' },
   gap: 2,
 } as const;
-
-export const urlTextSx = { fontFamily: 'monospace', wordBreak: 'break-all' } as const;

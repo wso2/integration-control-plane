@@ -25,10 +25,6 @@ import type { EnvCardActionsProps } from '../../../types/integration';
 import ServiceLogsDrawer from '../integration-as-api/ServiceLogsDrawer';
 import HowToConnectDialog from './HowToConnectDialog';
 
-/**
- * How to connect, View logs and Stop/Start. There is no Test action here: the
- * voice tester sits in the card body.
- */
 export default function EnvCardActions({ component, env, versionId, releaseId, orgHandler, componentHandler, projectId, hasDeployment, deploymentStatusV2, releaseMgtReleaseId, releaseMgtDeploymentId, onNotify, requestPoll }: EnvCardActionsProps): ReactNode {
   const [logsOpen, setLogsOpen] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);

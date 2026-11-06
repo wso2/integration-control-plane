@@ -119,7 +119,6 @@ function RouteLoading(): JSX.Element {
   );
 }
 
-/** Route guard for `test/voice-agent`; like {@link AgentChatTestRoute}, another type bounces to `test`. */
 export function VoiceAgentTestRoute(scope: ComponentScope): JSX.Element {
   const { projectId } = useProjectId(scope.project);
   const { data: comp, isPending } = useComponentByHandler(projectId, scope.component);

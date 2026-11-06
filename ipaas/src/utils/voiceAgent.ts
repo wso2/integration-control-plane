@@ -20,7 +20,6 @@ import { CUSTOM_VOICE_ID, STT_PROVIDERS, TTS_PROVIDERS } from '../constants/voic
 import type { TurnDetectionModel, VoiceAgentDeployment, VoiceAgentSettings } from '../types/voiceAgent';
 import { toHandler } from './string';
 
-/** The voice-agent component's handler is capped so the generated workload names stay within Kubernetes limits. */
 const MAX_HANDLER_LENGTH = 25;
 
 export const DEFAULT_VOICE_AGENT_SETTINGS: VoiceAgentSettings = {
@@ -62,7 +61,6 @@ export const DEFAULT_VOICE_AGENT_SETTINGS: VoiceAgentSettings = {
   tokenTtl: 3600,
 };
 
-// The image's names for the form's choices (backend/config.py).
 const TURN_DETECTION_MODE: Record<TurnDetectionModel, string> = {
   multilingual: 'adaptive',
   vad_only: 'vad',
@@ -78,17 +76,14 @@ export function isWebSocketUrl(value: string): boolean {
   }
 }
 
-/** The integration handler a voice agent is created under, derived from its display name. */
 export function voiceAgentHandler(displayName: string): string {
   return toHandler(displayName).slice(0, MAX_HANDLER_LENGTH).replace(/-+$/, '');
 }
 
-/** The integration name the voice agent is created under: the one typed, or one derived from the display name. */
 export function effectiveVoiceAgentHandler(s: Pick<VoiceAgentSettings, 'displayName' | 'name'>): string {
   return s.name.trim() ? voiceAgentHandler(s.name) : voiceAgentHandler(s.displayName);
 }
 
-/** Picking a provider selects its first model and language, so every step is valid as soon as a provider is chosen. */
 export function withSttProvider(settings: VoiceAgentSettings, providerId: string): VoiceAgentSettings {
   const provider = STT_PROVIDERS.find((p) => p.id === providerId);
   if (!provider) return settings;
@@ -108,7 +103,6 @@ export function withTtsProvider(settings: VoiceAgentSettings, providerId: string
   };
 }
 
-/** Field errors for one wizard step; an empty object means the step is complete. */
 export type StepErrors = Partial<Record<keyof VoiceAgentSettings, string>>;
 
 export function validateAgentStep(s: VoiceAgentSettings): StepErrors {
@@ -163,7 +157,6 @@ const NUMERIC_TUNING_FIELDS = [
 
 export function validateTuningStep(s: VoiceAgentSettings): StepErrors {
   const errors: StepErrors = {};
-  // A cleared number field is NaN, which every comparison below would let through.
   for (const field of NUMERIC_TUNING_FIELDS) {
     if (!Number.isFinite(s[field])) errors[field] = 'Enter a number.';
   }
@@ -177,10 +170,6 @@ export function validateTuningStep(s: VoiceAgentSettings): StepErrors {
 
 const seconds = (ms: number): string => String(ms / 1000);
 
-/**
- * The env vars the voice-agent image reads, split into plain settings and the
- * provider keys. AGENT_NAME is not sent: the BFF sets it to the integration name.
- */
 export function buildVoiceAgentDeployment(s: VoiceAgentSettings): VoiceAgentDeployment {
   const config: Record<string, string> = {
     TARGET_AGENT_WS_URL: s.targetAgentWsUrl.trim(),
@@ -192,7 +181,6 @@ export function buildVoiceAgentDeployment(s: VoiceAgentSettings): VoiceAgentDepl
     TTS_MODEL: s.ttsModel,
     TTS_VOICE_ID: s.ttsVoiceId === CUSTOM_VOICE_ID ? s.ttsCustomVoiceId.trim() : s.ttsVoiceId,
     TTS_LANGUAGE: s.ttsLanguage,
-    // The form exposes no switch for these; the previous console always sent them on.
     TURN_DETECTION_ENABLED: 'true',
     TURN_DETECTION_MODE: TURN_DETECTION_MODE[s.turnDetectionModel],
     BARGE_IN_ENABLED: 'true',
@@ -229,15 +217,8 @@ export interface VoiceTranscriptMessage {
   interrupted?: boolean;
 }
 
-/** The newest messages kept in the tester, so a long call cannot grow the list without bound. */
 export const MAX_TRANSCRIPT_MESSAGES = 200;
 
-/**
- * Applies one message from the worker's `voice-text` data topic to the transcript.
- * `stt` is what the caller said, `assistant` what the agent answered, and
- * `interrupt` marks the agent's last answer as cut off by the caller. Anything
- * else (including malformed JSON) leaves the transcript unchanged.
- */
 export function applyTranscriptEvent(prev: VoiceTranscriptMessage[], raw: string, nextId: number): VoiceTranscriptMessage[] {
   let event: { type?: unknown; text?: unknown };
   try {
@@ -255,22 +236,18 @@ export function applyTranscriptEvent(prev: VoiceTranscriptMessage[], raw: string
   return next.length > MAX_TRANSCRIPT_MESSAGES ? next.slice(next.length - MAX_TRANSCRIPT_MESSAGES) : next;
 }
 
-/** The endpoint the BFF publishes a voice agent's token service on (ipaas-service models.VoiceAgentTokenEndpointName). */
 export const VOICE_AGENT_TOKEN_ENDPOINT = 'token-service';
 
-/** The token service URL the browser calls, or null while the endpoint has no external URL yet. */
 export function tokenServiceUrlOf(endpoints: readonly { id: string; publicUrl?: string | null }[] | undefined): string | null {
   return endpoints?.find((e) => e.id === VOICE_AGENT_TOKEN_ENDPOINT)?.publicUrl || null;
 }
 
-/** Label a platform-hosted voice agent carries, naming the AI agent it speaks for (Devant's `voice-pipeline:` link, reversed). */
 export const VOICE_TARGET_LABEL_PREFIX = 'voice-target-agent:';
 
 export function voiceTargetLabel(agentHandler: string): string {
   return `${VOICE_TARGET_LABEL_PREFIX}${agentHandler}`;
 }
 
-/** The AI agent a voice agent's labels name, or null for an externally hosted target. */
 export function linkedAgentHandlerOf(labels: string | readonly string[] | undefined): string | null {
   const list = typeof labels === 'string' ? labels.split(',') : (labels ?? []);
   const label = list.map((l) => l.trim()).find((l) => l.startsWith(VOICE_TARGET_LABEL_PREFIX));
@@ -284,12 +261,6 @@ interface AgentEndpointLike {
   invokeUrl?: string | null;
 }
 
-/**
- * The WebSocket URL a voice agent reaches a platform-hosted AI agent on. Prefers a WebSocket
- * endpoint, and an agent with one endpoint uses it whatever its declared type (an agent
- * registers its voice listener's port as a plain endpoint). The in-project URL comes first,
- * as in Devant: the voice agent runs in the same project, so it skips the gateway's API key.
- */
 export function agentVoiceWsUrl(endpoints: readonly AgentEndpointLike[] | undefined): string | null {
   if (!endpoints?.length) return null;
   const ws = endpoints.filter((e) => /^(ws|websocket)$/i.test(e.type));
@@ -299,7 +270,6 @@ export function agentVoiceWsUrl(endpoints: readonly AgentEndpointLike[] | undefi
   return base ? base.replace(/^http/i, 'ws').replace(/\/+$/, '') : null;
 }
 
-/** An AI agent's voice endpoint: the WebSocket one a voice agent talks to, rather than its chat API. */
 export function isVoiceEndpoint(endpoint: { type: string } | undefined): boolean {
   return !!endpoint && /^(ws|wss|websocket)$/i.test(endpoint.type);
 }

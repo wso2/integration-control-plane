@@ -75,7 +75,6 @@ export default function EnvCardActions({
   // The agent chat opens a live connection, so only a running workload qualifies.
   const canTest = isDeploymentHealthy(deploymentStatusV2);
 
-  // The endpoint picked in the card body: its voice endpoint is tried through a voice agent.
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
   const [selectedId] = useSelectedAgentEndpoint(component.id, env.id);
   const selectedEndpoint = endpoints.find((e) => e.id === selectedId) ?? endpoints[0];

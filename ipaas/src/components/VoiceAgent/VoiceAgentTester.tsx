@@ -26,13 +26,10 @@ const STATUS_LABEL: Record<VoiceTesterStatus, string> = { idle: 'Offline', conne
 const STATUS_COLOR: Record<VoiceTesterStatus, 'default' | 'warning' | 'success' | 'error'> = { idle: 'default', connecting: 'warning', connected: 'success', error: 'error' };
 
 interface VoiceAgentTesterProps {
-  /** The token service URL, or null when the voice agent publishes none here. */
   tokenServiceUrl: string | null;
-  /** Why a call cannot start in this environment; shown in place of the hint and disables Start session. */
   unavailableReason?: string;
 }
 
-/** The env card's voice tester: one row to call the deployed voice agent, with the transcript below while it runs. */
 export default function VoiceAgentTester({ tokenServiceUrl, unavailableReason }: VoiceAgentTesterProps): JSX.Element {
   const { status, error, transcript, start, stop, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl ?? '');
   const inCall = status === 'connecting' || status === 'connected';
@@ -92,7 +89,6 @@ export default function VoiceAgentTester({ tokenServiceUrl, unavailableReason }:
           </Stack>
         </Paper>
       )}
-      {/* The agent's audio plays from elements LiveKit attaches here. */}
       <Box ref={audioContainerRef} sx={styles.hiddenSx} />
     </Box>
   );

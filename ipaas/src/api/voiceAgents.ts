@@ -20,10 +20,6 @@ import type { Component } from '../types/component';
 import type { VoiceAgentDeployment } from '../types/voiceAgent';
 import { bff, seg } from './_client';
 
-/**
- * The logical type a voice agent reads back as. OpenChoreo has no voice-agent
- * ComponentType: it is a generic service the BFF recognises by this annotation.
- */
 export const VOICE_AGENT_COMPONENT_TYPE = 'voiceAgent';
 
 interface CreateVoiceAgentComponentInput {
@@ -31,16 +27,9 @@ interface CreateVoiceAgentComponentInput {
   name: string;
   displayName: string;
   description: string;
-  /** Integration labels; a platform-hosted voice agent carries the link to its AI agent here. */
   labels?: string[];
 }
 
-/**
- * Creates the integration that holds a voice agent: a generic service with no
- * build workflow, since its image is prebuilt and chosen by the BFF on deploy.
- * The BFF answers 409 with a suffixed retry, so the returned handler can differ
- * from `name`.
- */
 export const createVoiceAgentComponent = (input: CreateVoiceAgentComponentInput): Promise<Component> =>
   bff.post<Component>(`/projects/${seg(input.projectId)}/components`, {
     metadata: {
@@ -60,15 +49,9 @@ export const createVoiceAgentComponent = (input: CreateVoiceAgentComponentInput)
     },
   });
 
-/** `POST /components/{c}/deploy-voice-agent`: rolls the voice agent out to the first environment. */
 export const deployVoiceAgent = (componentName: string, deployment: VoiceAgentDeployment): Promise<{ environment: string; releaseName: string }> =>
   bff.post<{ environment: string; releaseName: string }>(`/components/${seg(componentName)}/deploy-voice-agent`, deployment);
 
-/**
- * Asks a deployed voice agent's token service for a LiveKit room token. This is
- * the voice agent's own endpoint, not the BFF, so it is a plain request: the
- * token service holds the LiveKit keys and signs the token itself.
- */
 export async function fetchVoiceAgentRoomToken(tokenServiceUrl: string, roomName: string, participantName: string): Promise<{ token: string; url: string }> {
   const params = new URLSearchParams({ roomName, participantName });
   const response = await fetch(`${tokenServiceUrl.replace(/\/+$/, '')}/getToken?${params}`);

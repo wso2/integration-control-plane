@@ -20,7 +20,6 @@ import type { ReactNode } from 'react';
 import type { HeaderStatusProps } from '../../../types/integration';
 import StatusDot from '../_shared/StatusDot';
 
-/** Status only: a voice agent's settings are fixed at creation, so there is no Configure action. */
 export default function HeaderStatus({ deploymentStatusV2 }: HeaderStatusProps): ReactNode {
   return <StatusDot status={deploymentStatusV2} />;
 }

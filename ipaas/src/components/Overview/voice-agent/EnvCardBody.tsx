@@ -26,7 +26,6 @@ import VoiceAgentTester from '../../VoiceAgent/VoiceAgentTester';
 
 const DIVIDER_SX = { my: 2 } as const;
 
-/** The voice tester for this environment. The token service and how to call it are under How to connect. */
 export default function EnvCardBody({ component, versionId, releaseId, hasDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {
   const { data: endpoints, isLoading, isError } = useEnvEndpoints(component.id, versionId, releaseId);
   const tokenServiceUrl = tokenServiceUrlOf(endpoints);

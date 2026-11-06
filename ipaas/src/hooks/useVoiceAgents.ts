@@ -29,16 +29,11 @@ import { buildVoiceAgentDeployment, effectiveVoiceAgentHandler, linkedAgentHandl
 export interface VoiceAgentRow {
   component: Component;
   project: Project;
-  /** The platform-hosted AI agent it speaks for; undefined for an externally hosted one. */
   targetAgent?: Component;
 }
 
 const isVoiceAgent = (c: Component): boolean => c.componentType === VOICE_AGENT_COMPONENT_TYPE && !c.deleting;
 
-/**
- * Every voice agent in the given projects. Shares the per-project integration
- * lists' query keys, so the list is served from the same cache.
- */
 export function useOrgVoiceAgents(orgHandler: string, projects: Project[]) {
   return useQueries({
     queries: projects.map((project) => ({
@@ -61,11 +56,6 @@ export function useOrgVoiceAgents(orgHandler: string, projects: Project[]) {
   });
 }
 
-/**
- * Creates a voice agent and rolls it out. A deploy failure deletes the integration
- * it just created, so a failed attempt never leaves a voice agent with no image or
- * keys behind.
- */
 export function useCreateVoiceAgent() {
   const qc = useQueryClient();
   return useMutation({
@@ -89,7 +79,6 @@ export function useCreateVoiceAgent() {
   });
 }
 
-/** The voice agent in the project that speaks for the given AI agent, if any; shares the integration list's cache. */
 export function useLinkedVoiceAgent(orgHandler: string, projectId: string, agentHandler: string) {
   const { data, isLoading, isError } = useComponents(orgHandler, projectId);
   const voiceAgent = data?.find((c) => isVoiceAgent(c) && linkedAgentHandlerOf(c.labels) === agentHandler);

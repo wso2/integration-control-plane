@@ -16,15 +16,10 @@
  * under the License.
  */
 
-// The code samples of a voice agent's "How to connect" drawer, after Devant's. In v2 the token
-// service is a public endpoint, so the backend calls it directly: there is no OAuth2 exchange.
-
-/** The full `getToken` URL of a token service. */
 export function voiceAgentGetTokenUrl(tokenServiceUrl: string): string {
   return `${tokenServiceUrl.replace(/\/+$/, '')}/getToken`;
 }
 
-/** The backend's environment: the one value it needs from the platform. */
 export function voiceAgentBackendEnv(tokenServiceUrl: string): string {
   return `VOICE_AGENT_TOKEN_URL=${voiceAgentGetTokenUrl(tokenServiceUrl)}`;
 }

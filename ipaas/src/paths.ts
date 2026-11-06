@@ -122,17 +122,14 @@ export function voiceAgentsUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/voice-agents`;
 }
 
-/** The voice agent wizard at org level: choose the project and the target agent first. */
 export function newVoiceAgentUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/voice-agents/new`;
 }
 
-/** The voice agent wizard scoped to a project: an externally hosted target. */
 export function createVoiceAgentUrl(orgHandler: string, projectHandler: string): string {
   return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/voice-agent`;
 }
 
-/** The voice agent wizard scoped to an AI agent's integration: that agent is the target. */
 export function enableVoiceAgentUrl(orgHandler: string, projectHandler: string, agentHandler: string): string {
   return `/organizations/${orgHandler}/projects/${projectHandler}/components/${agentHandler}/voice-agent/new`;
 }

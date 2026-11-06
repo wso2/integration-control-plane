@@ -31,10 +31,6 @@ export type AgentVoiceEndpointState =
   | { status: 'no-endpoint'; env: Environment }
   | { status: 'ready'; env: Environment; url: string };
 
-/**
- * The WebSocket URL a voice agent reaches a platform-hosted AI agent on, in the project's first
- * environment (the one the voice agent is deployed to). `agent` undefined reports loading.
- */
 export function useAgentVoiceEndpoint(orgHandler: string, projectId: string, agent: Component | undefined): AgentVoiceEndpointState {
   const orgUuid = useOrgUuid() ?? '';
   const { data: environments = [], isLoading: loadingEnvs } = useEnvironments(orgHandler, projectId);

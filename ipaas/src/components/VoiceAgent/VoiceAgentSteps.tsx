@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Accordion, AccordionDetails, AccordionSummary, FormControlLabel, Link, MenuItem, Stack, Switch, TextField, Typography } from '@wso2/oxygen-ui';
-import { ChevronDown } from '@wso2/oxygen-ui-icons-react';
-import type { JSX } from 'react';
+import { Accordion, AccordionDetails, AccordionSummary, FormControlLabel, IconButton, Link, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { ChevronDown, ExternalLink, Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
+import { useState, type JSX } from 'react';
 import { CUSTOM_VOICE_ID, STT_PROVIDERS, TTS_PROVIDERS } from '../../constants/voiceAgentProviders';
 import type { BargeInMode, EndpointingMode, TurnDetectionModel, VoiceAgentSettings } from '../../types/voiceAgent';
 import { withSttProvider, withTtsProvider, type StepErrors } from '../../utils/voiceAgent';
@@ -26,47 +26,74 @@ import { withSttProvider, withTtsProvider, type StepErrors } from '../../utils/v
 export interface VoiceAgentStepProps {
   settings: VoiceAgentSettings;
   errors: StepErrors;
-  /** Merges the given fields into the settings. */
   onChange: (patch: Partial<VoiceAgentSettings>) => void;
-  /** Replaces the settings: provider changes reset the dependent fields together. */
   onReplace: (next: VoiceAgentSettings) => void;
 }
 
 const FIELD_STACK_SX = { maxWidth: 560 } as const;
 
-/** Keeps an error message reserved, so the form does not shift as errors come and go. */
 const help = (error: string | undefined, hint = ' '): string => error ?? hint;
+
+const LIVEKIT_CREDENTIALS_DOCS_URL = 'https://docs.livekit.io/deploy/agents/secrets/#livekit-credentials';
+
+interface SecretFieldProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+}
+
+function SecretField({ label, value, onChange, error, hint }: SecretFieldProps): JSX.Element {
+  const [visible, setVisible] = useState(false);
+  const toggleLabel = visible ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`;
+  return (
+    <TextField
+      labelPlacement="top"
+      label={label}
+      type={visible ? 'text' : 'password'}
+      fullWidth
+      autoComplete="new-password"
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      error={!!error}
+      helperText={help(error, hint)}
+      InputProps={{
+        endAdornment: (
+          <Tooltip title={toggleLabel}>
+            <IconButton aria-label={toggleLabel} size="small" onClick={() => setVisible((v) => !v)}>
+              {visible ? <EyeOff size={16} /> : <Eye size={16} />}
+            </IconButton>
+          </Tooltip>
+        ),
+      }}
+    />
+  );
+}
 
 const numberValue = (raw: string): number => (raw.trim() === '' ? Number.NaN : Number(raw));
 
 export function LiveKitStep({ settings, errors, onChange }: VoiceAgentStepProps): JSX.Element {
   return (
     <Stack gap={2} sx={FIELD_STACK_SX}>
-      <Typography variant="body2" color="text.secondary">
-        Calls run in your LiveKit project. Find these values under Settings › Keys in LiveKit Cloud.
-      </Typography>
-      <TextField
-        labelPlacement="top"
-        label="LiveKit URL"
-        placeholder="wss://your-project.livekit.cloud"
-        fullWidth
-        value={settings.liveKitUrl}
-        onChange={(e) => onChange({ liveKitUrl: e.target.value })}
-        error={!!errors.liveKitUrl}
-        helperText={help(errors.liveKitUrl)}
-      />
-      <TextField labelPlacement="top" label="API key" fullWidth autoComplete="off" value={settings.liveKitApiKey} onChange={(e) => onChange({ liveKitApiKey: e.target.value })} error={!!errors.liveKitApiKey} helperText={help(errors.liveKitApiKey)} />
-      <TextField
-        labelPlacement="top"
-        label="API secret"
-        type="password"
-        fullWidth
-        autoComplete="new-password"
-        value={settings.liveKitApiSecret}
-        onChange={(e) => onChange({ liveKitApiSecret: e.target.value })}
-        error={!!errors.liveKitApiSecret}
-        helperText={help(errors.liveKitApiSecret, 'Stored as a secret. It cannot be read back.')}
-      />
+      <Stack gap={0.5}>
+        <TextField
+          labelPlacement="top"
+          label="LiveKit URL"
+          placeholder="wss://your-project.livekit.cloud"
+          fullWidth
+          value={settings.liveKitUrl}
+          onChange={(e) => onChange({ liveKitUrl: e.target.value })}
+          error={!!errors.liveKitUrl}
+          helperText={errors.liveKitUrl}
+        />
+        <Link href={LIVEKIT_CREDENTIALS_DOCS_URL} target="_blank" rel="noopener noreferrer" variant="body2" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+          How to get your LiveKit URL, API key and secret?
+          <ExternalLink size={14} />
+        </Link>
+      </Stack>
+      <SecretField label="API key" value={settings.liveKitApiKey} onChange={(liveKitApiKey) => onChange({ liveKitApiKey })} error={errors.liveKitApiKey} />
+      <SecretField label="API secret" value={settings.liveKitApiSecret} onChange={(liveKitApiSecret) => onChange({ liveKitApiSecret })} error={errors.liveKitApiSecret} hint="Stored as a secret. It cannot be read back." />
     </Stack>
   );
 }
@@ -98,17 +125,7 @@ export function SttStep({ settings, errors, onChange, onReplace }: VoiceAgentSte
               </MenuItem>
             ))}
           </TextField>
-          <TextField
-            labelPlacement="top"
-            label={`${provider.name} API key`}
-            type="password"
-            fullWidth
-            autoComplete="new-password"
-            value={settings.sttApiKey}
-            onChange={(e) => onChange({ sttApiKey: e.target.value })}
-            error={!!errors.sttApiKey}
-            helperText={help(errors.sttApiKey, 'Stored as a secret. It cannot be read back.')}
-          />
+          <SecretField label={`${provider.name} API key`} value={settings.sttApiKey} onChange={(sttApiKey) => onChange({ sttApiKey })} error={errors.sttApiKey} hint="Stored as a secret. It cannot be read back." />
           <Link href={provider.apiKeyDocsUrl} target="_blank" rel="noopener noreferrer" variant="body2">
             Get a {provider.name} API key
           </Link>
@@ -163,17 +180,7 @@ export function TtsStep({ settings, errors, onChange, onReplace }: VoiceAgentSte
               </MenuItem>
             ))}
           </TextField>
-          <TextField
-            labelPlacement="top"
-            label={`${provider.name} API key`}
-            type="password"
-            fullWidth
-            autoComplete="new-password"
-            value={settings.ttsApiKey}
-            onChange={(e) => onChange({ ttsApiKey: e.target.value })}
-            error={!!errors.ttsApiKey}
-            helperText={help(errors.ttsApiKey, 'Stored as a secret. It cannot be read back.')}
-          />
+          <SecretField label={`${provider.name} API key`} value={settings.ttsApiKey} onChange={(ttsApiKey) => onChange({ ttsApiKey })} error={errors.ttsApiKey} hint="Stored as a secret. It cannot be read back." />
           <Link href={provider.apiKeyDocsUrl} target="_blank" rel="noopener noreferrer" variant="body2">
             Get a {provider.name} API key
           </Link>

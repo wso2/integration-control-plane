@@ -58,7 +58,6 @@ export const haloSx = {
   justifyContent: 'center',
 } as const;
 
-/** The orb; `live` makes it pulse while a call is connected. */
 export const orbSx = (live: boolean) =>
   ({
     width: 104,
