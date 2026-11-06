@@ -26,7 +26,7 @@ export default function Logo() {
         dark: `${import.meta.env.BASE_URL}assets/images/logo/WSO2-Integration-Platform-White.svg`,
       }}
       alt={{ light: 'WSO2 Integration Platform logo', dark: 'WSO2 Integration Platform logo' }}
-      sx={{ height: 20, width: 'auto', aspectRatio: '616 / 55' }}
+      sx={{ height: 20, width: 'auto', aspectRatio: '401 / 55' }}
     />
   );
 
