@@ -94,7 +94,12 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     apiKey: 'key-1',
     isAuthorized: true,
     isMinting: false,
+    canCreateKey: true,
     keyError: null,
+    needsApiKeyAuth: false,
+    canSwitch: true,
+    isSwitching: false,
+    switchToApiKey: vi.fn(async () => null),
     isUnavailable: false,
     securityError: null,
     mintKey: vi.fn(async () => null),
@@ -175,7 +180,10 @@ describe('useWorkflowConnection', () => {
     expect(sentTo(`${GATEWAY_URL}/runtime`)[0]).toMatchObject({ 'X-API-Key': 'key-1', 'X-JWT-Assertion': 'Bearer user-token-1' });
     expect(current().connection).toMatchObject({ baseUrl: GATEWAY_URL, scopeId: SCOPE, endpointName: 'workflow-ma-cf1', runtime: { taskQueue: 'orders-queue' } });
     // The endpoint the test key is for, and its discovered public URL as the gateway URL fallback.
-    expect(testAccessCalls.at(-1)).toEqual([{ componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' }, true, GATEWAY_URL]);
+    expect(testAccessCalls.at(-1)).toEqual([
+      { componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' },
+      { enabled: true, gatewayUrlFallback: GATEWAY_URL },
+    ]);
   });
 
   it('reads the caller’s token as each request goes out, so a refreshed one is used at once', async () => {

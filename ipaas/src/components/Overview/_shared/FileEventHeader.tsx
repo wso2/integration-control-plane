@@ -21,6 +21,8 @@ import { GitCommit, RefreshCw, RotateCw, Square } from '@wso2/oxygen-ui-icons-re
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import type { CustomHeaderProps } from '../../../types/integration';
 import StatusDot from './StatusDot';
@@ -63,10 +65,11 @@ export default function FileEventHeader({
   const redeployMutation = useRedeployDeployment();
   const isActionPending = stopMutation.isPending || redeployMutation.isPending;
 
-  const canStop = deploymentStatusV2 === 'ACTIVE';
-  const canStart = deploymentStatusV2 === 'SUSPENDED';
-  const hasError = deploymentStatusV2 === 'ERROR';
-  const isInProgress = deploymentStatusV2 === 'IN_PROGRESS';
+  const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
+  const canStop = canDeploy && deploymentStatusV2 === 'ACTIVE';
+  const canStart = canDeploy && deploymentStatusV2 === 'SUSPENDED';
+  const hasError = canDeploy && deploymentStatusV2 === 'ERROR';
+  const isInProgress = canDeploy && deploymentStatusV2 === 'IN_PROGRESS';
 
   // Switch the Configure button to "Configure to Continue" when the schema has
   // required configs without values (devant: `hasAllRequiredConfigs`).

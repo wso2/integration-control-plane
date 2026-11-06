@@ -20,8 +20,11 @@ import type { ReactNode } from 'react';
 import type { KnowledgeBase } from '../../types/knowledgeBase';
 import { retrievalUnavailableReason } from '../../utils/knowledgeBase';
 import RetrievalChat from './RetrievalChat';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 
 /** The retrieval test for a knowledge base, queried as `componentId`. */
 export default function KnowledgeBaseRetrieval({ knowledgeBase, componentId }: { knowledgeBase: KnowledgeBase; componentId: string }): ReactNode {
-  return <RetrievalChat knowledgeBase={knowledgeBase.name} componentId={componentId} unavailableReason={retrievalUnavailableReason(knowledgeBase)} />;
+  const refusal = useCan()(Scopes.ENDPOINT_TEST) ? null : "Your role can't query knowledge bases.";
+  return <RetrievalChat knowledgeBase={knowledgeBase.name} componentId={componentId} unavailableReason={refusal ?? retrievalUnavailableReason(knowledgeBase)} />;
 }

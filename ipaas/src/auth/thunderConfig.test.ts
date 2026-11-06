@@ -17,7 +17,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { signInParams, thunderConfig, THUNDER_INSTANCE_ID } from './thunderConfig';
+import { bffSignInUrl, signInParams, thunderConfig, THUNDER_INSTANCE_ID } from './thunderConfig';
 
 beforeEach(() => {
   window.API_CONFIG = {
@@ -77,5 +77,63 @@ describe('signInParams', () => {
   it('sends no resource when none is configured', () => {
     window.API_CONFIG.asgardeoResource = undefined;
     expect(signInParams()).toEqual({});
+  });
+});
+
+describe('thunderConfig on the gateway (BFF)', () => {
+  beforeEach(() => {
+    window.API_CONFIG.authBffContext = '/_auth/integration';
+  });
+
+  it('points the SDK at the gateway’s session endpoints and API root', () => {
+    expect(thunderConfig()).toMatchObject({
+      instanceId: THUNDER_INSTANCE_ID,
+      baseUrl: window.location.origin,
+      afterSignInUrl: 'https://console.example/signin',
+      endpoints: {
+        backend: {
+          signIn: '/_auth/integration/signin',
+          session: '/_auth/integration/userinfo',
+          checkSession: '/_auth/integration/checksession',
+          refresh: '/_auth/integration/refresh',
+          signOut: '/_auth/integration/logout',
+          proxy: '/_api',
+          token: '/_auth/integration/token',
+        },
+      },
+    });
+  });
+
+  it('starts sign-in where AUTH_BFF_SIGN_IN_URL says, under the configured API root', () => {
+    window.API_CONFIG.authBffSignInUrl = '/_auth/cloud/login?returnTo=%2F_auth%2Fintegration%2Fsignin';
+    window.API_CONFIG.authBffProxyContext = '/gw/_api';
+    const backend = thunderConfig().endpoints?.backend as { signIn: string; proxy: string };
+    expect(backend.signIn).toBe('/_auth/cloud/login?returnTo=%2F_auth%2Fintegration%2Fsignin');
+    expect(backend.proxy).toBe('/gw/_api');
+  });
+
+  it('reaches nothing at the IdP: no discovery, flow metadata, profile fetch or client', () => {
+    const config = thunderConfig();
+    expect(config.discovery?.wellKnown?.enabled).toBe(false);
+    expect(config.preferences?.resolveFromMeta).toBe(false);
+    expect(config.preferences?.user?.fetchUserProfile).toBe(false);
+    expect(config.clientId).toBeUndefined();
+    expect(config.session?.silentSignIn).toBeUndefined();
+  });
+
+  it('starts sign-in at the context’s signin, returning to the page', () => {
+    const url = new URL(bffSignInUrl('/projects?a=1&b=2'), window.location.origin);
+    expect(url.pathname).toBe('/_auth/integration/signin');
+    expect(url.searchParams.get('returnTo')).toBe('/projects?a=1&b=2');
+  });
+
+  it('nests the page inside AUTH_BFF_SIGN_IN_URL’s returnTo, so its query survives both hops', () => {
+    window.API_CONFIG.authBffSignInUrl = '/_auth/cloud/login?returnTo=%2F_auth%2Fintegration%2Fsignin';
+    const outer = new URL(bffSignInUrl('/projects?a=1&b=2'), window.location.origin);
+    expect(outer.pathname).toBe('/_auth/cloud/login');
+    expect([...outer.searchParams.keys()]).toEqual(['returnTo']);
+    const inner = new URL(outer.searchParams.get('returnTo') ?? '', window.location.origin);
+    expect(inner.pathname).toBe('/_auth/integration/signin');
+    expect(inner.searchParams.get('returnTo')).toBe('/projects?a=1&b=2');
   });
 });

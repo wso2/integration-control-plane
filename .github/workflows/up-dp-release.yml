@@ -168,6 +168,7 @@ jobs:
         id: create-pr
         uses: peter-evans/create-pull-request@v6
         with:
+          token: ${{ secrets.ICP_BOT_TOKEN }}
           commit-message: "Bump UP-DP to next dev version"
           title: "chore: Bump UP-DP to next dev version"
           body: |

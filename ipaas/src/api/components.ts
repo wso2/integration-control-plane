@@ -202,7 +202,7 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
       // git build on create; everything else builds from source.
       autoBuild: !input.isPrebuilt,
       workflow: {
-        kind: 'ClusterWorkflow',
+        kind: 'Workflow',
         name: mapping.workflow,
         parameters: {
           repository: {
@@ -238,6 +238,8 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
           },
         }
       : {}),
+    // Usage analytics only: the BFF reports it and never forwards it to OpenChoreo.
+    ...(input.creation ? { creation: input.creation } : {}),
   };
 }
 

@@ -124,7 +124,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
 
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
   // Release-scoped discovery already returns the gateway's public URL; the security read may too.
-  const access = useEndpointTestAccess(ref, !!ref, endpoint?.publicUrl ?? '');
+  const access = useEndpointTestAccess(ref, { enabled: !!ref, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
   const { authHeader, apiKey, mintKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 

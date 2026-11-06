@@ -68,6 +68,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
 /** Buildpack of a component built by neither the Ballerina nor the MI runtime. */
 export const OTHER_BUILDPACK = 'other';
 export const MI_BUILDPACK = 'wso2-mi';
+export const BI_BUILDPACK = 'BI';
 
 // buildpackType is cloud-only; absent means unknown, so the displayType verdict stands.
 export function isSupportedIntegration(displayType: string, componentSubType: string | null, buildpackType?: string): boolean {
@@ -183,6 +184,14 @@ export const COMPONENT_TYPE_LABELS: Record<string, string> = {
 
 export function formatComponentType(type: string): string {
   return COMPONENT_TYPE_LABELS[type] ?? type.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * A sample's id for usage analytics: its path in the samples repository, which
+ * stays unique and stable when its display name changes.
+ */
+export function sampleId(sample: { subDirectory?: string; componentPath: string }): string {
+  return `${sample.subDirectory ?? ''}${sample.componentPath}`.replace(/^\/+/, '');
 }
 
 export function displayTypeFromSample(componentType: string, buildPack: string): DisplayType {

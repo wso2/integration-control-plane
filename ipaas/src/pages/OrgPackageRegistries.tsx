@@ -47,14 +47,15 @@ export default function OrgPackageRegistries(_scope: OrgScope): JSX.Element {
         <>
           <Grid container spacing={3}>
             {PACKAGE_REGISTRIES.map((service) => {
-              const connected = service.id === BALLERINA_CENTRAL_ID ? !!tokenStatus?.configured : false;
+              // Unknown when the role can't read the token, so no chip then.
+              const connected = service.id === BALLERINA_CENTRAL_ID ? tokenStatus?.configured : false;
 
               return (
                 <Grid key={service.id} size={{ xs: 12, sm: 6, md: 4 }}>
                   <Card sx={{ height: '100%', borderRadius: 2, p: 3 }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
                       <Box component="img" src={SERVICE_ICONS[service.iconType]} alt={service.name} sx={{ width: 48, height: 48, flexShrink: 0, objectFit: 'contain' }} />
-                      <Chip size="small" variant="outlined" color={connected ? 'success' : 'default'} label={connected ? 'Connected' : 'Not connected'} />
+                      {connected !== undefined && <Chip size="small" variant="outlined" color={connected ? 'success' : 'default'} label={connected ? 'Connected' : 'Not connected'} />}
                     </Stack>
                     <Typography variant="body1" sx={{ fontWeight: 700, mb: 0.5 }}>
                       {service.name}

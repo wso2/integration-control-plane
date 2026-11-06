@@ -22,6 +22,9 @@ import { Alert, Box, Button, Typography } from '@wso2/oxygen-ui';
 import { useCreateCodeServer, useEditorKeepAlive, useEditorReady, useGetOrCreateSampleRegistry } from '../hooks/useCloudEditor';
 import { CLOUD_EDITOR_READY_TIMEOUT_MS, CLOUD_EDITOR_STEPS, CLOUD_EDITOR_TIMEOUT_MESSAGE } from '../constants/cloudEditor';
 import DeploymentWheel from '../components/CloudEditor/DeploymentWheel';
+import { Scopes } from '../constants/permissions';
+import { useAccessControl } from '../contexts/AccessControlContext';
+import { useCan } from '../hooks/useCan';
 import type { ChoreoSampleImage, CloudEditorStepKey, CodeServerInstance, DeploymentParams } from '../types/cloudEditor';
 
 /**
@@ -48,6 +51,10 @@ export default function CloudEditorDeployment(): JSX.Element {
   const hasRedirected = useRef(false);
   const getOrCreateRegistryMutation = useGetOrCreateSampleRegistry();
   const createCodeServerMutation = useCreateCodeServer();
+  // The page opens in a new tab, so its permissions load after its first effects run.
+  const { isOrgPermissionsLoaded } = useAccessControl();
+  const canUseEditor = useCan()(Scopes.EDITOR_USE);
+  const refusal = isOrgPermissionsLoaded && !canUseEditor ? "Your role can't open the Cloud Editor." : null;
 
   const params = useMemo<DeploymentParams>(() => {
     const q = new URLSearchParams(location.search);
@@ -71,7 +78,7 @@ export default function CloudEditorDeployment(): JSX.Element {
   // Provision the editor, then hand off to pod polling (or redirect immediately
   // when the platform can't report pod status — e.g. cloud).
   useEffect(() => {
-    if (hasRun.current) return;
+    if (!isOrgPermissionsLoaded || !canUseEditor || hasRun.current) return;
     hasRun.current = true;
 
     const deploy = async () => {
@@ -144,7 +151,7 @@ export default function CloudEditorDeployment(): JSX.Element {
     };
 
     deploy();
-  }, [params, createCodeServerMutation, getOrCreateRegistryMutation]);
+  }, [isOrgPermissionsLoaded, canUseEditor, params, createCodeServerMutation, getOrCreateRegistryMutation]);
 
   // The address is known but the workload may still be starting.
   const awaitingReady = !!instance && !instance.ready;
@@ -179,14 +186,15 @@ export default function CloudEditorDeployment(): JSX.Element {
 
   const activeIndex = CLOUD_EDITOR_STEPS.findIndex((s) => s.key === stepKey);
 
-  if (error) {
+  const failure = refusal ?? error;
+  if (failure) {
     return (
       <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 2, p: 4 }}>
         <Alert severity="error" sx={{ maxWidth: 520, width: '100%' }}>
           <Typography variant="body2" fontWeight={600} sx={{ mb: 0.5 }}>
             Cloud Editor setup failed
           </Typography>
-          <Typography variant="body2">{error}</Typography>
+          <Typography variant="body2">{failure}</Typography>
         </Alert>
         <Button variant="outlined" onClick={() => window.close()}>
           Close tab

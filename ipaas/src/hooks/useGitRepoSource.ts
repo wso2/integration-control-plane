@@ -48,7 +48,7 @@ export function useGitRepoSource() {
   const isPublicRepo = gitProvider === 'public';
   const providerSelected = gitProvider !== null;
 
-  const { authStatus, startGitHubAuth, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth();
+  const { authStatus, canConnect, startGitHubAuth, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth();
 
   const activeOrg = isPublicRepo ? parsedOrg : selectedOrg;
   const activeRepo = isPublicRepo ? parsedRepo : selectedRepo;
@@ -215,6 +215,7 @@ export function useGitRepoSource() {
     isContentsError,
     refetchContents,
     authStatus,
+    canConnect,
     startGitHubAuth,
     startGitHubAppInstall,
     openGitHubManage,

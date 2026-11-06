@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration } from './integrations';
+import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration, sampleId } from './integrations';
 
 describe('project listing — RAG components', () => {
   it('labels the ingestion cronjob as "RAG Ingestion" (not Automation)', () => {
@@ -86,5 +86,12 @@ describe('formatBuildPack', () => {
 
   it('shows an unknown buildpack as reported', () => {
     expect(formatBuildPack('java')).toBe('java');
+  });
+});
+
+describe('sampleId', () => {
+  it('is the sample path in its repository, without a leading slash', () => {
+    expect(sampleId({ subDirectory: 'bi', componentPath: '/hello-world' })).toBe('bi/hello-world');
+    expect(sampleId({ componentPath: '/hello-world' })).toBe('hello-world');
   });
 });
