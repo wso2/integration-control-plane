@@ -40,8 +40,9 @@ const links: IntegrationLinks = {
   environments: [environment('development'), environment('production')],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
-  useIntegrationLinks: () => ({ data: links }),
+  useIntegrationLinks: () => ({ data: answer.links ?? links }),
   useLinkWrite: () => ({ isError: false, mutate: (input: { target: unknown }) => writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useMiConfig', () => ({
@@ -70,6 +71,7 @@ const supplied = (name: string) => (document.querySelector(`input[aria-label="${
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   writes.length = 0;
+  answer.links = undefined;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -111,5 +113,15 @@ describe('the MI Configure form', () => {
     expect(document.querySelector('[aria-label="Link DB_URL"]')).toBeNull();
     expect(document.body.textContent).toContain('No Production values. Add them in WSO2 Cloud.');
     expect(document.body.textContent).toContain('Links apply to all environments. Change links in Development.');
+  });
+
+  it("shows workload.yaml's declarations read-only, with no link icons, when the repository declares the resources", async () => {
+    answer.links = { ...links, env: {}, used: {}, sourceDefined: true, declared: { GITHUB_TOKEN: github } };
+    await render('development');
+    expect(document.body.textContent).toContain('Links come from workload.yaml in the repository.');
+    expect(document.body.textContent).not.toContain('Links apply to all environments');
+    expect(supplied('GITHUB_TOKEN')).toBe('from workload.yaml (GitHub Acme · GITHUB_AUTH_TOKEN)');
+    expect(document.querySelectorAll('[aria-label^="Link "]')).toHaveLength(0);
+    expect((document.querySelector('[aria-label="Remove GITHUB_TOKEN"]') as HTMLButtonElement).disabled).toBe(true);
   });
 });

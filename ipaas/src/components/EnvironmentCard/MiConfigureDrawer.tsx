@@ -32,6 +32,7 @@ import { formLinkView, type TargetView } from '../../utils/integrationLinks';
 import { isEmptyMiConfigSavePlan, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
 import { EndpointCard } from '../EndpointCard';
 import { FieldLinkPicker } from '../SchemaConfigForm/FieldLinkPicker';
+import { fromText } from '../SchemaConfigForm/linkedFrom';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 
@@ -93,8 +94,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const envName = (id = '') => environments.find((e) => e.id === id)?.name ?? id;
   const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
   const linkOf = (name: string): TargetView => (name && linkView ? linkView.target(name) : {});
-  // Links apply to all environments: a linked name the form has no value for still gets a row.
-  const linkedNames = useMemo(() => Object.keys((linkView?.editable ? links?.env : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
+  // Links apply to all environments: a linked name the form has no value for still gets a row; so does a declared one.
+  const linkedNames = useMemo(() => Object.keys((links?.sourceDefined ? links.declared : linkView?.editable ? links?.env : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
   const linkedOnly = linkedNames.filter((n) => ![...envVars, ...secrets].some((r) => r.key.trim() === n));
 
   const handleClose = () => {
@@ -203,7 +204,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           fullWidth
           size="small"
           disabled
-          value={`from ${view.source.name} · ${view.source.key}`}
+          value={fromText({ resource: view.source.name, key: view.source.key, declared: view.source.declared })}
           inputProps={{ 'aria-label': `${name} is supplied by ${view.source.name}` }}
           InputProps={{ endAdornment: picker && <InputAdornment position="end">{picker}</InputAdornment> }}
         />
@@ -289,7 +290,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       <Button size="small" startIcon={<Plus size={14} />} onClick={() => addRow(setRows)}>
         {addLabel}
       </Button>
-      {kind === 'env' && (
+      {kind === 'env' && !linkView?.sourceDefined && (
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
           {linkView?.editable === false ? `Links apply to all environments. Change links in ${envName(links?.environments[0]?.name)}.` : 'Links apply to all environments; values are per environment.'}
         </Typography>
@@ -364,6 +365,11 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           )}
           .
         </Alert>
+        {linkView?.sourceDefined && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            Links come from workload.yaml in the repository.
+          </Typography>
+        )}
         {renderSection('Environment Variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')}
         {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')}
         {showErrors && errors.size > 0 && <Alert severity="error">Fix the highlighted keys before saving.</Alert>}
