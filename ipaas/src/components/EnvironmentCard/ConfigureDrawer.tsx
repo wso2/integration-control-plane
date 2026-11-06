@@ -32,7 +32,7 @@ import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer'
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCard } from '../EndpointCard';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
-import { schemaFields } from '../SchemaConfigForm/schemaUtils';
+import { linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -785,7 +785,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
-  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? schemaFields(parsedSchema).map((f) => f.path) : []);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {

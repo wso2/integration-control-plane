@@ -23,7 +23,7 @@ import { BffError } from '../../api/_client';
 import type { IntegrationLinks } from '../../types/configuration';
 import type { JSONSchema } from '../../types/schema';
 import { ConfigForm } from '../SchemaConfigForm/ConfigForm';
-import { schemaFields } from '../SchemaConfigForm/schemaUtils';
+import { linkableFields, schemaFields } from '../SchemaConfigForm/schemaUtils';
 import { useLinkedForm } from './useLinkedForm';
 
 // ipaas-service's answer: github linked to GitHub Acme; ordersDbUrl's link lost its target when the code renamed it.
@@ -66,13 +66,7 @@ const schema = {
 } as unknown as JSONSchema;
 
 function Form({ env = 'development', form = schema }: { env?: string; form?: JSONSchema }) {
-  const linked = useLinkedForm(
-    'default',
-    'ghdemo',
-    env,
-    true,
-    schemaFields(form).map((f) => f.path),
-  );
+  const linked = useLinkedForm('default', 'ghdemo', env, true, linkableFields(form));
   return (
     <>
       {linked.top}
@@ -157,6 +151,33 @@ describe('the Configure form with links', () => {
     expect(container.textContent).toContain("Couldn't refresh this integration's links. These are from the last read.");
     expect(container.textContent).toContain('githubLinked to GitHub Acme');
     expect(['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map((l) => button(l).disabled)).toEqual([true, true, true, true, true]);
+  });
+
+  it("offers a link icon on a simple-typed configurable only, not on a record's members", async () => {
+    const withRecord = {
+      type: 'object',
+      requiredLevel: 3,
+      properties: {
+        acme: {
+          type: 'object',
+          properties: {
+            ghdemo: {
+              type: 'object',
+              required: ['ordersDatabaseUrl', 'database'],
+              properties: {
+                ordersDatabaseUrl: { type: 'string', description: '' },
+                database: { type: 'object', description: '', required: ['host'], properties: { host: { type: 'string', description: '' } } },
+              },
+            },
+          },
+        },
+      },
+    } as unknown as JSONSchema;
+    await act(async () => root.render(<Form form={withRecord} />));
+    expect(linkableFields(withRecord)).toEqual(['acme.ghdemo.ordersDatabaseUrl']);
+    // The record's member renders as a value box of its own.
+    expect(container.textContent).toContain('host');
+    expect(Array.from(container.querySelectorAll('button[aria-label^="Link "]')).map((b) => b.getAttribute('aria-label'))).toEqual(['Link ordersDatabaseUrl']);
   });
 
   it('links a field to the key picked from its link icon', async () => {

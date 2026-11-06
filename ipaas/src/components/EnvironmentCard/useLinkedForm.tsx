@@ -30,7 +30,7 @@ import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
 
 const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [] };
 
-/** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's config keys. */
+/** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's linkable config keys (`linkableFields`). */
 export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[]) {
   const read = useIntegrationLinks(projectId, componentId, open);
   const links = read.data ?? noLinks;
@@ -43,7 +43,10 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   const write = useLinkWrite();
   const change = (target: LinkTarget) => write.mutateAsync({ projectId, componentId, target }).catch(() => undefined);
 
+  const linkable = new Set(fields);
   const fieldLinks: FieldLinks = (path) => {
+    // A member of a record, map or array is no configurable of its own: nothing links it.
+    if (!linkable.has(path)) return undefined;
     const id = configurableId(path);
     const t = view.target(id);
     return {
