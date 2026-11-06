@@ -83,11 +83,12 @@ function elementFields(prop: JSONSchema, label: string, path: string, nested: bo
   return [];
 }
 
-/** A list's items as a JSON array, in index order; anything else as a JSON object of its entries. */
+/** A list's items as a JSON array, in index order; anything else as a JSON object. A space after each comma lets it wrap between items. */
 function compact(entries: [string, string][]): string {
   const index = (key: string) => Number(/^\[(\d+)\]$/.exec(key)?.[1] ?? NaN);
   const list = entries.every(([key]) => !Number.isNaN(index(key)));
-  return JSON.stringify(list ? [...entries].sort(([a], [b]) => index(a) - index(b)).map(([, v]) => v) : Object.fromEntries(entries));
+  const items = list ? [...entries].sort(([a], [b]) => index(a) - index(b)).map(([, v]) => JSON.stringify(v)) : entries.map(([k, v]) => `${JSON.stringify(k)}: ${JSON.stringify(v)}`);
+  return list ? `[${items.join(', ')}]` : `{${items.join(', ')}}`;
 }
 
 /** A map key as the user wrote it: the schema escapes a dot inside one (`icp\.runtimeId`). */

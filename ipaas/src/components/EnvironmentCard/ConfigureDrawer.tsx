@@ -1261,7 +1261,7 @@ function ValueRow({ value: v }: { value: ConfigValue }) {
   return (
     <TableRow>
       <TableCell>{v.label ?? v.key}</TableCell>
-      <TableCell sx={{ wordBreak: 'break-all' }}>{v.secret ? MASK : v.value || (v.optional ? 'Default' : 'Not set')}</TableCell>
+      <TableCell sx={{ overflowWrap: 'anywhere' }}>{v.secret ? MASK : v.value || (v.optional ? 'Default' : 'Not set')}</TableCell>
     </TableRow>
   );
 }
