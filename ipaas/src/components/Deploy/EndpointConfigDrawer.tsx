@@ -19,6 +19,7 @@
 import { useEnvEndpoints } from '../../hooks/useDeployments';
 import ApiSecurityDrawer from '../Overview/integration-as-api/ApiSecurityDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
+import { useUserVisibleEndpoints } from '../../hooks/useUserVisibleEndpoints';
 
 interface EndpointConfigDrawerProps {
   open: boolean;
@@ -29,11 +30,14 @@ interface EndpointConfigDrawerProps {
   firstEnvReleaseId: string;
   /** Environment slug, required by the security drawer's BFF routes. */
   firstEnvId?: string;
+  /** A workflow integration, whose management endpoint is left out (see isUserVisibleEndpoint). */
+  isWorkflow?: boolean;
 }
 
 /** Endpoint security settings, scoped to the first environment's endpoints. */
-export default function EndpointConfigDrawer({ open, onClose, componentId, versionId, firstEnvReleaseId, firstEnvId }: EndpointConfigDrawerProps) {
-  const { data: endpoints = [] } = useEnvEndpoints(componentId, versionId, firstEnvReleaseId);
+export default function EndpointConfigDrawer({ open, onClose, componentId, versionId, firstEnvReleaseId, firstEnvId, isWorkflow = false }: EndpointConfigDrawerProps) {
+  const { data: allEndpoints = [] } = useEnvEndpoints(componentId, versionId, firstEnvReleaseId);
+  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
 
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();

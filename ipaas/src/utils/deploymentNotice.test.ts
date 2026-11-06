@@ -91,4 +91,16 @@ describe('notDeployedNotice', () => {
       expect(notice.message).toContain('not yet deployed');
     }
   });
+
+  it('words a Test page by default', () => {
+    expect(notDeployedNotice(null).message).toBe('This integration is not yet deployed. Deploy it to start testing.');
+    expect(notDeployedNotice('ERROR').message).toBe('This deployment is in an error state. Check the runtime logs and redeploy before testing.');
+  });
+
+  it('names what a workflow page needs the deployment for', () => {
+    expect(notDeployedNotice(null, 'runWorkflows').message).toBe('This integration is not yet deployed. Deploy it to run its workflows.');
+    expect(notDeployedNotice('IN_PROGRESS', 'workOnTasks').message).toBe('Deployment is still in progress. You can work on its tasks once it becomes active.');
+    expect(notDeployedNotice('ERROR', 'runWorkflows').message).toBe('This deployment is in an error state. Check the runtime logs and redeploy to run its workflows.');
+    expect(notDeployedNotice('SUSPENDED', 'workOnTasks').message).toBe('This deployment is stopped. Start it to work on its tasks.');
+  });
 });

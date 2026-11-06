@@ -18,18 +18,20 @@
 
 import { Alert } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { notDeployedNotice } from '../utils/deploymentNotice';
+import { notDeployedNotice, type NotDeployedPurpose } from '../utils/deploymentNotice';
 
 interface NotDeployedAlertProps {
   /** Raw `deploymentStatusV2`, when a deployment exists but is not usable yet. */
   status?: string | null;
+  /** What the page needs the deployment for; testing unless it says otherwise. */
+  purpose?: NotDeployedPurpose;
 }
 
 /**
  * Why a Test page has nothing to test. Shared by the API, MCP and automation
- * test surfaces so they explain the same state in the same words.
+ * test surfaces, and the workflow pages, so they explain the same state in the same words.
  */
-export default function NotDeployedAlert({ status }: NotDeployedAlertProps): JSX.Element {
-  const { severity, message } = notDeployedNotice(status);
+export default function NotDeployedAlert({ status, purpose }: NotDeployedAlertProps): JSX.Element {
+  const { severity, message } = notDeployedNotice(status, purpose);
   return <Alert severity={severity}>{message}</Alert>;
 }

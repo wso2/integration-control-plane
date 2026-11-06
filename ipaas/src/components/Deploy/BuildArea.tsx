@@ -355,7 +355,7 @@ export default function BuildArea({
 
       {/* Endpoint configuration drawer */}
       {!flags.isAutomation && !hideEndpoints && !!firstEnvReleaseId && (
-        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} projectId={projectId} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} />
+        <EndpointConfigDrawer open={endpointConfigOpen} onClose={() => setEndpointConfigOpen(false)} projectId={projectId} componentId={componentId} versionId={versionId} firstEnvReleaseId={firstEnvReleaseId} firstEnvId={firstEnvId} isWorkflow={isWorkflow} />
       )}
 
       {/* Image selection drawer */}
@@ -363,6 +363,7 @@ export default function BuildArea({
 
       {/* Configure env vars (opened via Configure & Deploy) */}
       <ConfigureDrawer
+        isWorkflow={isWorkflow}
         open={configureOpen}
         onClose={() => setConfigureOpen(false)}
         onSaved={handleConfigureSaved}
