@@ -87,6 +87,7 @@ import { trialLengthDays } from '../utils/billing';
 import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
+import { hasIntegrationTraces } from '../utils/integrationTraces';
 import { useAuth } from '../auth';
 import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
 import {
@@ -855,8 +856,8 @@ export default function AppLayout(): JSX.Element {
                               </Sidebar.ItemIcon>
                               <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                             </Sidebar.Item>
-                            {/* Only agents are instrumented, so no other integration has traces to show. */}
-                            {aiAgentType && (
+                            {/* Agents and Ballerina integrations are instrumented; no other integration has traces to show. */}
+                            {(aiAgentType || (!!currentComponent && hasIntegrationTraces(currentComponent))) && (
                               <Sidebar.Item id="traces">
                                 <Sidebar.ItemIcon>
                                   <Waypoints size={20} />

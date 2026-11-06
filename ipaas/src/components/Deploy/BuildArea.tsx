@@ -71,6 +71,7 @@ export default function BuildArea({
   firstEnvId,
   firstEnvTemplateId,
   autoDeployEnabled: initialAutoDeployEnabled,
+  autoDeployAvailable,
   componentName,
   projectHandler,
   displayType,
@@ -278,16 +279,18 @@ export default function BuildArea({
           <Divider sx={{ borderStyle: 'dashed', mb: 1.5 }} />
 
           {/* ── Auto Deploy on Build ── */}
-          <FormControlLabel
-            control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
-            label={
-              <Stack direction="row" alignItems="center" gap={0.5}>
-                <Typography variant="body2">Auto deploy on build</Typography>
-                {updateAutoDeploy.isPending && <CircularProgress size={12} />}
-              </Stack>
-            }
-            sx={{ mb: 2, ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
-          />
+          {autoDeployAvailable && (
+            <FormControlLabel
+              control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
+              label={
+                <Stack direction="row" alignItems="center" gap={0.5}>
+                  <Typography variant="body2">Auto deploy on build</Typography>
+                  {updateAutoDeploy.isPending && <CircularProgress size={12} />}
+                </Stack>
+              }
+              sx={{ mb: 2, ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+            />
+          )}
 
           {/* ── Endpoint Configurations (only for deployed service integrations;
                hidden for file/event/AI-agent, which have no endpoints) ── */}

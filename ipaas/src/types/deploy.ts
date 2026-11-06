@@ -34,6 +34,8 @@ export interface BuildAreaProps {
   firstEnvId: string;
   firstEnvTemplateId: string;
   autoDeployEnabled?: boolean;
+  /** Whether the "Auto deploy on build" switch is offered. */
+  autoDeployAvailable: boolean;
   componentName: string;
   projectHandler: string;
   displayType?: string;

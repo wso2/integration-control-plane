@@ -110,14 +110,15 @@ export default function AgentTraces(scope: ComponentScope): JSX.Element {
     return <NotFound message="Integration not found." backTo={resourceUrl({ level: 'projects', org, project }, 'overview')} backLabel="Back to project" />;
   }
 
-  // The sidebar offers this page for agents alone; this covers a URL typed or shared.
+  // The sidebar offers this page for agents and Ballerina integrations, and the route sends
+  // the latter to IntegrationTraces; this covers any other integration's URL, typed or shared.
   if (identifyIntegration(comp.displayType ?? '', comp.componentSubType ?? null).type !== 'ai-agent') {
     return (
       <PageContent>
         <Typography variant="h1" sx={{ mb: 3 }}>
           Traces
         </Typography>
-        <Alert severity="info">Traces are collected for AI agents only.</Alert>
+        <Alert severity="info">Traces are collected for AI agents and Ballerina integrations only.</Alert>
       </PageContent>
     );
   }
