@@ -17,7 +17,7 @@
  */
 
 import { beforeEach, describe, expect, it } from 'vitest';
-import { clearLegacySession } from './legacySession';
+import { clearBrowserSignInSession, clearLegacySession } from './legacySession';
 
 const LEGACY_LOCAL = ['auth_token', 'refresh_token', 'id_token', 'token_expires_at', 'refresh_token_expires_at', 'auth_mode', 'oidc_state', 'user'];
 
@@ -58,5 +58,25 @@ describe('clearLegacySession', () => {
 
   it('does nothing when there is nothing to clear', () => {
     expect(() => clearLegacySession()).not.toThrow();
+  });
+});
+
+describe('clearBrowserSignInSession', () => {
+  it('removes what the SDK stored for a browser (PKCE) sign-in, and nothing else', () => {
+    sessionStorage.setItem('session_data-instance_0-IPAAS_CONSOLE', '{"access_token":"t"}');
+    sessionStorage.setItem('temporary_data-instance_0-IPAAS_CONSOLE', '{}');
+    localStorage.setItem('hybrid_data-instance_0-IPAAS_CONSOLE', '{}');
+    sessionStorage.setItem('session_data-instance_0', '{}');
+    sessionStorage.setItem('github_oauth_state', 'state-1');
+    localStorage.setItem('org_handle', 'acme');
+
+    clearBrowserSignInSession();
+
+    expect(sessionStorage.getItem('session_data-instance_0-IPAAS_CONSOLE')).toBeNull();
+    expect(sessionStorage.getItem('temporary_data-instance_0-IPAAS_CONSOLE')).toBeNull();
+    expect(localStorage.getItem('hybrid_data-instance_0-IPAAS_CONSOLE')).toBeNull();
+    expect(sessionStorage.getItem('session_data-instance_0')).toBe('{}');
+    expect(sessionStorage.getItem('github_oauth_state')).toBe('state-1');
+    expect(localStorage.getItem('org_handle')).toBe('acme');
   });
 });

@@ -15,17 +15,17 @@ body {
 
 /* First paint only, in the theme's own colours; kept off <body> so the theme's glow blends over its black. */
 html {
-  background-color: #f5f5f5;
+  background-color: #f4f6fa;
 }
 
 @media (prefers-color-scheme: dark) {
   html:not([data-color-scheme='light']) {
-    background-color: #000000;
+    background-color: #050a1c;
   }
 }
 
 html[data-color-scheme='dark'] {
-  background-color: #000000;
+  background-color: #050a1c;
 }
 
 /* The AppShell renders the main-content scroll box as the first <div> child

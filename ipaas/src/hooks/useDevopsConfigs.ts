@@ -182,7 +182,7 @@ export function useSaveConfig(projectId: string, deploymentTrackId: string | und
   });
 }
 
-/** Update a release container (resources, image-pull policy, command/args). */
+/** Update a release container's resources or image pull policy. */
 export function useUpdateContainer(projectId: string, componentId: string, releaseId: string, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   const qc = useQueryClient();

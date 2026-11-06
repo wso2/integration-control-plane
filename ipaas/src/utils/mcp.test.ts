@@ -17,9 +17,170 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { classifyMcpError, coerceFieldValue, formatFieldLabel, formatMcpError, formatToolResult, generateDefaultValue, getMcpToolParameters, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError, isSimpleObjectSchema } from './mcp';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import type { JsonSchemaType as SdkJsonSchema } from '@modelcontextprotocol/sdk/validation';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
+import {
+  classifyMcpError,
+  coerceFieldValue,
+  createMcpClient,
+  formatFieldLabel,
+  formatMcpError,
+  formatToolResult,
+  generateDefaultValue,
+  getMcpToolParameters,
+  isMcpBlockedError,
+  isMcpForbiddenError,
+  isMcpUnauthorizedError,
+  isSimpleObjectSchema,
+  withNullableTypes,
+} from './mcp';
 import type { McpTool } from '../types/mcp';
+
+describe('createMcpClient', () => {
+  interface TestTool {
+    outputSchema: { type: 'object'; properties: Record<string, object>; required?: string[] };
+    structuredContent: Record<string, unknown>;
+  }
+
+  // One tool whose output schema and result the test can change between calls.
+  async function connect(client: Client, tool: TestTool) {
+    const server = new Server({ name: 'test-server', version: '1.0.0' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [{ name: 'greet', inputSchema: { type: 'object' }, outputSchema: tool.outputSchema }] }));
+    server.setRequestHandler(CallToolRequestSchema, async () => ({ content: [], structuredContent: tool.structuredContent }));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    return () => Promise.all([client.close(), server.close()]);
+  }
+
+  // Stands in for a Content-Security-Policy without 'unsafe-eval'.
+  async function withoutEval<T>(run: () => Promise<T>): Promise<T> {
+    const original = globalThis.Function;
+    globalThis.Function = function blockedFunction() {
+      throw new EvalError('eval is blocked');
+    } as unknown as FunctionConstructor;
+    try {
+      return await run();
+    } finally {
+      globalThis.Function = original;
+    }
+  }
+
+  const greetingTool = (): TestTool => ({ outputSchema: { type: 'object', properties: { greeting: { type: 'string' } }, required: ['greeting'] }, structuredContent: { greeting: 'hi' } });
+  // A schema the validator has not seen, so a compiling validator has to compile again.
+  const countSchema: TestTool['outputSchema'] = { type: 'object', properties: { count: { type: 'integer', minimum: 0 } }, required: ['count'] };
+
+  it('accepts structured content that matches the output schema and rejects content that does not', async () => {
+    const client = createMcpClient('test');
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      await client.listTools();
+      await expect(client.callTool({ name: 'greet', arguments: {} })).resolves.toMatchObject({ structuredContent: { greeting: 'hi' } });
+      tool.structuredContent = { greeting: 42 };
+      await expect(client.callTool({ name: 'greet', arguments: {} })).rejects.toThrow(/does not match the tool's output schema/);
+    } finally {
+      await close();
+    }
+  });
+
+  it('lists tools and checks their output where eval is blocked', async () => {
+    const client = createMcpClient('test');
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      // Warm the SDK's own message parsers first; only output-schema checking is under test.
+      await client.listTools();
+      await client.callTool({ name: 'greet', arguments: {} });
+      tool.outputSchema = countSchema;
+      tool.structuredContent = { count: 3 };
+      await withoutEval(async () => {
+        await expect(client.listTools()).resolves.toMatchObject({ tools: [{ name: 'greet' }] });
+        await expect(client.callTool({ name: 'greet', arguments: {} })).resolves.toMatchObject({ structuredContent: { count: 3 } });
+        tool.structuredContent = { count: -1 };
+        await expect(client.callTool({ name: 'greet', arguments: {} })).rejects.toThrow(/does not match the tool's output schema/);
+      });
+    } finally {
+      await close();
+    }
+  });
+
+  it("the SDK's default client cannot list tools with an output schema where eval is blocked", async () => {
+    const client = new Client({ name: 'test', version: '1.0.0' });
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      await client.listTools();
+      await client.callTool({ name: 'greet', arguments: {} });
+      tool.outputSchema = countSchema;
+      await withoutEval(async () => {
+        await expect(client.listTools()).rejects.toThrow(/eval is blocked/);
+      });
+    } finally {
+      await close();
+    }
+  });
+
+  it('accepts null for an OpenAPI nullable field where eval is blocked, as the SDK default did', async () => {
+    const client = createMcpClient('test');
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      await client.listTools();
+      await client.callTool({ name: 'greet', arguments: {} });
+      tool.outputSchema = { type: 'object', properties: { nickname: { type: 'string', nullable: true } }, required: ['nickname'] };
+      tool.structuredContent = { nickname: null };
+      await withoutEval(async () => {
+        await client.listTools();
+        await expect(client.callTool({ name: 'greet', arguments: {} })).resolves.toMatchObject({ structuredContent: { nickname: null } });
+        tool.structuredContent = { nickname: 7 };
+        await expect(client.callTool({ name: 'greet', arguments: {} })).rejects.toThrow(/does not match the tool's output schema/);
+      });
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe('withNullableTypes', () => {
+  const object = (properties: Record<string, object>, extra: object = {}): SdkJsonSchema => ({ type: 'object', properties, ...extra }) as SdkJsonSchema;
+
+  // Each case is checked against Ajv, the validator the console used before.
+  it.each<[string, SdkJsonSchema, unknown]>([
+    ['a nullable string', object({ a: { type: 'string', nullable: true } }), { a: null }],
+    ['a nullable string holding a string', object({ a: { type: 'string', nullable: true } }), { a: 'x' }],
+    ['a nullable string holding a number', object({ a: { type: 'string', nullable: true } }), { a: 1 }],
+    ['a string without nullable', object({ a: { type: 'string' } }), { a: null }],
+    ['nullable: false', object({ a: { type: 'string', nullable: false } }), { a: null }],
+    ['a nullable type list', object({ a: { type: ['string', 'integer'], nullable: true } }), { a: null }],
+    ['a nullable enum without null', object({ a: { type: 'string', enum: ['x'], nullable: true } }), { a: null }],
+    ['a nullable root', { type: 'object', nullable: true } as SdkJsonSchema, null],
+    ['nullable array items', object({ a: { type: 'array', items: { type: 'integer', nullable: true } } }), { a: [1, null] }],
+    ['a nullable anyOf branch', object({ a: { anyOf: [{ type: 'string', nullable: true }, { type: 'integer' }] } }), { a: null }],
+    ['nullable additionalProperties', { type: 'object', additionalProperties: { type: 'number', nullable: true } } as SdkJsonSchema, { x: null }],
+    ['a nullable $defs target', object({ a: { $ref: '#/$defs/S' } }, { $defs: { S: { type: 'object', nullable: true } } }), { a: null }],
+    ['a nullable definitions target', object({ a: { $ref: '#/definitions/N' } }, { definitions: { N: { type: 'number', nullable: true } } }), { a: null }],
+  ])('agrees with Ajv on %s', (_label, schema, data) => {
+    // Separate copies: Ajv adds 'null' to a nullable type list in the schema it is given.
+    const ajv = new AjvJsonSchemaValidator().getValidator(structuredClone(schema))(data).valid;
+    const cfworker = new CfWorkerJsonSchemaValidator().getValidator(withNullableTypes(structuredClone(schema)) as SdkJsonSchema)(data).valid;
+    expect(cfworker).toBe(ajv);
+  });
+
+  it('returns a copy and leaves enum, const and default values alone', () => {
+    const schema = { type: 'object', nullable: true, properties: { a: { enum: [{ type: 'string', nullable: true }], const: { type: 'x', nullable: true }, default: { type: 'y', nullable: true } } } };
+    const before = structuredClone(schema);
+    const result = withNullableTypes(schema) as typeof schema & { type: string[] };
+    expect(schema).toEqual(before);
+    expect(result.type).toEqual(['object', 'null']);
+    expect(result.properties.a).toEqual(before.properties.a);
+  });
+});
 
 describe('getMcpToolParameters', () => {
   it('flattens the input schema and marks required params', () => {

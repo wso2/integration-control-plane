@@ -46,6 +46,27 @@ const baseInput: CreateComponentInput = {
 
 const bodyOf = () => post.mock.calls[0][1] as { spec: { componentType: { name: string }; workflow?: { name?: string } } };
 
+describe('createComponent creation', () => {
+  beforeEach(() => {
+    post.mockReset();
+    post.mockResolvedValue({ handler: 'task-agent', componentType: 'service' });
+  });
+
+  // The BFF reports creation_method from this field and strips it before
+  // OpenChoreo, so it must travel at the top level of the body, not in spec.
+  it('sends how the integration was created at the top level of the body', async () => {
+    await createComponent({ ...baseInput, creation: { method: 'from-sample', sampleId: 'bi/hello-world' } });
+    const body = post.mock.calls[0][1] as { creation?: unknown; spec: Record<string, unknown> };
+    expect(body.creation).toEqual({ method: 'from-sample', sampleId: 'bi/hello-world' });
+    expect(body.spec).not.toHaveProperty('creation');
+  });
+
+  it('omits creation when the caller does not say', async () => {
+    await createComponent(baseInput);
+    expect(post.mock.calls[0][1]).not.toHaveProperty('creation');
+  });
+});
+
 describe('createComponent component-type mapping', () => {
   beforeEach(() => {
     post.mockReset();
@@ -165,29 +186,10 @@ describe('updateEndpoint visibility reconciliation', () => {
       releaseId: 'r1',
       endpointId: 'http',
       displayName: 'HTTP',
-      networkVisibilities: ['Project', 'Public'],
+      networkVisibilities: ['Organization'],
     });
     expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?projectName=project-a&deploymentTrackId=v1', {
-      visibility: ['project', 'public'],
-      displayProjectUrl: true,
-    });
-  });
-
-  it('keeps implicit project access while hiding its URL', async () => {
-    put.mockResolvedValue({});
-    await updateEndpoint({
-      projectId: 'project-a',
-      componentId: 'orders',
-      environmentId: 'development',
-      versionId: 'v1',
-      releaseId: 'r1',
-      endpointId: 'http',
-      displayName: 'HTTP',
-      networkVisibilities: ['Public'],
-    });
-    expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?projectName=project-a&deploymentTrackId=v1', {
-      visibility: ['project', 'public'],
-      displayProjectUrl: false,
+      visibility: ['project', 'organization'],
     });
   });
 });

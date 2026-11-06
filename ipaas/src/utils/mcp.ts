@@ -16,8 +16,54 @@
  * under the License.
  */
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
+import type { JsonSchemaType as SdkJsonSchema, JsonSchemaValidator, jsonSchemaValidator } from '@modelcontextprotocol/sdk/validation';
 import type { JsonSchemaType, JsonValue, McpErrorKind, McpTool, McpToolContent, McpToolParameter, McpToolResult } from '../types/mcp';
+
+// Keywords whose value is a subschema or a list of them, and keywords whose value maps names to subschemas.
+const SUBSCHEMA_KEYWORDS = new Set(['additionalItems', 'additionalProperties', 'allOf', 'anyOf', 'contains', 'else', 'if', 'items', 'not', 'oneOf', 'prefixItems', 'propertyNames', 'then', 'unevaluatedItems', 'unevaluatedProperties']);
+const SUBSCHEMA_MAP_KEYWORDS = new Set(['$defs', 'definitions', 'dependencies', 'dependentSchemas', 'patternProperties', 'properties']);
+
+/**
+ * A copy of the schema where OpenAPI's `nullable: true` next to a `type` adds `'null'` to that type,
+ * which is how Ajv reads it. Plain JSON Schema has no `nullable`.
+ */
+export function withNullableTypes(schema: unknown): unknown {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) return schema;
+  const entries = Object.entries(schema).map(([key, value]): [string, unknown] => {
+    if (SUBSCHEMA_KEYWORDS.has(key)) return [key, Array.isArray(value) ? value.map(withNullableTypes) : withNullableTypes(value)];
+    if (SUBSCHEMA_MAP_KEYWORDS.has(key) && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      return [key, Object.fromEntries(Object.entries(value).map(([name, sub]) => [name, withNullableTypes(sub)]))];
+    }
+    return [key, value];
+  });
+  const copy = Object.fromEntries(entries);
+  if (copy.nullable === true && copy.type !== undefined) {
+    const types: unknown[] = Array.isArray(copy.type) ? copy.type : [copy.type];
+    if (!types.includes('null')) copy.type = [...types, 'null'];
+  }
+  return copy;
+}
+
+class NoEvalJsonSchemaValidator implements jsonSchemaValidator {
+  private readonly inner = new CfWorkerJsonSchemaValidator();
+
+  getValidator<T>(schema: SdkJsonSchema): JsonSchemaValidator<T> {
+    return this.inner.getValidator<T>(withNullableTypes(schema) as SdkJsonSchema);
+  }
+}
+
+/**
+ * An MCP client that checks tool output schemas without eval. The SDK's default
+ * validator, Ajv, compiles each schema with `new Function`, which the console's
+ * Content-Security-Policy does not allow. CfWorker does not compile, and
+ * `withNullableTypes` keeps Ajv's reading of OpenAPI `nullable`.
+ */
+export function createMcpClient(name: string): Client {
+  return new Client({ name, version: '1.0.0' }, { capabilities: {}, jsonSchemaValidator: new NoEvalJsonSchemaValidator() });
+}
 
 /** Whether an MCP/transport error is a 401/403 — a permissions issue, not a transient failure. */
 export function isMcpForbiddenError(error: unknown): boolean {

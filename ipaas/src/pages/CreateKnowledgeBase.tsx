@@ -20,6 +20,8 @@ import { Alert, Box, Button, CircularProgress, PageContent, PageTitle, Stack, Ty
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
 import { DAILY_INGESTION, DATASOURCES, DEFAULT_CHUNKING } from '../constants/ragIngestion';
@@ -59,6 +61,7 @@ export default function CreateKnowledgeBase(scope: OrgScope): JSX.Element {
 function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element {
   const navigate = useAppNavigate();
   const create = useCreateKnowledgeBase();
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const [step, setStep] = useState(0);
   const [names, setNames] = useState<NameFields>({ displayName: '', name: '', description: '' });
   const [vectorStore, setVectorStore] = useState<VectorStoreConfig | null>(null);
@@ -121,7 +124,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
             {step === 0 ? 'Cancel' : 'Back'}
           </Button>
           {step === DATA_SOURCE_STEP && (
-            <Button variant="outlined" disabled={create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={() => submit(false)}>
+            <Button variant="outlined" disabled={!canManage || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={() => submit(false)}>
               Create Without Data Source
             </Button>
           )}
@@ -130,7 +133,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
               Next
             </Button>
           ) : (
-            <Button variant="contained" disabled={!stepValid[step] || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={() => submit(true)}>
+            <Button variant="contained" disabled={!canManage || !stepValid[step] || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={() => submit(true)}>
               {create.isPending ? 'Creating…' : 'Create Knowledge Base'}
             </Button>
           )}

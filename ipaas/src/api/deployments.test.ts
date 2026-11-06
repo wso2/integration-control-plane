@@ -19,13 +19,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const get = vi.hoisted(() => vi.fn());
+const post = vi.hoisted(() => vi.fn());
 
 vi.mock('./_client', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./_client')>();
-  return { ...actual, bff: { ...actual.bff, get } };
+  return { ...actual, bff: { ...actual.bff, get, post } };
 });
 
-import { fetchComponentDeployment, fetchDeploymentStatus, fetchDeploymentTrackImages, fetchReleaseMgtDeployments, toEnvEndpoint } from './deployments';
+import { fetchComponentDeployment, fetchDeploymentStatus, fetchDeploymentTrackImages, fetchReleaseMgtDeployments, promote, retryProxyReconciliation, toEnvEndpoint } from './deployments';
 
 // The two URLs OpenChoreo actually reports in a ReleaseBinding's status: Project reaches the
 // Service directly. Organization has no OpenChoreo-level address of its own — it goes through
@@ -42,7 +43,6 @@ const bffEndpoint = (visibility: string[], urls: { external?: typeof EXTERNAL; i
   type: 'HTTP',
   port: 8090,
   visibility,
-  displayProjectUrl: true,
   urls,
 });
 
@@ -107,18 +107,10 @@ describe('toEnvEndpoint visibility URLs', () => {
     expect(ep.projectUrl).toBe(INTERNAL_URL);
   });
 
-  it('hides only the project URL when its display preference is disabled', () => {
-    const ep = toEnvEndpoint({ ...bffEndpoint(['project', 'public']), displayProjectUrl: false }, 'r1');
-    expect(ep.networkVisibilities).toEqual(['Public']);
-    expect(ep.projectUrl).toBe('');
-    expect(ep.publicUrl).toBe(EXTERNAL_URL);
-  });
-
-  it('hides the project URL when the display preference is omitted', () => {
-    const { displayProjectUrl: _omitted, ...endpoint } = bffEndpoint(['project', 'public']);
-    const ep = toEnvEndpoint(endpoint, 'r1');
-    expect(ep.networkVisibilities).toEqual(['Public']);
-    expect(ep.projectUrl).toBe('');
+  it('lists the project URL whatever an older BFF says about showing it', () => {
+    const ep = toEnvEndpoint({ ...bffEndpoint(['project', 'public']), displayProjectUrl: false } as Parameters<typeof toEnvEndpoint>[0], 'r1');
+    expect(ep.networkVisibilities).toEqual(['Project', 'Public']);
+    expect(ep.projectUrl).toBe(INTERNAL_URL);
   });
 
   it('shows Public while its default APIP deployment is enabling', () => {
@@ -153,5 +145,31 @@ describe('deployment track forwarding', () => {
   ])('asks for the track’s %s', async (_, call, url) => {
     await call();
     expect(get).toHaveBeenCalledWith(url);
+  });
+});
+
+describe('API exposure wire contract', () => {
+  beforeEach(() => {
+    get.mockReset();
+    post.mockReset();
+  });
+
+  it('carries the saved exposure, which stays readable while the gateway state is unknown', () => {
+    const unknown = { status: 'UNKNOWN' as const };
+    const ep = toEnvEndpoint({ ...bffEndpoint(['project']), exposure: 'organization', visibilityStatus: { public: unknown, organization: unknown } }, 'r1');
+    expect(ep.exposure).toBe('organization');
+    expect(ep.networkVisibilities).toEqual(['Project']);
+  });
+
+  it('returns the promote result with its API gateway summary', async () => {
+    post.mockResolvedValue({ message: 'rel-1', proxyReconciliation: { status: 'FAILED', error: 'APIP_SOURCE_BUILD_UNAVAILABLE' } });
+    const result = await promote({ componentId: 'orders' } as Parameters<typeof promote>[0]);
+    expect(result.proxyReconciliation).toEqual({ status: 'FAILED', error: 'APIP_SOURCE_BUILD_UNAVAILABLE' });
+  });
+
+  it('retries one environment of one track', async () => {
+    post.mockResolvedValue({ status: 'PENDING', component: 'orders', environment: 'production', endpoints: [] });
+    await retryProxyReconciliation('orders', 'production', 'project-a', 'v1');
+    expect(post).toHaveBeenCalledWith('/components/orders/environments/production/api-proxy-reconciliation/retry?projectName=project-a&deploymentTrackId=v1');
   });
 });

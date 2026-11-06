@@ -19,6 +19,8 @@
 import { Box, CircularProgress, Divider } from '@wso2/oxygen-ui';
 import { useState, type ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
+import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
+import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
@@ -32,9 +34,13 @@ import { ENV_CARD_INSIGHTS_ENABLED } from '../../../constants/insights';
  * received, processing errors, error rate, latency) — the same layout as a
  * service card's, but without the OpenAPI/swagger viewer (webhooks publish no
  * contract). Matches Devant's webhook overview.
+ *
+ * `children` is a type's own content, shown under the endpoints and above the
+ * insights (the workflow body's definitions and figures).
  */
-export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {
-  const { data: envEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2, children }: EnvCardBodyProps & { children?: ReactNode }): ReactNode {
+  const { data: allEndpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const envEndpoints = useUserVisibleEndpoints(allEndpoints, isWorkflowIntegration(component));
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const activeEndpoint = envEndpoints[selectedEpIdx] ?? envEndpoints[0];
 
@@ -58,6 +64,8 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && <EndpointUrlsPanel endpoints={envEndpoints} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} />}
 
       {notDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && <EnvEmptyNotice icon={Rocket}>This webhook has not been deployed to this environment yet.</EnvEmptyNotice>}
+
+      {children}
 
       {showInsights && <ServiceInsights envName={env.name} envId={env.id} apimEnvId={env.apimEnvId} projectId={projectId} apiId={insightsApiId} />}
     </>

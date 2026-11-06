@@ -16,13 +16,14 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Slider, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, Grid, IconButton, Paper, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { Check, Copy, Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import ResourceRangeSlider from '../common/ResourceRangeSlider';
 import ContainerEditForm from './ContainerEditForm';
 import { formatDateTime, formatDistanceToNow } from '../../utils/time';
-import { CPU_MAX, CPU_MIN, MEMORY_MAX, MEMORY_MIN, containerImageName, isMainContainer, milliToCpu } from '../../utils/containers';
+import { CPU_MAX, CPU_MIN, MEMORY_MAX, MEMORY_MIN, containerImageName, formatCpu, isMainContainer } from '../../utils/containers';
+import type { PlanAccess } from '../../utils/billing';
 import type { ReleaseContainer } from '../../types/devopsConfigs';
 
 interface ContainerInfoCardProps {
@@ -32,17 +33,16 @@ interface ContainerInfoCardProps {
   releaseId: string;
   /** The deployment track the release belongs to. */
   deploymentTrackId: string;
-  isPaidOrPdpUser: boolean;
+  plan: PlanAccess;
   canManage: boolean;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
 }
 
 const cardSx = { p: 3, mb: 2 } as const;
-const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
+export default function ContainerInfoCard({ container: c, projectId, componentId, releaseId, deploymentTrackId, plan, canManage, onSaved, onError }: ContainerInfoCardProps): JSX.Element {
   const [isEditOpen, setIsEditOpen] = useState(false);
 
   if (isEditOpen) {
@@ -53,7 +53,7 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
         componentId={componentId}
         releaseId={releaseId}
         deploymentTrackId={deploymentTrackId}
-        isPaidOrPdpUser={isPaidOrPdpUser}
+        plan={plan}
         onClose={() => setIsEditOpen(false)}
         onSaved={(m) => {
           setIsEditOpen(false);
@@ -118,51 +118,17 @@ export default function ContainerInfoCard({ container: c, projectId, componentId
   );
 }
 
-/** Read-only CPU/Memory display (dual sliders when limits are set, else request-only + a warning). */
+/** Read-only CPU/Memory display. */
 function ResourceBars({ container: c }: { container: ReleaseContainer }): JSX.Element {
-  const limitDisabled = c.limit_disabled ?? false;
-  if (!limitDisabled) {
-    return (
-      <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <ResourceRangeSlider label="CPU request / limit" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={0.01} request={milliToCpu(c.cpu ?? 0)} limit={milliToCpu(c.cpu_limit ?? 0)} viewMode format={cpuFmt} />
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <ResourceRangeSlider label="Memory request / limit" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={1} request={c.memory ?? 0} limit={c.memory_limit ?? 0} viewMode format={memFmt} />
-        </Grid>
-      </Grid>
-    );
-  }
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 6 }}>
-        <ReadonlySingle label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} value={milliToCpu(c.cpu ?? 0)} format={cpuFmt} />
+        <ResourceRangeSlider label="CPU request / limit" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={1} request={c.cpu ?? 0} limit={c.cpu_limit ?? 0} viewMode format={formatCpu} />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
-        <ReadonlySingle label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} value={c.memory ?? 0} format={memFmt} />
-      </Grid>
-      <Grid size={{ xs: 12 }}>
-        <Alert severity="warning">Resource limits are disabled for this container. Containers without resource limits can freely use up resources and can negatively impact the performance of other integrations.</Alert>
+        <ResourceRangeSlider label="Memory request / limit" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={1} request={c.memory ?? 0} limit={c.memory_limit ?? 0} viewMode format={memFmt} />
       </Grid>
     </Grid>
-  );
-}
-
-function ReadonlySingle({ label, unit, min, max, value, format }: { label: string; unit: string; min: number; max: number; value: number; format: (v: number) => string }): JSX.Element {
-  return (
-    <Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" fontWeight={600}>
-          {label}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {format(value)} {unit}
-        </Typography>
-      </Stack>
-      <Box sx={{ px: 1 }}>
-        <Slider value={value} min={min} max={max} disabled aria-label={label} />
-      </Box>
-    </Box>
   );
 }
 

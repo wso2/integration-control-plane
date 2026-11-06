@@ -23,6 +23,8 @@ import { DATABASE_UNAVAILABLE } from '../../constants/databases';
 import { nodeDescription } from '../../utils/databases';
 import DeleteDatabaseDialog from './DeleteDatabaseDialog';
 import DetailRow from './DetailRow';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import type { DatabaseServerDetail } from '../../types/databases';
 
 const LABEL_WIDTH = 180;
@@ -43,6 +45,7 @@ function UnavailableEdit({ reason }: { reason: string }): JSX.Element {
 
 export default function AdvancedSettingsTab({ service, onDeleted }: { service: DatabaseServerDetail; onDeleted: () => void }): JSX.Element {
   const [deleting, setDeleting] = useState(false);
+  const canDelete = useCan()(Scopes.CONFIG_MANAGE);
   return (
     <Box>
       <Paper variant="outlined">
@@ -64,22 +67,26 @@ export default function AdvancedSettingsTab({ service, onDeleted }: { service: D
         </DetailRow>
       </Paper>
 
-      <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 4, mb: 1.5, color: 'error.main' }}>
-        Delete Server
-      </Typography>
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={2} sx={dangerZoneSx}>
-        <Box>
-          <Typography variant="body2" sx={{ fontWeight: 600 }}>
-            Delete this database server
+      {canDelete && (
+        <>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 4, mb: 1.5, color: 'error.main' }}>
+            Delete Server
           </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Permanently removes the server, all its data and its backups. This action cannot be undone.
-          </Typography>
-        </Box>
-        <Button variant="outlined" color="error" startIcon={<Trash2 size={16} />} onClick={() => setDeleting(true)} sx={{ flexShrink: 0 }}>
-          Delete Server
-        </Button>
-      </Stack>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={2} sx={dangerZoneSx}>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Delete this database server
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Permanently removes the server, all its data and its backups. This action cannot be undone.
+              </Typography>
+            </Box>
+            <Button variant="outlined" color="error" startIcon={<Trash2 size={16} />} onClick={() => setDeleting(true)} sx={{ flexShrink: 0 }}>
+              Delete Server
+            </Button>
+          </Stack>
+        </>
+      )}
       {deleting && <DeleteDatabaseDialog server={service} onClose={() => setDeleting(false)} onDeleted={onDeleted} />}
     </Box>
   );

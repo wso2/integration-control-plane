@@ -39,6 +39,8 @@ import { useExecutionArguments, useRuntimeArguments, useTaskExecutionCount, useT
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
+import { useCan } from '../hooks/useCan';
+import { Scopes } from '../constants/permissions';
 import { buildExecutionArgumentsFromForm, formDataEqual, hasAnyFormData, parseArgumentsToFormData, parseRuntimeArgumentsToFormFields, validateRequiredFields } from '../utils/runtimeArguments';
 import { isNotFoundError, isUnsupportedError } from '../utils/apiErrors';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
@@ -97,6 +99,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
 
   const { data: executionCount, isLoading: loadingExecutionCount } = useTaskExecutionCount(releaseId, comp?.id ?? '', envId, projectId);
   const trigger = useTriggerComponent();
+  const canRun = useCan()(Scopes.INTEGRATION_EXECUTE);
   const executionArgs = useMemo(() => buildExecutionArgumentsFromForm(runtimeArguments, formData), [runtimeArguments, formData]);
 
   const { data: executions = [] } = useTaskExecutions(releaseId, comp?.id ?? '', envId, projectId, polling ? 4000 : false);
@@ -301,9 +304,11 @@ export default function AutomationTest({ org, project, component }: ComponentSco
             <Button variant="text" size="small" startIcon={<RefreshCw size={16} />} onClick={() => queryClient.invalidateQueries({ queryKey: ['taskExecutions'] })}>
               Refresh
             </Button>
-            <Button variant="contained" size="small" startIcon={trigger.isPending ? <CircularProgress size={14} color="inherit" /> : <Play size={16} />} onClick={handleDirectRun} disabled={trigger.isPending}>
-              {trigger.isPending ? runningLabel : runLabel}
-            </Button>
+            {canRun && (
+              <Button variant="contained" size="small" startIcon={trigger.isPending ? <CircularProgress size={14} color="inherit" /> : <Play size={16} />} onClick={handleDirectRun} disabled={trigger.isPending}>
+                {trigger.isPending ? runningLabel : runLabel}
+              </Button>
+            )}
           </Stack>
         </Stack>
       </Card>

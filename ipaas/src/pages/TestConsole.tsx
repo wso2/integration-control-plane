@@ -28,6 +28,7 @@ import { useApimSwagger } from '../hooks/useApim';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useEndpointPolicies } from '../hooks/useConsumers';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
+import ApiKeyAuthOffer from '../components/ApiKeyAuthOffer';
 import { useComponentDeployment, useEnvEndpoints } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
@@ -41,6 +42,8 @@ import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
 import EnvironmentSelect from '../components/common/EnvironmentSelect';
+import { useUserVisibleEndpoints } from '../hooks/useUserVisibleEndpoints';
+import { isWorkflowIntegration } from '../utils/workflowIntegration';
 /** Header the APIM gateway reads the test key from. Cloud uses the api-key-auth header instead. */
 
 // Hides SwaggerUI top chrome — keeps only the operations list with try-it-out
@@ -79,7 +82,8 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   const releaseId = deployment?.releaseId ?? '';
 
   // Endpoints for the selected env + track
-  const { data: endpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
+  const { data: allEndpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', selectedTrackId, releaseId);
+  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflowIntegration(component));
 
   // Selected endpoint — derived rather than synced via an effect, since useApimSwagger below
   // keys off selectedEndpoint and an effect+render round trip would delay it becoming enabled.
@@ -97,7 +101,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   );
   // Mint the initial test key when the console resolves an api-key-secured endpoint;
   // the button below explicitly refreshes it on demand after that.
-  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef, selectedEndpoint?.publicUrl || '');
+  const access = useEndpointTestAccess(testKeyEndpointRef, { enabled: !!testKeyEndpointRef, gatewayUrlFallback: selectedEndpoint?.publicUrl || '' });
   // Try-it-out runs in the browser, so the gateway must return CORS headers for this origin.
   const { data: endpointPolicies } = useEndpointPolicies(testKeyEndpointRef, !!testKeyEndpointRef);
   const testKeyHeader = access.authHeader;
@@ -128,8 +132,8 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   const [keyCopied, setKeyCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
-  // Not offered for an open endpoint: the BFF's test-key route switches enforcement to api-key,
-  // so minting one would secure an endpoint the user deliberately left open.
+  // Not offered for an open endpoint, which needs no key. For jwt, ipaas-service refuses the key and
+  // ApiKeyAuthOffer offers the switch.
   const canGetTestKey = !!testKeyEndpointRef && (access.mode === 'api-key' || access.mode === 'jwt');
   const fetchingKey = access.isMinting;
   const unavailableNotice = endpointLoadNotice(access.securityError, {
@@ -326,21 +330,24 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                             </InputAdornment>
                           }
                         />
-                        <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={fetchingKey ? <CircularProgress size={14} color="inherit" /> : <Key size={14} />}
-                          disabled={fetchingKey || !canGetTestKey}
-                          onClick={handleGetTestKey}
-                          sx={{ whiteSpace: 'nowrap', textTransform: 'none' }}>
-                          Get test key
-                        </Button>
+                        {access.canCreateKey && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={fetchingKey ? <CircularProgress size={14} color="inherit" /> : <Key size={14} />}
+                            disabled={fetchingKey || !canGetTestKey}
+                            onClick={handleGetTestKey}
+                            sx={{ whiteSpace: 'nowrap', textTransform: 'none' }}>
+                            Get test key
+                          </Button>
+                        )}
                       </Stack>
                       {keyError && (
                         <Typography variant="caption" color="error">
                           {keyError}
                         </Typography>
                       )}
+                      <ApiKeyAuthOffer access={access} />
                     </Stack>
                   </Stack>
                 )}

@@ -57,6 +57,9 @@ Overview/
 │   │                            tools list via the MCP SDK + Configure Policies action
 │   ├── HeaderStatus.tsx  EnvCardActions.tsx  EnvCardBody.tsx  OverviewHeaderActions.tsx
 │   └── McpToolTile.tsx / McpToolDrawer.tsx  (reuse _shared/bodies/OperationTile + OperationHeader)
+├── workflow/                    integration-as-api header slots; the webhook body (endpoints +
+│                                insights) with the workflow content between them once the
+│                                deployment is active (Workflows/overview/: definitions + figures)
 └── registry.ts                  IntegrationType → () => import('./<type>')  (one chunk per type)
 ```
 

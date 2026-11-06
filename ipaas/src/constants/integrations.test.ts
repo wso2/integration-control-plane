@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration } from './integrations';
+import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration, sampleId, samplePath, sampleSourceUrl } from './integrations';
 
 describe('project listing — RAG components', () => {
   it('labels the ingestion cronjob as "RAG Ingestion" (not Automation)', () => {
@@ -86,5 +86,44 @@ describe('formatBuildPack', () => {
 
   it('shows an unknown buildpack as reported', () => {
     expect(formatBuildPack('java')).toBe('java');
+  });
+});
+
+describe('samplePath', () => {
+  it('keeps the catalog path as it is, leading slash included', () => {
+    expect(samplePath({ componentPath: '/integrator-default-profile/samples/hello-world-service' })).toBe('/integrator-default-profile/samples/hello-world-service');
+    expect(samplePath({ subDirectory: '/bi', componentPath: '/hello-world' })).toBe('/bi/hello-world');
+  });
+
+  it('joins the parts with one slash whether or not either supplies one', () => {
+    expect(samplePath({ subDirectory: 'bi', componentPath: 'hello-world' })).toBe('bi/hello-world');
+    expect(samplePath({ subDirectory: 'bi/', componentPath: '/hello-world' })).toBe('bi/hello-world');
+    expect(samplePath({ subDirectory: '', componentPath: '' })).toBe('');
+  });
+});
+
+describe('sampleId', () => {
+  it('is the sample path in its repository, without a leading slash', () => {
+    expect(sampleId({ subDirectory: 'bi', componentPath: '/hello-world' })).toBe('bi/hello-world');
+    expect(sampleId({ componentPath: '/hello-world' })).toBe('hello-world');
+  });
+
+  it('joins the parts with one slash whether or not the path starts with one', () => {
+    expect(sampleId({ subDirectory: 'bi', componentPath: 'hello-world' })).toBe('bi/hello-world');
+    expect(sampleId({ subDirectory: 'bi/', componentPath: '/hello-world' })).toBe('bi/hello-world');
+    expect(sampleId({ componentPath: 'hello-world' })).toBe('hello-world');
+  });
+});
+
+describe('sampleSourceUrl', () => {
+  const repositoryUrl = 'https://github.com/wso2/integration-samples/';
+
+  it('links the catalog sample to its folder on the main branch', () => {
+    expect(sampleSourceUrl({ repositoryUrl, componentPath: '/integrator-default-profile/samples/hello-world-service' })).toBe('https://github.com/wso2/integration-samples/tree/main/integrator-default-profile/samples/hello-world-service');
+  });
+
+  it('puts one slash after the branch whether or not the path starts with one', () => {
+    expect(sampleSourceUrl({ repositoryUrl, branch: 'dev', subDirectory: 'bi', componentPath: 'hello-world' })).toBe('https://github.com/wso2/integration-samples/tree/dev/bi/hello-world');
+    expect(sampleSourceUrl({ repositoryUrl, branch: 'dev', subDirectory: '/bi', componentPath: '/hello-world' })).toBe('https://github.com/wso2/integration-samples/tree/dev/bi/hello-world');
   });
 });

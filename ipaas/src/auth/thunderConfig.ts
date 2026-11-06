@@ -22,11 +22,20 @@ import { basePath } from '../utils/basePath';
 /** The SDK instance the console uses. Its `state` on the authorize request is prefixed with this. */
 export const THUNDER_INSTANCE_ID = 0;
 
+/** The only post-logout URI the client registers: the bare origin, or the console's prefix under it. */
+const afterSignOutUrl = (): string => (basePath ? `${window.location.origin}${basePath}/` : window.location.origin);
+
+/** Whether sign-in runs on the gateway (BFF): it holds the tokens, the browser only an HttpOnly session cookie. */
+export function isBffAuth(): boolean {
+  return Boolean(window.API_CONFIG.authBffContext);
+}
+
 /**
  * Thunder SDK options from the runtime config. Reuses the ASGARDEO_* keys the
  * cloud deployment already sets until it gets keys of its own.
  */
 export function thunderConfig(): ThunderIDProviderProps {
+  if (isBffAuth()) return bffConfig();
   const { authBaseUrl, asgardeoClientId, asgardeoScope, asgardeoSignInRedirectUrl } = window.API_CONFIG;
   return {
     instanceId: THUNDER_INSTANCE_ID,
@@ -34,8 +43,7 @@ export function thunderConfig(): ThunderIDProviderProps {
     clientId: asgardeoClientId,
     scopes: asgardeoScope,
     afterSignInUrl: asgardeoSignInRedirectUrl,
-    // The only post-logout URI the client registers: the bare origin, or the console's prefix under it.
-    afterSignOutUrl: basePath ? `${window.location.origin}${basePath}/` : window.location.origin,
+    afterSignOutUrl: afterSignOutUrl(),
     // Per tab, and gone when the tab closes (the cloud team's call). A reload keeps it; a new
     // tab signs in again through Thunder, whose own session usually makes that a redirect.
     // Each tab also refreshes its own tokens, so tabs never race on Thunder's rotating refresh token.
@@ -58,6 +66,71 @@ export function thunderConfig(): ThunderIDProviderProps {
       i18n: { storageStrategy: 'none' },
     },
   };
+}
+
+/**
+ * SDK options for sign-in on the gateway. The gateway's oauth2-session for this console answers the
+ * session endpoints under authBffContext, and the client, its secret, scopes and resource live there.
+ * The browser never reaches Thunder, so discovery and the SDK's own profile and flow-metadata lookups
+ * would fail; the profile comes from the session's ID token claims.
+ */
+function bffConfig(): ThunderIDProviderProps {
+  const { authBffContext, authBffSignInUrl, authBffProxyContext, asgardeoSignInRedirectUrl } = window.API_CONFIG;
+  return {
+    instanceId: THUNDER_INSTANCE_ID,
+    baseUrl: window.location.origin,
+    endpoints: {
+      backend: {
+        signIn: authBffSignInUrl ?? `${authBffContext}/signin`,
+        // The policy names this one userinfoPath.
+        session: `${authBffContext}/userinfo`,
+        checkSession: `${authBffContext}/checksession`,
+        refresh: `${authBffContext}/refresh`,
+        signOut: `${authBffContext}/logout`,
+        // The gateway's API root, under which each product's oauth2-session-proxy sits.
+        proxy: authBffProxyContext ?? '/_api',
+        token: `${authBffContext}/token`,
+      },
+    },
+    afterSignInUrl: asgardeoSignInRedirectUrl,
+    afterSignOutUrl: afterSignOutUrl(),
+    session: { checkInterval: 30 },
+    discovery: { wellKnown: { enabled: false } },
+    preferences: {
+      resolveFromMeta: false,
+      user: { fetchUserProfile: false },
+      i18n: { storageStrategy: 'none' },
+    },
+  };
+}
+
+export function bffSignInUrl(returnTo: string): string {
+  const { authBffContext, authBffSignInUrl } = window.API_CONFIG;
+  const base = 'https://console.invalid';
+  const url = new URL(authBffSignInUrl ?? `${authBffContext}/signin`, base);
+  const outer = url.searchParams.get('returnTo');
+  if (outer) {
+    const inner = new URL(outer, base);
+    inner.searchParams.set('returnTo', returnTo);
+    url.searchParams.set('returnTo', `${inner.pathname}${inner.search}`);
+  } else {
+    url.searchParams.set('returnTo', returnTo);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
+export async function gatewaySignedIn(): Promise<boolean> {
+  try {
+    const res = await fetch(`${window.API_CONFIG.authBffContext}/checksession`, {
+      credentials: 'include',
+      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+    });
+    if (!res.ok) return true;
+    const { isSignedIn } = (await res.json()) as { isSignedIn?: boolean };
+    return isSignedIn !== false;
+  } catch {
+    return true;
+  }
 }
 
 /**

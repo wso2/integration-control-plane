@@ -24,6 +24,7 @@ import { useCreateConsumer, useRegenerateConsumerToken, useRevokeConsumer } from
 import type { Consumer, EndpointRef } from '../../../types/consumers';
 import { isConsumerNameTaken } from '../../../utils/apiConsumption';
 import { friendlyApiError } from '../../../utils/apiSecurity';
+import { isPermissionError } from '../../../utils/apiErrors';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
 import CopyButton from './CopyButton';
 import * as styles from './apiConsumption.styles';
@@ -92,7 +93,7 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
     try {
       await createMutation.mutateAsync({ ...endpointRef, projectName, appName: appName.trim() });
     } catch (err) {
-      setError(friendlyApiError(err, 'Could not create the consumer application.'));
+      if (!isPermissionError(err)) setError(friendlyApiError(err, 'Could not create the consumer application.'));
     }
   };
 
@@ -110,7 +111,7 @@ export default function ConsumerDrawer({ open, onClose, projectName, endpointRef
       }
       setConfirm(null);
     } catch (err) {
-      setError(friendlyApiError(err, confirm === 'regenerate' ? 'Could not regenerate the API key.' : 'Could not revoke this API key.'));
+      if (!isPermissionError(err)) setError(friendlyApiError(err, confirm === 'regenerate' ? 'Could not regenerate the API key.' : 'Could not revoke this API key.'));
     }
   };
 

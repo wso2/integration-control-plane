@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { DevopsConfigMap, DevopsConfigMount, DevopsSecret, ReleaseContainer } from '../types/devopsConfigs';
-import { buildConfigRows, mainContainer, mountKind, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from './devopsConfigs';
+import { buildConfigRows, mainContainer, mountKind, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName, keyInOtherGroupError } from './devopsConfigs';
 
 const makeContainer = (overrides: Partial<ReleaseContainer>): ReleaseContainer => ({
   ID: 'c1',
@@ -98,6 +98,13 @@ describe('validateConfigKey', () => {
 
   it('accepts a key at exactly 250 characters', () => {
     expect(validateConfigKey('a'.repeat(250))).toBe('');
+  });
+
+  it("rejects Ballerina's config env var names, and only those", () => {
+    expect(validateConfigKey('BAL_CONFIG_FILES')).toMatch(/reserved for Ballerina/);
+    expect(validateConfigKey('BAL_CONFIG_VAR_DB_PASSWORD')).toMatch(/reserved for Ballerina/);
+    expect(validateConfigKey('BAL_CONFIG_FILESX')).toBe('');
+    expect(validateConfigKey('bal_config_files')).toBe('');
   });
 
   it('rejects keys that do not match the env-var pattern', () => {
@@ -286,5 +293,13 @@ describe('buildConfigRows', () => {
 
   it('returns an empty array for an empty mounts list', () => {
     expect(buildConfigRows([], [], [])).toEqual([]);
+  });
+});
+
+describe('keyInOtherGroupError', () => {
+  it("names the group that already sets the key, or returns ''", () => {
+    const other = new Map([['DB_URL', 'db-settings']]);
+    expect(keyInOtherGroupError('DB_URL', other)).toBe('"DB_URL" is already set by the "db-settings" config.');
+    expect(keyInOtherGroupError('HOST', other)).toBe('');
   });
 });

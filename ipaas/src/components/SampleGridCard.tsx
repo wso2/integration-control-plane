@@ -20,7 +20,9 @@ import { Box, Button, Card, Chip, CircularProgress, IconButton, Tooltip, Typogra
 import { ExternalLink, Rocket } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { Sample } from '../types/samples';
-import { formatBuildPack, formatComponentType } from '../constants/integrations';
+import { Scopes } from '../constants/permissions';
+import { useAgentRefusal, useCan } from '../hooks/useCan';
+import { formatBuildPack, formatComponentType, sampleSourceUrl } from '../constants/integrations';
 
 const MAX_WORDS = 20;
 
@@ -31,7 +33,10 @@ function truncateWords(text: string): { display: string; isTruncated: boolean } 
 }
 
 export default function SampleGridCard({ sample, onDeploy, isDeploying }: { sample: Sample; onDeploy: () => void; isDeploying: boolean }): JSX.Element {
-  const sourceUrl = `${sample.repositoryUrl}tree/${sample.branch ?? 'main'}${sample.subDirectory ?? ''}${sample.componentPath}`;
+  const agentRefusal = useAgentRefusal()(Scopes.AGENT_CREATE);
+  const canCreate = useCan()(Scopes.INTEGRATION_CREATE);
+  const refusal = !canCreate ? 'You do not have permission to create integrations.' : sample.componentType === 'ai-agent' ? agentRefusal : '';
+  const sourceUrl = sampleSourceUrl(sample);
   const { display: descriptionDisplay, isTruncated: isDescriptionTruncated } = truncateWords(sample.description);
 
   return (
@@ -108,9 +113,9 @@ export default function SampleGridCard({ sample, onDeploy, isDeploying }: { samp
             <ExternalLink size={14} />
           </IconButton>
         </Tooltip>
-        <Tooltip title="Deploy this sample" placement="top">
+        <Tooltip title={refusal || 'Deploy this sample'} placement="top">
           <span>
-            <Button size="small" variant="contained" startIcon={isDeploying ? undefined : <Rocket size={12} />} onClick={onDeploy} disabled={isDeploying} sx={{ height: 30, fontSize: 12, px: 1.5 }}>
+            <Button size="small" variant="contained" startIcon={isDeploying ? undefined : <Rocket size={12} />} onClick={onDeploy} disabled={isDeploying || !!refusal} sx={{ height: 30, fontSize: 12, px: 1.5 }}>
               {isDeploying ? <CircularProgress size={12} color="inherit" /> : 'Quick deploy'}
             </Button>
           </span>
