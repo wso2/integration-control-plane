@@ -17,6 +17,7 @@
  */
 
 import type { DisplayType } from '../types/component';
+import type { Sample } from '../types/samples';
 import { RAG_NO_SOURCE_SUBTYPES } from './ragIngestion';
 
 /**
@@ -186,12 +187,14 @@ export function formatComponentType(type: string): string {
   return COMPONENT_TYPE_LABELS[type] ?? type.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
+type SamplePathParts = Pick<Sample, 'subDirectory' | 'componentPath'>;
+
 /**
  * A sample's path in its repository, as the create request's repositorySubPath.
  * The non-empty parts are joined with one slash, whether or not either supplies
  * its own, and a leading slash the catalog gives is kept.
  */
-export function samplePath(sample: { subDirectory?: string; componentPath: string }): string {
+export function samplePath(sample: SamplePathParts): string {
   return [sample.subDirectory, sample.componentPath]
     .filter(Boolean)
     .join('/')
@@ -202,12 +205,12 @@ export function samplePath(sample: { subDirectory?: string; componentPath: strin
  * A sample's id for usage analytics: its path in the samples repository, which
  * stays unique and stable when its display name changes.
  */
-export function sampleId(sample: { subDirectory?: string; componentPath: string }): string {
+export function sampleId(sample: SamplePathParts): string {
   return samplePath(sample).replace(/^\/+/, '');
 }
 
 /** The sample's folder on GitHub, for the "Go to source" link. */
-export function sampleSourceUrl(sample: { repositoryUrl: string; branch?: string; subDirectory?: string; componentPath: string }): string {
+export function sampleSourceUrl(sample: SamplePathParts & Pick<Sample, 'repositoryUrl' | 'branch'>): string {
   return `${sample.repositoryUrl}tree/${sample.branch ?? 'main'}/${sampleId(sample)}`;
 }
 
