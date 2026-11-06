@@ -1200,7 +1200,10 @@ function ReadOnlyConfigureDrawer({ open, onClose, projectId, componentId, envId,
         <TableHead>
           <TableRow>
             <TableCell>Key</TableCell>
-            <TableCell>Value</TableCell>
+            <TableCell>
+              {/* Long keys squeeze this column; the floor keeps "Default" whole while longer values still wrap. */}
+              <Box sx={{ minWidth: '10ch' }}>Value</Box>
+            </TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
