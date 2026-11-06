@@ -47,6 +47,7 @@ import { asHttpError, enginePath, engineRequest, engineUpload, forgetConsoleAcce
 import type {
   ContextApiKey,
   ContextEngine,
+  ContextEngineAccess,
   ContextEngineDetail,
   ContextEngineExposure,
   ContextEngineModels,
@@ -237,6 +238,8 @@ interface BffEngine {
   createdAt?: string;
   consoleApiUrl?: string;
   publicApiUrl?: string;
+  apiEnabled?: boolean;
+  mcpEnabled?: boolean;
 }
 
 interface BffIntegration {
@@ -316,6 +319,7 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   ...(raw.statusReason ? { statusReason: raw.statusReason } : {}),
   createdAt: raw.createdAt ?? '',
   ...(raw.publicApiUrl ? { publicApiUrl: raw.publicApiUrl.replace(/\/+$/, '') } : {}),
+  ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -389,8 +393,8 @@ const toSourceProgress = (raw: RawSourceProgress): SourceProgress => ({
   },
 });
 
-/** Which public surfaces the deployment serves, as the engine reports them; unknown counts as off. */
-const toExposure = (raw: RawEngineConfig | null): ContextEngineExposure => ({ api: raw?.interfaces?.publicApi ?? false, mcp: raw?.interfaces?.mcp ?? false, answers: raw?.interfaces?.answers ?? false });
+/** API and MCP are on when the BFF says the gateway lets callers through; answers are on when the engine offers them. Unknown counts as off. */
+const toExposure = (raw: RawEngineConfig | null, access: ContextEngineAccess | undefined): ContextEngineExposure => ({ api: access?.api ?? false, mcp: access?.mcp ?? false, answers: raw?.interfaces?.answers ?? false });
 
 /** The engine reports a store by provider id; the card shows the name people know. */
 const STORE_PROVIDER_LABEL: Record<string, { label: string; detail: string }> = {
@@ -520,7 +524,6 @@ export async function getContextEngineSummary(engineId: string): Promise<Context
     sourceCount: facets.sources.length,
     sourceTypes: facets.sources.map((s) => s.type),
     roleCount: rolesFromGrants(facets.grants.map(toGrant)).length,
-    exposure: toExposure(facets.engine),
     progress: progress
       ? summarizeEngineProgress(
           facets.sources.map((src) => src.id),
@@ -534,7 +537,7 @@ export async function getContextEngineSummary(engineId: string): Promise<Context
 export async function getContextEngine(engineId: string): Promise<ContextEngineDetail> {
   const engine = toEngine(await viaBff(() => bff.get<BffEngine>(enginePath(engineId))));
   if (engine.state !== 'ready') {
-    return { ...engine, sources: [], models: toModels(null), queryRoles: [], exposure: toExposure(null), storage: null };
+    return { ...engine, sources: [], models: toModels(null), queryRoles: [], exposure: toExposure(null, engine.access), storage: null };
   }
   const { engine: config, sources, grants } = await fetchEngineFacets(engineId);
   return {
@@ -543,7 +546,7 @@ export async function getContextEngine(engineId: string): Promise<ContextEngineD
     sources: sources.map(toSource),
     models: toModels(config),
     queryRoles: rolesFromGrants(grants.map(toGrant)),
-    exposure: toExposure(config),
+    exposure: toExposure(config, engine.access),
     storage: toStorage(config),
   };
 }
@@ -634,6 +637,11 @@ export async function listContextApiKeys(engineId: string): Promise<ContextApiKe
 export async function createContextApiKey(engineId: string, input: { displayName?: string; expiresAt?: string }): Promise<CreatedContextApiKey> {
   const raw = await viaBff(() => bff.post<{ keyId: string; apiKey: string; expiresAt?: string }>(`${enginePath(engineId)}/api-keys`, input));
   return { keyId: raw.keyId, apiKey: raw.apiKey, expiresAt: raw.expiresAt };
+}
+
+/** Turns callers' access to the engine's REST API or MCP server on or off at its gateway; a field left out is unchanged. */
+export async function setContextEngineAccess(engineId: string, input: Partial<ContextEngineAccess>): Promise<ContextEngineAccess> {
+  return viaBff(() => bff.put<ContextEngineAccess>(`${enginePath(engineId)}/access`, input));
 }
 
 export async function revokeContextApiKey(engineId: string, keyName: string): Promise<void> {

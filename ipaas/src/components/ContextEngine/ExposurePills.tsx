@@ -19,19 +19,19 @@
 import { Chip, Stack } from '@wso2/oxygen-ui';
 import { Check, Circle } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
-import type { ContextEngineExposure } from '../../types/contextEngine';
+import type { ContextEngineAccess } from '../../types/contextEngine';
 
 const offSx = { opacity: 0.6 } as const;
 
 /** Two small pills saying whether the REST API and the MCP server are published. */
-export default function ExposurePills({ exposure }: { exposure: ContextEngineExposure }): JSX.Element {
+export default function ExposurePills({ access }: { access: ContextEngineAccess }): JSX.Element {
   const pill = (label: string, on: boolean) => (
     <Chip size="small" variant="outlined" color={on ? 'success' : 'default'} icon={on ? <Check size={12} /> : <Circle size={10} />} label={label} sx={on ? undefined : offSx} aria-label={`${label} ${on ? 'published' : 'not published'}`} />
   );
   return (
     <Stack direction="row" gap={0.75}>
-      {pill('API', exposure.api)}
-      {pill('MCP', exposure.mcp)}
+      {pill('API', access.api)}
+      {pill('MCP', access.mcp)}
     </Stack>
   );
 }

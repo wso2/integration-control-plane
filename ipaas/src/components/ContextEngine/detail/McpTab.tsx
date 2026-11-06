@@ -25,6 +25,7 @@ import { Scopes } from '../../../constants/permissions';
 import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
 import { buildMcpClientConfigs, mcpEndpointUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
+import AccessSwitch from './AccessSwitch';
 import McpPlayground from '../../McpPlayground/McpPlayground';
 import SurfaceHeader from './SurfaceHeader';
 import { clientTabsSx, endpointFieldSx, endpointRowSx, playgroundFrameSx } from '../styles';
@@ -65,7 +66,12 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   return (
     <Box>
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." />
+        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="mcp" />} />
+        {engine.access?.mcp === false && (
+          <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+            MCP access is off. Agents get a 403 error until you turn it on.
+          </Alert>
+        )}
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
           Server endpoint

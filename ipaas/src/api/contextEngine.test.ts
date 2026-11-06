@@ -32,7 +32,7 @@ vi.mock('./_client', async (importOriginal) => ({ ...(await importOriginal<typeo
 vi.mock('./_contextEngineAccess', async (importOriginal) => ({ ...(await importOriginal<typeof import('./_contextEngineAccess')>()), engineRequest }));
 
 import { BffError } from './_client';
-import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setUpContextEngine, toEngineManagedServer } from './contextEngine';
+import { createContextEngine, deleteContextEngine, getContextEngine, listContextEngines, setContextEngineAccess, setUpContextEngine, toEngineManagedServer } from './contextEngine';
 import type { ContextSourceConfig, CreateContextEngineInput } from '../types/contextEngine';
 
 const ENGINE = 'docs';
@@ -66,6 +66,23 @@ describe('engines', () => {
     expect(engines[0]).toMatchObject({ id: ENGINE, handle: 'docs', name: 'Docs', state: 'ready', publicApiUrl: 'https://gw/p' });
     expect(engines[1]).toMatchObject({ id: 'hr', name: 'hr', state: 'unknown', statusReason: 'could not read', description: '' });
     expect(engineRequest).not.toHaveBeenCalled();
+  });
+
+  it("takes API and MCP access from the BFF, not from the engine's own configuration", async () => {
+    bff.get.mockResolvedValueOnce({ ...bffEngine, apiEnabled: false, mcpEnabled: true });
+    engineRequest.mockImplementation((_id: string, _method: string, path: string) => Promise.resolve(path === '/v1/engine' ? { interfaces: { publicApi: true, mcp: false, answers: true } } : []));
+
+    const engine = await getContextEngine(ENGINE);
+
+    expect(engine.access).toEqual({ api: false, mcp: true });
+    expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true });
+  });
+
+  it('sets access through the BFF', async () => {
+    bff.put.mockResolvedValueOnce({ api: true, mcp: false });
+
+    await expect(setContextEngineAccess(ENGINE, { mcp: false })).resolves.toEqual({ api: true, mcp: false });
+    expect(bff.put).toHaveBeenCalledWith('/context-engines/docs/environments/development/access', { mcp: false });
   });
 
   it('reads an engine that is still starting from the BFF alone', async () => {
