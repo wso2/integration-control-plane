@@ -188,10 +188,14 @@ export function formatComponentType(type: string): string {
 
 /**
  * A sample's id for usage analytics: its path in the samples repository, which
- * stays unique and stable when its display name changes.
+ * stays unique and stable when its display name changes. The parts are joined
+ * with a slash whether or not the component path starts with one.
  */
 export function sampleId(sample: { subDirectory?: string; componentPath: string }): string {
-  return `${sample.subDirectory ?? ''}${sample.componentPath}`.replace(/^\/+/, '');
+  return [sample.subDirectory, sample.componentPath]
+    .join('/')
+    .replace(/\/{2,}/g, '/')
+    .replace(/^\/+/, '');
 }
 
 export function displayTypeFromSample(componentType: string, buildPack: string): DisplayType {

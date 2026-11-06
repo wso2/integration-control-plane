@@ -94,4 +94,10 @@ describe('sampleId', () => {
     expect(sampleId({ subDirectory: 'bi', componentPath: '/hello-world' })).toBe('bi/hello-world');
     expect(sampleId({ componentPath: '/hello-world' })).toBe('hello-world');
   });
+
+  it('joins the parts with one slash whether or not the path starts with one', () => {
+    expect(sampleId({ subDirectory: 'bi', componentPath: 'hello-world' })).toBe('bi/hello-world');
+    expect(sampleId({ subDirectory: 'bi/', componentPath: '/hello-world' })).toBe('bi/hello-world');
+    expect(sampleId({ componentPath: 'hello-world' })).toBe('hello-world');
+  });
 });

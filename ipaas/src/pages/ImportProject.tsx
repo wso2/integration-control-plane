@@ -228,7 +228,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             <RepoSourceFields source={source} directoryHint={workspaceHint} />
             {pathReady && !isContentsLoading && !isContentsError && !isWorkspace && (
               <Alert severity="info" sx={{ mb: 3 }}>
-                No WSO2 Integrator: Default workspace detected in the selected directory. Select a directory that contains a WSO2 Integrator: Default workspace.
+                No workspace found in this directory. Select one with a <code>Ballerina.toml</code> at its root and subdirectories that each have their own <code>Ballerina.toml</code>.
               </Alert>
             )}
           </Box>
