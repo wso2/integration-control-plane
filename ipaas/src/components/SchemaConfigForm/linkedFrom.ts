@@ -27,7 +27,12 @@ export interface LinkedSource {
   overrides?: boolean;
   /** The environment the resource has no values in. */
   noValuesIn?: string;
+  /** Declared in the repository's workload.yaml, not linked. */
+  declared?: boolean;
 }
+
+/** A linked field's read-only value: where it comes from. */
+export const fromText = ({ resource, key, declared }: Pick<LinkedSource, 'resource' | 'key' | 'declared'>): string => (declared ? `from workload.yaml (${resource} · ${key})` : `from ${resource} · ${key}`);
 
 /** A resource key the picker offers: the field that uses it already, or the lost target a pick takes it from. */
 export interface PickerKey {

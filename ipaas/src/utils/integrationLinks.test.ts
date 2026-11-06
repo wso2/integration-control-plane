@@ -138,4 +138,15 @@ describe('formLinkView', () => {
       { key: 'PASSWORD', usedBy: 'ordersDbPassword' },
     ]);
   });
+
+  it("shows workload.yaml's declarations, with nothing to link, when the repository declares the resources", () => {
+    // ipaas-service's answer for an integration whose workload.yaml declares GitHub Acme's token for githubAuthToken.
+    const links: IntegrationLinks = { ...linked, sourceDefined: true, declared: { [id('githubAuthToken')]: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN' } } };
+    const view = formLinkView(links, 'development', envName);
+    expect(view.sourceDefined).toBe(true);
+    expect(view.target(id('githubAuthToken'))).toEqual({ source: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN', name: 'GitHub Acme', noValues: false, declared: true } });
+    expect(view.target(id('githubTimeout'))).toEqual({});
+    expect(view.connections.map((c) => [c.connection.id, c.linked, c.note])).toEqual([[id('github'), undefined, undefined]]);
+    expect(formLinkView(links, 'production', envName, ghdemoFields).target(id('githubAuthToken')).picker).toBeUndefined();
+  });
 });
