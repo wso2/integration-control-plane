@@ -102,25 +102,25 @@ function ExposureRow({ engine, surface, label, link, disabledReason, onOpen }: {
   return (
     <Box sx={summaryRowSx}>
       <Box>
-        <Typography variant="body2">{label}</Typography>
+        <Stack direction="row" alignItems="baseline" gap={1.5}>
+          <Typography variant="body2">{label}</Typography>
+          <Link component="button" type="button" variant="body2" onClick={onOpen}>
+            {link}
+          </Link>
+        </Stack>
         {engine.access?.[surface] === false && (
           <Typography variant="caption" sx={mutedSx}>
             Clients get a 403 until it&apos;s turned on.
           </Typography>
         )}
       </Box>
-      <Stack direction="row" alignItems="center" gap={1.5}>
-        {engine.access ? (
-          <AccessSwitch engineId={engine.id} access={engine.access} surface={surface} disabledReason={disabledReason} />
-        ) : (
-          <Typography variant="caption" sx={mutedSx}>
-            Not available yet
-          </Typography>
-        )}
-        <Link component="button" type="button" variant="body2" onClick={onOpen}>
-          {link}
-        </Link>
-      </Stack>
+      {engine.access ? (
+        <AccessSwitch engineId={engine.id} access={engine.access} surface={surface} disabledReason={disabledReason} />
+      ) : (
+        <Typography variant="caption" sx={mutedSx}>
+          Not available yet
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -151,7 +151,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const permissions = useContextPermissions(readOnly ? '' : engine.id);
   // Models are set when the engine is created; the BFF cannot change them yet.
   const canEditModels = CONTEXT_ENGINE_MODEL_UPDATES && !readOnly && !!permissions.data?.includes('engine.manage');
-  const accessDisabledReason = readOnly ? 'The engine is being deleted.' : permissions.data?.includes('engine.manage') ? undefined : 'You need the manage permission on this engine to change its access.';
+  const accessDisabledReason = readOnly ? 'The engine is being deleted.' : undefined;
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
   const openModels = () => {
@@ -325,9 +325,12 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
             <ExposureRow engine={engine} surface="api" label="REST API" link="View API →" disabledReason={accessDisabledReason} onOpen={() => onGoTab('api')} />
             <ExposureRow engine={engine} surface="mcp" label="MCP server" link="View MCP →" disabledReason={accessDisabledReason} onOpen={() => onGoTab('mcp')} />
             <Box sx={summaryRowSx}>
-              <Link component="button" type="button" variant="body2" onClick={() => onGoTab('playground')}>
-                Test playground
-              </Link>
+              <Stack direction="row" alignItems="baseline" gap={1.5}>
+                <Typography variant="body2">Test playground</Typography>
+                <Link component="button" type="button" variant="body2" onClick={() => onGoTab('playground')}>
+                  Open →
+                </Link>
+              </Stack>
               <Chip size="small" variant="outlined" label="Always on" />
             </Box>
           </Card>
