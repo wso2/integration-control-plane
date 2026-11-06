@@ -324,7 +324,7 @@ export default function AppLayout(): JSX.Element {
               </NavLink>
             </Header.BrandLogo>
           </Header.Brand>
-          <Header.Switchers showDivider={false} sx={{ ml: 4 }}>
+          <Header.Switchers showDivider={false}>
             {/* Matches the Project/Integration cards. */}
             <Box
               ref={orgCardRef}
