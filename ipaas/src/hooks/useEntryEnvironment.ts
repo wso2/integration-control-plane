@@ -16,9 +16,10 @@
  * under the License.
  */
 
+import { useQuery } from '@tanstack/react-query';
+import { fetchProjectDeploymentPipelines } from '../api/deploymentPipelines';
 import { useEnvironments } from './useEnvironments';
 import { useOrgUuid } from './useOrgUuid';
-import { useProjectDeploymentPipelines } from './useDeploymentPipelines';
 import { entryEnvironmentIds, isEntryEnvironment } from '../utils/entryEnvironment';
 
 /**
@@ -26,8 +27,13 @@ import { entryEnvironmentIds, isEntryEnvironment } from '../utils/entryEnvironme
  * isEntry is false until the pipeline has loaded, so copy that claims an environment is not the entry waits for loading to clear.
  */
 export function useEntryEnvironment(projectId: string, envId: string): { isEntry: boolean; loading: boolean; entryEnvironmentName: string } {
-  const { data: pipelines, isError } = useProjectDeploymentPipelines(projectId);
-  const { data: environments = [] } = useEnvironments(useOrgUuid() ?? '', projectId);
+  const orgUuid = useOrgUuid() ?? '';
+  const { data: pipelines, isError } = useQuery({
+    queryKey: ['deploymentPipelines', 'project', orgUuid, projectId],
+    queryFn: () => fetchProjectDeploymentPipelines(orgUuid, projectId),
+    enabled: !!orgUuid && !!projectId,
+  });
+  const { data: environments = [] } = useEnvironments(orgUuid, projectId);
   // A failed read is "no pipeline", not "still loading": the BFF still guards the change.
   const tree = isError ? null : pipelines === undefined ? undefined : (pipelines[0]?.promotion_tree ?? null);
   const entryNames = entryEnvironmentIds(tree).map((id) => environments.find((env) => env.id === id)?.name ?? id);
