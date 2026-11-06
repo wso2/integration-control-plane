@@ -23,7 +23,7 @@ import CopyButton from '../../Overview/integration-as-api/CopyButton';
 import * as styles from './DetailSections.styles';
 
 /**
- * The building blocks of the task and review views, ported from ICP's `shared.tsx`: every section
+ * The building blocks of the task and review views: every section
  * is the same card, titled the same way, and every decision is a card you pick rather than a row of
  * buttons.
  */

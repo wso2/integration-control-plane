@@ -32,12 +32,17 @@ const state = vi.hoisted(() => ({
   api: { client: null, connection: { status: 'loading' } } as unknown as WorkflowApi,
   displayType: 'ballerinaWorkflow',
   targets: [] as unknown[],
+  componentError: null as Error | null,
+  refetchComponent: vi.fn(),
 }));
 
 vi.mock('../../../hooks/useOrgUuid', () => ({ useOrgUuid: () => 'org-uuid' }));
 vi.mock('../../../hooks/useProjects', () => ({ useProjectId: () => ({ projectId: 'project-1', isLoading: false }) }));
 vi.mock('../../../hooks/useComponents', () => ({
-  useComponentByHandler: () => ({ data: { id: 'orders', handler: 'orders', displayType: state.displayType, componentSubType: null, deploymentTracks: [] }, isLoading: false }),
+  useComponentByHandler: () =>
+    state.componentError
+      ? { data: undefined, isLoading: false, error: state.componentError, refetch: state.refetchComponent }
+      : { data: { id: 'orders', handler: 'orders', displayType: state.displayType, componentSubType: null, deploymentTracks: [] }, isLoading: false, error: null },
 }));
 vi.mock('../../../hooks/useEnvironments', () => ({
   useEnvironments: () => ({
@@ -85,6 +90,8 @@ async function renderShell(url = '/') {
 beforeEach(() => {
   state.displayType = 'ballerinaWorkflow';
   state.targets = [];
+  state.componentError = null;
+  state.refetchComponent.mockClear();
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -138,5 +145,20 @@ describe('WorkflowPageShell', () => {
   it('says the pages are only for workflow integrations', async () => {
     state.displayType = 'ballerinaService';
     expect(await renderShell()).toContain('Workflows are available only for workflow integrations.');
+  });
+
+  it('says a failed read of the integration is not a missing one, and reads it again on Retry', async () => {
+    state.componentError = Object.assign(new Error('HTTP 500'), { status: 500 });
+    const text = await renderShell();
+    expect(text).toContain('Could not load this integration.');
+    expect(text).not.toContain('Integration not found');
+    const retry = [...container.querySelectorAll('button')].find((button) => button.textContent === 'Retry');
+    await act(async () => retry?.click());
+    expect(state.refetchComponent).toHaveBeenCalledTimes(1);
+  });
+
+  it('says an integration the BFF does not know is not found', async () => {
+    state.componentError = Object.assign(new Error('HTTP 404'), { status: 404 });
+    expect(await renderShell()).toContain('Integration not found');
   });
 });

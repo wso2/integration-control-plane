@@ -19,6 +19,7 @@
 import { Alert, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, MenuItem, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState, type JSX } from 'react';
+import { formatDateTime } from '../../../utils/time';
 import type { WorkflowClient } from '../api/client';
 import { retryWorkflowRead } from '../api/http';
 import { workflowKeys } from '../api/queryKeys';
@@ -28,7 +29,7 @@ import { splitQualifiedName } from '../model/workflowHistory';
 import { invalidateRun } from './runQueries';
 
 /**
- * Replays a run from an earlier point. Ported from ICP's reset dialog.
+ * Replays a run from an earlier point.
  *
  * Reset keeps the workflow id and produces a **new run id**, so every run-scoped read for the old
  * run is stale afterwards, which is why the whole run-scoped key set is invalidated rather than
@@ -50,8 +51,7 @@ interface ResetWorkflowDialogProps {
 const listFormat = new Intl.ListFormat('en', { type: 'unit', style: 'short' });
 
 /**
- * A checkpoint named by the steps it follows, never by its Temporal event; ported from ICP's
- * `resetPointLabel`. A point with no step of its own is placed by the nearest named one before it.
+ * A checkpoint named by the steps it follows, never by its Temporal event. A point with no step of its own is placed by the nearest named one before it.
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function resetPointLabel(points: ResetPoint[], index: number): string {
@@ -192,7 +192,7 @@ export default function ResetWorkflowDialog({ open, run, api, scopeId, onClose, 
         </MenuItem>
         {resetPoints.map((point, index) => (
           <MenuItem key={point.eventId} value={String(point.eventId)}>
-            {`${resetPointLabel(resetPoints, index)}${point.isFirstFailure ? ' (just before the first failure)' : ''} · ${new Date(point.timestamp).toLocaleString()}`}
+            {`${resetPointLabel(resetPoints, index)}${point.isFirstFailure ? ' (just before the first failure)' : ''} · ${formatDateTime(point.timestamp)}`}
           </MenuItem>
         ))}
       </TextField>

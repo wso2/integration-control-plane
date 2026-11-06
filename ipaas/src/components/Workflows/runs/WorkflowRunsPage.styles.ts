@@ -22,7 +22,7 @@ import type { Theme } from '@wso2/oxygen-ui';
 const FILTER_WIDTH = 200;
 const FILTER_GAP = 2;
 
-/** The search with the page's own action at the far end of the same row, as ICP lays it out. */
+/** The search with the page's own action at the far end of the same row. */
 export const searchActionRow = { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 2, mb: 2 } as const;
 
 /** Ends where the second filter ends, so the search and the filters it narrows read as one block. */

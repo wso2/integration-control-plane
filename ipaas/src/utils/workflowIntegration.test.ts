@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { isUserVisibleEndpoint, isWorkflowIntegration } from './useUserVisibleEndpoints';
+import { isUserVisibleEndpoint, isWorkflowIntegration, isWorkflowManagementEndpoint } from './workflowIntegration';
 
 const management = { displayName: 'Workflow Management API' };
 const business = { displayName: 'Processorder' };
@@ -44,5 +44,14 @@ describe('isWorkflowIntegration', () => {
     expect(isWorkflowIntegration({ displayType: 'ballerinaService', componentSubType: null })).toBe(false);
     expect(isWorkflowIntegration(null)).toBe(false);
     expect(isWorkflowIntegration(undefined)).toBe(false);
+  });
+});
+
+describe('isWorkflowManagementEndpoint', () => {
+  it('knows the management API by its display name, whatever the case and spacing', () => {
+    expect(isWorkflowManagementEndpoint(management)).toBe(true);
+    expect(isWorkflowManagementEndpoint({ displayName: ' WORKFLOW MANAGEMENT API ' })).toBe(true);
+    expect(isWorkflowManagementEndpoint(business)).toBe(false);
+    expect(isWorkflowManagementEndpoint({ displayName: '' })).toBe(false);
   });
 });

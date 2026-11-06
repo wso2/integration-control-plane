@@ -23,7 +23,7 @@ import type { WorkflowNoticeAction } from '../connection/useWorkflowConnection';
 
 interface TestKeyNoticeProps {
   notice: WorkflowNotice;
-  /** What can be done about it here, such as getting a test key or trying again. */
+  /** What can be done about it here, such as switching the endpoint to API key or trying again. */
   action?: WorkflowNoticeAction | null;
 }
 

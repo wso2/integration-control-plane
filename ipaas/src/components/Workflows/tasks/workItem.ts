@@ -26,8 +26,7 @@ import type { WorkItemKind } from '../routing/useWorkflowRoutes';
 /**
  * One row in the Human Tasks queue, from either of the two resources behind it.
  *
- * ICP shows a single queue backed by a unified `work-items` route on its own proxy. This engine has
- * no such route (`/human-tasks` and `/review-activities` are separate, differently-filtered
+ * The engine has no single queue route (`/human-tasks` and `/review-activities` are separate, differently-filtered
  * resources), so the merge happens here instead. See `mergeWorkItems`.
  */
 export interface WorkItem {
@@ -92,7 +91,7 @@ export function reviewToWorkItem(review: ReviewActivitySummary): WorkItem {
 }
 
 /**
- * Any pending review can be decided in bulk, as ICP allows: the engine's bulk retry proceeds a
+ * Any pending review can be decided in bulk: the engine's bulk retry proceeds a
  * review whatever its trigger. Human tasks never are; each carries a result a person supplies.
  */
 export function isBulkSelectable(item: WorkItem): boolean {

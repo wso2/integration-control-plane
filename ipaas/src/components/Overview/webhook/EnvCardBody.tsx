@@ -19,7 +19,8 @@
 import { Box, CircularProgress, Divider } from '@wso2/oxygen-ui';
 import { useState, type ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
-import { isWorkflowIntegration, useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
+import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
+import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';

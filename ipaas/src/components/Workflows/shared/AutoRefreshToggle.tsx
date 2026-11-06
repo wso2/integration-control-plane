@@ -43,8 +43,7 @@ interface AutoRefreshToggleProps {
 }
 
 /**
- * The auto-refresh switch, with when the view last got fresh data. Ported from ICP's
- * `RefreshingNote`. Switching it back on refetches the workflow views at once, so nothing waits a
+ * The auto-refresh switch, with when the view last got fresh data. Switching it back on refetches the workflow views at once, so nothing waits a
  * whole interval to catch up.
  */
 export default function AutoRefreshToggle({ updatedAt, scopeId }: AutoRefreshToggleProps): JSX.Element {

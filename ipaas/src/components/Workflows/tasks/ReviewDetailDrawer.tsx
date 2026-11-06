@@ -38,7 +38,7 @@ import * as styles from './WorkItemDrawer.styles';
 
 /**
  * A review activity's detail and its three decisions (proceed as proposed, proceed with edited
- * arguments, or reject), ported from ICP's `ReviewActivityDetailDialog`. It opens maximized over
+ * arguments, or reject). It opens maximized over
  * the page, like the execution view. The arguments are shown as a form, read-only; the edited-rerun
  * path seeds the editor from them and states what changed before acting, since the decision reruns
  * a real activity. An administrator also gets the Administer card.

@@ -17,8 +17,7 @@
  */
 
 /**
- * A copy of `items` ordered by start time, newest first, as ICP orders its lists
- * (`sortByStartTimeDesc`). A missing or unreadable start time sorts last.
+ * A copy of `items` ordered by start time, newest first. A missing or unreadable start time sorts last.
  *
  * Only what has been loaded is ordered: the engine pages in its own order (open runs ahead of
  * closed ones), so a page fetched later can still hold an older run that belongs higher up.

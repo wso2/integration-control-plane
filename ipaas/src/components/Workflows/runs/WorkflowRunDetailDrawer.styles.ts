@@ -68,7 +68,7 @@ export const timelinePane = { flex: 1, minWidth: 0, height: '100%', overflow: 'h
 
 /**
  * The flow's card. It frames rather than scrolls, so the style toggle in its corner stays put
- * while the rail scrolls beneath it, as ICP's does.
+ * while the rail scrolls beneath it.
  */
 export const railPane = {
   position: 'relative',

@@ -20,7 +20,7 @@ import type { Theme } from '@wso2/oxygen-ui';
 import { softPrimary } from './graphVisuals';
 
 /**
- * The rail's styling, ported from ICP's `sx` against the Oxygen theme. Only the genuinely dynamic
+ * The rail's styling. Only the genuinely dynamic
  * values (a row's status colour, its indent) stay inline at the call site.
  *
  * Indentation is a CSS custom property rather than a style per depth, because nesting depth is

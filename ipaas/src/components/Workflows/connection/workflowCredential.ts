@@ -17,6 +17,7 @@
  */
 
 import type { EndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
+import { SECURITY_MODE_LABEL } from '../../../constants/apiConsumption';
 import { httpStatusOf } from '../../../utils/apiErrors';
 import { endpointLoadNotice } from '../../../utils/apiSecurity';
 
@@ -54,10 +55,11 @@ export function workflowRequestHeaders({ authHeader, apiKey }: GatewayCredential
  * `not-exposed`: the endpoint is not an API on the gateway yet. `gateway-unavailable`: API
  * exposure is not configured in this environment. `security-unreadable`: the gateway's
  * configuration of the API could not be read. `no-gateway-url`: it is exposed, but no invoke URL
- * is known. `jwt-secured`: the gateway expects a JWT; a test key would switch it to api-key auth,
- * which only the person may choose. `mint-failed`: minting the key failed.
+ * is known. `key-refused`: the role may not create test keys. `needs-api-key`: the endpoint uses
+ * another auth mode, so ipaas-service issues no test key until it is switched to API key, which
+ * changes every caller's auth and so is the person's choice. `mint-failed`: minting the key failed.
  */
-export type TestKeyReason = 'not-exposed' | 'gateway-unavailable' | 'security-unreadable' | 'no-gateway-url' | 'jwt-secured' | 'mint-failed';
+export type TestKeyReason = 'not-exposed' | 'gateway-unavailable' | 'security-unreadable' | 'no-gateway-url' | 'key-refused' | 'needs-api-key' | 'mint-failed';
 
 /** What a notice says, and how loudly. */
 export interface WorkflowNotice {
@@ -65,7 +67,7 @@ export interface WorkflowNotice {
   text: string;
 }
 
-type TestKeyAccess = Pick<EndpointTestAccess, 'isUnavailable' | 'securityError' | 'mode' | 'isAuthorized' | 'keyError'>;
+type TestKeyAccess = Pick<EndpointTestAccess, 'isUnavailable' | 'securityError' | 'mode' | 'isAuthorized' | 'keyError' | 'canCreateKey' | 'needsApiKeyAuth' | 'canSwitch'>;
 
 /** The reason the endpoint's test access leaves the management API out of reach, or null. */
 export function testKeyReasonOf(access: TestKeyAccess): TestKeyReason | null {
@@ -77,7 +79,8 @@ export function testKeyReasonOf(access: TestKeyAccess): TestKeyReason | null {
     return status === 503 ? 'gateway-unavailable' : 'security-unreadable';
   }
   if (access.isAuthorized || access.mode === null) return null;
-  if (access.mode === 'jwt') return 'jwt-secured';
+  if (!access.canCreateKey) return 'key-refused';
+  if (access.needsApiKeyAuth) return 'needs-api-key';
   return access.keyError ? 'mint-failed' : null;
 }
 
@@ -97,11 +100,13 @@ export function testKeyNotice(reason: TestKeyReason, access: TestKeyAccess): Wor
       return endpointLoadNotice(access.securityError, LOAD_COPY) ?? { severity: 'warning', text: LOAD_COPY.readFailed };
     case 'no-gateway-url':
       return { severity: 'warning', text: 'The Workflow Management API is exposed on the gateway, but the gateway reports no URL to reach it at.' };
-    case 'jwt-secured':
-      return {
-        severity: 'info',
-        text: 'The gateway secures the Workflow Management API with JWT, and the console calls it with a test key. Getting one switches the endpoint to API key authentication, as it does in the Test Console.',
-      };
+    case 'key-refused':
+      return { severity: 'info', text: 'Your role can’t create test keys, so the console can’t call the Workflow Management API.' };
+    case 'needs-api-key': {
+      const mode = access.mode ? SECURITY_MODE_LABEL[access.mode] : 'another';
+      const choice = access.canSwitch ? 'Switching it to API key changes how every caller of this API authenticates.' : 'Your role can’t switch it to API key.';
+      return { severity: 'info', text: `The Workflow Management API uses ${mode} authentication, so it can’t issue the test key the console calls it with. ${choice}` };
+    }
     case 'mint-failed':
       return { severity: 'warning', text: access.keyError ?? 'Could not mint a test key.' };
   }

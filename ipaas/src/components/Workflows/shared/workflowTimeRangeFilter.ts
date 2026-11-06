@@ -19,8 +19,7 @@
 import { METRICS_RANGES } from '../../../types/observability';
 
 /**
- * The relative time windows of the Workflows list, mirroring ICP's own time-range filter on
- * `components/workflow/AdminPortal.tsx`: a plain window select rather than a date-range picker.
+ * The relative time windows of the Workflows list: a plain window select rather than a date-range picker.
  * The list filters on when a run started, or, from a figure that counts closed runs, when it
  * closed. The short codes are what links carry.
  */

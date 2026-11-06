@@ -54,7 +54,7 @@ interface SchemaOrRawEditorProps {
 }
 
 /**
- * The escape hatch every workflow input surface shares, ported from ICP's `SchemaOrRawEditor.tsx`:
+ * The escape hatch every workflow input surface shares:
  * a schema-generated form with an `Edit as JSON` toggle beside it. Raw mode carries the form's
  * current values across once and never converts back, so a value the generated form cannot express
  * (anything the schema describes loosely, or text the inputs would reshape) can still be submitted

@@ -27,11 +27,11 @@ import { actionErrorText, countOf } from './workItem';
 /**
  * Retry or fail a set of pending reviews in one call.
  *
- * Ported from ICP's bulk selection bar. One behaviour is deliberately preserved: the engine answers
+ * One behaviour is deliberate: the engine answers
  * **200 even when individual items failed**, reporting per-item outcomes, so this reads the counts
  * and reports them rather than treating a 200 as "all done".
  *
- * Any pending review is eligible, as in ICP: the engine proceeds a review whatever its trigger.
+ * Any pending review is eligible: the engine proceeds a review whatever its trigger.
  * Human tasks are never bulk-actioned, because each one carries a result a person has to supply.
  *
  * Mounted for one batch at a time, so each opening starts clean: no error, feedback or outcome

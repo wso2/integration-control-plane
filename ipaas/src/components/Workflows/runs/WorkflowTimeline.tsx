@@ -95,7 +95,7 @@ function SpanBar({ span, total, rangeStart, now, color }: SpanBarProps): JSX.Ele
 }
 
 /**
- * The run's Gantt timeline, ported from ICP's `WorkflowTimeline.tsx`: one lane per span built from
+ * The run's Gantt timeline: one lane per span built from
  * the history (so a retried step gets a lane per attempt), coloured by status only, with running
  * spans live (they stretch to the clock, march, and glow) and an axis that grows with them.
  * Filtering dims rather than hides, so lanes never reflow when a step is selected.

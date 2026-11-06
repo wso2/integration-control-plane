@@ -21,6 +21,7 @@ import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { withTrackParam } from '../../../hooks/useSelectedTrack';
 import { componentHumanTasksUrl, componentWorkflowsUrl, hasComponent, overviewUrl, useScope, type ComponentScope } from '../../../nav';
 import type { WorkflowStatusFilter } from '../api/types';
+import type { WorkflowTimeRange } from '../shared/workflowTimeRangeFilter';
 
 /**
  * Links to the workflow pages, which sit under the integration's Operate group at `/workflows`
@@ -29,14 +30,16 @@ import type { WorkflowStatusFilter } from '../api/types';
  * every integration page does.
  */
 
-/** The Workflows page's definition filter, carried in the URL as ICP carries it. */
+/** The Workflows page's definition filter, carried in the URL. */
 export const WORKFLOW_TYPE_PARAM = 'type';
-/** The environment a workflow page opens on, as ICP's `env`; without it, the first one. */
+/** The environment a workflow page opens on; without it, the first one. */
 export const WORKFLOW_ENV_PARAM = 'env';
-/** A workflow whose newest run the Workflows page opens, as ICP's `workflowId` link names one. */
+/** A workflow whose newest run the Workflows page opens. */
 export const WORKFLOW_ID_PARAM = 'workflowId';
 /** The status the Workflows page opens filtered to, for a link that counts runs in one status. */
 export const WORKFLOW_STATUS_PARAM = 'status';
+/** The window a figure of closed runs counts in (`24h`): the Workflows page lists the runs closed within it. */
+export const WORKFLOW_CLOSED_PARAM = 'closed';
 /** The kind of work item (task or review) the Human Tasks page opens filtered to. */
 export const WORK_ITEM_TYPE_PARAM = 'type';
 /**
@@ -53,6 +56,8 @@ export type WorkItemTypeFilter = '' | WorkItemKind;
 export interface WorkflowRunsLink {
   workflowType?: string;
   status?: WorkflowStatusFilter;
+  /** Lists only the runs closed within this window, as the Failed and Completed figures count them. */
+  closedWithin?: WorkflowTimeRange;
   envId?: string;
   /** Opens that run's execution view. */
   runId?: string;
@@ -76,12 +81,13 @@ function withQuery(url: string, params: Record<string, string | undefined>, sear
 }
 
 /** The Workflows page on the named environment, filtered and opened as the link names. */
-export function workflowRunsUrl(scope: ComponentScope, { workflowType, status, envId, runId, workflowId }: WorkflowRunsLink = {}, search = ''): string {
+export function workflowRunsUrl(scope: ComponentScope, { workflowType, status, closedWithin, envId, runId, workflowId }: WorkflowRunsLink = {}, search = ''): string {
   return withQuery(
     componentWorkflowsUrl(scope, runId),
     {
       [WORKFLOW_TYPE_PARAM]: workflowType,
       [WORKFLOW_STATUS_PARAM]: status,
+      [WORKFLOW_CLOSED_PARAM]: closedWithin,
       [WORKFLOW_ENV_PARAM]: envId,
       // A run id already names the run; the workflow id would only open its newest one instead.
       [WORKFLOW_ID_PARAM]: runId ? undefined : workflowId,

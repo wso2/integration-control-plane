@@ -62,8 +62,8 @@ export function stepStatusLabel(status?: string): string {
 }
 
 /**
- * Falls back to 'default' for any status outside the known vocabulary, as ICP's own
- * `STATUS_COLORS[status] ?? 'default'` (helpers.ts:100) does, rather than throwing on an unknown value.
+ * Falls back to 'default' for any status outside the known vocabulary, rather than
+ * throwing on an unknown value.
  */
 export function stepStatusChipColor(status?: string): StatusChipColor {
   const key = (status ?? '').toUpperCase() as WorkflowStepStatus;

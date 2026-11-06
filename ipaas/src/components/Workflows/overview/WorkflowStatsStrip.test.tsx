@@ -58,7 +58,13 @@ async function renderStrip(client: ReturnType<typeof fakeClient>, workflowType: 
     root.render(
       <QueryClientProvider client={new QueryClient()}>
         <MemoryRouter>
-          <WorkflowStatsStrip client={client as unknown as WorkflowClient} scopeId="scope" workflowType={workflowType ?? undefined} runsLink={(status) => `/runs/${status}`} tasksLink={(kind) => `/tasks/${kind}`} />
+          <WorkflowStatsStrip
+            client={client as unknown as WorkflowClient}
+            scopeId="scope"
+            workflowType={workflowType ?? undefined}
+            runsLink={(status, closedWithin) => `/runs/${status}${closedWithin ? `?closed=${closedWithin}` : ''}`}
+            tasksLink={(kind) => `/tasks/${kind}`}
+          />
         </MemoryRouter>
       </QueryClientProvider>,
     ),
@@ -90,7 +96,7 @@ describe('WorkflowStatsStrip', () => {
 
   it('links each figure to its list, filtered to what it counts', async () => {
     await renderStrip(fakeClient());
-    expect(['Running', 'Suspended', 'Failed (24h)', 'Completed (24h)'].map((key) => tile(key).getAttribute('href'))).toEqual(['/runs/RUNNING', '/runs/SUSPENDED', '/runs/FAILED', '/runs/COMPLETED']);
+    expect(['Running', 'Suspended', 'Failed (24h)', 'Completed (24h)'].map((key) => tile(key).getAttribute('href'))).toEqual(['/runs/RUNNING', '/runs/SUSPENDED', '/runs/FAILED?closed=24h', '/runs/COMPLETED?closed=24h']);
     expect(['Pending Reviews', 'Pending Tasks'].map((key) => tile(key).getAttribute('href'))).toEqual(['/tasks/review', '/tasks/task']);
   });
 

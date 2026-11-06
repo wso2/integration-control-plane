@@ -28,10 +28,17 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('workflowFetch', () => {
-  it('sends the headers it is given as JSON and parses the answer', async () => {
+  it('sends the headers it is given and parses the answer', async () => {
     fetchMock.mockResolvedValueOnce(new Response('{"taskQueue":"q"}'));
     await expect(workflowFetch('https://gw/x/runtime', { headers: { 'X-API-Key': 'k' } })).resolves.toEqual({ taskQueue: 'q' });
-    expect(fetchMock.mock.calls[0][1]).toMatchObject({ method: 'GET', headers: { 'X-API-Key': 'k', 'Content-Type': 'application/json' }, body: undefined });
+    // No body, so no content type: a read stays as simple a request as its headers allow.
+    expect(fetchMock.mock.calls[0][1]).toEqual({ method: 'GET', headers: { 'X-API-Key': 'k' }, body: undefined });
+  });
+
+  it('sends a body as JSON', async () => {
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await workflowFetch('https://gw/x/workflows/w/signal', { method: 'POST', headers: { 'X-API-Key': 'k' }, body: { name: 'go' } });
+    expect(fetchMock.mock.calls[0][1]).toEqual({ method: 'POST', headers: { 'X-API-Key': 'k', 'Content-Type': 'application/json' }, body: '{"name":"go"}' });
   });
 
   it('reads an empty answer as null', async () => {
@@ -57,6 +64,13 @@ describe('workflowFetch', () => {
 
   it('reads a failed request as the engine being out of reach', async () => {
     fetchMock.mockRejectedValueOnce(new TypeError('Failed to fetch'));
+    await expect(workflowFetch('https://gw/x/runtime', { headers: {} })).rejects.toMatchObject({ code: 'NETWORK', status: 0 });
+  });
+
+  it('reads a connection dropped mid-body the same way', async () => {
+    const response = new Response('{"taskQueue":');
+    vi.spyOn(response, 'text').mockRejectedValueOnce(new TypeError('network error'));
+    fetchMock.mockResolvedValueOnce(response);
     await expect(workflowFetch('https://gw/x/runtime', { headers: {} })).rejects.toMatchObject({ code: 'NETWORK', status: 0 });
   });
 });

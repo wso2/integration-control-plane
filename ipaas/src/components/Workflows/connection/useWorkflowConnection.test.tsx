@@ -229,7 +229,7 @@ describe('useWorkflowConnection', () => {
     access.reset(keyAccess({ mode: 'none', apiKey: null }));
     mount();
     await vi.waitFor(() => expect(status()).toBe('ready'));
-    expect(sentTo(`${GATEWAY_URL}/runtime`)[0]).toEqual({ 'X-JWT-Assertion': 'Bearer user-token-1', 'Content-Type': 'application/json' });
+    expect(sentTo(`${GATEWAY_URL}/runtime`)[0]).toEqual({ 'X-JWT-Assertion': 'Bearer user-token-1' });
   });
 
   it('says the track is not deployed, with the status it is in, and asks for nothing', async () => {
@@ -258,18 +258,34 @@ describe('useWorkflowConnection', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('leaves switching a JWT-secured endpoint to a test key to the person', async () => {
+  it('leaves switching an endpoint that takes no test key to API key to the person', async () => {
     const mintKey = vi.fn(async () => 'key-1');
-    access.reset(keyAccess({ apiKey: null, isAuthorized: false, mode: 'jwt', mintKey }));
+    const switchToApiKey = vi.fn(async () => 'key-1');
+    access.reset(keyAccess({ apiKey: null, isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, mintKey, switchToApiKey }));
     mount();
-    await vi.waitFor(() => expect(status()).toBe('unavailable'));
-    expect(mintKey).not.toHaveBeenCalled();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'needs-api-key' }));
+    expect(switchToApiKey).not.toHaveBeenCalled();
 
     const { connection } = current();
     if (connection.status !== 'unavailable' || !connection.action) throw new Error('expected an action');
-    expect(connection.action.label).toBe('Get test key');
+    expect(connection.action.label).toBe('Switch to API key');
     connection.action.run();
-    expect(mintKey).toHaveBeenCalledTimes(1);
+    expect(switchToApiKey).toHaveBeenCalledTimes(1);
+    expect(mintKey).not.toHaveBeenCalled();
+  });
+
+  it('offers no switch to a role that may not make it', async () => {
+    access.reset(keyAccess({ apiKey: null, isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true, canSwitch: false }));
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'needs-api-key', action: null }));
+  });
+
+  it('says a role that may not create test keys cannot reach the API, and offers nothing to retry', async () => {
+    const mintKey = vi.fn(async () => null);
+    access.reset(keyAccess({ apiKey: null, isAuthorized: false, canCreateKey: false, keyError: "Your role can't create test keys.", mintKey }));
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'key-refused', action: null }));
+    expect(mintKey).not.toHaveBeenCalled();
   });
 
   it('says the integration does not serve the API when the probe answers 404', async () => {

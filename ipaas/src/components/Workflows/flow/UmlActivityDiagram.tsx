@@ -28,8 +28,7 @@ import { diagramColors, softPrimary } from './graphVisuals';
  * merge below it, laid out by the recursive box-packing in `floorPlan.ts`. A workflow body is
  * single-threaded, so a single centre line is a faithful spine.
  *
- * Ported from the `UmlActivityDiagram` half of ICP's `FlowRail.tsx`, extracted into its own file
- * because it is a self-contained renderer. The SVG geometry is unchanged. Every colour comes from
+ * It lives in its own file because it is a self-contained renderer. Every colour comes from
  * the theme's CSS variables, set through `style` (an SVG presentation attribute does not take a
  * `var()` everywhere), so the diagram follows the active colour scheme.
  */

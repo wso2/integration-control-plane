@@ -16,9 +16,6 @@
  * under the License.
  */
 
-// Ported from ICP (frontend/src/components/workflow/floorPlan.ts) with only the type import
-// changed, so it stays diffable against upstream.
-//
 // Turns a workflow's published structure into a floor plan: nested boxes, one per control-flow block, with its
 // steps laid out inside. This is deliberately *not* general graph layout.
 

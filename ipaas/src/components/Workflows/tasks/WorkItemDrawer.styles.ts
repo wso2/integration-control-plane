@@ -18,7 +18,7 @@
 
 /** Shared by the task and review detail views, their Administer card and their dialogs. */
 
-/** The detail reads as a centred column, maximized or not, as ICP's dialogs do. */
+/** The detail reads as a centred column, maximized or not. */
 export const content = { maxWidth: 960, mx: 'auto', display: 'flex', flexDirection: 'column', gap: 2.5 } as const;
 
 /** The editor an action card opens, parted from the cards above it. */

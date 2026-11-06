@@ -17,8 +17,8 @@
  */
 
 /**
- * Types for the execution-flow view, shaped like ICP's backend APIs
- * (integration-control-plane/frontend/src/api/workflows.ts) so the ported rail keeps its contracts.
+ * Types for the execution-flow view, shaped like the backend's workflow
+ * APIs so the rail keeps its contracts.
  *
  * `InstanceGraph` is produced by `flow/instanceGraph.ts` from a run's activity tree, and
  * `TimelineSpan`s by `model/workflowHistory.ts` from its history. The `ModelGraph` is a workflow's
@@ -103,7 +103,7 @@ export interface InstanceGraph {
   stepIdsAvailable: boolean;
   /**
    * Keyed by step id. A step with no entry here never ran: this (not `takenArms`) is how a taken
-   * vs. not-taken branch is actually distinguished, matching ICP's own rendering.
+   * vs. not-taken branch is actually distinguished.
    */
   steps: Record<string, StepExecution>;
   takenArms: Record<string, string[]>;

@@ -21,7 +21,7 @@ import { useState } from 'react';
 /**
  * The maximized state of a workflow detail drawer, shaped for `DrawerPanel`'s `expanded` and
  * `onExpandedChange`, so a drawer spreads it: `<DrawerPanel {...useOpenMaximized(id)} ...>`.
- * Detail views open maximized over the page, as ICP's do. A person may restore one to a side panel
+ * Detail views open maximized over the page. A person may restore one to a side panel
  * for the item in front of them; closing forgets that, so the next item opens maximized from its
  * first frame.
  */

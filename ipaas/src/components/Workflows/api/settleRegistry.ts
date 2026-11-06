@@ -24,8 +24,8 @@
  * immediately therefore returns the *old* status, and because nothing further changes, the UI parks
  * on it: the run looks like the action silently failed.
  *
- * ICP never had to solve this: its proxy sent an `x-workflow-stale` header that told the client to
- * keep polling. This engine has no such signal, so the client remembers instead.
+ * The engine gives no signal that a read is stale (nothing tells the client to keep polling), so the
+ * client remembers instead.
  *
  * Module-level on purpose: a drawer that unmounts and remounts (or a list that re-renders) must not
  * forget that an action is still settling.

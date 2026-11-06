@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, AlertTitle, Box, Button, IconButton, PageContent, PageTitle, Stack, Tooltip } from '@wso2/oxygen-ui';
+import { Alert, AlertTitle, Box, IconButton, PageContent, PageTitle, Stack, Tooltip } from '@wso2/oxygen-ui';
 import { Layers, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import type { JSX, ReactNode } from 'react';
@@ -36,11 +36,13 @@ import { broaden, overviewUrl, resourceUrl, type ComponentScope } from '../../..
 import type { Component } from '../../../types/component';
 import type { Environment } from '../../../types/environment';
 import type { NotDeployedPurpose } from '../../../utils/deploymentNotice';
-import { identifyIntegration } from '../../../utils/identifyIntegration';
+import { isNotFoundError } from '../../../utils/apiErrors';
+import { isWorkflowIntegration } from '../../../utils/workflowIntegration';
 import { isScopedWorkflowKey } from '../api/queryKeys';
 import { useWorkflowApi, type ReadyWorkflowApi, type WorkflowApi } from '../api/useWorkflowApi';
 import { WORKFLOW_ENV_PARAM } from '../routing/useWorkflowRoutes';
 import AutoRefreshToggle from './AutoRefreshToggle';
+import { retryAction } from './retryAction';
 import TestKeyNotice from './TestKeyNotice';
 import { WorkflowContentSkeleton, WorkflowPageSkeleton } from './WorkflowPageSkeleton';
 import * as styles from './WorkflowPageShell.styles';
@@ -84,12 +86,6 @@ function RefreshControls({ scopeId }: { scopeId: string }): JSX.Element {
   );
 }
 
-const retryAction = (retry: () => void) => (
-  <Button color="inherit" size="small" onClick={retry}>
-    Retry
-  </Button>
-);
-
 /** What the page shows until the management API answers, or its content once it does. */
 function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose: WorkflowPageShellProps['purpose']; children: (api: ReadyWorkflowApi) => ReactNode }): ReactNode {
   if (api.client) return children(api);
@@ -129,8 +125,8 @@ function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose:
  */
 export default function WorkflowPageShell({ scope, title, purpose, children }: WorkflowPageShellProps): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
-  const { projectId, isLoading: loadingProject } = useProjectId(scope.project);
-  const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
+  const { projectId, isLoading: loadingProject, isError: projectError, refetch: refetchProject } = useProjectId(scope.project);
+  const { data: component, isLoading: loadingComponent, error: componentError, refetch: refetchComponent } = useComponentByHandler(projectId, scope.component);
   const { data: environments = [], isLoading: loadingEnvironments, isError: environmentsError, refetch: refetchEnvironments } = useEnvironments(orgUuid, projectId);
   const { trackId } = useSelectedTrack(component);
 
@@ -152,8 +148,21 @@ export default function WorkflowPageShell({ scope, title, purpose, children }: W
   const api = useWorkflowApi({ componentId, environmentId: environment?.id ?? '', trackId, deployment, isDeploymentLoading: loadingDeployment });
 
   if (loadingProject || loadingComponent || loadingEnvironments) return <WorkflowPageSkeleton title={title} />;
+  // A failed read is not a missing integration; only a 404 says it does not exist.
+  if (projectError || (!component && componentError && !isNotFoundError(componentError))) {
+    return (
+      <PageContent fullWidth>
+        <PageTitle>
+          <PageTitle.Header>{title}</PageTitle.Header>
+        </PageTitle>
+        <Alert severity="error" action={retryAction(() => void (projectError ? refetchProject() : refetchComponent()))}>
+          Could not load this integration.
+        </Alert>
+      </PageContent>
+    );
+  }
   if (!component) return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
-  if (identifyIntegration(component.displayType ?? '', component.componentSubType ?? null).type !== 'workflow') {
+  if (!isWorkflowIntegration(component)) {
     return <NotFound message={`${title} are available only for workflow integrations.`} backTo={overviewUrl(scope)} backLabel="Back to overview" />;
   }
 

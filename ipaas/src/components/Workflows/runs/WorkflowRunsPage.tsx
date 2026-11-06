@@ -22,12 +22,13 @@ import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-qu
 import { useEffect, useState, type JSX, type ReactNode } from 'react';
 import { useParams, useSearchParams } from 'react-router';
 import EmptyListing from '../../EmptyListing';
+import { formatDateTime } from '../../../utils/time';
 import { retryWorkflowRead } from '../api/http';
 import { workflowKeys } from '../api/queryKeys';
 import { DEFAULT_SETTLE_MS, isSettling } from '../api/settleRegistry';
 import type { WorkflowInstanceSummary, WorkflowStatusFilter } from '../api/types';
 import { COUNT_PAGE } from '../overview/workflowStats';
-import { useWorkflowRoutes, WORKFLOW_ID_PARAM, WORKFLOW_STATUS_PARAM, WORKFLOW_TYPE_PARAM } from '../routing/useWorkflowRoutes';
+import { useWorkflowRoutes, WORKFLOW_CLOSED_PARAM, WORKFLOW_ID_PARAM, WORKFLOW_STATUS_PARAM, WORKFLOW_TYPE_PARAM } from '../routing/useWorkflowRoutes';
 import { whenAutoRefresh } from '../shared/autoRefresh';
 import { sortByStartTimeDesc } from '../shared/sortByStartTime';
 import StatusChip from '../shared/StatusChip';
@@ -47,7 +48,10 @@ const COLUMNS = ['Workflow ID', 'Run ID', 'Workflow Definition Name', 'Status', 
 const SKELETON_ROWS = [0, 1, 2, 3, 4];
 
 /** The newest of a workflow's runs: the one a link to the workflow means. */
-const newest = (runs: WorkflowInstanceSummary[]) => [...runs].sort((a, b) => b.startTime.localeCompare(a.startTime))[0];
+const newest = (runs: WorkflowInstanceSummary[]) => sortByStartTimeDesc(runs)[0];
+
+/** The time select's value for a window of closed runs, kept apart from the start-time windows. */
+const CLOSED_PREFIX = 'closed:';
 
 /** A table row holding one message across every column. */
 function MessageRow({ children }: { children: ReactNode }): JSX.Element {
@@ -63,8 +67,7 @@ function MessageRow({ children }: { children: ReactNode }): JSX.Element {
 }
 
 /**
- * Workflow executions list for a workflow integration, ported from ICP's Workflows page
- * (integration-control-plane/frontend/src/pages/Workflows.tsx + components/workflow/AdminPortal.tsx).
+ * Workflow executions list for a workflow integration.
  * It renders inside `WorkflowPageShell`, which owns the track bar, the environment, the auto-refresh
  * switch and the refresh button, and every state before the connection is ready.
  *
@@ -95,6 +98,14 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
   const statusParam = params.get(WORKFLOW_STATUS_PARAM);
   const statusFilter: WorkflowStatusFilter | '' = WORKFLOW_STATUS_OPTIONS.find((status) => status === statusParam) ?? '';
   const [timeRangeFilter, setTimeRangeFilter] = useState<WorkflowTimeRange>('');
+  // A figure of closed runs (Failed (24h)) links its window; the list then filters on close time, as the figure counts.
+  const closedParam = params.get(WORKFLOW_CLOSED_PARAM);
+  const closedWithin = WORKFLOW_TIME_RANGE_OPTIONS.find((option) => option.value !== '' && option.value === closedParam);
+  const selectTimeRange = (value: string) => {
+    if (value.startsWith(CLOSED_PREFIX)) return;
+    setParam(WORKFLOW_CLOSED_PARAM, '');
+    setTimeRangeFilter(value as WorkflowTimeRange);
+  };
   const [search, setSearch] = useState('');
   const [startOpen, setStartOpen] = useState(false);
 
@@ -163,11 +174,12 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
     hasNextPage,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: workflowKeys.instances(scopeId, { statusFilter, timeRangeFilter, pageSize }),
+    queryKey: workflowKeys.instances(scopeId, { statusFilter, timeRangeFilter, closedWithin: closedWithin?.value ?? '', pageSize }),
     queryFn: ({ pageParam }) =>
       client.instances.list({
         status: statusFilter || undefined,
-        startTimeFrom: workflowTimeRangeFrom(timeRangeFilter),
+        startTimeFrom: closedWithin ? undefined : workflowTimeRangeFrom(timeRangeFilter),
+        closeTimeFrom: closedWithin ? workflowTimeRangeFrom(closedWithin.value) : undefined,
         limit: pageSize,
         pageToken: pageParam,
       }),
@@ -186,7 +198,7 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
     },
   });
 
-  // Newest first, as ICP lists them: the engine pages open runs ahead of closed ones.
+  // Newest first: the engine pages open runs ahead of closed ones.
   const allRuns = sortByStartTimeDesc((runPages?.pages ?? []).flatMap((page) => page.items));
   const runs = workflowNameFilter ? allRuns.filter((run) => run.workflowType === workflowNameFilter) : allRuns;
 
@@ -215,7 +227,7 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
 
   const query = search.trim().toLowerCase();
   const visibleRuns = query ? runs.filter((run) => run.workflowId.toLowerCase().includes(query) || run.runId.toLowerCase().includes(query) || run.workflowType.toLowerCase().includes(query)) : runs;
-  const narrowed = !!query || !!statusFilter || !!workflowNameFilter || !!timeRangeFilter;
+  const narrowed = !!query || !!statusFilter || !!workflowNameFilter || !!timeRangeFilter || !!closedWithin;
 
   // An error with runs on screen is shown beneath them; only one with nothing to show replaces them.
   const listErrorMessage = listError instanceof Error ? listError.message : 'Could not load workflow executions.';
@@ -279,7 +291,7 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
           </ListingTable.Cell>
           <ListingTable.Cell>
             <Typography variant="body2" noWrap>
-              {new Date(run.startTime).toLocaleString()}
+              {formatDateTime(run.startTime)}
             </Typography>
           </ListingTable.Cell>
         </ListingTable.Row>
@@ -321,7 +333,7 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
 
   return (
     <Box>
-      {/* As in ICP: the search, and the page's own action at the far end of the same row. */}
+      {/* The search, and the page's own action at the far end of the same row. */}
       <Box sx={styles.searchActionRow}>
         <TextField
           size="small"
@@ -377,9 +389,10 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
           select
           size="small"
           sx={styles.filterSelect}
-          value={timeRangeFilter}
-          onChange={(event) => setTimeRangeFilter(event.target.value as WorkflowTimeRange)}
-          slotProps={{ select: { displayEmpty: true }, htmlInput: { 'aria-label': 'Started within' } }}>
+          value={closedWithin ? `${CLOSED_PREFIX}${closedWithin.value}` : timeRangeFilter}
+          onChange={(event) => selectTimeRange(event.target.value)}
+          slotProps={{ select: { displayEmpty: true }, htmlInput: { 'aria-label': closedWithin ? 'Closed within' : 'Started within' } }}>
+          {closedWithin && <MenuItem value={`${CLOSED_PREFIX}${closedWithin.value}`}>Closed in the {closedWithin.label.toLowerCase()}</MenuItem>}
           {WORKFLOW_TIME_RANGE_OPTIONS.map((option) => (
             <MenuItem key={option.value || 'any'} value={option.value}>
               {option.label}

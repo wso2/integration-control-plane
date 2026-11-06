@@ -28,6 +28,9 @@ const access = (patch: Partial<Parameters<typeof testKeyReasonOf>[0]> = {}) => (
   mode: 'api-key' as const,
   isAuthorized: true,
   keyError: null,
+  canCreateKey: true,
+  needsApiKeyAuth: false,
+  canSwitch: true,
   ...patch,
 });
 
@@ -64,10 +67,19 @@ describe('testKeyReasonOf', () => {
     expect(testKeyReasonOf(unavailable(500))).toBe('security-unreadable');
   });
 
-  it('names an exposed API with no URL, a JWT-secured one, and a failed mint', () => {
+  it('names an exposed API with no URL, one that takes no test key, and a failed mint', () => {
     expect(testKeyReasonOf(access({ isUnavailable: true }))).toBe('no-gateway-url');
-    expect(testKeyReasonOf(access({ isAuthorized: false, mode: 'jwt' }))).toBe('jwt-secured');
+    expect(testKeyReasonOf(access({ isAuthorized: false, mode: 'jwt', needsApiKeyAuth: true }))).toBe('needs-api-key');
+    // ipaas-service refused a key for an endpoint the security read calls api-key.
+    expect(testKeyReasonOf(access({ isAuthorized: false, needsApiKeyAuth: true }))).toBe('needs-api-key');
     expect(testKeyReasonOf(access({ isAuthorized: false, keyError: 'Could not mint a test key.' }))).toBe('mint-failed');
+  });
+
+  it('names a role that may not create test keys, whatever the endpoint’s mode', () => {
+    expect(testKeyReasonOf(access({ isAuthorized: false, canCreateKey: false, keyError: "Your role can't create test keys." }))).toBe('key-refused');
+    expect(testKeyReasonOf(access({ isAuthorized: false, mode: 'jwt', canCreateKey: false }))).toBe('key-refused');
+    // An open API needs no key, so the role does not matter.
+    expect(testKeyReasonOf(access({ mode: 'none', canCreateKey: false }))).toBeNull();
   });
 });
 
@@ -79,8 +91,11 @@ describe('testKeyNotice', () => {
     expect(notice.text).toContain('Set the endpoint’s visibility to Public and deploy');
   });
 
-  it('warns that switching a JWT-secured endpoint is the person’s choice', () => {
-    expect(testKeyNotice('jwt-secured', access()).text).toContain('switches the endpoint to API key authentication');
+  it('says switching to API key changes every caller, or that the role cannot switch', () => {
+    expect(testKeyNotice('needs-api-key', access({ mode: 'jwt' })).text).toBe(
+      'The Workflow Management API uses OAuth authentication, so it can’t issue the test key the console calls it with. Switching it to API key changes how every caller of this API authenticates.',
+    );
+    expect(testKeyNotice('needs-api-key', access({ mode: 'jwt', canSwitch: false })).text).toContain('Your role can’t switch it to API key.');
   });
 
   it('passes the mint failure through in the words the hook chose', () => {

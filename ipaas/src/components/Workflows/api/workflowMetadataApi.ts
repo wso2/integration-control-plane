@@ -27,9 +27,8 @@ import type { WorkflowApi } from './useWorkflowApi';
  * program, and the only source of a workflow's *structure* (branches, loops, arms, and the steps a
  * run has not reached yet).
  *
- * ICP receives it in runtime heartbeats: the bridge calls `workflow.management:getWorkflowMetadata`
- * in-process and sends the document. The console has no heartbeat, so it reads the same document
- * from the Management API's `GET /metadata` (`client.metadata.get`). A runtime built against a
+ * A runtime builds it in-process with `workflow.management:getWorkflowMetadata`; the console reads
+ * the same document from the Management API's `GET /metadata` (`client.metadata.get`). A runtime built against a
  * workflow module older than that route answers 404, which is a first-class, non-error state: the
  * flow view then draws the run's executed steps and says why.
  */
@@ -93,9 +92,8 @@ export function useWorkflowMetadata({ client, connection }: WorkflowApi): Workfl
 
 /**
  * The graph of one workflow type, and whether it is a workflow's control flow or an agent's star,
- * or null when the descriptor does not describe the type. Looked up as ICP's
- * `workflowGraphFromStoredMetadata` does: workflows by name first, then agents, since an agent's
- * runner registers under the agent's own name.
+ * or null when the descriptor does not describe the type. Workflows are looked
+ * up by name first, then agents, since an agent's runner registers under the agent's own name.
  */
 export function workflowGraphFor(state: WorkflowMetadataState, workflowType: string): { graph: ModelGraph; graphKind: 'workflow' | 'agent' } | null {
   if (state.status !== 'available') {

@@ -35,7 +35,7 @@ import { actionErrorText, audienceSummary, completedAsLabel, errorText, ownedHer
 import * as styles from './WorkItemDrawer.styles';
 
 /**
- * A human task's detail, and what a person can do with it, ported from ICP's `TaskDetailDialog`.
+ * A human task's detail, and what a person can do with it.
  * It opens maximized over the page, like the execution view. The task's input is shown as a form,
  * read-only; completing it submits a result through the task's own form, or as JSON; failing it
  * takes a reason; an administrator also gets the Administer card.

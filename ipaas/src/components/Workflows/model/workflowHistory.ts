@@ -19,10 +19,9 @@
 import type { SpanCategory, TimelineSpan } from './workflowFlow';
 
 /**
- * Reads a run's history events, the way ICP does (`components/workflow/helpers.ts`): the timeline
- * is reconstructed from them, and a step's input, result and failure are decoded from them. The
- * engine's `/history` is the same Temporal-shaped list ICP reads through its tunnel, so the parsing
- * ports unchanged.
+ * Reads a run's history events: the timeline is reconstructed from them, and a step's input, result
+ * and failure are decoded from them. The engine's `/history` is a Temporal-shaped list, so the
+ * parsing follows Temporal's event vocabulary.
  *
  * Each event carries a short-form `eventType` (WORKFLOW_EXECUTION_STARTED, ACTIVITY_TASK_SCHEDULED,
  * ...), an `eventId`, a time, and a type-specific `attributes` object. Durations are recovered by
@@ -31,9 +30,8 @@ import type { SpanCategory, TimelineSpan } from './workflowFlow';
  * (echoed as `initiatedEventId`). Anything left unpaired is still running, or, once the run has
  * ended, ended with it.
  *
- * One deviation: ICP pretty-prints decoded payloads into strings for its own renderer. The console
- * renders them with `shared/StructuredValue`, which wants the value, so the decoded value is
- * returned instead.
+ * Decoded payloads are returned as values, not pretty-printed strings: the console renders them with
+ * `shared/StructuredValue`, which wants the value.
  */
 
 export interface Timeline {
@@ -378,7 +376,7 @@ export interface NodeExecutionDetail {
   childWorkflowId: string | null;
 }
 
-const statusFromCloseType = (type: string): string => type.replace(/^(ACTIVITY_TASK_|CHILD_WORKFLOW_EXECUTION_|WORKFLOW_EXECUTION_)/, '');
+const statusFromCloseType = (type: string): string => ACTIVITY_CLOSE_STATUS[type] ?? CHILD_CLOSE_STATUS[type] ?? WF_TERMINAL_STATUS[type] ?? type;
 
 /** The key the module marks its call-configuration envelope with. */
 const CALL_CONFIG_MARKER = '__callConfig__';

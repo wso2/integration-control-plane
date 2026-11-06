@@ -161,6 +161,15 @@ describe('extractNodeExecutionDetail', () => {
     });
   });
 
+  it('reports a child workflow that failed to start as failed, as the timeline does', () => {
+    const history = [
+      event(1, 'WORKFLOW_EXECUTION_STARTED', 0),
+      event(2, 'START_CHILD_WORKFLOW_EXECUTION_INITIATED', 1, { workflowId: 'child-1', workflowType: { name: 'shipWorkflow' } }),
+      event(3, 'START_CHILD_WORKFLOW_EXECUTION_FAILED', 2, { initiatedEventId: '2' }),
+    ];
+    expect(extractNodeExecutionDetail({ id: '2', type: 'CHILD_WORKFLOW' }, history)).toMatchObject({ status: 'FAILED', durationMs: 1000 });
+  });
+
   it('reads the run itself from its start and terminal events', () => {
     const failed = [
       ...RUNNING_RUN,

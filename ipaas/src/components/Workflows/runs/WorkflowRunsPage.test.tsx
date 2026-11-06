@@ -134,6 +134,18 @@ describe('WorkflowRunsPage', () => {
     expect(other.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: undefined }));
   });
 
+  it('lists the runs closed within the window a figure of closed runs links, as it counts them', async () => {
+    const before = Date.now();
+    const { client, list } = fakeClient();
+    await renderPage('/workflows?status=FAILED&closed=24h', client);
+    const filters = list.mock.calls.at(-1)?.[0];
+    expect(filters).toMatchObject({ status: 'FAILED', startTimeFrom: undefined });
+    const windowMs = before - Date.parse(filters?.closeTimeFrom ?? '');
+    expect(windowMs).toBeGreaterThan(24 * 3600_000 - 60_000);
+    expect(windowMs).toBeLessThan(24 * 3600_000 + 60_000);
+    expect(container.textContent).toContain('Closed in the past 24 hours');
+  });
+
   it('filters to the definition a link names, reading the engine’s largest page', async () => {
     const { client, list } = fakeClient();
     await renderPage('/workflows?type=refundWorkflow', client);

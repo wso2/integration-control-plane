@@ -129,7 +129,7 @@ interface TaskAdministerCardProps {
 
 /**
  * What an administrator may do to a pending task besides deciding it: hand it to a new audience,
- * or move or clear its deadline. Ported from ICP's `TaskAdministerCard.tsx`. Both kinds of task
+ * or move or clear its deadline. Both kinds of task
  * accept both acts, and the engine records each one in the task's history under the caller's name.
  * Shown only when the engine reports that the caller administers the task (`canAdminister`), which
  * it decides from the caller's token against the task's administrators; a refused act says why.

@@ -26,7 +26,7 @@ import { WORKFLOW_STATUS_LABEL } from '../shared/workflowStatus';
  * The visual vocabulary the flow rail and the Gantt timeline share: one icon per node kind, and
  * the handful of theme colours the hand-drawn SVG paints with.
  *
- * This is the single point where ICP's `graphVisuals.ts` is translated to this console. Colours are
+ * This is the single point where the diagram's visuals meet the console's theme. Colours are
  * read through `theme.vars`, so the diagram follows the active colour scheme (light or dark); they
  * are CSS values (`var(...)` under the console's theme), so tints are mixed with `color-mix` rather
  * than `alpha()`, which cannot parse a variable. Status colours are deliberately NOT redefined here:

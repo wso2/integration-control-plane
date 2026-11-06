@@ -19,8 +19,7 @@
 import type { InstanceGraph } from '../model/workflowFlow';
 
 /**
- * Why the structural view can't be drawn, or null when it can. Ported from ICP's `flowUnavailable`
- * (`components/workflow/helpers.ts`).
+ * Why the structural view can't be drawn, or null when it can.
  *
  * The wording matters: each case is a different fact about the deployment, and saying the wrong one
  * sends someone looking in the wrong place. In particular, "could not be placed" is a statement

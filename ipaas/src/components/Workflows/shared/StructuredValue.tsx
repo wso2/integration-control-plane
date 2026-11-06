@@ -21,13 +21,13 @@ import { Braces } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactElement } from 'react';
 import CodeViewer from '../../CodeViewer';
 import CopyButton from '../../Overview/integration-as-api/CopyButton';
+import { formatDateTime } from '../../../utils/time';
 import { humanizeKey, jsonPretty } from '../forms/schemaForm';
 import { IdText, SectionCard } from './DetailSections';
 import * as styles from './StructuredValue.styles';
 
 /**
- * A JSON value shown as labelled rows, as a form would show it, ported from ICP's
- * `StructuredValue.tsx`. Nested objects become indented sub-forms; ids and timestamps are shown as
+ * A JSON value shown as labelled rows, as a form would show it. Nested objects become indented sub-forms; ids and timestamps are shown as
  * such; anything a row cannot hold falls back to the JSON viewer. The raw JSON is one toggle away,
  * and the whole value can be copied.
  */
@@ -73,7 +73,7 @@ function ObjectRows({ value, depth, onOpenWorkflow }: RowsProps): ReactElement {
         if (typeof v === 'string' && ISO_TIMESTAMP.test(v)) {
           return row(
             <Typography variant="body2" title={v} sx={styles.value}>
-              {new Date(v).toLocaleString()}
+              {formatDateTime(v)}
             </Typography>,
           );
         }

@@ -30,8 +30,6 @@ import * as styles from './FlowRail.styles';
  * element per row, nesting as indentation, keywords lowercase, `else` on the same level as its
  * `if`, exactly like reading the source.
  *
- * Ported from ICP's `FlowRail.tsx`. The structure, wording and interaction model are unchanged.
- *
  * The rail needs the workflow's *structure*: the descriptor's when the engine serves one, or the
  * steps the run executed when it does not. With neither, this renders nothing and the caller shows
  * `flowUnavailable`'s explanation instead.

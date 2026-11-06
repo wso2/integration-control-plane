@@ -126,17 +126,18 @@ export interface WorkflowRequestInit {
 export async function workflowFetch<T>(url: string, { method = 'GET', headers, body }: WorkflowRequestInit): Promise<T> {
   const route = `${method} ${url}`;
   let response: Response;
+  let text: string;
   try {
     response = await fetch(url, {
       method,
-      headers: { ...headers, 'Content-Type': 'application/json' },
+      headers: body === undefined ? headers : { ...headers, 'Content-Type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+    // A connection that drops mid-body fails here, not in fetch.
+    text = await response.text();
   } catch {
     throw new WorkflowApiError('NETWORK', 0, null, route);
   }
-
-  const text = await response.text();
 
   if (!response.ok) {
     throw new WorkflowApiError(CODE_BY_STATUS[response.status] ?? 'UNEXPECTED', response.status, extractServerMessage(text), route);

@@ -21,7 +21,7 @@ import { formatFieldLabel } from '../../../utils/mcp';
 /**
  * Turns a JSON Schema into a form, and a filled form back into a typed value.
  *
- * Ported from ICP's `components/workflow/helpers.ts`. Three engine routes need it and there is no
+ * Three engine routes need it and there is no
  * other source of field metadata:
  *
  *   POST /workflows                                 input  <- definitions[].inputSchema

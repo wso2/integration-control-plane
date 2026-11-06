@@ -74,6 +74,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   Waypoints,
+  Workflow,
   Wrench,
   X,
 } from '@wso2/oxygen-ui-icons-react';
@@ -88,6 +89,7 @@ import { trialLengthDays } from '../utils/billing';
 import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/integrations';
 import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
+import { isWorkflowIntegration } from '../utils/workflowIntegration';
 import { hasIntegrationTraces } from '../utils/integrationTraces';
 import { useAuth } from '../auth';
 import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
@@ -549,7 +551,7 @@ export default function AppLayout(): JSX.Element {
                             // A generic-only tab (Lifecycle, API Info, Plans, …) can't survive a switch to a non-generic integration,
                             // nor a workflow-only one (Workflows, Human Tasks) a switch to an integration that runs no workflows.
                             const currentKey = resolveResourceKey(pathname, scope);
-                            const target = { isGenericService: GENERIC_SERVICE_TYPES.has(c.displayType), isWorkflow: identifyIntegration(c.displayType, c.componentSubType ?? null).type === 'workflow' };
+                            const target = { isGenericService: GENERIC_SERVICE_TYPES.has(c.displayType), isWorkflow: isWorkflowIntegration(c) };
                             if (!componentKeepsPage(currentKey, target)) {
                               navigateTo(componentOverviewUrl(scope.org, scope.project, c.handler));
                               return;
@@ -872,7 +874,7 @@ export default function AppLayout(): JSX.Element {
                             {workflowType && (
                               <Sidebar.Item id="workflows">
                                 <Sidebar.ItemIcon>
-                                  <Waypoints size={20} />
+                                  <Workflow size={20} />
                                 </Sidebar.ItemIcon>
                                 <Sidebar.ItemLabel>Workflows</Sidebar.ItemLabel>
                               </Sidebar.Item>

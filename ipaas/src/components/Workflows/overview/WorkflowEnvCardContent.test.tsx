@@ -126,10 +126,10 @@ describe('WorkflowEnvCardContent', () => {
 
   it('says why it cannot reach the management API, with what can be done about it', async () => {
     const run = vi.fn();
-    state.api = { client: null, connection: { status: 'unavailable', reason: 'jwt-secured', notice: { severity: 'info', text: 'This endpoint is secured with OAuth.' }, action: { label: 'Get test key', run, pending: false } } } as unknown as WorkflowApi;
+    state.api = { client: null, connection: { status: 'unavailable', reason: 'needs-api-key', notice: { severity: 'info', text: 'This endpoint is secured with OAuth.' }, action: { label: 'Switch to API key', run, pending: false } } } as unknown as WorkflowApi;
     await renderContent();
     expect(container.querySelector('[role="alert"]')?.textContent).toMatch(/secured with OAuth/);
-    await act(async () => buttonNamed('Get test key')?.click());
+    await act(async () => buttonNamed('Switch to API key')?.click());
     expect(run).toHaveBeenCalledTimes(1);
   });
 
@@ -153,7 +153,7 @@ describe('WorkflowEnvCardContent', () => {
     await renderContent();
     expect(container.querySelector('[role="combobox"]')?.textContent).toBe('orderWorkflow');
     expect(linkNamed('View Workflows')?.getAttribute('href')).toBe(`${BASE}/workflows?type=orderWorkflow&env=production&track=track-2`);
-    expect(hrefOf('workflow-stat-Failed (24h)')).toBe(`${BASE}/workflows?type=orderWorkflow&status=FAILED&env=production&track=track-2`);
+    expect(hrefOf('workflow-stat-Failed (24h)')).toBe(`${BASE}/workflows?type=orderWorkflow&status=FAILED&closed=24h&env=production&track=track-2`);
     expect(hrefOf('workflow-stat-Pending Reviews')).toBe(`${BASE}/human-tasks?type=review&workflowType=orderWorkflow&env=production&track=track-2`);
     expect(hrefOf('workflow-stat-Pending Tasks')).toBe(`${BASE}/human-tasks?type=task&workflowType=orderWorkflow&env=production&track=track-2`);
     expect(container.textContent).not.toMatch(/currently inactive/);

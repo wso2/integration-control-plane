@@ -21,8 +21,8 @@ import type { ReactElement } from 'react';
 import { fieldPath, type FormField, type FormValues } from './schemaForm';
 
 /**
- * Renders the fields `parseFormSchema` produced. Ported from ICP's `SchemaFormFields.tsx`, with its
- * inputs swapped for this console's (labels on top, as the MCP playground's form has them).
+ * Renders the fields `parseFormSchema` produced, with labels on top
+ * as the MCP playground's form has them.
  *
  * Values are held flat by dotted path so the caller keeps one state object regardless of nesting;
  * `buildFormResult` rebuilds the nesting when the form is submitted.
@@ -73,7 +73,7 @@ export default function SchemaFormFields({ fields, values, errors, onChange, dis
           );
         }
 
-        // Yes / No rather than an on/off switch, as ICP renders it: a switch shows "off" for a
+        // Yes / No rather than an on/off switch: a switch shows "off" for a
         // value nobody has given yet, so "No" could only be entered by switching on and off again.
         if (field.type === 'boolean') {
           let answer: 'yes' | 'no' | null = null;
@@ -163,7 +163,7 @@ export default function SchemaFormFields({ fields, values, errors, onChange, dis
             minRows={isJson ? 4 : undefined}
             maxRows={isText ? 10 : undefined}
             sx={isJson ? monospaceInputSx : undefined}
-            // Numeric fields are deliberately text inputs, as ICP's are: <input type="number">
+            // Numeric fields are deliberately text inputs: <input type="number">
             // replaces content it cannot parse with '', which reaches validation looking untouched
             // and reports "is required" instead of "must be a number".
             type="text"

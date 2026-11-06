@@ -17,25 +17,8 @@
  */
 
 import { useMemo } from 'react';
-import { isWorkflowManagementEndpoint } from '../components/Workflows/connection/resolveWorkflowBaseUrl';
-import type { Component, EnvEndpoint } from '../types/component';
-import { identifyIntegration } from '../utils/identifyIntegration';
-
-/** Whether a component is a workflow integration, as the nav and the Deploy page tell. */
-export function isWorkflowIntegration(component: Pick<Component, 'displayType' | 'componentSubType'> | null | undefined): boolean {
-  return !!component && identifyIntegration(component.displayType ?? '', component.componentSubType ?? null).type === 'workflow';
-}
-
-/**
- * Whether an endpoint is one the person works with. A workflow integration's
- * "Workflow Management API" is the platform's own: the console calls it for the
- * Workflows and Human Tasks pages and the workflow Overview card, and nobody tests,
- * configures or shares it, so workflow integrations leave it out of their endpoint
- * lists, as the old console did. Other integrations list every endpoint.
- */
-export function isUserVisibleEndpoint(endpoint: Pick<EnvEndpoint, 'displayName'>, isWorkflow: boolean): boolean {
-  return !(isWorkflow && isWorkflowManagementEndpoint(endpoint));
-}
+import type { EnvEndpoint } from '../types/component';
+import { isUserVisibleEndpoint } from '../utils/workflowIntegration';
 
 /** The endpoints of a list the person works with; see isUserVisibleEndpoint. */
 export function useUserVisibleEndpoints<T extends Pick<EnvEndpoint, 'displayName'>>(endpoints: T[], isWorkflow: boolean): T[] {

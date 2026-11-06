@@ -28,6 +28,8 @@ import { useWorkflowApi, type ReadyWorkflowApi } from '../api/useWorkflowApi';
 import type { WorkflowTarget } from '../connection/useWorkflowConnection';
 import { humanTasksUrl, useWorkflowRoutes, workflowRunsUrl, type WorkItemKind } from '../routing/useWorkflowRoutes';
 import StartWorkflowDialog from '../runs/StartWorkflowDialog';
+import { retryAction } from '../shared/retryAction';
+import type { WorkflowTimeRange } from '../shared/workflowTimeRangeFilter';
 import TestKeyNotice from '../shared/TestKeyNotice';
 import WorkflowStatsStrip from './WorkflowStatsStrip';
 import { strip } from './WorkflowStatsStrip.styles';
@@ -40,22 +42,16 @@ interface WorkflowEnvCardContentProps {
 
 /** Where the card's links go: the workflow pages, opened on the card's environment and track. */
 interface CardLinks {
-  runs: (status?: WorkflowStatusFilter) => string;
+  runs: (status?: WorkflowStatusFilter, closedWithin?: WorkflowTimeRange) => string;
   tasks: (kind: WorkItemKind) => string;
 }
 
 function cardLinks(scope: ComponentScope, search: string, envId: string, workflowType: string | undefined): CardLinks {
   return {
-    runs: (status) => workflowRunsUrl(scope, { workflowType, status, envId }, search),
+    runs: (status, closedWithin) => workflowRunsUrl(scope, { workflowType, status, closedWithin, envId }, search),
     tasks: (type) => humanTasksUrl(scope, { type, envId, workflowType }, search),
   };
 }
-
-const retryAction = (retry: () => void) => (
-  <Button color="inherit" size="small" onClick={retry}>
-    Retry
-  </Button>
-);
 
 /** The definition row and the six figures, while the card connects or reads its definitions. */
 function WorkflowEnvCardSkeleton(): JSX.Element {
@@ -162,8 +158,7 @@ function WorkflowDefinitions({ api, scope, search, envId }: { api: ReadyWorkflow
 }
 
 /**
- * The workflow content of an environment card, ported from the console's `WorkflowEnvCardContent`
- * (itself ICP's `components/EntryPoints.tsx` Workflow branch): the definition selector, a link to
+ * The workflow content of an environment card: the definition selector, a link to
  * the definition's runs, Start New Workflow (the Workflows page's own dialog), and its figures, each
  * linking to its list in this card's environment.
  *

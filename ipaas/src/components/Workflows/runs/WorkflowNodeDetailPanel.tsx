@@ -66,10 +66,9 @@ function resultMessage(status?: string): string {
 }
 
 /**
- * The details of one execution, opened from a flow node or a timeline span. Ported from ICP's
- * `NodeDetailPanel.tsx`: the step's type, status and duration, its call configuration, and its
- * input, result and failure decoded from the run's history (`extractNodeExecutionDetail`). ICP's
- * conversation view for AI-agent model calls is left out; the console hosts no agent workflows.
+ * The details of one execution, opened from a flow node or a timeline span: the step's type, status and duration, its call configuration, and its
+ * input, result and failure decoded from the run's history (`extractNodeExecutionDetail`).
+ * There is no conversation view for AI-agent model calls; the console hosts no agent workflows.
  * Rendered as a third card beside the flow and the timeline, which narrow to make room for it.
  */
 export default function WorkflowNodeDetailPanel({ label, type, detail, hasHistory, stepId, step, onClose }: WorkflowNodeDetailPanelProps): JSX.Element {

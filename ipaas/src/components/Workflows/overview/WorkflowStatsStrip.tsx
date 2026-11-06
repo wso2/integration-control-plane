@@ -40,8 +40,8 @@ interface WorkflowStatsStripProps {
   scopeId: string;
   /** The definition the figures describe; absent for the whole integration. */
   workflowType?: string;
-  /** The Workflows list, filtered to the status a figure counts. */
-  runsLink: (status: WorkflowStatusFilter) => string;
+  /** The Workflows list, filtered to the status a figure counts and, for closed runs, the window. */
+  runsLink: (status: WorkflowStatusFilter, closedWithin?: WorkflowTimeRange) => string;
   /** Human Tasks, filtered to the kind of work item a figure counts. */
   tasksLink: (kind: WorkItemKind) => string;
 }
@@ -127,7 +127,7 @@ function FigureTile({ figure }: { figure: Figure }): JSX.Element {
 }
 
 /**
- * The selected definition's figures on the overview, ported from ICP's `DefinitionStatsStrip`:
+ * The selected definition's figures on the overview:
  * what is running, suspended, failed or completed in the last day, and what waits on a person.
  * Each figure links to the list behind it. Figures, not a list of runs: the Workflows page is where
  * individual runs are read.
@@ -175,7 +175,7 @@ export default function WorkflowStatsStrip({ client, scopeId, workflowType, runs
       tone: toneOf(WORKFLOW_STATUS_CHIP_COLOR.FAILED),
       count: failed,
       help: `${subject} instances that finished as failed in the last 24 hours.`,
-      href: runsLink('FAILED'),
+      href: runsLink('FAILED', CLOSED_WITHIN),
       alarm: (failed?.count ?? 0) > 0,
     },
     {
@@ -185,7 +185,7 @@ export default function WorkflowStatsStrip({ client, scopeId, workflowType, runs
       tone: toneOf(WORKFLOW_STATUS_CHIP_COLOR.COMPLETED),
       count: completed,
       help: `${subject} instances that finished successfully in the last 24 hours.`,
-      href: runsLink('COMPLETED'),
+      href: runsLink('COMPLETED', CLOSED_WITHIN),
     },
     {
       key: 'Pending Reviews',

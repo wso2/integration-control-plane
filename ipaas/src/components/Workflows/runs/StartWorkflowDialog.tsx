@@ -30,11 +30,11 @@ import { invalidateRunLists } from './runQueries';
 import * as styles from './StartWorkflowDialog.styles';
 
 /**
- * Starts a workflow. Ported from ICP's `StartWorkflowDialog`.
+ * Starts a workflow.
  *
  * The input form is driven by the chosen definition's `inputSchema`; when the engine reports no
  * schema the workflow takes no input and the form says so rather than offering an empty JSON box.
- * On success the dialog swaps to ICP's confirmation, with the new workflow id to copy and a way to
+ * On success the dialog swaps to a confirmation, with the new workflow id to copy and a way to
  * the run itself. A started workflow is not visible in the list until the visibility store catches
  * up, which is also why the id is marked settling.
  */
@@ -44,7 +44,7 @@ interface StartWorkflowDialogProps {
   api: WorkflowClient | null;
   scopeId: string;
   definitions: WorkflowDefinition[];
-  /** Preselects this definition each time the dialog opens, as ICP's does from the overview. */
+  /** Preselects this definition each time the dialog opens (the overview passes its selection). */
   initialWorkflowType?: string;
   onClose: () => void;
   /** Opens the run just started; the confirmation offers it as View Running Workflow. */

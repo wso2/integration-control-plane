@@ -142,6 +142,11 @@ export default function HumanTasksPage({ environment, api }: WorkflowPageSlotPro
   };
 
   const visible = filterWorkItems(items, { type: typeFilter, search, workflowType: workflowTypeFilter });
+  // Only a kind, definition or search narrows the queue; the status picks which part of it is shown.
+  const narrowed = !!typeFilter || !!workflowTypeFilter || !!search.trim();
+  let emptyMessage = 'No tasks match these filters.';
+  if (!narrowed && statusFilter === 'PENDING') emptyMessage = 'Nothing is waiting on a person: no task or review is pending in this environment.';
+  else if (!narrowed && !statusFilter) emptyMessage = 'No task or review has been raised in this environment yet.';
   const bulkEligible = visible.filter(isBulkSelectable);
   // Only ids still on screen can be acted on, so a filter change cannot submit a hidden selection.
   const activeSelection = selectedIds.filter((id) => bulkEligible.some((item) => item.taskId === id));
@@ -232,7 +237,7 @@ export default function HumanTasksPage({ environment, api }: WorkflowPageSlotPro
         )}
       </Box>
 
-      {/* Bulk decisions are a mode you enter, as in ICP: the bar says what is chosen and acts on it,
+      {/* Bulk decisions are a mode you enter: the bar says what is chosen and acts on it,
           and Done leaves the mode. */}
       {bulkMode && (
         <Box sx={styles.bulkBar}>
@@ -266,7 +271,7 @@ export default function HumanTasksPage({ environment, api }: WorkflowPageSlotPro
           onToggleAll={() => setSelectedIds(activeSelection.length === bulkEligible.length ? [] : bulkEligible.map((item) => item.taskId))}
           onToggleSelect={(taskId) => setSelectedIds((current) => (current.includes(taskId) ? current.filter((id) => id !== taskId) : [...current, taskId]))}
           loading={tasks.isPending || reviews.isPending}
-          emptyMessage="No tasks match these filters."
+          emptyMessage={emptyMessage}
           onOpen={setSelected}
         />
       )}

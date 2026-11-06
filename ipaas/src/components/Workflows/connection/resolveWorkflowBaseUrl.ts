@@ -17,6 +17,7 @@
  */
 
 import type { EnvEndpoint } from '../../../types/component';
+import { isWorkflowManagementEndpoint } from '../../../utils/workflowIntegration';
 
 /**
  * Finds the endpoint the workflow Management API is served from.
@@ -32,20 +33,9 @@ import type { EnvEndpoint } from '../../../types/component';
  * onto the endpoint's base path, so the client's paths go straight after it.
  */
 
-/**
- * The `info.title` of the workflow module's management spec, which the platform keeps as the
- * endpoint's display name.
- */
-export const WORKFLOW_MANAGEMENT_API_TITLE = 'Workflow Management API';
-
 export const NO_MANAGEMENT_ENDPOINT = 'This integration has no workflow management endpoint.';
 
 export type WorkflowEndpointResolution = { status: 'ready'; endpoint: EnvEndpoint } | { status: 'unavailable'; reason: string };
-
-/** Whether an endpoint is the platform's management API rather than a business endpoint. */
-export function isWorkflowManagementEndpoint(endpoint: Pick<EnvEndpoint, 'displayName'>): boolean {
-  return (endpoint.displayName || '').trim().toLowerCase() === WORKFLOW_MANAGEMENT_API_TITLE.toLowerCase();
-}
 
 /** The release's management endpoint. The platform lists only a release's live endpoints. */
 export function resolveWorkflowEndpoint(endpoints: EnvEndpoint[]): WorkflowEndpointResolution {

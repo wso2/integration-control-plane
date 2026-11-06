@@ -25,6 +25,7 @@ import { WorkflowApiError } from '../api/http';
 import { clearSettling, isSettling } from '../api/settleRegistry';
 import type { ActivityTreeNode, WorkflowInstanceSummary } from '../api/types';
 import type { ReadyWorkflowApi } from '../api/useWorkflowApi';
+import { formatDateTime } from '../../../utils/time';
 import WorkflowRunDetailDrawer from './WorkflowRunDetailDrawer';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -179,5 +180,40 @@ describe('WorkflowRunDetailDrawer', () => {
     await renderDrawer(api);
     expect(text()).toContain('Drawn from the steps this run executed, in order.');
     expect(document.querySelector('svg[aria-label="Workflow activity diagram"]')?.textContent).toContain('reserveStock');
+  });
+
+  it('takes the close time of a run that closed after its row was read from its history', async () => {
+    const { api } = fakeApi();
+    const { instances } = api.client as unknown as { instances: Record<string, ReturnType<typeof vi.fn>> };
+    instances.get.mockResolvedValue({ workflowId: RUN.workflowId, workflowType: RUN.workflowType, status: 'COMPLETED', kind: 'WORKFLOW', result: null, errorMessage: null, activityInvocations: [] });
+    instances.history.mockResolvedValue([
+      { eventId: 1, eventType: 'WORKFLOW_EXECUTION_STARTED', timestamp: '2026-10-01T10:00:00Z', attributes: { workflowType: { name: 'orderWorkflow' } } },
+      { eventId: 2, eventType: 'WORKFLOW_EXECUTION_COMPLETED', timestamp: '2026-10-01T10:00:05Z', attributes: {} },
+    ]);
+    // The row still says running, with no close time.
+    await renderDrawer(api, RUN);
+    expect(text()).not.toContain('Still running');
+    expect(text()).toContain(formatDateTime('2026-10-01T10:00:05Z'));
+    expect(text()).toContain('5.0s');
+  });
+
+  it('says when the run’s history or steps cannot be read, and reads them again on Retry', async () => {
+    const { api } = fakeApi();
+    const { instances } = api.client as unknown as { instances: Record<string, ReturnType<typeof vi.fn>> };
+    instances.history.mockRejectedValue(new WorkflowApiError('NOT_FOUND', 404, null, 'GET /history'));
+    instances.activityTree.mockRejectedValue(new WorkflowApiError('NOT_FOUND', 404, null, 'GET /tree'));
+    await renderDrawer(api);
+    expect(text()).toContain('Could not load this run’s history.');
+    expect(text()).toContain('Could not load this run’s steps.');
+    expect(text()).not.toContain('No timeline data available.');
+
+    const retries = [...document.querySelectorAll('button')].filter((b) => b.textContent === 'Retry');
+    expect(retries).toHaveLength(2);
+    const historyCalls = instances.history.mock.calls.length;
+    const treeCalls = instances.activityTree.mock.calls.length;
+    await act(async () => retries.forEach((button) => button.click()));
+    await flush();
+    expect(instances.history.mock.calls.length).toBeGreaterThan(historyCalls);
+    expect(instances.activityTree.mock.calls.length).toBeGreaterThan(treeCalls);
   });
 });

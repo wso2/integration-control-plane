@@ -20,7 +20,7 @@ import { workflowKeys } from '../api/queryKeys';
 import type { Page } from '../api/types';
 
 /**
- * Counts for the overview's figures, as ICP makes them (`WorkflowStats.ts`): the engine has no count
+ * Counts for the overview's figures: the engine has no count
  * operation, so a count is the first page of a listing, capped when the page filled.
  */
 

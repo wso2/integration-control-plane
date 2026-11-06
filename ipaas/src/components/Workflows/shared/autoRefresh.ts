@@ -19,7 +19,7 @@
 import { local } from '../../../utils/storage';
 
 /**
- * Whether the workflow views poll, as ICP decides it (`api/workflows.ts`): per viewer, persisted in
+ * Whether the workflow views poll: per viewer, persisted in
  * the browser, on unless switched off. It governs refreshing what is already on screen (a manual
  * refresh always works), and every workflow poll reads it through `whenAutoRefresh`, so switching
  * it off stops them all at their next tick without re-rendering anything.

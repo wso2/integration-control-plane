@@ -23,23 +23,22 @@ import type { InstanceGraph, ModelGraph, ModelGraphEdge, ModelGraphNode, StepExe
  * Folds a workflow's published structure together with one run's history, producing the
  * `InstanceGraph` the flow rail draws.
  *
- * Ported from ICP's `icp_server/workflow_instance_graph.bal`, where it runs server-side because ICP
- * collects descriptors from runtime heartbeats into its own store. The console talks straight to the
- * integration's management API, so the same composition happens here, in the browser, over the
- * descriptor fetched from the engine.
+ * The console talks straight to the integration's management API, with no server in between to
+ * compose the graph, so the composition happens here, in the browser, over the descriptor fetched
+ * from the engine.
  *
- * Three deviations from upstream, all forced by what the Management API actually returns:
+ * Three behaviours are forced by what the Management API actually returns:
  *
  *  1. `ActivityTreeNode` carries no `childWorkflowId`, so a folded review has no `taskId`. A review
- *     names the step it gates through its own `stepId`, as upstream reads it; with no model, a
+ *     names the step it gates through its own `stepId`; with no model, a
  *     review whose step has not run (an approval gate still waiting) keeps a step of its own, so the
  *     wait shows on the chain rather than only as an unplaced note.
- *  2. With no model at all, ICP has nothing to place an unstamped step against and drops it. Here
- *     it instead gets a synthetic `@node:<id>` step, so a run still shows every execution it made,
+ *  2. With no model at all there is nothing to place an unstamped step against, so instead of being
+ *     dropped it gets a synthetic `@node:<id>` step, so a run still shows every execution it made,
  *     and those steps, in the order they first ran, become the graph (`chainFromExecutions`).
  *     A published model, even one with no nodes, is an answer about this workflow, so against one
- *     the upstream placement rules apply unchanged (`placeExecution`).
- *  3. The `.bal`'s repeated linear scans over the model become one `Map` lookup.
+ *     the normal placement rules apply (`placeExecution`).
+ *  3. The model is indexed once into a `Map`, so each placement is a lookup rather than a scan.
  */
 
 /**
@@ -172,9 +171,8 @@ function recordTakenArm(takenArms: Map<string, string[]>, model: ModelIndex, ste
 /**
  * The run's executed steps, in the order each first ran, as a graph the rail can draw.
  *
- * No descriptor means no structure, only what ran. ICP's server says as much: without one it
- * returns the history "so the console can draw it as a chain". Laying the steps out in order gives
- * the rail and the diagram that chain, each node clickable like any other, without inventing a
+ * No descriptor means no structure, only what ran. Laying the steps out in order gives
+ * the rail and the diagram a chain, each node clickable like any other, without inventing a
  * branch the history cannot show. Each node's kind is its execution type, which the rail's icons
  * already read.
  */
@@ -200,8 +198,7 @@ interface Unplaceable {
 }
 
 /**
- * Which model step one execution belongs to, or why none does. Every placement rule lives here, as
- * ICP's `placeExecution` keeps them, so a new outcome is a case in one decision rather than a flag
+ * Which model step one execution belongs to, or why none does. Every placement rule lives here, so a new outcome is a case in one decision rather than a flag
  * threaded through the loop.
  */
 function placeExecution(node: ActivityTreeNode, model: ModelGraph | null, index: ModelIndex, cursor: number, graphKind: 'workflow' | 'agent'): string | Unplaceable {

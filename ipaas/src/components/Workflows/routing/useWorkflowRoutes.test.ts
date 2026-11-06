@@ -35,6 +35,10 @@ describe('workflowRunsUrl', () => {
     expect(workflowRunsUrl(SCOPE, { workflowType: 'orderWorkflow', status: 'FAILED', envId: 'production' })).toBe(`${BASE}/workflows?type=orderWorkflow&status=FAILED&env=production`);
   });
 
+  it('carries the window a figure of closed runs counts in', () => {
+    expect(workflowRunsUrl(SCOPE, { status: 'FAILED', closedWithin: '24h', envId: 'production' })).toBe(`${BASE}/workflows?status=FAILED&closed=24h&env=production`);
+  });
+
   it('opens a run by its id, or a workflow’s newest run when only the workflow is known', () => {
     expect(workflowRunsUrl(SCOPE, { runId: 'run/1', workflowId: 'order-1' })).toBe(`${BASE}/workflows/run%2F1`);
     expect(workflowRunsUrl(SCOPE, { workflowId: 'order-1', envId: 'development' })).toBe(`${BASE}/workflows?env=development&workflowId=order-1`);

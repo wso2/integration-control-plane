@@ -23,6 +23,7 @@ import { useEffect, useMemo, useRef, useState, type JSX, type PointerEvent as Re
 import CodeViewer from '../../CodeViewer';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
 import CopyButton from '../../Overview/integration-as-api/CopyButton';
+import { formatDateTime } from '../../../utils/time';
 import { retryWorkflowRead } from '../api/http';
 import { workflowKeys } from '../api/queryKeys';
 import { isSettling, markSettling } from '../api/settleRegistry';
@@ -38,6 +39,7 @@ import { buildTimeline, extractNodeExecutionDetail, extractWorkflowInput } from 
 import { whenAutoRefresh } from '../shared/autoRefresh';
 import { DetailList, DetailRow, NotProvided, SectionCard } from '../shared/DetailSections';
 import StatusChip from '../shared/StatusChip';
+import { retryAction } from '../shared/retryAction';
 import StructuredValue from '../shared/StructuredValue';
 import { useOpenMaximized } from '../shared/useOpenMaximized';
 import { formatDurationBetween } from '../shared/workflowDuration';
@@ -62,7 +64,7 @@ const LIFECYCLE_ACTIONS: {
   /** The statuses this action is meaningful from; the engine 409s from any other. */
   from: WorkflowStatus[];
 }[] = [
-  // Ends an in-progress sleep tool call early; offered for agent runs only, as ICP offers it.
+  // Ends an in-progress sleep tool call early; offered for agent runs only.
   { action: 'wake', label: 'Wake', color: 'primary', from: ['RUNNING'] },
   { action: 'suspend', label: 'Suspend', color: 'warning', from: ['RUNNING'] },
   { action: 'resume', label: 'Resume', color: 'primary', from: ['SUSPENDED'] },
@@ -143,8 +145,7 @@ function RailSkeleton(): JSX.Element {
 }
 
 /**
- * A run's execution view, ported from ICP's `WorkflowDetailDrawer.tsx` and `WorkflowFlowTab.tsx`.
- * It opens maximized over the page, like ICP's, with the lifecycle actions, the run's summary with
+ * A run's execution view. It opens maximized over the page, with the lifecycle actions, the run's summary with
  * its input and result, then the flow rail beside the timeline.
  *
  * Both panes read the run's history. The timeline is rebuilt from it, so running spans are live,
@@ -152,7 +153,7 @@ function RailSkeleton(): JSX.Element {
  * instance graph, folded from the activity tree against the workflow's descriptor when the engine
  * serves one, or against the steps that ran when it does not (`chainFromExecutions`).
  *
- * The two panes steer each other, as in ICP. Picking a rail step filters the timeline to that
+ * The two panes steer each other. Picking a rail step filters the timeline to that
  * step's executions and opens the first one's details. Picking a span highlights its step on the
  * rail and opens that span's details.
  */
@@ -165,7 +166,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   const [target, setTarget] = useState<DetailTarget | null>(null);
   // The flow opens as the activity diagram; the compact list (`chart`) is one toggle away.
   const [railVariant, setRailVariant] = useState<'chart' | 'uml'>('uml');
-  // The flow's share of the flow + timeline pair, as ICP sizes it: a percentage, so both cards
+  // The flow's share of the flow + timeline pair: a percentage, so both cards
   // give way together when the detail card opens beside them, and take the room back on close.
   const [railPct, setRailPct] = useState(40);
   const splitRef = useRef<HTMLDivElement>(null);
@@ -230,6 +231,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
     data: events,
     isPending: historyPending,
     isError: isHistoryError,
+    refetch: refetchHistory,
   } = useQuery({
     queryKey: workflowKeys.history(scopeId, workflowId, runId),
     queryFn: () => client.instances.history(workflowId, runId),
@@ -237,7 +239,12 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
     retry: retryWorkflowRead,
     refetchInterval: pollWhileLive,
   });
-  const { data: activityNodes, isPending: treePending } = useQuery({
+  const {
+    data: activityNodes,
+    isPending: treePending,
+    isError: isTreeError,
+    refetch: refetchTree,
+  } = useQuery({
     queryKey: workflowKeys.activityTree(scopeId, workflowId, runId),
     queryFn: () => client.instances.activityTree(workflowId, runId),
     enabled,
@@ -257,6 +264,9 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
 
   const history = useMemo(() => events ?? [], [events]);
   const timeline = useMemo(() => buildTimeline(history), [history]);
+  // The list row was read when the run was opened, so a run that closes while open takes its close time from its history.
+  const workflowSpan = timeline.spans.find((span) => span.key === 'workflow');
+  const closeTime = run?.closeTime ?? (workflowSpan && !workflowSpan.running ? new Date(workflowSpan.end).toISOString() : null);
   const workflowInput = useMemo(() => extractWorkflowInput(history), [history]);
   const workflowResult = useMemo(() => {
     if (info && info.result !== null && info.result !== undefined) {
@@ -359,6 +369,12 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   let rail: ReactNode;
   if (railLoading) {
     rail = <RailSkeleton />;
+  } else if (isTreeError && !activityNodes) {
+    rail = (
+      <Alert severity="error" action={retryAction(() => void refetchTree())}>
+        Could not load this run’s steps.
+      </Alert>
+    );
   } else if (railMessage || !instanceGraph) {
     rail = (
       <Box sx={styles.railEmpty}>
@@ -382,7 +398,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
     <Box component="span" sx={styles.badge}>
       <StatusChip label={statusLabel} color={WORKFLOW_STATUS_CHIP_COLOR[status] ?? 'default'} />
       <Typography variant="body2" color="text.secondary">
-        {formatDurationBetween(run.startTime, run.closeTime)}
+        {formatDurationBetween(run.startTime, closeTime)}
       </Typography>
       <Tooltip title="Debug information: the raw event history" placement="top">
         <IconButton size="small" aria-label="Show the raw event history" onClick={() => setHistoryOpen(true)}>
@@ -446,8 +462,8 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
                     <FullId id={run.runId} />
                   </DetailRow>
                   <DetailRow label="Workflow Definition Name">{run.workflowType}</DetailRow>
-                  <DetailRow label="Started">{new Date(run.startTime).toLocaleString()}</DetailRow>
-                  <DetailRow label="Closed">{run.closeTime ? new Date(run.closeTime).toLocaleString() : <NotProvided label="Still running" />}</DetailRow>
+                  <DetailRow label="Started">{formatDateTime(run.startTime)}</DetailRow>
+                  <DetailRow label="Closed">{closeTime ? formatDateTime(closeTime) : <NotProvided label="Still running" />}</DetailRow>
                   <DetailRow label="Task Queue">{run.taskQueue || <NotProvided />}</DetailRow>
                 </DetailList>
                 {info?.errorMessage && (
@@ -519,7 +535,13 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
                     <Box sx={styles.flowResizerGrip} />
                   </Box>
                   <Box sx={styles.timelinePane}>
-                    {historyPending && !events ? <Skeleton variant="rounded" sx={styles.paneSkeleton} /> : <WorkflowTimeline timeline={timeline} visibleIds={visibleIds} selectedKey={target?.id ?? null} onSelect={selectSpan} />}
+                    {historyPending && <Skeleton variant="rounded" sx={styles.paneSkeleton} />}
+                    {isHistoryError && events === undefined && (
+                      <Alert severity="error" action={retryAction(() => void refetchHistory())}>
+                        Could not load this run’s history.
+                      </Alert>
+                    )}
+                    {events !== undefined && <WorkflowTimeline timeline={timeline} visibleIds={visibleIds} selectedKey={target?.id ?? null} onSelect={selectSpan} />}
                   </Box>
                 </Box>
                 {target && targetDetail && (
