@@ -50,7 +50,7 @@ type envKey struct{}
 
 func (h *Handler) Routes() http.Handler {
 	r := chi.NewRouter()
-	r.Route("/api/v1/portal/orgs/{orgUuid}/environments/{envId}", func(r chi.Router) {
+	r.Route("/user-portal/orgs/{orgUuid}/environments/{envId}", func(r chi.Router) {
 		r.Use(h.portalClientOnly, h.knownEnvironment)
 		r.Get("/scopes", h.scopes)
 		r.Get("/projects", h.projects)
@@ -88,8 +88,8 @@ func envName(r *http.Request) string {
 	return name
 }
 
-// portalClientOnly admits a Platform IdP token issued to a portal client of the org
-// in the path.
+// portalClientOnly admits a Platform IdP token issued to the portal client of the org in
+// the path: its client ID is exactly the portal prefix and that org's UUID.
 func (h *Handler) portalClientOnly(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		raw, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer ")
@@ -110,7 +110,8 @@ func (h *Handler) portalClientOnly(next http.Handler) http.Handler {
 		}
 
 		orgUUID := chi.URLParam(r, "orgUuid")
-		if claims.OUID != orgUUID || orgUUID != h.catalog.Org().UUID.String() {
+		if claims.OUID != orgUUID || orgUUID != h.catalog.Org().UUID.String() ||
+			claims.ClientID != config.PortalClientPrefix+orgUUID {
 			web.StatusForbidden(w, r, fmt.Errorf("token org %q may not read org %q", claims.OUID, orgUUID))
 			return
 		}

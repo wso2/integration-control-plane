@@ -16,8 +16,14 @@
  * under the License.
  */
 
+/** ListingCard holds a 280px minimum, wider than a quarter-width grid column on narrower screens; the card follows its column instead of overlapping the next. */
+export const card = {
+  minWidth: 0,
+} as const;
+
 /** A finalizing project is inert, so it gets no hover affordance at all. */
 export const cardDeleting = {
+  ...card,
   opacity: 0.38,
   cursor: 'default',
 } as const;

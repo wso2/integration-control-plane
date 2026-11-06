@@ -41,7 +41,7 @@ export interface TokenClaims {
  * API. token.test.ts fails when package.json pins other versions, so an upgrade re-checks these
  * keys instead of finding out from a run that never signs in.
  */
-export const SDK_STORAGE_VERSIONS: Record<string, string> = { '@thunderid/browser': '1.2.2', '@thunderid/react': '1.3.3' };
+export const SDK_STORAGE_VERSIONS: Record<string, string> = { '@thunderid/browser': '1.10.0', '@thunderid/react': '1.12.0' };
 export const SDK_SESSION_ACTIVE_KEY = 'thunderid-session-active';
 
 /** Instance 0 is the only SDK instance the console creates. */

@@ -43,7 +43,7 @@ func TestEveryCallNamesTheOrgAndTheEnvironment(t *testing.T) {
 		paths = append(paths, r.Method+" "+r.URL.RequestURI())
 		assert.Equal(t, "Bearer tok", r.Header.Get("Authorization"))
 		switch r.URL.Path {
-		case "/portal/orgs/8f7c2a0e-4d1b-4c6a-9b3e-2f5d7a1c9e40/environments/0b6f3d2e-1c4a-4e5b-8a9d-7c6b5a4f3e21/scopes":
+		case "/user-portal/orgs/8f7c2a0e-4d1b-4c6a-9b3e-2f5d7a1c9e40/environments/0b6f3d2e-1c4a-4e5b-8a9d-7c6b5a4f3e21/scopes":
 			_, _ = w.Write([]byte(`{"scopes":["orders:read"]}`))
 		default:
 			_, _ = w.Write([]byte(`{"items":[]}`))
@@ -51,7 +51,7 @@ func TestEveryCallNamesTheOrgAndTheEnvironment(t *testing.T) {
 	}))
 	t.Cleanup(server.Close)
 
-	client := NewClient(Config{BaseURL: server.URL + "/portal", TokenURL: server.URL + "/token", ClientID: "c", ClientSecret: "s"},
+	client := NewClient(Config{BaseURL: server.URL + "/user-portal", TokenURL: server.URL + "/token", ClientID: "c", ClientSecret: "s"},
 		httpclient.WithRetry(httpclient.RetryParams{MaxAttempts: 1}))
 	scope := Scope{
 		OrgUUID: common.MustParseID("8f7c2a0e-4d1b-4c6a-9b3e-2f5d7a1c9e40"),
@@ -68,7 +68,7 @@ func TestEveryCallNamesTheOrgAndTheEnvironment(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, page.Items)
 
-	base := "/portal/orgs/8f7c2a0e-4d1b-4c6a-9b3e-2f5d7a1c9e40/environments/0b6f3d2e-1c4a-4e5b-8a9d-7c6b5a4f3e21"
+	base := "/user-portal/orgs/8f7c2a0e-4d1b-4c6a-9b3e-2f5d7a1c9e40/environments/0b6f3d2e-1c4a-4e5b-8a9d-7c6b5a4f3e21"
 	assert.Equal(t, []string{
 		"GET " + base + "/scopes",
 		"GET " + base + "/components?cursor=abc&kind=workflow&kind=aiAgent&limit=20&project=finance&project=people&search=purchase+order",
@@ -100,7 +100,7 @@ func TestABadRequestIsAnInvalidCursorOnlyByItsMessage(t *testing.T) {
 				_, _ = w.Write([]byte(tc.body))
 			}))
 			t.Cleanup(server.Close)
-			client := NewClient(Config{BaseURL: server.URL + "/portal", TokenURL: server.URL + "/token", ClientID: "c", ClientSecret: "s"},
+			client := NewClient(Config{BaseURL: server.URL + "/user-portal", TokenURL: server.URL + "/token", ClientID: "c", ClientSecret: "s"},
 				httpclient.WithRetry(httpclient.RetryParams{MaxAttempts: 1}))
 
 			_, err := client.GetComponents(context.Background(), Scope{OrgUUID: common.NewID(), EnvID: common.NewID()}, ComponentQuery{Limit: 20, Cursor: "page-2"})

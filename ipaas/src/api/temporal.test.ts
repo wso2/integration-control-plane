@@ -24,7 +24,12 @@ const server = { id: '22222222-0000-4000-8000-00000000000a', name: 'payments', s
 
 describe('toTemporalServer', () => {
   it('keeps the BFF fields', () => {
-    expect(toTemporalServer(server)).toEqual(server);
+    expect(toTemporalServer(server)).toEqual({ ...server, managed: false });
+  });
+
+  // The BFF omits the flag on servers the user created.
+  it('marks only the platform-managed server', () => {
+    expect(toTemporalServer({ ...server, managed: true }).managed).toBe(true);
   });
 
   // A status the console does not know has no safe action attached to it.

@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Permissions } from './permissions';
+import { Permissions, Scopes } from './permissions';
 import { isSettingsSectionVisible, type SettingsSectionDef } from './orgSettingsSections';
 import type { IntegrationIdentity } from '../types/integration';
 
@@ -55,7 +55,7 @@ export function urlSettingsEnabled(): boolean {
 // standalone page; it is intentionally NOT a section here.
 export const COMPONENT_SETTINGS_SECTIONS: readonly ComponentSettingsSectionDef[] = [
   // Deployment Tracks: source-built integrations only (not BYOI proxies like Tailscale, not API/MCP proxies).
-  { id: 'deployment-tracks', label: 'Deployment tracks', path: 'deployment-tracks', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => !isProxy(i) && !isByoi(i), routed: true },
+  { id: 'deployment-tracks', label: 'Deployment tracks', path: 'deployment-tracks', permissions: [Scopes.INTEGRATION_READ], appliesTo: (i) => !isProxy(i) && !isByoi(i), routed: true },
   // Proxy Versions: proxy components (e.g. MCP proxy).
   { id: 'proxy-versions', label: 'Proxy versions', path: 'proxy-versions', permissions: [Permissions.INTEGRATION_VIEW, Permissions.INTEGRATION_MANAGE], appliesTo: (i) => isProxy(i), routed: false },
   // URL Settings (custom domains): endpoint-exposing types, gated by the custom-URL feature flag + URL-manager service config.

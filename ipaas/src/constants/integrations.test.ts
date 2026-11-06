@@ -17,13 +17,19 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration } from './integrations';
+import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration, sampleId } from './integrations';
 
 describe('project listing — RAG components', () => {
   it('labels the ingestion cronjob as "RAG Ingestion" (not Automation)', () => {
     expect(getDisplayLabel('byoiCronjob', 'rag-ingestion')).toBe('RAG Ingestion');
     // a plain byoiCronjob with no RAG subtype still reads as Automation
     expect(getDisplayLabel('byoiCronjob', null)).toBe('Automation');
+  });
+
+  it('labels a knowledge base\'s service and data sources', () => {
+    expect(getDisplayLabel('service', 'knowledge-base')).toBe('Knowledge Base Service');
+    expect(getDisplayLabel('automation', 'kb-ingestion')).toBe('Knowledge Base Data Source');
+    expect(isSupportedIntegration('service', 'knowledge-base')).toBe(true);
   });
 
   it('labels every foreign-runtime component "Other"', () => {
@@ -80,5 +86,12 @@ describe('formatBuildPack', () => {
 
   it('shows an unknown buildpack as reported', () => {
     expect(formatBuildPack('java')).toBe('java');
+  });
+});
+
+describe('sampleId', () => {
+  it('is the sample path in its repository, without a leading slash', () => {
+    expect(sampleId({ subDirectory: 'bi', componentPath: '/hello-world' })).toBe('bi/hello-world');
+    expect(sampleId({ componentPath: '/hello-world' })).toBe('hello-world');
   });
 });

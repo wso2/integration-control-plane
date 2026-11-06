@@ -38,6 +38,7 @@ interface BffServer {
   plan?: string;
   namespace?: string;
   createdAt?: string;
+  managed?: boolean;
 }
 
 interface BffServerDetail extends BffServer {
@@ -61,6 +62,7 @@ export const toTemporalServer = (s: BffServer): TemporalServer => ({
   plan: s.plan,
   namespace: s.namespace,
   createdAt: s.createdAt,
+  managed: s.managed === true,
 });
 
 export const toTemporalServerDetail = (s: BffServerDetail): TemporalServerDetail => ({

@@ -78,7 +78,7 @@ export default function DatabaseServerDetail(scope: OrgScope): JSX.Element {
 
   if (isLoading)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         {backButton}
         <DatabaseDetailSkeleton />
       </PageContent>
@@ -87,7 +87,7 @@ export default function DatabaseServerDetail(scope: OrgScope): JSX.Element {
   // A failed poll keeps the last good data; only a first load that failed has nothing to show.
   if (!service)
     return (
-      <PageContent>
+      <PageContent fullWidth>
         {backButton}
         <Alert
           severity="error"
@@ -102,7 +102,7 @@ export default function DatabaseServerDetail(scope: OrgScope): JSX.Element {
     );
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       {backButton}
 
       {/* The page stays up on a failed poll so open dialogs and in-flight actions survive it. */}

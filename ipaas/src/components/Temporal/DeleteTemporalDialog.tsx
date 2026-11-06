@@ -23,7 +23,7 @@ import { useDeleteTemporalServer } from '../../hooks/useTemporal';
 import type { TemporalServer } from '../../types/temporal';
 
 interface DeleteTemporalDialogProps {
-  server: Pick<TemporalServer, 'id' | 'name'>;
+  server: Pick<TemporalServer, 'id' | 'name' | 'managed'>;
   onClose: () => void;
   onDeleted?: () => void;
 }
@@ -55,6 +55,11 @@ export default function DeleteTemporalDialog({ server, onClose, onDeleted }: Del
       {del.isError && (
         <Alert severity="error" sx={{ mb: 2 }}>
           {del.error.message || 'The Temporal server could not be deleted. Try again.'}
+        </Alert>
+      )}
+      {server.managed && (
+        <Alert severity="warning" sx={{ mb: 2 }}>
+          This server runs your organization&rsquo;s workflow integrations. It can be deleted only once no workflow integrations remain, and the next workflow integration you create starts a new one.
         </Alert>
       )}
       <Typography variant="body2" sx={{ mb: 2 }}>

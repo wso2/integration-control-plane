@@ -46,6 +46,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
   'miCronjob',
   'miJob',
   'miWebhook',
+  'ballerinaWorkflow',
   'byocWebhook',
   'buildpackWebhook',
   'ballerinaEventHandler',
@@ -67,6 +68,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
 /** Buildpack of a component built by neither the Ballerina nor the MI runtime. */
 export const OTHER_BUILDPACK = 'other';
 export const MI_BUILDPACK = 'wso2-mi';
+export const BI_BUILDPACK = 'BI';
 
 // buildpackType is cloud-only; absent means unknown, so the displayType verdict stands.
 export function isSupportedIntegration(displayType: string, componentSubType: string | null, buildpackType?: string): boolean {
@@ -96,6 +98,10 @@ export function getDisplayLabel(displayType: string, componentSubType: string | 
       return 'Webhook';
     case 'rag-ingestion':
       return 'RAG Ingestion';
+    case 'kb-ingestion':
+      return 'Knowledge Base Data Source';
+    case 'knowledge-base':
+      return 'Knowledge Base Service';
     case 'rag-retrieval-service':
     case 'rag-service':
       return 'Integration as API';
@@ -119,6 +125,8 @@ export function getDisplayLabel(displayType: string, componentSubType: string | 
       return 'Automation';
     case 'manualTrigger':
       return 'Manual Trigger';
+    case 'ballerinaWorkflow':
+      return 'Workflow';
     case 'proxy':
     case 'gitProxy':
       return 'REST API Proxy';
@@ -169,12 +177,21 @@ export const COMPONENT_TYPE_LABELS: Record<string, string> = {
   'ai-agent': 'AI Agent',
   'event-handler': 'Event Integration',
   'file-integration': 'File Integration',
+  workflow: 'Workflow',
   'test-runner': 'Test Runner',
   'web-application': 'Web Application',
 };
 
 export function formatComponentType(type: string): string {
   return COMPONENT_TYPE_LABELS[type] ?? type.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * A sample's id for usage analytics: its path in the samples repository, which
+ * stays unique and stable when its display name changes.
+ */
+export function sampleId(sample: { subDirectory?: string; componentPath: string }): string {
+  return `${sample.subDirectory ?? ''}${sample.componentPath}`.replace(/^\/+/, '');
 }
 
 export function displayTypeFromSample(componentType: string, buildPack: string): DisplayType {
