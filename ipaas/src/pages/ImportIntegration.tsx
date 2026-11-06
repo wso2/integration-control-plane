@@ -118,10 +118,10 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const [selectedTechnology, setSelectedTechnology] = useState<'MI' | 'BI' | null>(null);
   const [pickedIntegrationType, setSelectedIntegrationType] = useState<IntegrationType | null>(null);
   // Workflows are Ballerina only and need the platform's workflow runtime, and
-  // AI agents cannot be created from Azure DevOps. A pick that a later source or
-  // technology change hides no longer counts as selected.
+  // AI agents are Ballerina only and cannot be created from Azure DevOps. A pick
+  // that a later source or technology change hides no longer counts as selected.
   const { data: workflowRuntime } = useWorkflowRuntime();
-  const hiddenIntegrationTypes: IntegrationType[] = [...(isAzureDevOps ? (['ai-agent'] as const) : []), ...(selectedTechnology === 'MI' || workflowRuntime?.status === 'NOT_CONFIGURED' ? (['workflow'] as const) : [])];
+  const hiddenIntegrationTypes: IntegrationType[] = [...(isAzureDevOps || selectedTechnology === 'MI' ? (['ai-agent'] as const) : []), ...(selectedTechnology === 'MI' || workflowRuntime?.status === 'NOT_CONFIGURED' ? (['workflow'] as const) : [])];
   const selectedIntegrationType = pickedIntegrationType && !hiddenIntegrationTypes.includes(pickedIntegrationType) ? pickedIntegrationType : null;
   const [ballerinaTokenInput, setBallerinaTokenInput] = useState('');
   const [ballerinaDrawerOpen, setBallerinaDrawerOpen] = useState(false);
