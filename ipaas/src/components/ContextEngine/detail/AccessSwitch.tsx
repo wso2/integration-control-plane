@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Link, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useContextPermissions, useSetContextEngineAccess } from '../../../hooks/useContextEngine';
 import type { ContextEngineAccess } from '../../../types/contextEngine';
@@ -38,7 +38,9 @@ const SURFACES: Record<keyof ContextEngineAccess, { name: string; clients: strin
 export default function AccessSwitch({ engineId, access, surface, disabledReason }: AccessSwitchProps): JSX.Element {
   const set = useSetContextEngineAccess(engineId);
   const permissions = useContextPermissions(engineId);
-  const blocked = disabledReason ?? (permissions.data?.includes('engine.manage') ? undefined : 'You need the manage permission on this engine to change its access.');
+  const blocked =
+    disabledReason ??
+    (permissions.isPending ? 'Checking your permissions…' : permissions.isError ? "Couldn't check your permissions." : permissions.data?.includes('engine.manage') ? undefined : 'You need the manage permission on this engine to change its access.');
   const [confirming, setConfirming] = useState(false);
   const { name, clients } = SURFACES[surface];
   const checked = set.isPending ? (set.variables[surface] ?? access[surface]) : access[surface];
@@ -62,6 +64,14 @@ export default function AccessSwitch({ engineId, access, surface, disabledReason
           </span>
         </Tooltip>
       </Stack>
+      {!disabledReason && permissions.isError && (
+        <Typography variant="caption" color="error">
+          Couldn&apos;t check your permissions.{' '}
+          <Link component="button" type="button" variant="caption" onClick={() => void permissions.refetch()}>
+            Retry
+          </Link>
+        </Typography>
+      )}
       {set.isError && (
         <Typography variant="caption" color="error">
           {set.error.message || "Couldn't change access. Try again."}

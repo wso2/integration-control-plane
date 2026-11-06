@@ -21,8 +21,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mutate = vi.fn();
-const permissions = { data: ['engine.manage'] as string[] };
-vi.mock('../../../hooks/useContextEngine', () => ({ useSetContextEngineAccess: () => ({ mutate, isPending: false, isError: false }), useContextPermissions: () => permissions }));
+const refetch = vi.fn();
+const permissions = { data: ['engine.manage'] as string[] | undefined, isPending: false, isError: false, refetch };
+const mutation = { mutate, isPending: false, isError: false, variables: {} as Record<string, boolean>, error: new Error('') };
+vi.mock('../../../hooks/useContextEngine', () => ({ useSetContextEngineAccess: () => mutation, useContextPermissions: () => permissions }));
 
 import AccessSwitch from './AccessSwitch';
 
@@ -37,6 +39,8 @@ beforeEach(() => {
   document.body.append(host);
   root = createRoot(host);
   mutate.mockReset();
+  Object.assign(mutation, { isPending: false, isError: false, variables: {}, error: new Error('') });
+  Object.assign(permissions, { data: ['engine.manage'], isPending: false, isError: false });
 });
 
 afterEach(() => {
@@ -63,6 +67,28 @@ describe('AccessSwitch', () => {
     permissions.data = ['context.read'];
     act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: true }} surface="mcp" />));
     expect(toggle()?.disabled).toBe(true);
-    permissions.data = ['engine.manage'];
+  });
+
+  it('shows the pending value while applying', () => {
+    Object.assign(mutation, { isPending: true, variables: { mcp: true } });
+    act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: false }} surface="mcp" />));
+    expect(toggle()?.checked).toBe(true);
+    expect(toggle()?.disabled).toBe(true);
+    expect(host.textContent).toContain('Applying…');
+  });
+
+  it('shows why a change failed', () => {
+    Object.assign(mutation, { isError: true, error: new Error('Gateway unavailable') });
+    act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: true }} surface="mcp" />));
+    expect(host.textContent).toContain('Gateway unavailable');
+  });
+
+  it('offers a retry when permissions could not be checked', () => {
+    Object.assign(permissions, { data: undefined, isError: true });
+    act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: true }} surface="mcp" />));
+    expect(toggle()?.disabled).toBe(true);
+    expect(host.textContent).not.toContain('manage permission');
+    act(() => button('Retry')?.click());
+    expect(refetch).toHaveBeenCalled();
   });
 });

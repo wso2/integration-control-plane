@@ -752,6 +752,7 @@ function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDet
     description: '',
     state: 'ready',
     createdAt: '2026-09-23T09:00:00Z',
+    access: { api: false, mcp: false },
     sources: [
       { id: 's1', name: 'Platform docs', type: 'github', state: 'ready' },
       { id: 's2', name: 'Support runbooks', type: 'confluence', state: 'ready' },
@@ -791,6 +792,12 @@ describe('first run', () => {
     expect(getStartedSteps(uploads, false, summary)[0].description).toBe('Syncing 1 source.');
     expect(getStartedSteps(uploads, false)[0].description).toBe('Files become searchable after upload.');
     expect(getStartedSteps(engineDetail(), false)[2]).toMatchObject({ title: 'Connect an agent' });
+  });
+
+  it('leaves the connect step done unless access is known to be off', () => {
+    expect(getStartedSteps(engineDetail({ access: undefined }), false)[2].state).toBe('done');
+    expect(getStartedSteps(engineDetail(), false)[2].state).toBe('todo');
+    expect(getStartedSteps(engineDetail({ access: { api: false, mcp: true } }), false)[2].state).toBe('done');
   });
 });
 
