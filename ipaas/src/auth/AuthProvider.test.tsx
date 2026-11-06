@@ -462,3 +462,116 @@ describe('cloud AuthProvider — actions', () => {
     expect(getOrgUuidFromToken()).toBeNull();
   });
 });
+
+describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
+  const GATEWAY_CLAIMS = { ...ID_CLAIMS, ouHandle: 'acme', ouId: 'org-uuid', ouName: 'Acme' };
+
+  beforeEach(() => {
+    window.API_CONFIG.authBffContext = '/_auth/integration';
+  });
+
+  it('signs in from the session’s ID token claims, without asking for a token', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    expect(auth).toMatchObject({ isAuthenticated: true, userId: 'u1', displayName: 'Ada Lovelace', orgHandle: 'acme' });
+    expect(getOrgUuidFromToken()).toBe('org-uuid');
+    expect(sdk.get().getAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('never tries a silent sign-in: the session check joins the cloud console’s session', async () => {
+    sdkWith({ getDecodedIdToken: vi.fn(async () => Promise.reject(new Error('not signed in'))) });
+    await render();
+
+    expect(screen()).toBe('signed-out');
+    expect(sdk.get().signInSilently).not.toHaveBeenCalled();
+  });
+
+  it('refuses a session without org claims', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => ID_CLAIMS) });
+    window.history.replaceState({}, '', '/signin');
+    await render();
+
+    await expect(auth?.completeSignIn(new URLSearchParams())).rejects.toThrow('Missing organization context');
+  });
+
+  const gateway = (signedIn: boolean) => vi.fn(async (url: string) => (url.endsWith('/checksession') ? Response.json({ isSignedIn: signedIn }) : new Response('', { status: 401 })));
+
+  it('sends API calls with the session cookie and no Authorization header, and ends the session on a 401 once the gateway says it is over', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    const fetchMock = gateway(false);
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await authenticatedFetch('/_api/integration/projects');
+    });
+    const calls = fetchMock.mock.calls as unknown as [string, RequestInit][];
+    expect(new Headers(calls[0][1].headers).has('Authorization')).toBe(false);
+    expect(calls[1][0]).toBe('/_auth/integration/checksession');
+    expect(screen()).toBe('signed-out');
+  });
+
+  it('keeps the session on a same-origin 401 while the gateway still holds it', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    vi.stubGlobal('fetch', gateway(true));
+    await act(async () => {
+      await authenticatedFetch('/_api/billing/api/v1/subscriptions');
+    });
+    expect(screen()).toBe('signed-in');
+  });
+
+  it('keeps the session on a 401 from another host, which never gets the session cookie', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+
+    const fetchMock = gateway(false);
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      const res = await authenticatedFetch('https://cloud-obs-proxy.obs.dp.example/wso2cloud-obs/api/v1/logs/query');
+      expect(res.status).toBe(401);
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(screen()).toBe('signed-in');
+    expect(getOrgUuidFromToken()).toBe('org-uuid');
+  });
+
+  it('ends the session when the SDK finds the gateway session over', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+    expect(screen()).toBe('signed-in');
+
+    await act(async () => {
+      sdk.set({ isSignedIn: false });
+    });
+    expect(screen()).toBe('signed-out');
+    expect(getOrgUuidFromToken()).toBeNull();
+  });
+
+  it('clears the browser sign-in session an earlier PKCE build left behind', async () => {
+    sessionStorage.setItem('session_data-instance_0-IPAAS_CONSOLE', '{"access_token":"t","refresh_token":"r"}');
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS) });
+    await render();
+    expect(sessionStorage.getItem('session_data-instance_0-IPAAS_CONSOLE')).toBeNull();
+  });
+
+  it('starts sign-in at the gateway with the page nested inside the configured returnTo', async () => {
+    window.API_CONFIG.authBffSignInUrl = '/_auth/cloud/login?returnTo=%2F_auth%2Fintegration%2Fsignin';
+    window.history.replaceState({}, '', '/login?a=1&b=2');
+    const assign = vi.spyOn(window.location, 'assign').mockImplementation(() => undefined);
+    sdkWith({ getDecodedIdToken: vi.fn(async () => Promise.reject(new Error('not signed in'))) });
+    await render();
+
+    await act(async () => {
+      await auth?.loginWithOIDC();
+    });
+    const outer = new URL(assign.mock.calls[0][0] as string, 'https://console.example');
+    const inner = new URL(outer.searchParams.get('returnTo') ?? '', 'https://console.example');
+    expect(outer.pathname).toBe('/_auth/cloud/login');
+    expect(inner.pathname).toBe('/_auth/integration/signin');
+    expect(inner.searchParams.get('returnTo')).toBe('/login?a=1&b=2');
+    expect(sdk.get().signIn).not.toHaveBeenCalled();
+  });
+});

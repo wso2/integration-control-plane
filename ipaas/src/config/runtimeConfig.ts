@@ -30,6 +30,9 @@ interface RuntimeConfig {
   ASGARDEO_SIGN_IN_REDIRECT_URL?: string;
   ASGARDEO_SCOPE?: string;
   ASGARDEO_RESOURCE?: string;
+  AUTH_BFF_CONTEXT?: string;
+  AUTH_BFF_SIGN_IN_URL?: string;
+  AUTH_BFF_PROXY_CONTEXT?: string;
   CHOREO_BASE_API_URL?: string;
   SYS_API_PREFIX?: string;
   GITHUB_APP_CLIENT_ID?: string;
@@ -63,6 +66,15 @@ export interface ApiConfig {
   asgardeoSignInRedirectUrl: string;
   asgardeoScope: string;
   asgardeoResource?: string;
+  /**
+   * The gateway's sign-in context for this console (e.g. /_auth/integration). Set, the gateway holds the
+   * tokens and the browser only an HttpOnly session cookie (BFF mode); unset, the browser signs in itself.
+   */
+  authBffContext?: string;
+  /** Where BFF sign-in starts. Defaults to `<authBffContext>/signin`. */
+  authBffSignInUrl?: string;
+  /** The gateway's API root that the per-product session proxies sit under (e.g. /_api). */
+  authBffProxyContext?: string;
   choreoBaseApiUrl: string;
   choreoOrgApiUrl: string;
   systemApisBaseUrl?: string;
@@ -175,6 +187,8 @@ const DEFAULT_CONFIG: ApiConfig = {
   trackingEnv: 'dev',
 };
 
+const localPath = (value: string | undefined): string | undefined => (value && /^\/(?![/\\])/.test(value) ? value : undefined);
+
 /**
  * Load configuration from /config.json.
  * This allows modifying URLs after build without rebuilding the app.
@@ -198,6 +212,9 @@ export async function loadConfig(): Promise<void> {
       asgardeoSignInRedirectUrl: config.ASGARDEO_SIGN_IN_REDIRECT_URL || DEFAULT_CONFIG.asgardeoSignInRedirectUrl,
       asgardeoScope: config.ASGARDEO_SCOPE || DEFAULT_CONFIG.asgardeoScope,
       asgardeoResource: config.ASGARDEO_RESOURCE?.trim() || undefined,
+      authBffContext: localPath(config.AUTH_BFF_CONTEXT ? trim(config.AUTH_BFF_CONTEXT.trim()) : undefined),
+      authBffSignInUrl: localPath(config.AUTH_BFF_SIGN_IN_URL?.trim()),
+      authBffProxyContext: config.AUTH_BFF_PROXY_CONTEXT ? trim(config.AUTH_BFF_PROXY_CONTEXT.trim()) || undefined : undefined,
       choreoBaseApiUrl: choreoBase,
       choreoOrgApiUrl: `${choreoBase}/orgs/1.0.0`,
       systemApisBaseUrl: systemApisBase || DEFAULT_CONFIG.systemApisBaseUrl,

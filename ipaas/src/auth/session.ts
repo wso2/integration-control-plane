@@ -37,6 +37,8 @@ export interface CloudSession {
   orgHandle: string;
   /** `ouId` */
   orgUuid: string;
+  /** `ouName` */
+  orgName?: string;
 }
 
 interface Connection {
@@ -45,6 +47,7 @@ interface Connection {
   getAccessToken: () => Promise<string>;
   /** Ends the session locally once the token has expired anyway. */
   onExpired: () => void;
+  checkSession?: () => Promise<boolean>;
 }
 
 let connection: Connection | null = null;
@@ -63,6 +66,7 @@ export async function getAccessToken(): Promise<string | null> {
 }
 
 export async function authenticatedFetch(url: string, options: RequestInit = {}): Promise<Response> {
+  if (connection?.checkSession) return cookieFetch(url, options, connection.checkSession);
   const token = await getAccessToken();
   const headers = new Headers(options.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
@@ -76,6 +80,25 @@ export async function authenticatedFetch(url: string, options: RequestInit = {})
     connection?.onExpired();
   }
   return res;
+}
+
+async function cookieFetch(url: string, options: RequestInit, checkSession: () => Promise<boolean>): Promise<Response> {
+  const sameOrigin = isSameOrigin(url);
+  const send = (): Promise<Response> => {
+    const headers = new Headers(options.headers);
+    if (sameOrigin) headers.set('X-Requested-With', 'XMLHttpRequest');
+    return fetch(url, { ...options, headers });
+  };
+
+  const res = await send();
+  if (res.status !== 401 || !sameOrigin) return res;
+  if (await checkSession()) return send();
+  connection?.onExpired();
+  return res;
+}
+
+function isSameOrigin(url: string): boolean {
+  return new URL(url, window.location.href).origin === window.location.origin;
 }
 
 export function getOrgUuidFromToken(): string | null {
