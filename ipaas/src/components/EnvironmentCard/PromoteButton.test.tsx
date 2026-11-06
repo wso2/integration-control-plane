@@ -37,7 +37,7 @@ const answered = (resources: LinkableResource[] = [], uses: string[] = []) =>
     isSuccess: true,
     data: { kind: 'ballerina', resources, used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [{ name: 'development', resources: uses.map((ref) => ({ ref, state: 'in_use' })) }] },
   });
-vi.mock('../Authorized', () => ({ default: ({ children }: { children: ReactNode }) => <>{children}</> }));
+vi.mock('../../hooks/useCan', () => ({ useCan: () => () => true }));
 vi.mock('@wso2/oxygen-ui', () => {
   const Plain = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return {

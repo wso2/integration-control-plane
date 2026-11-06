@@ -31,13 +31,14 @@ import { savedValue } from '../../utils/savedConfig';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
-import { EndpointCard } from '../EndpointCard';
+import { EndpointCardList } from '../EndpointCardList';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
 import { linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
+import { useUserVisibleEndpoints } from '../../hooks/useUserVisibleEndpoints';
 
 // Keys the platform sets (a workflow integration's runtime connection), shown read-only.
 const managedConfigKeys = (configurations: SchemaConfigItem[] | undefined): ReadonlySet<string> => new Set((configurations ?? []).filter((c) => c.isManaged).map((c) => c.key));
@@ -680,6 +681,8 @@ export interface ConfigureDrawerProps {
   isAutomation?: boolean;
   /** Hide the Endpoints step — file/event integrations have no endpoints. */
   hideEndpoints?: boolean;
+  /** A workflow integration, whose management endpoint the Endpoints step leaves out (see isUserVisibleEndpoint). */
+  isWorkflow?: boolean;
   envTemplateId?: string;
   buildId?: string;
   /**
@@ -752,6 +755,7 @@ function GenericServiceConfigureDrawer({
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
   hideEndpoints = false,
+  isWorkflow = false,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
   // File/event integrations have no endpoints (devant: they open the
@@ -782,7 +786,8 @@ function GenericServiceConfigureDrawer({
   const { data, isLoading, isError } = useSchemaConfig(projectId, componentId, schemaEnvId, versionId, commitHash);
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, schemaEnvId, versionId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
-  const { data: endpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
+  const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
+  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
   const generateEp = useGenerateComponentEndpoints();
@@ -1098,13 +1103,7 @@ function GenericServiceConfigureDrawer({
         </Box>
       );
     }
-    return (
-      <Box>
-        {endpoints.map((ep, idx) => (
-          <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} onEdit={setManagingEp} onSettings={handleSettings} />
-        ))}
-      </Box>
-    );
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} />;
   };
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();

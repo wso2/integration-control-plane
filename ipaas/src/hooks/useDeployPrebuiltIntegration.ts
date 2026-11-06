@@ -24,6 +24,8 @@ import { componentSubTypeFromSample, displayTypeFromSample } from '../constants/
 import { derivePrebuiltSlug } from '../utils/prebuilt';
 import { checkNameAvailability, fetchComponentDetail, fetchFirstEnvironment, fetchLatestCommitSha, savePrebuiltConfig } from '../api/prebuilt';
 import { isQuotaError } from '../utils/apiErrors';
+import { Scopes } from '../constants/permissions';
+import { useCan } from './useCan';
 import type { DeployPrebuiltIntegrationInput, DeployPrebuiltIntegrationState } from '../types/prebuilt';
 
 const IDLE_STATE: DeployPrebuiltIntegrationState = {
@@ -48,6 +50,13 @@ export function useDeployPrebuiltIntegration() {
   const deployImageRef = useRef(deployImage);
   const deleteComponentRef = useRef(deleteComponent);
   createComponentRef.current = createComponent;
+  // Saving configuration needs cloud:resource-type:manage; without it the values travel only in deploy-prebuilt.
+  const can = useCan();
+  const canSaveConfigRef = useRef(false);
+  canSaveConfigRef.current = can(Scopes.CONFIG_MANAGE);
+  // Without ipaas:integration:delete the rollback would only be refused: the half-made integration stays for an Admin to delete.
+  const canDeleteRef = useRef(false);
+  canDeleteRef.current = can(Scopes.INTEGRATION_DELETE);
   deployImageRef.current = deployImage;
   deleteComponentRef.current = deleteComponent;
 
@@ -78,6 +87,7 @@ export function useDeployPrebuiltIntegration() {
         isPublicRepo: true,
         enableAutoDeploy: false,
         isPrebuilt: true,
+        creation: { method: 'from-prebuilt', prebuiltSlug: slug },
       });
       createdComponentId = component.id;
 
@@ -91,7 +101,7 @@ export function useDeployPrebuiltIntegration() {
       const env = await fetchFirstEnvironment(orgUuid, projectId);
       if (!env.templateId) throw new Error('Environment has no template ID');
 
-      if (configValues && configValues.length > 0) {
+      if (configValues && configValues.length > 0 && canSaveConfigRef.current) {
         setState((s) => ({ ...s, progress: 70, stepLabel: 'Saving configuration…' }));
         try {
           const sha = await fetchLatestCommitSha(detail.id, integration.branch ?? 'main');
@@ -106,8 +116,8 @@ export function useDeployPrebuiltIntegration() {
         componentId: detail.id,
         imageUrl: integration.imageUrl,
         appBranch: integration.branch ?? 'main',
-        // The BFF bakes these onto the Workload at creation; the config saved
-        // above is also kept for the Configure form.
+        // The BFF bakes these onto the Workload at creation, and accepts them from a
+        // role without config-manage only here, in the first deploy-prebuilt.
         configurations: configValues,
       });
 
@@ -116,7 +126,7 @@ export function useDeployPrebuiltIntegration() {
       // Log the primary failure before rolling back — otherwise the actual cause
       // (name check, create, deploy, …) is lost and only the generic toast remains.
       console.error('Prebuilt integration deploy failed', { orgHandler, projectId, createdComponentId }, err);
-      if (createdComponentId) {
+      if (createdComponentId && canDeleteRef.current) {
         try {
           await deleteComponentRef.current.mutateAsync({ orgHandler, componentId: createdComponentId, projectId });
         } catch (rollbackErr) {

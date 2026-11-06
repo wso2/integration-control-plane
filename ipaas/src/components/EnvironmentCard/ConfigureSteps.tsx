@@ -17,10 +17,24 @@
  */
 
 import { Alert, Box, Button, Checkbox, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { Building2, Folder, Globe } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
+import { Scopes } from '../../constants/permissions';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
+import { useCan } from '../../hooks/useCan';
 import { useUpdateEndpoint } from '../../hooks/useComponents';
-import type { EnvEndpoint } from '../../types/component';
-import { VISIBILITY_OPTS } from '../EndpointCard';
+import type { EndpointExposure, EnvEndpoint } from '../../types/component';
+import { friendlyApiError } from '../../utils/apiSecurity';
+import { editorExposure, exposureLabels } from '../../utils/endpoints';
+
+// Project access is always on, so it shows checked and locked. The gateway serves an endpoint on one
+// host at a time, so Public and Organization exclude each other, and clearing the checked one leaves
+// the endpoint on neither.
+const VISIBILITY_OPTS: { value: 'project' | Exclude<EndpointExposure, 'none'>; label: string; Icon: typeof Globe; description: string }[] = [
+  { value: 'project', label: 'Project', Icon: Folder, description: 'Integrations in the same project can always call it.' },
+  { value: 'public', label: 'Public', Icon: Globe, description: 'Reachable from the internet, including integrations in your organization. The API’s security settings still apply.' },
+  { value: 'organization', label: 'Organization', Icon: Building2, description: 'Reachable only from integrations in your organization.' },
+];
 
 // Pieces shared by the configure drawers (ConfigureDrawer and MiConfigureDrawer).
 
@@ -83,21 +97,24 @@ interface ManageEndpointProps {
 }
 
 export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseId, environmentId, onBack }: ManageEndpointProps) {
-  const [visibilities, setVisibilities] = useState<string[]>(() => Array.from(new Set([...(ep.displayProjectUrl === false ? [] : ['Project']), ...(ep.networkVisibilities ?? []).filter((value) => value !== 'Project')])));
+  const [{ exposure: seededExposure, legacyBothHosts }] = useState(() => editorExposure(ep));
+  const [exposure, setExposure] = useState<EndpointExposure>(seededExposure);
   const [saveError, setSaveError] = useState<string | null>(null);
   const updateEp = useUpdateEndpoint();
-
-  const handleToggle = (key: string) => {
-    setVisibilities((prev) => (prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]));
-  };
+  const allowLeave = useUnsavedChanges(exposure !== seededExposure);
+  const guardNavigation = useLeaveGuard();
+  const canExpose = useCan()(Scopes.ENDPOINT_EXPOSE);
 
   const handleSave = () => {
     setSaveError(null);
     updateEp.mutate(
-      { componentId, projectId, environmentId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: visibilities },
+      { componentId, projectId, environmentId, versionId, releaseId, endpointId: ep.id, displayName: ep.displayName, networkVisibilities: exposureLabels(exposure) },
       {
-        onSuccess: onBack,
-        onError: (err) => setSaveError(err instanceof Error ? err.message : 'Failed to update endpoint'),
+        onSuccess: () => {
+          allowLeave();
+          onBack();
+        },
+        onError: (err) => setSaveError(friendlyApiError(err, 'Could not update the endpoint visibility.')),
       },
     );
   };
@@ -125,45 +142,55 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
         )}
       </Box>
 
-      {/* Network visibility */}
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Network visibility
       </Typography>
-      <Stack gap={1} sx={{ mb: 2 }}>
-        {VISIBILITY_OPTS.map(({ key, label, Icon, description }) => {
-          const checked = visibilities.includes(key);
+      <Stack gap={1} sx={{ mb: 1.5 }} role="group" aria-label="Network visibility">
+        {VISIBILITY_OPTS.map(({ value, label, Icon, description }) => {
+          const locked = value === 'project';
+          const checked = locked || exposure === value;
+          const toggle = () => {
+            if (!locked) setExposure((current) => (current === value ? 'none' : value));
+          };
           return (
             <Box
-              key={key}
-              onClick={() => handleToggle(key)}
+              key={value}
+              onClick={toggle}
+              title={locked ? 'Always on' : undefined}
               sx={{
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: 1.25,
                 p: 1.5,
                 border: '1px solid',
-                borderColor: checked ? 'primary.main' : 'divider',
+                borderColor: locked ? 'action.disabled' : checked ? 'primary.main' : 'divider',
                 borderRadius: 1,
-                cursor: 'pointer',
+                bgcolor: locked ? 'action.hover' : undefined,
+                cursor: locked ? 'not-allowed' : 'pointer',
                 transition: 'border-color 0.15s',
-                '&:hover': { borderColor: 'primary.main' },
+                '&:hover': locked ? undefined : { borderColor: 'primary.main' },
               }}>
-              <Box sx={{ display: 'flex', color: 'primary.main', mt: 0.25, flexShrink: 0 }}>
+              <Box sx={{ display: 'flex', color: locked ? 'text.disabled' : 'primary.main', mt: 0.25, flexShrink: 0 }}>
                 <Icon size={18} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }} color={locked ? 'text.secondary' : undefined}>
                   {label}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {description}
                 </Typography>
               </Box>
-              <Checkbox checked={checked} size="small" sx={{ p: 0, flexShrink: 0, mt: 0.25 }} onClick={(e) => e.stopPropagation()} onChange={() => handleToggle(key)} />
+              <Checkbox checked={checked} disabled={locked} size="small" value={value} sx={{ p: 0, flexShrink: 0, mt: 0.25 }} inputProps={{ 'aria-label': label }} onClick={(e) => e.stopPropagation()} onChange={toggle} />
             </Box>
           );
         })}
       </Stack>
+      {legacyBothHosts && (
+        <Alert severity="info" sx={{ mb: 1.5 }}>
+          This endpoint was exposed on both the public and the organization host. An endpoint is now served on one host, so saving keeps it only on the host selected here.
+        </Alert>
+      )}
 
       {saveError && (
         <Alert severity="error" sx={{ mb: 1 }}>
@@ -172,12 +199,14 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
       )}
 
       <Stack direction="row" justifyContent="flex-end" gap={1}>
-        <Button variant="outlined" color="inherit" onClick={onBack}>
+        <Button variant="outlined" color="inherit" onClick={() => guardNavigation(onBack)}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending || visibilities.length === 0} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
-          {updateEp.isPending ? 'Updating…' : 'Update'}
-        </Button>
+        {canExpose && (
+          <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+            {updateEp.isPending ? 'Updating…' : 'Update'}
+          </Button>
+        )}
       </Stack>
     </Box>
   );

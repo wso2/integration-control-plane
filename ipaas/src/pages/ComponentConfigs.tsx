@@ -24,7 +24,7 @@ import Authorized from '../components/Authorized';
 import EmptyListing from '../components/EmptyListing';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import ConfigEditor, { type EditorContext } from '../components/Configs/ConfigEditor';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
 import { useConfigMaps, useContainerConfigMounts, useDeleteConfig, useRelease, useSecrets } from '../hooks/useDevopsConfigs';
@@ -33,6 +33,8 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import { buildConfigRows, mainContainer } from '../utils/devopsConfigs';
+import { runtimeFromDisplayType } from '../utils/identifyIntegration';
+import { isMiManagedGroup } from '../utils/miConfigs';
 import type { ConfigRow } from '../types/devopsConfigs';
 import type { ComponentScope } from '../nav';
 
@@ -60,6 +62,13 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
   const { data: configMaps = [] } = useConfigMaps(projectId, envId, trackId);
   const { data: secrets = [] } = useSecrets(projectId, envId, trackId);
   const rows = useMemo(() => buildConfigRows(mounts, configMaps, secrets), [mounts, configMaps, secrets]);
+  // An MI integration's configuration is edited in its Configure drawer, which owns these
+  // groups: an edit here could be undone by the drawer's next save, or break its reads.
+  const isMi = runtimeFromDisplayType(comp?.displayType ?? '') === 'mi';
+  const managedByMi = (r: ConfigRow): boolean => isMi && r.kind === 'envVars' && isMiManagedGroup({ name: r.name, sensitive: r.isSecret, keys: r.keys });
+  // Keys of the env-var groups other than the one being edited (MI Configure's included):
+  // a key can belong to one group only.
+  const otherGroupKeys = (editing?: ConfigRow): Map<string, string> => new Map(rows.filter((r) => r.kind === 'envVars' && r.name !== editing?.name).flatMap((r) => r.keys.map((k): [string, string] => [k, r.name])));
 
   const del = useDeleteConfig(projectId, trackId);
   const [view, setView] = useState<View>({ kind: 'list' });
@@ -116,7 +125,7 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
           <PageTitle.Header>Configs &amp; secrets</PageTitle.Header>
           {!isLoading && comp && releaseId && containerId && view.kind === 'list' && (
             <PageTitle.Actions>
-              <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
+              <Authorized permissions={Scopes.CONFIG_MANAGE}>
                 <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => setView({ kind: 'create' })}>
                   Create
                 </Button>
@@ -147,9 +156,9 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
         ) : trackId === undefined ? null : !releaseId || !containerId ? (
           <Alert severity="info">Deploy this integration to the selected environment to manage its configs and secrets.</Alert>
         ) : view.kind === 'create' ? (
-          <ConfigEditor ctx={ctx} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
+          <ConfigEditor ctx={ctx} otherGroupKeys={otherGroupKeys()} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
         ) : view.kind === 'edit' ? (
-          <ConfigEditor ctx={ctx} existing={view.row} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
+          <ConfigEditor ctx={ctx} existing={view.row} otherGroupKeys={otherGroupKeys(view.row)} onBack={() => setView({ kind: 'list' })} onSaved={onEditorDone} onError={(message) => setAlert({ type: 'error', message })} />
         ) : (
           <>
             {loadingMounts ? (
@@ -176,22 +185,31 @@ export default function ComponentConfigs({ org, project, component }: ComponentS
                           <Stack direction="row" alignItems="center" gap={1}>
                             {r.name}
                             {r.isSecret && <Chip label="Secret" size="small" variant="outlined" color="warning" />}
+                            {managedByMi(r) && <Chip label="Managed by Configure" size="small" variant="outlined" />}
                           </Stack>
                         </ListingTable.Cell>
                         <ListingTable.Cell>{r.kind === 'fileMount' ? 'File mount' : 'Environment variables'}</ListingTable.Cell>
                         <ListingTable.Cell>{r.kind === 'fileMount' ? r.mount.mount_path || '—' : r.keys.join(', ') || '—'}</ListingTable.Cell>
                         <ListingTable.Cell align="right">
-                          <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
-                            <Tooltip title="Edit">
-                              <IconButton size="small" aria-label={`Edit ${r.name}`} onClick={() => setView({ kind: 'edit', row: r })}>
-                                <Pencil size={16} />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Remove">
-                              <IconButton size="small" color="error" aria-label={`Remove ${r.name}`} onClick={() => setDeleting(r)}>
-                                <Trash2 size={16} />
-                              </IconButton>
-                            </Tooltip>
+                          <Authorized permissions={Scopes.CONFIG_MANAGE}>
+                            {managedByMi(r) ? (
+                              <Typography variant="body2" color="text.secondary">
+                                Edit in Configure
+                              </Typography>
+                            ) : (
+                              <>
+                                <Tooltip title="Edit">
+                                  <IconButton size="small" aria-label={`Edit ${r.name}`} onClick={() => setView({ kind: 'edit', row: r })}>
+                                    <Pencil size={16} />
+                                  </IconButton>
+                                </Tooltip>
+                                <Tooltip title="Remove">
+                                  <IconButton size="small" color="error" aria-label={`Remove ${r.name}`} onClick={() => setDeleting(r)}>
+                                    <Trash2 size={16} />
+                                  </IconButton>
+                                </Tooltip>
+                              </>
+                            )}
                           </Authorized>
                         </ListingTable.Cell>
                       </ListingTable.Row>

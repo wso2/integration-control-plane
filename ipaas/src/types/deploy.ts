@@ -34,6 +34,8 @@ export interface BuildAreaProps {
   firstEnvId: string;
   firstEnvTemplateId: string;
   autoDeployEnabled?: boolean;
+  /** Whether the "Auto deploy on build" switch is offered. */
+  autoDeployAvailable: boolean;
   componentName: string;
   projectHandler: string;
   displayType?: string;
@@ -111,7 +113,8 @@ export interface DeployEnvironmentCardBodyProps {
   scaleToZeroEnabled?: boolean;
   /** Why the environment can't start until configured; the card then offers "Configure to Continue". */
   missingConfigsReason?: string;
-  onConfigClick: () => void;
+  /** Absent when the user's role can't change configuration here: the card hides the control. */
+  onConfigClick?: () => void;
   onJobConfigClick?: () => void;
   onHistoryClick?: () => void;
   onEndpointsClick?: () => void;

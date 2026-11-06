@@ -32,6 +32,9 @@ export function isPaidPlan(org: BillingOrg | null, plan: BillingPlan | null): bo
   return !!sub && ENTITLED_STATUSES.has(sub.status) && !!plan && plan.code === sub.plan?.code && plan.type === 'paid';
 }
 
+/** Whether the org's plan unlocks a paid feature, or the plan could not be read and the read can be retried. */
+export type PlanAccess = { state: 'paid' } | { state: 'free' } | { state: 'unavailable'; retry: () => void };
+
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** Length of the trial in days, from the period start to the trial end; undefined when billing does not give both. */

@@ -212,11 +212,13 @@ export default function DeployEnvironmentCardBody({
           <Typography variant="body2">Configurables</Typography>
           {configurablesCount !== undefined && configurablesCount >= 0 && <Chip size="small" label={configurablesCount} sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />}
         </Stack>
-        <Tooltip title="Configure environment variables">
-          <IconButton aria-label="Configure environment variables" size="small" onClick={onConfigClick}>
-            <Settings size={16} />
-          </IconButton>
-        </Tooltip>
+        {onConfigClick && (
+          <Tooltip title="Configure environment variables">
+            <IconButton aria-label="Configure environment variables" size="small" onClick={onConfigClick}>
+              <Settings size={16} />
+            </IconButton>
+          </Tooltip>
+        )}
       </Stack>
 
       {/* Job Configs — automation only */}
@@ -224,11 +226,13 @@ export default function DeployEnvironmentCardBody({
         <Stack gap={0.25}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Typography variant="body2">Job configs</Typography>
-            <Tooltip title="Configure job schedule">
-              <IconButton aria-label="Configure job schedule" size="small" onClick={onJobConfigClick}>
-                <Settings size={16} />
-              </IconButton>
-            </Tooltip>
+            {onJobConfigClick && (
+              <Tooltip title="Configure job schedule">
+                <IconButton aria-label="Configure job schedule" size="small" onClick={onJobConfigClick}>
+                  <Settings size={16} />
+                </IconButton>
+              </Tooltip>
+            )}
           </Stack>
           {scheduleDescription && (
             <Stack direction="row" alignItems="center" gap={0.5} sx={{ pl: 0.25 }}>

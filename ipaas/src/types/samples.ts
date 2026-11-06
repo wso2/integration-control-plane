@@ -22,7 +22,7 @@ export interface Sample {
   componentType: string;
   buildPack: string;
   repositoryUrl: string;
-  subDirectory: string;
+  subDirectory?: string;
   componentPath: string;
   thumbnailPath: string;
   tags: string[];

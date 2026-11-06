@@ -20,6 +20,8 @@ import { Alert, AlertTitle, Button, CircularProgress, Skeleton, Stack } from '@w
 import { Archive } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { useDatabaseOffering, useEnableDatabaseBackups } from '../../hooks/useDatabases';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import { databaseBackupView } from '../../utils/databases';
 import { formatDateTime } from '../../utils/time';
 import type { DatabaseServerDetail } from '../../types/databases';
@@ -31,6 +33,7 @@ const ENABLED_RETENTION_DAYS = 7;
 export default function BackupsTab({ service }: { service: DatabaseServerDetail }): JSX.Element {
   const offering = useDatabaseOffering();
   const enable = useEnableDatabaseBackups(service.id);
+  const canEnable = useCan()(Scopes.CONFIG_MANAGE);
   const plan = offering.data?.plans.find((p) => p.id === service.plan);
   const view = databaseBackupView(service, plan?.backups, enable.isSuccess);
 
@@ -97,9 +100,11 @@ export default function BackupsTab({ service }: { service: DatabaseServerDetail 
           <Alert
             severity="warning"
             action={
-              <Button color="inherit" size="small" startIcon={enable.isPending ? <CircularProgress size={14} color="inherit" /> : <Archive size={16} />} disabled={enable.isPending || service.status !== 'ACTIVE'} onClick={() => enable.mutate()}>
-                Enable Backups
-              </Button>
+              canEnable && (
+                <Button color="inherit" size="small" startIcon={enable.isPending ? <CircularProgress size={14} color="inherit" /> : <Archive size={16} />} disabled={enable.isPending || service.status !== 'ACTIVE'} onClick={() => enable.mutate()}>
+                  Enable Backups
+                </Button>
+              )
             }>
             <AlertTitle>Backups are not enabled</AlertTitle>
             Enable daily backups to keep this database recoverable to any point in the last {ENABLED_RETENTION_DAYS} days.

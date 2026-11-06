@@ -22,6 +22,8 @@ import { fetchApimSwagger } from '../api/apim';
 import { fetchComponentByHandler } from '../api/components';
 import { trackEvent } from '../services/tracking/tracking';
 import { identifyIntegration } from '../utils/identifyIntegration';
+import { isExposureTransitioning } from '../utils/endpoints';
+import { invalidateEndpointSettings } from './useConsumers';
 import { TYPE_TO_KIND } from '../constants/insights';
 import {
   fetchComponentDeployment,
@@ -33,6 +35,7 @@ import {
   deployDeploymentTrack,
   triggerBuild,
   promote,
+  retryProxyReconciliation,
   stopDeployment,
   redeployDeployment,
   deployPrebuiltImage,
@@ -85,7 +88,7 @@ export function useEnvEndpoints(componentId: string, versionId: string | undefin
     retry: false,
     refetchInterval: (query) => {
       const endpoints = query.state.data;
-      return endpoints?.some((endpoint) => ['ENABLING', 'DISABLING'].includes(endpoint.visibilityStatus?.public.status ?? '')) ? 2_000 : false;
+      return endpoints?.some((endpoint) => isExposureTransitioning(endpoint.visibilityStatus)) ? 2_000 : false;
     },
   });
 }
@@ -206,7 +209,21 @@ export function usePromote() {
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
       // The links report what the target's release carries; they follow it until it is the promoted one.
       qc.invalidateQueries({ queryKey: ['integrationLinks'] });
+      // A promotion carries the source's API settings and visibility to the target.
+      qc.invalidateQueries({ queryKey: ['envEndpoints', input.componentId] });
+      invalidateEndpointSettings(qc, input.componentId, input.targetEnvironmentId);
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId] });
+    },
+  });
+}
+
+export function useRetryProxyReconciliation(componentId: string, environmentId: string, projectName: string, versionId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => retryProxyReconciliation(componentId, environmentId, projectName, versionId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+      qc.invalidateQueries({ queryKey: ['envEndpoints', componentId] });
     },
   });
 }

@@ -20,44 +20,24 @@
  * Cloud (OpenChoreo) org / user API.
  *
  * Most org-related state is owned upstream by Thunder, which issues
- * org-scoped access tokens at sign-in. The functions here either read those
- * claims (fetchOrgs) or proxy through the BFF for namespace-scoped resources
+ * org-scoped access tokens at sign-in. The functions here either read the
+ * session's org (fetchOrgs) or proxy through the BFF for namespace-scoped resources
  * (/orgs/*). Thunder provisions the org at sign-up, so the console never creates one.
  */
 
 import type { OrgEntry, OrgComponentLimits, OrgSubscription } from '../types/org';
-import { getAccessToken } from '../auth';
+import { getSession } from '../auth';
 import { bff, items, seg, type ListResponse } from './_client';
 
-// Read org claims from the access-token payload. Returns empty on any failure
-// — callers treat that as "unscoped" rather than throwing.
-async function readJwtOrgClaims(): Promise<{ handle?: string; uuid?: string; name?: string }> {
-  const token = await getAccessToken();
-  if (!token) return {};
-  try {
-    // JWT payloads are base64url without padding; restore '+'/'/' and pad to a
-    // multiple of 4 so atob doesn't reject otherwise-valid segments.
-    const normalized = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4);
-    const payload = JSON.parse(atob(padded)) as Record<string, unknown>;
-    const org = (payload.organization as Record<string, unknown> | undefined) ?? {};
-    const handle = (org.handle as string | undefined) ?? (payload.ouHandle as string | undefined);
-    const uuid = (org.uuid as string | undefined) ?? (payload.ouId as string | undefined);
-    const name = (org.name as string | undefined) ?? (payload.ouName as string | undefined);
-    return { handle, uuid, name };
-  } catch {
-    return {};
-  }
-}
-
-// Synthesize the caller's org as a 1-element list from the JWT — Thunder
+// Synthesize the caller's org as a 1-element list from the session — Thunder
 // issues org-scoped tokens at sign-in so handle + uuid are always present.
 // No BFF round-trip: the org switcher is disabled in cloud, and AppLayout
 // only needs an entry where handle === scope.org for the header to render.
 export const fetchOrgs = async (): Promise<OrgEntry[]> => {
-  const { handle, uuid, name } = await readJwtOrgClaims();
-  if (!handle && !uuid) return [];
-  return [{ handle: handle ?? '', numericId: 0, ...(uuid ? { uuid } : {}), ...(name ? { name } : {}) }];
+  const session = getSession();
+  if (!session) return [];
+  const { orgHandle, orgUuid, orgName } = session;
+  return [{ handle: orgHandle, numericId: 0, uuid: orgUuid, ...(orgName ? { name: orgName } : {}) }];
 };
 
 export const fetchOrgComponentLimits = (orgUuid: string): Promise<OrgComponentLimits> => bff.get<OrgComponentLimits>(`/orgs/${seg(orgUuid)}/component-limits`);

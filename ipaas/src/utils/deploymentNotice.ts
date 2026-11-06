@@ -61,20 +61,31 @@ export interface NotDeployedNotice {
   message: string;
 }
 
+/** What a page with nothing to act on needs the deployment for: testing, or a workflow page's own work. */
+export type NotDeployedPurpose = 'test' | 'runWorkflows' | 'workOnTasks';
+
+// Each purpose's phrase in each sentence below, so every surface explains the same state alike.
+const PURPOSE_PHRASES: Record<NotDeployedPurpose, { start: string; whenActive: string; redeploy: string; begin: string }> = {
+  test: { start: 'start testing', whenActive: 'start testing', redeploy: 'before testing', begin: 'begin testing' },
+  runWorkflows: { start: 'run its workflows', whenActive: 'run its workflows', redeploy: 'to run its workflows', begin: 'run its workflows' },
+  workOnTasks: { start: 'work on its tasks', whenActive: 'work on its tasks', redeploy: 'to work on its tasks', begin: 'work on its tasks' },
+};
+
 /**
- * Why a Test page cannot run anything, keyed on the same `deploymentStatusV2`
- * vocabulary as `deploymentNotice` above. Kept here rather than in the Alert so
- * the wording is testable and the three Test surfaces cannot drift apart.
+ * Why a Test page (or a workflow page, by `purpose`) cannot run anything, keyed on the
+ * same `deploymentStatusV2` vocabulary as `deploymentNotice` above. Kept here rather
+ * than in the Alert so the wording is testable and the surfaces cannot drift apart.
  */
-export function notDeployedNotice(status: string | null | undefined): NotDeployedNotice {
+export function notDeployedNotice(status: string | null | undefined, purpose: NotDeployedPurpose = 'test'): NotDeployedNotice {
+  const phrase = PURPOSE_PHRASES[purpose];
   switch (status) {
     case 'IN_PROGRESS':
-      return { severity: 'info', message: 'Deployment is still in progress. You can start testing once it becomes active.' };
+      return { severity: 'info', message: `Deployment is still in progress. You can ${phrase.whenActive} once it becomes active.` };
     case 'ERROR':
-      return { severity: 'error', message: 'This deployment is in an error state. Check the runtime logs and redeploy before testing.' };
+      return { severity: 'error', message: `This deployment is in an error state. Check the runtime logs and redeploy ${phrase.redeploy}.` };
     case 'SUSPENDED':
-      return { severity: 'warning', message: 'This deployment is stopped. Start it to begin testing.' };
+      return { severity: 'warning', message: `This deployment is stopped. Start it to ${phrase.begin}.` };
     default:
-      return { severity: 'warning', message: 'This integration is not yet deployed. Deploy it to start testing.' };
+      return { severity: 'warning', message: `This integration is not yet deployed. Deploy it to ${phrase.start}.` };
   }
 }

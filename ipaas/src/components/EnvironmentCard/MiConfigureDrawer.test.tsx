@@ -46,7 +46,7 @@ vi.mock('../../hooks/useConfiguration', () => ({
   useLinkWrite: () => ({ isError: false, mutate: (input: { target: unknown }) => writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useMiConfig', () => ({
-  useMiConfig: () => ({ data: { envVars: [{ key: 'DB_URL', value: 'jdbc:x' }], secrets: [] }, isLoading: false, isError: false }),
+  useMiConfig: () => ({ data: { envVars: [{ key: 'DB_URL', value: 'jdbc:x' }], secrets: [], legacySecrets: [], shadowedLegacySecrets: [] }, isLoading: false, isError: false }),
   useSaveMiConfig: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 vi.mock('../../hooks/useDeployments', () => ({ useEnvEndpoints: () => ({ data: [] }) }));

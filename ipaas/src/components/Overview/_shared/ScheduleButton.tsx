@@ -20,7 +20,7 @@ import { Button, ButtonGroup, ClickAwayListener, Grow, MenuItem, MenuList, Paper
 import { CalendarClock, ChevronDown } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState } from 'react';
 import Authorized from '../../Authorized';
-import { Permissions } from '../../../constants/permissions';
+import { Scopes } from '../../../constants/permissions';
 import { useStopSchedule } from '../../../hooks/useExecutions';
 import ScheduleDialog from './ScheduleDialog';
 
@@ -56,7 +56,7 @@ export default function ScheduleButton({ hasSchedule, disabled, disabledReason, 
 
   return (
     <>
-      <Authorized permissions={Permissions.INTEGRATION_MANAGE}>
+      <Authorized permissions={Scopes.INTEGRATION_UPDATE}>
         {hasSchedule ? (
           <Tooltip title={disabled ? (disabledReason ?? '') : ''} placement="top">
             <span>

@@ -30,6 +30,9 @@ interface RuntimeConfig {
   ASGARDEO_SIGN_IN_REDIRECT_URL?: string;
   ASGARDEO_SCOPE?: string;
   ASGARDEO_RESOURCE?: string;
+  AUTH_BFF_CONTEXT?: string;
+  AUTH_BFF_SIGN_IN_URL?: string;
+  AUTH_BFF_PROXY_CONTEXT?: string;
   CHOREO_BASE_API_URL?: string;
   SYS_API_PREFIX?: string;
   GITHUB_APP_CLIENT_ID?: string;
@@ -54,6 +57,7 @@ interface RuntimeConfig {
   /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
   TRACKING_ENV?: string;
   MOESIF_APP_API_KEY?: string;
+  SCOPES_ENFORCED?: string | boolean;
 }
 
 export interface ApiConfig {
@@ -63,6 +67,15 @@ export interface ApiConfig {
   asgardeoSignInRedirectUrl: string;
   asgardeoScope: string;
   asgardeoResource?: string;
+  /**
+   * The gateway's sign-in context for this console (e.g. /_auth/integration). Set, the gateway holds the
+   * tokens and the browser only an HttpOnly session cookie (BFF mode); unset, the browser signs in itself.
+   */
+  authBffContext?: string;
+  /** Where BFF sign-in starts. Defaults to `<authBffContext>/signin`. */
+  authBffSignInUrl?: string;
+  /** The gateway's API root that the per-product session proxies sit under (e.g. /_api). */
+  authBffProxyContext?: string;
   choreoBaseApiUrl: string;
   choreoOrgApiUrl: string;
   systemApisBaseUrl?: string;
@@ -125,6 +138,8 @@ export interface ApiConfig {
   trackingEnv: 'dev' | 'stage' | 'prod' | 'off';
   /** Moesif app key for product-usage analytics. Separate from the API Insights embed above. Unset disables Moesif tracking. */
   moesifAppApiKey?: string;
+  /** Hide actions the user's role doesn't allow. Set from the same deployment variable as ipaas-service's SCOPES_ENFORCED, so the console hides what ipaas-service refuses. */
+  scopesEnforced?: boolean;
 }
 
 // Extend window interface
@@ -175,6 +190,8 @@ const DEFAULT_CONFIG: ApiConfig = {
   trackingEnv: 'dev',
 };
 
+const localPath = (value: string | undefined): string | undefined => (value && /^\/(?![/\\])/.test(value) ? value : undefined);
+
 /**
  * Load configuration from /config.json.
  * This allows modifying URLs after build without rebuilding the app.
@@ -198,6 +215,9 @@ export async function loadConfig(): Promise<void> {
       asgardeoSignInRedirectUrl: config.ASGARDEO_SIGN_IN_REDIRECT_URL || DEFAULT_CONFIG.asgardeoSignInRedirectUrl,
       asgardeoScope: config.ASGARDEO_SCOPE || DEFAULT_CONFIG.asgardeoScope,
       asgardeoResource: config.ASGARDEO_RESOURCE?.trim() || undefined,
+      authBffContext: localPath(config.AUTH_BFF_CONTEXT ? trim(config.AUTH_BFF_CONTEXT.trim()) : undefined),
+      authBffSignInUrl: localPath(config.AUTH_BFF_SIGN_IN_URL?.trim()),
+      authBffProxyContext: config.AUTH_BFF_PROXY_CONTEXT ? trim(config.AUTH_BFF_PROXY_CONTEXT.trim()) || undefined : undefined,
       choreoBaseApiUrl: choreoBase,
       choreoOrgApiUrl: `${choreoBase}/orgs/1.0.0`,
       systemApisBaseUrl: systemApisBase || DEFAULT_CONFIG.systemApisBaseUrl,
@@ -233,6 +253,7 @@ export async function loadConfig(): Promise<void> {
       trackingEnv: parseTrackingEnv(config.TRACKING_ENV),
       // config.json is untyped: a non-string value must not throw here and reset the whole config.
       moesifAppApiKey: typeof config.MOESIF_APP_API_KEY === 'string' ? config.MOESIF_APP_API_KEY.trim() || undefined : undefined,
+      scopesEnforced: config.SCOPES_ENFORCED === 'true' || config.SCOPES_ENFORCED === true,
     };
 
     console.info('✓ Runtime configuration loaded from config.json');

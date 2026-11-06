@@ -21,11 +21,11 @@ import { ArrowDown } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ReactNode } from 'react';
 import { useIntegrationLinks } from '../../hooks/useConfiguration';
 import { promoteWithoutValues } from '../../utils/integrationLinks';
-import { useComponentDeployment } from '../../hooks/useDeployments';
-import { usePromote } from '../../hooks/useDeployments';
+import { useComponentDeployment, usePromote } from '../../hooks/useDeployments';
+import { pendingApiChange, PENDING_API_CHANGE_TOOLTIP } from '../../utils/promotion';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
-import Authorized from '../Authorized';
-import { Permissions } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
+import { Scopes } from '../../constants/permissions';
 
 interface PromoteButtonProps {
   orgHandler: string;
@@ -50,12 +50,16 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
   const links = useIntegrationLinks(projectId, componentId, true);
   const [checking, setChecking] = useState(false);
   const [confirming, setConfirming] = useState<{ withoutValues: string[]; unchecked: boolean } | null>(null);
+  const can = useCan();
 
   const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
   const sourceReleaseId = sourceDeployment?.releaseId;
-  // The release, not the build: a ComponentType update gives the same build a new release.
-  const alreadyPromoted = !deploymentsLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
+  // The release, not the build: a ComponentType update gives the same build a new release. Two environments on the
+  // same release can still differ in API settings or visibility, which only a promotion carries.
+  const sameRelease = !deploymentsLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
+  const apiChange = sameRelease ? pendingApiChange(sourceDeployment?.proxyReconciliation, targetDeployment?.proxyReconciliation) : null;
+  const alreadyPromoted = sameRelease && !apiChange;
 
   const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted && !blockedReason;
@@ -88,11 +92,24 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
     );
   };
 
+  if (!can(Scopes.INTEGRATION_DEPLOY)) return null;
+
   const tooltipTitle =
-    blockedReason ?? (!buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : promote.isError ? promote.error.message : '');
+    blockedReason ??
+    (!buildId
+      ? 'No build available to promote'
+      : alreadyPromoted
+        ? 'Already deployed in target environment'
+        : missingPipeline
+          ? 'No deployment pipeline configured for this project'
+          : promote.isError
+            ? promote.error.message
+            : apiChange
+              ? PENDING_API_CHANGE_TOOLTIP[apiChange]
+              : '');
 
   return (
-    <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
+    <>
       <Tooltip title={tooltipTitle}>
         <span>
           <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || checking || promote.isPending} onClick={checkThenPromote}>
@@ -117,6 +134,6 @@ export default function PromoteButton({ orgHandler, projectId, componentId, vers
           </Button>
         </DialogActions>
       </Dialog>
-    </Authorized>
+    </>
   );
 }

@@ -21,6 +21,8 @@ import { BookOpen, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useKnowledgeBases } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, newKnowledgeBaseUrl, type OrgScope } from '../nav';
 import { knowledgeBaseSummary } from '../utils/knowledgeBase';
@@ -49,6 +51,7 @@ export default function KnowledgeBases(scope: OrgScope): JSX.Element {
 function KnowledgeBaseList({ scope }: { scope: OrgScope }): JSX.Element {
   const navigate = useAppNavigate();
   const { data: knowledgeBases, isLoading, isError, refetch } = useKnowledgeBases();
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const [search, setSearch] = useState('');
   const [deleting, setDeleting] = useState<KnowledgeBase | null>(null);
   const [deleted, setDeleted] = useState<string | null>(null);
@@ -86,7 +89,7 @@ function KnowledgeBaseList({ scope }: { scope: OrgScope }): JSX.Element {
         icon={<BookOpen size={48} />}
         title="No knowledge bases"
         description="Create a knowledge base to give your AI agents and integrations retrieval over your documents."
-        showAction
+        showAction={canManage}
         actionLabel="Create Knowledge Base"
         onAction={() => navigate(newKnowledgeBaseUrl(scope))}
       />
@@ -111,11 +114,15 @@ function KnowledgeBaseList({ scope }: { scope: OrgScope }): JSX.Element {
       summary.embedding,
       String(kb.dataSources.length),
       <DeploymentStatusChip key="status" status={kb.status} />,
-      <Tooltip key="delete" title="Delete">
-        <IconButton size="small" color="error" aria-label={`Delete ${kb.displayName}`} onClick={() => setDeleting(kb)}>
-          <Trash2 size={16} />
-        </IconButton>
-      </Tooltip>,
+      canManage ? (
+        <Tooltip key="delete" title="Delete">
+          <IconButton size="small" color="error" aria-label={`Delete ${kb.displayName}`} onClick={() => setDeleting(kb)}>
+            <Trash2 size={16} />
+          </IconButton>
+        </Tooltip>
+      ) : (
+        ''
+      ),
     ];
   });
 
@@ -123,9 +130,11 @@ function KnowledgeBaseList({ scope }: { scope: OrgScope }): JSX.Element {
     <>
       <Stack direction="row" gap={1} alignItems="center" sx={toolbarSx}>
         <SearchField value={search} onChange={setSearch} placeholder="Search knowledge bases..." fullWidth />
-        <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newKnowledgeBaseUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
-          Create Knowledge Base
-        </Button>
+        {canManage && (
+          <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newKnowledgeBaseUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0, px: 2.5 }}>
+            Create Knowledge Base
+          </Button>
+        )}
       </Stack>
       {deleted && (
         <Alert severity="success" onClose={() => setDeleted(null)} sx={toolbarSx}>

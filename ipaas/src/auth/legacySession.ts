@@ -16,6 +16,8 @@
  * under the License.
  */
 
+import { THUNDER_INSTANCE_ID } from './thunderConfig';
+
 /**
  * What the console kept in browser storage before cloud moved to the Thunder SDK. The SDK keeps
  * its own session, so nothing reads these again, but an upgraded browser would otherwise hold
@@ -33,5 +35,18 @@ export function clearLegacySession(): void {
     LEGACY_SESSION_KEYS.forEach((key) => sessionStorage.removeItem(key));
   } catch {
     // Storage blocked (private mode, site data disabled): there is nothing left behind to clear.
+  }
+}
+
+export function clearBrowserSignInSession(): void {
+  const pkceKey = `-instance_${THUNDER_INSTANCE_ID}-`;
+  try {
+    [localStorage, sessionStorage].forEach((storage) => {
+      Array.from({ length: storage.length }, (_, i) => storage.key(i))
+        .filter((key): key is string => key?.includes(pkceKey) ?? false)
+        .forEach((key) => storage.removeItem(key));
+    });
+  } catch {
+    return;
   }
 }

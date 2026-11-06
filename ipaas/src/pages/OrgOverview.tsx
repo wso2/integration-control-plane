@@ -24,7 +24,7 @@ import Authorized from '../components/Authorized';
 import EmptyListing from '../components/EmptyListing';
 import ExploreMore from '../components/ExploreMore';
 import ProjectPickerDialog from '../components/OrgOverview/ProjectPickerDialog';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useOrgComponents } from '../hooks/useComponents';
@@ -138,11 +138,11 @@ function RowsSkeleton(): JSX.Element {
 export default function OrgOverview(scope: OrgScope): JSX.Element {
   const dbAvailability = useDatabaseAvailability();
   const databasesAvailable = dbAvailability.data?.available === true;
-  const databasesUnavailableReason = dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
   const navigate = useAppNavigate();
   const [pickingProject, setPickingProject] = useState(false);
   const { displayName, username } = useAuth();
   const { hasOrgPermission } = useAccessControl();
+  const databaseDeniedReason = !hasOrgPermission(Scopes.CONFIG_MANAGE) ? 'You do not have permission to create databases.' : dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
   const { data: projects = [], isLoading, isError, refetch } = useProjects();
   // The BFF returns projects unordered, so the most recently updated are picked here.
   const listed = [...projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, LIST_SIZE);
@@ -158,7 +158,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
   const openProjects = projects.filter((p) => !p.deleting);
   // With no project yet the action creates one first, so it needs that permission instead.
   const createDeniedReason =
-    openProjects.length === 0 ? (hasOrgPermission(Permissions.PROJECT_MANAGE) ? undefined : 'You do not have permission to create projects.') : hasOrgPermission(Permissions.INTEGRATION_MANAGE) ? undefined : 'You do not have permission to create integrations.';
+    openProjects.length === 0 ? (hasOrgPermission(Scopes.PROJECT_CREATE) ? undefined : 'You do not have permission to create projects.') : hasOrgPermission(Scopes.INTEGRATION_CREATE) ? undefined : 'You do not have permission to create integrations.';
 
   // Integrations live in a project, so the user picks one only when there is a choice to make.
   const createIntegration = () => {
@@ -221,7 +221,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           description="Provision managed databases for your integrations to store and query data."
           actionLabel="Create a database"
           onAction={databasesAvailable ? () => navigate(newDatabaseUrl(scope, 'postgres')) : undefined}
-          disabledReason={databasesUnavailableReason}
+          disabledReason={databaseDeniedReason}
         />
       </Box>
 
@@ -238,7 +238,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
             )}
           </Stack>
           <Box sx={{ flex: 1 }} />
-          <Authorized permissions={Permissions.PROJECT_MANAGE}>
+          <Authorized permissions={Scopes.PROJECT_CREATE}>
             <Button variant="outlined" startIcon={<Plus size={16} />} onClick={() => navigate(newProjectUrl(scope))} sx={{ whiteSpace: 'nowrap', flexShrink: 0 }}>
               Create project
             </Button>

@@ -18,6 +18,7 @@
 
 import type { SchemaConfigItem } from './configuration';
 import type { IntegrationKind } from './insights';
+import type { EndpointExposure } from './component';
 
 export const DeploymentStatus = {
   Active: 'Active',
@@ -33,6 +34,45 @@ export interface ReleaseMgtDeploymentRef {
   releaseMgtReleaseId: string;
   releaseMgtDeploymentId: string;
   releaseMgtReleaseName?: string;
+}
+
+/** Where the API gateway stands against what the environment's release asks for. */
+export type ProxyReconciliationState = 'PENDING' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'DEGRADED' | 'NOT_APPLICABLE' | 'PENDING_PROMOTION';
+
+export interface ProxyReconciliationEndpoint {
+  endpoint: string;
+  /** The endpoint's saved gateway exposure here; a promotion copies it from the source. */
+  exposure?: EndpointExposure;
+  gateway?: string;
+  deploymentId?: string;
+  /** The API Platform build the environment runs for this endpoint. */
+  buildId?: string;
+  status: ProxyReconciliationState;
+  /** A stable code, never an upstream body. */
+  error?: string;
+}
+
+export interface ProxyReconciliationStatus {
+  status: ProxyReconciliationState;
+  component: string;
+  environment: string;
+  componentRelease?: string;
+  endpoints: ProxyReconciliationEndpoint[];
+  attemptCount?: number;
+  lastAttemptAt?: string;
+  nextRetryAt?: string;
+  error?: string;
+}
+
+export interface ProxyReconciliationSummary {
+  status: ProxyReconciliationState;
+  statusUrl?: string;
+  error?: string;
+}
+
+export interface PromoteResult {
+  message: string;
+  proxyReconciliation?: ProxyReconciliationSummary;
 }
 
 export interface ComponentDeployment {
@@ -55,6 +95,8 @@ export interface ComponentDeployment {
       author: { name: string; date: string; email: string; avatarUrl: string };
     };
   };
+  /** Integration-as-API only: the API gateway's state for this environment. */
+  proxyReconciliation?: ProxyReconciliationStatus;
 }
 
 export interface BuildRun {

@@ -45,8 +45,9 @@ interface EnvCardShellProps {
 
 // Per-env query keys invalidated by the generic Refresh — the union across
 // every migrated type's data. Invalidating a key a given type doesn't use is
-// harmless; adding a new type may mean adding its key here.
-const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionConfigs', 'taskExecutions', 'schemaConfig', 'component-logs'];
+// harmless; adding a new type may mean adding its key here. `wf` holds every
+// read from a workflow integration's engine (definitions and figures).
+const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionConfigs', 'taskExecutions', 'schemaConfig', 'component-logs', 'wf'];
 
 /**
  * The generic env-card frame. It owns ONLY what every type shares:

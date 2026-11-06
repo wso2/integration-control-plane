@@ -43,6 +43,9 @@ import EndpointsDrawer from './EndpointsDrawer';
 import WorkflowRuntimeRow from './WorkflowRuntimeRow';
 import { useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { DeployEnvironmentCardProps } from '../../../types/deploy';
+import { useUserVisibleEndpoints } from '../../../hooks/useUserVisibleEndpoints';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 
 export default function DeployEnvironmentCard({
   orgHandler,
@@ -67,6 +70,7 @@ export default function DeployEnvironmentCard({
   const showEndpoints = !flags.isAutomation && !hideEndpoints;
   const isMI = runtimeFromDisplayType(displayType ?? '') === 'mi';
   const qc = useQueryClient();
+  const can = useCan();
   const [configureOpen, setConfigureOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -149,7 +153,8 @@ export default function DeployEnvironmentCard({
 
   const { data: trackImages = [] } = useDeploymentTrackImages(componentId, versionId);
   const { data: deploymentStatus = [] } = useDeploymentStatus(componentId, versionId);
-  const { data: endpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '');
+  const { data: allEndpoints = [], isLoading: endpointsLoading } = useEnvEndpoints(showEndpoints ? componentId : '', showEndpoints ? versionId : '', showEndpoints && releaseId ? releaseId : '');
+  const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
 
   const deployedRunId = deployment?.build?.runId ?? null;
   const deployedBuildId = deployment?.build?.buildId ?? null;
@@ -302,14 +307,15 @@ export default function DeployEnvironmentCard({
   const isSuspended = status === DeploymentStatus.Suspended;
   // Keep button visible while in-flight. Suppress the opposing button while an action is in-flight
   // to prevent both showing simultaneously when status transitions mid-flight (header scatter).
-  const showStop = !flags.isAutomation && (((isActive || isInProgress) && hasRelease && !isRedeployPending) || isStopPending);
+  const canDeployHere = can(Scopes.INTEGRATION_DEPLOY);
+  const showStop = canDeployHere && !flags.isAutomation && (((isActive || isInProgress) && hasRelease && !isRedeployPending) || isStopPending);
   // `isRedeployPending` keeps a button visible mid-flight, but it must be the one
   // that was clicked: a redeploy started from ERROR stays on Redeploy, not Start.
-  const showStart = !flags.isAutomation && ((isSuspended && hasRelease && !isStopPending) || (isRedeployPending && !isError));
+  const showStart = canDeployHere && !flags.isAutomation && ((isSuspended && hasRelease && !isStopPending) || (isRedeployPending && !isError));
   // A failed deployment is already not serving, so stopping it achieves nothing —
   // offer the recovery action instead, and hold it through the redeploy.
-  const showRedeploy = !flags.isAutomation && isError && hasRelease && !isStopPending;
-  const showPromote = !!nextEnvId;
+  const showRedeploy = canDeployHere && !flags.isAutomation && isError && hasRelease && !isStopPending;
+  const showPromote = !!nextEnvId && can(Scopes.INTEGRATION_DEPLOY);
   const { data: workflowRuntime } = useWorkflowRuntime(isWorkflow);
   const workflowRuntimeBlocked = isWorkflow && workflowRuntime?.status !== 'READY';
 
@@ -350,8 +356,8 @@ export default function DeployEnvironmentCard({
             endpointCount={endpoints.length}
             scaleToZeroEnabled={env.scaleToZeroEnabled}
             missingConfigsReason={missingConfigsReason}
-            onConfigClick={() => setConfigureOpen(true)}
-            onJobConfigClick={flags.isAutomation ? () => setScheduleOpen(true) : undefined}
+            onConfigClick={can(Scopes.CONFIG_MANAGE) ? () => setConfigureOpen(true) : undefined}
+            onJobConfigClick={flags.isAutomation && can(Scopes.INTEGRATION_UPDATE) ? () => setScheduleOpen(true) : undefined}
             onHistoryClick={() => setHistoryOpen(true)}
             configurablesCount={configurablesCount}
             onEndpointsClick={showEndpoints ? () => setEndpointsOpen(true) : undefined}
@@ -386,6 +392,7 @@ export default function DeployEnvironmentCard({
       </Card>
 
       <ConfigureDrawer
+        isWorkflow={isWorkflow}
         open={configureOpen}
         onClose={() => setConfigureOpen(false)}
         orgHandler={orgHandler}
