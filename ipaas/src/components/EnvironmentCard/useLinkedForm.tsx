@@ -44,7 +44,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
     const id = configurableId(path);
     const t = view.target(id);
     return {
-      ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }) } }),
+      ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }), ...(t.source.declared && { declared: true }) } }),
       ...(t.picker && { picker: { ...t.picker, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
     };
   };
@@ -63,7 +63,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
         )}
       </Stack>
     ),
-    actions: view.editable && <ConnectionLink connection={c} links={links} busy={write.isPending} onLink={(ref) => change(ref ? { connection: c.id, ref } : { connection: c.id })} />,
+    actions: view.editable && !view.sourceDefined && <ConnectionLink connection={c} links={links} busy={write.isPending} onLink={(ref) => change(ref ? { connection: c.id, ref } : { connection: c.id })} />,
     note: note && (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
         {note}
@@ -73,11 +73,18 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   }));
 
   const linkedKeys = new Set(
-    [...Object.keys(links.fieldLinks), ...links.connections.flatMap((c) => c.fields.map((f) => f.configurable)), ...Object.keys(links.environments.find((e) => e.name === env)?.configurables ?? {})].filter((id) => view.target(id).source).map(configKey),
+    [...Object.keys(links.fieldLinks), ...Object.keys(links.declared ?? {}), ...links.connections.flatMap((c) => c.fields.map((f) => f.configurable)), ...Object.keys(links.environments.find((e) => e.name === env)?.configurables ?? {})]
+      .filter((id) => view.target(id).source)
+      .map(configKey),
   );
 
   const top: ReactNode = (
     <>
+      {view.sourceDefined && (
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+          Links come from workload.yaml in the repository.
+        </Typography>
+      )}
       {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending} change={change} />}
       {write.data?.workload === 'next_deploy' && (
         <Alert severity="info" sx={{ mb: 1.5 }}>

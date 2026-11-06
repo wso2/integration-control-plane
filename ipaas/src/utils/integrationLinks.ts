@@ -39,6 +39,8 @@ export interface FieldSource extends KeyRef {
   /** An own link that beats its connection's. */
   overrides?: boolean;
   noValues: boolean;
+  /** Declared in workload.yaml. */
+  declared?: boolean;
 }
 
 export interface Picker {
@@ -63,6 +65,8 @@ export interface ConnectionView {
 
 export interface FormLinkView {
   editable: boolean;
+  /** workload.yaml declares the resources: nothing links here. */
+  sourceDefined: boolean;
   connections: ConnectionView[];
   /** By configurable id, or env var name for MI. */
   target: (target: string) => TargetView;
@@ -88,6 +92,10 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
   };
 
   const target = (id: string): TargetView => {
+    if (links.sourceDefined) {
+      const d = links.declared?.[id];
+      return d ? { source: { ...source(d), declared: true } } : {};
+    }
     if (!editable) {
       const ref = release?.configurables[id] ?? release?.env[id];
       return ref ? { source: source(ref) } : {};
@@ -121,7 +129,10 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
       return own.length ? [{ id, ...(link && { link }), suggestions: [], fields: own.map((configurable) => ({ configurable })) }] : [];
     });
 
-  const connections = (editable ? links.connections : releaseConnections()).map((c) => {
+  const sections = editable ? links.connections : releaseConnections();
+  if (links.sourceDefined) return { editable, sourceDefined: true, connections: sections.map((c) => ({ connection: c })), target, orphaned: [] };
+
+  const connections = sections.map((c) => {
     const uses = c.link;
     // A connection the Workload's build renamed has no link now to compare with.
     const now = editable ? c : links.connections.find((x) => x.id === c.id);
@@ -132,7 +143,7 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
     return { connection: c, ...(uses && { linked: resource(uses) }), ...(note && { note }) };
   });
 
-  return { editable, connections, target, orphaned: links.orphaned.map((o) => ({ ...o, name: name(o.ref) })) };
+  return { editable, sourceDefined: false, connections, target, orphaned: links.orphaned.map((o) => ({ ...o, name: name(o.ref) })) };
 }
 
 /** A connection's configurables among fields: those named after it (`github` → `githubAuthToken`), as ipaas-service groups them. */

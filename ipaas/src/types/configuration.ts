@@ -191,6 +191,10 @@ export interface IntegrationLinks {
   orphaned: OrphanedLink[];
   env: Record<string, KeyRef>;
   environments: EnvironmentLinks[];
+  /** The repository's workload.yaml declares the integration's resources: links are ignored, and writes refused. */
+  sourceDefined?: boolean;
+  /** With sourceDefined: configurable id (or MI env var name) → the key workload.yaml gives it. */
+  declared?: Record<string, KeyRef>;
 }
 
 /** One link change: a target, and its source; without `ref` the target's own link goes. */

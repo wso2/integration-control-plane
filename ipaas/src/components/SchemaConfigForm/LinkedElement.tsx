@@ -18,13 +18,13 @@
 
 import { Box, Chip, InputAdornment, TextField, Typography } from '@wso2/oxygen-ui';
 import { FieldLinkPicker } from './FieldLinkPicker';
-import type { FieldLinkPicker as Picker, LinkedSource } from './linkedFrom';
+import { fromText, type FieldLinkPicker as Picker, type LinkedSource } from './linkedFrom';
 
 const chipSx = { height: 18, fontSize: '0.65rem', borderRadius: 0.75 } as const;
 
 /** A field a link fills: read-only, saying where from, with the link icon to change it. */
 export function LinkedElement({ title, source, picker }: { title: string; source: LinkedSource; picker?: Picker }) {
-  const from = `from ${source.resource} · ${source.key}`;
+  const from = fromText(source);
   return (
     <Box sx={{ mt: 1.5 }}>
       <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', mb: 0.5 }}>

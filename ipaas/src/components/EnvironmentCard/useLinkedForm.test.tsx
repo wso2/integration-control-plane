@@ -230,4 +230,16 @@ describe('the Configure form with links', () => {
     await act(async () => root.render(<Unread env="development" />));
     expect(container.textContent).toBe('none');
   });
+
+  it("shows workload.yaml's declarations read-only, with no link icons or link selects, when the repository declares the resources", async () => {
+    answer.links = { ...links, sourceDefined: true, declared: { [id('githubAuthToken')]: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN' } }, orphaned: [], usedByOrphaned: {} };
+    await act(async () => root.render(<Form />));
+    expect(container.textContent).toContain('Links come from workload.yaml in the repository.');
+    expect((container.querySelector('input[aria-label="githubAuthToken is supplied by GitHub Acme"]') as HTMLInputElement).value).toBe('from workload.yaml (GitHub Acme · GITHUB_AUTH_TOKEN)');
+    expect(container.querySelector('[aria-label="Link github"]')).toBeNull();
+    expect(container.querySelector('[aria-label="Unlink github"]')).toBeNull();
+    expect(container.querySelectorAll('button[aria-label^="Link "]')).toHaveLength(0);
+    // Every field but the declared one keeps its value box.
+    expect(Array.from(container.querySelectorAll('input')).filter((i) => !i.disabled && i.placeholder === 'Enter a value')).toHaveLength(schemaFields(schema).length - 1);
+  });
 });
