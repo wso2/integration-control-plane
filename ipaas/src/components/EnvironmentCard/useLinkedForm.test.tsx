@@ -23,7 +23,7 @@ import { BffError } from '../../api/_client';
 import type { IntegrationLinks } from '../../types/configuration';
 import type { JSONSchema } from '../../types/schema';
 import { ConfigForm } from '../SchemaConfigForm/ConfigForm';
-import { schemaFields } from '../SchemaConfigForm/schemaUtils';
+import { linkableFields, schemaFields } from '../SchemaConfigForm/schemaUtils';
 import { useLinkedForm } from './useLinkedForm';
 
 // ipaas-service's answer: github linked to GitHub Acme; ordersDbUrl's link lost its target when the code renamed it.
@@ -48,11 +48,17 @@ const links: IntegrationLinks = {
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: false, connections: {}, configurables: {}, env: {} }],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0 }));
 const failed = vi.hoisted(() => ({ current: undefined as { error: Error; variables: { target: unknown } } | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
-  useIntegrationLinks: () => ({ data: answer.links ?? links }),
-  useLinkWrite: () => ({ isPending: false, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
+  useIntegrationLinks: () => ({
+    data: answer.cached ? (answer.links ?? links) : undefined,
+    isError: answer.readFailed,
+    isLoading: false,
+    isFetching: false,
+    refetch: async () => void answer.refetches++,
+  }),
+  useLinkWrite: () => ({ isPending: answer.pending, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useEnvironments', () => ({ useEnvironments: () => ({ data: [{ id: 'development', name: 'Development' }] }) }));
 
@@ -74,13 +80,7 @@ const schema = {
 } as unknown as JSONSchema;
 
 function Form({ env = 'development', form = schema }: { env?: string; form?: JSONSchema }) {
-  const linked = useLinkedForm(
-    'default',
-    'ghdemo',
-    env,
-    true,
-    schemaFields(form).map((f) => f.path),
-  );
+  const linked = useLinkedForm('default', 'ghdemo', env, true, linkableFields(form));
   return (
     <>
       {linked.top}
@@ -110,6 +110,7 @@ beforeEach(async () => {
   writes.length = 0;
   failed.current = undefined;
   answer.links = undefined;
+  Object.assign(answer, { pending: false, readFailed: false, cached: true, refetches: 0 });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -155,6 +156,85 @@ describe('the Configure form with links', () => {
     } finally {
       Object.assign(links, { used, usedByOrphaned });
     }
+  });
+
+  it('offers no link action while a link write is on its way', async () => {
+    answer.pending = true;
+    await act(async () => root.render(<Form />));
+    const actions = ['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map(button);
+    expect(actions.map((b) => [b.getAttribute('aria-label') ?? b.textContent, b.disabled])).toEqual([
+      ['Link githubAuthToken', true],
+      ['Link ordersDatabaseUrl', true],
+      ['Unlink github', true],
+      ['Move', true],
+      ['Remove', true],
+    ]);
+    expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it("says the links couldn't be read, with Try again, and offers no link action or save", async () => {
+    Object.assign(answer, { readFailed: true, cached: false });
+    const Read = () => {
+      const linked = useLinkedForm('default', 'ghdemo', 'development', true, []);
+      return (
+        <>
+          {linked.top}
+          <span>{`missing ${linked.linksMissing} unread ${linked.linksUnread}`}</span>
+        </>
+      );
+    };
+    await act(async () => root.render(<Read />));
+    expect(container.textContent).toBe("Couldn't read this integration's links.Try againmissing true unread true");
+    await act(async () => button('Try again').click());
+    expect(answer.refetches).toBe(1);
+  });
+
+  it('keeps the links of the last read, marked as not refreshed, with no link action', async () => {
+    answer.readFailed = true;
+    await act(async () => root.render(<Form />));
+    expect(container.textContent).toContain("Couldn't refresh this integration's links. These are from the last read.");
+    expect(container.textContent).toContain('githubLinked to GitHub Acme');
+    expect(['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map((l) => button(l).disabled)).toEqual([true, true, true, true, true]);
+    expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it("offers a link icon on a simple-typed configurable only, not on a record's members", async () => {
+    const withRecord = {
+      type: 'object',
+      requiredLevel: 3,
+      properties: {
+        acme: {
+          type: 'object',
+          properties: {
+            ghdemo: {
+              type: 'object',
+              required: ['ordersDatabaseUrl', 'database'],
+              properties: {
+                ordersDatabaseUrl: { type: 'string', description: '' },
+                database: { type: 'object', description: '', required: ['host'], properties: { host: { type: 'string', description: '' } } },
+              },
+            },
+          },
+        },
+      },
+    } as unknown as JSONSchema;
+    await act(async () => root.render(<Form form={withRecord} />));
+    expect(linkableFields(withRecord)).toEqual(['acme.ghdemo.ordersDatabaseUrl']);
+    // The record's member renders as a value box of its own.
+    expect(container.textContent).toContain('host');
+    expect(Array.from(container.querySelectorAll('button[aria-label^="Link "]')).map((b) => b.getAttribute('aria-label'))).toEqual(['Link ordersDatabaseUrl']);
+  });
+
+  it('links a boolean configurable from its link icon', async () => {
+    const withBoolean = {
+      type: 'object',
+      requiredLevel: 3,
+      properties: { acme: { type: 'object', properties: { ghdemo: { type: 'object', required: ['ordersVerbose'], properties: { ordersVerbose: { type: 'boolean', description: '' } } } } } },
+    } as unknown as JSONSchema;
+    await act(async () => root.render(<Form form={withBoolean} />));
+    await act(async () => button('Link ordersVerbose').click());
+    await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersVerbose"] li')).find((li) => li.textContent?.startsWith('URL')) as HTMLElement).click());
+    expect(writes).toEqual([{ configurable: id('ordersVerbose'), ref: 'orders-db', key: 'URL' }]);
   });
 
   it('links a field to the key picked from its link icon', async () => {

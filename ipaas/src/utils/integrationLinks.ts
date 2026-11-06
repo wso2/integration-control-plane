@@ -92,13 +92,10 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
   };
 
   const target = (id: string): TargetView => {
-    if (links.sourceDefined) {
-      const d = links.declared?.[id];
-      return d ? { source: { ...source(d), declared: true } } : {};
-    }
-    if (!editable) {
-      const ref = release?.configurables[id] ?? release?.env[id];
-      return ref ? { source: source(ref) } : {};
+    // Another environment shows what its release uses; `declared` is the current Workload's.
+    if (!editable || links.sourceDefined) {
+      const ref = editable ? links.declared?.[id] : (release?.configurables[id] ?? release?.env[id]);
+      return ref ? { source: { ...source(ref), ...(links.sourceDefined && { declared: true }) } } : {};
     }
     const own = links.fieldLinks[id] ?? links.env[id];
     const via = connectionKey(id);

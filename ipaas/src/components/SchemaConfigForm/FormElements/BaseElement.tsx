@@ -363,6 +363,7 @@ function EditableElement({
               handleValidationChange(jsonPath, true);
             }}
           />
+          {pickerIcon}
           {linkAdornment}
         </Stack>
       </Box>

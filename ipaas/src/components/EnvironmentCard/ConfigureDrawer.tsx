@@ -33,7 +33,7 @@ import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer'
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCard } from '../EndpointCard';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
-import { schemaFields } from '../SchemaConfigForm/schemaUtils';
+import { linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -328,7 +328,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return null;
     }
   }, [data?.jsonSchema]);
-  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? schemaFields(parsedSchema).map((f) => f.path) : []);
+  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? linkableFields(parsedSchema) : []);
 
   // Seed values only on open; avoid clobbering edits on background refetches.
   const seededRef = useRef(false);
@@ -793,7 +793,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
-  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? schemaFields(parsedSchema).map((f) => f.path) : []);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {
@@ -1027,7 +1027,7 @@ function GenericServiceConfigureDrawer({
   };
 
   const renderConfigurations = () => {
-    if (isLoading) {
+    if (isLoading || linked.linksLoading) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress size={32} color="primary" />
@@ -1043,6 +1043,8 @@ function GenericServiceConfigureDrawer({
         </Box>
       );
     }
+    // Without the links, linked fields would read as empty value boxes.
+    if (linked.linksMissing) return linked.top;
     if (!data?.jsonSchema || !parsedSchema) {
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
@@ -1111,7 +1113,7 @@ function GenericServiceConfigureDrawer({
   const isApplying = save.isPending || saveCertMappings.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === lastStep ? (isApplying ? 'Applying…' : 'Apply') : step === 1 && generateEp.isPending ? 'Loading…' : 'Next';
-  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
+  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
   const showFooter = !(step === lastStep && managingEp !== null);
 
   return (
