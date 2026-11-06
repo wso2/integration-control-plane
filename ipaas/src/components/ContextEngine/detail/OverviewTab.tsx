@@ -19,10 +19,10 @@
 import { Alert, Box, Button, Chip, /* CircularProgress, */ Grid, Link, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { EyeOff, Lock /* , Play, RefreshCw */ } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
-import { CONTEXT_ENGINE_MODEL_UPDATES, useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
+import { useAddContextSource, useAskedFlag, useContextEngineProgress, useContextPermissions, useUploadAudience } from '../../../hooks/useContextEngine';
 import { rememberedSourceRules, rememberSourceRules, startUploads } from '../../../hooks/contextUploads';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
-import { checkStagedFile, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
+import { answersFromIngestion, checkStagedFile, effectiveVisibility, engineMessage, getStartedSteps, modelProviderName, sourceAsConfig, summarizeEngineProgress, visibilityTags, withSourceVisibilityRules } from '../../../utils/contextEngine';
 import { dropStagedFile, getStagedFile } from '../../../utils/stagedFiles';
 import { HttpError } from '../../../types/http';
 import GetStartedChecklist from './GetStartedChecklist';
@@ -34,7 +34,7 @@ import EditModelsDrawer from './EditModelsDrawer';
 import AccessSwitch from './AccessSwitch';
 import SourceDrawer from '../SourceDrawer';
 import { deleteCardSx, mutedSx, summaryCardHeaderSx, summaryCardSx, summaryRowSx } from '../styles';
-import type { ContextEngineAccess, ContextEngineDetail, ContextEngineTabKey, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
+import type { ContextEngineAccess, ContextEngineDetail, ContextEngineTabKey, ContextModelSummary, ContextSource, ContextSourceConfig, GetStartedStepId } from '../../../types/contextEngine';
 
 interface OverviewTabProps {
   engine: ContextEngineDetail;
@@ -72,26 +72,38 @@ function LockedChip({ title }: { title: string }): JSX.Element {
   );
 }
 
-function ModelRow({ label, provider, model, locked = false }: { label: string; provider: string; model: string | undefined; locked?: boolean }): JSX.Element {
+/** One model: what it is, and how it can change. */
+function ModelRow({ label, model, locked, action }: { label: string; model: string; locked?: string; action: ReactNode }): JSX.Element {
   return (
     <Box sx={summaryRowSx}>
-      <Stack direction="row" alignItems="center" gap={1}>
-        <Typography variant="body2" sx={mutedSx}>
-          {label}
-        </Typography>
-        {locked && <LockedChip title="Can't change after indexing." />}
-      </Stack>
-      <Box sx={{ textAlign: 'right' }}>
-        <Typography variant="body2" sx={{ fontWeight: 500 }}>
-          {provider}
-        </Typography>
-        {model && (
-          <Typography variant="caption" sx={mutedSx}>
-            {model}
-          </Typography>
-        )}
+      <Box sx={{ minWidth: 0 }}>
+        <Typography variant="body2">{label}</Typography>
+        <Stack direction="row" alignItems="center" gap={0.5} sx={mutedSx}>
+          <Typography variant="caption">{model}</Typography>
+          {locked && (
+            <Tooltip title={locked}>
+              <Lock size={12} aria-label={locked} />
+            </Tooltip>
+          )}
+        </Stack>
       </Box>
+      {action}
     </Box>
+  );
+}
+
+const modelText = (kind: 'embedding' | 'llm', m: ContextModelSummary | null | undefined, fallback: string): string => (m ? `${modelProviderName(kind, m.provider)} · ${m.model}` : fallback);
+
+/** Opens the models drawer; disabled, with the reason as its tooltip, when the caller can't change models. */
+function ModelAction({ label, blocked, onClick }: { label: string; blocked?: string; onClick: () => void }): JSX.Element {
+  return (
+    <Tooltip title={blocked ?? ''}>
+      <span>
+        <Link component="button" type="button" variant="body2" disabled={!!blocked} onClick={onClick}>
+          {label}
+        </Link>
+      </span>
+    </Tooltip>
   );
 }
 
@@ -145,15 +157,25 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
   const [sourceNotice, setSourceNotice] = useState<{ severity: 'warning' | 'error'; message: string; forbidden?: boolean; retry?: () => void } | null>(null);
   const addSource = useAddContextSource(engine.id);
   const permissions = useContextPermissions(readOnly ? '' : engine.id);
-  // Models are set when the engine is created; the BFF cannot change them yet.
-  const canEditModels = CONTEXT_ENGINE_MODEL_UPDATES && !readOnly && !!permissions.data?.includes('engine.manage');
+  const modelsBlocked = permissions.isPending
+    ? 'Checking your permissions…'
+    : permissions.isError
+      ? "Couldn't check your permissions."
+      : permissions.data?.includes('engine.manage')
+        ? undefined
+        : 'You need the manage permission on this engine to change its models.';
+  const llmModels = engine.models.llm ? { ...engine.models, llm: engine.models.llm } : null;
+  const canOpenModels = !readOnly && !!llmModels;
   const accessDisabledReason = readOnly ? 'The engine is being deleted.' : undefined;
   const [modelsOpen, setModelsOpen] = useState(false);
   const [modelsSession, setModelsSession] = useState(0);
-  const openModels = () => {
+  const [focusEmbeddingKey, setFocusEmbeddingKey] = useState(false);
+  const openModels = (embeddingKey = false) => {
+    setFocusEmbeddingKey(embeddingKey);
     setModelsSession((n) => n + 1);
     setModelsOpen(true);
   };
+  const changeModels = canOpenModels ? <ModelAction label="Change" blocked={modelsBlocked} onClick={() => openModels()} /> : undefined;
   const { everyone } = useUploadAudience(orgHandle, engine.queryRoles, readOnly ? null : engine.id);
   const existingConfigs = engine.sources.map((s) => sourceAsConfig(s, rememberedSourceRules(s.id)));
 
@@ -265,24 +287,29 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
         */}
 
         <Grid size={{ xs: 12, md: 4 }}>
-          <Card
-            title="Models"
-            action={
-              canEditModels && canSeeModels(permissions.data) ? (
-                <Link component="button" type="button" variant="body2" onClick={openModels}>
-                  {engine.models.embedding || engine.models.llm ? 'Edit' : 'Choose models'}
-                </Link>
-              ) : undefined
-            }>
+          <Card title="Models">
             {canSeeModels(permissions.data) ? (
               <>
-                <ModelRow label="Embedding" provider={engine.models.embedding ? modelProviderName('embedding', engine.models.embedding.provider) : 'Engine default'} model={engine.models.embedding?.model} locked={!!engine.models.embeddingLocked} />
-                <ModelRow label="Ingestion language model" provider={engine.models.llm ? modelProviderName('llm', engine.models.llm.provider) : 'Engine default'} model={engine.models.llm?.model} />
+                <ModelRow
+                  label="Embedding model"
+                  model={modelText('embedding', engine.models.embedding, 'Engine default')}
+                  locked="The embedding model can't change."
+                  action={canOpenModels && engine.models.embedding ? <ModelAction label="Replace key" blocked={modelsBlocked} onClick={() => openModels(true)} /> : undefined}
+                />
+                <ModelRow label="Ingestion language model" model={modelText('llm', engine.models.llm, 'Engine default')} action={changeModels} />
                 <ModelRow
                   label="Answer language model"
-                  provider={!engine.exposure.answers ? 'Disabled' : engine.models.answer ? modelProviderName('llm', engine.models.answer.provider) : 'Engine default'}
-                  model={engine.exposure.answers ? engine.models.answer?.model : undefined}
+                  model={!engine.exposure.answers ? 'Answers are off' : answersFromIngestion(engine.models) ? 'Same as the ingestion model' : modelText('llm', engine.models.answer, 'Same as the ingestion model')}
+                  action={engine.exposure.answers ? changeModels : undefined}
                 />
+                {canOpenModels && permissions.isError && (
+                  <Typography variant="caption" color="error">
+                    Couldn&apos;t check your permissions.{' '}
+                    <Link component="button" type="button" variant="caption" onClick={() => void permissions.refetch()}>
+                      Retry
+                    </Link>
+                  </Typography>
+                )}
               </>
             ) : (
               <Stack direction="row" gap={1} sx={mutedSx}>
@@ -351,7 +378,7 @@ export default function OverviewTab({ engine, orgHandle, /* roleNames, */ onGoTa
         )}
       </Grid>
 
-      {modelsSession > 0 && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={engine.models} open={modelsOpen} onClose={() => setModelsOpen(false)} />}
+      {modelsSession > 0 && llmModels && <EditModelsDrawer key={modelsSession} engineId={engine.id} models={llmModels} answersEnabled={engine.exposure.answers} focusEmbeddingKey={focusEmbeddingKey} open={modelsOpen} onClose={() => setModelsOpen(false)} />}
       {filesSource && <FilesDrawer engineId={engine.id} orgHandle={orgHandle} source={filesSource} queryRoles={engine.queryRoles} open={filesOpen} onClose={() => setFilesOpen(false)} />}
       <SourceDrawer key={addSession} orgHandle={orgHandle} open={addOpen} existing={existingConfigs} queryRoles={engine.queryRoles} engineId={engine.id} onClose={() => setAddOpen(false)} onSubmit={submitNewSource} />
       {editSource && (

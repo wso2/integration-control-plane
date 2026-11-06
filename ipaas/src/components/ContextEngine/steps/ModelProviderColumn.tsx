@@ -72,10 +72,13 @@ interface ModelProviderColumnProps<T extends ModelLike> {
   choice?: ReactNode;
   /** False leaves only the title, purpose and choice. */
   showProviders?: boolean;
+  /** Shown under the key field, which is then optional: an empty key keeps the stored one. */
+  keyHelperText?: string;
+  keyError?: string;
 }
 
 /** One model choice — provider tiles, model, credentials — laid out as a column so three fit side by side. */
-export default function ModelProviderColumn<T extends ModelLike>({ title, purpose, providers, value, onChange, blank, shareKey, modelLabel, choice, showProviders = true }: ModelProviderColumnProps<T>): JSX.Element {
+export default function ModelProviderColumn<T extends ModelLike>({ title, purpose, providers, value, onChange, blank, shareKey, modelLabel, choice, showProviders = true, keyHelperText, keyError }: ModelProviderColumnProps<T>): JSX.Element {
   const providerInfo = providers.find((p) => p.id === value?.provider);
   const models = providerInfo?.models ?? [];
   const keyShared = !!shareKey?.available && shareKey.checked;
@@ -178,7 +181,7 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
 
           {shareKey?.available && <FormControlLabel control={<Checkbox size="small" checked={shareKey.checked} onChange={(_e, checked) => shareKey.onChange(checked)} />} label="Use the same API key as the embedding model" />}
 
-          {!keyShared && <SecretField label="API Key" required value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} />}
+          {!keyShared && <SecretField label="API Key" required={!keyHelperText} value={value.apiKey} onChange={(v) => onChange({ ...value, apiKey: v })} helperText={keyHelperText} error={keyError} />}
         </Stack>
       )}
     </Box>

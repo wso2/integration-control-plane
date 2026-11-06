@@ -63,6 +63,8 @@ export interface ContextEngine {
   publicApiUrl?: string;
   /** Whether the gateway lets callers through to the REST API and the MCP server; set only while the engine runs. */
   access?: ContextEngineAccess;
+  /** When the running pod started; set only while the engine runs. */
+  startedAt?: string;
 }
 
 export interface ContextEngineAccess {
@@ -82,11 +84,7 @@ export interface ContextEngineExposure {
 export interface ContextModelSummary {
   provider: string;
   model: string;
-  /** How the engine holds the key: `encrypted` from a typed key, `reference` resolved at call time. The key never comes back. */
-  keyKind?: 'encrypted' | 'reference' | 'unknown' | string;
   dimensions?: number;
-  baseUrl?: string;
-  apiVersion?: string;
 }
 
 export interface ContextEngineModels {
@@ -96,40 +94,31 @@ export interface ContextEngineModels {
   answer?: ContextModelSummary | null;
   /** The engine holds indexed content, so the embedding model cannot change until it can re-index. */
   embeddingLocked?: boolean;
-  /** Configuration version and when it last changed, when the engine reports them. */
-  version?: number;
-  updatedAt?: string;
 }
 
-/** One model to save. Sent without a key or reference, an unchanged model keeps its stored key. */
-export interface ContextModelInput {
+/** A language model to move to. Without a key, it keeps the stored one. */
+export interface ContextModelChange {
   provider: string;
   model: string;
   apiKey?: string;
-  /** `env:NAME` from the engine's environment, or `cp:<id>` from the control plane. */
-  apiKeyRef?: string;
-  baseUrl?: string;
-  apiVersion?: string;
-  dimensions?: number;
 }
 
-/** One model while it is edited on a running engine; an empty key or reference keeps the stored one when the model is unchanged. */
-export interface ModelDraft {
-  provider: string;
-  model: string;
-  baseUrl: string;
-  apiVersion: string;
-  dimensions?: number;
-  keyMode: 'key' | 'ref';
-  apiKey: string;
-  apiKeyRef: string;
-}
-
-/** Both models go together: the engine drops a model left out, and refuses a locked embedding that is not sent back unchanged. */
+/** Only what changes is sent. The embedding model never changes, since every stored vector came from it; only its key can. */
 export interface UpdateContextModelsInput {
   engineId: string;
-  embedding: ContextModelInput | null;
-  llm: ContextModelInput | null;
+  ingestion?: ContextModelChange;
+  answer?: ContextModelChange | { sameAsIngestion: true };
+  embeddingKey?: string;
+}
+
+/** The Change models drawer's fields. An empty key keeps the stored one. */
+export interface ModelsDraft {
+  embeddingKey: string;
+  llm: LlmConfig;
+  /** The ingestion model takes the embedding key. */
+  shareKey: boolean;
+  answerChoice: 'same' | 'different';
+  answer: LlmConfig | null;
 }
 
 /** The full engine as shown on its detail page. */
