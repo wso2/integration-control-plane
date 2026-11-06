@@ -16,21 +16,25 @@
  * under the License.
  */
 
-import { Divider, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Divider, Stack, Typography } from '@wso2/oxygen-ui';
 import { Sparkles } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, type ReactNode } from 'react';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
+import { isVoiceEndpoint } from '../../../utils/voiceAgent';
+import { useSelectedAgentEndpoint } from './selectedEndpoint';
 
 //AI Agent env-card body
 export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
-  const [selectedEpIdx, setSelectedEpIdx] = useState(0);
-  const selectedEndpoint = endpoints[selectedEpIdx] ?? endpoints[0];
+  // Shared with the header actions, which offer Test or Test voice for the endpoint picked here.
+  const [selectedId, setSelectedId] = useSelectedAgentEndpoint(component.id, env.id);
+  const selectedEpIdx = Math.max(0, endpoints.findIndex((e) => e.id === selectedId));
+  const selectedEndpoint = endpoints[selectedEpIdx];
 
   // The enforcing API Platform gateway URL for the selected endpoint. Shown in place of the raw OpenChoreo external route, as the
   // integration-as-api card does.
@@ -66,8 +70,15 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   return (
     <>
       <Divider sx={{ my: 2 }} />
-      {showEndpoints && <EndpointUrlsPanel endpoints={endpointsForPanel} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
-      <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
+      {showEndpoints && <EndpointUrlsPanel endpoints={endpointsForPanel} selectedIdx={selectedEpIdx} onSelect={(i) => setSelectedId(endpoints[i].id)} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
+      {isVoiceEndpoint(selectedEndpoint) ? (
+        // The voice endpoint speaks WebSocket to a voice agent, not chat: point to Test voice instead.
+        <Alert severity="info" sx={{ mt: 2 }}>
+          This is the voice endpoint of the agent. Enable a voice agent, then click <strong>Test voice</strong> to talk to the agent.
+        </Alert>
+      ) : (
+        <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
+      )}
     </>
   );
 }

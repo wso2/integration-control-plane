@@ -298,3 +298,8 @@ export function agentVoiceWsUrl(endpoints: readonly AgentEndpointLike[] | undefi
   const base = ep?.projectUrl || ep?.publicUrl || ep?.invokeUrl;
   return base ? base.replace(/^http/i, 'ws').replace(/\/+$/, '') : null;
 }
+
+/** An AI agent's voice endpoint: the WebSocket one a voice agent talks to, rather than its chat API. */
+export function isVoiceEndpoint(endpoint: { type: string } | undefined): boolean {
+  return !!endpoint && /^(ws|wss|websocket)$/i.test(endpoint.type);
+}

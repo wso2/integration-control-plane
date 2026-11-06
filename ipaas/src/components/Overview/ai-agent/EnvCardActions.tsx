@@ -17,15 +17,19 @@
  */
 
 import { Button, Tooltip } from '@wso2/oxygen-ui';
-import { List, RotateCw, Square, Funnel } from '@wso2/oxygen-ui-icons-react';
+import { List, Mic, RotateCw, Square, Funnel } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
 import { withTrackParam } from '../../../hooks/useSelectedTrack';
 import { useLocation } from 'react-router';
-import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
+import { useEnvEndpoints, useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
+import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
+import { componentUrl } from '../../../paths';
+import { isVoiceEndpoint } from '../../../utils/voiceAgent';
+import { useSelectedAgentEndpoint } from './selectedEndpoint';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import ServiceLogsDrawer from '../integration-as-api/ServiceLogsDrawer';
@@ -71,6 +75,13 @@ export default function EnvCardActions({
   // The agent chat opens a live connection, so only a running workload qualifies.
   const canTest = isDeploymentHealthy(deploymentStatusV2);
 
+  // The endpoint picked in the card body: its voice endpoint is tried through a voice agent.
+  const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
+  const [selectedId] = useSelectedAgentEndpoint(component.id, env.id);
+  const selectedEndpoint = endpoints.find((e) => e.id === selectedId) ?? endpoints[0];
+  const voiceSelected = isVoiceEndpoint(selectedEndpoint);
+  const { voiceAgent } = useLinkedVoiceAgent(orgHandler, projectId, componentHandler);
+
   const handleStop = () => {
     stopMutation.mutate(
       // OpenChoreo's stop endpoint is per-environment.
@@ -100,7 +111,21 @@ export default function EnvCardActions({
 
   return (
     <>
-      {hasDeployment && !env.critical && (
+      {hasDeployment && !env.critical && voiceSelected && (
+        <Tooltip title={voiceAgent ? 'Talk to this agent through its voice agent' : 'Enable a voice agent for this agent first.'}>
+          <span>
+            <Button
+              variant="text"
+              size="small"
+              startIcon={<Mic size={14} />}
+              onClick={() => voiceAgent && navigate(`${componentUrl(orgHandler, projectHandler, voiceAgent.handler)}/test/voice-agent`)}
+              disabled={!voiceAgent || !canTest}>
+              Test voice
+            </Button>
+          </span>
+        </Tooltip>
+      )}
+      {hasDeployment && !env.critical && !voiceSelected && (
         <Button
           variant="text"
           size="small"

@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Alert, Button, Link, ListingTable, Menu, MenuItem, PageContent, PageTitle, RelativeTime, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Button, Link, ListingTable, PageContent, PageTitle, RelativeTime, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { Mic, Plus } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX, type MouseEvent } from 'react';
+import { useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
 import EmptyListing from '../components/EmptyListing';
 import SearchField from '../components/SearchField';
@@ -26,7 +26,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useActiveProjects } from '../hooks/useProjects';
 import { useOrgVoiceAgents } from '../hooks/useVoiceAgents';
 import type { OrgScope } from '../nav';
-import { componentOverviewUrl, createVoiceAgentUrl } from '../paths';
+import { componentOverviewUrl, newVoiceAgentUrl } from '../paths';
 import type { Project } from '../types/project';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
 
@@ -53,7 +53,7 @@ export default function VoiceAgents(scope: OrgScope): JSX.Element {
         <PageTitle.SubHeader>Let callers talk to your agents. Each voice agent turns speech into text for an agent and speaks its answers back.</PageTitle.SubHeader>
         {projects && projects.length > 0 && (
           <PageTitle.Actions>
-            <CreateVoiceAgentButton org={scope.org} projects={projects} />
+            <CreateVoiceAgentButton org={scope.org} />
           </PageTitle.Actions>
         )}
       </PageTitle>
@@ -78,29 +78,12 @@ export default function VoiceAgents(scope: OrgScope): JSX.Element {
   );
 }
 
-function CreateVoiceAgentButton({ org, projects }: { org: string; projects: Project[] }): JSX.Element {
+function CreateVoiceAgentButton({ org }: { org: string }): JSX.Element {
   const navigate = useAppNavigate();
-  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const onClick = (e: MouseEvent<HTMLElement>) => {
-    if (projects.length === 1) navigate(createVoiceAgentUrl(org, projects[0].handler));
-    else setAnchor(e.currentTarget);
-  };
   return (
-    <>
-      <Button variant="contained" startIcon={<Plus size={16} />} onClick={onClick} aria-haspopup={projects.length > 1 ? 'menu' : undefined}>
-        Create voice agent
-      </Button>
-      <Menu anchorEl={anchor} open={!!anchor} onClose={() => setAnchor(null)}>
-        <MenuItem disabled>
-          <Typography variant="caption">Create in project</Typography>
-        </MenuItem>
-        {projects.map((p) => (
-          <MenuItem key={p.id} onClick={() => navigate(createVoiceAgentUrl(org, p.handler))}>
-            {p.name}
-          </MenuItem>
-        ))}
-      </Menu>
-    </>
+    <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newVoiceAgentUrl(org))}>
+      Create voice agent
+    </Button>
   );
 }
 

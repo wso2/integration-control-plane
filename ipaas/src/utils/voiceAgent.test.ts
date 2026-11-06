@@ -25,6 +25,7 @@ import {
   MAX_TRANSCRIPT_MESSAGES,
   agentVoiceWsUrl,
   effectiveVoiceAgentHandler,
+  isVoiceEndpoint,
   isWebSocketUrl,
   linkedAgentHandlerOf,
   voiceTargetLabel,
@@ -234,5 +235,14 @@ describe('agentVoiceWsUrl', () => {
     expect(agentVoiceWsUrl([{ type: 'REST', projectUrl: 'http://a' }, { type: 'REST', projectUrl: 'http://b' }])).toBeNull();
     expect(agentVoiceWsUrl([])).toBeNull();
     expect(agentVoiceWsUrl(undefined)).toBeNull();
+  });
+});
+
+describe('isVoiceEndpoint', () => {
+  it('is the WebSocket endpoint, not the chat API', () => {
+    expect(isVoiceEndpoint({ type: 'WS' })).toBe(true);
+    expect(isVoiceEndpoint({ type: 'Websocket' })).toBe(true);
+    expect(isVoiceEndpoint({ type: 'REST' })).toBe(false);
+    expect(isVoiceEndpoint(undefined)).toBe(false);
   });
 });

@@ -19,37 +19,71 @@
 import { Alert, Button, CircularProgress, Grid, PageContent, Skeleton, Stack, Step, StepLabel, Stepper, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ComponentType, type JSX } from 'react';
-import { useSearchParams } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { LiveKitStep, SttStep, TtsStep, TuningStep, type VoiceAgentStepProps } from '../components/VoiceAgent/VoiceAgentSteps';
-import VoiceAgentTargetStep from '../components/VoiceAgent/VoiceAgentTargetStep';
+import VoiceAgentTargetStep, { AgentEndpointStatus } from '../components/VoiceAgent/VoiceAgentTargetStep';
 import { useLeaveGuard, useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+import { useAgentVoiceEndpoint } from '../hooks/useAgentVoiceEndpoint';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useComponentByHandler } from '../hooks/useComponents';
 import { useActiveProjects, useProjectByHandler } from '../hooks/useProjects';
 import { useCreateVoiceAgent } from '../hooks/useVoiceAgents';
-import { newComponentUrl, type ProjectScope } from '../nav';
-import { componentOverviewUrl, VOICE_TARGET_AGENT_NAME_PARAM, VOICE_TARGET_AGENT_PARAM } from '../paths';
+import { newComponentUrl, type ComponentScope, type OrgScope, type ProjectScope } from '../nav';
+import { componentOverviewUrl, createVoiceAgentUrl, enableVoiceAgentUrl, voiceAgentsUrl } from '../paths';
+import type { Component } from '../types/component';
 import type { Project } from '../types/project';
 import type { VoiceAgentSettings } from '../types/voiceAgent';
 import PageNotFound from './PageNotFound';
 import { DEFAULT_VOICE_AGENT_SETTINGS, validateAgentStep, validateLiveKitStep, validateSttStep, validateTtsStep, validateTuningStep, type StepErrors } from '../utils/voiceAgent';
 
+type StepKey = 'agent' | 'livekit' | 'stt' | 'tts' | 'tune';
+
 interface WizardStep {
+  key: StepKey;
   label: string;
   description: string;
-  /** Null for the first step, which needs the wizard's project and is rendered by the wizard itself. */
+  /** Null for the first step, which needs the wizard's projects and is rendered by the wizard itself. */
   Form: ComponentType<VoiceAgentStepProps> | null;
   validate: (s: VoiceAgentSettings) => StepErrors;
 }
 
-const STEPS: WizardStep[] = [
-  { label: 'Configure agent', description: 'Choose which agent this voice agent connects to.', Form: null, validate: validateAgentStep },
-  { label: 'Connect LiveKit', description: 'The LiveKit project that carries the calls.', Form: LiveKitStep, validate: validateLiveKitStep },
-  { label: 'Speech to text', description: "Transcribes the caller's speech for the agent.", Form: SttStep, validate: validateSttStep },
-  { label: 'Text to speech', description: "Speaks the agent's answers.", Form: TtsStep, validate: validateTtsStep },
-  { label: 'Tune and deploy', description: 'How the conversation flows. The defaults suit most agents.', Form: TuningStep, validate: validateTuningStep },
+const ALL_STEPS: WizardStep[] = [
+  { key: 'agent', label: 'Configure agent', description: 'Choose which agent this voice agent connects to.', Form: null, validate: validateAgentStep },
+  { key: 'livekit', label: 'Connect LiveKit', description: 'The LiveKit project that carries the calls.', Form: LiveKitStep, validate: validateLiveKitStep },
+  { key: 'stt', label: 'Speech to text', description: "Transcribes the caller's speech for the agent.", Form: SttStep, validate: validateSttStep },
+  { key: 'tts', label: 'Text to speech', description: "Speaks the agent's answers.", Form: TtsStep, validate: validateTtsStep },
+  { key: 'tune', label: 'Tune and deploy', description: 'How the conversation flows. The defaults suit most agents.', Form: TuningStep, validate: validateTuningStep },
 ];
 
 const STEPPER_SX = { position: 'sticky', top: 24 } as const;
+const STATUS_SX = { mb: 3, maxWidth: 720 } as const;
+
+/** What Configure agent decided, carried in router state when the wizard moves to the project or agent's own route. */
+type GeneralHandoff = Pick<VoiceAgentSettings, 'displayName' | 'name' | 'description' | 'targetMode' | 'targetAgentHandler' | 'targetAgentWsUrl'> & { projectId: string };
+
+interface HandoffState {
+  voiceAgentGeneral?: GeneralHandoff;
+}
+
+const toHandoff = (s: VoiceAgentSettings, projectId: string): GeneralHandoff => ({
+  displayName: s.displayName,
+  name: s.name,
+  description: s.description,
+  targetMode: s.targetMode,
+  targetAgentHandler: s.targetAgentHandler,
+  targetAgentWsUrl: s.targetAgentWsUrl,
+  projectId,
+});
+
+/**
+ * Where the wizard runs, after Devant's (wso2-enterprise/devant#2836):
+ * - `org`: AI services > Voice agents > Create. Configure agent only; Next hands off to the project
+ *   (an externally hosted target) or to the AI agent's integration (a platform-hosted one).
+ * - `project`: the project's create page, or resumed from `org` for an external target.
+ * - `agent`: an AI agent's Enable voice agents, or resumed from `org` for a platform-hosted target.
+ *   Opened directly, the agent is the target and Configure agent is skipped.
+ */
+type WizardMode = 'org' | 'project' | 'agent';
 
 function CreateVoiceAgentSkeleton(): JSX.Element {
   return (
@@ -67,65 +101,131 @@ function CreateVoiceAgentSkeleton(): JSX.Element {
   );
 }
 
-export default function CreateVoiceAgent(scope: ProjectScope): JSX.Element {
-  const { data: project, isLoading } = useProjectByHandler(scope.project);
-  const { data: projects, isLoading: loadingProjects } = useActiveProjects();
-  if (isLoading || loadingProjects) return <CreateVoiceAgentSkeleton />;
-  if (!project || !projects) return <PageNotFound title="Project not found" />;
-  return <CreateVoiceAgentWizard scope={scope} project={project} projects={projects} />;
+/** AI services > Voice agents > Create: pick the project and the target agent first. */
+export function CreateVoiceAgentOrg(scope: OrgScope): JSX.Element {
+  const { data: projects, isLoading } = useActiveProjects();
+  if (isLoading) return <CreateVoiceAgentSkeleton />;
+  if (!projects || projects.length === 0) return <PageNotFound title="No projects" />;
+  return <CreateVoiceAgentWizard org={scope.org} mode="org" projects={projects} project={projects[0]} />;
 }
 
-function CreateVoiceAgentWizard({ scope, project, projects }: { scope: ProjectScope; project: Project; projects: Project[] }): JSX.Element {
+/** The project's create page, and where an externally hosted target continues from the org level. */
+export default function CreateVoiceAgent(scope: ProjectScope): JSX.Element {
+  const { data: project, isLoading } = useProjectByHandler(scope.project);
+  if (isLoading) return <CreateVoiceAgentSkeleton />;
+  if (!project) return <PageNotFound title="Project not found" />;
+  return <CreateVoiceAgentWizard org={scope.org} mode="project" projects={[project]} project={project} />;
+}
+
+/** An AI agent's Enable voice agents, and where a platform-hosted target continues from the org level. */
+export function EnableVoiceAgent(scope: ComponentScope): JSX.Element {
+  const { data: project, isLoading: loadingProject } = useProjectByHandler(scope.project);
+  const { data: agent, isLoading: loadingAgent } = useComponentByHandler(project?.id ?? '', scope.component);
+  if (loadingProject || (project && loadingAgent)) return <CreateVoiceAgentSkeleton />;
+  if (!project) return <PageNotFound title="Project not found" />;
+  if (!agent) return <PageNotFound title="Integration not found" />;
+  return <CreateVoiceAgentWizard org={scope.org} mode="agent" projects={[project]} project={project} agent={agent} />;
+}
+
+interface WizardProps {
+  org: string;
+  mode: WizardMode;
+  projects: Project[];
+  /** The project the voice agent is created in (the first one at org level, until the user picks). */
+  project: Project;
+  /** The AI agent the wizard is scoped to, in `agent` mode. */
+  agent?: Component;
+}
+
+function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardProps): JSX.Element {
   const navigate = useAppNavigate();
+  // Plain router navigation for writing this entry's state: useAppNavigate preloads, and a
+  // second navigation right after it would supersede the first before it lands.
+  const routerNavigate = useNavigate();
   const guardNavigation = useLeaveGuard();
+  const location = useLocation();
   const create = useCreateVoiceAgent();
-  const [params] = useSearchParams();
-  // Opened from an AI agent's "Enable voice agents": that agent is the target and stays fixed.
-  const lockedAgent = params.get(VOICE_TARGET_AGENT_PARAM);
-  const [initialSettings] = useState<VoiceAgentSettings>(() =>
-    lockedAgent ? { ...DEFAULT_VOICE_AGENT_SETTINGS, targetMode: 'platform', targetAgentHandler: lockedAgent, displayName: `${params.get(VOICE_TARGET_AGENT_NAME_PARAM) || lockedAgent} - Voice agent` } : DEFAULT_VOICE_AGENT_SETTINGS,
-  );
+
+  // Configure agent's choices, when this route was reached from it (or returned to with Back).
+  const [handoff] = useState(() => (location.state as HandoffState | null)?.voiceAgentGeneral);
+  const resumed = !!handoff && mode !== 'org';
+  // Enable voice agents: the agent is the target already, so there is no Configure agent step.
+  const skipTarget = mode === 'agent' && !handoff;
+  const steps = skipTarget ? ALL_STEPS.slice(1) : ALL_STEPS;
+
+  const [initialSettings] = useState<VoiceAgentSettings>(() => {
+    if (handoff) return { ...DEFAULT_VOICE_AGENT_SETTINGS, ...handoff };
+    if (mode === 'agent' && agent) return { ...DEFAULT_VOICE_AGENT_SETTINGS, targetMode: 'platform', targetAgentHandler: agent.handler, displayName: `${agent.displayName || agent.handler} - Voice agent` };
+    return DEFAULT_VOICE_AGENT_SETTINGS;
+  });
   const [settings, setSettings] = useState<VoiceAgentSettings>(initialSettings);
-  const [projectId, setProjectId] = useState(project.id);
-  const [activeStep, setActiveStep] = useState(0);
+  const [projectId, setProjectId] = useState(handoff?.projectId && projects.some((p) => p.id === handoff.projectId) ? handoff.projectId : project.id);
+  const [activeStep, setActiveStep] = useState(resumed ? 1 : 0);
   // Errors show only after the user tries to leave a step, not while they type into a fresh one.
   const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const allowLeave = useUnsavedChanges(settings !== initialSettings && !create.isSuccess);
   const targetProject = projects.find((p) => p.id === projectId) ?? project;
 
-  const step = STEPS[activeStep];
-  const stepErrors = step.validate(settings);
+  // A platform-hosted target is resolved here when Configure agent is not on screen to do it.
+  const endpoint = useAgentVoiceEndpoint(org, targetProject.id, mode === 'agent' ? agent : undefined);
+  const resolvedSettings = mode === 'agent' && endpoint.status === 'ready' ? { ...settings, targetAgentWsUrl: endpoint.url } : settings;
+  const agentBlocked = mode === 'agent' && endpoint.status !== 'ready';
+
+  const step = steps[activeStep];
+  const stepErrors = step.validate(resolvedSettings);
   const visibleErrors = attempted.has(activeStep) ? stepErrors : {};
-  const isLastStep = activeStep === STEPS.length - 1;
+  const isLastStep = activeStep === steps.length - 1;
 
   const onChange = (patch: Partial<VoiceAgentSettings>) => setSettings((prev) => ({ ...prev, ...patch }));
+
+  /** Leaves Configure agent for the route the target belongs to, keeping its choices for Back. */
+  const handOff = (): boolean => {
+    const state: HandoffState = { voiceAgentGeneral: toHandoff(settings, targetProject.id) };
+    const to = settings.targetMode === 'platform' ? enableVoiceAgentUrl(org, targetProject.handler, settings.targetAgentHandler) : mode === 'org' ? createVoiceAgentUrl(org, targetProject.handler) : null;
+    if (!to) return false;
+    allowLeave();
+    // Back from the next route returns here with the same choices.
+    routerNavigate(`${location.pathname}${location.search}`, { replace: true, state });
+    navigate(to, { state });
+    return true;
+  };
 
   const next = () => {
     setAttempted((prev) => new Set(prev).add(activeStep));
     if (Object.keys(stepErrors).length > 0) return;
+    if (step.key === 'agent' && handOff()) return;
     if (!isLastStep) {
       setActiveStep(activeStep + 1);
       return;
     }
+    if (agentBlocked) return;
     create.mutate(
-      { orgHandler: scope.org, projectId, settings },
+      { orgHandler: org, projectId: targetProject.id, settings: resolvedSettings },
       {
         onSuccess: (component) => {
           allowLeave();
-          navigate(componentOverviewUrl(scope.org, targetProject.handler, component.handler || component.id));
+          navigate(componentOverviewUrl(org, targetProject.handler, component.handler || component.id));
         },
       },
     );
   };
 
+  const back = () => {
+    // The step before is Configure agent on the route this one was handed off from.
+    if (resumed && activeStep === 1) {
+      guardNavigation(() => navigate(-1));
+      return;
+    }
+    setActiveStep(activeStep - 1);
+  };
+
+  const exitUrl = mode === 'agent' && agent ? componentOverviewUrl(org, targetProject.handler, agent.handler) : mode === 'project' ? newComponentUrl({ org, project: targetProject.handler }) : voiceAgentsUrl(org);
+  const exitLabel = mode === 'agent' ? 'Back to the agent' : mode === 'project' ? 'Back to create an integration' : 'Back to voice agents';
+
   return (
     <PageContent sx={{ pt: 5 }}>
-      <Button
-        startIcon={<ArrowLeft size={16} />}
-        onClick={() => guardNavigation(() => navigate(lockedAgent ? componentOverviewUrl(scope.org, project.handler, lockedAgent) : newComponentUrl(scope)))}
-        sx={{ mb: 3 }}
-        disabled={create.isPending}>
-        {lockedAgent ? 'Back to the agent' : 'Back to create an integration'}
+      <Button startIcon={<ArrowLeft size={16} />} onClick={() => guardNavigation(() => navigate(exitUrl))} sx={{ mb: 3 }} disabled={create.isPending}>
+        {exitLabel}
       </Button>
       <Typography variant="h1" sx={{ mb: 4 }}>
         Create a voice agent
@@ -133,8 +233,8 @@ function CreateVoiceAgentWizard({ scope, project, projects }: { scope: ProjectSc
       <Grid container spacing={4}>
         <Grid size={{ xs: 12, md: 3 }}>
           <Stepper activeStep={activeStep} orientation="vertical" sx={STEPPER_SX}>
-            {STEPS.map((s) => (
-              <Step key={s.label}>
+            {steps.map((s) => (
+              <Step key={s.key}>
                 <StepLabel>{s.label}</StepLabel>
               </Step>
             ))}
@@ -147,6 +247,11 @@ function CreateVoiceAgentWizard({ scope, project, projects }: { scope: ProjectSc
           <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
             {step.description}
           </Typography>
+          {mode === 'agent' && agent && step.key !== 'agent' && (
+            <Stack sx={STATUS_SX}>
+              <AgentEndpointStatus state={endpoint} agentName={agent.displayName || agent.handler} />
+            </Stack>
+          )}
           {step.Form ? (
             <step.Form settings={settings} errors={visibleErrors} onChange={onChange} onReplace={setSettings} />
           ) : (
@@ -155,11 +260,11 @@ function CreateVoiceAgentWizard({ scope, project, projects }: { scope: ProjectSc
               errors={visibleErrors}
               onChange={onChange}
               onReplace={setSettings}
-              orgHandler={scope.org}
+              orgHandler={org}
               projects={projects}
-              projectId={projectId}
+              projectId={targetProject.id}
               onProjectChange={setProjectId}
-              locked={!!lockedAgent}
+              lockProject={mode !== 'org'}
             />
           )}
           {create.isError && (
@@ -168,12 +273,12 @@ function CreateVoiceAgentWizard({ scope, project, projects }: { scope: ProjectSc
             </Alert>
           )}
           <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
-            {activeStep > 0 && (
-              <Button variant="outlined" onClick={() => setActiveStep(activeStep - 1)} disabled={create.isPending}>
+            {(activeStep > 0 || resumed) && (
+              <Button variant="outlined" onClick={back} disabled={create.isPending}>
                 Back
               </Button>
             )}
-            <Button variant="contained" onClick={next} disabled={create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
+            <Button variant="contained" onClick={next} disabled={create.isPending || (isLastStep && agentBlocked)} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
               {isLastStep ? (create.isPending ? 'Deploying' : 'Deploy voice agent') : 'Next'}
             </Button>
           </Stack>

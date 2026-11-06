@@ -24,7 +24,7 @@ import { useDeploymentStatus } from '../../../hooks/useDeployments';
 import { useSelectedTrack } from '../../../hooks/useSelectedTrack';
 import { useLinkedVoiceAgent } from '../../../hooks/useVoiceAgents';
 import { useScope } from '../../../nav';
-import { componentOverviewUrl, createVoiceAgentUrl } from '../../../paths';
+import { componentOverviewUrl, enableVoiceAgentUrl } from '../../../paths';
 import type { Component } from '../../../types/component';
 
 interface EnableVoiceAgentButtonProps {
@@ -76,7 +76,7 @@ export default function EnableVoiceAgentButton({ component, orgHandler, projectI
           size="small"
           startIcon={<Mic size={16} />}
           disabled={!buildSucceeded}
-          onClick={() => navigate(createVoiceAgentUrl(orgHandler, projectHandler, { handler: component.handler, name: component.displayName || component.handler }))}>
+          onClick={() => navigate(enableVoiceAgentUrl(orgHandler, projectHandler, component.handler))}>
           Enable voice agents
         </Button>
       </span>
