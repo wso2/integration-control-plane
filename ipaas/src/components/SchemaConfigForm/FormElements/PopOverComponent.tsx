@@ -87,7 +87,7 @@ export function PopOverComponent({
     <Popover open={open} anchorEl={anchorEl} onClose={onClose} anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }} transformOrigin={{ horizontal: 'right', vertical: 'top' }}>
       <Paper sx={{ p: 2, minWidth: 320, maxWidth: 420 }}>
         <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-          Add Values
+          Add values
         </Typography>
         {Array.from(uniqueKeySet)
           .sort()

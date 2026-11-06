@@ -1,0 +1,126 @@
+/*
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package oidc
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"go.uber.org/zap"
+
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/httpclient"
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/logging"
+)
+
+const serviceName = "oidc"
+
+const requestTimeout = 5 * time.Second
+
+// WellKnownSuffix is the OIDC Discovery 1.0 path.
+const WellKnownSuffix = "/.well-known/openid-configuration"
+
+// Metadata is the discovery document
+type Metadata struct {
+	Issuer                string `json:"issuer"`
+	AuthorizationEndpoint string `json:"authorization_endpoint"`
+	TokenEndpoint         string `json:"token_endpoint"`
+	UserInfoEndpoint      string `json:"userinfo_endpoint"`
+	JWKSURI               string `json:"jwks_uri"`
+	RevocationEndpoint    string `json:"revocation_endpoint"`
+	RegistrationEndpoint  string `json:"registration_endpoint"`
+	EndSessionEndpoint    string `json:"end_session_endpoint"`
+}
+
+type Discovery interface {
+	Discover(ctx context.Context, wellKnownURL string) (*Metadata, error)
+}
+
+type Client interface {
+	Discovery
+
+	FetchJWKS(ctx context.Context, jwksURI string) (json.RawMessage, error)
+	ExchangeToken(ctx context.Context, tokenEndpoint string, form url.Values) (*TokenResponse, error)
+	RedeemCode(ctx context.Context, tokenEndpoint string, form url.Values) (*TokenResponse, error)
+	RefreshToken(ctx context.Context, tokenEndpoint string, form url.Values) (*TokenResponse, error)
+	Revoke(ctx context.Context, revokeEndpoint string, form url.Values) error
+}
+
+type client struct {
+	http *httpclient.Client
+}
+
+func NewClient(opts ...httpclient.Option) Client {
+	base := []httpclient.Option{
+		httpclient.WithServiceName(serviceName),
+		httpclient.WithHTTPClient(&http.Client{CheckRedirect: refuseRedirect}),
+		httpclient.WithTimeout(requestTimeout),
+	}
+	return &client{http: httpclient.New(append(base, opts...)...)}
+}
+
+func refuseRedirect(req *http.Request, _ []*http.Request) error {
+	return fmt.Errorf("%s: refusing redirect to %s", serviceName, req.URL.Redacted())
+}
+
+func WellKnownFor(issuer string) string {
+	return issuer + WellKnownSuffix
+}
+
+func IssuerForWellKnown(wellKnownURL string) (string, bool) {
+	return strings.CutSuffix(wellKnownURL, WellKnownSuffix)
+}
+
+func AuthorizeURL(authorizeEndpoint string, q url.Values) string {
+	if len(q) == 0 {
+		return authorizeEndpoint
+	}
+	return authorizeEndpoint + "?" + q.Encode()
+}
+
+// Discover reads the document at wellKnownURL.
+func (svc *client) Discover(ctx context.Context, wellKnownURL string) (*Metadata, error) {
+	const operationName = "Discover"
+	ctx = logging.With(ctx, zap.String("wellKnownUrl", wellKnownURL))
+
+	metadata, err := httpclient.GetJSON[*Metadata](ctx, svc.http, operationName, wellKnownURL)
+	if err != nil {
+		return nil, err
+	}
+	if metadata == nil {
+		return nil, fmt.Errorf("%s:%s: unexpected empty data in response", serviceName, operationName)
+	}
+
+	for _, required := range []struct{ name, value string }{
+		{"issuer", metadata.Issuer},
+		{"authorization_endpoint", metadata.AuthorizationEndpoint},
+		{"token_endpoint", metadata.TokenEndpoint},
+		{"jwks_uri", metadata.JWKSURI},
+	} {
+		if required.value == "" {
+			return nil, fmt.Errorf("%s:%s: discovery document at %q has no %s",
+				serviceName, operationName, wellKnownURL, required.name)
+		}
+	}
+
+	return metadata, nil
+}

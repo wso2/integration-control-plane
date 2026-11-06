@@ -207,7 +207,7 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
               Use a test key
             </Button>
           }>
-          This agent is secured with OAuth. Chatting here needs a test key, which switches the endpoint to API Key authentication.
+          This agent is secured with OAuth. Chatting here needs a test key, which switches the endpoint to API key authentication.
         </Alert>
       )}
       {isPage && operationsKnown && !noEndpoint && !hasChatOperation && chatUrl && messages.length === 0 && (

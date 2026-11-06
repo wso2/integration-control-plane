@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useEffect, useMemo, useState, type Dispatch, type MouseEvent, type SetStateAction } from 'react';
+import { useContext, useEffect, useMemo, useState, type Dispatch, type MouseEvent, type SetStateAction } from 'react';
 import { Box, Button, Chip, IconButton, InputAdornment, MenuItem, Popover, Stack, Switch, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Eye, EyeOff, Link2, Link2Off, Lock, Pencil, Unlock } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../../types/schema';
@@ -24,6 +24,7 @@ import { type LinkingInfo, isNumberType, typeDisplayName } from '../schemaUtils'
 import { FieldLinkPicker } from '../FieldLinkPicker';
 import { LinkedElement } from '../LinkedElement';
 import { type FieldLinkPicker as Picker, useFieldLink } from '../linkedFrom';
+import { ManagedConfigContext } from '../managedConfig';
 
 interface ConfigGroup {
   groupUuid: string;
@@ -101,6 +102,7 @@ function EditableElement({
   const linked = useMemo(() => linkingMap?.has(jsonPath) || false, [linkingMap, jsonPath]);
   const linkedInfo = linkingMap?.get(jsonPath);
   const isSensitive = useMemo(() => sensitiveMap?.get(jsonPath) || false, [sensitiveMap, jsonPath]);
+  const isManaged = useContext(ManagedConfigContext).has(jsonPath);
   const isExistingSensitiveConfig = useMemo(() => isSensitive && valueMap.has(jsonPath) && !valueMap.get(jsonPath), [isSensitive, valueMap, jsonPath]);
 
   useEffect(() => {
@@ -222,10 +224,25 @@ function EditableElement({
     setLinkAnchorEl(null);
   };
 
+  // The platform sets these, and a save leaves them as they are, so they are shown, not edited.
+  if (isManaged) {
+    return (
+      <Box sx={{ mt: 1.5 }}>
+        <Stack direction="row" alignItems="center" gap={1}>
+          <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace' }}>
+            {title}
+          </Typography>
+          <Chip label="managed" size="small" variant="outlined" sx={{ height: 18, fontSize: '0.65rem', borderRadius: 0.75 }} />
+        </Stack>
+        <TextField fullWidth size="small" value={isSensitive ? '••••••••' : String(valueMap.get(jsonPath) ?? '')} disabled helperText="Set by the integration platform" sx={{ mt: 0.5 }} />
+      </Box>
+    );
+  }
+
   const selectedGroup = configGroups?.find((g) => g.groupUuid === selectedGroupId) ?? null;
   const sensitiveAdornment = (
     <Tooltip title={isSensitive ? 'Mark as non-sensitive (stored in database)' : 'Mark as sensitive (stored in Key Vault)'}>
-      <IconButton size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
+      <IconButton aria-label={isSensitive ? 'Mark as non-sensitive' : 'Mark as sensitive'} size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
         {isSensitive ? <Lock size={14} /> : <Unlock size={14} />}
       </IconButton>
     </Tooltip>
@@ -234,21 +251,21 @@ function EditableElement({
   const linkAdornment = allowLinking && (
     <>
       <Tooltip title={linked ? 'Linked to config group' : 'Link to config group'}>
-        <IconButton size="small" onClick={linked ? handleUnlink : handleLinkOpen} sx={{ p: 0.25 }}>
+        <IconButton aria-label={linked ? 'Unlink config group' : 'Link to config group'} size="small" onClick={linked ? handleUnlink : handleLinkOpen} sx={{ p: 0.25 }}>
           {linked ? <Link2Off size={14} /> : <Link2 size={14} />}
         </IconButton>
       </Tooltip>
       <Popover open={Boolean(linkAnchorEl)} anchorEl={linkAnchorEl} onClose={() => setLinkAnchorEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} transformOrigin={{ vertical: 'top', horizontal: 'right' }}>
         <Box sx={{ p: 2, minWidth: 280 }}>
           <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 600 }}>
-            Link Configuration Group
+            Link configuration group
           </Typography>
           <TextField
             labelPlacement="top"
             select
             fullWidth
             size="small"
-            label="Config Group"
+            label="Config group"
             value={selectedGroupId}
             onChange={(e) => {
               setSelectedGroupId(e.target.value);
@@ -261,7 +278,7 @@ function EditableElement({
               </MenuItem>
             ))}
           </TextField>
-          <TextField labelPlacement="top" select fullWidth size="small" label="Config Key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
+          <TextField labelPlacement="top" select fullWidth size="small" label="Config key" value={selectedKeyId} onChange={(e) => setSelectedKeyId(e.target.value)} disabled={!selectedGroupId} sx={{ mb: 1.5 }}>
             {(selectedGroup?.configurations || []).map((c) => (
               <MenuItem key={c.keyUuid} value={c.keyUuid}>
                 {c.key}
@@ -358,7 +375,7 @@ function EditableElement({
         <Popover open={Boolean(secretAnchorEl)} anchorEl={secretAnchorEl} onClose={() => setSecretAnchorEl(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }}>
           <Box sx={{ p: 2, minWidth: 320 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              Update Secret Content
+              Update secret content
             </Typography>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
               Updating the value removes the previous value permanently and cannot be restored.
@@ -377,9 +394,11 @@ function EditableElement({
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                      {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </IconButton>
+                    <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                      <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                        {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </IconButton>
+                    </Tooltip>
                   </InputAdornment>
                 ),
               }}
@@ -429,9 +448,11 @@ function EditableElement({
                 readOnly: !!linked,
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                      {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </IconButton>
+                    <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                      <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                        {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                      </IconButton>
+                    </Tooltip>
                     {linkAdornment}
                     {pickerIcon}
                   </InputAdornment>
@@ -457,7 +478,7 @@ function EditableElement({
           <Chip label="secret" size="small" variant="outlined" color="info" sx={chipSx} />
           {optionalChip}
           <Tooltip title="Mark as non-sensitive (stored in database)">
-            <IconButton size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
+            <IconButton aria-label="Mark as non-sensitive" size="small" onClick={toggleSensitive} sx={{ p: 0.25 }}>
               <Lock size={14} />
             </IconButton>
           </Tooltip>
@@ -497,9 +518,11 @@ function EditableElement({
             <InputAdornment position="end">
               {sensitiveAdornment}
               {isSensitive && (
-                <IconButton size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
-                  {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
-                </IconButton>
+                <Tooltip title={showContent ? 'Hide' : 'Show'}>
+                  <IconButton aria-label={showContent ? 'Hide value' : 'Show value'} size="small" onClick={() => setShowContent((p) => !p)} sx={{ p: 0.25 }}>
+                    {showContent ? <EyeOff size={14} /> : <Eye size={14} />}
+                  </IconButton>
+                </Tooltip>
               )}
               {linkAdornment}
               {pickerIcon}

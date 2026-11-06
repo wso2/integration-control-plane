@@ -22,8 +22,12 @@ import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
 import type { ScheduleFormApi } from './useScheduleForm';
 
-/** Presentational cron editor bound to a {@link useScheduleForm} instance. */
-export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX.Element {
+/**
+ * Presentational cron editor bound to a {@link useScheduleForm} instance.
+ * `executionSettings={false}` leaves out the job timeout and overlap settings,
+ * for jobs whose execution behaviour is fixed by the platform.
+ */
+export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors } = form;
 
@@ -39,7 +43,8 @@ export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX
           <Typography variant="body2" color="text.secondary">
             Repeat beginning of every
           </Typography>
-          <Stack direction="row" gap={2}>
+          {/* Top-aligned: the count's reserved helper line would otherwise stretch the unit select. */}
+          <Stack direction="row" gap={2} alignItems="flex-start">
             <TextField
               inputMode="numeric"
               value={intervalCount}
@@ -108,7 +113,7 @@ export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX
           <Stack gap={2} sx={{ mt: 1.5 }}>
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                In Time Zone
+                In time zone
               </Typography>
               <Autocomplete
                 options={TIMEZONE_OPTIONS}
@@ -119,13 +124,17 @@ export default function ScheduleFields({ form }: { form: ScheduleFormApi }): JSX
                 renderInput={(params) => <TextField {...params} size="small" />}
               />
             </Box>
-            <Box>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
-                Job Timeout (in seconds) (Optional)
-              </Typography>
-              <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout || ' '} />
-            </Box>
-            <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow Overlapping Executions" />
+            {executionSettings && (
+              <>
+                <Box>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
+                    Job Timeout (in seconds) (Optional)
+                  </Typography>
+                  <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout || ' '} />
+                </Box>
+                <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow overlapping executions" />
+              </>
+            )}
           </Stack>
         </Collapse>
       </Box>

@@ -21,6 +21,7 @@ import { ExternalLink, Rocket } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { Sample } from '../types/samples';
 import { formatComponentType } from '../constants/integrations';
+import { START_QUICKLY_CARD_MIN_HEIGHT } from '../constants/styles';
 
 export default function SampleRowCard({
   sample,
@@ -46,6 +47,7 @@ export default function SampleRowCard({
         display: 'flex',
         alignItems: 'center',
         width: '100%',
+        minHeight: START_QUICKLY_CARD_MIN_HEIGHT,
         py: 2.4,
         px: 1.5,
         border: '1px solid',

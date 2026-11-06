@@ -18,10 +18,10 @@
 
 import { Navigate, useParams } from 'react-router';
 import type { JSX } from 'react';
-import { loginUrl } from '../paths';
+import { loginUrl, orgHomeUrl } from '../paths';
 
 export default function OrgHomeRedirect(): JSX.Element {
   const { orgHandler } = useParams();
   if (!orgHandler || orgHandler === 'default') return <Navigate to={loginUrl()} replace />;
-  return <Navigate to={`/organizations/${orgHandler}/home`} replace />;
+  return <Navigate to={orgHomeUrl(orgHandler)} replace />;
 }

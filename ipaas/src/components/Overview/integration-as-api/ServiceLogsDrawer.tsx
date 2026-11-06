@@ -51,7 +51,7 @@ export default function ServiceLogsDrawer({ open, onClose, projectId, componentH
     <DrawerPanel open={open} onClose={handleClose} width={720}>
       <DrawerPanel.Header>
         <Stack sx={{ flex: 1, minWidth: 0 }}>
-          <DrawerPanel.Title>Runtime Logs</DrawerPanel.Title>
+          <DrawerPanel.Title>Runtime logs</DrawerPanel.Title>
           <Typography variant="caption" color="text.secondary">
             {env.name}
           </Typography>

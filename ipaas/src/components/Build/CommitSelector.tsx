@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, Divider, InputAdornment, Stack, Typography, TextField } from '@wso2/oxygen-ui';
-import { GitCommit, Search } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, CircularProgress, Divider, Stack, Typography } from '@wso2/oxygen-ui';
+import { GitCommit } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useState } from 'react';
 import type { Commit } from '../../types/repository';
+import SearchField from '../SearchField';
 
 interface CommitSelectorProps {
   commits: Commit[];
@@ -62,19 +63,7 @@ export default function CommitSelector({ commits, commitsLoading, onBuild, isBui
 
   return (
     <Stack gap={2} sx={{ height: '100%' }}>
-      <TextField
-        size="small"
-        placeholder="Search commits…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <Search size={16} />
-            </InputAdornment>
-          ),
-        }}
-      />
+      <SearchField value={search} onChange={setSearch} placeholder="Search commits" />
 
       <Box sx={{ flex: 1, overflowY: 'auto' }}>
         {filtered.map((commit) => {

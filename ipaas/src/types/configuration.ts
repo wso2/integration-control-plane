@@ -31,6 +31,8 @@ export interface SchemaConfigItem {
   configGroupId?: string;
   configKeyId?: string;
   isDynamic?: boolean;
+  /** Set by the platform (a workflow integration's runtime connection); a save leaves it unchanged. */
+  isManaged?: boolean;
 }
 
 export interface SchemaConfigData {

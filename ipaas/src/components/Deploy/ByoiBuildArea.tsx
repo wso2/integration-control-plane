@@ -45,7 +45,7 @@ function registryLabel(host: string): string {
 }
 
 /**
- * The Deploy-page "Set Up" card for image-based (BYOI / RAG ingestion) components.
+ * The Deploy-page "Set up" card for image-based (BYOI / RAG ingestion) components.
  * Mirrors Devant's BYOI Build Area: the source registry, a Deploy action for the
  * latest image, and the image history list (with a View More drawer).
  */
@@ -72,7 +72,7 @@ export default function ByoiBuildArea({ componentId, versionId, orgHandler, orgU
       <Card sx={{ width: 320, flexShrink: 0, position: 'sticky', top: 24, alignSelf: 'flex-start', background: 'transparent' }}>
         <CardContent>
           <Typography variant="h4" component="h2" sx={{ mb: 2 }}>
-            Set Up
+            Set up
           </Typography>
 
           <Divider sx={{ mb: 2 }} />
@@ -102,7 +102,7 @@ export default function ByoiBuildArea({ componentId, versionId, orgHandler, orgU
 
           {/* ── Image history ── */}
           <Typography variant="h5" sx={{ mb: 1 }}>
-            Image History
+            Image history
           </Typography>
 
           {imagesLoading ? (
@@ -132,7 +132,7 @@ export default function ByoiBuildArea({ componentId, versionId, orgHandler, orgU
       {/* Full image-history drawer */}
       <DrawerPanel open={historyOpen} onClose={() => setHistoryOpen(false)} width={440}>
         <DrawerPanel.Header>
-          <DrawerPanel.Title>Image History</DrawerPanel.Title>
+          <DrawerPanel.Title>Image history</DrawerPanel.Title>
           <DrawerPanel.Actions>
             <DrawerPanel.CloseButton />
           </DrawerPanel.Actions>

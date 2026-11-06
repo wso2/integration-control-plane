@@ -138,7 +138,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
               Use a test key
             </Button>
           }>
-          This MCP server is secured with OAuth. Listing its tools needs a test key, which switches the endpoint to API Key authentication.
+          This MCP server is secured with OAuth. Listing its tools needs a test key, which switches the endpoint to API key authentication.
         </Alert>
       ) : (
         <>

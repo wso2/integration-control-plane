@@ -23,6 +23,7 @@ import type { BaseType, JSONSchema } from '../../types/schema';
 import { type LinkingInfo, type SchemaField, ownPackage, schemaFields } from './schemaUtils';
 import { ConfigElement } from './FormElements/ConfigElement';
 import { FieldLinkContext, type FieldLinks, noFieldLinks } from './linkedFrom';
+import { ManagedConfigContext } from './managedConfig';
 
 interface ConfigGroup {
   groupUuid: string;
@@ -55,15 +56,33 @@ export interface ConfigFormProps {
   /** Boxes before "Other configurables", one per connection. */
   groups?: FormGroup[];
   fieldLinks?: FieldLinks;
+  /** Keys the platform sets; shown read-only. */
+  managedKeys?: ReadonlySet<string>;
 }
 
 const groupSx = { mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
 const headSx = { px: 2, py: 1, bgcolor: 'action.hover', borderBottom: 1, borderColor: 'divider' } as const;
 
+const NO_MANAGED_KEYS: ReadonlySet<string> = new Set();
+
 /** Required fields first, each list in the schema's order. */
 const requiredFirst = (fields: SchemaField[]) => [...fields.filter((f) => f.required), ...fields.filter((f) => !f.required)];
 
-export function ConfigForm({ schema, valueMap, handleValueChange, validationMap, handleValidationChange, linkingMap, setLinkingMap, sensitiveMap, setSensitiveMap, configGroups, groups = [], fieldLinks = noFieldLinks }: ConfigFormProps) {
+export function ConfigForm({
+  schema,
+  valueMap,
+  handleValueChange,
+  validationMap,
+  handleValidationChange,
+  linkingMap,
+  setLinkingMap,
+  sensitiveMap,
+  setSensitiveMap,
+  configGroups,
+  groups = [],
+  fieldLinks = noFieldLinks,
+  managedKeys = NO_MANAGED_KEYS,
+}: ConfigFormProps) {
   const targetLevel = schema.requiredLevel || 1;
   const fields = schemaFields(schema);
   const own = ownPackage(fields);
@@ -109,35 +128,37 @@ export function ConfigForm({ schema, valueMap, handleValueChange, validationMap,
   );
 
   return (
-    <FieldLinkContext.Provider value={fieldLinks}>
-      {groups.map((g) =>
-        box(
-          g.id,
-          g.title,
-          g.actions,
-          g.note,
-          fields.filter((f) => g.keys.includes(f.path)),
-        ),
-      )}
-      {other.length > 0 &&
-        box(
-          'other',
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            {groups.length > 0 ? 'Other configurables' : 'Configurables'}
-          </Typography>,
-          null,
-          null,
-          other,
+    <ManagedConfigContext.Provider value={managedKeys}>
+      <FieldLinkContext.Provider value={fieldLinks}>
+        {groups.map((g) =>
+          box(
+            g.id,
+            g.title,
+            g.actions,
+            g.note,
+            fields.filter((f) => g.keys.includes(f.path)),
+          ),
         )}
-      {libraries.map((pkg) => {
-        const list = fields.filter((f) => f.pkg === pkg);
-        return (
-          <LibraryBox key={pkg} title={pkg.replace('.', '/')} expanded={list.some((f) => f.required)}>
-            {requiredFirst(list).map(renderField)}
-          </LibraryBox>
-        );
-      })}
-    </FieldLinkContext.Provider>
+        {other.length > 0 &&
+          box(
+            'other',
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              {groups.length > 0 ? 'Other configurables' : 'Configurables'}
+            </Typography>,
+            null,
+            null,
+            other,
+          )}
+        {libraries.map((pkg) => {
+          const list = fields.filter((f) => f.pkg === pkg);
+          return (
+            <LibraryBox key={pkg} title={pkg.replace('.', '/')} expanded={list.some((f) => f.required)}>
+              {requiredFirst(list).map(renderField)}
+            </LibraryBox>
+          );
+        })}
+      </FieldLinkContext.Provider>
+    </ManagedConfigContext.Provider>
   );
 }
 

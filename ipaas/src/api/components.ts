@@ -68,6 +68,9 @@ const ANN_PREBUILT = 'openchoreo.dev/prebuilt';
 // runtime and this annotation is what makes it read back as a webhook.
 const ANN_COMPONENT_TYPE = 'ipaas.wso2.com/component-type';
 const WEBHOOK_DISPLAY_TYPES = new Set(['webhook', 'miWebhook']);
+// A workflow runs as an integration-as-api, whose endpoint is the workflow management API, and reads back as a workflow
+// by this annotation.
+const isWorkflowInput = (input: CreateComponentInput): boolean => input.displayType === 'ballerinaWorkflow';
 // Samples build as integration-as-api, so they carry the identity in componentSubType instead.
 const isWebhookInput = (input: CreateComponentInput): boolean => WEBHOOK_DISPLAY_TYPES.has(input.displayType) || input.componentSubType === 'webhook';
 
@@ -103,6 +106,7 @@ const DISPLAY_TYPE_MAP: Record<DisplayType, { componentType: string; workflow: s
   miJob: { componentType: 'cronjob/mi-scheduled-task', workflow: 'mi-image-builder' },
   miWebhook: { componentType: 'deployment/mi-event-integration', workflow: 'mi-image-builder' },
   miEventHandler: { componentType: 'deployment/mi-event-integration', workflow: 'mi-image-builder' },
+  ballerinaWorkflow: { componentType: 'deployment/integration-as-api', workflow: 'ballerina-buildpack-builder' },
 };
 
 // Reverse map (read path): the BFF returns a composite displayType from
@@ -116,6 +120,8 @@ const LOGICAL_TYPE_TO_DISPLAY_TYPE: Record<string, { bi: string; mi: string }> =
   eventIntegration: { bi: 'ballerinaEventHandler', mi: 'miEventHandler' },
   webhook: { bi: 'ballerinaWebhook', mi: 'miWebhook' },
   proxy: { bi: 'proxy', mi: 'proxy' },
+  // Workflows are Ballerina only.
+  workflow: { bi: 'ballerinaWorkflow', mi: 'ballerinaWorkflow' },
 };
 
 function withFrontendDisplayType<T extends Component>(c: T): T {
@@ -184,12 +190,14 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
         // the supplied image; the annotation is omitted for normal components.
         ...(input.isPrebuilt ? { [ANN_PREBUILT]: 'true' } : {}),
         ...(isWebhookInput(input) ? { [ANN_COMPONENT_TYPE]: 'webhook' } : {}),
+        ...(isWorkflowInput(input) ? { [ANN_COMPONENT_TYPE]: 'workflow' } : {}),
       },
     },
     spec: {
       owner: { projectName: input.projectId },
       componentType: { kind: 'ComponentType', name: mapping.componentType },
-      autoDeploy: input.enableAutoDeploy ?? true,
+      // A workflow's first deploy waits for the platform's workflow runtime, which a deploy page shows; an auto-deploy could not wait.
+      autoDeploy: isWorkflowInput(input) ? false : (input.enableAutoDeploy ?? true),
       // Prebuilt integrations deploy a ready-made image and must not trigger a
       // git build on create; everything else builds from source.
       autoBuild: !input.isPrebuilt,
@@ -349,7 +357,6 @@ export const updateEndpoint = (input: UpdateEndpointInput): Promise<object> =>
 export const createMcpProxyComponent = (_input: CreateMcpProxyComponentInput): Promise<Component> => {
   throw new Error('[cloud] components.createMcpProxyComponent: not implemented');
 };
-
 
 export const createDeploymentTrack = (input: CreateDeploymentTrackInput): Promise<DeploymentTrack> =>
   bff.post<DeploymentTrack>(`/components/${seg(input.componentId)}/deployment-tracks`, {

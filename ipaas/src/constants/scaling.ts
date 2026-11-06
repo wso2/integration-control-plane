@@ -26,7 +26,7 @@ export interface ScalingMethodCard {
 
 export const SCALE_TO_ZERO_CARD: ScalingMethodCard = {
   value: ScalingMethod.ScaleToZero,
-  title: 'Scale to Zero',
+  title: 'Scale to zero',
   description: 'Your deployment will automatically scale down to zero during inactivity and swiftly scale up upon receiving new requests.',
 };
 
@@ -45,7 +45,7 @@ export const CLOUD_HPA_CARD: ScalingMethodCard = {
 
 export const NO_AUTOSCALING_CARD: ScalingMethodCard = {
   value: ScalingMethod.None,
-  title: 'No Autoscaling',
+  title: 'No autoscaling',
   description: 'Your deployment runs with a fixed number of replicas.',
 };
 

@@ -34,9 +34,11 @@ interface ScheduleDialogProps {
   buildId?: string;
   versionId: string;
   deploymentPipelineId: string;
+  /** Save with no build: the BFF then releases the current workload. For image-only components such as knowledge base data sources. */
+  allowWithoutBuild?: boolean;
 }
 
-export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, buildId, versionId, deploymentPipelineId }: ScheduleDialogProps) {
+export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, buildId, versionId, deploymentPipelineId, allowWithoutBuild = false }: ScheduleDialogProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -81,7 +83,7 @@ export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveErr
 
       <DrawerPanel.Footer>
         <Button onClick={onClose}>Back</Button>
-        <Button variant="contained" onClick={handleSave} disabled={deployTrack.isPending || !buildId || !form.isValid} startIcon={deployTrack.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+        <Button variant="contained" onClick={handleSave} disabled={deployTrack.isPending || (!buildId && !allowWithoutBuild) || !form.isValid} startIcon={deployTrack.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {deployTrack.isPending ? 'Updating…' : 'Update'}
         </Button>
       </DrawerPanel.Footer>

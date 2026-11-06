@@ -59,5 +59,5 @@ export const CLOUD_COMING_SOON_PROVIDERS = new Set<string>([GitProvider.BITBUCKE
 
 /** Tooltip for a provider that is visible but not yet usable, e.g. "Import from GitLab Coming Soon". */
 export function providerComingSoonLabel(provider: string): string {
-  return `Importing from ${GIT_PROVIDER_LABEL[provider] ?? provider} Coming Soon`;
+  return `Importing from ${GIT_PROVIDER_LABEL[provider] ?? provider} coming soon`;
 }

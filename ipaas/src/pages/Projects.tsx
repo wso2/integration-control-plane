@@ -20,7 +20,7 @@ import { Alert, Box, Button, CircularProgress, Grid, IconButton, ListingCard, Pa
 import { Folder, FolderInput, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import SearchField from '../components/SearchField';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useEffect, useState, type JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
 import DeleteProjectDialog from '../components/DeleteProjectDialog';
@@ -28,13 +28,11 @@ import { useRemovalNotice } from '../hooks/useRemovalNotice';
 import type { Project } from '../types/project';
 import EmptyListing from '../components/EmptyListing';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
-import ExploreMore from '../components/ExploreMore';
 import { newProjectUrl, importProjectUrl, type OrgScope } from '../nav';
 import { projectHomeUrl } from '../paths';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { Permissions } from '../constants/permissions';
 import Authorized from '../components/Authorized';
-import { trackEvent } from '../services/tracking/tracking';
 import * as styles from './Projects.styles';
 
 function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: string; project: Project; canDelete: boolean; onClick: () => void; onDelete: () => void }) {
@@ -53,7 +51,7 @@ function ProjectCard({ org, project, canDelete, onClick, onDelete }: { org: stri
         updatedTooltip={deleting ? undefined : formatDateTime(project.updatedAt)}
         onClick={deleting ? undefined : onClick}
         aria-disabled={deleting || undefined}
-        sx={deleting ? styles.cardDeleting : undefined}
+        sx={deleting ? styles.cardDeleting : styles.card}
         onMouseEnter={() => setArmed(true)}
         onFocus={() => setArmed(true)}
         actions={
@@ -92,8 +90,6 @@ export default function Projects(scope: OrgScope): JSX.Element {
   const canCreateProject = hasOrgPermission(Permissions.PROJECT_MANAGE);
   const { data: projects, isLoading } = useProjects();
 
-  useEffect(() => trackEvent('visit-home'), []);
-
   useRemovalNotice(
     scope.org,
     projects,
@@ -121,7 +117,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
   return (
     <PageContent fullWidth>
       <PageTitle>
-        <PageTitle.Header>All Projects</PageTitle.Header>
+        <PageTitle.Header>All projects</PageTitle.Header>
         <PageTitle.Actions>
           <Authorized permissions={Permissions.PROJECT_MANAGE}>
             <Button variant="outlined" startIcon={<FolderInput size={16} />} onClick={() => navigate(importProjectUrl(scope))} sx={styles.projectActionSx}>
@@ -134,7 +130,7 @@ export default function Projects(scope: OrgScope): JSX.Element {
         </PageTitle.Actions>
       </PageTitle>
 
-      <SearchField value={query} onChange={setQuery} placeholder="Search projects" fullWidth sx={styles.searchSx} />
+      <SearchField value={query} onChange={setQuery} placeholder="Search projects" width="standard" sx={styles.searchSx} />
 
       {alert && (
         <Alert severity="success" onClose={() => setAlert(null)} sx={{ mb: 3 }}>
@@ -179,8 +175,6 @@ export default function Projects(scope: OrgScope): JSX.Element {
       )}
 
       {deletingProject && <DeleteProjectDialog project={deletingProject} onClose={() => setDeletingProject(null)} />}
-
-      <ExploreMore />
     </PageContent>
   );
 }

@@ -58,11 +58,11 @@ export function validatePath(val: string): string | undefined {
 export function probeTypeLabel(type: ProbeType): string {
   switch (type) {
     case PROBE_TYPE.HTTP_GET:
-      return 'HTTP GET Request';
+      return 'HTTP GET request';
     case PROBE_TYPE.TCP:
-      return 'TCP Socket';
+      return 'TCP socket';
     case PROBE_TYPE.EXEC:
-      return 'Execute a Command';
+      return 'Execute a command';
     default:
       return '';
   }

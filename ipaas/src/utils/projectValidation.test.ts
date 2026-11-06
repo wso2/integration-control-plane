@@ -73,12 +73,12 @@ describe('validateProjectHandler', () => {
   });
 
   it('returns error for handles that collide with a project-level route', () => {
-    expect(validateProjectHandler('import')).not.toBeNull();
     expect(validateProjectHandler('redirect')).not.toBeNull();
   });
 
   it('accepts names that no longer collide with a route', () => {
     expect(validateProjectHandler('new')).toBeNull();
+    expect(validateProjectHandler('import')).toBeNull();
     expect(validateProjectHandler('settings')).toBeNull();
   });
 

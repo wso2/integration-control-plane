@@ -74,7 +74,7 @@ export default function BuildAccordionStepper({ logs, isInProgress }: BuildAccor
         const hasSubSteps = !isBuild && steps.length > 0;
         const isExpanded = expanded.has(key);
         const showSubs = hasSubSteps && isExpanded;
-        const label = isBuild && !hadUnitTest ? 'Build Source' : defaultLabel;
+        const label = isBuild && !hadUnitTest ? 'Build source' : defaultLabel;
 
         return (
           <Box key={key} sx={{ position: 'relative', pb: (hasSubSteps && !isExpanded) || isBuild ? 1.5 : 0 }}>

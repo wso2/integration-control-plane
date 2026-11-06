@@ -31,14 +31,14 @@ export type GitRefType = (typeof GitRefType)[keyof typeof GitRefType];
 
 export const BUILD_STAGES = [
   { key: 'init' as const, label: 'Initialization' },
-  { key: 'build' as const, label: 'Build Source & Test' },
+  { key: 'build' as const, label: 'Build source & test' },
   { key: 'deploy' as const, label: 'Finalization' },
 ];
 
 export const BUILD_DRAWER_TITLES: Record<BuildDrawerType, string> = {
-  [BuildDrawerType.BuildLogs]: 'Build Details',
-  [BuildDrawerType.CommitSelector]: 'All Commits',
-  [BuildDrawerType.BuildConfig]: 'Build Configuration',
+  [BuildDrawerType.BuildLogs]: 'Build details',
+  [BuildDrawerType.CommitSelector]: 'All commits',
+  [BuildDrawerType.BuildConfig]: 'Build configuration',
 };
 
 export const STEPPER_ICON_COL = 36;

@@ -16,20 +16,23 @@
  * under the License.
  */
 
-import { Box, Divider, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Divider, Skeleton, Typography } from '@wso2/oxygen-ui';
 import { useState, type ReactNode } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import AutomationExecutions from '../../AutomationExecutions';
 import PillTabs from '../../PillTabs';
-import RagRetrievalChat from './RagRetrievalChat';
+import KnowledgeBaseRetrieval from '../../KnowledgeBase/KnowledgeBaseRetrieval';
+import { useKnowledgeBase } from '../../../hooks/useKnowledgeBases';
+import { isNotFoundError } from '../../../utils/apiErrors';
+import type { Component } from '../../../types/component';
 
 /**
  * RAG Ingestion's content-only body: an Executions | Retrieval tab switcher.
  * Executions reuses the shared cronjob execution-history table; Retrieval is a
- * chat window that queries the project's RAG Retrieval Service. Both appear only
- * once the ingestion is deployed. No Card/header chrome — the shell frames it.
+ * chat window that queries the knowledge base the ingestion feeds. Both appear
+ * only once the ingestion is deployed. No Card/header chrome — the shell frames it.
  */
 export default function EnvCardBody({
   component,
@@ -91,11 +94,36 @@ export default function EnvCardBody({
 
           {tab === 1 && (
             <Box sx={{ minHeight: 320 }}>
-              <RagRetrievalChat ingestionComponentId={component.id} orgHandler={orgHandler} projectId={projectId} envId={env.id} envCritical={env.critical ?? false} />
+              <IngestionRetrieval component={component} />
             </Box>
           )}
         </>
       )}
     </>
   );
+}
+
+function IngestionRetrieval({ component }: { component: Component }): ReactNode {
+  if (!component.knowledgeBase) return <Alert severity="info">This ingestion does not feed a knowledge base, so there is nothing to query.</Alert>;
+  return <LinkedKnowledgeBaseRetrieval knowledgeBase={component.knowledgeBase} componentId={component.id} />;
+}
+
+function LinkedKnowledgeBaseRetrieval({ knowledgeBase, componentId }: { knowledgeBase: string; componentId: string }): ReactNode {
+  const { data: kb, isLoading, isError, error, refetch } = useKnowledgeBase(knowledgeBase);
+  if (isLoading) return <Skeleton variant="rounded" height={320} />;
+  if (isNotFoundError(error)) return <Alert severity="info">The knowledge base this ingestion feeds no longer exists, so there is nothing to query.</Alert>;
+  if (isError || !kb) {
+    return (
+      <Alert
+        severity="warning"
+        action={
+          <Button color="inherit" size="small" onClick={() => refetch()}>
+            Retry
+          </Button>
+        }>
+        Could not load the knowledge base this ingestion feeds.
+      </Alert>
+    );
+  }
+  return <KnowledgeBaseRetrieval knowledgeBase={kb} componentId={componentId} />;
 }

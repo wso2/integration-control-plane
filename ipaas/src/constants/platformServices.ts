@@ -29,7 +29,7 @@ export const ENABLE_REDIS_CREATION = false;
 export const FREE_TIER_DISABLED_PROVIDERS: CloudProvider[] = ['aws', 'azure', 'gcp'];
 
 /** Trademark disclaimer shown in the layout footer while on the Databases pages. */
-export const DB_TRADEMARK_NOTICE = 'PostgreSQL, MySQL, and Redis are trademarks and property of their respective owners. All product and service names used in this platform are for identification purposes only.';
+export const DB_TRADEMARK_NOTICE = 'PostgreSQL and Temporal are trademarks and property of their respective owners. All product and service names used in this platform are for identification purposes only.';
 
 /** Public path prefixes for the provider logos (shipped from Devant). */
 const DB_LOGO_BASE = 'assets/images/databases/';

@@ -85,7 +85,7 @@ export default function OrgDataPlanes(_scope: OrgScope): JSX.Element {
     <PageContent fullWidth>
       <Stack direction="row" justifyContent="space-between" alignItems="center" gap={2} sx={{ mb: 3 }}>
         <PageTitle>
-          <PageTitle.Header>Data Planes</PageTitle.Header>
+          <PageTitle.Header>Data planes</PageTitle.Header>
         </PageTitle>
         <Tooltip title="Refresh">
           <span>
@@ -126,7 +126,7 @@ export default function OrgDataPlanes(_scope: OrgScope): JSX.Element {
                   <ListingTable.Cell>Name</ListingTable.Cell>
                   <ListingTable.Cell>Type</ListingTable.Cell>
                   <ListingTable.Cell>Status</ListingTable.Cell>
-                  <ListingTable.Cell align="right">Registered Time</ListingTable.Cell>
+                  <ListingTable.Cell align="right">Registered time</ListingTable.Cell>
                 </ListingTable.Row>
               </ListingTable.Head>
               <ListingTable.Body>
@@ -138,7 +138,7 @@ export default function OrgDataPlanes(_scope: OrgScope): JSX.Element {
                       <ListingTable.Cell>
                         <NameCell name={pdp.name} />
                       </ListingTable.Cell>
-                      <ListingTable.Cell>Private Data Plane</ListingTable.Cell>
+                      <ListingTable.Cell>Private data plane</ListingTable.Cell>
                       <ListingTable.Cell>
                         <Stack direction="row" alignItems="center" gap={1}>
                           <Chip size="small" variant="outlined" color={chip.color} label={pdp.creationStatus === 'IN_PROGRESS' ? `${chip.label} · ${progress}%` : chip.label} />
@@ -162,7 +162,7 @@ export default function OrgDataPlanes(_scope: OrgScope): JSX.Element {
                       <ListingTable.Cell>
                         <NameCell name={dp.name} />
                       </ListingTable.Cell>
-                      <ListingTable.Cell>{isPrivate ? 'Private Data Plane' : 'WSO2 Cloud Data Plane'}</ListingTable.Cell>
+                      <ListingTable.Cell>{isPrivate ? 'Private data plane' : 'WSO2 Cloud data plane'}</ListingTable.Cell>
                       <ListingTable.Cell>
                         <Chip size="small" variant="outlined" color={dp.isActive ? 'success' : 'error'} label={dp.isActive ? 'Active' : 'Disconnected'} />
                       </ListingTable.Cell>

@@ -20,7 +20,7 @@ import { Box, Card, CardContent, Link, Stack, Typography } from '@wso2/oxygen-ui
 import { ArrowRight, BookOpen, FileText, LifeBuoy } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { EXPLORE_GROUPS } from '../constants/exploreLinks';
-import { cardContentSx, cardSx, gridSx, groupHeaderSx, groupIconSx, groupSx, groupTitleSx, headingSx, linkArrowSx, linkSx, sectionSx } from './ExploreMore.styles';
+import { cardContentSx, gridSx, groupHeaderSx, groupIconSx, groupSx, groupTitleSx, headingSx, linkArrowSx, linkSx, sectionSx } from './ExploreMore.styles';
 
 const GROUP_ICONS: Record<string, JSX.Element> = {
   Tutorials: <BookOpen size={22} />,
@@ -33,9 +33,9 @@ export default function ExploreMore(): JSX.Element {
   return (
     <Box sx={sectionSx}>
       <Typography variant="h5" component="h2" sx={headingSx}>
-        Explore More
+        Explore more
       </Typography>
-      <Card sx={cardSx}>
+      <Card>
         <CardContent sx={cardContentSx}>
           <Box sx={gridSx}>
             {EXPLORE_GROUPS.map((group) => (

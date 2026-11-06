@@ -21,7 +21,7 @@ import { KeyRound, Pencil, Plus, RefreshCw, Trash2 } from '@wso2/oxygen-ui-icons
 import { useState, type JSX } from 'react';
 import Authorized from '../../components/Authorized';
 import EmptyListing from '../../components/EmptyListing';
-import OrgSettingsTabs from '../../components/Settings/OrgSettingsTabs';
+import OrgSettingsTabs from '../../components/Settings/OrgConfigureTabs';
 import CopyOnPremKeyDialog from '../components/Settings/OnPremKeys/CopyOnPremKeyDialog';
 import OnPremKeyFormDialog from '../components/Settings/OnPremKeys/OnPremKeyFormDialog';
 import { Permissions } from '../../constants/permissions';

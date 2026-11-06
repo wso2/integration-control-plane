@@ -59,7 +59,11 @@ export function orgUrl(orgHandler: string): string {
 }
 
 export function orgHomeUrl(orgHandler: string): string {
-  return `/organizations/${orgHandler}/home`;
+  return `/organizations/${orgHandler}/overview`;
+}
+
+export function orgProjectsUrl(orgHandler: string): string {
+  return `/organizations/${orgHandler}/projects`;
 }
 
 export function newOrgUrl(): string {
@@ -132,10 +136,6 @@ export function newOrgRoleUrl(orgHandler: string): string {
 
 export function newOrgGroupUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/settings/access-control/groups/new`;
-}
-
-export function editEnvironmentUrl(orgHandler: string, envId: string): string {
-  return `/organizations/${orgHandler}/environments/${envId}/edit`;
 }
 
 export function orgAccessControlUrl(orgHandler: string, tab: 'users' | 'roles' | 'groups' = 'users'): string {

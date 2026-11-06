@@ -41,7 +41,7 @@ export default function ArchitectureCard({ projectId, components, isLoading }: {
         <Stack direction="row" alignItems="center" sx={{ mb: expanded ? 1.5 : 0, cursor: 'pointer' }} onClick={() => setExpanded((prev) => !prev)}>
           <GitBranch size={20} aria-hidden="true" />
           <Typography variant="h6" component="h2" sx={{ fontWeight: 600, ml: 1, flex: 1 }}>
-            Architecture Diagram
+            Architecture diagram
           </Typography>
           <IconButton size="small" aria-label={expanded ? 'Collapse architecture diagram' : 'Expand architecture diagram'} aria-expanded={expanded}>
             {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}

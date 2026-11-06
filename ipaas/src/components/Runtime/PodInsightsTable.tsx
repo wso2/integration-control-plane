@@ -106,11 +106,11 @@ export default function PodInsightsTable({ pods, isLoading, isError, isFetching,
           <ListingTable size="small">
             <ListingTable.Head>
               <ListingTable.Row>
-                <ListingTable.Cell>Pod Details</ListingTable.Cell>
+                <ListingTable.Cell>Pod details</ListingTable.Cell>
                 <ListingTable.Cell>Status</ListingTable.Cell>
                 <ListingTable.Cell>Available</ListingTable.Cell>
                 <ListingTable.Cell>Restarts</ListingTable.Cell>
-                <ListingTable.Cell>Last Activity</ListingTable.Cell>
+                <ListingTable.Cell>Last activity</ListingTable.Cell>
                 <ListingTable.Cell align="right">Actions</ListingTable.Cell>
               </ListingTable.Row>
             </ListingTable.Head>

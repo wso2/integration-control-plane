@@ -41,7 +41,7 @@ export default function FormExecutionSummary({ commitSha, buildDate, onNewTest, 
   return (
     <Box sx={{ width: '100%' }}>
       <PageTitle>
-        <PageTitle.Header>Test Your Automation</PageTitle.Header>
+        <PageTitle.Header>Test your automation</PageTitle.Header>
         <PageTitle.Actions>
           <Tooltip title="Create new test">
             <span>
@@ -73,7 +73,7 @@ export default function FormExecutionSummary({ commitSha, buildDate, onNewTest, 
       </Alert>
 
       <Stack direction="row" alignItems="center" gap={2} sx={{ color: 'text.secondary' }}>
-        <Typography variant="caption">Current Build:</Typography>
+        <Typography variant="caption">Current build:</Typography>
         <Stack direction="row" alignItems="center" gap={0.5}>
           <GitCommit size={14} />
           <Typography variant="body2" color="text.secondary">
