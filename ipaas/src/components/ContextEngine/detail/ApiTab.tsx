@@ -20,7 +20,7 @@ import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router';
 import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl } from '../../../utils/contextEngine';
-import AccessSwitch from './AccessSwitch';
+import AccessOffAlert from './AccessOffAlert';
 import ApiKeysSection from './ApiKeysSection';
 import CodeViewer from '../../CodeViewer';
 import SurfaceHeader from './SurfaceHeader';
@@ -57,12 +57,8 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
   return (
     <Box sx={{ maxWidth: 900 }}>
-      <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="api" />} />
-      {engine.access?.api === false && (
-        <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
-          API access is off. Requests to these endpoints get a 403 error until you turn it on.
-        </Alert>
-      )}
+      <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
+      {engine.access?.api === false && <AccessOffAlert engineId={engine.id} surface="api" />}
 
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Endpoints

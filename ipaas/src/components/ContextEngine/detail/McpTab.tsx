@@ -25,7 +25,7 @@ import { Scopes } from '../../../constants/permissions';
 import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
 import { buildMcpClientConfigs, mcpEndpointUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
-import AccessSwitch from './AccessSwitch';
+import AccessOffAlert from './AccessOffAlert';
 import McpPlayground from '../../McpPlayground/McpPlayground';
 import SurfaceHeader from './SurfaceHeader';
 import { clientTabsSx, endpointFieldSx, endpointRowSx, playgroundFrameSx } from '../styles';
@@ -51,6 +51,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   const canMintKey = useCan()(Scopes.CONFIG_MANAGE);
   const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + TEST_KEY_LIFETIME_MS).toISOString() });
   const selected = configs.find((c) => c.id === client) ?? configs[0];
+  const mcpOff = engine.access?.mcp === false;
 
   if (!engine.publicApiUrl) {
     return (
@@ -66,12 +67,8 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
   return (
     <Box>
       <Box sx={readableSx}>
-        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." action={engine.access && <AccessSwitch engineId={engine.id} access={engine.access} surface="mcp" />} />
-        {engine.access?.mcp === false && (
-          <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
-            MCP access is off. Agents get a 403 error until you turn it on.
-          </Alert>
-        )}
+        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." />
+        {mcpOff && <AccessOffAlert engineId={engine.id} surface="mcp" />}
 
         <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
           Server endpoint
@@ -92,7 +89,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
 
         {canMintKey && (
           <Box sx={{ my: 3 }}>
-            <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} onClick={() => setTesting((t) => !t)}>
+            <Button variant={testing ? 'outlined' : 'contained'} startIcon={<Play size={16} />} disabled={mcpOff} onClick={() => setTesting((t) => !t)}>
               {testing ? 'Hide MCP Playground' : 'Test in MCP Playground'}
             </Button>
           </Box>
@@ -100,7 +97,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
       </Box>
 
       {/* The playground takes the page's full width; the text around it keeps a readable measure. */}
-      {testing && canMintKey && (
+      {testing && canMintKey && !mcpOff && (
         <Box sx={playgroundFrameSx}>
           {testKey.isError && (
             <Alert

@@ -16,27 +16,22 @@
  * under the License.
  */
 
-import { Box, Stack, Typography } from '@wso2/oxygen-ui';
-import type { JSX, ReactNode } from 'react';
+import { Box, Typography } from '@wso2/oxygen-ui';
+import type { JSX } from 'react';
 import { mutedSx, surfaceHeaderSx } from '../styles';
 
 interface SurfaceHeaderProps {
   title: string;
   description: string;
-  /** Shown beside the title, such as the surface's access switch. */
-  action?: ReactNode;
 }
 
-/** Title of the API and MCP tabs. */
-export default function SurfaceHeader({ title, description, action }: SurfaceHeaderProps): JSX.Element {
+/** Title of the API and MCP tabs. Access to each surface is switched on the Overview tab. */
+export default function SurfaceHeader({ title, description }: SurfaceHeaderProps): JSX.Element {
   return (
     <Box sx={surfaceHeaderSx}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2}>
-        <Typography variant="h6" sx={{ fontWeight: 600 }}>
-          {title}
-        </Typography>
-        {action}
-      </Stack>
+      <Typography variant="h6" sx={{ fontWeight: 600 }}>
+        {title}
+      </Typography>
       <Typography variant="body2" sx={mutedSx}>
         {description}
       </Typography>
