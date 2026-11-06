@@ -550,7 +550,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   };
 
   const renderConfigurations = () => {
-    if (isLoading) {
+    if (isLoading || linked.linksLoading) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress size={32} color="primary" />
@@ -566,6 +566,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
         </Box>
       );
     }
+    // Without the links, linked fields would read as empty value boxes.
+    if (linked.linksMissing) return linked.top;
     if (!data?.jsonSchema || !parsedSchema) {
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
@@ -611,7 +613,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === 2 ? (isApplying ? 'Updating…' : 'Update') : 'Next';
-  const nextDisabled = step === 1 ? hasValidationErrors || isLoading : isApplying || hasCertPathErrors;
+  const nextDisabled = step === 1 ? hasValidationErrors || isLoading || linked.linksUnread : isApplying || hasCertPathErrors;
 
   return (
     <DrawerPanel open={open} onClose={handleClose}>
