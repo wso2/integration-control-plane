@@ -178,7 +178,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           <CheckCircle2 size={14} />
         </Box>
         <Typography variant="caption" color="success.main" fontWeight={500}>
-          Ballerina workspace detected
+          WSO2 Integrator: Default workspace detected
         </Typography>
       </Stack>
     ) : null;
@@ -192,6 +192,10 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       <PageTitle>
         <PageTitle.Header>Import a project</PageTitle.Header>
       </PageTitle>
+
+      <Alert severity="info" sx={{ mb: 3 }}>
+        Import currently supports WSO2 Integrator: Default projects only.
+      </Alert>
 
       {submitError && (
         <Alert severity="error" role="alert" sx={{ mb: 3 }} onClose={() => setSubmitError(null)}>
@@ -217,7 +221,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             <RepoSourceFields source={source} directoryHint={workspaceHint} />
             {pathReady && !isContentsLoading && !isContentsError && !isWorkspace && (
               <Alert severity="info" sx={{ mb: 3 }}>
-                No Ballerina workspace detected in the selected directory. Select a directory that contains a Ballerina workspace (a root <code>Ballerina.toml</code> with subdirectories that each have their own <code>Ballerina.toml</code>).
+                No WSO2 Integrator: Default workspace detected in the selected directory. Select a directory that contains a WSO2 Integrator: Default workspace.
               </Alert>
             )}
           </Box>
