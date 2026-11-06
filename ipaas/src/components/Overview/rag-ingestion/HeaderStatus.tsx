@@ -20,12 +20,18 @@ import { useState, type ReactNode } from 'react';
 import type { HeaderStatusProps } from '../../../types/integration';
 import StatusDot from '../_shared/StatusDot';
 import ConfigureButton from '../_shared/ConfigureButton';
-import RagIngestionConfigureDrawer from './configure/RagIngestionConfigureDrawer';
+import RagIngestionConfigureDrawer, { type ConfigureStep } from './configure/RagIngestionConfigureDrawer';
+import { KB_INGESTION_SUBTYPE } from '../../../constants/ragIngestion';
+
+// A knowledge base's data source runs the image the platform deploys for it and
+// reads no configuration file, so only its variables and schedule are editable.
+const KB_DATA_SOURCE_STEPS: ConfigureStep[] = ['envVars', 'schedule'];
 
 /**
  * RAG Ingestion's left-header slot: the deployment status dot plus a Configure
  * entry point that opens the 4-step BYOI Configure drawer (Environment
  * Variables, Configuration File, Schedule, Update Image) — matching devant.
+ * A knowledge base's data source gets only the steps it can use.
  */
 export default function HeaderStatus({ component, env, projectId, versionId, orgHandler, deploymentPipelineId, hasDeployment, deploymentStatusV2 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
@@ -36,7 +42,17 @@ export default function HeaderStatus({ component, env, projectId, versionId, org
       {hasDeployment && (
         <>
           <ConfigureButton onClick={() => setConfigureOpen(true)} />
-          <RagIngestionConfigureDrawer open={configureOpen} onClose={() => setConfigureOpen(false)} component={component} env={env} versionId={versionId} orgHandler={orgHandler} projectId={projectId} deploymentPipelineId={deploymentPipelineId} />
+          <RagIngestionConfigureDrawer
+            open={configureOpen}
+            onClose={() => setConfigureOpen(false)}
+            component={component}
+            env={env}
+            versionId={versionId}
+            orgHandler={orgHandler}
+            projectId={projectId}
+            deploymentPipelineId={deploymentPipelineId}
+            steps={component.componentSubType === KB_INGESTION_SUBTYPE ? KB_DATA_SOURCE_STEPS : undefined}
+          />
         </>
       )}
     </>

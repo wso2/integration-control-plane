@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, skipToken, useMutation, useQuery, useQueryClient, type Query } from '@tanstack/react-query';
 import { fetchExecutionConfigs, fetchTaskExecutions, fetchRuntimeArguments, fetchExecutionArguments, fetchExecutionLogs, fetchTaskExecutionCount, updateJobConfigs, stopSchedule, triggerTask, triggerComponentRun } from '../api/executions';
-import type { StopScheduleInput, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
+import type { StopScheduleInput, TaskExecution, ExecutionLogWindow, UpdateJobConfigsInput, TriggerComponentInput, RuntimeArgument } from '../types/executions';
 import type { TriggerTaskInput } from '../types/artifact';
 
 export function useExecutionConfigs(componentId: string, releaseId: string, envId = '') {
@@ -30,7 +30,8 @@ export function useExecutionConfigs(componentId: string, releaseId: string, envI
   });
 }
 
-export function useTaskExecutions(releaseId: string, componentId = '', envId = '', projectId = '', refetchInterval: number | false = false) {
+// `refetchInterval` may be a function of the query, to poll only while a run is in flight.
+export function useTaskExecutions(releaseId: string, componentId = '', envId = '', projectId = '', refetchInterval: number | false | ((query: Query<TaskExecution[]>) => number | false) = false) {
   return useQuery({
     queryKey: ['taskExecutions', releaseId, componentId, envId, projectId],
     queryFn: () => fetchTaskExecutions(releaseId, componentId, envId, projectId),

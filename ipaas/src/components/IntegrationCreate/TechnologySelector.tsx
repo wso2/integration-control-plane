@@ -38,7 +38,7 @@ export default function TechnologySelector({ selected, detectedMode, enabled, on
   };
 
   return (
-    <Box sx={{ display: 'flex', gap: 2 }}>
+    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
       {TECH_OPTIONS.map((opt) => {
         const disabled = isCardDisabled(opt.id);
         const isActive = selected === opt.id;
@@ -49,8 +49,7 @@ export default function TechnologySelector({ selected, detectedMode, enabled, on
               if (!disabled) onSelect(opt.id);
             }}
             sx={{
-              width: '25%',
-              minWidth: 180,
+              width: { xs: '100%', sm: 'calc(50% - 8px)', lg: 'calc(25% - 12px)' },
               border: 2,
               borderColor: isActive ? 'primary.main' : 'divider',
               bgcolor: isActive ? 'primary.50' : 'background.paper',

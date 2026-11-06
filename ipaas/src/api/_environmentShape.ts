@@ -19,10 +19,9 @@
 /**
  * The BFF environment wire shape, and the one mapper that normalizes it.
  *
- * Two domain modules need this: `environments.ts` for environment CRUD, and
+ * Two domain modules need this: `environments.ts` for environment reads, and
  * `deploymentPipelines.ts` to project environments into promotion-chain templates.
- * It lives in its own module so neither of them has to depend on the other —
- * `environments.ts` already imports `appendEnvironmentToDefaultPipeline` from
+ * It lives in its own module because `environments.ts` already imports from
  * `deploymentPipelines.ts`, so exporting the mapper from `environments.ts` instead
  * would close an import cycle.
  *

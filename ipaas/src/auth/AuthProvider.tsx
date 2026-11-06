@@ -25,9 +25,9 @@ import { oidcCallbackUrl } from '../paths';
 import { editorSignInForwardUrl } from '../utils/vscodeCallback';
 import type { AuthContextValue } from './types';
 import { decodeJwtPayload, isExpired, stringClaim } from './jwt';
-import { clearLegacySession } from './legacySession';
+import { clearBrowserSignInSession, clearLegacySession } from './legacySession';
 import { connect, disconnect, type CloudSession, type CloudUser } from './session';
-import { THUNDER_INSTANCE_ID, signInParams, thunderConfig } from './thunderConfig';
+import { THUNDER_INSTANCE_ID, bffSignInUrl, gatewaySignedIn, isBffAuth, signInParams, thunderConfig } from './thunderConfig';
 import { stripBase } from '../utils/basePath';
 import { local, session as browserSession } from '../utils/storage';
 
@@ -84,16 +84,21 @@ function sdkHasCode(): boolean {
   return isSignInLanding() && hasAuthParamsInUrl(search) && hasCalledForThisInstanceInUrl(THUNDER_INSTANCE_ID, search);
 }
 
+// On the gateway an API call carries the session cookie and the gateway adds the token, so there is
+// none to hand out; authenticatedFetch sets no Authorization header without one.
+const noBffToken = (): Promise<string> => Promise.resolve('');
+
 /**
  * The org comes from the access token, which the backend reads too. The profile prefers the ID
  * token and falls back to the access token, which carries the same name and email claims — a
- * session seeded from an access token alone, as E2E token mode does, has no ID token.
+ * session seeded from an access token alone, as E2E token mode does, has no ID token. On the
+ * gateway the browser holds no access token, and the session's ID token claims carry the same org.
  */
-function toSession(accessToken: string, idClaims: Record<string, unknown> | null): CloudSession | null {
-  const access = decodeJwtPayload(accessToken);
+function toSession(access: Record<string, unknown>, idClaims: Record<string, unknown> | null): CloudSession | null {
   const claim = (name: string): string | undefined => (idClaims ? stringClaim(idClaims, name) : undefined) ?? stringClaim(access, name);
   const orgHandle = stringClaim(access, 'ouHandle');
   const orgUuid = stringClaim(access, 'ouId');
+  const orgName = stringClaim(access, 'ouName');
   const userId = claim('sub');
   // 'default' is the placeholder the routes treat as "no org" (ScopeResolver), never a real handle.
   if (!orgHandle || orgHandle === 'default' || !orgUuid || !userId) return null;
@@ -108,6 +113,8 @@ function toSession(accessToken: string, idClaims: Record<string, unknown> | null
     },
     orgHandle,
     orgUuid,
+    orgName,
+    scopes: (stringClaim(access, 'scope') ?? '').split(' ').filter(Boolean),
   };
 }
 
@@ -117,6 +124,7 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
   useEffect(() => {
     clearLegacySession();
+    if (isBffAuth()) clearBrowserSignInSession();
   }, []);
 
   useEffect(() => {
@@ -131,11 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }): JSX.Element
 
 function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Element {
   const { isInitialized, isLoading, isSignedIn, getAccessToken, getDecodedIdToken, clearSession, signIn, signInSilently, signOut } = useThunderID();
+  const [bff] = useState(isBffAuth);
   const [hasCode] = useState(sdkHasCode);
   const [status, setStatus] = useState<Status>({ kind: 'pending' });
   // A sign-in landing already carries Thunder's answer, a code or an error; a load right after a
-  // sign-out must not rejoin the session it left.
-  const [silent, setSilent] = useState<Silent>(() => (isSignInLanding() || skipSilentRequested() ? 'done' : 'idle'));
+  // sign-out must not rejoin the session it left. On the gateway the browser never reaches Thunder:
+  // the session check itself joins the cloud console's session (Native SSO).
+  const [silent, setSilent] = useState<Silent>(() => (bff || isSignInLanding() || skipSilentRequested() ? 'done' : 'idle'));
   const silentStarted = useRef(false);
   const [waitFrom, setWaitFrom] = useState(Date.now);
   const [recheck, setRecheck] = useState(0);
@@ -159,6 +169,24 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    // getDecodedIdToken waits for the gateway's session and rejects when there is none. The SDK's own
+    // getAccessToken would ask the gateway for a token it never hands out.
+    const settleOnGateway = async (): Promise<void> => {
+      const idClaims = await getDecodedIdToken().then(
+        (claims) => claims as Record<string, unknown>,
+        () => null,
+      );
+      if (cancelled) return;
+      if (!idClaims || Object.keys(idClaims).length === 0) return setStatus({ kind: 'signedOut', error: null });
+      const claimed = toSession(idClaims, idClaims);
+      if (!claimed) return endSession(MISSING_ORG);
+      // The gateway keeps the access token, so the browser has no scopes to gate on.
+      const session = { ...claimed, scopes: [] };
+
+      connect({ session, getAccessToken: noBffToken, onExpired: () => endSession(null), checkSession: gatewaySignedIn });
+      local.set(ORG_HANDLE_KEY, session.orgHandle);
+      setStatus({ kind: 'signedIn', session });
+    };
     const settle = async (): Promise<void> => {
       const accessToken = await getAccessToken();
       if (cancelled) return;
@@ -180,7 +208,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
         (claims) => claims as Record<string, unknown>,
         () => null,
       );
-      const session = toSession(accessToken, idClaims);
+      const session = toSession(decodeJwtPayload(accessToken), idClaims);
       if (cancelled) return;
       if (!session) return endSession(MISSING_ORG);
 
@@ -189,14 +217,24 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       local.set(ORG_HANDLE_KEY, session.orgHandle);
       setStatus({ kind: 'signedIn', session });
     };
-    settle().catch(() => {
+    (bff ? settleOnGateway() : settle()).catch(() => {
       if (!cancelled) endSession(null);
     });
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [status.kind, hasCode, silent, isInitialized, isLoading, isSignedIn, recheck, waitFrom, getAccessToken, getDecodedIdToken, endSession]);
+  }, [status.kind, bff, hasCode, silent, isInitialized, isLoading, isSignedIn, recheck, waitFrom, getAccessToken, getDecodedIdToken, endSession]);
+
+  const sdkSignedIn = useRef(false);
+  useEffect(() => {
+    if (!bff || status.kind !== 'signedIn') return;
+    if (isSignedIn) sdkSignedIn.current = true;
+    else if (sdkSignedIn.current) {
+      sdkSignedIn.current = false;
+      endSession(null);
+    }
+  }, [bff, status.kind, isSignedIn, endSession]);
 
   // Read once in the initialiser above; cleared here, not there, so StrictMode's second call agrees.
   useEffect(() => {
@@ -225,9 +263,10 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
 
   const loginWithOIDC = useCallback(
     async (fidp?: string) => {
+      if (bff) return window.location.assign(bffSignInUrl(`${window.location.pathname}${window.location.search}`));
       await signIn(signInParams(fidp));
     },
-    [signIn],
+    [bff, signIn],
   );
 
   const completeSignIn = useCallback(
@@ -259,6 +298,7 @@ function CloudSessionProvider({ children }: { children: ReactNode }): JSX.Elemen
       displayName: user.displayName,
       pictureUrl: user.pictureUrl,
       orgHandle: status.kind === 'signedIn' ? status.session.orgHandle : '',
+      scopes: status.kind === 'signedIn' ? status.session.scopes : [],
       loginWithOIDC,
       completeSignIn,
       logout,

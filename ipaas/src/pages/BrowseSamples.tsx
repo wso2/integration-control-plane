@@ -25,7 +25,7 @@ import { isQuotaError } from '../utils/apiErrors';
 import FilterSection from '../components/FilterSection';
 import SampleGridCard from '../components/SampleGridCard';
 import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
-import { componentSubTypeFromSample, displayTypeFromSample, formatBuildPack, formatComponentType, normalizeComponentType } from '../constants/integrations';
+import { componentSubTypeFromSample, displayTypeFromSample, formatBuildPack, formatComponentType, normalizeComponentType, sampleId, samplePath } from '../constants/integrations';
 import { PAGE_SIZE, sampleKey } from '../constants/samples';
 import { useSamples } from '../hooks/useSamples';
 import { resourceUrl, narrow, newComponentUrl, type ProjectScope } from '../nav';
@@ -84,10 +84,11 @@ export default function BrowseSamples(scope: ProjectScope): JSX.Element {
         displayType: displayTypeFromSample(sample.componentType, sample.buildPack),
         componentSubType: componentSubTypeFromSample(sample.componentType, sample.buildPack),
         srcGitRepoUrl: sample.repositoryUrl,
-        repositorySubPath: `${sample.subDirectory ?? ''}${sample.componentPath}`,
+        repositorySubPath: samplePath(sample),
         repositoryBranch: sample.branch ?? 'main',
         isPublicRepo: true,
         enableAutoDeploy: true,
+        creation: { method: 'from-sample', sampleId: sampleId(sample) },
       },
       {
         onSuccess: (component) => navigate(resourceUrl(narrow(scope, component.handler), 'overview')),

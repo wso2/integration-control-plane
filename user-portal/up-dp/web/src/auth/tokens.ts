@@ -140,7 +140,7 @@ export function configureAuth(next: AuthConfig) {
 }
 
 function settings(): AuthConfig {
-  if (!config?.issuer || !config.clientId) throw new SignInError('unavailable');
+  if (!config?.issuer || !config.clientId || !config.resource) throw new SignInError('unavailable');
   return config;
 }
 
@@ -248,9 +248,9 @@ async function postForm(endpoint: string, params: Record<string, string>): Promi
 }
 
 async function tokenRequest(params: Record<string, string>): Promise<TokenResponse> {
-  const { clientId } = settings();
+  const { clientId, resource } = settings();
   const { token } = await endpoints();
-  const response = await postForm(token, { ...params, client_id: clientId });
+  const response = await postForm(token, { ...params, client_id: clientId, resource });
   const body = (await response.json().catch(() => ({}))) as Partial<TokenResponse> & { error?: string; error_description?: string };
   if (!response.ok || !body.access_token) {
     throw new SignInError(body.error ?? `http_${response.status}`, body.error_description, response.status >= 500);
@@ -330,7 +330,7 @@ export async function checkScopes(): Promise<void> {
 
 /** The WIdP-DP's authorization request for one sign-in. Silent asks with prompt=none. */
 async function authorizationUrl(tx: SignInTransaction): Promise<string> {
-  const { clientId } = settings();
+  const { clientId, resource } = settings();
   const { authorization } = await endpoints();
   const url = new URL(authorization);
   const query: Record<string, string> = {
@@ -338,6 +338,7 @@ async function authorizationUrl(tx: SignInTransaction): Promise<string> {
     client_id: clientId,
     redirect_uri: redirectUri(),
     scope: tx.scope,
+    resource,
     state: tx.state,
     nonce: tx.nonce,
     code_challenge: await pkceChallenge(tx.verifier),

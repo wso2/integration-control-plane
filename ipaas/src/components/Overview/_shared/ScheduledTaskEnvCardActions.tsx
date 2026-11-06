@@ -30,6 +30,8 @@ import NextRunLabel from '../../NextRunLabel';
 import ScheduleButton from './ScheduleButton';
 import RunButton from '../automation/RunButton';
 import RunWithArgsDialog from '../automation/RunWithArgsDialog';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 
 const NO_ARGUMENTS: RuntimeArgument[] = [];
 
@@ -78,6 +80,7 @@ export default function EnvCardActions({
   const actionsDisabled = !!blockedReason;
 
   const triggerRun = useTriggerComponent();
+  const canRun = useCan()(Scopes.INTEGRATION_EXECUTE);
   const [argsDialogOpen, setArgsDialogOpen] = useState(false);
   // Read from the source only once Test with Arguments is picked, since plain Test sends
   // none. A failed lookup leaves runtimeArgs empty, so the drawer offers free-form rows and
@@ -122,25 +125,29 @@ export default function EnvCardActions({
         onSaveError={() => onNotify({ text: 'Failed to save schedule. Please try again.', severity: 'error' })}
         onStopSuccess={() => onNotify({ text: 'Schedule stopped successfully', severity: 'success' })}
       />
-      <Tooltip title={blockedReason} placement="top">
-        <span>
-          <RunButton envCritical={env.critical} disabled={actionsDisabled} pending={triggerRun.isPending} loading={argsDialogOpen && runtimeArgsLoading} onRun={handleTest} onRunWithArgs={() => setArgsDialogOpen(true)} />
-        </span>
-      </Tooltip>
-      {/* Mounted once the arguments have loaded, so its rows are laid out from them. */}
-      {argsDialogOpen && !runtimeArgsLoading && (
-        <RunWithArgsDialog
-          open
-          onClose={() => setArgsDialogOpen(false)}
-          onRunSuccess={handleRunSuccess}
-          envCritical={env.critical}
-          orgHandler={orgHandler}
-          projectId={projectId}
-          componentId={component.id}
-          releaseId={releaseId}
-          runtimeArguments={runtimeArgs}
-          argumentsUnavailable={runtimeArgsError}
-        />
+      {canRun && (
+        <>
+          <Tooltip title={blockedReason} placement="top">
+            <span>
+              <RunButton envCritical={env.critical} disabled={actionsDisabled} pending={triggerRun.isPending} loading={argsDialogOpen && runtimeArgsLoading} onRun={handleTest} onRunWithArgs={() => setArgsDialogOpen(true)} />
+            </span>
+          </Tooltip>
+          {/* Mounted once the arguments have loaded, so its rows are laid out from them. */}
+          {argsDialogOpen && !runtimeArgsLoading && (
+            <RunWithArgsDialog
+              open
+              onClose={() => setArgsDialogOpen(false)}
+              onRunSuccess={handleRunSuccess}
+              envCritical={env.critical}
+              orgHandler={orgHandler}
+              projectId={projectId}
+              componentId={component.id}
+              releaseId={releaseId}
+              runtimeArguments={runtimeArgs}
+              argumentsUnavailable={runtimeArgsError}
+            />
+          )}
+        </>
       )}
     </>
   );

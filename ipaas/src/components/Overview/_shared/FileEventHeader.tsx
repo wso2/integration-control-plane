@@ -21,6 +21,8 @@ import { GitCommit, RefreshCw, RotateCw, Square } from '@wso2/oxygen-ui-icons-re
 import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
 import type { CustomHeaderProps } from '../../../types/integration';
 import StatusDot from './StatusDot';
@@ -56,16 +58,18 @@ export default function FileEventHeader({
   requestPoll,
   isRefreshing,
   onRefresh,
+  deployAction,
 }: CustomHeaderProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
   const isActionPending = stopMutation.isPending || redeployMutation.isPending;
 
-  const canStop = deploymentStatusV2 === 'ACTIVE';
-  const canStart = deploymentStatusV2 === 'SUSPENDED';
-  const hasError = deploymentStatusV2 === 'ERROR';
-  const isInProgress = deploymentStatusV2 === 'IN_PROGRESS';
+  const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
+  const canStop = canDeploy && deploymentStatusV2 === 'ACTIVE';
+  const canStart = canDeploy && deploymentStatusV2 === 'SUSPENDED';
+  const hasError = canDeploy && deploymentStatusV2 === 'ERROR';
+  const isInProgress = canDeploy && deploymentStatusV2 === 'IN_PROGRESS';
 
   // Switch the Configure button to "Configure to Continue" when the schema has
   // required configs without values (devant: `hasAllRequiredConfigs`).
@@ -155,7 +159,7 @@ export default function FileEventHeader({
         )}
       </Stack>
 
-      {/* Right: Stop / Start + Refresh */}
+      {/* Right: Stop / Start / Deploy + Refresh */}
       <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
         {(canStop || isInProgress) && (
           <Tooltip title="Stop deployment">
@@ -184,6 +188,7 @@ export default function FileEventHeader({
             </span>
           </Tooltip>
         )}
+        {deployAction}
         <Tooltip title="Refresh">
           <IconButton size="small" disabled={isRefreshing} aria-label="Refresh" onClick={onRefresh}>
             <RefreshCw size={16} style={{ animation: isRefreshing ? 'spin 1s linear infinite' : 'none', transformOrigin: 'center' }} />

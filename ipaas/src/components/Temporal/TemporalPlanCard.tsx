@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { Card, CardActionArea, Divider, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
+import ServicePlanCard, { type PlanSpec } from '../Databases/ServicePlanCard';
 import { cpuLabel, memoryLabel, planLabel, planPrice } from '../../utils/databases';
 import type { TemporalPlan } from '../../types/temporal';
 
@@ -28,38 +28,24 @@ interface TemporalPlanCardProps {
   onSelect: () => void;
 }
 
-/** A selectable Temporal plan card showing the plan's size, throughput and list price. */
+/** A Temporal plan option showing the plan's size, throughput and list price. */
 export default function TemporalPlanCard({ plan, selected, disabled, onSelect }: TemporalPlanCardProps): JSX.Element {
-  const price = planPrice(plan);
+  const highlyAvailable = plan.replicas > 1;
+  const specs: PlanSpec[] = [{ label: 'Replicas', value: String(plan.replicas) }];
+  if (plan.historyShards !== undefined) specs.push({ label: 'History shards', value: String(plan.historyShards) });
+  if (plan.memory) specs.push({ label: 'Memory', value: memoryLabel(plan.memory) });
+  if (plan.cpu) specs.push({ label: 'CPU', value: cpuLabel(plan.cpu) });
   return (
-    <Card variant="outlined" sx={{ width: 240, borderColor: selected ? 'primary.main' : 'divider', borderWidth: selected ? 2 : 1, opacity: disabled ? 0.5 : 1 }}>
-      <CardActionArea disabled={disabled} onClick={onSelect} aria-pressed={selected} sx={{ p: 2, alignItems: 'flex-start' }}>
-        <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-          {planLabel(plan.id)}
-        </Typography>
-        <Typography variant="body2">Replicas: {plan.replicas}</Typography>
-        {plan.cpu && <Typography variant="body2">CPU: {cpuLabel(plan.cpu)}</Typography>}
-        {plan.memory && <Typography variant="body2">Memory: {memoryLabel(plan.memory)}</Typography>}
-        {plan.historyShards !== undefined && <Typography variant="body2">History shards: {plan.historyShards}</Typography>}
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1.5 }}>
-          {plan.replicas > 1 ? 'Highly available: every Temporal service runs on separate nodes.' : 'Single replica. For development use.'}
-        </Typography>
-        {price && (
-          <>
-            <Divider sx={{ my: 1.5 }} />
-            <Typography variant="subtitle1" sx={{ color: 'primary.main', fontWeight: 600 }}>
-              {price.monthly}
-              <Typography component="span" variant="caption" color="text.secondary">
-                {' '}
-                / month
-              </Typography>
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {price.hourly} / hour
-            </Typography>
-          </>
-        )}
-      </CardActionArea>
-    </Card>
+    <ServicePlanCard
+      name={planLabel(plan.id)}
+      tagline={highlyAvailable ? `${plan.replicas} replicas · highly available` : 'Single replica'}
+      price={planPrice(plan)}
+      specs={specs}
+      note={highlyAvailable ? 'Every Temporal service runs on separate nodes' : 'No redundancy · development only'}
+      noteTone={highlyAvailable ? 'success' : 'warning'}
+      selected={selected}
+      disabled={disabled}
+      onSelect={onSelect}
+    />
   );
 }

@@ -45,7 +45,7 @@ export function useSaveMiConfig(projectId: string, componentId: string, envId: s
   return useMutation({
     mutationFn: (plan: MiConfigSavePlan) =>
       applyMiConfigSavePlan(plan, {
-        put: (name, sensitive, data) => putEnvGroup(projectId, componentId, envId, name, sensitive, data),
+        put: (name, sensitive, data, keep) => putEnvGroup(projectId, componentId, envId, name, sensitive, data, keep),
         remove: (name) => deleteEnvGroup(projectId, componentId, envId, name),
       }),
     // Settled, not success: a partial failure has still changed some groups.

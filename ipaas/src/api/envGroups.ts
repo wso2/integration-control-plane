@@ -20,8 +20,9 @@
  * Env-var groups on a (component, environment), served by the BFF at
  * /components/{c}/environments/{e}/env-groups[/{name}]. The groups live on the
  * environment's ReleaseBinding, so writes need the component to be deployed
- * there. A PUT replaces the whole group and needs at least one variable; to
- * empty a group, delete it.
+ * there. A PUT replaces the whole group: it needs at least one variable, sent or
+ * named in `keep` (stored secrets of a sensitive group left as they are); to empty
+ * a group, delete it.
  *
  * `devopsConfigs.ts` maps the same routes onto devant's ConfigMap/Secret shapes
  * for the Configs & Secrets page. This file is the plain, component-scoped view.
@@ -50,8 +51,8 @@ export const listEnvGroups = async (projectId: string, componentId: string, envI
 /** One group with its values (blank for a sensitive group). */
 export const getEnvGroup = async (projectId: string, componentId: string, envId: string, name: string): Promise<EnvGroup> => toEnvGroup(await bff.get<BffEnvGroup>(`${groupsPath(componentId, envId)}/${seg(name)}${q({ projectName: projectId })}`));
 
-export const putEnvGroup = async (projectId: string, componentId: string, envId: string, name: string, sensitive: boolean, data: Record<string, string>): Promise<void> => {
-  await bff.put(`${groupsPath(componentId, envId)}/${seg(name)}${q({ projectName: projectId })}`, { name, sensitive, data });
+export const putEnvGroup = async (projectId: string, componentId: string, envId: string, name: string, sensitive: boolean, data: Record<string, string>, keep?: string[]): Promise<void> => {
+  await bff.put(`${groupsPath(componentId, envId)}/${seg(name)}${q({ projectName: projectId })}`, { name, sensitive, data, ...(keep?.length ? { keep } : {}) });
 };
 
 export const deleteEnvGroup = async (projectId: string, componentId: string, envId: string, name: string): Promise<void> => {

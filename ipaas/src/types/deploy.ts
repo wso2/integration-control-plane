@@ -34,6 +34,8 @@ export interface BuildAreaProps {
   firstEnvId: string;
   firstEnvTemplateId: string;
   autoDeployEnabled?: boolean;
+  /** Whether the "Auto deploy on build" switch is offered. */
+  autoDeployAvailable: boolean;
   componentName: string;
   projectHandler: string;
   displayType?: string;
@@ -43,6 +45,8 @@ export interface BuildAreaProps {
    * user-configurable endpoints (devant only shows endpoint config for generic
    * services / MCP). Resolved by `identifyIntegration` in Deploy.tsx.
    */
+  /** A workflow integration, which deploys only once the platform's workflow runtime is ready. */
+  isWorkflow?: boolean;
   hideEndpoints?: boolean;
 }
 
@@ -63,6 +67,8 @@ export interface DeployEnvironmentCardProps {
   hideEndpoints?: boolean;
   /** The component's real `displayType`; the configure drawer picks its view (e.g. MI) from it. */
   displayType?: string;
+  /** A workflow integration: shows the workflow runtime it runs on, and promotes only once the runtime is ready. */
+  isWorkflow?: boolean;
   env: Environment;
   branch: string;
   componentName: string;
@@ -105,7 +111,8 @@ export interface DeployEnvironmentCardBodyProps {
   endpointCount?: number;
   configurablesCount?: number;
   scaleToZeroEnabled?: boolean;
-  onConfigClick: () => void;
+  /** Absent when the user's role can't change configuration here: the card hides the control. */
+  onConfigClick?: () => void;
   onJobConfigClick?: () => void;
   onHistoryClick?: () => void;
   onEndpointsClick?: () => void;

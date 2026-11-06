@@ -26,14 +26,15 @@ describe('pageTitleFor', () => {
   });
 
   it('drops the scope prefix', () => {
-    expect(pageTitleFor('org-environments')).toBe('Environments');
+    expect(pageTitleFor('org-deploy')).toBe('Deploy');
     expect(pageTitleFor('proj-overview')).toBe('Overview');
   });
 
   it('uses an override where sentence-casing the id reads wrong', () => {
     expect(pageTitleFor('configs-secrets')).toBe('Configs & secrets');
     expect(pageTitleFor('external-ci')).toBe('External CI');
-    expect(pageTitleFor('component-settings')).toBe('Settings');
+    expect(pageTitleFor('org-settings')).toBe('Configure');
+    expect(pageTitleFor('component-settings')).toBe('Configure');
   });
 
   it('returns empty for an unknown nav id', () => {

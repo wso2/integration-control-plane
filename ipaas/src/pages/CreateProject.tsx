@@ -21,6 +21,8 @@ import { ArrowLeft, Edit } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateProject } from '../hooks/useProjects';
 import { useProjectHandler } from '../hooks/useProjectHandler';
@@ -41,6 +43,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
 
   const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, handlerTaken, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createProject = useCreateProject();
+  const canCreate = useCan()(Scopes.PROJECT_CREATE);
   const navigate = useAppNavigate();
   const orgHomeUrl = resourceUrl(scope, 'overview');
   const allowLeave = useUnsavedChanges(displayName !== '' || description !== '' || effectiveHandler !== '');
@@ -58,7 +61,7 @@ export default function CreateProject(scope: OrgScope): JSX.Element {
 
   // A failed availability check must not hard-block submit — the create call still validates uniqueness.
   const availabilityReady = !effectiveHandler || effectiveHandler.length < 2 || availability !== undefined || availabilityError;
-  const canSubmit = !!displayName.trim() && !nameError && !!effectiveHandler && !handlerInvalid && !handlerTaken && !isCheckingAvailability && availabilityReady;
+  const canSubmit = canCreate && !!displayName.trim() && !nameError && !!effectiveHandler && !handlerInvalid && !handlerTaken && !isCheckingAvailability && availabilityReady;
 
   const handleSubmit = async () => {
     setIsCreating(true);
