@@ -32,13 +32,13 @@ let unmount = () => {};
 afterEach(() => unmount());
 
 describe('the read-only Configure drawer', () => {
-  it('lists the optional configurables the editor shows, as their default, under "Optional" by module', async () => {
+  it('lists the configurables as the editor sections them, an unset optional one as its default', async () => {
     const r = await renderWithScopes(
       <ConfigureDrawer open readOnly onClose={() => {}} orgHandler="acme" projectId="default" componentId="hello" envId="development" versionId="v1" componentName="hello" projectHandler="default" displayType="ballerinaService" />,
       DEVELOPER,
     );
     unmount = r.unmount;
     const rows = [...document.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
-    expect(rows).toEqual([['hello.greeting', 'hi'], ['Optional'], ['log'], ['level', 'Default'], ['hello'], ['port', 'Default']]);
+    expect(rows).toEqual([['Required'], ['hello'], ['greeting', 'hi'], ['Optional'], ['log'], ['level', 'Default'], ['hello'], ['port', 'Default']]);
   });
 });

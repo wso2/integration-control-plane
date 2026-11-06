@@ -36,33 +36,48 @@ describe('schemaConfigValues', () => {
     ]);
   });
 
-  it('adds the keys that have no value, required before optional', () => {
+  it("lists the editor's fields, required before optional, with their stored values", () => {
     const jsonSchema = btoa(JSON.stringify({ type: 'object', properties: { d: { type: 'integer' }, a: { type: 'string' }, b: { type: 'string' }, c: { type: 'string' } }, required: ['a', 'b'] }));
     const data = { jsonSchema, configurations: [{ key: 'a', values: [{ environmentUuid: 'dev', value: '1' }] }] };
     expect(schemaConfigValues(data)).toEqual([
-      { key: 'a', value: '1', secret: false },
-      { key: 'b', value: '', secret: false },
-      { key: 'd', value: '', secret: false, optional: true },
-      { key: 'c', value: '', secret: false, optional: true },
+      { key: 'a', label: 'a', value: '1', secret: false, section: 'Required' },
+      { key: 'b', label: 'b', value: '', secret: false, section: 'Required' },
+      { key: 'd', label: 'd', value: '', secret: false, optional: true, section: 'Optional' },
+      { key: 'c', label: 'c', value: '', secret: false, optional: true, section: 'Optional' },
     ]);
   });
 
-  it("names a module's keys by their path, and an optional key's module as the editor groups it", () => {
-    // As Ballerina nests them: organization, then module, then the module's configurables.
+  it("puts each field under its module, labels an object's fields as the editor does, and shows a list or map as JSON", () => {
     const module = (properties: object, required: string[] = []) => ({ type: 'object', properties, required });
-    const org = (modules: object) => ({ type: 'object', properties: modules });
     const jsonSchema = btoa(
       JSON.stringify({
         type: 'object',
         requiredLevel: 3,
-        properties: { acme: org({ hello: module({ port: { type: 'integer' }, greeting: { type: 'string' } }, ['greeting']) }), ballerina: org({ log: module({ level: { type: 'string' }, format: { type: 'string' } }) }) },
+        properties: {
+          acme: { type: 'object', properties: { hello: module({ token: { type: 'string' } }, ['token']) } },
+          ballerina: {
+            type: 'object',
+            properties: {
+              log: module({
+                accessLog: { type: 'object', properties: { console: { type: 'boolean' } } },
+                keyValues: { type: 'object', additionalProperties: { type: 'string' } },
+                paths: { type: 'array', items: { type: 'string' } },
+              }),
+            },
+          },
+        },
       }),
     );
-    expect(schemaConfigValues({ jsonSchema, configurations: [] })).toEqual([
-      { key: 'acme.hello.greeting', value: '', secret: false },
-      { key: 'ballerina.log.level', value: '', secret: false, optional: true, module: 'ballerina.log' },
-      { key: 'ballerina.log.format', value: '', secret: false, optional: true, module: 'ballerina.log' },
-      { key: 'acme.hello.port', value: '', secret: false, optional: true, module: 'acme.hello' },
+    const value = (key: string, v: string, isSensitive = false) => ({ key, isSensitive, values: [{ environmentUuid: 'dev', value: v }] });
+    const data = {
+      jsonSchema,
+      configurations: [value('acme.hello.token', 's3cret', true), value('ballerina.log.keyValues.icp\\.runtimeId', 'r1'), value('ballerina.log.keyValues.key', 'k', true), value('ballerina.log.paths.[1]', '/b'), value('ballerina.log.paths.[0]', '/a')],
+    };
+    expect(schemaConfigValues(data)).toEqual([
+      { key: 'acme.hello.token', label: 'token', value: '', secret: true, section: 'Required', module: 'acme.hello' },
+      { key: 'ballerina.log.accessLog.console', label: 'accessLog / console', value: '', secret: false, optional: true, section: 'Optional', module: 'ballerina.log' },
+      { key: 'ballerina.log.keyValues', label: 'keyValues', value: '{"icp.runtimeId":"r1","key":"••••••••"}', secret: false, optional: true, section: 'Optional', module: 'ballerina.log' },
+      { key: 'ballerina.log.paths', label: 'paths', value: '["/a","/b"]', secret: false, optional: true, section: 'Optional', module: 'ballerina.log' },
     ]);
   });
 

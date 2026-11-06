@@ -50,7 +50,7 @@ import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import { useMiConfig } from '../../hooks/useMiConfig';
-import { miConfigValues, schemaConfigValues, type ConfigValue } from '../../utils/configValues';
+import { MASK, miConfigValues, schemaConfigValues, type ConfigValue } from '../../utils/configValues';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCard } from '../EndpointCard';
@@ -1195,9 +1195,6 @@ function ReadOnlyConfigureDrawer({ open, onClose, projectId, componentId, envId,
     if (isLoading) return <CircularProgress size={32} />;
     if (!values) return <Typography color="text.secondary">Could not load the configurations.</Typography>;
     if (!values.length) return <Typography color="text.secondary">No configurable values.</Typography>;
-    // Grouped as the editor groups them: the optional keys under "Optional", by module.
-    const listed = values.filter((v) => !v.optional);
-    const optional = values.filter((v) => v.optional);
     return (
       <Table size="small">
         <TableHead>
@@ -1210,16 +1207,18 @@ function ReadOnlyConfigureDrawer({ open, onClose, projectId, componentId, envId,
           </TableRow>
         </TableHead>
         <TableBody>
-          {listed.map((v) => (
-            <ValueRow key={v.key} label={v.key} value={v} />
-          ))}
-          {optional.length > 0 && <HeadingRow title="Optional" />}
-          {optional.map((v, i) => (
-            <Fragment key={v.key}>
-              {v.module && v.module !== optional[i - 1]?.module && <HeadingRow title={v.module.replace('.', '/')} module />}
-              <ValueRow label={v.module ? v.key.slice(v.module.length + 1) : v.key} value={v} />
-            </Fragment>
-          ))}
+          {/* Sectioned as the editor sections them: Required, then Optional, each by module. */}
+          {values.map((v, i) => {
+            const newSection = !!v.section && v.section !== values[i - 1]?.section;
+            const newModule = !!v.module && (newSection || v.module !== values[i - 1]?.module);
+            return (
+              <Fragment key={v.key}>
+                {newSection && <HeadingRow title={v.section!} />}
+                {newModule && <HeadingRow title={v.module!.replace('.', '/')} module />}
+                <ValueRow value={v} />
+              </Fragment>
+            );
+          })}
         </TableBody>
       </Table>
     );
@@ -1258,11 +1257,11 @@ function HeadingRow({ title, module = false }: { title: string; module?: boolean
   );
 }
 
-function ValueRow({ label, value: v }: { label: string; value: ConfigValue }) {
+function ValueRow({ value: v }: { value: ConfigValue }) {
   return (
     <TableRow>
-      <TableCell>{label}</TableCell>
-      <TableCell sx={{ wordBreak: 'break-all' }}>{v.secret ? '••••••••' : v.value || (v.optional ? 'Default' : 'Not set')}</TableCell>
+      <TableCell>{v.label ?? v.key}</TableCell>
+      <TableCell sx={{ wordBreak: 'break-all' }}>{v.secret ? MASK : v.value || (v.optional ? 'Default' : 'Not set')}</TableCell>
     </TableRow>
   );
 }
