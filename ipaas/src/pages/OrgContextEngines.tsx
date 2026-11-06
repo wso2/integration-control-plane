@@ -34,7 +34,7 @@ import SourceMark from '../components/ContextEngine/SourceMark';
 import { listMarksSx, listProgressTextSx, wrapSx } from '../components/ContextEngine/styles';
 import { engineMessage, progressListingLine, selectEnvironment } from '../utils/contextEngine';
 import NoContextEnginesBanner from '../components/ContextEngine/NoContextEnginesBanner';
-import type { ContextEngine, ContextEngineSummary } from '../types/contextEngine';
+import type { ContextEngine, ContextEngineAccess, ContextEngineSummary } from '../types/contextEngine';
 import type { OrgScope } from '../nav';
 
 const centeredSx = { display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' } as const;
@@ -73,7 +73,7 @@ function RowActions({ engine, onPlayground, onDelete }: { engine: ContextEngine;
 }
 
 /** The three summary cells of a row: filled, waiting, or blank when the engine has nothing to say. */
-function SummaryCells({ summary, pending }: { summary: ContextEngineSummary | null; pending: boolean }): JSX.Element {
+function SummaryCells({ summary, pending, access }: { summary: ContextEngineSummary | null; pending: boolean; access: ContextEngineAccess | undefined }): JSX.Element {
   if (pending || !summary) {
     const filler = pending ? <Skeleton variant="text" width={64} /> : '—';
     return (
@@ -106,7 +106,7 @@ function SummaryCells({ summary, pending }: { summary: ContextEngineSummary | nu
         <Typography variant="body2">{summary.roleCount === 0 ? 'Only you' : `${summary.roleCount} role${summary.roleCount === 1 ? '' : 's'}`}</Typography>
       </ListingTable.Cell>
       <ListingTable.Cell>
-        <ExposurePills exposure={summary.exposure} />
+        {access ? <ExposurePills access={access} /> : '—'}
       </ListingTable.Cell>
     </>
   );
@@ -143,7 +143,7 @@ function EngineRow({ engine, onOpen, onPlayground, onDelete }: { engine: Context
           </Typography>
         )}
       </ListingTable.Cell>
-      <SummaryCells summary={running ? (summary.data ?? null) : null} pending={running && (!seen || summary.isLoading)} />
+      <SummaryCells summary={running ? (summary.data ?? null) : null} pending={running && (!seen || summary.isLoading)} access={engine.access} />
       <ListingTable.Cell>
         <EngineStateChip state={engine.state} reason={engine.statusReason} />
       </ListingTable.Cell>
