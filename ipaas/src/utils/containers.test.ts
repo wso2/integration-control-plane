@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { CPU_MAX, CPU_MIN, CPU_STEP, containerImageName, containerToForm, formatCpu, formToWriteData, hasCustomImage, isMainContainer } from './containers';
+import { CPU_MAX, CPU_MIN, CPU_STEP, MEMORY_MAX, MEMORY_MIN, containerImageName, containerToForm, formatCpu, formToWriteData, hasCustomImage, isMainContainer } from './containers';
 import type { ReleaseContainer } from '../types/devopsConfigs';
 
 const baseContainer: ReleaseContainer = {
@@ -106,5 +106,31 @@ describe('containerToForm / formToWriteData', () => {
     const initial = containerToForm(baseContainer);
     const body = formToWriteData({ ...initial, imagePullPolicy: 'Always', memLimit: 2048 }, initial);
     expect(Object.keys(body).sort()).toEqual(['cpu', 'cpu_limit', 'image_pull_policy', 'memory', 'memory_limit']);
+  });
+
+  it('brings stored sizes above the range into it, so editing another size can be saved', () => {
+    const initial = containerToForm({ ...baseContainer, cpu: 64000, cpu_limit: 64000, memory: 262144, memory_limit: 262144 });
+    expect(initial).toMatchObject({ cpuRequest: CPU_MAX, cpuLimit: CPU_MAX, memRequest: MEMORY_MAX, memLimit: MEMORY_MAX });
+    const body = formToWriteData({ ...initial, memRequest: 512, memLimit: 1024 }, initial);
+    expect(body).toEqual({ cpu: CPU_MAX, cpu_limit: CPU_MAX, memory: 512, memory_limit: 1024 });
+  });
+
+  it('raises missing or zero sizes to the minimum', () => {
+    const { cpu: _cpu, cpu_limit: _cpuLimit, ...noCpu } = baseContainer;
+    expect(containerToForm({ ...noCpu, memory: 0, memory_limit: 0 })).toMatchObject({ cpuRequest: CPU_MIN, cpuLimit: CPU_MIN, memRequest: MEMORY_MIN, memLimit: MEMORY_MIN });
+  });
+
+  it('keeps the request no greater than the limit', () => {
+    expect(containerToForm({ ...baseContainer, cpu: 3000, cpu_limit: 2000, memory: 64000, memory_limit: 4096 })).toMatchObject({
+      cpuRequest: 2000,
+      cpuLimit: 2000,
+      memRequest: 4096,
+      memLimit: 4096,
+    });
+  });
+
+  it('still sends only the pull policy when the stored sizes are out of range', () => {
+    const initial = containerToForm({ ...baseContainer, cpu: 64000, cpu_limit: 64000 });
+    expect(formToWriteData({ ...initial, imagePullPolicy: 'Always' }, initial)).toEqual({ image_pull_policy: 'Always' });
   });
 });

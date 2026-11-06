@@ -61,14 +61,22 @@ export interface ContainerFormState {
   memLimit: number;
 }
 
-/** Seed the edit form from a container. */
+const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+
+/**
+ * Seed the edit form from a container. Sizes outside the sliders' range (set before the range was
+ * enforced, or missing and read as 0) are brought into it, request no greater than limit. Every size
+ * goes out once any one is edited, so an out-of-range one would otherwise fail the save.
+ */
 export function containerToForm(c: ReleaseContainer): ContainerFormState {
+  const cpuLimit = clamp(c.cpu_limit ?? 0, CPU_MIN, CPU_MAX);
+  const memLimit = clamp(c.memory_limit ?? 0, MEMORY_MIN, MEMORY_MAX);
   return {
     imagePullPolicy: c.image_pull_policy ?? 'IfNotPresent',
-    cpuRequest: c.cpu ?? 0,
-    cpuLimit: c.cpu_limit ?? 0,
-    memRequest: c.memory ?? 0,
-    memLimit: c.memory_limit ?? 0,
+    cpuRequest: clamp(c.cpu ?? 0, CPU_MIN, cpuLimit),
+    cpuLimit,
+    memRequest: clamp(c.memory ?? 0, MEMORY_MIN, memLimit),
+    memLimit,
   };
 }
 
