@@ -21,8 +21,9 @@ import ConfigureDrawer from './ConfigureDrawer';
 import { renderWithScopes } from '../../test/renderWithScopes';
 import { DEVELOPER } from '../../test/roles';
 
-// A service with one required configurable, stored, and one optional, left to the integration's default.
-const jsonSchema = btoa(JSON.stringify({ type: 'object', requiredLevel: 2, properties: { hello: { type: 'object', properties: { greeting: { type: 'string' }, port: { type: 'integer' } }, required: ['greeting'] } } }));
+// A service with one required configurable, stored, and optional ones in two modules, left to their defaults.
+const module = (properties: object, required: string[] = []) => ({ type: 'object', properties, required });
+const jsonSchema = btoa(JSON.stringify({ type: 'object', requiredLevel: 2, properties: { hello: module({ greeting: { type: 'string' }, port: { type: 'integer' } }, ['greeting']), log: module({ level: { type: 'string' } }) } }));
 const schemaConfig = { jsonSchema, configurations: [{ key: 'hello.greeting', values: [{ environmentUuid: 'development', value: 'hi' }] }] };
 vi.mock('../../hooks/useConfiguration', () => ({ useSchemaConfig: () => ({ data: schemaConfig, isLoading: false }) }));
 vi.mock('../../hooks/useMiConfig', () => ({ useMiConfig: () => ({ data: undefined, isLoading: false }) }));
@@ -31,16 +32,13 @@ let unmount = () => {};
 afterEach(() => unmount());
 
 describe('the read-only Configure drawer', () => {
-  it('lists the optional configurables the editor shows, as their default', async () => {
+  it('lists the optional configurables the editor shows, as their default, under "Optional" by module', async () => {
     const r = await renderWithScopes(
       <ConfigureDrawer open readOnly onClose={() => {}} orgHandler="acme" projectId="default" componentId="hello" envId="development" versionId="v1" componentName="hello" projectHandler="default" displayType="ballerinaService" />,
       DEVELOPER,
     );
     unmount = r.unmount;
     const rows = [...document.querySelectorAll('tbody tr')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent));
-    expect(rows).toEqual([
-      ['hello.greeting', 'hi'],
-      ['hello.port', 'Default'],
-    ]);
+    expect(rows).toEqual([['hello.greeting', 'hi'], ['Optional'], ['log'], ['level', 'Default'], ['hello'], ['port', 'Default']]);
   });
 });

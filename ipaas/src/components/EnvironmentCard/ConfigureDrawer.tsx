@@ -40,7 +40,7 @@ import {
   Typography,
 } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp, Link, Trash2 } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEnvEndpoints } from '../../hooks/useDeployments';
 import { useSchemaConfig, useCertificateGroups, useCertificateMappings, useConfigGroups } from '../../hooks/useConfiguration';
@@ -50,7 +50,7 @@ import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import { useMiConfig } from '../../hooks/useMiConfig';
-import { miConfigValues, schemaConfigValues } from '../../utils/configValues';
+import { miConfigValues, schemaConfigValues, type ConfigValue } from '../../utils/configValues';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCard } from '../EndpointCard';
@@ -1195,6 +1195,9 @@ function ReadOnlyConfigureDrawer({ open, onClose, projectId, componentId, envId,
     if (isLoading) return <CircularProgress size={32} />;
     if (!values) return <Typography color="text.secondary">Could not load the configurations.</Typography>;
     if (!values.length) return <Typography color="text.secondary">No configurable values.</Typography>;
+    // Grouped as the editor groups them: the optional keys under "Optional", by module.
+    const listed = values.filter((v) => !v.optional);
+    const optional = values.filter((v) => v.optional);
     return (
       <Table size="small">
         <TableHead>
@@ -1207,11 +1210,15 @@ function ReadOnlyConfigureDrawer({ open, onClose, projectId, componentId, envId,
           </TableRow>
         </TableHead>
         <TableBody>
-          {values.map((v) => (
-            <TableRow key={v.key}>
-              <TableCell>{v.key}</TableCell>
-              <TableCell sx={{ wordBreak: 'break-all' }}>{v.secret ? '••••••••' : v.value || (v.optional ? 'Default' : 'Not set')}</TableCell>
-            </TableRow>
+          {listed.map((v) => (
+            <ValueRow key={v.key} label={v.key} value={v} />
+          ))}
+          {optional.length > 0 && <HeadingRow title="Optional" />}
+          {optional.map((v, i) => (
+            <Fragment key={v.key}>
+              {v.module && v.module !== optional[i - 1]?.module && <HeadingRow title={v.module.replace('.', '/')} module />}
+              <ValueRow label={v.module ? v.key.slice(v.module.length + 1) : v.key} value={v} />
+            </Fragment>
           ))}
         </TableBody>
       </Table>
@@ -1238,5 +1245,24 @@ function ReadOnlyConfigureDrawer({ open, onClose, projectId, componentId, envId,
         </Button>
       </DrawerPanel.Footer>
     </DrawerPanel>
+  );
+}
+
+function HeadingRow({ title, module = false }: { title: string; module?: boolean }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={2} sx={{ fontWeight: 600, pl: module ? 3 : 2 }}>
+        {title}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ValueRow({ label, value: v }: { label: string; value: ConfigValue }) {
+  return (
+    <TableRow>
+      <TableCell>{label}</TableCell>
+      <TableCell sx={{ wordBreak: 'break-all' }}>{v.secret ? '••••••••' : v.value || (v.optional ? 'Default' : 'Not set')}</TableCell>
+    </TableRow>
   );
 }

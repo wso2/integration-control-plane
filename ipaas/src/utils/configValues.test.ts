@@ -47,11 +47,22 @@ describe('schemaConfigValues', () => {
     ]);
   });
 
-  it("names a module's keys by their path, as the schema nests them", () => {
-    const jsonSchema = btoa(JSON.stringify({ type: 'object', requiredLevel: 2, properties: { hello: { type: 'object', properties: { port: { type: 'integer' }, greeting: { type: 'string' } }, required: ['greeting'] } } }));
+  it("names a module's keys by their path, and an optional key's module as the editor groups it", () => {
+    // As Ballerina nests them: organization, then module, then the module's configurables.
+    const module = (properties: object, required: string[] = []) => ({ type: 'object', properties, required });
+    const org = (modules: object) => ({ type: 'object', properties: modules });
+    const jsonSchema = btoa(
+      JSON.stringify({
+        type: 'object',
+        requiredLevel: 3,
+        properties: { acme: org({ hello: module({ port: { type: 'integer' }, greeting: { type: 'string' } }, ['greeting']) }), ballerina: org({ log: module({ level: { type: 'string' }, format: { type: 'string' } }) }) },
+      }),
+    );
     expect(schemaConfigValues({ jsonSchema, configurations: [] })).toEqual([
-      { key: 'hello.greeting', value: '', secret: false },
-      { key: 'hello.port', value: '', secret: false, optional: true },
+      { key: 'acme.hello.greeting', value: '', secret: false },
+      { key: 'ballerina.log.level', value: '', secret: false, optional: true, module: 'ballerina.log' },
+      { key: 'ballerina.log.format', value: '', secret: false, optional: true, module: 'ballerina.log' },
+      { key: 'acme.hello.port', value: '', secret: false, optional: true, module: 'acme.hello' },
     ]);
   });
 
