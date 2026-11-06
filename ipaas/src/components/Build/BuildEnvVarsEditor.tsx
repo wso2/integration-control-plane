@@ -58,7 +58,7 @@ export default function BuildEnvVarsEditor({ value, onChange, onHasError }: Buil
   return (
     <Stack gap={1}>
       <Stack direction="row" alignItems="center" gap={0.75}>
-        <Typography variant="body2">Environment Variables</Typography>
+        <Typography variant="body2">Environment variables</Typography>
         <Typography variant="caption" color="text.secondary">
           (Optional)
         </Typography>

@@ -127,7 +127,7 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
 
       {/* Network visibility */}
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
-        Network Visibility
+        Network visibility
       </Typography>
       <Stack gap={1} sx={{ mb: 2 }}>
         {VISIBILITY_OPTS.map(({ key, label, Icon, description }) => {

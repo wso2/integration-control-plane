@@ -67,7 +67,7 @@ export default function RuntimeLogsIntegration(scope: ComponentScope): JSX.Eleme
 
   return (
     <IntegrationLogs orgHandler={scope.org} orgUuid={orgUuid} component={component} environments={environments} region={project?.region} filtersKey={`${scope.org}/${scope.project}/${scope.component}`}>
-      {({ toolbar, viewer }) => <LogsPageLayout title="Runtime Logs" filtersElement={toolbar} logPanelElement={viewer} />}
+      {({ toolbar, viewer }) => <LogsPageLayout title="Runtime logs" filtersElement={toolbar} logPanelElement={viewer} />}
     </IntegrationLogs>
   );
 }

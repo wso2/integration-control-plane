@@ -44,7 +44,7 @@ export default function SetupInstructionsButton({ repository }: { repository: Re
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="md" fullWidth>
         <DialogTitle>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
-            Setup Instructions
+            Setup instructions
             <IconButton aria-label="Close" onClick={() => setOpen(false)} edge="end">
               <X size={18} />
             </IconButton>

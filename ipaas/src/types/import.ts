@@ -20,7 +20,8 @@ import type { ReactNode } from 'react';
 import type { WorkspaceIntegrationType } from './project';
 
 export type SourceMode = 'github' | 'public' | 'azure-devops';
-export type { WorkspaceIntegrationType as IntegrationType } from './project';
+/** What the create flow offers: the workspace types plus workflows, which a workspace import does not detect. */
+export type IntegrationType = WorkspaceIntegrationType | 'workflow';
 
 export type AuthStatus = 'idle' | 'authenticating' | 'needs-install' | 'installing' | 'done' | 'failed';
 
@@ -31,9 +32,9 @@ export interface LocationState {
 }
 
 export interface IntegrationTypeOption {
-  id: WorkspaceIntegrationType;
+  id: IntegrationType;
   title: string;
   description: string;
-  docLink: string;
+  docLink?: string;
   icons: { icon: ReactNode; label: string }[];
 }

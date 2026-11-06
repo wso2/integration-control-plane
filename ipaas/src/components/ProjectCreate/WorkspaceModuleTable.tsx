@@ -16,14 +16,17 @@
  * under the License.
  */
 
-import { Alert, Box, Card, CardContent, Divider, Grid, IconButton, InputAdornment, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
-import { File, Folder, FolderOpen, Inbox, Plus, Trash2, Search } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Box, Card, CardContent, Divider, Grid, IconButton, MenuItem, Paper, Select, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
+import { File, Folder, FolderOpen, Inbox, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, useMemo, type JSX } from 'react';
 import type { RepoTreeNode } from '../../types/repository';
 import type { WorkspaceModule, WorkspaceIntegrationType } from '../../types/project';
 import { isBallerinaModule, extractWorkspaceModules } from '../../utils/technologyDetection';
 import { formatRepoNameToDisplayName } from '../../utils/string';
 import { INTEGRATION_TYPE_LABELS } from '../../constants/project';
+import SearchField from '../SearchField';
+
+const HEAD_CELL_SX = { fontWeight: 600, fontSize: 11, color: 'text.secondary' } as const;
 
 interface WorkspaceModuleTableProps {
   repoName: string;
@@ -148,7 +151,7 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
   return (
     <Box>
       <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-        Configure Integrations
+        Configure integrations
       </Typography>
       <Grid container spacing={2}>
         {/* Left panel — Workspace Directory Structure */}
@@ -156,26 +159,10 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ pb: '16px !important' }}>
               <Typography variant="body2" fontWeight={600} sx={{ mb: 1.5 }}>
-                Workspace Directories
+                Workspace directories
               </Typography>
 
-              <TextField
-                size="small"
-                placeholder="Search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                fullWidth
-                sx={{ mb: 1.5 }}
-                slotProps={{
-                  input: {
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search size={16} />
-                      </InputAdornment>
-                    ),
-                  },
-                }}
-              />
+              <SearchField value={search} onChange={setSearch} placeholder="Search directories" fullWidth sx={{ mb: 1.5 }} />
 
               {/* Root node */}
               {!search && (
@@ -239,7 +226,7 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
           <Card sx={{ height: '100%' }}>
             <CardContent sx={{ pb: '16px !important' }}>
               <Typography variant="body2" fontWeight={600} sx={{ mb: 1.5 }}>
-                Configured Integrations
+                Configured integrations
               </Typography>
 
               {quotaAlert && (
@@ -260,7 +247,7 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
                     <Inbox size={40} />
                   </Box>
                   <Typography variant="body2" color="text.secondary">
-                    No Integrations Configured.
+                    No integrations configured.
                   </Typography>
                 </Stack>
               ) : (
@@ -268,10 +255,10 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        <TableCell sx={{ fontWeight: 600, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', color: 'text.secondary' }}>Integration Display Name</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', color: 'text.secondary' }}>Path</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', color: 'text.secondary' }}>Component Type</TableCell>
-                        <TableCell sx={{ fontWeight: 600, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', color: 'text.secondary' }}>Action</TableCell>
+                        <TableCell sx={HEAD_CELL_SX}>Integration display name</TableCell>
+                        <TableCell sx={HEAD_CELL_SX}>Path</TableCell>
+                        <TableCell sx={HEAD_CELL_SX}>Integration type</TableCell>
+                        <TableCell sx={HEAD_CELL_SX}>Action</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -296,7 +283,7 @@ export default function WorkspaceModuleTable({ repoName, repoContents, modules, 
                           </TableCell>
                           <TableCell>
                             <Tooltip title="Remove" placement="top">
-                              <IconButton size="small" onClick={() => removeModule(module.path)} sx={{ color: 'error.main' }}>
+                              <IconButton aria-label={`Remove ${module.displayName || module.path || '/'}`} size="small" onClick={() => removeModule(module.path)} sx={{ color: 'error.main' }}>
                                 <Trash2 size={16} />
                               </IconButton>
                             </Tooltip>

@@ -114,7 +114,7 @@ export default function GraphqlOperationDrawer({ operationName, field, colors }:
 
       <Box>
         <Typography variant="subtitle2" sx={{ mb: 1 }}>
-          Response Attributes
+          Response attributes
         </Typography>
         <Box sx={GRAPHQL_BORDERED_BOX_SX}>
           {field.responseAttributes.length > 0 ? (

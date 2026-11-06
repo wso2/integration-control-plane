@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { ComponentType } from 'react';
+import type { ComponentType, ReactNode } from 'react';
 import type { Component } from './component';
 import type { Environment } from './environment';
 
@@ -29,7 +29,7 @@ import type { Environment } from './environment';
  * Any component whose pair does not resolve to a known type falls into
  * `'unsupported'`, which renders a fallback module.
  */
-export type IntegrationType = 'integration-as-api' | 'webhook' | 'automation' | 'file-integration' | 'event-integration' | 'ai-agent' | 'mcp-server' | 'mcp-proxy' | 'tailscale-vpn' | 'rag-ingestion' | 'unsupported';
+export type IntegrationType = 'integration-as-api' | 'webhook' | 'automation' | 'file-integration' | 'event-integration' | 'ai-agent' | 'mcp-server' | 'mcp-proxy' | 'tailscale-vpn' | 'rag-ingestion' | 'workflow' | 'unsupported';
 
 /** Underlying build runtime, when the integration type has more than one. */
 export type IntegrationRuntime = 'ballerina' | 'mi' | 'unknown';
@@ -123,6 +123,16 @@ export type HeaderStatusProps = EnvCardSlotProps;
 export type EnvCardActionsProps = EnvCardSlotProps;
 
 /**
+ * The first environment's Deploy action, shown while the track's auto deploy is
+ * off. A type whose deploy can be held back by something outside the deployment
+ * passes the reason, and a short label to show in place of Deploy while it holds.
+ */
+export interface DeployActionProps extends EnvCardSlotProps {
+  blockedReason?: string;
+  blockedLabel?: string;
+}
+
+/**
  * Body slot: the type's content only — panels, tables, insights, log streams.
  * No `Card`/header chrome (that's the shell's frame).
  */
@@ -147,6 +157,8 @@ export type EnvCardFooterProps = EnvCardSlotProps;
 export interface CustomHeaderProps extends EnvCardSlotProps {
   isRefreshing: boolean;
   onRefresh: () => void;
+  /** The Deploy action, on the first environment while auto deploy is off; render it with the header's actions. */
+  deployAction?: ReactNode;
 }
 
 /**
@@ -180,6 +192,8 @@ export interface IntegrationModule {
   // header — generic-frame slots
   HeaderStatus?: ComponentType<HeaderStatusProps>;
   EnvCardActions?: ComponentType<EnvCardActionsProps>;
+  /** Replaces the shared Deploy action, for a type whose deploy waits on more than a build. */
+  DeployAction?: ComponentType<DeployActionProps>;
   // header — full escape hatch (replaces the generic frame header)
   CustomHeader?: ComponentType<CustomHeaderProps>;
 

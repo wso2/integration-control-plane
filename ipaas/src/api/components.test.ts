@@ -137,6 +137,21 @@ describe('createComponent component-type mapping', () => {
     expect(bodyOf().spec.componentType.name).toBe(expected);
     expect(bodyOf().spec.workflow?.name).toBe('mi-image-builder');
   });
+
+  it('creates a workflow as an annotated integration-as-api that waits for its runtime to deploy', async () => {
+    await createComponent({ ...baseInput, displayType: 'ballerinaWorkflow', enableAutoDeploy: true });
+    const body = post.mock.calls[0][1] as { metadata: { annotations: Record<string, string> }; spec: { componentType: { name: string }; autoDeploy: boolean; workflow: { name: string } } };
+    expect(body.spec.componentType.name).toBe('deployment/integration-as-api');
+    expect(body.spec.workflow.name).toBe('ballerina-buildpack-builder');
+    expect(body.metadata.annotations['ipaas.wso2.com/component-type']).toBe('workflow');
+    expect(body.spec.autoDeploy).toBe(false);
+  });
+
+  it('reads a workflow back as the workflow display type', async () => {
+    post.mockResolvedValue({ handler: 'orders', componentType: 'workflow', displayType: 'biWorkflow' });
+    const created = await createComponent({ ...baseInput, displayType: 'ballerinaWorkflow' });
+    expect(created.displayType).toBe('ballerinaWorkflow');
+  });
 });
 
 describe('updateEndpoint visibility reconciliation', () => {

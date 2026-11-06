@@ -51,7 +51,7 @@ export function assertSignedIn(page: Page): void {
 
 export async function enterOrgHome(page: Page, orgHandler: string): Promise<void> {
   await refreshSession(page);
-  await page.goto(`organizations/${orgHandler}/home`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });
   assertSignedIn(page);
   await waitForApiConfig(page);
   await gotoOrgHome(page, orgHandler);

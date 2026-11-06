@@ -1,0 +1,15 @@
+{
+  "welcome": "Welcome, {{name}}",
+  "subtitle": "What {{org}} has published to you, and what is waiting on you.",
+  "loadError": "Could not load the integrations published to you.",
+  "waitingOnYou": "Waiting on You",
+  "caughtUp": {
+    "title": "You're all caught up",
+    "description": "No task or approval is waiting on you."
+  },
+  "yourIntegrations": "Your Integrations",
+  "nothingPublished": {
+    "title": "Nothing published to you yet",
+    "description": "Ask your organization administrator to publish AI agents, automations or workflows to you."
+  }
+}

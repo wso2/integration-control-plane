@@ -1,0 +1,12 @@
+{
+  "justNow": "just now",
+  "inAFewSeconds": "in a few seconds",
+  "duration": {
+    "days": "{{d}}d {{h}}h",
+    "hours": "{{h}}h {{m}}m",
+    "minutes": "{{m}}m {{s}}s",
+    "seconds": "{{s}}s"
+  },
+  "schedule": "{{schedule}}, in {{timezone}}",
+  "trackLabel": "{{version}} ({{branch}})"
+}

@@ -182,6 +182,7 @@ export default function IntegrationFlowChart({ diagram }: IntegrationFlowChartPr
       {isRendered && (
         <Tooltip title="Reset view" placement="left">
           <IconButton
+            aria-label="Reset view"
             onClick={handleReset}
             size="small"
             sx={{

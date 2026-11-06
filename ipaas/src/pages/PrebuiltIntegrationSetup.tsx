@@ -176,7 +176,7 @@ export default function PrebuiltIntegrationSetup(scope: ProjectScope): JSX.Eleme
         {/* Left: Setup Instructions — sticky once heading hits top of viewport */}
         <Box sx={{ position: 'sticky', top: 80, alignSelf: 'flex-start' }}>
           <Typography variant="h2" sx={{ mb: 2 }}>
-            Setup Instructions
+            Setup instructions
           </Typography>
           {isInstructionsLoading ? (
             <InstructionsSkeleton />

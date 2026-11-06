@@ -98,7 +98,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
     return (
       <Box sx={styles.cardSx}>
         <Typography variant="h5" component="h2" sx={styles.placeholderTitleSx(!loadingBuilds)}>
-          Latest Build
+          Latest build
         </Typography>
         {!loadingBuilds && (
           <Typography variant="body2" color="text.secondary">
@@ -131,9 +131,9 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
     statusDotColor = 'text.secondary';
   } else if (status === 'in_progress') {
     // A stage can fail before the build itself is marked complete; surface that
-    // straight away instead of reading "In Progress" until the run wraps up.
+    // straight away instead of reading "In progress" until the run wraps up.
     const failedEarly = stepperState.failedStages.size > 0;
-    statusLabel = failedEarly ? failedLabel : 'In Progress';
+    statusLabel = failedEarly ? failedLabel : 'In progress';
     statusDotColor = failedEarly ? 'error.main' : 'warning.main';
   } else if (status === 'completed' && conclusion === 'success') {
     statusLabel = 'Completed';
@@ -171,7 +171,7 @@ export default function BuildCard({ componentId, versionId, commits }: BuildCard
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={styles.headerRowSx(expanded)}>
         <Stack direction="row" alignItems="center" gap={1.5} sx={styles.minWidthZeroSx}>
           <Typography variant="h5" component="h2" sx={CARD_HEADER_TITLE_SX}>
-            Latest Build
+            Latest build
           </Typography>
 
           {commitSha && <CommitSummary sha={commitSha} message={commitMessage} tooltip={commitTooltip} />}

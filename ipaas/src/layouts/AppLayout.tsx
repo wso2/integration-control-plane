@@ -30,7 +30,7 @@ import {
   Footer,
   Header,
   IconButton,
-  InputAdornment,
+  SearchBar,
   MenuItem,
   Box,
   CircularProgress,
@@ -42,7 +42,6 @@ import {
   Typography,
   UserMenu,
   useAppShell,
-  TextField,
 } from '@wso2/oxygen-ui';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
@@ -52,28 +51,29 @@ import Logo from '../components/Logo';
 import NotFound from '../components/NotFound';
 import {
   Activity,
+  BookOpen,
   Boxes,
   ChartColumn,
   ChevronDown,
   ChevronRight,
-  Cog,
+  Database,
   FileLock,
   FlaskConical,
   Gauge,
   Hammer,
   HeartPulse,
-  Layers,
+  Box as BoxIcon,
   LayoutDashboard,
   LogOut,
   Logs,
   Maximize2,
   Plus,
   Rocket,
-  Search,
   Server,
-  Settings2,
   SlidersHorizontal,
-  Workflow,
+  Sparkles,
+  Waypoints,
+  Wrench,
   X,
 } from '@wso2/oxygen-ui-icons-react';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
@@ -121,8 +121,7 @@ import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
 import { configuredMoesifOrigin } from '../utils/moesif';
 import { local } from '../utils/storage';
-
-const trialBadgeSx = { mx: 0.75 } as const;
+import { expandedMenusFrom } from '../utils/sidebar';
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
@@ -152,7 +151,7 @@ export default function AppLayout(): JSX.Element {
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
   // a fresh literal here re-triggers it (and its setState) on every render, which on a
   // sub-'md'-breakpoint viewport becomes an infinite render loop.
-  const appShellOptions = useMemo(() => ({ initialCollapsed: local.get('sidebar:collapsed') !== 'false' }), []);
+  const appShellOptions = useMemo(() => ({ initialCollapsed: local.get('sidebar:collapsed') === 'true' }), []);
   const { state: shell, actions } = useAppShell(appShellOptions);
 
   const handleToggleSidebar = () => {
@@ -172,12 +171,20 @@ export default function AppLayout(): JSX.Element {
     document.title = formatDocumentTitle(pageTitleFor(activeNavId));
   }, [activeNavId]);
 
-  // Auto-expand the parent group when navigating to a child nav item.
+  // Groups start expanded, so only the ones the user closed are tracked.
+  const [collapsedMenus, setCollapsedMenus] = useState<ReadonlySet<string>>(() => new Set());
+  const expandedMenus = useMemo(() => expandedMenusFrom(collapsedMenus), [collapsedMenus]);
+  const toggleMenu = (id: string) =>
+    setCollapsedMenus((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+
+  // Navigating to a child reopens its group if the user had closed it.
   useEffect(() => {
     const parent = parentGroupId(scope, activeNavId);
-    if (parent && !shell.expandedMenus[parent]) {
-      actions.toggleMenu(parent);
-    }
+    if (parent) setCollapsedMenus((prev) => (prev.has(parent) ? new Set([...prev].filter((id) => id !== parent)) : prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNavId]);
 
@@ -344,6 +351,7 @@ export default function AppLayout(): JSX.Element {
             {!hasProject(scope) && !projectMenuAnchor && (
               <Tooltip title="Select project">
                 <IconButton
+                  aria-label="Select project"
                   size="small"
                   onClick={() => {
                     setProjectMenuDir('right');
@@ -369,21 +377,7 @@ export default function AppLayout(): JSX.Element {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                   Project
                 </Typography>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder="Search"
-                  inputRef={projectSearchRef}
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Search size={16} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <SearchBar size="small" fullWidth placeholder="Search projects" inputRef={projectSearchRef} value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
               </Box>
               <Button
                 variant="text"
@@ -400,7 +394,7 @@ export default function AppLayout(): JSX.Element {
               </Button>
               <Divider />
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
-                All Projects
+                All projects
               </Typography>
               {selectableProjects.filter((p) => !projectSearch.trim() || p.name.toLowerCase().includes(projectSearch.trim().toLowerCase())).length === 0 ? (
                 <MenuItem disabled>No projects found</MenuItem>
@@ -504,6 +498,7 @@ export default function AppLayout(): JSX.Element {
                 {!hasComponent(scope) && !componentMenuAnchor && (
                   <Tooltip title="Select integration">
                     <IconButton
+                      aria-label="Select integration"
                       size="small"
                       onClick={() => {
                         setComponentMenuDir('right');
@@ -529,21 +524,7 @@ export default function AppLayout(): JSX.Element {
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                       Integration
                     </Typography>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="Search"
-                      inputRef={componentSearchRef}
-                      value={componentSearch}
-                      onChange={(e) => setComponentSearch(e.target.value)}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Search size={16} />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
+                    <SearchBar size="small" fullWidth placeholder="Search integrations" inputRef={componentSearchRef} value={componentSearch} onChange={(e) => setComponentSearch(e.target.value)} />
                   </Box>
                   <Button
                     variant="text"
@@ -560,7 +541,7 @@ export default function AppLayout(): JSX.Element {
                   </Button>
                   <Divider />
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
-                    All Integrations
+                    All integrations
                   </Typography>
                   {components.filter((c) => !componentSearch.trim() || c.displayName.toLowerCase().includes(componentSearch.trim().toLowerCase())).length === 0 ? (
                     <MenuItem disabled>No integrations found</MenuItem>
@@ -668,7 +649,7 @@ export default function AppLayout(): JSX.Element {
           <Header.Actions>
             {billingTrial && (
               // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
-              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} sx={trialBadgeSx} />
+              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} />
             )}
             <ColorSchemeToggle />
             <UserMenu>
@@ -686,9 +667,9 @@ export default function AppLayout(): JSX.Element {
           <Sidebar
             collapsed={shell.sidebarCollapsed}
             activeItem={pendingNavId ?? activeNavId}
-            expandedMenus={shell.expandedMenus}
+            expandedMenus={expandedMenus}
             onSelect={handleNavSelect}
-            onToggleExpand={actions.toggleMenu}
+            onToggleExpand={toggleMenu}
             sx={{
               backgroundColor: 'background.acrylic',
               backdropFilter: 'blur(3px)',
@@ -698,11 +679,17 @@ export default function AppLayout(): JSX.Element {
                 ? /* Org-level nav */
                   [
                     <Sidebar.Category key="org-overview">
-                      <Sidebar.Item id="overview">
+                      <Sidebar.Item id="org-overview">
                         <Sidebar.ItemIcon>
                           <LayoutDashboard size={20} />
                         </Sidebar.ItemIcon>
                         <Sidebar.ItemLabel>Overview</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+                      <Sidebar.Item id="org-projects">
+                        <Sidebar.ItemIcon>
+                          <BoxIcon size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Projects</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     </Sidebar.Category>,
 
@@ -746,7 +733,7 @@ export default function AppLayout(): JSX.Element {
                           <Sidebar.ItemIcon>
                             <Logs size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                          <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                         </Sidebar.Item>
                         <Sidebar.Item id="org-metrics">
                           <Sidebar.ItemIcon>
@@ -757,33 +744,35 @@ export default function AppLayout(): JSX.Element {
                       </Sidebar.Item>
                     </Sidebar.Category>,
 
-                    <Sidebar.Category key="org-infra">
-                      {/* Environments come before the pipelines that promote across them. */}
-                      <Sidebar.Item id="org-admin">
+                    <Sidebar.Category key="org-ai">
+                      <Sidebar.Item id="org-ai-services">
                         <Sidebar.ItemIcon>
-                          <Settings2 size={20} />
+                          <Sparkles size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                        <Sidebar.Item id="org-environments">
+                        <Sidebar.ItemLabel>AI Services</Sidebar.ItemLabel>
+                        <Sidebar.Item id="org-knowledge-bases">
                           <Sidebar.ItemIcon>
-                            <Layers size={20} />
+                            <BookOpen size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                        <Sidebar.Item id="org-cd-pipelines">
-                          <Sidebar.ItemIcon>
-                            <Workflow size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
+                          <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       </Sidebar.Item>
+                    </Sidebar.Category>,
 
-                      {/* Settings carries Package Registries. */}
+                    <Sidebar.Category key="org-infra">
+                      {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                      <Sidebar.Item id="org-platform-services">
+                        <Sidebar.ItemIcon>
+                          <Database size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+                      {/* Configure carries Package Registries. */}
                       <Sidebar.Item id="org-settings">
                         <Sidebar.ItemIcon>
-                          <Cog size={20} />
+                          <SlidersHorizontal size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                        <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     </Sidebar.Category>,
                   ]
@@ -858,7 +847,7 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemIcon>
                                 <Logs size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                             </Sidebar.Item>
                             <Sidebar.Item id="metrics">
                               <Sidebar.ItemIcon>
@@ -866,13 +855,20 @@ export default function AppLayout(): JSX.Element {
                               </Sidebar.ItemIcon>
                               <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                             </Sidebar.Item>
+                            {/* Only agents are instrumented, so no other integration has traces to show. */}
+                            {aiAgentType && (
+                              <Sidebar.Item id="traces">
+                                <Sidebar.ItemIcon>
+                                  <Waypoints size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Traces</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
                           </Sidebar.Item>
 
-                          {/* Day-2 operations on a running integration. Sits beside Observe rather than
-                              under Infrastructure, which is now just the environments and the pipeline. */}
                           <Sidebar.Item id="operate">
                             <Sidebar.ItemIcon>
-                              <SlidersHorizontal size={20} />
+                              <Wrench size={20} />
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Operate</Sidebar.ItemLabel>
                             <Sidebar.Item id="runtime">
@@ -891,14 +887,14 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemIcon>
                                 <FileLock size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Configs &amp; Secrets</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Configs &amp; secrets</Sidebar.ItemLabel>
                             </Sidebar.Item>
                             {isGenericService && (
                               <Sidebar.Item id="health-checks">
                                 <Sidebar.ItemIcon>
                                   <HeartPulse size={20} />
                                 </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Health Checks</Sidebar.ItemLabel>
+                                <Sidebar.ItemLabel>Health checks</Sidebar.ItemLabel>
                               </Sidebar.Item>
                             )}
                             {isGenericService && (
@@ -913,34 +909,19 @@ export default function AppLayout(): JSX.Element {
                         </Sidebar.Category>,
 
                         <Sidebar.Category key="int-infra">
-                          <Sidebar.Item id="admin">
+                          {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                          <Sidebar.Item id="org-platform-services">
                             <Sidebar.ItemIcon>
-                              <Settings2 size={20} />
+                              <Database size={20} />
                             </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                            {/* Neither page exists at integration level — these link up, and lead the group.
-                              Rendered as separate children: a fragment hides them from the Sidebar's
-                              child scan, which is what decides sub-item indentation. */}
-                            <Sidebar.Item id="org-environments">
-                              <Sidebar.ItemIcon>
-                                <Layers size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="proj-cd-pipelines">
-                              <Sidebar.ItemIcon>
-                                <Workflow size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                            </Sidebar.Item>
+                            <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                           </Sidebar.Item>
-
                           {hasSettings && (
                             <Sidebar.Item id="component-settings">
                               <Sidebar.ItemIcon>
-                                <Cog size={20} />
+                                <SlidersHorizontal size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
                             </Sidebar.Item>
                           )}
                         </Sidebar.Category>,
@@ -988,7 +969,7 @@ export default function AppLayout(): JSX.Element {
                             <Sidebar.ItemIcon>
                               <Logs size={20} />
                             </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                            <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                           </Sidebar.Item>
                           <Sidebar.Item id="proj-metrics">
                             <Sidebar.ItemIcon>
@@ -1000,24 +981,12 @@ export default function AppLayout(): JSX.Element {
                       </Sidebar.Category>,
 
                       <Sidebar.Category key="proj-infra">
-                        {/* Environments link up to the org page; the pipeline is this project's own. */}
-                        <Sidebar.Item id="proj-admin">
+                        {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                        <Sidebar.Item id="org-platform-services">
                           <Sidebar.ItemIcon>
-                            <Settings2 size={20} />
+                            <Database size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Infrastructure</Sidebar.ItemLabel>
-                          <Sidebar.Item id="org-environments">
-                            <Sidebar.ItemIcon>
-                              <Layers size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Environments</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                          <Sidebar.Item id="proj-cd-pipelines">
-                            <Sidebar.ItemIcon>
-                              <Workflow size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
-                          </Sidebar.Item>
+                          <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       </Sidebar.Category>,
                     ]}
@@ -1060,7 +1029,7 @@ export default function AppLayout(): JSX.Element {
       </AppShell.Main>
 
       <AppShell.Footer>
-        {pathname.includes('/admin/databases') && (
+        {activeNavId === 'org-platform-services' && (
           <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', fontStyle: 'italic', color: 'text.disabled', px: 2, pb: 1 }}>
             {DB_TRADEMARK_NOTICE}
           </Typography>

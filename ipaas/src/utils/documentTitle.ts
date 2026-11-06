@@ -19,34 +19,31 @@
 /** Matches the static title in index.html, which public routes keep. */
 export const APP_NAME = 'WSO2 Integration Platform';
 
-/** Nav ids whose page name is not simply the id title-cased. */
+/** Nav ids whose page name is not simply the id in sentence case. */
 const TITLE_OVERRIDES: Record<string, string> = {
-  'configs-secrets': 'Configs & Secrets',
-  'component-settings': 'Settings',
-  'org-audit-logs': 'Audit Logs',
-  'org-cd-pipelines': 'Pipelines',
-  'proj-cd-pipelines': 'Pipelines',
-  'org-data-planes': 'Data Planes',
-  'org-genai-services': 'GenAI Services',
-  'proj-genai-services': 'GenAI Services',
-  'org-third-party': 'Third Party Services',
-  'proj-third-party': 'Third Party Services',
-  'org-vector-databases': 'Vector Databases',
-  'org-scheduled-ingestion': 'Scheduled Ingestion',
+  'configs-secrets': 'Configs & secrets',
+  'org-settings': 'Configure',
+  'component-settings': 'Configure',
+  'org-audit-logs': 'Audit logs',
+  'org-data-planes': 'Data planes',
+  'org-genai-services': 'GenAI services',
+  'proj-genai-services': 'GenAI services',
+  'org-third-party': 'Third-party services',
+  'proj-third-party': 'Third-party services',
+  'org-vector-databases': 'Vector databases',
+  'org-scheduled-ingestion': 'Scheduled ingestion',
   'org-rag': 'RAG',
-  'api-info': 'API Info',
-  'api-chat': 'API Chat',
+  'api-info': 'API info',
+  'api-chat': 'API chat',
   'external-ci': 'External CI',
 };
 
 /** Scope prefixes that qualify a nav id but add nothing to a browser tab title. */
 const SCOPE_PREFIXES = ['org-', 'proj-'];
 
-function titleCase(id: string): string {
-  return id
-    .split('-')
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
+function sentenceCase(id: string): string {
+  const words = id.split('-').join(' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
 export function pageTitleFor(navId: string | undefined | null): string {
@@ -54,7 +51,7 @@ export function pageTitleFor(navId: string | undefined | null): string {
   const override = TITLE_OVERRIDES[navId];
   if (override) return override;
   const prefix = SCOPE_PREFIXES.find((p) => navId.startsWith(p));
-  return titleCase(prefix ? navId.slice(prefix.length) : navId);
+  return sentenceCase(prefix ? navId.slice(prefix.length) : navId);
 }
 
 export function formatDocumentTitle(page: string): string {
