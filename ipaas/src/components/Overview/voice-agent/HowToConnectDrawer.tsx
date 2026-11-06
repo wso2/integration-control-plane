@@ -17,14 +17,13 @@
  */
 
 import { Alert, Box, DrawerPanel, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import type { JSX, ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { tokenServiceUrlOf } from '../../../utils/voiceAgent';
+import { VOICE_AGENT_BACKEND_SAMPLE, VOICE_AGENT_CLIENT_SAMPLE, VOICE_AGENT_TOKEN_RESPONSE, voiceAgentBackendEnv } from '../../../utils/voiceAgentConnect';
 import CodeViewer from '../../CodeViewer';
-import CopyButton from '../integration-as-api/CopyButton';
 
-const URL_ROW_SX = { display: 'flex', alignItems: 'center', gap: 1, p: 1.5, borderRadius: 1, bgcolor: 'action.hover' } as const;
-const URL_TEXT_SX = { fontFamily: 'monospace', wordBreak: 'break-all', flex: 1 } as const;
+const NOTES_SX = { m: 0, pl: 2.5 } as const;
 
 interface HowToConnectDrawerProps {
   open: boolean;
@@ -35,61 +34,88 @@ interface HowToConnectDrawerProps {
   releaseId: string;
 }
 
-/** How an app talks to the voice agent: fetch a LiveKit room token from its token service, then join the room. */
+function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
+  return (
+    <Stack gap={1.25}>
+      <Typography variant="subtitle1" fontWeight={600}>
+        {title}
+      </Typography>
+      {children}
+    </Stack>
+  );
+}
+
+/**
+ * How an application talks to the voice agent, after Devant's "Connect your application": a
+ * backend fetches a LiveKit room token from the token service and the application joins the room.
+ */
 export default function HowToConnectDrawer({ open, onClose, envName, componentId, versionId, releaseId }: HowToConnectDrawerProps): JSX.Element {
   const { data: endpoints, isLoading, isError } = useEnvEndpoints(componentId, versionId, releaseId);
   const tokenServiceUrl = tokenServiceUrlOf(endpoints);
 
   return (
-    <DrawerPanel open={open} onClose={onClose} width={560}>
+    <DrawerPanel open={open} onClose={onClose} width={720}>
       <DrawerPanel.Header>
         <Stack sx={{ flex: 1, minWidth: 0 }}>
-          <DrawerPanel.Title>How to connect</DrawerPanel.Title>
+          <DrawerPanel.Title>Connect your application</DrawerPanel.Title>
           <Typography variant="caption" color="text.secondary">
             {envName}
           </Typography>
         </Stack>
         <DrawerPanel.Actions>
+          <DrawerPanel.ExpandButton expandLabel="Expand to full width" collapseLabel="Exit full width" />
           <DrawerPanel.CloseButton />
         </DrawerPanel.Actions>
       </DrawerPanel.Header>
       <DrawerPanel.Body>
         {isLoading ? (
           <Stack gap={1.5}>
-            <Skeleton variant="text" width="40%" />
+            <Skeleton variant="text" width="80%" />
             <Skeleton variant="rounded" height={48} />
-            <Skeleton variant="rounded" height={160} />
+            <Skeleton variant="rounded" height={240} />
           </Stack>
         ) : isError ? (
           <Alert severity="error">Could not load the token service endpoint.</Alert>
         ) : !tokenServiceUrl ? (
           <Alert severity="info">The token service endpoint isn&apos;t deployed in {envName} yet.</Alert>
         ) : (
-          <Stack gap={3}>
-            <Stack gap={1}>
-              <Typography variant="subtitle2">Token service</Typography>
-              <Box sx={URL_ROW_SX}>
-                <Typography variant="body2" sx={URL_TEXT_SX}>
-                  {tokenServiceUrl}
-                </Typography>
-                <CopyButton value={tokenServiceUrl} label="Copy URL" />
+          <Stack gap={3.5}>
+            <Typography variant="body2" color="text.secondary">
+              Connect your application through a backend service: your backend calls this voice agent&apos;s token service and passes the result to your application, which joins the voice session directly. The application never needs the token service URL itself.
+            </Typography>
+
+            <Section title="Step 1: Set up your backend">
+              <Typography variant="body2">Configure your backend with this voice agent&apos;s token service:</Typography>
+              <CodeViewer language="text" showLineNumbers={false} wrapLongLines code={voiceAgentBackendEnv(tokenServiceUrl)} />
+              <Typography variant="body2">The token service returns both the room token and the LiveKit server URL:</Typography>
+              <CodeViewer language="text" showLineNumbers={false} showCopyButton={false} wrapLongLines code={VOICE_AGENT_TOKEN_RESPONSE} />
+              <Typography variant="body2">
+                Example Node.js server (<code>npm install express</code>):
+              </Typography>
+              <CodeViewer language="javascript" code={VOICE_AGENT_BACKEND_SAMPLE} maxHeight={360} />
+            </Section>
+
+            <Section title="Step 2: Connect your application">
+              <Typography variant="body2">
+                Fetch the room token from your backend and join the session (<code>npm install livekit-client @livekit/components-react</code>):
+              </Typography>
+              <CodeViewer language="javascript" code={VOICE_AGENT_CLIENT_SAMPLE} maxHeight={420} />
+              <Typography variant="body2" color="text.secondary">
+                Any LiveKit client SDK (web, iOS, Android, Flutter) can join the same way with the returned <code>url</code> and <code>token</code>. The voice agent also sends the conversation&apos;s transcript on the <code>voice-text</code> data topic.
+              </Typography>
+            </Section>
+
+            <Section title="Security notes">
+              <Alert severity="warning">The token service is public: anyone who has its URL can start calls that use your LiveKit and provider accounts. Keep it on your backend, and stop the voice agent when you are not using it.</Alert>
+              <Box component="ul" sx={NOTES_SX}>
+                <li>
+                  <Typography variant="body2">Add authentication between your application and your backend before exposing it publicly.</Typography>
+                </li>
+                <li>
+                  <Typography variant="body2">Restrict your backend&apos;s CORS allowed origins to your application&apos;s domains.</Typography>
+                </li>
               </Box>
-            </Stack>
-            <Stack gap={1}>
-              <Typography variant="subtitle2">1. Get a room token</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Your app asks the token service above for a LiveKit room token. Use one room per conversation.
-              </Typography>
-              <CodeViewer language="text" showLineNumbers={false} wrapLongLines code="GET /getToken?roomName=<room>&participantName=<caller>" />
-              <CodeViewer language="json" showLineNumbers={false} code={'{ "token": "<LiveKit room token>", "url": "<LiveKit URL>" }'} />
-            </Stack>
-            <Stack gap={1}>
-              <Typography variant="subtitle2">2. Join the room</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Connect to <code>url</code> with <code>token</code> using a LiveKit client SDK and publish the caller&apos;s microphone. The voice agent joins the room, answers out loud, and sends the transcript on the <code>voice-text</code> data topic.
-              </Typography>
-            </Stack>
-            <Alert severity="warning">This URL is public: anyone who has it can start calls that use your LiveKit and provider accounts. Share it only with apps you trust, and stop the voice agent when you are not using it.</Alert>
+            </Section>
           </Stack>
         )}
       </DrawerPanel.Body>
