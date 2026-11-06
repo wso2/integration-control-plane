@@ -21,7 +21,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mutate = vi.fn();
-vi.mock('../../../hooks/useContextEngine', () => ({ useSetContextEngineAccess: () => ({ mutate, isPending: false, isError: false }) }));
+const permissions = { data: ['engine.manage'] as string[] };
+vi.mock('../../../hooks/useContextEngine', () => ({ useSetContextEngineAccess: () => ({ mutate, isPending: false, isError: false }), useContextPermissions: () => permissions }));
 
 import AccessSwitch from './AccessSwitch';
 
@@ -58,8 +59,10 @@ describe('AccessSwitch', () => {
     expect(mutate).toHaveBeenCalledWith({ mcp: false });
   });
 
-  it('cannot be used without permission', () => {
-    act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: true }} surface="mcp" disabledReason="No" />));
+  it('cannot be used without the manage permission', () => {
+    permissions.data = ['context.read'];
+    act(() => root.render(<AccessSwitch engineId="e" access={{ api: true, mcp: true }} surface="mcp" />));
     expect(toggle()?.disabled).toBe(true);
+    permissions.data = ['engine.manage'];
   });
 });

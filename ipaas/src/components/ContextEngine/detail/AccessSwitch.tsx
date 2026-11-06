@@ -18,14 +18,14 @@
 
 import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
-import { useSetContextEngineAccess } from '../../../hooks/useContextEngine';
+import { useContextPermissions, useSetContextEngineAccess } from '../../../hooks/useContextEngine';
 import type { ContextEngineAccess } from '../../../types/contextEngine';
 
 interface AccessSwitchProps {
   engineId: string;
   access: ContextEngineAccess;
   surface: keyof ContextEngineAccess;
-  /** Why the switch can't be used; it is disabled when set. */
+  /** Why the switch can't be used, beyond a missing manage permission; it is disabled when set. */
   disabledReason?: string;
 }
 
@@ -37,6 +37,8 @@ const SURFACES: Record<keyof ContextEngineAccess, { name: string; clients: strin
 /** Lets callers through to one public surface, or turns them away with a 403, at the engine's gateway. Turning it off asks first. */
 export default function AccessSwitch({ engineId, access, surface, disabledReason }: AccessSwitchProps): JSX.Element {
   const set = useSetContextEngineAccess(engineId);
+  const permissions = useContextPermissions(engineId);
+  const blocked = disabledReason ?? (permissions.data?.includes('engine.manage') ? undefined : 'You need the manage permission on this engine to change its access.');
   const [confirming, setConfirming] = useState(false);
   const { name, clients } = SURFACES[surface];
   const checked = set.isPending ? (set.variables[surface] ?? access[surface]) : access[surface];
@@ -54,9 +56,9 @@ export default function AccessSwitch({ engineId, access, surface, disabledReason
             </Typography>
           </>
         )}
-        <Tooltip title={disabledReason ?? ''}>
+        <Tooltip title={blocked ?? ''}>
           <span>
-            <Switch checked={checked} disabled={set.isPending || !!disabledReason} onChange={(_e, on) => onChange(on)} slotProps={{ input: { 'aria-label': `${name} access` } }} />
+            <Switch checked={checked} disabled={set.isPending || !!blocked} onChange={(_e, on) => onChange(on)} slotProps={{ input: { 'aria-label': `${name} access` } }} />
           </span>
         </Tooltip>
       </Stack>

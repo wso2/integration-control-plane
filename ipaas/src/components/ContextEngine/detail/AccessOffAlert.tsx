@@ -16,27 +16,17 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress } from '@wso2/oxygen-ui';
+import { Alert } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { useSetContextEngineAccess } from '../../../hooks/useContextEngine';
 import type { ContextEngineAccess } from '../../../types/contextEngine';
 
 const NAMES: Record<keyof ContextEngineAccess, string> = { api: 'API', mcp: 'MCP' };
 
-/** Says a surface is off, with a button that turns it back on. */
-export default function AccessOffAlert({ engineId, surface }: { engineId: string; surface: keyof ContextEngineAccess }): JSX.Element {
-  const set = useSetContextEngineAccess(engineId);
+/** Says a surface is off; its switch is in the tab's header. */
+export default function AccessOffAlert({ surface }: { surface: keyof ContextEngineAccess }): JSX.Element {
   return (
-    <Alert
-      severity="warning"
-      variant="outlined"
-      sx={{ mb: 3 }}
-      action={
-        <Button size="small" color="inherit" disabled={set.isPending} startIcon={set.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={() => set.mutate({ [surface]: true })}>
-          {set.isPending ? 'Applying…' : 'Turn on'}
-        </Button>
-      }>
-      {set.isError ? set.error.message || "Couldn't turn it on. Try again." : `${NAMES[surface]} access is off. Clients get a 403.`}
+    <Alert severity="warning" variant="outlined" sx={{ mb: 3 }}>
+      {NAMES[surface]} access is off. Clients get a 403.
     </Alert>
   );
 }
