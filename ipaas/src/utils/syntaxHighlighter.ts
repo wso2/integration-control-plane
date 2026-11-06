@@ -20,12 +20,18 @@
 // grammar (~250 of them). PrismLight + explicit registerLanguage calls only
 // bundle the grammars this app actually renders.
 import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import bash from 'react-syntax-highlighter/dist/esm/languages/prism/bash';
+import javascript from 'react-syntax-highlighter/dist/esm/languages/prism/javascript';
 import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
+import jsx from 'react-syntax-highlighter/dist/esm/languages/prism/jsx';
 import markup from 'react-syntax-highlighter/dist/esm/languages/prism/markup';
 import yaml from 'react-syntax-highlighter/dist/esm/languages/prism/yaml';
 import { prism } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
+SyntaxHighlighter.registerLanguage('bash', bash);
+SyntaxHighlighter.registerLanguage('javascript', javascript);
 SyntaxHighlighter.registerLanguage('json', json);
+SyntaxHighlighter.registerLanguage('jsx', jsx);
 SyntaxHighlighter.registerLanguage('markup', markup); // covers the 'xml' alias
 SyntaxHighlighter.registerLanguage('yaml', yaml);
 

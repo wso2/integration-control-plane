@@ -23,7 +23,7 @@ import type { ReactNode } from 'react';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import ServiceLogsDrawer from '../integration-as-api/ServiceLogsDrawer';
-import HowToConnectDrawer from './HowToConnectDrawer';
+import HowToConnectDialog from './HowToConnectDialog';
 
 /**
  * How to connect, View logs and Stop/Start. There is no Test action here: the
@@ -104,7 +104,7 @@ export default function EnvCardActions({ component, env, versionId, releaseId, o
           </span>
         </Tooltip>
       )}
-      {hasDeployment && <HowToConnectDrawer open={connectOpen} onClose={() => setConnectOpen(false)} envName={env.name} componentId={component.id} versionId={versionId} releaseId={releaseId} />}
+      {hasDeployment && <HowToConnectDialog open={connectOpen} onClose={() => setConnectOpen(false)} envName={env.name} componentId={component.id} versionId={versionId} releaseId={releaseId} />}
       <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} projectId={projectId} componentHandler={componentHandler} env={env} versionId={versionId} />
     </>
   );
