@@ -16,6 +16,7 @@
  * under the License.
  */
 
+import { act } from 'react';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it } from 'vitest';
 import { ManageEndpoint } from './ConfigureSteps';
@@ -28,7 +29,7 @@ const ep = { id: 'http', displayName: 'HTTP', networkVisibilities: ['Public'] } 
 let unmount = () => {};
 afterEach(() => unmount());
 
-async function update(scopes: string[]) {
+async function render(scopes: string[]) {
   const r = await renderWithScopes(
     <MemoryRouter>
       <UnsavedChangesProvider>
@@ -38,8 +39,13 @@ async function update(scopes: string[]) {
     scopes,
   );
   unmount = r.unmount;
-  return button(r.container, 'Update');
+  return r.container;
 }
+
+const update = async (scopes: string[]) => button(await render(scopes), 'Update');
+
+const checkbox = (container: HTMLElement, label: string) => container.querySelector<HTMLInputElement>(`input[type="checkbox"][aria-label="${label}"]`)!;
+const checkedLabels = (container: HTMLElement) => [...container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')].filter((c) => c.checked).map((c) => c.getAttribute('aria-label'));
 
 describe('ManageEndpoint visibility', () => {
   it('lets a Developer update it', async () => {
@@ -48,5 +54,28 @@ describe('ManageEndpoint visibility', () => {
 
   it('is not offered to a Viewer', async () => {
     expect(await update(VIEWER)).toBeUndefined();
+  });
+});
+
+describe('ManageEndpoint network visibility', () => {
+  it('shows Project as checked and locked', async () => {
+    const project = checkbox(await render(DEVELOPER), 'Project');
+    expect(project.checked).toBe(true);
+    expect(project.disabled).toBe(true);
+  });
+
+  it('clears the checked host when it is clicked again', async () => {
+    const container = await render(DEVELOPER);
+    expect(checkedLabels(container)).toEqual(['Project', 'Public']);
+    await act(async () => checkbox(container, 'Public').click());
+    expect(checkedLabels(container)).toEqual(['Project']);
+    await act(async () => checkbox(container, 'Public').click());
+    expect(checkedLabels(container)).toEqual(['Project', 'Public']);
+  });
+
+  it('keeps Public and Organization exclusive', async () => {
+    const container = await render(DEVELOPER);
+    await act(async () => checkbox(container, 'Organization').click());
+    expect(checkedLabels(container)).toEqual(['Project', 'Organization']);
   });
 });

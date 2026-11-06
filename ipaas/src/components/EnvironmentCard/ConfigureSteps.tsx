@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Radio, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Checkbox, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
 import { Building2, Folder, Globe } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
 import { Scopes } from '../../constants/permissions';
@@ -27,12 +27,13 @@ import type { EndpointExposure, EnvEndpoint } from '../../types/component';
 import { friendlyApiError } from '../../utils/apiSecurity';
 import { editorExposure, exposureLabels } from '../../utils/endpoints';
 
-// The gateway serves an endpoint on one host at a time: the public one, the organization's internal
-// one, or neither. Project access is always on and its URL always shows, so it is not a choice here.
-const EXPOSURE_OPTS: { value: EndpointExposure; label: string; Icon: typeof Globe; description: string }[] = [
-  { value: 'public', label: 'Public', Icon: Globe, description: 'On the gateway’s public host. Reachable from the internet, including integrations in your organization. The API’s security settings still apply.' },
-  { value: 'organization', label: 'Organization', Icon: Building2, description: 'On the gateway’s internal host. Only integrations in your organization can call it.' },
-  { value: 'none', label: 'Project only', Icon: Folder, description: 'Not on the API gateway. Only integrations in the same project can call the endpoint.' },
+// Project access is always on, so it shows checked and locked. The gateway serves an endpoint on one
+// host at a time, so Public and Organization exclude each other, and clearing the checked one leaves
+// the endpoint on neither.
+const VISIBILITY_OPTS: { value: 'project' | Exclude<EndpointExposure, 'none'>; label: string; Icon: typeof Globe; description: string }[] = [
+  { value: 'project', label: 'Project', Icon: Folder, description: 'Integrations in the same project can always call it.' },
+  { value: 'public', label: 'Public', Icon: Globe, description: 'Reachable from the internet, including integrations in your organization. The API’s security settings still apply.' },
+  { value: 'organization', label: 'Organization', Icon: Building2, description: 'Reachable only from integrations in your organization.' },
 ];
 
 // Pieces shared by the configure drawers (ConfigureDrawer and MiConfigureDrawer).
@@ -141,41 +142,46 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
         )}
       </Box>
 
-      {/* Gateway exposure: one host at a time, or none */}
       <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
         Network visibility
       </Typography>
-      <Stack gap={1} sx={{ mb: 1.5 }} role="radiogroup" aria-label="Network visibility">
-        {EXPOSURE_OPTS.map(({ value, label, Icon, description }) => {
-          const selected = exposure === value;
+      <Stack gap={1} sx={{ mb: 1.5 }} role="group" aria-label="Network visibility">
+        {VISIBILITY_OPTS.map(({ value, label, Icon, description }) => {
+          const locked = value === 'project';
+          const checked = locked || exposure === value;
+          const toggle = () => {
+            if (!locked) setExposure((current) => (current === value ? 'none' : value));
+          };
           return (
             <Box
               key={value}
-              onClick={() => setExposure(value)}
+              onClick={toggle}
+              title={locked ? 'Always on' : undefined}
               sx={{
                 display: 'flex',
                 alignItems: 'flex-start',
                 gap: 1.25,
                 p: 1.5,
                 border: '1px solid',
-                borderColor: selected ? 'primary.main' : 'divider',
+                borderColor: locked ? 'action.disabled' : checked ? 'primary.main' : 'divider',
                 borderRadius: 1,
-                cursor: 'pointer',
+                bgcolor: locked ? 'action.hover' : undefined,
+                cursor: locked ? 'not-allowed' : 'pointer',
                 transition: 'border-color 0.15s',
-                '&:hover': { borderColor: 'primary.main' },
+                '&:hover': locked ? undefined : { borderColor: 'primary.main' },
               }}>
-              <Box sx={{ display: 'flex', color: 'primary.main', mt: 0.25, flexShrink: 0 }}>
+              <Box sx={{ display: 'flex', color: locked ? 'text.disabled' : 'primary.main', mt: 0.25, flexShrink: 0 }}>
                 <Icon size={18} />
               </Box>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }} color={locked ? 'text.secondary' : undefined}>
                   {label}
                 </Typography>
                 <Typography variant="caption" color="text.secondary">
                   {description}
                 </Typography>
               </Box>
-              <Radio checked={selected} size="small" name="network-visibility" value={value} sx={{ p: 0, flexShrink: 0, mt: 0.25 }} inputProps={{ 'aria-label': label }} onClick={(e) => e.stopPropagation()} onChange={() => setExposure(value)} />
+              <Checkbox checked={checked} disabled={locked} size="small" value={value} sx={{ p: 0, flexShrink: 0, mt: 0.25 }} inputProps={{ 'aria-label': label }} onClick={(e) => e.stopPropagation()} onChange={toggle} />
             </Box>
           );
         })}
