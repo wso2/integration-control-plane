@@ -47,7 +47,6 @@ import type { JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import { useUpdateAutoDeployEnabled } from '../../hooks/useComponents';
-import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import { useComponentDeployment, useDeploymentStatus, useDeploymentTrackImages } from '../../hooks/useDeployments';
 import type { DeploymentTrackImage } from '../../types/deployment';
 import ConfigureDrawer from '../EnvironmentCard/ConfigureDrawer';
@@ -70,6 +69,7 @@ export default function BuildArea({
   firstEnvId,
   firstEnvTemplateId,
   autoDeployEnabled: initialAutoDeployEnabled,
+  autoDeployAvailable,
   componentName,
   projectHandler,
   displayType,
@@ -255,7 +255,7 @@ export default function BuildArea({
           <Divider sx={{ borderStyle: 'dashed', mb: 1.5 }} />
 
           {/* ── Auto Deploy on Build ── */}
-          {AUTO_DEPLOY_AVAILABLE && (
+          {autoDeployAvailable && (
             <FormControlLabel
               control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
               label={
