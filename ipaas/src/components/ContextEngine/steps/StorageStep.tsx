@@ -19,11 +19,12 @@
 import { Box, Typography } from '@wso2/oxygen-ui';
 import { useMemo, type JSX } from 'react';
 import { isPlatformServicesEnabled, useDatabaseServers } from '../../../hooks/usePlatformServices';
+import { useEngineManagedServer } from '../../../hooks/useContextEngine';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
 import { newOrgDatabaseUrl, newOrgVectorDatabaseUrl, orgDatabasesUrl, orgVectorDatabasesUrl } from '../../../paths';
 import StorageBackendCard from './StorageBackendCard';
 import { stepHeadingSx, stepHintSx, storageGridSx } from '../styles';
-import type { ContextEngineStorage, StorageKind, StorageSelection } from '../../../types/contextEngine';
+import type { ContextEngineStorage, EngineManagedServer, StorageKind, StorageSelection } from '../../../types/contextEngine';
 import type { DatabaseServer } from '../../../types/platformServices';
 
 interface StorageStepProps {
@@ -31,6 +32,11 @@ interface StorageStepProps {
   storage: ContextEngineStorage;
   onChange: (kind: StorageKind, value: StorageSelection) => void;
 }
+
+const MANAGED_HINT: Record<EngineManagedServer, string> = {
+  embedded: 'Engine managed stores are embedded and need no setup.',
+  postgres: 'Engine managed stores run on the engine’s own PostgreSQL server, created and deleted with it, and need no setup.',
+};
 
 /** Which Infrastructure servers can back a store: pgvector servers for vectors, plain PostgreSQL for relational. */
 function serversFor(kind: StorageKind, servers: DatabaseServer[]): DatabaseServer[] {
@@ -44,6 +50,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
   const infrastructureAvailable = isPlatformServicesEnabled();
   const servers = useDatabaseServers();
   const all = useMemo(() => servers.data ?? [], [servers.data]);
+  const managedServer = useEngineManagedServer();
 
   return (
     <>
@@ -51,7 +58,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
         Configure Storage
       </Typography>
       <Typography variant="body2" sx={stepHintSx}>
-        Where the engine keeps its data. Engine managed stores are embedded and need no setup. Pick a server from Infrastructure when you want shared, backed-up storage you already operate.
+        Where the engine keeps its data.{managedServer.data ? ` ${MANAGED_HINT[managedServer.data]}` : ''}
       </Typography>
 
       <Box sx={storageGridSx}>
@@ -59,6 +66,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
           <StorageBackendCard
             key={info.kind}
             info={info}
+            managedServer={managedServer.data}
             value={storage[info.kind]}
             onChange={(value) => onChange(info.kind, value)}
             servers={serversFor(info.kind, all)}
@@ -66,6 +74,7 @@ export default function StorageStep({ orgHandle, storage, onChange }: StorageSte
             serversError={infrastructureAvailable && servers.isError}
             onRefresh={() => servers.refetch()}
             infrastructureAvailable={infrastructureAvailable}
+            alternativeUnavailable
             listUrl={info.infraSegment === 'vector-databases' ? orgVectorDatabasesUrl(orgHandle) : info.infraSegment === 'databases' ? orgDatabasesUrl(orgHandle) : undefined}
             createUrl={info.infraSegment === 'vector-databases' ? newOrgVectorDatabaseUrl(orgHandle) : info.infraSegment === 'databases' ? newOrgDatabaseUrl(orgHandle) : undefined}
           />

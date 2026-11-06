@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, LinearProgress, Stack, Typography } from '@wso2/oxygen-ui';
+import { Box, Button, CircularProgress, LinearProgress, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { Check, CircleAlert, FileText } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { retryUpload, useAnySending, useSourceUploads } from '../../../hooks/contextUploads';
@@ -29,12 +29,18 @@ export interface SetupUploadSource {
   name: string;
 }
 
+/** Where the wizard is after Create: the engine starting, its sources being sent, or done. */
+export type SetupPhase = 'starting' | 'failed' | 'setting-up' | 'done';
+
 interface SetupProgressProps {
   engineId: string;
   engineName: string;
+  phase: SetupPhase;
+  /** The last status check failed; the wizard keeps polling. */
+  statusUnknown?: boolean;
   sourceCount: number;
   roleCount: number;
-  /** Steps the engine skipped because it does not serve them yet. */
+  /** Steps the engine refused. */
   warnings: string[];
   uploads: SetupUploadSource[];
   onOpen: () => void;
@@ -98,9 +104,13 @@ function UploadSource({ engineId, source }: { engineId: string; source: SetupUpl
   );
 }
 
-/** What the wizard shows after Create while the staged files are handed to the new engine. */
-export default function SetupProgress({ engineId, engineName, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
-  const configSkipped = warnings.some((w) => /models/i.test(w));
+/** What the wizard shows after Create: the engine starting, then its sources, grants and files being handed to it. */
+export default function SetupProgress({ engineId, engineName, phase, statusUnknown = false, sourceCount, roleCount, warnings, uploads, onOpen }: SetupProgressProps): JSX.Element {
+  const failedTo = (pattern: RegExp) => warnings.find((w) => pattern.test(w));
+  const sourceFailures = warnings.filter((w) => w.startsWith('Register source')).length;
+  const roleFailures = warnings.filter((w) => w.startsWith('Grant query access')).length;
+  const ownerFailure = failedTo(/^Give you query and upload access/);
+  const waiting = phase === 'starting' || phase === 'setting-up';
   const sending = useAnySending();
   return (
     <Box sx={setupCardSx}>
@@ -110,32 +120,58 @@ export default function SetupProgress({ engineId, engineName, sourceCount, roleC
         </Typography>
       </Stack>
       <Box sx={{ mt: 2 }}>
-        <Step tone="done" aside={engineId}>
-          Engine created
-        </Step>
-        <Step tone="done">You have query and upload access</Step>
-        <Step tone="done">{`${sourceCount} source${sourceCount === 1 ? '' : 's'} registered with visibility rules`}</Step>
-        {roleCount > 0 && <Step tone="done">{`${roleCount} role${roleCount === 1 ? '' : 's'} granted query access`}</Step>}
-        {configSkipped && (
-          <Step tone="skipped" aside={warnings.find((w) => /models/i.test(w))?.split(': ')[1]}>
-            Models were not saved
+        <Step tone="done">Engine created</Step>
+        {phase === 'starting' && (
+          <Step tone="running" aside={statusUnknown ? "Couldn't check the engine's status. Trying again…" : undefined}>
+            Starting the engine
           </Step>
         )}
-        {uploads.map((u) => (
-          <UploadSource key={u.sourceId} engineId={engineId} source={u} />
-        ))}
+        {phase === 'failed' && (
+          <Step tone="failed">The engine failed to start</Step>
+        )}
+        {phase === 'setting-up' && <Step tone="running">Adding your sources and access</Step>}
+        {phase === 'done' && (
+          <>
+            <Step tone={ownerFailure ? 'failed' : 'done'} aside={ownerFailure?.split(': ').slice(1).join(': ')}>
+              You have query and upload access
+            </Step>
+            <Step tone={sourceFailures ? 'failed' : 'done'}>{`${sourceCount - sourceFailures} of ${sourceCount} source${sourceCount === 1 ? '' : 's'} added with visibility rules`}</Step>
+            {roleCount > 0 && <Step tone={roleFailures ? 'failed' : 'done'}>{`${roleCount - roleFailures} of ${roleCount} role${roleCount === 1 ? '' : 's'} granted query access`}</Step>}
+            {uploads.map((u) => (
+              <UploadSource key={u.sourceId} engineId={engineId} source={u} />
+            ))}
+          </>
+        )}
       </Box>
       <Stack direction="row" alignItems="center" justifyContent="space-between" gap={2} sx={{ mt: 3, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
-        {sending ? (
+        {waiting ? (
+          <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+            Keep this page open until the engine is running: your sources and files are sent to it from this page. If you leave, the engine is still created and you can add them again from its page.
+          </Typography>
+        ) : phase === 'failed' ? (
+          <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
+            Open the engine to see why, or delete it and create it again.
+          </Typography>
+        ) : sending ? (
           <Typography variant="caption" sx={{ ...mutedSx, lineHeight: 1.5 }}>
             Files are still being sent. Closing or reloading this tab stops them. You can open the engine while they finish.
           </Typography>
         ) : (
           <span />
         )}
-        <Button variant="contained" onClick={onOpen} sx={{ flexShrink: 0 }}>
-          Open engine
-        </Button>
+        {waiting ? (
+          <Tooltip title="Available once the engine is running">
+            <Box component="span" sx={{ flexShrink: 0 }}>
+              <Button variant="outlined" disabled>
+                Open engine
+              </Button>
+            </Box>
+          </Tooltip>
+        ) : (
+          <Button variant="contained" onClick={onOpen} sx={{ flexShrink: 0 }}>
+            Open engine
+          </Button>
+        )}
       </Stack>
     </Box>
   );

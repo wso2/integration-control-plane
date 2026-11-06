@@ -20,7 +20,7 @@ import { Alert, Box, Button, Chip, CircularProgress, IconButton, LinearProgress,
 import { Pencil, Plus, Upload } from '@wso2/oxygen-ui-icons-react';
 import { useSourceUploads } from '../../../hooks/contextUploads';
 import type { JSX } from 'react';
-import { useContextEngineProgress } from '../../../hooks/useContextEngine';
+import { useContextEngineProgress, useContextIntegrations } from '../../../hooks/useContextEngine';
 import { SOURCE_PROGRESS_LABEL, SOURCE_PROGRESS_TONE } from '../../../constants/contextEngine';
 import {
   formatProgressPercent,
@@ -38,12 +38,14 @@ import {
 } from '../../../utils/contextEngine';
 import SourceMark from '../SourceMark';
 import { mutedSx, progressBarSx, progressCaptionSx, progressHeadlineSx, progressOverallSx, sourceProgressBodySx, sourceProgressHeadSx, sourceProgressRowSx, summaryCardHeaderSx, summaryCardSx } from '../styles';
-import type { ContextSource, SourceProgress } from '../../../types/contextEngine';
+import type { ContextIntegration, ContextSource, SourceProgress } from '../../../types/contextEngine';
 
 interface SourcesProgressCardProps {
   /** DOM id, so the checklist can scroll here. */
   id?: string;
   engineId: string;
+  /** Progress comes from the engine, so it is asked for only once the engine runs. */
+  running: boolean;
   sources: ContextSource[];
   /** Drives the fallback chip on engines that do not report progress yet. */
   /** Opens the Files drawer for a File Upload source. */
@@ -69,6 +71,22 @@ function FallbackChip({ source }: { source: ContextSource }): JSX.Element {
   const label = source.state;
   const color = source.state === 'ready' ? 'success' : source.state === 'failed' ? 'error' : 'default';
   return <Chip size="small" variant="outlined" color={color} label={label} />;
+}
+
+const INTEGRATION_TONE: Record<string, 'success' | 'info' | 'error' | 'warning' | 'default'> = { running: 'success', succeeded: 'success', scheduled: 'info', provisioning: 'info', failed: 'error', removing: 'warning' };
+
+/** The integration that runs a source: its status, and why or when it last ran on hover. */
+function IntegrationChip({ integration }: { integration: ContextIntegration }): JSX.Element {
+  const run = integration.lastRun;
+  const detail = integration.statusReason ?? (run?.completedAt ? `Last run ${run.status} at ${new Date(run.completedAt).toLocaleString()}` : run?.startedAt ? `Running since ${new Date(run.startedAt).toLocaleString()}` : undefined);
+  const chip = <Chip size="small" variant="outlined" color={INTEGRATION_TONE[integration.status] ?? 'default'} label={`Integration · ${integration.status}`} />;
+  return detail ? (
+    <Tooltip title={detail}>
+      <span>{chip}</span>
+    </Tooltip>
+  ) : (
+    chip
+  );
 }
 
 function ProgressChip({ progress }: { progress: SourceProgress }): JSX.Element {
@@ -123,8 +141,13 @@ function ProgressBody({ source, progress }: { source: ContextSource; progress: S
  * how many delivered items the engine has processed, and, once the engine
  * collects it, how much the search index has caught up. Polls while anything moves.
  */
-export default function SourcesProgressCard({ id, engineId, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
-  const progressQuery = useContextEngineProgress(engineId);
+export default function SourcesProgressCard({ id, engineId, running, sources, onManageFiles, onAddSource, onEditSource }: SourcesProgressCardProps): JSX.Element {
+  const progressQuery = useContextEngineProgress(running ? engineId : '');
+  const integrations = useContextIntegrations(
+    engineId,
+    sources.some((s) => s.type !== 'upload'),
+  );
+  const integrationBySource = new Map((integrations.data ?? []).flatMap((i) => (i.sourceId ? [[i.sourceId, i] as const] : [])));
   const progress = progressQuery.data;
   const available = !!progress?.available;
   const byId = new Map((progress?.sources ?? []).map((p) => [p.sourceId, p]));
@@ -178,6 +201,12 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
         </Alert>
       )}
 
+      {integrations.isError && (
+        <Typography variant="caption" sx={{ ...mutedSx, display: 'block', mb: 1.5 }}>
+          Couldn&apos;t load integration status. Trying again…
+        </Typography>
+      )}
+
       {summary && overall && visible > 1 && (
         <Box sx={progressOverallSx}>
           <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.75 }}>
@@ -199,6 +228,7 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
       ) : (
         sources.map((s) => {
           const p = byId.get(s.id);
+          const integration = integrationBySource.get(s.id);
           return (
             <Box key={s.id} sx={sourceProgressRowSx}>
               <Box sx={sourceProgressHeadSx}>
@@ -214,6 +244,7 @@ export default function SourcesProgressCard({ id, engineId, sources, onManageFil
                   </Box>
                 </Stack>
                 <Stack direction="row" alignItems="center" gap={1} sx={{ flexShrink: 0 }}>
+                  {integration && <IntegrationChip integration={integration} />}
                   {p ? <ProgressChip progress={p} /> : available ? <Chip size="small" variant="outlined" label="Progress hidden" /> : <FallbackChip source={s} />}
                   {s.type === 'upload' && onManageFiles && <FilesAction engineId={engineId} source={s} onManage={onManageFiles} />}
                   {onEditSource && (

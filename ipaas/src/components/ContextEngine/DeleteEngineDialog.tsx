@@ -31,8 +31,6 @@ interface DeleteEngineDialogProps {
   error?: string | null;
   onConfirm: () => void;
   onClose: () => void;
-  /** Deleting only forgets the engine here; its data stays in the engine's databases until they are cleared. */
-  forgetOnly?: boolean;
 }
 
 function Item({ icon, children }: { icon: ReactNode; children: ReactNode }): JSX.Element {
@@ -57,7 +55,7 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
         <Item icon={<Database size={16} />}>{sources}</Item>
         <Item icon={<Upload size={16} />}>Files uploaded to it</Item>
         <Item icon={<MessageSquare size={16} />}>Stored questions, answers and links to their passages</Item>
-        <Item icon={<KeyRound size={16} />}>Its models, keys and every access grant</Item>
+        <Item icon={<KeyRound size={16} />}>Its models, API keys, integrations and every access grant</Item>
       </Stack>
       <Typography variant="body2" color="text.secondary" sx={{ mt: 1.75 }}>
         Agents using its API or MCP endpoint stop working right away.
@@ -68,10 +66,9 @@ function DeletesEverything({ sourceCount }: { sourceCount?: number }): JSX.Eleme
 
 /**
  * Confirm deleting an engine: what the engine removes, and the
- * engine's name typed to confirm. Deletion runs as a job on the engine, so the
- * engine shows as deleting until the job finishes. Without provisioning, it only forgets the engine.
+ * engine's name typed to confirm. The engine shows as deleting until it is gone.
  */
-export default function DeleteEngineDialog({ name, sourceCount, isPending, error, onConfirm, onClose, forgetOnly = false }: DeleteEngineDialogProps): JSX.Element {
+export default function DeleteEngineDialog({ name, sourceCount, isPending, error, onConfirm, onClose }: DeleteEngineDialogProps): JSX.Element {
   const [typed, setTyped] = useState('');
   const matches = typed.trim() === name.trim();
   return (
@@ -90,14 +87,8 @@ export default function DeleteEngineDialog({ name, sourceCount, isPending, error
       isPending={isPending}
       confirmDisabled={!matches}
       confirmLabel="Delete engine"
-      pendingLabel={forgetOnly ? 'Deleting…' : 'Starting…'}>
-      {forgetOnly ? (
-        <Typography variant="body2" color="text.secondary">
-          Its data stays in the engine's databases. A new engine picks it up again.
-        </Typography>
-      ) : (
-        <DeletesEverything sourceCount={sourceCount} />
-      )}
+      pendingLabel="Deleting…">
+      <DeletesEverything sourceCount={sourceCount} />
       <TextField
         fullWidth
         size="small"

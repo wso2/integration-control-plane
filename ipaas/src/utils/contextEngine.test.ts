@@ -30,6 +30,8 @@ import {
   evidenceBackTarget,
   isTransientReadError,
   formatBytes,
+  nextRecordVersion,
+  reselectedFileProblem,
   describeUploadAudience,
   endsSentence,
   splitSentences,
@@ -125,6 +127,7 @@ import {
   toConfigurationPayload,
   toCreateInput,
   toSourceRegistration,
+  toIntegrationRequest,
   queuedUploadText,
   uploadSourceTitle,
   uploadIsSlow,
@@ -283,23 +286,23 @@ describe('source validation', () => {
     expect(visibleFields(sf, { authType: 'bearer' }).map((f) => f.key)).not.toContain('refreshToken');
   });
 
-  it('shows and requires only the fields of the chosen Google Drive auth flow', () => {
-    const gd = SOURCE_CONNECTORS.find((c) => c.id === 'gdrive')!;
-    const clientEmail = gd.fields.find((f) => f.key === 'clientEmail')!;
-    const refreshToken = gd.fields.find((f) => f.key === 'refreshToken')!;
+  it('shows and requires only the fields of the chosen Google auth flow', () => {
+    for (const id of ['gdrive', 'google-calendar']) {
+      const google = SOURCE_CONNECTORS.find((c) => c.id === id)!;
+      const refreshToken = google.fields.find((f) => f.key === 'refreshToken')!;
+      const authType = google.fields.find((f) => f.key === 'authType')!;
 
-    // Default flow is refresh token: its credentials show, the service-account fields do not.
-    expect(blankSource('gdrive').values.authType).toBe('refresh_token');
-    expect(isFieldVisible(refreshToken, { authType: 'refresh_token' })).toBe(true);
-    expect(isFieldVisible(clientEmail, { authType: 'refresh_token' })).toBe(false);
-    expect(isFieldVisible(clientEmail, { authType: 'service_account' })).toBe(true);
-
+      // Refresh token is the default; service accounts are not offered, since their key file cannot be mounted.
+      expect(blankSource(id).values.authType).toBe('refresh_token');
+      expect(authType.options!.map((o) => o.value)).toEqual(['refresh_token', 'bearer']);
+      expect(isFieldVisible(refreshToken, { authType: 'refresh_token' })).toBe(true);
+      expect(isFieldVisible(refreshToken, { authType: 'bearer' })).toBe(false);
+    }
     // Refresh-token flow needs the client id, secret and refresh token besides the folder.
     expect(isSourceValid(withValues('gdrive', { folderId: 'f', clientId: 'c', clientSecret: 's' }))).toBe(false);
     expect(isSourceValid(withValues('gdrive', { folderId: 'f', clientId: 'c', clientSecret: 's', refreshToken: 'r' }))).toBe(true);
-    // Bearer flow needs only the access token; service account needs the email and key path (subject is optional).
+    // Bearer flow needs only the access token.
     expect(isSourceValid(withValues('gdrive', { folderId: 'f', authType: 'bearer', token: 't' }))).toBe(true);
-    expect(invalidSourceFields(withValues('gdrive', { folderId: 'f', authType: 'service_account' })).map((f) => f.key)).toEqual(['clientEmail', 'privateKeyPath']);
   });
 
   it('models the Google Calendar settings on the shared Google auth', () => {
@@ -312,7 +315,7 @@ describe('source validation', () => {
     expect(isSourceValid(withValues('google-calendar', { clientId: 'c', clientSecret: 's' }))).toBe(false);
     expect(isSourceValid(withValues('google-calendar', { clientId: 'c', clientSecret: 's', refreshToken: 'r' }))).toBe(true);
     expect(isSourceValid(withValues('google-calendar', { authType: 'bearer', token: 't' }))).toBe(true);
-    expect(invalidSourceFields(withValues('google-calendar', { authType: 'service_account', calendarId: '' })).map((f) => f.key)).toEqual(['clientEmail', 'privateKeyPath', 'calendarId']);
+    expect(invalidSourceFields(withValues('google-calendar', { authType: 'bearer', token: 't', calendarId: '' })).map((f) => f.key)).toEqual(['calendarId']);
   });
 
   it('offers an optional RML mapping on structured connectors', () => {
@@ -329,7 +332,7 @@ describe('source validation', () => {
     const base = { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name', clientId: 'c', clientSecret: 's' };
     expect(isSourceValid(withValues('salesforce', base))).toBe(true);
     const mapped = withValues('salesforce', { ...base, rmlMapping: '@prefix ex: <http://ex> .' });
-    const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] })).sources[0].settings;
+    const settings = toConfigurationPayload(toCreateInput({ ...completeForm(), sources: [mapped] }, 'development')).sources[0].settings;
     expect(settings.rmlMapping).toBe('@prefix ex: <http://ex> .');
   });
 
@@ -337,9 +340,9 @@ describe('source validation', () => {
     const keys = (id: string) => SOURCE_CONNECTORS.find((c) => c.id === id)!.fields.map((f) => f.key);
     // Only MySQL, PostgreSQL and SQL Server are supported, and they are enabled.
     for (const id of ['mysql', 'postgresql', 'mssql']) expect(isConnectorEnabled(id)).toBe(true);
-    // Core DatabaseSettings fields are present on each.
+    // Core settings of the database integrations are present on each.
     for (const id of ['mysql', 'postgresql', 'mssql']) {
-      expect(keys(id)).toEqual(expect.arrayContaining(['host', 'port', 'database', 'username', 'password', 'tableName', 'primaryKey', 'columns', 'updatedAtColumn', 'cdcEnabled']));
+      expect(keys(id)).toEqual(expect.arrayContaining(['host', 'port', 'database', 'username', 'password', 'tableName', 'primaryKey', 'columns', 'updatedAtColumn', 'pollInterval']));
     }
     // MySQL has no schema layer; PostgreSQL and SQL Server do.
     expect(keys('mysql')).not.toContain('schema');
@@ -347,10 +350,13 @@ describe('source validation', () => {
     expect(keys('mssql')).toContain('schema');
     // PostgreSQL exposes its CDC replication overrides.
     expect(keys('postgresql')).toEqual(expect.arrayContaining(['slotName', 'publicationName']));
-    // Per-dialect default ports and CDC on by default.
+    // Per-dialect default ports.
     expect(blankSource('mysql').values.port).toBe('3306');
     expect(blankSource('mssql').values.port).toBe('1433');
-    expect(blankSource('postgresql').values.cdcEnabled).toBe('true');
+    // Numeric fields refuse text.
+    const db = { host: 'h', database: 'd', username: 'u', password: 'p', tableName: 't', primaryKey: 'id' };
+    expect(invalidSourceFields(withValues('postgresql', { ...db, port: '54x' })).map((f) => f.key)).toEqual(['port']);
+    expect(invalidSourceFields(withValues('postgresql', { ...db, port: '5432', pollInterval: 'soon' })).map((f) => f.key)).toEqual(['pollInterval']);
   });
 
   it('needs at least one complete, unique visibility rule', () => {
@@ -470,10 +476,10 @@ describe('form completion', () => {
   });
 
   it('converts to a create input with trimmed name/description', () => {
-    const input = toCreateInput({ ...completeForm(), name: '  Ops  ', description: ' d ' });
+    const input = toCreateInput({ ...completeForm(), name: '  Ops  ', description: ' d ' }, 'development');
     expect(input.name).toBe('Ops');
     expect(input.description).toBe('d');
-    expect(() => toCreateInput({ ...completeForm(), llm: null })).toThrow();
+    expect(() => toCreateInput({ ...completeForm(), llm: null }, 'development')).toThrow();
   });
 });
 
@@ -522,7 +528,7 @@ describe('wire payloads', () => {
   });
 
   it('separates settings from credentials and adds azure fields only for azure', () => {
-    const payload = toConfigurationPayload(toCreateInput(completeForm()));
+    const payload = toConfigurationPayload(toCreateInput(completeForm(), 'development'));
     expect(payload.sources[0].settings).toEqual({ repositoryUrl: 'https://github.com/wso2/docs', branch: 'main', includePaths: '' });
     expect(payload.sources[0].credentials).toEqual({ accessToken: 'ghp_x' });
     expect(payload.llm).toEqual({ provider: 'anthropic', model: 'claude-sonnet-4-6', apiKey: 'sk-ant' });
@@ -532,11 +538,40 @@ describe('wire payloads', () => {
   it('sends only the settings and credentials the chosen auth flow uses', () => {
     const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale' });
     const form = { ...completeForm(), sources: [sf] };
-    const source = toConfigurationPayload(toCreateInput(form)).sources[0];
+    const source = toConfigurationPayload(toCreateInput(form, 'development')).sources[0];
     // Client credentials is the default flow: the Connected App key is a setting, the hidden refresh token is dropped.
     expect(source.settings).toMatchObject({ authType: 'client_credentials', baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', apiVersion: '59.0' });
     expect(source.credentials).toEqual({ clientSecret: 's' });
     expect(source.credentials.refreshToken).toBeUndefined();
+  });
+
+  it('shapes an integration request as the integration settings type it', () => {
+    const pg = withValues('postgresql', { host: 'db', port: '5432', database: 'cetest', schema: 'kb', username: 'u', password: ' p ', tableName: 'articles', primaryKey: 'id', columns: 'title, body,, category', pollInterval: '60' });
+    expect(toIntegrationRequest(pg, 'postgresql').settings).toEqual({
+      host: 'db',
+      port: 5432,
+      databaseName: 'cetest',
+      schema: 'kb',
+      username: 'u',
+      password: ' p ',
+      tableName: 'articles',
+      primaryKey: 'id',
+      columns: ['title', 'body', 'category'],
+      pollInterval: 60,
+    });
+
+    const sf = withValues('salesforce', { baseUrl: 'https://acme.my.salesforce.com', sobject: 'Account', fields: 'Name, Industry', clientId: 'c', clientSecret: 's', refreshToken: 'stale', rmlMapping: '@prefix ex: <http://ex> .' });
+    // The auth flow nests under auth; the hidden refresh token and the mapping file are left out.
+    expect(toIntegrationRequest(sf, 'salesforce').settings).toEqual({
+      baseUrl: 'https://acme.my.salesforce.com',
+      auth: { type: 'client_credentials', clientId: 'c', clientSecret: 's' },
+      sobject: 'Account',
+      fields: ['Name', 'Industry'],
+      apiVersion: '59.0',
+    });
+
+    const calendar = withValues('google-calendar', { authType: 'bearer', token: 't', eventTypes: 'default' });
+    expect(toIntegrationRequest(calendar, 'google_calendar').settings).toEqual({ auth: { type: 'bearer', token: 't' }, calendarId: 'primary', eventTypes: ['default'], includePrivateEvents: false, pageSize: 250 });
   });
 
   it('summarizes sources for review', () => {
@@ -557,7 +592,7 @@ describe('exposure snippets', () => {
     // The mode is in the URL and the engine is its address; neither is in the body.
     expect(curl).not.toContain('spaceId');
     expect(curl).not.toContain('"mode"');
-    expect(curl).toContain('Authorization: Bearer $TOKEN');
+    expect(curl).toContain('X-API-Key: $API_KEY');
     expect(buildQueryCurl('https://engine.example.com', 'q', 'answer')).toContain('https://engine.example.com/v1/answer');
   });
 
@@ -571,7 +606,7 @@ describe('exposure snippets', () => {
     const cfg = JSON.parse(buildMcpClientConfig('https://engine.example.com/', 'Support Knowledge!'));
     expect(Object.keys(cfg.mcpServers)).toEqual(['support-knowledge']);
     expect(cfg.mcpServers['support-knowledge'].url).toBe('https://engine.example.com/v1/mcp');
-    expect(cfg.mcpServers['support-knowledge'].headers).toEqual({ Authorization: 'Bearer <token>' });
+    expect(cfg.mcpServers['support-knowledge'].headers).toEqual({ 'X-API-Key': '<api key>' });
   });
 });
 
@@ -584,7 +619,7 @@ describe('shared api key', () => {
     expect(effectiveLlm(sameProvider)?.apiKey).toBe('sk-test');
     expect(modelsStepBlocker(sameProvider)).toBeNull();
     expect(modelsStepBlocker({ ...sameProvider, shareApiKey: false })).toBe('Complete the ingestion language model');
-    expect(toCreateInput(sameProvider).llm.apiKey).toBe('sk-test');
+    expect(toCreateInput(sameProvider, 'development').llm.apiKey).toBe('sk-test');
   });
 
   it('names the first missing piece of the models step', () => {
@@ -599,9 +634,9 @@ describe('shared api key', () => {
     expect(modelsStepBlocker({ ...form, answersEnabled: false })).toBeNull();
     const chosen = { ...form, answerLlm: { ...blankLlm('openai'), model: 'gpt-5', apiKey: 'sk-answer' } };
     expect(modelsStepBlocker(chosen)).toBeNull();
-    expect(toCreateInput(chosen).answers).toEqual({ enabled: true, model: chosen.answerLlm });
-    expect(toCreateInput({ ...chosen, answersEnabled: false }).answers).toEqual({ enabled: false, model: null });
-    expect(toCreateInput(completeForm()).answers).toEqual({ enabled: true, model: null });
+    expect(toCreateInput(chosen, 'development').answers).toEqual({ enabled: true, model: chosen.answerLlm });
+    expect(toCreateInput({ ...chosen, answersEnabled: false }, 'development').answers).toEqual({ enabled: false, model: null });
+    expect(toCreateInput(completeForm(), 'development').answers).toEqual({ enabled: true, model: null });
   });
 });
 
@@ -706,7 +741,9 @@ describe('drafts', () => {
 
 function engineDetail(over: Partial<ContextEngineDetail> = {}): ContextEngineDetail {
   return {
-    id: 'spc_1',
+    id: 'development/support-knowledge',
+    handle: 'support-knowledge',
+    environment: 'development',
     name: 'Support Knowledge',
     description: '',
     state: 'ready',
@@ -827,15 +864,26 @@ describe('storage', () => {
     expect(storageSelectionError('graph', { ...ext, password: '' })).toBe('Enter the database, user and password');
   });
 
-  it('the step blocker names the first incomplete store', () => {
+  it('the step blocker accepts only engine managed stores for now', () => {
     expect(storageStepBlocker(defaultStorage())).toBeNull();
-    expect(storageStepBlocker({ ...defaultStorage(), relational: { mode: 'infrastructure', serverId: '', serverName: '', database: '' } })).toBe('Choose a database server, or switch to Engine managed');
+    expect(storageStepBlocker({ ...defaultStorage(), relational: { mode: 'infrastructure', serverId: 's1', serverName: 'pg', database: 'context' } })).toBe('Only engine managed storage is available for now');
   });
 
   it('summarizes each mode in two lines', () => {
-    expect(summarizeStorage('graph', { mode: 'managed' })).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · embedded' });
-    expect(summarizeStorage('vector', { mode: 'infrastructure', serverId: 's1', serverName: 'support-vectors', database: 'context_vectors' })).toEqual({ primary: 'support-vectors', secondary: 'pgvector · context_vectors' });
-    expect(summarizeStorage('graph', { mode: 'external', uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'u', password: 'p' })).toEqual({ primary: 'Neo4j', secondary: 'graph.internal:7687 · neo4j' });
+    expect(summarizeStorage('graph', { mode: 'managed' }, 'embedded')).toEqual({ primary: 'Engine managed', secondary: 'Kuzu · embedded' });
+    expect(summarizeStorage('vector', { mode: 'infrastructure', serverId: 's1', serverName: 'support-vectors', database: 'context_vectors' }, 'embedded')).toEqual({ primary: 'support-vectors', secondary: 'pgvector · context_vectors' });
+    expect(summarizeStorage('graph', { mode: 'external', uri: 'bolt://graph.internal:7687', database: 'neo4j', user: 'u', password: 'p' }, 'embedded')).toEqual({ primary: 'Neo4j', secondary: 'graph.internal:7687 · neo4j' });
+  });
+
+  it.each([
+    ['vector', 'embedded', 'LanceDB · embedded'],
+    ['relational', 'embedded', 'SQLite · embedded'],
+    ['graph', 'embedded', 'Kuzu · embedded'],
+    ['vector', 'postgres', 'PostgreSQL + pgvector · own server'],
+    ['relational', 'postgres', 'PostgreSQL · own server'],
+    ['graph', 'postgres', 'PostgreSQL · own server'],
+  ] as const)('names the engine managed %s store of a deployment whose engines are %s', (kind, server, secondary) => {
+    expect(summarizeStorage(kind, { mode: 'managed' }, server)).toEqual({ primary: 'Engine managed', secondary });
   });
 
   it('maps to the engine payload and requires a resolved connection for infrastructure', () => {
@@ -853,7 +901,7 @@ describe('storage', () => {
       password: 'pw',
       sslRequired: true,
     });
-    const payload = toConfigurationPayload(toCreateInput({ ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } } }));
+    const payload = toConfigurationPayload(toCreateInput({ ...completeForm(), storage: { ...defaultStorage(), graph: { mode: 'external', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' } } }, 'development'));
     expect(payload.storage.vector).toEqual({ provider: 'lancedb' });
     expect(payload.storage.graph).toEqual({ provider: 'neo4j', uri: 'bolt://g:7687', database: 'neo4j', user: 'u', password: 'p' });
   });
@@ -1060,6 +1108,20 @@ describe('file uploads', () => {
     expect(formatBytes(3277)).toBe('3.2 KB');
     expect(formatBytes(25 * MB)).toBe('25 MB');
     expect(formatBytes(4.8 * MB)).toBe('4.8 MB');
+  });
+
+  it('picks a version newer than the record, even when the record is ahead of the clock', () => {
+    expect(nextRecordVersion('1000', 5000)).toBe('5000');
+    expect(nextRecordVersion('5000', 5000)).toBe('5001');
+    expect(nextRecordVersion('9000', 5000)).toBe('9001');
+    expect(nextRecordVersion(undefined, 5000)).toBe('5000');
+  });
+
+  it('accepts a file chosen again only when its name and size match the record', () => {
+    const record = { name: 'oncall.txt', size: 1100 };
+    expect(reselectedFileProblem(record, { name: 'oncall.txt', size: 1100 })).toBeNull();
+    expect(reselectedFileProblem(record, { name: 'oncall.txt', size: 1200 })).toBe('That is not oncall.txt (1.1 KB). Choose the same file that was uploaded.');
+    expect(reselectedFileProblem(record, { name: 'other.txt', size: 1100 })).not.toBeNull();
   });
 
   it('checks a chosen file and explains the outcome', () => {

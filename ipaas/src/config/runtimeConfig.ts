@@ -65,10 +65,6 @@ interface RuntimeConfig {
   /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
   TRACKING_ENV?: string;
   MOESIF_APP_API_KEY?: string;
-  /** Context Engine REST base (the app calls `<base>/v1/...`). Unset disables the feature. */
-  CONTEXT_ENGINE_API_URL?: string;
-  /** Local-development only: a static engine token when the engine cannot verify platform tokens. */
-  CONTEXT_ENGINE_API_TOKEN?: string;
   ENABLE_CONTEXT_ENGINE_FEATURE?: string | boolean;
   SCOPES_ENFORCED?: string | boolean;
 }
@@ -157,10 +153,6 @@ export interface ApiConfig {
   trackingEnv: 'dev' | 'stage' | 'prod' | 'off';
   /** Moesif app key for product-usage analytics. Separate from the API Insights embed above. Unset disables Moesif tracking. */
   moesifAppApiKey?: string;
-  /** Context Engine REST base. Empty when the engine is not configured for this deployment. */
-  contextEngineApiUrl: string;
-  /** Dev-only static bearer token for the engine; unset sends the platform token. */
-  contextEngineApiToken?: string;
   /** Gates the org-level Context Engines feature. */
   enableContextEngineFeature?: boolean;
   /** Hide actions the user's role doesn't allow. Set from the same deployment variable as ipaas-service's SCOPES_ENFORCED, so the console hides what ipaas-service refuses. */
@@ -213,7 +205,6 @@ const DEFAULT_CONFIG: ApiConfig = {
   integrationBuilderMaxTokens: 1024,
   integrationBuilderCentralGraphqlUrl: 'https://api.dev-central.ballerina.io/2.0/graphql',
   trackingEnv: 'dev',
-  contextEngineApiUrl: '',
 };
 
 const localPath = (value: string | undefined): string | undefined => (value && /^\/(?![/\\])/.test(value) ? value : undefined);
@@ -290,8 +281,6 @@ export async function loadConfig(): Promise<void> {
       trackingEnv: parseTrackingEnv(config.TRACKING_ENV),
       // config.json is untyped: a non-string value must not throw here and reset the whole config.
       moesifAppApiKey: typeof config.MOESIF_APP_API_KEY === 'string' ? config.MOESIF_APP_API_KEY.trim() || undefined : undefined,
-      contextEngineApiUrl: config.CONTEXT_ENGINE_API_URL ? trim(config.CONTEXT_ENGINE_API_URL) : DEFAULT_CONFIG.contextEngineApiUrl,
-      contextEngineApiToken: config.CONTEXT_ENGINE_API_TOKEN?.trim() || undefined,
       enableContextEngineFeature: config.ENABLE_CONTEXT_ENGINE_FEATURE === 'true' || config.ENABLE_CONTEXT_ENGINE_FEATURE === true,
       scopesEnforced: config.SCOPES_ENFORCED === 'true' || config.SCOPES_ENFORCED === true,
     };

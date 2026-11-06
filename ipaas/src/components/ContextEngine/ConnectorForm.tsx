@@ -41,6 +41,8 @@ interface ConnectorFormProps {
   onChangeSource?: () => void;
   /** Roles granted query access, for visibility warnings. Set on a running engine; absent in the wizard, where access is chosen in a later step. */
   queryRoles?: string[];
+  /** The running engine the source belongs to; absent in the wizard. */
+  engineId?: string;
 }
 
 /** A field whose value is the text contents of an uploaded file (e.g. an RML mapping). The file name is kept only for display this session; a restored draft still has the contents. */
@@ -136,7 +138,7 @@ function Field({ def, value, onChange }: { def: SourceFieldDef; value: string; o
 }
 
 /** The configuration form for one connector, rendered from its field schema. */
-export default function ConnectorForm({ orgHandle, connector, draft, otherNames, onChange, onChangeSource, queryRoles }: ConnectorFormProps): JSX.Element {
+export default function ConnectorForm({ orgHandle, connector, draft, otherNames, onChange, onChangeSource, queryRoles, engineId }: ConnectorFormProps): JSX.Element {
   const nameError = sourceNameError(draft.name, otherNames);
   const upload = connector.id === 'upload';
   const change = onChange;
@@ -213,7 +215,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
         {!ROLE_VISIBILITY_ENABLED ? (
           <VisibilityComingSoon label={upload ? 'Who can see these files' : 'Who can see this source'} />
         ) : upload ? (
-          <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} />
+          <StagedVisibilityField draft={draft} onChange={change} orgHandle={orgHandle} queryRoles={queryRoles} engineId={engineId} />
         ) : (
           <FileVisibilityField
             id="source-visibility"
@@ -221,6 +223,7 @@ export default function ConnectorForm({ orgHandle, connector, draft, otherNames,
             hint="Access is set per source: everything this source brings in is visible to the same people."
             orgHandle={orgHandle}
             queryRoles={queryRoles}
+            engineId={engineId}
             value={draft.stagedVisibility ?? EVERYONE_VISIBILITY}
             onChange={(stagedVisibility) => change({ ...draft, stagedVisibility })}
           />
