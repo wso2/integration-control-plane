@@ -104,16 +104,18 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       seededRef.current = false;
       return;
     }
-    setShowErrors(false);
-    setSaveError(null);
     if (data && !seededRef.current) seed(data);
   }, [open, data]);
 
-  // Back to the first step on open; not on data refetches, which would move the user mid-edit.
+  // Back to the first step, with no errors, on open. Not on data refetches: those
+  // would move the user mid-edit, and the refetch after a partly failed save would
+  // clear the error that says what was saved.
   useEffect(() => {
     if (!open) return;
     setStep(1);
     setManagingEp(null);
+    setShowErrors(false);
+    setSaveError(null);
   }, [open]);
 
   const draft: MiConfigDraft = useMemo(

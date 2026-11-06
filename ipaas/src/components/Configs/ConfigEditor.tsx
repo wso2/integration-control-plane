@@ -191,12 +191,14 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
       const reserved = all.filter((p) => isBallerinaConfigKey(p.key)).map((p) => p.key);
       const invalid = all.filter((p) => validateConfigKey(p.key) && !isBallerinaConfigKey(p.key)).map((p) => p.key);
       const taken = parsed.filter((p) => otherGroupKeys.has(p.key)).map((p) => p.key);
+      const existingKeys = new Set(rows.map((r) => r.key));
+      const present = parsed.filter((p) => existingKeys.has(p.key) && !otherGroupKeys.has(p.key)).map((p) => p.key);
       const reason = (keys: string[], why: string) => (keys.length ? `${why}: ${keys.join(', ')}` : '');
-      const skipped = [reason(invalid, 'invalid name'), reason(reserved, 'reserved for Ballerina configuration'), reason(taken, 'already set by another config')].filter(Boolean);
+      const skipped = [reason(invalid, 'invalid name'), reason(reserved, 'reserved for Ballerina configuration'), reason(taken, 'already set by another config'), reason(present, 'already in this config')].filter(Boolean);
       setImportNotice(skipped.length ? `Not imported, ${skipped.join('; ')}.` : '');
       setRows((prev) => {
-        const existingKeys = new Set(prev.map((r) => r.key));
-        return [...prev, ...parsed.filter((p) => !existingKeys.has(p.key) && !otherGroupKeys.has(p.key))];
+        const prevKeys = new Set(prev.map((r) => r.key));
+        return [...prev, ...parsed.filter((p) => !prevKeys.has(p.key) && !otherGroupKeys.has(p.key))];
       });
     });
   };
