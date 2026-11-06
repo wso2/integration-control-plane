@@ -119,7 +119,7 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
 
   // An edit keeps the group's stored name, so only a new env-var group is held to the reserved prefix.
   const nameErr = !isEdit && kind === 'envVars' ? validateNewEnvGroupName(name) : validateDisplayName(name);
-  const draftKeyErr = draftKey ? validateConfigKey(draftKey) || keyInOtherGroupError(draftKey.trim(), otherGroupKeys) : '';
+  const draftKeyErr = draftKey ? validateConfigKey(draftKey) || (rows.some((r) => r.key === draftKey.trim()) ? 'A variable with this key already exists.' : '') || keyInOtherGroupError(draftKey.trim(), otherGroupKeys) : '';
   const pathErr = validateMountPath(mountPath);
   // A key/value typed but not yet added is saved with the rest, as if Add was clicked,
   // instead of being dropped silently.
@@ -140,7 +140,8 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
   const guardNavigation = useLeaveGuard();
 
   // An unchanged edit is not saved: with stored secrets kept, it would only restart the workload.
-  const canSave = !save.isPending && (!isEdit || changed) && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? effectiveRows.length > 0 : !pathErr && fileContent.trim().length > 0);
+  // A pending key that can't be added can't be saved either; its field shows why.
+  const canSave = !save.isPending && (!isEdit || changed) && !nameErr && !(pendingRow && draftKeyErr) && !hasEmptySecretValue && (kind === 'envVars' ? effectiveRows.length > 0 : !pathErr && fileContent.trim().length > 0);
 
   // Why Save is disabled, for causes no field already explains (a filled-in field shows its own error).
   const blockedReason = (() => {
@@ -156,15 +157,9 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
   })();
 
   const addRow = () => {
-    const keyErr = validateConfigKey(draftKey) || keyInOtherGroupError(draftKey.trim(), otherGroupKeys);
-    if (keyErr) {
-      setDraftError(keyErr);
-      return;
-    }
-    if (rows.some((r) => r.key === draftKey.trim())) {
-      setDraftError('A variable with this key already exists.');
-      return;
-    }
+    // draftKeyErr is '' for an empty key; validating it says the key is required.
+    const keyErr = draftKeyErr || validateConfigKey(draftKey);
+    if (keyErr) return setDraftError(keyErr);
     setRows((prev) => [...prev, { key: draftKey.trim(), value: draftValue }]);
     setDraftKey('');
     setImportNotice('');
@@ -194,8 +189,10 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
       const parsed = all.filter((p) => !validateConfigKey(p.key));
       // Keys the save would reject are left out, and said so.
       const reserved = all.filter((p) => isBallerinaConfigKey(p.key)).map((p) => p.key);
+      const invalid = all.filter((p) => validateConfigKey(p.key) && !isBallerinaConfigKey(p.key)).map((p) => p.key);
       const taken = parsed.filter((p) => otherGroupKeys.has(p.key)).map((p) => p.key);
-      const skipped = [reserved.length ? `reserved for Ballerina configuration: ${reserved.join(', ')}` : '', taken.length ? `already set by another config: ${taken.join(', ')}` : ''].filter(Boolean);
+      const reason = (keys: string[], why: string) => (keys.length ? `${why}: ${keys.join(', ')}` : '');
+      const skipped = [reason(invalid, 'invalid name'), reason(reserved, 'reserved for Ballerina configuration'), reason(taken, 'already set by another config')].filter(Boolean);
       setImportNotice(skipped.length ? `Not imported, ${skipped.join('; ')}.` : '');
       setRows((prev) => {
         const existingKeys = new Set(prev.map((r) => r.key));
@@ -214,10 +211,6 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
   const handleSave = () => {
     setError('');
     if (!canSave) return;
-    if (pendingRow) {
-      if (draftKeyErr) return setDraftError(draftKeyErr);
-      if (rows.some((r) => r.key === pendingRow.key)) return setDraftError('A variable with this key already exists.');
-    }
     // Stored secrets left blank are kept as they are, not re-sent.
     const kept = effectiveRows.filter((r) => r.stored && r.value === '');
     const sent = effectiveRows.filter((r) => !(r.stored && r.value === ''));
@@ -374,7 +367,10 @@ export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, 
                   placeholder="value"
                   type={isSecret ? 'password' : 'text'}
                   value={draftValue}
-                  onChange={(e) => setDraftValue(e.target.value)}
+                  onChange={(e) => {
+                    setDraftValue(e.target.value);
+                    setImportNotice('');
+                  }}
                   onKeyDown={addOnEnter}
                   fullWidth
                   sx={styles.envDraftInput}
