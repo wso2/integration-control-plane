@@ -122,8 +122,13 @@ export function voiceAgentsUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/voice-agents`;
 }
 
-export function createVoiceAgentUrl(orgHandler: string, projectHandler: string): string {
-  return `/organizations/${orgHandler}/projects/${projectHandler}/components/new/voice-agent`;
+/** The query parameter that opens the voice agent wizard for one AI agent, fixed as the target. */
+export const VOICE_TARGET_AGENT_PARAM = 'targetAgent';
+export const VOICE_TARGET_AGENT_NAME_PARAM = 'targetAgentName';
+
+export function createVoiceAgentUrl(orgHandler: string, projectHandler: string, targetAgent?: { handler: string; name: string }): string {
+  const base = `/organizations/${orgHandler}/projects/${projectHandler}/components/new/voice-agent`;
+  return targetAgent ? `${base}?${new URLSearchParams({ [VOICE_TARGET_AGENT_PARAM]: targetAgent.handler, [VOICE_TARGET_AGENT_NAME_PARAM]: targetAgent.name })}` : base;
 }
 
 export function prebuiltIntegrationsUrl(orgHandler: string, projectHandler: string): string {

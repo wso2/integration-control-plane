@@ -34,6 +34,7 @@ import { useAuth } from '../../../auth';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import { getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';
+import EnableVoiceAgentButton from '../ai-agent/EnableVoiceAgentButton';
 import type { IntegrationModule } from '../../../types/integration';
 import type { Environment } from '../../../types/environment';
 import { withBase } from '../../../utils/basePath';
@@ -212,6 +213,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   const isSample = !!matchSample(repository, samplesData?.samples);
   const showOpenInEditor = hasSource && !isSamplesPending && !isSample && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
   const HeaderActions = module?.HeaderActions;
+  const isAiAgent = identifyIntegration(displayType, component.componentSubType ?? null).type === 'ai-agent';
 
   // An integration without source (a voice agent, a proxy) can still be reported with an empty
   // repository record, whose missing org and name would crash the URL builder.
@@ -551,6 +553,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
           )}
 
           {HeaderActions && <HeaderActions component={component} environments={environments} versionId={versionId} projectId={projectId} orgHandler={orgHandler} />}
+          {isAiAgent && <EnableVoiceAgentButton component={component} orgHandler={orgHandler} projectId={projectId} />}
 
           {/* Prebuilt integrations expose a "How to setup this integration" guide. */}
           <SetupInstructionsButton repository={repository ?? null} />

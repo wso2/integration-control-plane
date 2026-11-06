@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Button, Link, ListingTable, Menu, MenuItem, PageContent, PageTitle, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Button, Link, ListingTable, Menu, MenuItem, PageContent, PageTitle, RelativeTime, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { Mic, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type MouseEvent } from 'react';
 import { Link as RouterLink } from 'react-router';
@@ -28,8 +28,10 @@ import { useOrgVoiceAgents } from '../hooks/useVoiceAgents';
 import type { OrgScope } from '../nav';
 import { componentOverviewUrl, createVoiceAgentUrl } from '../paths';
 import type { Project } from '../types/project';
+import { formatDateTime, formatDistanceToNow } from '../utils/time';
 
 const SEARCH_SX = { mb: 2, maxWidth: 360 } as const;
+const NAME_CELL_SX = { display: 'flex', alignItems: 'center', gap: 1 } as const;
 
 function VoiceAgentsSkeleton(): JSX.Element {
   return (
@@ -122,7 +124,7 @@ function VoiceAgentList({ org, projects }: { org: string; projects: Project[] })
   if (rows.length === 0) return <EmptyListing icon={<Mic size={48} />} title="No voice agents" description="Create a voice agent to let callers talk to one of your agents." />;
 
   const needle = query.trim().toLowerCase();
-  const visible = needle ? rows.filter((r) => `${r.component.displayName} ${r.component.handler} ${r.project.name}`.toLowerCase().includes(needle)) : rows;
+  const visible = needle ? rows.filter((r) => `${r.component.displayName} ${r.component.handler} ${r.project.name} ${r.targetAgent?.displayName ?? ''}`.toLowerCase().includes(needle)) : rows;
   return (
     <>
       <SearchField value={query} onChange={setQuery} placeholder="Search voice agents" sx={SEARCH_SX} />
@@ -132,21 +134,41 @@ function VoiceAgentList({ org, projects }: { org: string; projects: Project[] })
             <ListingTable.Row>
               <ListingTable.Cell>Name</ListingTable.Cell>
               <ListingTable.Cell>Project</ListingTable.Cell>
+              <ListingTable.Cell>AI agent</ListingTable.Cell>
               <ListingTable.Cell>Description</ListingTable.Cell>
+              <ListingTable.Cell>Type</ListingTable.Cell>
+              <ListingTable.Cell align="right">Last updated</ListingTable.Cell>
             </ListingTable.Row>
           </ListingTable.Head>
           <ListingTable.Body>
-            {visible.map(({ component, project }) => (
-              <ListingTable.Row key={`${project.id}/${component.id}`}>
-                <ListingTable.Cell>
-                  <Link component={RouterLink} to={componentOverviewUrl(org, project.handler, component.handler)}>
-                    {component.displayName || component.handler}
-                  </Link>
-                </ListingTable.Cell>
-                <ListingTable.Cell>{project.name}</ListingTable.Cell>
-                <ListingTable.Cell>{component.description || '—'}</ListingTable.Cell>
-              </ListingTable.Row>
-            ))}
+            {visible.map(({ component, project, targetAgent }) => {
+              const updated = component.updatedAt || component.createdAt;
+              return (
+                <ListingTable.Row key={`${project.id}/${component.id}`}>
+                  <ListingTable.Cell>
+                    <Link component={RouterLink} to={componentOverviewUrl(org, project.handler, component.handler)} sx={NAME_CELL_SX}>
+                      <Mic size={16} />
+                      {component.displayName || component.handler}
+                    </Link>
+                  </ListingTable.Cell>
+                  <ListingTable.Cell>{project.name}</ListingTable.Cell>
+                  <ListingTable.Cell>
+                    {targetAgent ? (
+                      <Link component={RouterLink} to={componentOverviewUrl(org, project.handler, targetAgent.handler)}>
+                        {targetAgent.displayName || targetAgent.handler}
+                      </Link>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        External
+                      </Typography>
+                    )}
+                  </ListingTable.Cell>
+                  <ListingTable.Cell>{component.description || '—'}</ListingTable.Cell>
+                  <ListingTable.Cell>Voice agent</ListingTable.Cell>
+                  <ListingTable.Cell align="right">{updated ? <RelativeTime time={formatDistanceToNow(updated)} dateTime={updated} tooltip={formatDateTime(updated)} /> : '—'}</ListingTable.Cell>
+                </ListingTable.Row>
+              );
+            })}
           </ListingTable.Body>
         </ListingTable>
       </ListingTable.Container>

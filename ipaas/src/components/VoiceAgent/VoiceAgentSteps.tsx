@@ -21,7 +21,7 @@ import { ChevronDown } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import { CUSTOM_VOICE_ID, STT_PROVIDERS, TTS_PROVIDERS } from '../../constants/voiceAgentProviders';
 import type { BargeInMode, EndpointingMode, TurnDetectionModel, VoiceAgentSettings } from '../../types/voiceAgent';
-import { voiceAgentHandler, withSttProvider, withTtsProvider, type StepErrors } from '../../utils/voiceAgent';
+import { withSttProvider, withTtsProvider, type StepErrors } from '../../utils/voiceAgent';
 
 export interface VoiceAgentStepProps {
   settings: VoiceAgentSettings;
@@ -38,26 +38,6 @@ const FIELD_STACK_SX = { maxWidth: 560 } as const;
 const help = (error: string | undefined, hint = ' '): string => error ?? hint;
 
 const numberValue = (raw: string): number => (raw.trim() === '' ? Number.NaN : Number(raw));
-
-export function AgentStep({ settings, errors, onChange }: VoiceAgentStepProps): JSX.Element {
-  const handler = voiceAgentHandler(settings.displayName);
-  return (
-    <Stack gap={2} sx={FIELD_STACK_SX}>
-      <TextField labelPlacement="top" label="Name" fullWidth value={settings.displayName} onChange={(e) => onChange({ displayName: e.target.value })} error={!!errors.displayName} helperText={help(errors.displayName, handler ? `Created as ${handler}` : ' ')} />
-      <TextField labelPlacement="top" label="Description" optional fullWidth multiline minRows={2} value={settings.description} onChange={(e) => onChange({ description: e.target.value })} helperText=" " />
-      <TextField
-        labelPlacement="top"
-        label="Agent WebSocket URL"
-        placeholder="wss://agent.example.com/ws"
-        fullWidth
-        value={settings.targetAgentWsUrl}
-        onChange={(e) => onChange({ targetAgentWsUrl: e.target.value })}
-        error={!!errors.targetAgentWsUrl}
-        helperText={help(errors.targetAgentWsUrl, 'The agent the voice agent relays each conversation to.')}
-      />
-    </Stack>
-  );
-}
 
 export function LiveKitStep({ settings, errors, onChange }: VoiceAgentStepProps): JSX.Element {
   return (

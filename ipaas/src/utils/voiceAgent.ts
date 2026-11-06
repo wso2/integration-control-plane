@@ -25,7 +25,10 @@ const MAX_HANDLER_LENGTH = 25;
 
 export const DEFAULT_VOICE_AGENT_SETTINGS: VoiceAgentSettings = {
   displayName: '',
+  name: '',
   description: '',
+  targetMode: 'platform',
+  targetAgentHandler: '',
   targetAgentWsUrl: '',
   liveKitUrl: '',
   liveKitApiKey: '',
@@ -80,6 +83,11 @@ export function voiceAgentHandler(displayName: string): string {
   return toHandler(displayName).slice(0, MAX_HANDLER_LENGTH).replace(/-+$/, '');
 }
 
+/** The integration name the voice agent is created under: the one typed, or one derived from the display name. */
+export function effectiveVoiceAgentHandler(s: Pick<VoiceAgentSettings, 'displayName' | 'name'>): string {
+  return s.name.trim() ? voiceAgentHandler(s.name) : voiceAgentHandler(s.displayName);
+}
+
 /** Picking a provider selects its first model and language, so every step is valid as soon as a provider is chosen. */
 export function withSttProvider(settings: VoiceAgentSettings, providerId: string): VoiceAgentSettings {
   const provider = STT_PROVIDERS.find((p) => p.id === providerId);
@@ -105,9 +113,15 @@ export type StepErrors = Partial<Record<keyof VoiceAgentSettings, string>>;
 
 export function validateAgentStep(s: VoiceAgentSettings): StepErrors {
   const errors: StepErrors = {};
-  if (!s.displayName.trim()) errors.displayName = 'Enter a name.';
-  else if (voiceAgentHandler(s.displayName).length < 3) errors.displayName = 'Use at least three letters or digits.';
-  if (!isWebSocketUrl(s.targetAgentWsUrl)) errors.targetAgentWsUrl = 'Enter a ws:// or wss:// URL.';
+  if (!s.displayName.trim()) errors.displayName = 'Enter a display name.';
+  if (effectiveVoiceAgentHandler(s).length < 3) errors.name = 'Use at least three letters or digits.';
+  if (s.targetMode === 'external') {
+    if (!isWebSocketUrl(s.targetAgentWsUrl)) errors.targetAgentWsUrl = 'Enter a ws:// or wss:// URL.';
+  } else if (!s.targetAgentHandler) {
+    errors.targetAgentHandler = 'Choose an agent.';
+  } else if (!isWebSocketUrl(s.targetAgentWsUrl)) {
+    errors.targetAgentHandler = 'This agent has no reachable endpoint yet. Deploy it, then try again.';
+  }
   return errors;
 }
 
@@ -247,4 +261,40 @@ export const VOICE_AGENT_TOKEN_ENDPOINT = 'token-service';
 /** The token service URL the browser calls, or null while the endpoint has no external URL yet. */
 export function tokenServiceUrlOf(endpoints: readonly { id: string; publicUrl?: string | null }[] | undefined): string | null {
   return endpoints?.find((e) => e.id === VOICE_AGENT_TOKEN_ENDPOINT)?.publicUrl || null;
+}
+
+/** Label a platform-hosted voice agent carries, naming the AI agent it speaks for (Devant's `voice-pipeline:` link, reversed). */
+export const VOICE_TARGET_LABEL_PREFIX = 'voice-target-agent:';
+
+export function voiceTargetLabel(agentHandler: string): string {
+  return `${VOICE_TARGET_LABEL_PREFIX}${agentHandler}`;
+}
+
+/** The AI agent a voice agent's labels name, or null for an externally hosted target. */
+export function linkedAgentHandlerOf(labels: string | readonly string[] | undefined): string | null {
+  const list = typeof labels === 'string' ? labels.split(',') : (labels ?? []);
+  const label = list.map((l) => l.trim()).find((l) => l.startsWith(VOICE_TARGET_LABEL_PREFIX));
+  return label ? label.slice(VOICE_TARGET_LABEL_PREFIX.length) || null : null;
+}
+
+interface AgentEndpointLike {
+  type: string;
+  projectUrl?: string | null;
+  publicUrl?: string | null;
+  invokeUrl?: string | null;
+}
+
+/**
+ * The WebSocket URL a voice agent reaches a platform-hosted AI agent on. Prefers a WebSocket
+ * endpoint, and an agent with one endpoint uses it whatever its declared type (an agent
+ * registers its voice listener's port as a plain endpoint). The in-project URL comes first,
+ * as in Devant: the voice agent runs in the same project, so it skips the gateway's API key.
+ */
+export function agentVoiceWsUrl(endpoints: readonly AgentEndpointLike[] | undefined): string | null {
+  if (!endpoints?.length) return null;
+  const ws = endpoints.filter((e) => /^(ws|websocket)$/i.test(e.type));
+  const candidates = ws.length > 0 ? ws : endpoints.length === 1 ? endpoints : [];
+  const ep = candidates.find((e) => e.projectUrl) ?? candidates.find((e) => e.publicUrl || e.invokeUrl);
+  const base = ep?.projectUrl || ep?.publicUrl || ep?.invokeUrl;
+  return base ? base.replace(/^http/i, 'ws').replace(/\/+$/, '') : null;
 }

@@ -41,11 +41,19 @@ export interface TtsProvider extends SttProvider {
 export type TurnDetectionModel = 'multilingual' | 'vad_only' | 'stt_endpointing';
 export type BargeInMode = 'adaptive' | 'always' | 'never';
 export type EndpointingMode = 'dynamic' | 'static';
+/** Where the agent a voice agent relays to runs: an AI agent integration on the platform, or anywhere else. */
+export type VoiceTargetMode = 'platform' | 'external';
 
 /** Everything the create wizard collects. Durations are in the unit the form shows (see each field). */
 export interface VoiceAgentSettings {
   displayName: string;
+  /** The integration name; empty derives it from the display name. */
+  name: string;
   description: string;
+  targetMode: VoiceTargetMode;
+  /** Handler of the platform-hosted AI agent, when `targetMode` is `platform`. */
+  targetAgentHandler: string;
+  /** The agent's WebSocket URL: typed for an external agent, resolved from the AI agent's endpoint otherwise. */
   targetAgentWsUrl: string;
 
   liveKitUrl: string;

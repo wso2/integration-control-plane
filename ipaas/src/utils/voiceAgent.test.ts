@@ -23,7 +23,11 @@ import {
   buildVoiceAgentDeployment,
   DEFAULT_VOICE_AGENT_SETTINGS,
   MAX_TRANSCRIPT_MESSAGES,
+  agentVoiceWsUrl,
+  effectiveVoiceAgentHandler,
   isWebSocketUrl,
+  linkedAgentHandlerOf,
+  voiceTargetLabel,
   tokenServiceUrlOf,
   validateAgentStep,
   validateLiveKitStep,
@@ -39,6 +43,7 @@ const complete: VoiceAgentSettings = withTtsProvider(
     {
       ...DEFAULT_VOICE_AGENT_SETTINGS,
       displayName: 'Support line',
+      targetMode: 'external',
       targetAgentWsUrl: 'wss://agent.example.com/ws',
       liveKitUrl: 'wss://demo.livekit.cloud',
       liveKitApiKey: 'lk-key',
@@ -94,6 +99,19 @@ describe('step validation', () => {
   it('rejects an http agent URL and a missing LiveKit secret', () => {
     expect(validateAgentStep({ ...complete, targetAgentWsUrl: 'https://agent.example.com' })).toHaveProperty('targetAgentWsUrl');
     expect(validateLiveKitStep({ ...complete, liveKitApiSecret: ' ' })).toHaveProperty('liveKitApiSecret');
+  });
+
+  it('needs an agent with a reachable endpoint for a platform-hosted target', () => {
+    const platform = { ...complete, targetMode: 'platform' as const, targetAgentWsUrl: '' };
+    expect(validateAgentStep(platform)).toEqual({ targetAgentHandler: 'Choose an agent.' });
+    expect(validateAgentStep({ ...platform, targetAgentHandler: 'support-agent' })).toHaveProperty('targetAgentHandler');
+    expect(validateAgentStep({ ...platform, targetAgentHandler: 'support-agent', targetAgentWsUrl: 'ws://support-agent:8080' })).toEqual({});
+  });
+
+  it('checks the typed name, not the display name, when one is given', () => {
+    expect(validateAgentStep({ ...complete, name: 'ab' })).toHaveProperty('name');
+    expect(effectiveVoiceAgentHandler({ displayName: 'Support line', name: '' })).toBe('support-line');
+    expect(effectiveVoiceAgentHandler({ displayName: 'Support line', name: 'Help Desk' })).toBe('help-desk');
   });
 
   it('requires the voice id when a custom voice is chosen', () => {
@@ -186,5 +204,35 @@ describe('tokenServiceUrlOf', () => {
     expect(tokenServiceUrlOf(undefined)).toBeNull();
     expect(tokenServiceUrlOf([{ id: 'token-service', publicUrl: null }])).toBeNull();
     expect(tokenServiceUrlOf([{ id: 'token-service', publicUrl: '' }])).toBeNull();
+  });
+});
+
+describe('voice target link', () => {
+  it('reads back the agent a label names, from a list or the comma-joined form', () => {
+    expect(linkedAgentHandlerOf([voiceTargetLabel('support-agent')])).toBe('support-agent');
+    expect(linkedAgentHandlerOf(`team:a, ${voiceTargetLabel('support-agent')}`)).toBe('support-agent');
+    expect(linkedAgentHandlerOf(['team:a'])).toBeNull();
+    expect(linkedAgentHandlerOf(undefined)).toBeNull();
+  });
+});
+
+describe('agentVoiceWsUrl', () => {
+  it('prefers a WebSocket endpoint and its in-project URL', () => {
+    expect(
+      agentVoiceWsUrl([
+        { type: 'REST', projectUrl: 'http://agent:9090' },
+        { type: 'WS', projectUrl: 'http://agent:8080/', publicUrl: 'https://gw.example.com/agent' },
+      ]),
+    ).toBe('ws://agent:8080');
+  });
+
+  it('uses a lone endpoint whatever its type, falling back to the public URL', () => {
+    expect(agentVoiceWsUrl([{ type: 'HTTP', publicUrl: 'https://gw.example.com/agent' }])).toBe('wss://gw.example.com/agent');
+  });
+
+  it('gives up on several non-WebSocket endpoints, or none', () => {
+    expect(agentVoiceWsUrl([{ type: 'REST', projectUrl: 'http://a' }, { type: 'REST', projectUrl: 'http://b' }])).toBeNull();
+    expect(agentVoiceWsUrl([])).toBeNull();
+    expect(agentVoiceWsUrl(undefined)).toBeNull();
   });
 });
