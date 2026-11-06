@@ -149,4 +149,21 @@ describe('formLinkView', () => {
     expect(view.connections.map((c) => [c.connection.id, c.linked, c.note])).toEqual([[id('github'), undefined, undefined]]);
     expect(formLinkView(links, 'production', envName, ghdemoFields).target(id('githubAuthToken')).picker).toBeUndefined();
   });
+
+  it("shows another environment the workload.yaml declarations its release uses, not the current Workload's", () => {
+    // workload.yaml now declares GitHub Sandbox for githubAuthToken and nothing for githubTimeout; production's release still has GitHub Acme for both.
+    const links: IntegrationLinks = {
+      ...base,
+      sourceDefined: true,
+      declared: { [id('githubAuthToken')]: { ref: 'github-sandbox', key: 'GITHUB_AUTH_TOKEN' } },
+      environments: [
+        environment('development', { configurables: { [id('githubAuthToken')]: { ref: 'github-sandbox', key: 'GITHUB_AUTH_TOKEN' } } }),
+        environment('production', { configurables: { [id('githubAuthToken')]: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN' }, [id('githubTimeout')]: { ref: 'orders-db', key: 'URL' } } }),
+      ],
+    };
+    const production = formLinkView(links, 'production', envName, ghdemoFields);
+    expect(production.target(id('githubAuthToken'))).toEqual({ source: { ref: 'github-acme', key: 'GITHUB_AUTH_TOKEN', name: 'GitHub Acme', noValues: false, declared: true } });
+    expect(production.target(id('githubTimeout'))).toEqual({ source: { ref: 'orders-db', key: 'URL', name: 'orders-db', noValues: false, declared: true } });
+    expect(formLinkView(links, 'development', envName).target(id('githubAuthToken')).source).toMatchObject({ ref: 'github-sandbox', declared: true });
+  });
 });
