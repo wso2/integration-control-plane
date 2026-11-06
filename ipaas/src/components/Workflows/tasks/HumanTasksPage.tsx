@@ -36,6 +36,7 @@ import ReviewDetailDrawer from './ReviewDetailDrawer';
 import TaskDetailDrawer from './TaskDetailDrawer';
 import WorkItemTable from './WorkItemTable';
 import { countOf, errorText, humanTaskToWorkItem, isBulkSelectable, reviewToWorkItem, type TaskNotice, type WorkItem } from './workItem';
+import { TEST_KEY_DECISIONS_NOTICE } from '../connection/workflowCredential';
 import * as styles from './HumanTasksPage.styles';
 
 /**
@@ -191,6 +192,9 @@ export default function HumanTasksPage({ environment, api }: WorkflowPageSlotPro
 
   return (
     <Box>
+      <Alert severity="info" sx={styles.alert}>
+        {TEST_KEY_DECISIONS_NOTICE}
+      </Alert>
       <Box sx={styles.searchRow}>
         <SearchField value={search} onChange={setSearch} placeholder="Search by task, workflow ID or task ID" sx={styles.searchField} />
       </Box>

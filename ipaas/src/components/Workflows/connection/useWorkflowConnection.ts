@@ -18,7 +18,6 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAccessToken } from '../../../auth';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
 import type { EndpointRef } from '../../../types/consumers';
@@ -38,8 +37,8 @@ import { TEST_KEY_VALIDITY_SECONDS, isKeyRefusal, testKeyRefreshInterval } from 
  * The API is the release's "Workflow Management API" endpoint (`resolveWorkflowEndpoint`), listed
  * by ipaas-service like any other endpoint. The console calls it through the API Platform gateway,
  * at the invoke URL and with the test key `useEndpointTestAccess` holds for it, as the Test Console
- * calls an endpoint. The caller's own access token goes along as `X-JWT-Assertion` on every call,
- * read as the call goes out, so the engine knows who is asking (`workflowCredential.ts`).
+ * calls an endpoint. The key is the only credential sent, and it names no user
+ * (`workflowCredential.ts`).
  *
  * The key is minted again a minute before it expires, and after a read it gets refused once it is
  * old enough to have expired; the refused reads of this connection are then read again. A cheap
@@ -135,7 +134,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     credential.current = { authHeader, apiKey };
   }, [authHeader, apiKey]);
 
-  const getHeaders = useCallback(async () => workflowRequestHeaders(credential.current, await getAccessToken()), []);
+  const getHeaders = useCallback(async () => workflowRequestHeaders(credential.current), []);
   const client = useMemo(() => (baseUrl ? createWorkflowClient({ baseUrl, getHeaders }) : null), [baseUrl, getHeaders]);
 
   const probe = useQuery({

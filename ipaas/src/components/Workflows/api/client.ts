@@ -80,7 +80,7 @@ export interface WorkflowClientConnection {
   baseUrl: string;
   /**
    * The headers of one request, resolved as it goes out: the gateway credential as it stands then,
-   * and the caller's current access token, which the session may have refreshed since the last call.
+   * so a test key minted again reaches the next call.
    */
   getHeaders: () => Promise<Record<string, string>>;
   /**
@@ -154,7 +154,8 @@ export function createWorkflowClient({ baseUrl, getHeaders, taskQueue }: Workflo
           })}`,
         ),
 
-      pendingCount: async (queue?: string) => (await get<{ count: number }>(`/human-tasks/pending-count${buildQuery(scoped({ taskQueue: queue }))}`))?.count ?? 0,
+      // `all`: the test key names no caller, and without it the engine counts only the caller's own tasks.
+      pendingCount: async (queue?: string) => (await get<{ count: number }>(`/human-tasks/pending-count${buildQuery({ ...scoped({ taskQueue: queue }), all: true })}`))?.count ?? 0,
 
       get: (taskId: string) => get<HumanTaskInfo>(`/human-tasks/${encodeURIComponent(taskId)}`),
 
