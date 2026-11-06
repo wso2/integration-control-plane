@@ -24,6 +24,8 @@ import type { TaskExecution } from '../../types/executions';
 import { executionIdTail } from '../../utils/executionStatus';
 import { useTriggerComponent } from '../../hooks/useExecutions';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 
 interface ExecutionDrawerProps {
   execution: TaskExecution | null;
@@ -55,14 +57,24 @@ function isTerminal(status: string): boolean {
   return v === 'succeeded' || v === 'success' || v === 'failed' || v === 'failure';
 }
 
-function StatusIcon({ status }: { status: string }) {
+function isSucceeded(status: string): boolean {
   const v = status?.toLowerCase();
+  return v === 'succeeded' || v === 'success';
+}
+
+// A finished run that did not succeed; the status icon and the failure alert agree on this.
+function isFailed(status: string): boolean {
+  return isTerminal(status) && !isSucceeded(status);
+}
+
+function StatusIcon({ status }: { status: string }) {
   if (!isTerminal(status)) return <CircularProgress size={16} />;
-  if (v === 'succeeded' || v === 'success') return <CheckCircle2 size={16} color="green" />;
+  if (isSucceeded(status)) return <CheckCircle2 size={16} color="green" />;
   return <XCircle size={16} color="red" />;
 }
 
 export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess, orgHandler, projectId, componentId, releaseId }: ExecutionDrawerProps) {
+  const canExecute = useCan()(Scopes.INTEGRATION_EXECUTE);
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -182,6 +194,12 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
                   </Box>
                 </Stack>
               </Box>
+              {/* A run that recovered on a retry can still carry the reason its first attempt failed. */}
+              {execution.failedReason && isFailed(execution.status) && (
+                <Alert severity="error" sx={{ mt: 1.5 }}>
+                  {execution.failedReason}
+                </Alert>
+              )}
             </Box>
 
             {/* Tabs */}
@@ -240,9 +258,11 @@ export default function ExecutionDrawer({ execution, open, onClose, onRunSuccess
               <Button variant="outlined" color="inherit" onClick={requestClose}>
                 Cancel
               </Button>
-              <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
-                {trigger.isPending ? 'Executing…' : 'Execute'}
-              </Button>
+              {canExecute && (
+                <Button variant="contained" onClick={handleRun} disabled={trigger.isPending || !releaseId} startIcon={trigger.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+                  {trigger.isPending ? 'Executing…' : 'Execute'}
+                </Button>
+              )}
             </DrawerPanel.Footer>
           )}
         </>

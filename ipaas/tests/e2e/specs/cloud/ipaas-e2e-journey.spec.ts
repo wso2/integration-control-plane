@@ -38,7 +38,6 @@ import {
   EXECUTIONS_WATCH_MS,
   FOOTER_LINKS,
   MI_DEPLOY_TIMEOUT_MS,
-  MI_SAMPLE_TECHNOLOGY,
   MI_TECHNOLOGY,
   NO_CONSUMERS,
   NO_SCHEDULE,
@@ -365,7 +364,7 @@ test.describe('03 browse samples @smoke', () => {
     for (const section of ['Type', 'Technology', 'Tags']) {
       await expect(page.getByRole('button', { name: section, exact: true })).toBeVisible();
     }
-    await expect(page.getByRole('checkbox', { name: MI_SAMPLE_TECHNOLOGY, exact: true }), 'the Technology filter offers no MI samples').toBeVisible();
+    await expect(page.getByRole('checkbox', { name: MI_TECHNOLOGY, exact: true }), 'the Technology filter offers no MI samples').toBeVisible();
   });
 
   test('TC_IP_SMPL_005 a search with no matches shows the empty-result message', async () => {
@@ -966,9 +965,10 @@ test.describe('07 page availability @smoke', () => {
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
     await openNavGroup(page, 'Observe', 'Runtime logs');
-    await expectNavItems(page, ['Runtime logs', 'Metrics']);
-    await openNavGroup(page, 'Infrastructure', 'Environments');
-    await expectNavItems(page, ['Environments', 'Pipelines', 'Settings']);
+    await expectNavItems(page, ['Runtime logs', 'Metrics', 'Platform Services', 'Configure']);
+    for (const retired of ['Infrastructure', 'Environments', 'Pipelines']) {
+      await expect(page.getByRole('button', { name: retired, exact: true })).toHaveCount(0);
+    }
   });
 
   test('TC_IP_NAV_002 the project scope offers its pages', async () => {
@@ -977,11 +977,11 @@ test.describe('07 page availability @smoke', () => {
 
     await expectNavItems(page, ['Build', 'Deploy', 'Test']);
     await openNavGroup(page, 'Observe', 'Runtime logs');
-    await expectNavItems(page, ['Runtime logs', 'Metrics']);
-    await openNavGroup(page, 'Infrastructure', 'Environments');
-    await expectNavItems(page, ['Environments', 'Pipelines']);
-    // Projects have no Settings page: editing is on the overview and deletion on the project list's card.
-    await expect(page.getByRole('button', { name: 'Settings', exact: true })).toHaveCount(0);
+    await expectNavItems(page, ['Runtime logs', 'Metrics', 'Platform Services']);
+    await expect(page.getByRole('button', { name: 'Configure', exact: true })).toHaveCount(0);
+    for (const retired of ['Infrastructure', 'Environments', 'Pipelines']) {
+      await expect(page.getByRole('button', { name: retired, exact: true })).toHaveCount(0);
+    }
 
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await expect(page.getByRole('heading', { name: activeProject() })).toBeVisible({ timeout: 30_000 });
@@ -1007,8 +1007,9 @@ test.describe('07 page availability @smoke', () => {
 
     await openNavGroup(page, 'Operate', 'Runtime');
     await expectNavItems(page, ['Runtime', 'Containers', 'Configs & secrets']);
-    await openNavGroup(page, 'Infrastructure', 'Environments');
-    await expectNavItems(page, ['Environments', 'Pipelines']);
+    for (const retired of ['Infrastructure', 'Environments', 'Pipelines']) {
+      await expect(page.getByRole('button', { name: retired, exact: true })).toHaveCount(0);
+    }
 
     await page.getByRole('button', { name: 'Overview', exact: true }).click();
     await expect(page.getByRole('heading', { name: SAMPLE })).toBeVisible({ timeout: 30_000 });

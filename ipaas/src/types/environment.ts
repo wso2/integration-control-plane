@@ -42,17 +42,11 @@ export interface Logger {
   runtimeIds: string[];
 }
 
-export interface EnvironmentInput {
-  name: string;
-  description: string;
-  critical: boolean;
-}
-
 // ---------------------------------------------------------------------------
-// Org environment templates + REST create/delete (devops API)
+// Org environment templates
 // ---------------------------------------------------------------------------
 
-/** An org environment template — the record the devops API creates/deletes. */
+/** An org environment template. */
 export interface EnvironmentTemplate {
   id: string;
   name: string;
@@ -61,35 +55,6 @@ export interface EnvironmentTemplate {
   clusterId?: string;
   choreoEnv?: string;
   critical: boolean;
-}
-
-/** POST body for creating an org environment. `isProd` mirrors the "critical" flag. */
-export interface CreateEnvironmentData {
-  name: string;
-  dataplaneId: string;
-  isProd: boolean;
-  /** OpenChoreo stores it as an annotation. */
-  description?: string;
-}
-
-export interface DeployedComponent {
-  componentName?: string;
-  componentId?: string;
-}
-
-export interface ProjectDeployedComponents {
-  projectName?: string;
-  projectId?: string;
-  components?: DeployedComponent[];
-}
-
-/** Whether an environment template can be deleted, plus what is deployed to it. */
-export interface EnvDeletionEligibility {
-  templateId: string;
-  envName?: string;
-  deletable: boolean;
-  isClusterActive?: boolean;
-  deployedComponentsDetails?: ProjectDeployedComponents[];
 }
 
 /** APIM name/vhost pre-flight validation result. */

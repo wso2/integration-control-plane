@@ -19,7 +19,9 @@
 import { Alert, Box, Button, CircularProgress, Radio, Stack, Typography } from '@wso2/oxygen-ui';
 import { Building2, Folder, Globe } from '@wso2/oxygen-ui-icons-react';
 import { useState } from 'react';
+import { Scopes } from '../../constants/permissions';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
+import { useCan } from '../../hooks/useCan';
 import { useUpdateEndpoint } from '../../hooks/useComponents';
 import type { EndpointExposure, EnvEndpoint } from '../../types/component';
 import { friendlyApiError } from '../../utils/apiSecurity';
@@ -100,6 +102,7 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
   const updateEp = useUpdateEndpoint();
   const allowLeave = useUnsavedChanges(exposure !== seededExposure);
   const guardNavigation = useLeaveGuard();
+  const canExpose = useCan()(Scopes.ENDPOINT_EXPOSE);
 
   const handleSave = () => {
     setSaveError(null);
@@ -193,9 +196,11 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
         <Button variant="outlined" color="inherit" onClick={() => guardNavigation(onBack)}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
-          {updateEp.isPending ? 'Updating…' : 'Update'}
-        </Button>
+        {canExpose && (
+          <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+            {updateEp.isPending ? 'Updating…' : 'Update'}
+          </Button>
+        )}
       </Stack>
     </Box>
   );

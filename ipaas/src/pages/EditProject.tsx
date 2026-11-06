@@ -16,16 +16,19 @@
  * under the License.
  */
 
-import { Alert, Button, CircularProgress, Grid, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
+import { Alert, Button, CircularProgress, Grid, PageContent, PageTitle, Stack, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import EditProjectSkeleton from '../components/EditProjectSkeleton';
 import PageNotFound from './PageNotFound';
 import { useProjectId, useProjects, useUpdateProject } from '../hooks/useProjects';
 import { resourceUrl, type ProjectScope } from '../nav';
+import { orgProjectsUrl } from '../paths';
 import type { Project } from '../types/project';
 import { validateProjectName } from '../utils/projectValidation';
 import { DESCRIPTION_MAX_LENGTH, toSingleLineDescription } from '../utils/description';
@@ -33,6 +36,7 @@ import { DESCRIPTION_MAX_LENGTH, toSingleLineDescription } from '../utils/descri
 function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Project }): JSX.Element {
   const navigate = useAppNavigate();
   const updateProject = useUpdateProject();
+  const canUpdate = useCan()(Scopes.PROJECT_UPDATE);
   const { data: allProjects = [] } = useProjects();
   const projectHomeUrl = resourceUrl(scope, 'overview');
   // The overview edits the description on one line, so this form keeps the same shape.
@@ -48,7 +52,7 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
   const nameError = validateProjectName(displayName) ?? (nameTaken ? 'A project with this name already exists.' : null);
   const descriptionChanged = description.trim() !== originalDescription;
   const changed = displayName.trim() !== project.name || descriptionChanged;
-  const canSubmit = changed && !nameError && !updateProject.isPending;
+  const canSubmit = canUpdate && changed && !nameError && !updateProject.isPending;
   const allowLeave = useUnsavedChanges(changed);
 
   const handleSubmit = async () => {
@@ -148,7 +152,7 @@ export default function EditProject(scope: ProjectScope): JSX.Element {
         </Alert>
       </PageContent>
     );
-  if (!project) return <PageNotFound title="Project not found" actionTo={resourceUrl({ level: 'organizations', org: scope.org }, 'overview')} actionLabel="Back to projects" />;
+  if (!project) return <PageNotFound title="Project not found" actionTo={orgProjectsUrl(scope.org)} actionLabel="Back to projects" />;
 
   return (
     <PageContent fullWidth sx={{ pt: 5 }}>
@@ -156,9 +160,9 @@ export default function EditProject(scope: ProjectScope): JSX.Element {
         Back to project
       </Button>
 
-      <Typography variant="h1" sx={{ mb: 4 }}>
-        Edit project
-      </Typography>
+      <PageTitle>
+        <PageTitle.Header>Manage project</PageTitle.Header>
+      </PageTitle>
 
       <EditProjectForm key={project.id} scope={scope} project={project} />
     </PageContent>

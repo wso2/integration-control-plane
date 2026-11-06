@@ -18,23 +18,28 @@
 
 import { Alert, Button, IconButton, PageContent, PageTitle, Stack, Tooltip } from '@wso2/oxygen-ui';
 import { Plus, RefreshCw } from '@wso2/oxygen-ui-icons-react';
-import type { JSX } from 'react';
+import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useDatabaseAvailability, useDatabaseOffering, useDatabaseServers } from '../hooks/useDatabases';
 import { useTemporalOffering, useTemporalServers } from '../hooks/useTemporal';
 import { databaseUrl, newDatabaseUrl, temporalUrl, type OrgScope } from '../nav';
 import PlatformServicesTable, { type ServiceRow } from '../components/Databases/PlatformServicesTable';
-import NoDatabaseServersBanner from '../components/Databases/NoDatabaseServersBanner';
+import CreateServiceWizard from '../components/Databases/CreateServiceWizard';
 import { DatabaseListSkeleton } from '../components/Databases/DatabaseSkeletons';
 import type { DatabasePlan } from '../types/databases';
 import type { TemporalPlan } from '../types/temporal';
 
-const headerSx = { mb: 3 } as const;
+const headerSx = { mb: 5 } as const;
+// The header row owns the spacing below the title, so PageTitle's own margin is dropped.
+const titleSx = { mb: 0 } as const;
 const NO_DATABASE_PLANS: readonly DatabasePlan[] = [];
 const NO_TEMPORAL_PLANS: readonly TemporalPlan[] = [];
 
 export default function OrgDatabases(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   // Every service type is provisioned through the same provider, so one availability answers for all.
   const availability = useDatabaseAvailability();
   const available = availability.data?.available === true;
@@ -50,6 +55,10 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
   const rows: ServiceRow[] = [...(databases.data ?? []).map((server): ServiceRow => ({ kind: 'postgres', server })), ...(temporals.data ?? []).map((server): ServiceRow => ({ kind: 'temporal', server }))].sort((a, b) =>
     a.server.name.localeCompare(b.server.name),
   );
+
+  // Once the empty page shows the wizard it stays, so a refetch that adds a row (its own create included) cannot unmount it mid-flow.
+  const [wizardShown, setWizardShown] = useState(false);
+  if (!wizardShown && available && lists.every((q) => q.data) && !rows.length) setWizardShown(true);
 
   const create = () => navigate(newDatabaseUrl(scope));
   const open = (row: ServiceRow) => navigate(row.kind === 'temporal' ? temporalUrl(scope, row.server.id) : databaseUrl(scope, row.server.id));
@@ -77,18 +86,19 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
         </Alert>
       );
     if (!available) return <Alert severity="info">Platform services are not available in this environment.</Alert>;
-    if (!rows.length) return <NoDatabaseServersBanner onCreate={create} />;
+    // With nothing to list, the page is the create flow itself.
+    if (wizardShown || !rows.length) return <CreateServiceWizard scope={scope} />;
     return <PlatformServicesTable rows={rows} databasePlans={databaseOffering.data?.plans ?? NO_DATABASE_PLANS} temporalPlans={temporalOffering.data?.plans ?? NO_TEMPORAL_PLANS} onOpen={open} />;
   };
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={headerSx}>
-        <PageTitle>
+        <PageTitle sx={titleSx}>
           <PageTitle.Header>Platform Services</PageTitle.Header>
           <PageTitle.SubHeader>Managed services your integrations can connect to.</PageTitle.SubHeader>
         </PageTitle>
-        {rows.length > 0 && (
+        {rows.length > 0 && !wizardShown && (
           <Stack direction="row" alignItems="center" gap={1}>
             <Tooltip title="Refresh">
               <span>
@@ -97,9 +107,11 @@ export default function OrgDatabases(scope: OrgScope): JSX.Element {
                 </IconButton>
               </span>
             </Tooltip>
-            <Button variant="contained" startIcon={<Plus size={20} />} onClick={create} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-              Create
-            </Button>
+            {canManage && (
+              <Button variant="contained" startIcon={<Plus size={20} />} onClick={create} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+                Create
+              </Button>
+            )}
           </Stack>
         )}
       </Stack>

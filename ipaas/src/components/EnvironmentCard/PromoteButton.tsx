@@ -22,8 +22,8 @@ import type { ReactNode } from 'react';
 import { useComponentDeployment, usePromote } from '../../hooks/useDeployments';
 import { pendingApiChange, PENDING_API_CHANGE_TOOLTIP } from '../../utils/promotion';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
-import Authorized from '../Authorized';
-import { Permissions } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
+import { Scopes } from '../../constants/permissions';
 
 interface PromoteButtonProps {
   orgHandler: string;
@@ -35,13 +35,16 @@ interface PromoteButtonProps {
   icon?: ReactNode;
   onPromoteStarted?: () => void;
   onPromoteSettled?: () => void;
+  /** Why the promote cannot run yet, when something outside this deployment holds it back. */
+  blockedReason?: string;
 }
 
-export default function PromoteButton({ orgHandler, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled }: PromoteButtonProps) {
+export default function PromoteButton({ orgHandler, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
+  const can = useCan();
 
   const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
@@ -53,7 +56,7 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
   const alreadyPromoted = sameBuild && !apiChange;
 
   const missingPipeline = !deploymentPipelineId;
-  const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted;
+  const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted && !blockedReason;
 
   const handlePromote = () => {
     if (!canPromote || !sourceReleaseId) return;
@@ -72,17 +75,29 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
     );
   };
 
-  const tooltipTitle = !buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : apiChange ? PENDING_API_CHANGE_TOOLTIP[apiChange] : '';
+  if (!can(Scopes.INTEGRATION_DEPLOY)) return null;
+
+  const tooltipTitle =
+    blockedReason ??
+    (!buildId
+      ? 'No build available to promote'
+      : alreadyPromoted
+        ? 'Already deployed in target environment'
+        : missingPipeline
+          ? 'No deployment pipeline configured for this project'
+          : promote.isError
+            ? promote.error.message
+            : apiChange
+              ? PENDING_API_CHANGE_TOOLTIP[apiChange]
+              : '');
 
   return (
-    <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
-      <Tooltip title={tooltipTitle}>
-        <span>
-          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || promote.isPending} onClick={handlePromote}>
-            {promote.isPending ? 'Promoting…' : 'Promote'}
-          </Button>
-        </span>
-      </Tooltip>
-    </Authorized>
+    <Tooltip title={tooltipTitle}>
+      <span>
+        <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || promote.isPending} onClick={handlePromote}>
+          {promote.isPending ? 'Promoting…' : 'Promote'}
+        </Button>
+      </span>
+    </Tooltip>
   );
 }

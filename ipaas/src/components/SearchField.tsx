@@ -17,6 +17,7 @@
  */
 
 import { SearchBar } from '@wso2/oxygen-ui';
+import { SEARCH_STANDARD_WIDTH_SX } from '../constants/styles';
 
 type SearchFieldProps = {
   value: string;
@@ -25,9 +26,12 @@ type SearchFieldProps = {
   placeholder: string;
   size?: 'small' | 'medium';
   fullWidth?: boolean;
+  /** `standard` is the list and grid page search: 400px, shrinking in narrower containers. `fullWidth` wins. */
+  width?: 'auto' | 'standard';
   sx?: object;
 };
 
-export default function SearchField({ value, onChange, placeholder, size = 'small', fullWidth, sx }: SearchFieldProps) {
-  return <SearchBar value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} size={size} fullWidth={fullWidth} sx={sx} />;
+export default function SearchField({ value, onChange, placeholder, size = 'small', fullWidth, width = 'auto', sx }: SearchFieldProps) {
+  const widthSx = width === 'standard' && !fullWidth ? { ...SEARCH_STANDARD_WIDTH_SX, ...sx } : sx;
+  return <SearchBar value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} size={size} fullWidth={fullWidth} sx={widthSx} />;
 }

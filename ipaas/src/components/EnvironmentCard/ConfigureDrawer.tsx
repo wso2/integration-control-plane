@@ -36,6 +36,9 @@ import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
 
+// Keys the platform sets (a workflow integration's runtime connection), shown read-only.
+const managedConfigKeys = (configurations: SchemaConfigItem[] | undefined): ReadonlySet<string> => new Set((configurations ?? []).filter((c) => c.isManaged).map((c) => c.key));
+
 const SERVICE_STEPS = ['Configurations', 'Certificate mount', 'Endpoints'];
 const AUTOMATION_STEPS = ['Configurations', 'Certificate mount'];
 
@@ -579,6 +582,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          managedKeys={managedConfigKeys(data?.configurations)}
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>
@@ -1048,6 +1052,7 @@ function GenericServiceConfigureDrawer({
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          managedKeys={managedConfigKeys(data?.configurations)}
         />
         {saveError && (
           <Alert severity="error" sx={{ mt: 1 }}>

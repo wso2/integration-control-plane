@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, regenerateConsumerToken, revokeConsumer, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
+import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, regenerateConsumerToken, revokeConsumer, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
 import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
 
 /** Endpoint refs are only usable once every segment is known, the track included: one read before its track resolves would read the default track's API. */
@@ -130,6 +130,16 @@ export function useSetEndpointSecurity(ref: EndpointRef | null | undefined) {
   });
 }
 
+/** Switches the endpoint to API-key auth (`PUT …/security/api-key`). */
+/** Switch an endpoint to API-key auth; the endpoint is the mutation's variable, so a later selection can't redirect it. */
+export function useEnableEndpointApiKeyAuth() {
+  const qc = useQueryClient();
+  return useMutation<boolean, Error, EndpointRef>({
+    mutationFn: (ref) => setEndpointApiKeyAuth(ref, true),
+    onSuccess: (_, ref) => qc.invalidateQueries({ queryKey: securityKey(ref) }),
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Endpoint policies — CORS and rate limiting
 // ---------------------------------------------------------------------------
@@ -165,12 +175,11 @@ export function useSetEndpointPolicies(ref: EndpointRef | null | undefined) {
 }
 
 /**
- * Mint a short-lived (1h) test key for the exposed API. The plaintext is
- * returned once and is sent as the `api-key-auth` header, which this route also
- * turns on if it is off.
+ * Mint a short-lived (1h) test key for an endpoint using API-key auth (another mode answers 409
+ * `API_KEY_AUTH_REQUIRED`). The endpoint is the mutation's variable, so a later selection can't redirect it.
  */
-export function useCreateEndpointTestKey(ref: EndpointRef | null | undefined) {
-  return useMutation<ApiKeyResult, Error, void>({
-    mutationFn: () => createEndpointTestKey(ref!),
+export function useCreateEndpointTestKey() {
+  return useMutation<ApiKeyResult, Error, EndpointRef>({
+    mutationFn: (ref) => createEndpointTestKey(ref),
   });
 }

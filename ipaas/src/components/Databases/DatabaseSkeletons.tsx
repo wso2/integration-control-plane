@@ -16,8 +16,9 @@
  * under the License.
  */
 
-import { Box, Skeleton, Stack } from '@wso2/oxygen-ui';
+import { Box, Card, Skeleton, Stack } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
+import * as wizardStyles from './CreateServiceWizard.styles';
 
 /** Stands in for the databases table while the list loads. */
 export function DatabaseListSkeleton(): JSX.Element {
@@ -52,21 +53,40 @@ export function DatabaseDetailSkeleton(): JSX.Element {
   );
 }
 
-/**
- * Stands in for the plan step of the create wizard while the offering loads:
- * the version line, the "Select Service Plan" heading and a row of plan cards
- * as tall as a card with a price block.
- */
+/** Stands in for the create page's plan cards while the offering loads, sized like a card with a price block. */
 export function DatabasePlansSkeleton(): JSX.Element {
   return (
-    <Box aria-busy="true" aria-label="Loading service plans">
-      <Skeleton variant="text" width={280} height={20} sx={{ mb: 3 }} />
-      <Skeleton variant="text" width={140} height={22} sx={{ mb: 1.5 }} />
-      <Stack direction="row" gap={2} flexWrap="wrap">
-        {[0, 1, 2].map((i) => (
-          <Skeleton key={i} variant="rounded" width={240} height={220} />
-        ))}
-      </Stack>
+    <Box aria-busy="true" aria-label="Loading service plans" sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
+      {[0, 1, 2].map((i) => (
+        <Skeleton key={i} variant="rounded" height={320} sx={{ borderRadius: '8px' }} />
+      ))}
     </Box>
+  );
+}
+
+/** Stands in for the create wizard while availability loads: the step lines, heading, service cards and footer. */
+export function CreateServiceWizardSkeleton(): JSX.Element {
+  return (
+    <Card variant="outlined" aria-busy="true" aria-label="Loading" sx={wizardStyles.wizardSx}>
+      <Box sx={wizardStyles.progressSx}>
+        <Skeleton variant="rectangular" height={2} />
+        <Skeleton variant="rectangular" height={2} />
+      </Box>
+      <Box sx={wizardStyles.bodySx}>
+        <Box sx={wizardStyles.stepHeaderSx}>
+          <Skeleton variant="text" width={240} height={42} />
+          <Skeleton variant="text" width={380} height={24} />
+        </Box>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', md: 'repeat(4, minmax(0, 1fr))' }, gap: 2 }}>
+          {[0, 1].map((i) => (
+            <Skeleton key={i} variant="rounded" height={140} />
+          ))}
+        </Box>
+      </Box>
+      <Box sx={wizardStyles.footerSx}>
+        <Skeleton variant="text" width={80} height={22} />
+        <Skeleton variant="rounded" width={120} height={36} />
+      </Box>
+    </Card>
   );
 }

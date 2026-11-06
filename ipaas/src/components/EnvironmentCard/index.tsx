@@ -32,6 +32,8 @@ import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useTriggerComponent } from '../../hooks/useExecutions';
 import { useStopDeployment, useRedeployDeployment } from '../../hooks/useDeployments';
 import { GENERIC_SERVICE_TYPES } from '../../constants/integrations';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import { nextCronRunMs, formatTimeUntil, describeCron } from '../../utils/cronUtils';
 import { deploymentPollIntervalUntil, REQUESTED_POLL_WINDOW_MS } from '../../utils/deploymentStatus';
 import EnvironmentCardHeader from './EnvironmentCardHeader';
@@ -60,6 +62,7 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
   const isAutomation = (displayType ?? '').toLowerCase() === 'scheduledtask';
   const isGenericService = GENERIC_SERVICE_TYPES.has(displayType ?? '');
   const queryClient = useQueryClient();
+  const can = useCan();
   const navigate = useAppNavigate();
   const location = useLocation();
   const [configureOpen, setConfigureOpen] = useState(false);
@@ -222,6 +225,8 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
     }
   };
 
+  const canDeployHere = can(Scopes.INTEGRATION_DEPLOY);
+
   return (
     <Card sx={{ mb: 3 }}>
       <CardContent sx={{ pb: (theme) => `${theme.spacing(2)} !important` }}>
@@ -233,8 +238,8 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
           isGenericService={isGenericService}
           deploymentStatusV2={deploymentStatusV2}
           isActionPending={stopMutation.isPending || redeployMutation.isPending}
-          onStop={handleStop}
-          onRedeploy={handleRedeploy}
+          onStop={canDeployHere ? handleStop : undefined}
+          onRedeploy={canDeployHere ? handleRedeploy : undefined}
           nextRunLabel={nextRunLabel}
           isRefreshing={isRefreshing}
           deployTrackIsPending={trigger.isPending}
@@ -257,10 +262,10 @@ export default function Environment({ env, prevEnv, componentId, projectId, comp
                 }
               : undefined
           }
-          onRun={handleRun}
+          onRun={can(Scopes.INTEGRATION_EXECUTE) ? handleRun : undefined}
           onRunWithArgs={() => setRunWithArgsOpen(true)}
           onRefresh={handleRefresh}
-          onConfigure={() => setConfigureOpen(true)}
+          onConfigure={can(Scopes.CONFIG_MANAGE) ? () => setConfigureOpen(true) : undefined}
           onViewLogs={isGenericService ? () => setLogsOpen(true) : undefined}
           onTest={isGenericService ? () => navigate(withTrackParam(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test/console`, location.search)) : undefined}
           hasMissingConfigs={hasMissingConfigs}

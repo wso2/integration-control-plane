@@ -138,10 +138,6 @@ export function newOrgGroupUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/settings/access-control/groups/new`;
 }
 
-export function editEnvironmentUrl(orgHandler: string, envId: string): string {
-  return `/organizations/${orgHandler}/environments/${envId}/edit`;
-}
-
 export function orgAccessControlUrl(orgHandler: string, tab: 'users' | 'roles' | 'groups' = 'users'): string {
   return `/organizations/${orgHandler}/settings/access-control/${tab}`;
 }

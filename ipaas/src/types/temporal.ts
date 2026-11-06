@@ -63,6 +63,8 @@ export interface TemporalServer {
   plan?: string;
   namespace?: string;
   createdAt?: string;
+  /** The server the platform runs the organization's workflow integrations on. It cannot be deleted while they exist. */
+  managed: boolean;
 }
 
 export interface TemporalServerDetail extends TemporalServer {

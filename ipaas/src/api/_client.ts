@@ -90,14 +90,17 @@ export class BffError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, headers?: Record<string, string>, signal?: AbortSignal): Promise<T> {
+  // A URLSearchParams body is sent form-encoded (fetch sets its content type); anything else as JSON.
+  const form = body instanceof URLSearchParams;
   const init: RequestInit = {
     method,
     headers: {
-      ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(body !== undefined && !form ? { 'Content-Type': 'application/json' } : {}),
       ...headers,
     },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    ...(body !== undefined ? { body: form ? body : JSON.stringify(body) } : {}),
+    ...(signal ? { signal } : {}),
   };
 
   const res = await authenticatedFetch(`${bffBaseUrl()}${path}`, init);
@@ -108,7 +111,7 @@ async function request<T>(method: string, path: string, body?: unknown, headers?
 
 export const bff = {
   get: <T>(path: string) => request<T>('GET', path),
-  post: <T>(path: string, body?: unknown, headers?: Record<string, string>) => request<T>('POST', path, body, headers),
+  post: <T>(path: string, body?: unknown, headers?: Record<string, string>, signal?: AbortSignal) => request<T>('POST', path, body, headers, signal),
   put: <T>(path: string, body?: unknown, headers?: Record<string, string>) => request<T>('PUT', path, body, headers),
   patch: <T>(path: string, body?: unknown, headers?: Record<string, string>) => request<T>('PATCH', path, body, headers),
   delete: <T>(path: string, body?: unknown, headers?: Record<string, string>) => request<T>('DELETE', path, body, headers),

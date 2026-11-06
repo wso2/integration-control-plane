@@ -24,7 +24,7 @@ import { useComponentByHandler } from '../../hooks/useComponents';
 import { useIntegrationIdentity } from '../../hooks/useIntegrationIdentity';
 import { useProjectId } from '../../hooks/useProjects';
 import { componentSettingsSectionUrl, hasComponent, useScope } from '../../nav';
-import SettingsTabs from './SettingsTabs';
+import ConfigureTabs from './ConfigureTabs';
 
 /**
  * The Integration (component) Settings header — resolves the sections applicable
@@ -43,5 +43,5 @@ export default function ComponentSettingsTabs({ active }: { active: string }): J
 
   const can = (perms: string[]) => hasAnyPermission(perms, projectId || undefined, component?.id);
   const visible = visibleComponentSettingsSections(identity, can);
-  return <SettingsTabs active={active} sections={visible} onSelect={(path) => navigate(componentSettingsSectionUrl({ org: scope.org, project: projectHandle, component: componentHandle }, path))} />;
+  return <ConfigureTabs active={active} sections={visible} onSelect={(path) => navigate(componentSettingsSectionUrl({ org: scope.org, project: projectHandle, component: componentHandle }, path))} />;
 }

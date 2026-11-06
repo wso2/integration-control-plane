@@ -11,7 +11,7 @@ Every call the console makes to a backend lives here, one file per domain (`proj
 
   Branch on `status`; show `message` as is; never parse `message`.
 
-- `obsClient.post` calls the observability proxy (`observabilityUrl`) for logs and metrics. It throws an `HttpError` carrying `status`.
+- `obsClient.post` calls the observability proxy (`observabilityUrl`) for logs, metrics and integration traces. It throws an `HttpError` carrying `status`.
 - Helpers:
   - `seg(value)` encodes one path segment. Wrap every dynamic segment: `` `/projects/${seg(id)}` ``.
   - `q({ key: value })` builds a query string and drops empty values.

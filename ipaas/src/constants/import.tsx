@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Globe, Clock, Repeat, FileText, Bot, MCP, Cable } from '@wso2/oxygen-ui-icons-react';
+import { Globe, Clock, Repeat, FileText, Bot, MCP, Cable, Workflow, UserCheck } from '@wso2/oxygen-ui-icons-react';
 import IntegratorIcon from '../assets/icons/IntegratorIcon';
 import GraphqlIcon from '../assets/icons/GraphqlIcon';
 import GrpcIcon from '../assets/icons/GrpcIcon';
@@ -27,6 +27,7 @@ import NatsIcon from '../assets/icons/NatsIcon';
 import S3Icon from '../assets/icons/S3Icon';
 import type { ReactNode } from 'react';
 import type { IntegrationTypeOption } from '../types/import';
+import { TECHNOLOGY_LABELS } from './integrations';
 
 export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
   {
@@ -87,17 +88,26 @@ export const INTEGRATION_TYPES: IntegrationTypeOption[] = [
       { icon: <S3Icon size={16} />, label: 'S3' },
     ],
   },
+  {
+    id: 'workflow',
+    title: 'Workflow',
+    description: 'Run durable, long-running processes that survive restarts and wait on people or events',
+    icons: [
+      { icon: <Workflow size={16} />, label: 'Durable Workflow' },
+      { icon: <UserCheck size={16} />, label: 'Human Task' },
+    ],
+  },
 ];
 
 export const TECH_OPTIONS: { id: 'MI' | 'BI'; label: string; icon: ReactNode }[] = [
   {
     id: 'BI',
-    label: 'WSO2 Integrator',
+    label: TECHNOLOGY_LABELS.BI,
     icon: <IntegratorIcon width={20} height={20} />,
   },
   {
     id: 'MI',
-    label: 'WSO2 Integrator: MI',
+    label: TECHNOLOGY_LABELS.MI,
     icon: <IntegratorIcon width={20} height={20} />,
   },
 ];

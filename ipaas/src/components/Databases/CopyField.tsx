@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, IconButton, InputAdornment, Tooltip } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, IconButton, InputAdornment, TextField, Tooltip } from '@wso2/oxygen-ui';
 import { Copy } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 

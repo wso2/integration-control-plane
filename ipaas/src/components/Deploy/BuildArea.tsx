@@ -17,6 +17,7 @@
  */
 
 import {
+  Alert,
   Box,
   Button,
   ButtonGroup,
@@ -46,10 +47,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { useWorkflowRuntime } from '../../hooks/useWorkflowRuntime';
 import { useUpdateAutoDeployEnabled } from '../../hooks/useComponents';
 import { useComponentDeployment, useDeploymentStatus, useDeploymentTrackImages } from '../../hooks/useDeployments';
 import type { DeploymentTrackImage } from '../../types/deployment';
 import ConfigureDrawer from '../EnvironmentCard/ConfigureDrawer';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import BuildAreaImageDrawer from './BuildAreaImageDrawer';
 import BuildImageCard from './BuildImageCard';
 import ByoiBuildArea from './ByoiBuildArea';
@@ -69,10 +73,12 @@ export default function BuildArea({
   firstEnvId,
   firstEnvTemplateId,
   autoDeployEnabled: initialAutoDeployEnabled,
+  autoDeployAvailable,
   componentName,
   projectHandler,
   displayType,
   hideEndpoints = false,
+  isWorkflow = false,
 }: BuildAreaProps): JSX.Element {
   // Determine build-in-progress state first so images can poll faster during active builds
   const { data: builds = [] } = useDeploymentStatus(componentId, versionId);
@@ -82,7 +88,7 @@ export default function BuildArea({
   const isBuildRunning = pendingBuild?.status === 'in_progress';
   const buildingCommit = pendingBuild ? (commits.find((c) => c.sha === pendingBuild.sha) ?? null) : null;
 
-  const { data: images = [], isLoading: imagesLoading } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
+  const { data: images = [], isLoading: imagesLoading, isSuccess: imagesLoaded, isError: imagesFailed, refetch: refetchImages } = useDeploymentTrackImages(componentId, versionId, isBuildPending ? 10_000 : undefined);
   const { data: firstEnvDeployment } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, firstEnvId);
   const firstEnvReleaseId = firstEnvDeployment?.releaseId ?? '';
 
@@ -103,6 +109,7 @@ export default function BuildArea({
   const qc = useQueryClient();
   const deployTrack = useDeployDeploymentTrack();
   const updateAutoDeploy = useUpdateAutoDeployEnabled();
+  const can = useCan();
 
   // When build completes, trigger an immediate image refetch and show skeleton while it loads
   useEffect(() => {
@@ -130,14 +137,24 @@ export default function BuildArea({
 
   const isLatest = selectedImage?.imageId === images[0]?.imageId;
   const isDeploying = deployTrack.isPending;
-  const canDeploy = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId) && !!firstEnvId && !isDeploying && !isBuildPending;
+  // Image-only components (e.g. knowledge base data sources) have no builds, so there is
+  // no image to pick. Once deployed they can still be redeployed: an empty imageId makes
+  // the BFF cut a new release from the current workload, picking up component changes.
+  // Only once the images have loaded: a failed fetch is not the same as having none.
+  const redeployCurrent = imagesLoaded && images.length === 0 && !!firstEnvReleaseId;
+  // A picked image must still be in the loaded list, so a stale pick is not deployed.
+  const imagePicked = !!selectedImage?.imageId && !imagesLoading && images.some((i) => i.imageId === selectedImage?.imageId);
+  const { data: workflowRuntime } = useWorkflowRuntime(isWorkflow);
+  // A workflow's worker needs the runtime to connect to; the environment card says why it is not ready.
+  const workflowRuntimeBlocked = isWorkflow && workflowRuntime?.status !== 'READY';
+  const canDeploy = (imagePicked || redeployCurrent) && !!firstEnvId && !isDeploying && !isBuildPending && !workflowRuntimeBlocked;
 
   const handleDeploy = () => {
     if (!canDeploy) return;
     deployTrack.mutate({
       componentId,
       id: versionId,
-      imageId: selectedImage!.imageId,
+      imageId: selectedImage?.imageId ?? '',
       environmentId: firstEnvId,
       deploymentPipelineId,
     });
@@ -231,16 +248,27 @@ export default function BuildArea({
                 variant="detail"
               />
             </Box>
+          ) : imagesFailed ? (
+            <Alert
+              severity="error"
+              sx={{ mb: 2 }}
+              action={
+                <Button color="inherit" size="small" onClick={() => refetchImages()}>
+                  Retry
+                </Button>
+              }>
+              Could not load the build images.
+            </Alert>
           ) : images.length === 0 ? (
             <Box sx={{ py: 2 }}>
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1, color: 'text.secondary' }}>
                 <Rocket size={16} />
                 <Typography variant="body2" color="text.secondary">
-                  No images available yet.
+                  {redeployCurrent ? 'No build images for this component.' : 'No images available yet.'}
                 </Typography>
               </Stack>
               <Typography variant="caption" color="text.secondary">
-                Trigger a build from the Build page first.
+                {redeployCurrent ? 'Deploy redeploys the current image with the latest component settings.' : 'Trigger a build from the Build page first.'}
               </Typography>
             </Box>
           ) : (
@@ -254,16 +282,18 @@ export default function BuildArea({
           <Divider sx={{ borderStyle: 'dashed', mb: 1.5 }} />
 
           {/* ── Auto Deploy on Build ── */}
-          <FormControlLabel
-            control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending} />}
-            label={
-              <Stack direction="row" alignItems="center" gap={0.5}>
-                <Typography variant="body2">Auto deploy on build</Typography>
-                {updateAutoDeploy.isPending && <CircularProgress size={12} />}
-              </Stack>
-            }
-            sx={{ mb: 2, ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
-          />
+          {autoDeployAvailable && (
+            <FormControlLabel
+              control={<Switch size="small" checked={autoDeployEnabled} onChange={(e) => handleAutoDeployToggle(e.target.checked)} disabled={updateAutoDeploy.isPending || !can(Scopes.INTEGRATION_UPDATE)} />}
+              label={
+                <Stack direction="row" alignItems="center" gap={0.5}>
+                  <Typography variant="body2">Auto deploy on build</Typography>
+                  {updateAutoDeploy.isPending && <CircularProgress size={12} />}
+                </Stack>
+              }
+              sx={{ mb: 2, ml: 0, mr: 0, width: '100%', justifyContent: 'space-between', flexDirection: 'row-reverse' }}
+            />
+          )}
 
           {/* ── Endpoint Configurations (only for deployed service integrations;
                hidden for file/event/AI-agent, which have no endpoints) ── */}
@@ -274,43 +304,52 @@ export default function BuildArea({
           )}
 
           {/* ── Deploy / Configure & Deploy split button ── */}
-          <Box sx={{ position: 'relative' }}>
-            <ButtonGroup variant="contained" size="small" ref={splitButtonRef} disabled={!canDeploy} sx={{ width: '100%' }}>
-              <Button
-                startIcon={isDeploying || isBuildRunning ? <CircularProgress color="inherit" size={14} /> : selectedDeployAction === 'deploy' ? <Rocket size={14} /> : <Settings size={14} />}
-                onClick={handleMainButtonClick}
-                sx={{ whiteSpace: 'nowrap', flex: 1 }}>
-                {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
-              </Button>
-              <Button size="small" sx={{ px: 0.5 }} aria-label="More deploy options" aria-expanded={splitOpen} onClick={() => setSplitOpen((prev) => !prev)}>
-                <ChevronDown size={14} />
-              </Button>
-            </ButtonGroup>
-            <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-start" transition style={{ zIndex: 1300 }}>
-              {({ TransitionProps }) => (
-                <Grow {...TransitionProps}>
-                  <Paper elevation={3}>
-                    <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
-                      <MenuList dense sx={{ minWidth: 280, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 3 }}>
-                        <MenuItem onClick={handleSelectDeploy} selected={selectedDeployAction === 'deploy'}>
-                          <Stack direction="row" alignItems="center" gap={1}>
-                            <Rocket size={14} />
-                            <Typography variant="body2">Deploy</Typography>
-                          </Stack>
-                        </MenuItem>
-                        <MenuItem onClick={handleSelectConfigureAndDeploy} selected={selectedDeployAction === 'configure'}>
-                          <Stack direction="row" alignItems="center" gap={1}>
-                            <Settings size={14} />
-                            <Typography variant="body2">Configure &amp; deploy</Typography>
-                          </Stack>
-                        </MenuItem>
-                      </MenuList>
-                    </ClickAwayListener>
-                  </Paper>
-                </Grow>
-              )}
-            </Popper>
-          </Box>
+          {can(Scopes.INTEGRATION_DEPLOY) && (
+            <Box sx={{ position: 'relative' }}>
+              <ButtonGroup variant="contained" size="small" ref={splitButtonRef} disabled={!canDeploy} sx={{ width: '100%' }}>
+                <Button
+                  startIcon={isDeploying || isBuildRunning ? <CircularProgress color="inherit" size={14} /> : selectedDeployAction === 'deploy' ? <Rocket size={14} /> : <Settings size={14} />}
+                  onClick={handleMainButtonClick}
+                  sx={{ whiteSpace: 'nowrap', flex: 1 }}>
+                  {isDeploying ? 'Deploying…' : isBuildRunning ? 'Building & deploying' : isBuildPending ? 'Build queued' : workflowRuntimeBlocked ? 'Preparing workflow runtime' : selectedDeployAction === 'deploy' ? 'Deploy' : 'Configure & deploy'}
+                </Button>
+                <Button size="small" sx={{ px: 0.5 }} aria-label="More deploy options" aria-expanded={splitOpen} onClick={() => setSplitOpen((prev) => !prev)}>
+                  <ChevronDown size={14} />
+                </Button>
+              </ButtonGroup>
+              <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-start" transition style={{ zIndex: 1300 }}>
+                {({ TransitionProps }) => (
+                  <Grow {...TransitionProps}>
+                    <Paper elevation={3}>
+                      <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
+                        <MenuList dense sx={{ minWidth: 280, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 3 }}>
+                          <MenuItem onClick={handleSelectDeploy} selected={selectedDeployAction === 'deploy'}>
+                            <Stack direction="row" alignItems="center" gap={1}>
+                              <Rocket size={14} />
+                              <Typography variant="body2">Deploy</Typography>
+                            </Stack>
+                          </MenuItem>
+                          {can(Scopes.CONFIG_MANAGE) && (
+                            <MenuItem onClick={handleSelectConfigureAndDeploy} selected={selectedDeployAction === 'configure'}>
+                              <Stack direction="row" alignItems="center" gap={1}>
+                                <Settings size={14} />
+                                <Typography variant="body2">Configure &amp; deploy</Typography>
+                              </Stack>
+                            </MenuItem>
+                          )}
+                        </MenuList>
+                      </ClickAwayListener>
+                    </Paper>
+                  </Grow>
+                )}
+              </Popper>
+            </Box>
+          )}
+          {deployTrack.isError && (
+            <Alert severity="error" sx={{ mt: 1.5 }}>
+              {deployTrack.error.message}
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
