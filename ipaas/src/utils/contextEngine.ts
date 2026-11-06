@@ -1290,7 +1290,8 @@ export function modelsDraftOf(models: ContextEngineModels & { llm: ContextModelS
   return { embeddingKey: '', llm: draftLlm(models.llm), shareKey: false, answerChoice: fromIngestion ? 'same' : 'different', answer: !fromIngestion && models.answer ? draftLlm(models.answer) : null };
 }
 
-const ingestionKey = (draft: ModelsDraft): string => (draft.shareKey ? draft.embeddingKey : draft.llm.apiKey);
+/** The embedding key serves the ingestion model only on the embedding model's provider. */
+const ingestionKey = (models: ContextEngineModels, draft: ModelsDraft): string => (draft.shareKey && models.embedding?.provider === draft.llm.provider ? draft.embeddingKey : draft.llm.apiKey);
 
 export const NEW_PROVIDER_KEY_TEXT = 'A new provider needs its own key.';
 
@@ -1302,7 +1303,7 @@ export function modelsDraftErrors(models: ContextEngineModels, draft: ModelsDraf
   const providerMoved = draft.llm.provider !== models.llm?.provider;
   let llm = '';
   if (!nonEmpty(draft.llm.model)) llm = 'Choose a model.';
-  else if (providerMoved && !nonEmpty(ingestionKey(draft))) llm = NEW_PROVIDER_KEY_TEXT;
+  else if (providerMoved && !nonEmpty(ingestionKey(models, draft))) llm = NEW_PROVIDER_KEY_TEXT;
   let answer = '';
   if (answersEnabled && draft.answerChoice === 'different') {
     const current = answersFromIngestion(models) ? models.llm : models.answer;
@@ -1317,7 +1318,7 @@ export function modelsUpdate(models: ContextEngineModels, draft: ModelsDraft, an
   const update: Omit<UpdateContextModelsInput, 'engineId'> = {};
   if (nonEmpty(draft.embeddingKey)) update.embeddingKey = draft.embeddingKey;
   const llm = { provider: draft.llm.provider, model: draft.llm.model.trim() };
-  const llmKey = ingestionKey(draft);
+  const llmKey = ingestionKey(models, draft);
   if (!sameModel(models.llm, llm) || nonEmpty(llmKey)) update.ingestion = { ...llm, ...(nonEmpty(llmKey) ? { apiKey: llmKey } : {}) };
   const fromIngestion = answersFromIngestion(models);
   if (answersEnabled && draft.answerChoice === 'same' && !fromIngestion) update.answer = { sameAsIngestion: true };

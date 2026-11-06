@@ -1416,6 +1416,8 @@ describe('changing models on a running engine', () => {
     expect(modelsDraftErrors(models, { ...draft, llm: anthropic }, true).llm).toBe('A new provider needs its own key.');
     expect(modelsDraftErrors(models, { ...draft, answerChoice: 'different', answer: anthropic }, true).answer).toBe('A new provider needs its own key.');
     expect(modelsDraftErrors(models, { ...draft, llm: { ...anthropic, apiKey: 'sk-a' }, answerChoice: 'different', answer: anthropic }, true)).toEqual({ llm: '', answer: '' });
+    expect(modelsDraftErrors(models, { ...draft, embeddingKey: 'sk-e', shareKey: true, llm: anthropic }, true).llm).toBe('A new provider needs its own key.');
+    expect(modelsUpdate(models, { ...draft, embeddingKey: 'sk-e', shareKey: true, llm: { ...anthropic, apiKey: 'sk-a' } }, true)?.ingestion).toEqual({ provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: 'sk-a' });
   });
 
   it('keeps a restart pending until a pod that started after it runs', () => {
