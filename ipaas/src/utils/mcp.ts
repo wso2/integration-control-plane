@@ -16,8 +16,19 @@
  * under the License.
  */
 
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
 import type { JsonSchemaType, JsonValue, McpErrorKind, McpTool, McpToolContent, McpToolParameter, McpToolResult } from '../types/mcp';
+
+/**
+ * An MCP client that checks tool output schemas without eval. The SDK's default
+ * validator, Ajv, compiles each schema with `new Function`, which the console's
+ * Content-Security-Policy does not allow.
+ */
+export function createMcpClient(name: string): Client {
+  return new Client({ name, version: '1.0.0' }, { capabilities: {}, jsonSchemaValidator: new CfWorkerJsonSchemaValidator() });
+}
 
 /** Whether an MCP/transport error is a 401/403 — a permissions issue, not a transient failure. */
 export function isMcpForbiddenError(error: unknown): boolean {

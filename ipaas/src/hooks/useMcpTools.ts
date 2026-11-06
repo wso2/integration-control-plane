@@ -17,10 +17,9 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { KEY_ACTIVATION_ATTEMPTS, KEY_ACTIVATION_DELAY_MS } from '../constants/mcp';
-import { isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError } from '../utils/mcp';
+import { createMcpClient, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError } from '../utils/mcp';
 import type { McpTool } from '../types/mcp';
 
 /** APIM gateways read the test key from this header; cloud uses the api-key-auth header. */
@@ -74,7 +73,7 @@ export function useMcpTools({ baseUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER,
       const transport = new StreamableHTTPClientTransport(new URL(`${baseUrl.replace(/\/+$/, '')}/mcp?transportType=streamable-http`), {
         requestInit: { headers: apiKey ? { [authHeader]: apiKey } : {} },
       });
-      const client = new Client({ name: 'ipaas-console', version: '1.0.0' }, { capabilities: {} });
+      const client = createMcpClient('ipaas-console');
       try {
         await client.connect(transport);
         if (!client.getServerCapabilities()?.tools) throw new Error('MCP server does not support the tools capability');

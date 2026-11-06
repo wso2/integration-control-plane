@@ -17,9 +17,98 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { classifyMcpError, coerceFieldValue, formatFieldLabel, formatMcpError, formatToolResult, generateDefaultValue, getMcpToolParameters, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError, isSimpleObjectSchema } from './mcp';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { classifyMcpError, coerceFieldValue, createMcpClient, formatFieldLabel, formatMcpError, formatToolResult, generateDefaultValue, getMcpToolParameters, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError, isSimpleObjectSchema } from './mcp';
 import type { McpTool } from '../types/mcp';
+
+describe('createMcpClient', () => {
+  interface TestTool {
+    outputSchema: { type: 'object'; properties: Record<string, object>; required?: string[] };
+    structuredContent: Record<string, unknown>;
+  }
+
+  // One tool whose output schema and result the test can change between calls.
+  async function connect(client: Client, tool: TestTool) {
+    const server = new Server({ name: 'test-server', version: '1.0.0' }, { capabilities: { tools: {} } });
+    server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [{ name: 'greet', inputSchema: { type: 'object' }, outputSchema: tool.outputSchema }] }));
+    server.setRequestHandler(CallToolRequestSchema, async () => ({ content: [], structuredContent: tool.structuredContent }));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    await Promise.all([server.connect(serverTransport), client.connect(clientTransport)]);
+    return () => Promise.all([client.close(), server.close()]);
+  }
+
+  // Stands in for a Content-Security-Policy without 'unsafe-eval'.
+  async function withoutEval<T>(run: () => Promise<T>): Promise<T> {
+    const original = globalThis.Function;
+    globalThis.Function = function blockedFunction() {
+      throw new EvalError('eval is blocked');
+    } as unknown as FunctionConstructor;
+    try {
+      return await run();
+    } finally {
+      globalThis.Function = original;
+    }
+  }
+
+  const greetingTool = (): TestTool => ({ outputSchema: { type: 'object', properties: { greeting: { type: 'string' } }, required: ['greeting'] }, structuredContent: { greeting: 'hi' } });
+  // A schema the validator has not seen, so a compiling validator has to compile again.
+  const countSchema: TestTool['outputSchema'] = { type: 'object', properties: { count: { type: 'integer', minimum: 0 } }, required: ['count'] };
+
+  it('accepts structured content that matches the output schema and rejects content that does not', async () => {
+    const client = createMcpClient('test');
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      await client.listTools();
+      await expect(client.callTool({ name: 'greet', arguments: {} })).resolves.toMatchObject({ structuredContent: { greeting: 'hi' } });
+      tool.structuredContent = { greeting: 42 };
+      await expect(client.callTool({ name: 'greet', arguments: {} })).rejects.toThrow(/does not match the tool's output schema/);
+    } finally {
+      await close();
+    }
+  });
+
+  it('lists tools and checks their output where eval is blocked', async () => {
+    const client = createMcpClient('test');
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      // Warm the SDK's own message parsers first; only output-schema checking is under test.
+      await client.listTools();
+      await client.callTool({ name: 'greet', arguments: {} });
+      tool.outputSchema = countSchema;
+      tool.structuredContent = { count: 3 };
+      await withoutEval(async () => {
+        await expect(client.listTools()).resolves.toMatchObject({ tools: [{ name: 'greet' }] });
+        await expect(client.callTool({ name: 'greet', arguments: {} })).resolves.toMatchObject({ structuredContent: { count: 3 } });
+        tool.structuredContent = { count: -1 };
+        await expect(client.callTool({ name: 'greet', arguments: {} })).rejects.toThrow(/does not match the tool's output schema/);
+      });
+    } finally {
+      await close();
+    }
+  });
+
+  it("the SDK's default client cannot list tools with an output schema where eval is blocked", async () => {
+    const client = new Client({ name: 'test', version: '1.0.0' });
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      await client.listTools();
+      await client.callTool({ name: 'greet', arguments: {} });
+      tool.outputSchema = countSchema;
+      await withoutEval(async () => {
+        await expect(client.listTools()).rejects.toThrow(/eval is blocked/);
+      });
+    } finally {
+      await close();
+    }
+  });
+});
 
 describe('getMcpToolParameters', () => {
   it('flattens the input schema and marks required params', () => {
