@@ -19,8 +19,8 @@
 import { Button, Tooltip } from '@wso2/oxygen-ui';
 import { ArrowDown } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
-import { useComponentDeployment } from '../../hooks/useDeployments';
-import { usePromote } from '../../hooks/useDeployments';
+import { useComponentDeployment, usePromote } from '../../hooks/useDeployments';
+import { pendingApiChange, PENDING_API_CHANGE_TOOLTIP } from '../../utils/promotion';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { useCan } from '../../hooks/useCan';
 import { Scopes } from '../../constants/permissions';
@@ -49,7 +49,11 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
   const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
   const sourceReleaseId = sourceDeployment?.releaseId;
-  const alreadyPromoted = !deploymentsLoading && !!buildId && buildId === targetDeployment?.build?.buildId;
+  const sameBuild = !deploymentsLoading && !!buildId && buildId === targetDeployment?.build?.buildId;
+  // Two environments on the same build can still differ in API settings or visibility, which only a
+  // promotion carries.
+  const apiChange = sameBuild ? pendingApiChange(sourceDeployment?.proxyReconciliation, targetDeployment?.proxyReconciliation) : null;
+  const alreadyPromoted = sameBuild && !apiChange;
 
   const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted && !blockedReason;
@@ -74,7 +78,18 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
   if (!can(Scopes.INTEGRATION_DEPLOY)) return null;
 
   const tooltipTitle =
-    blockedReason ?? (!buildId ? 'No build available to promote' : alreadyPromoted ? 'Already deployed in target environment' : missingPipeline ? 'No deployment pipeline configured for this project' : promote.isError ? promote.error.message : '');
+    blockedReason ??
+    (!buildId
+      ? 'No build available to promote'
+      : alreadyPromoted
+        ? 'Already deployed in target environment'
+        : missingPipeline
+          ? 'No deployment pipeline configured for this project'
+          : promote.isError
+            ? promote.error.message
+            : apiChange
+              ? PENDING_API_CHANGE_TOOLTIP[apiChange]
+              : '');
 
   return (
     <Tooltip title={tooltipTitle}>

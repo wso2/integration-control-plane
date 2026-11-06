@@ -38,6 +38,24 @@ export function httpStatusOf(error: unknown): number {
   return Number(/\bHTTP (\d{3})\b/.exec(messageOf(error))?.[1]);
 }
 
+/** The BFF's stable error code (`BffError.code`), or '' for an error that carries none. */
+export function httpCodeOf(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'code' in error) {
+    const code = (error as { code: unknown }).code;
+    if (typeof code === 'string') return code;
+  }
+  return '';
+}
+
+/** A string field of a BFF error, such as `entryEnvironment`, or '' when it carries none. */
+export function errorField(error: unknown, field: 'entryEnvironment' | 'sourceEnvironment'): string {
+  if (typeof error === 'object' && error !== null && field in error) {
+    const value = (error as Record<string, unknown>)[field];
+    if (typeof value === 'string') return value;
+  }
+  return '';
+}
+
 /** A 404 from a resource query — "this does not exist", not "the call broke". */
 export function isNotFoundError(error: unknown): boolean {
   return httpStatusOf(error) === 404;

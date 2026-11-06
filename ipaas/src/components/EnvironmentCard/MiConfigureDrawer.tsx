@@ -27,7 +27,7 @@ import type { EnvEndpoint } from '../../types/component';
 import type { MiConfig, MiConfigDraft } from '../../types/envGroups';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, MI_SECRETS_GROUP, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
-import { EndpointCard } from '../EndpointCard';
+import { EndpointCardList } from '../EndpointCardList';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
@@ -241,13 +241,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         </Typography>
       );
     }
-    return (
-      <Box>
-        {endpoints.map((ep, idx) => (
-          <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} onEdit={setManagingEp} onSettings={setSettingsEp} />
-        ))}
-      </Box>
-    );
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={setSettingsEp} />;
   };
 
   const renderContent = () => {

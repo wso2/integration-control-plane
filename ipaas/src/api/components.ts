@@ -26,6 +26,7 @@ import type {
   UpdateComponentInput,
   UpdateAutoDeployInput,
   UpdateEndpointInput,
+  EndpointVisibilityResult,
   GenerateComponentEndpointsInput,
   ComponentNameAvailability,
   DisplayType,
@@ -39,7 +40,7 @@ import type {
 import type { CreateMcpProxyComponentInput } from '../types/mcpProxy';
 import { bff, BffError, items, q, seg, type ListResponse } from './_client';
 import { parseGitHubUrl } from '../utils/github';
-import { toVisibilityWire } from './_visibility';
+import { visibilityRequestBody } from './_visibility';
 import { OTHER_BUILDPACK } from '../constants/integrations';
 
 // Underscored params (_orgHandler, _versionId, _releaseId) are kept on exported
@@ -347,13 +348,13 @@ export const generateComponentEnvironmentJwtSecret = (componentId: string, envir
 export const rotateComponentEnvironmentJwtSecret = (componentId: string, environmentId: string): Promise<string> =>
   bff.put<{ secret: string }>(`/components/${seg(componentId)}/environments/${seg(environmentId)}/jwt-secret/rotate`).then((r) => r?.secret ?? '');
 
-// APIP reconciles Public for this environment. Project access is implicit; its checkbox only
-// controls whether the console displays the internal project URL.
-export const updateEndpoint = (input: UpdateEndpointInput): Promise<object> =>
-  bff.put<object>(`/components/${seg(input.componentId)}/environments/${seg(input.environmentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ projectName: input.projectId, deploymentTrackId: input.versionId })}`, {
-    visibility: Array.from(new Set(['project', ...input.networkVisibilities.filter((value) => value !== 'Project').map(toVisibilityWire)])),
-    displayProjectUrl: input.networkVisibilities.includes('Project'),
-  });
+// APIP reconciles the endpoint's gateway exposure (Public, Organization or none) for this
+// environment. Project access is implicit and always on.
+export const updateEndpoint = (input: UpdateEndpointInput): Promise<EndpointVisibilityResult> =>
+  bff.put<EndpointVisibilityResult>(
+    `/components/${seg(input.componentId)}/environments/${seg(input.environmentId)}/endpoints/${seg(input.endpointId)}/visibility${q({ projectName: input.projectId, deploymentTrackId: input.versionId })}`,
+    visibilityRequestBody(input.networkVisibilities),
+  );
 
 // MCP proxy (convert from an existing HTTP API) is an APIM flow the BFF doesn't serve.
 export const createMcpProxyComponent = (_input: CreateMcpProxyComponentInput): Promise<Component> => {
