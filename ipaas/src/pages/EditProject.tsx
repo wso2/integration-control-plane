@@ -20,6 +20,8 @@ import { Alert, Button, CircularProgress, Grid, PageContent, PageTitle, Stack, T
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import EditProjectSkeleton from '../components/EditProjectSkeleton';
@@ -34,6 +36,7 @@ import { DESCRIPTION_MAX_LENGTH, toSingleLineDescription } from '../utils/descri
 function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Project }): JSX.Element {
   const navigate = useAppNavigate();
   const updateProject = useUpdateProject();
+  const canUpdate = useCan()(Scopes.PROJECT_UPDATE);
   const { data: allProjects = [] } = useProjects();
   const projectHomeUrl = resourceUrl(scope, 'overview');
   // The overview edits the description on one line, so this form keeps the same shape.
@@ -49,7 +52,7 @@ function EditProjectForm({ scope, project }: { scope: ProjectScope; project: Pro
   const nameError = validateProjectName(displayName) ?? (nameTaken ? 'A project with this name already exists.' : null);
   const descriptionChanged = description.trim() !== originalDescription;
   const changed = displayName.trim() !== project.name || descriptionChanged;
-  const canSubmit = changed && !nameError && !updateProject.isPending;
+  const canSubmit = canUpdate && changed && !nameError && !updateProject.isPending;
   const allowLeave = useUnsavedChanges(changed);
 
   const handleSubmit = async () => {

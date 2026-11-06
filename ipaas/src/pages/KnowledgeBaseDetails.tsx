@@ -48,6 +48,8 @@ import { useState, type JSX } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useKnowledgeBase, useUpdateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { useDeleteComponent } from '../hooks/useComponents';
 import { useProjectByHandler } from '../hooks/useProjects';
@@ -130,6 +132,7 @@ function KnowledgeBaseView({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }
   const navigate = useAppNavigate();
   const [tab, setTab] = useState(0);
   const [deleting, setDeleting] = useState(false);
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   // Above the configuration tab, which remounts when a save changes the stored settings.
   const [configSaved, setConfigSaved] = useState(false);
   return (
@@ -142,16 +145,18 @@ function KnowledgeBaseView({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }
           </Stack>
         </PageTitle.Header>
         {kb.description && <PageTitle.SubHeader>{kb.description}</PageTitle.SubHeader>}
-        <PageTitle.Actions>
-          <Stack direction="row" gap={1}>
-            <Button variant="outlined" color="error" startIcon={<Trash2 size={16} />} onClick={() => setDeleting(true)}>
-              Delete
-            </Button>
-            <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newKnowledgeBaseDataSourceUrl(scope, kb.name))}>
-              Add Data Source
-            </Button>
-          </Stack>
-        </PageTitle.Actions>
+        {canManage && (
+          <PageTitle.Actions>
+            <Stack direction="row" gap={1}>
+              <Button variant="outlined" color="error" startIcon={<Trash2 size={16} />} onClick={() => setDeleting(true)}>
+                Delete
+              </Button>
+              <Button variant="contained" startIcon={<Plus size={16} />} onClick={() => navigate(newKnowledgeBaseDataSourceUrl(scope, kb.name))}>
+                Add Data Source
+              </Button>
+            </Stack>
+          </PageTitle.Actions>
+        )}
       </PageTitle>
 
       <Box sx={tabsSx}>
@@ -238,6 +243,7 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
   const [viewingLogs, setViewingLogs] = useState<KnowledgeBaseDataSource | null>(null);
   const [deleting, setDeleting] = useState<KnowledgeBaseDataSource | null>(null);
   const addDataSource = () => navigate(newKnowledgeBaseDataSourceUrl(scope, kb.name));
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
 
   const refresh = () => {
     refetch();
@@ -264,7 +270,14 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
       )}
 
       {kb.dataSources.length === 0 ? (
-        <EmptyListing icon={<Database size={40} />} title="No data sources" description="Add a Google Drive folder or an Amazon S3 bucket to load documents into this knowledge base." showAction actionLabel="Add Data Source" onAction={addDataSource} />
+        <EmptyListing
+          icon={<Database size={40} />}
+          title="No data sources"
+          description="Add a Google Drive folder or an Amazon S3 bucket to load documents into this knowledge base."
+          showAction={canManage}
+          actionLabel="Add Data Source"
+          onAction={addDataSource}
+        />
       ) : (
         <>
           <Stack direction="row" alignItems="center" gap={1} sx={dataSourceToolbarSx}>
@@ -364,6 +377,7 @@ function DataSourceRow({ scope, kb, dataSource: ds, onNotify, onSchedule, onView
   const navigate = useAppNavigate();
   const queryClient = useQueryClient();
   const trigger = useTriggerComponent();
+  const can = useCan();
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   // A run needs a deployed release to start from.
   const deployed = !!ds.releaseName;
@@ -397,12 +411,16 @@ function DataSourceRow({ scope, kb, dataSource: ds, onNotify, onSchedule, onView
       </TableCell>
       <TableCell align="right">
         <Stack direction="row" gap={1} justifyContent="flex-end" alignItems="center" sx={{ whiteSpace: 'nowrap' }}>
-          <Button size="small" variant="contained" startIcon={trigger.isPending ? <CircularProgress size={14} color="inherit" /> : <Play size={14} />} disabled={!deployed || trigger.isPending} onClick={ingest}>
-            Ingest
-          </Button>
-          <Button size="small" variant="contained" startIcon={<Clock size={14} />} disabled={!deployed} onClick={onSchedule}>
-            Schedule
-          </Button>
+          {can(Scopes.INTEGRATION_EXECUTE) && (
+            <Button size="small" variant="contained" startIcon={trigger.isPending ? <CircularProgress size={14} color="inherit" /> : <Play size={14} />} disabled={!deployed || trigger.isPending} onClick={ingest}>
+              Ingest
+            </Button>
+          )}
+          {can(Scopes.INTEGRATION_UPDATE) && (
+            <Button size="small" variant="contained" startIcon={<Clock size={14} />} disabled={!deployed} onClick={onSchedule}>
+              Schedule
+            </Button>
+          )}
           <Button size="small" variant="text" disabled={!deployed} onClick={onViewLogs}>
             Execution logs
           </Button>
@@ -419,15 +437,17 @@ function DataSourceRow({ scope, kb, dataSource: ds, onNotify, onSchedule, onView
             }}>
             View
           </MenuItem>
-          <MenuItem
-            dense
-            sx={{ color: 'error.main' }}
-            onClick={() => {
-              setMenuAnchor(null);
-              onDelete();
-            }}>
-            Delete
-          </MenuItem>
+          {can(Scopes.INTEGRATION_DELETE) && (
+            <MenuItem
+              dense
+              sx={{ color: 'error.main' }}
+              onClick={() => {
+                setMenuAnchor(null);
+                onDelete();
+              }}>
+              Delete
+            </MenuItem>
+          )}
         </Menu>
       </TableCell>
     </TableRow>
@@ -498,6 +518,7 @@ function KnowledgeBaseServiceTable({ scope, kb, onDelete }: { scope: OrgScope; k
   const navigate = useAppNavigate();
   const { data: project } = useProjectByHandler(kb.projectName);
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const lastDeployed = kb.status && kb.updatedAt ? formatDistanceToNow(kb.updatedAt) : '';
   return (
     <Card variant="outlined">
@@ -546,15 +567,17 @@ function KnowledgeBaseServiceTable({ scope, kb, onDelete }: { scope: OrgScope; k
                   }}>
                   View
                 </MenuItem>
-                <MenuItem
-                  dense
-                  sx={{ color: 'error.main' }}
-                  onClick={() => {
-                    setMenuAnchor(null);
-                    onDelete();
-                  }}>
-                  Delete
-                </MenuItem>
+                {canManage && (
+                  <MenuItem
+                    dense
+                    sx={{ color: 'error.main' }}
+                    onClick={() => {
+                      setMenuAnchor(null);
+                      onDelete();
+                    }}>
+                    Delete
+                  </MenuItem>
+                )}
               </Menu>
             </TableCell>
           </TableRow>
@@ -606,6 +629,7 @@ function DeleteDataSourceDialog({ kb, dataSource, orgHandler, onClose }: { kb: K
 
 function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: KnowledgeBase; saved: boolean; onSavedChange: (saved: boolean) => void }): JSX.Element {
   const update = useUpdateKnowledgeBase(kb.name);
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const [displayName, setDisplayName] = useState(kb.displayName);
   const [description, setDescription] = useState(kb.description);
   const [vectorStore, setVectorStore] = useState<VectorStoreConfig | null>(() => vectorStoreFromConfig(kb.config));
@@ -657,11 +681,13 @@ function ConfigurationTab({ kb, saved, onSavedChange: setSaved }: { kb: Knowledg
         <ChunkingStep value={chunking} onChange={setChunking} />
       </Box>
       {changesVectors && <Alert severity="warning">Documents already ingested were embedded with the current settings. Run each data source again after saving so retrieval finds them.</Alert>}
-      <Stack direction="row" sx={wizardActionsSx}>
-        <Button variant="contained" disabled={!valid || update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={save}>
-          {update.isPending ? 'Saving…' : 'Save'}
-        </Button>
-      </Stack>
+      {canManage && (
+        <Stack direction="row" sx={wizardActionsSx}>
+          <Button variant="contained" disabled={!valid || update.isPending} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={save}>
+            {update.isPending ? 'Saving…' : 'Save'}
+          </Button>
+        </Stack>
+      )}
     </Stack>
   );
 }

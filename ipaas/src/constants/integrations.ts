@@ -68,6 +68,7 @@ export const SUPPORTED_DISPLAY_TYPES = new Set([
 /** Buildpack of a component built by neither the Ballerina nor the MI runtime. */
 export const OTHER_BUILDPACK = 'other';
 export const MI_BUILDPACK = 'wso2-mi';
+export const BI_BUILDPACK = 'BI';
 
 // buildpackType is cloud-only; absent means unknown, so the displayType verdict stands.
 export function isSupportedIntegration(displayType: string, componentSubType: string | null, buildpackType?: string): boolean {

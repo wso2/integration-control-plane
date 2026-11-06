@@ -18,6 +18,8 @@
 
 import { Alert, Box, Button, Checkbox, CircularProgress, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState } from 'react';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import { useUpdateEndpoint } from '../../hooks/useComponents';
 import type { EnvEndpoint } from '../../types/component';
 import { VISIBILITY_OPTS } from '../EndpointCard';
@@ -86,6 +88,7 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
   const [visibilities, setVisibilities] = useState<string[]>(() => Array.from(new Set([...(ep.displayProjectUrl === false ? [] : ['Project']), ...(ep.networkVisibilities ?? []).filter((value) => value !== 'Project')])));
   const [saveError, setSaveError] = useState<string | null>(null);
   const updateEp = useUpdateEndpoint();
+  const canExpose = useCan()(Scopes.ENDPOINT_EXPOSE);
 
   const handleToggle = (key: string) => {
     setVisibilities((prev) => (prev.includes(key) ? prev.filter((v) => v !== key) : [...prev, key]));
@@ -175,9 +178,11 @@ export function ManageEndpoint({ ep, componentId, projectId, versionId, releaseI
         <Button variant="outlined" color="inherit" onClick={onBack}>
           Cancel
         </Button>
-        <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending || visibilities.length === 0} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
-          {updateEp.isPending ? 'Updating…' : 'Update'}
-        </Button>
+        {canExpose && (
+          <Button variant="contained" onClick={handleSave} disabled={updateEp.isPending || visibilities.length === 0} startIcon={updateEp.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+            {updateEp.isPending ? 'Updating…' : 'Update'}
+          </Button>
+        )}
       </Stack>
     </Box>
   );

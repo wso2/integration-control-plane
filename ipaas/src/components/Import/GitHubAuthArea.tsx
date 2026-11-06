@@ -20,11 +20,13 @@ import { Alert, Box, Button, CircularProgress, Stack, Typography } from '@wso2/o
 import { GitHub } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { AuthStatus } from '../../types/import';
+import ConnectRefused from './ConnectRefused';
 
 interface GitHubAuthAreaProps {
   authStatus: AuthStatus;
   isCheckingAuth: boolean;
   isAuthenticated: boolean;
+  canConnect: boolean;
   onAuthorize: () => void;
   onInstall: () => void;
 }
@@ -34,7 +36,7 @@ interface GitHubAuthAreaProps {
  * reconnect / install-app buttons, and failure retry. Once authenticated it renders nothing —
  * the Organization field itself then carries the provider icon and reconnect action.
  */
-export default function GitHubAuthArea({ authStatus, isCheckingAuth, isAuthenticated, onAuthorize, onInstall }: GitHubAuthAreaProps): JSX.Element | null {
+export default function GitHubAuthArea({ authStatus, isCheckingAuth, isAuthenticated, canConnect, onAuthorize, onInstall }: GitHubAuthAreaProps): JSX.Element | null {
   if (isCheckingAuth) {
     return (
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 3, minHeight: 40 }}>
@@ -46,6 +48,7 @@ export default function GitHubAuthArea({ authStatus, isCheckingAuth, isAuthentic
     );
   }
   if (isAuthenticated) return null;
+  if (!canConnect) return <ConnectRefused label="Authorize with GitHub" icon={<GitHub size={16} />} mb={3} />;
   if (authStatus === 'authenticating' || authStatus === 'installing') {
     return (
       <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 3, minHeight: 40 }}>

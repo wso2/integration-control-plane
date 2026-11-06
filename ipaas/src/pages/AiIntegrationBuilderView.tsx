@@ -41,6 +41,8 @@ import { ErrorCard } from '../components/AiBuilder/ErrorCard';
 import { AgentAvatar, UserMessage } from '../components/AiBuilder/ChatMessage';
 import { AGENT_ROW_SX, CHAT_COLUMN_SX, CHAT_MESSAGES_SX, INPUT_BOX_SX, STICKY_INPUT_SX } from './AiIntegrationBuilderView.styles';
 import type { ProjectScope } from '../nav';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 
 function scaffoldStepsText(response: CustomIntegrationResponse): string {
   const steps = response.steps.map((step, i) => `${i + 1}. ${step.title}: ${step.description}`).join('\n');
@@ -61,6 +63,7 @@ function AiIntegrationBuilderView(scope: ProjectScope): JSX.Element {
   const [followUp, setFollowUp] = useState('');
   const [isEditorOpened, setIsEditorOpened] = useState(false);
   const [pageError, setPageError] = useState<string | null>(null);
+  const canUseEditor = useCan()(Scopes.EDITOR_USE);
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -110,7 +113,7 @@ function AiIntegrationBuilderView(scope: ProjectScope): JSX.Element {
       case 'prebuilt':
         return <PrebuiltMatchCard response={response} onConfigureDeploy={handleConfigureDeploy} />;
       case 'custom':
-        return <CustomPlanCard response={response} onOpenEditor={() => handleOpenEditor(response, query)} />;
+        return <CustomPlanCard response={response} onOpenEditor={canUseEditor ? () => handleOpenEditor(response, query) : undefined} />;
       case 'unsupported':
         return <UnsupportedCard response={response} onTryAgain={handleTryAgain} />;
       case 'invalid':

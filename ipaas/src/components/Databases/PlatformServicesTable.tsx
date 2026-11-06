@@ -29,6 +29,8 @@ import type { TemporalPlan, TemporalServer } from '../../types/temporal';
 import DeleteDatabaseDialog from './DeleteDatabaseDialog';
 import DeleteTemporalDialog from '../Temporal/DeleteTemporalDialog';
 import ServicePlanCell from './ServicePlanCell';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 
 /** One listed platform service, of whichever type. */
 export type ServiceRow = { kind: 'postgres'; server: DatabaseServer } | { kind: 'temporal'; server: TemporalServer };
@@ -74,6 +76,7 @@ interface PlatformServicesTableProps {
 
 export default function PlatformServicesTable({ rows, databasePlans, temporalPlans, onOpen }: PlatformServicesTableProps): JSX.Element {
   const [deleting, setDeleting] = useState<ServiceRow | null>(null);
+  const canDelete = useCan()(Scopes.CONFIG_MANAGE);
   return (
     <ListingTable.Container disablePaper>
       <ListingTable variant="card" density="compact" sx={CARD_TABLE_SX}>
@@ -162,7 +165,7 @@ export default function PlatformServicesTable({ rows, databasePlans, temporalPla
                 </ListingTable.Cell>
                 <ListingTable.Cell align="right">
                   {/* A service being torn down is already on its way out. */}
-                  {openable && (
+                  {openable && canDelete && (
                     <Tooltip title="Delete">
                       <IconButton
                         size="small"

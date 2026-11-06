@@ -40,7 +40,39 @@ export interface MiConfigEntry {
  */
 export interface MiConfig {
   envVars: MiConfigEntry[];
+  /** Every stored secret key, sorted. */
   secrets: string[];
+  /**
+   * The keys of `secrets` still in a group of their own (`mi-secret-<KEY>`), as saved
+   * before all MI secrets moved to one `mi-secrets` group. Each moves there once it
+   * is given a new value; until then it stays where it is.
+   */
+  legacySecrets: string[];
+  /**
+   * Keys in `mi-secrets` whose old `mi-secret-<KEY>` group also still exists. It is
+   * left alone while the key stays a secret, and deleted once the key leaves `mi-secrets`.
+   */
+  shadowedLegacySecrets: string[];
+  /**
+   * The `mi-env-vars` group exists but is stored as a secret (e.g. made on Configs &
+   * Secrets). Its values can't be read back, so the editor can't show or change them.
+   */
+  envVarsGroupIsSecret: boolean;
+  /** The `mi-secrets` group exists but is not stored as a secret, so the editor leaves it alone. */
+  secretsGroupIsPlain: boolean;
+  /**
+   * Keys set by the environment's other env-var groups (e.g. made on Configs & Secrets),
+   * each mapped to its group's name. A key can belong to one group only, so MI can't
+   * add these to a group. A key the group already has is let through (as the BFF
+   * does), so a clash saved before the BFF checked for one still saves.
+   */
+  otherGroupKeys: Record<string, string>;
+  /**
+   * `otherGroupKeys` split by the kind of group that sets them. The BFF rejects a write of
+   * a group listing a key that a group of the other kind also lists, even one it already has.
+   */
+  otherPlainGroupKeys: Record<string, string>;
+  otherSecretGroupKeys: Record<string, string>;
 }
 
 /** The editor's result: secrets with a blank `value` keep their stored value. */
@@ -49,10 +81,10 @@ export interface MiConfigDraft {
   secrets: MiConfigEntry[];
 }
 
-/** The env-group writes that turn the stored MI configuration into a draft. */
+/** One env-group write: replace a group (keeping the named stored secrets), or delete it. */
+export type MiConfigWrite = { kind: 'put'; group: string; sensitive: boolean; data: Record<string, string>; keep?: string[] } | { kind: 'delete'; group: string };
+
+/** The env-group writes, in order, that turn the stored MI configuration into a draft. */
 export interface MiConfigSavePlan {
-  /** New env-var group data; `null` deletes the group; `undefined` leaves it as is. */
-  envVars?: Record<string, string> | null;
-  secretsToPut: MiConfigEntry[];
-  secretsToDelete: string[];
+  writes: MiConfigWrite[];
 }

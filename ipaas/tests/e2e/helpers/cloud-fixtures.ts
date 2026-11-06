@@ -110,7 +110,7 @@ export async function createFixtureComponent(page: Page, project: string, name: 
             autoDeploy: false,
             autoBuild: false,
             workflow: {
-              kind: 'ClusterWorkflow',
+              kind: 'Workflow',
               name: 'ballerina-buildpack-builder',
               parameters: { repository: { url: 'https://github.com/wso2/integration-control-plane', revision: { branch: 'main' }, appPath: '.' } },
             },
