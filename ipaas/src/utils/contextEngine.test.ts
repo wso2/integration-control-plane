@@ -41,10 +41,11 @@ import {
   evidencePlace,
   evidenceVersionLabel,
   versionFromLabel,
-  isSameModel,
-  modelDraftError,
+  isRestartPending,
+  modelsDraftErrors,
+  modelsDraftOf,
+  modelsUpdate,
   passageLines,
-  toModelInput,
   describeVisibility,
   everyoneRoles,
   sharingMismatches,
@@ -1398,26 +1399,34 @@ describe('provenance and evidence', () => {
   });
 });
 
-describe('editing models on a running engine', () => {
-  const current = { provider: 'openai', model: 'gpt-4.1', keyKind: 'encrypted' };
-  const draft = { provider: 'openai', model: 'gpt-4.1', baseUrl: '', apiVersion: '', keyMode: 'key' as const, apiKey: '', apiKeyRef: '' };
+describe('changing models on a running engine', () => {
+  const models = { embedding: { provider: 'openai', model: 'text-embedding-3-small' }, llm: { provider: 'openai', model: 'gpt-6-luna' }, answer: { provider: 'openai', model: 'gpt-6-luna' } };
+  const draft = modelsDraftOf(models);
 
-  it('keeps the stored key for an unchanged model and asks for one when it changes', () => {
-    expect(isSameModel(current, draft)).toBe(true);
-    expect(modelDraftError(draft, current)).toBe('');
-    expect(toModelInput(draft)).toEqual({ provider: 'openai', model: 'gpt-4.1' });
-    const other = { ...draft, model: 'gpt-4.1-mini' };
-    expect(isSameModel(current, other)).toBe(false);
-    expect(modelDraftError(other, current)).toBe('Enter an API key for this model');
-    expect(modelDraftError({ ...other, apiKey: 'sk-x' }, current)).toBe('');
-    expect(toModelInput({ ...other, apiKey: 'sk-x' })).toEqual({ provider: 'openai', model: 'gpt-4.1-mini', apiKey: 'sk-x' });
+  it('sends only what changes, and nothing for an untouched draft', () => {
+    expect(modelsUpdate(models, draft, true)).toBeNull();
+    expect(modelsUpdate(models, { ...draft, embeddingKey: 'sk-e', shareKey: true }, true)).toEqual({ embeddingKey: 'sk-e', ingestion: { provider: 'openai', model: 'gpt-6-luna', apiKey: 'sk-e' } });
+    const anthropic = { ...draft.llm, provider: 'anthropic' as const, model: 'claude-haiku-5-5' };
+    expect(modelsUpdate(models, { ...draft, answerChoice: 'different', answer: anthropic }, true)).toEqual({ answer: { provider: 'anthropic', model: 'claude-haiku-5-5' } });
+    expect(modelsUpdate({ ...models, answer: { provider: 'anthropic', model: 'claude-haiku-5-5' } }, draft, true)).toEqual({ answer: { sameAsIngestion: true } });
   });
 
-  it('checks key references and Azure fields', () => {
-    expect(modelDraftError({ ...draft, keyMode: 'ref', apiKeyRef: 'OPENAI_KEY' }, current)).toBe('A reference looks like env:NAME or cp:ID');
-    expect(toModelInput({ ...draft, keyMode: 'ref', apiKeyRef: ' env:OPENAI_KEY ' })).toEqual({ provider: 'openai', model: 'gpt-4.1', apiKeyRef: 'env:OPENAI_KEY' });
-    expect(modelDraftError({ ...draft, provider: 'azure_openai', model: 'dep', apiKey: 'k' }, null)).toBe('Enter the base URL and API version');
-    expect(modelDraftError({ ...draft, model: ' ' }, current)).toBe('Choose a model');
+  it('asks for a key when a provider changes, unless the answer model can borrow the ingestion key', () => {
+    const anthropic = { ...draft.llm, provider: 'anthropic' as const, model: 'claude-haiku-5-5' };
+    expect(modelsDraftErrors(models, { ...draft, llm: anthropic }, true).llm).toBe('A new provider needs its own key.');
+    expect(modelsDraftErrors(models, { ...draft, answerChoice: 'different', answer: anthropic }, true).answer).toBe('A new provider needs its own key.');
+    expect(modelsDraftErrors(models, { ...draft, llm: { ...anthropic, apiKey: 'sk-a' }, answerChoice: 'different', answer: anthropic }, true)).toEqual({ llm: '', answer: '' });
+    expect(modelsDraftErrors(models, { ...draft, embeddingKey: 'sk-e', shareKey: true, llm: anthropic }, true).llm).toBe('A new provider needs its own key.');
+    expect(modelsUpdate(models, { ...draft, embeddingKey: 'sk-e', shareKey: true, llm: { ...anthropic, apiKey: 'sk-a' } }, true)?.ingestion).toEqual({ provider: 'anthropic', model: 'claude-haiku-5-5', apiKey: 'sk-a' });
+  });
+
+  it('keeps a restart pending until a pod that started after it runs', () => {
+    const asked = '2026-11-06T09:12:03.512Z';
+    const now = Date.parse(asked) + 20_000;
+    expect(isRestartPending('2026-11-06T08:00:00Z', asked, now)).toBe(true);
+    expect(isRestartPending(undefined, asked, now)).toBe(true);
+    expect(isRestartPending('2026-11-06T09:12:40Z', asked, now)).toBe(false);
+    expect(isRestartPending('2026-11-06T08:00:00Z', asked, Date.parse(asked) + 10 * 60_000)).toBe(false);
   });
 });
 

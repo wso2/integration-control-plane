@@ -70,9 +70,10 @@ import type {
   AskedQuestion,
   ContextEngineSummary,
   ContextEngineTabKey,
-  ContextModelInput,
+  ContextEngineModels,
   ContextModelSummary,
-  ModelDraft,
+  ModelsDraft,
+  UpdateContextModelsInput,
   ContextEvidence,
   ContextEvidenceLocationState,
   ContextQueryMode,
@@ -80,6 +81,7 @@ import type {
   FileVisibility,
   GetStartedStep,
   LlmConfig,
+  LlmProvider,
   McpClientConfig,
   RecordProgress,
   SourceCategory,
@@ -1275,32 +1277,67 @@ export const DELETION_FAILURE_TEXT = 'Deletion did not finish. Your data is kept
 
 // ── Editing models on a running engine ──────────────────────────────────────
 
-/** Whether a draft names the model already stored, ignoring its key, as the engine compares them. */
-export function isSameModel(current: ContextModelSummary | null, draft: ModelDraft | null): boolean {
-  if (!current || !draft) return !current && !draft;
-  return current.provider === draft.provider && current.model === draft.model.trim() && (current.baseUrl ?? '') === draft.baseUrl.trim() && (current.apiVersion ?? '') === draft.apiVersion.trim() && current.dimensions === draft.dimensions;
+const sameModel = (a: ContextModelSummary | null | undefined, b: ContextModelSummary): boolean => !!a && a.provider === b.provider && a.model === b.model;
+
+/** Whether answers come from the ingestion model, as far as the engine reports its models. */
+export const answersFromIngestion = (models: ContextEngineModels): boolean => !models.answer || (!!models.llm && sameModel(models.answer, models.llm));
+
+const draftLlm = (m: ContextModelSummary): LlmConfig => ({ ...blankLlm(m.provider as LlmProvider), model: m.model });
+
+/** The drawer's fields for an engine's current models, every key left empty. */
+export function modelsDraftOf(models: ContextEngineModels & { llm: ContextModelSummary }): ModelsDraft {
+  const fromIngestion = answersFromIngestion(models);
+  return { embeddingKey: '', llm: draftLlm(models.llm), shareKey: false, answerChoice: fromIngestion ? 'same' : 'different', answer: !fromIngestion && models.answer ? draftLlm(models.answer) : null };
 }
 
-/** Why a model draft cannot be saved, or '' when it can. A new model needs its own key; an unchanged one keeps the stored key when none is entered. */
-export function modelDraftError(draft: ModelDraft, current: ContextModelSummary | null): string {
-  if (!nonEmpty(draft.model)) return 'Choose a model';
-  if (draft.provider === 'azure_openai' && (!nonEmpty(draft.baseUrl) || !nonEmpty(draft.apiVersion))) return 'Enter the base URL and API version';
-  const entered = draft.keyMode === 'key' ? draft.apiKey : draft.apiKeyRef;
-  if (draft.keyMode === 'ref' && nonEmpty(entered) && !/^(env|cp):\S+$/.test(entered.trim())) return 'A reference looks like env:NAME or cp:ID';
-  if (!nonEmpty(entered) && !isSameModel(current, draft)) return draft.keyMode === 'key' ? 'Enter an API key for this model' : 'Enter a key reference for this model';
-  return '';
+/** The embedding key serves the ingestion model only on the embedding model's provider. */
+const ingestionKey = (models: ContextEngineModels, draft: ModelsDraft): string => (draft.shareKey && models.embedding?.provider === draft.llm.provider ? draft.embeddingKey : draft.llm.apiKey);
+
+export const NEW_PROVIDER_KEY_TEXT = 'A new provider needs its own key.';
+
+/**
+ * Why each language model can't be saved, or '' when it can. A new provider needs a key. An answer
+ * model without one borrows the ingestion key, which the engine allows only on the same provider.
+ */
+export function modelsDraftErrors(models: ContextEngineModels, draft: ModelsDraft, answersEnabled: boolean): { llm: string; answer: string } {
+  const providerMoved = draft.llm.provider !== models.llm?.provider;
+  let llm = '';
+  if (!nonEmpty(draft.llm.model)) llm = 'Choose a model.';
+  else if (providerMoved && !nonEmpty(ingestionKey(models, draft))) llm = NEW_PROVIDER_KEY_TEXT;
+  let answer = '';
+  if (answersEnabled && draft.answerChoice === 'different') {
+    const current = answersFromIngestion(models) ? models.llm : models.answer;
+    if (!draft.answer || !nonEmpty(draft.answer.model)) answer = 'Choose a model.';
+    else if ((providerMoved || draft.answer.provider !== current?.provider) && draft.answer.provider !== draft.llm.provider && !nonEmpty(draft.answer.apiKey)) answer = NEW_PROVIDER_KEY_TEXT;
+  }
+  return { llm, answer };
 }
 
-/** A draft as the engine takes it: the key or the reference only when one was entered. */
-export function toModelInput(draft: ModelDraft): ContextModelInput {
-  return {
-    provider: draft.provider,
-    model: draft.model.trim(),
-    ...(draft.provider === 'azure_openai' ? { baseUrl: draft.baseUrl.trim(), apiVersion: draft.apiVersion.trim() } : {}),
-    ...(draft.dimensions ? { dimensions: draft.dimensions } : {}),
-    ...(draft.keyMode === 'key' && nonEmpty(draft.apiKey) ? { apiKey: draft.apiKey } : {}),
-    ...(draft.keyMode === 'ref' && nonEmpty(draft.apiKeyRef) ? { apiKeyRef: draft.apiKeyRef.trim() } : {}),
-  };
+/** What the drawer changes, as the BFF takes it; null when nothing changes. */
+export function modelsUpdate(models: ContextEngineModels, draft: ModelsDraft, answersEnabled: boolean): Omit<UpdateContextModelsInput, 'engineId'> | null {
+  const update: Omit<UpdateContextModelsInput, 'engineId'> = {};
+  if (nonEmpty(draft.embeddingKey)) update.embeddingKey = draft.embeddingKey;
+  const llm = { provider: draft.llm.provider, model: draft.llm.model.trim() };
+  const llmKey = ingestionKey(models, draft);
+  if (!sameModel(models.llm, llm) || nonEmpty(llmKey)) update.ingestion = { ...llm, ...(nonEmpty(llmKey) ? { apiKey: llmKey } : {}) };
+  const fromIngestion = answersFromIngestion(models);
+  if (answersEnabled && draft.answerChoice === 'same' && !fromIngestion) update.answer = { sameAsIngestion: true };
+  if (answersEnabled && draft.answerChoice === 'different' && draft.answer) {
+    const answer = { provider: draft.answer.provider, model: draft.answer.model.trim() };
+    if (fromIngestion || !sameModel(models.answer, answer) || nonEmpty(draft.answer.apiKey)) update.answer = { ...answer, ...(nonEmpty(draft.answer.apiKey) ? { apiKey: draft.answer.apiKey } : {}) };
+  }
+  return Object.keys(update).length > 0 ? update : null;
+}
+
+/** How long a restart is waited for before the engine is shown as it reports itself again. */
+const RESTART_WAIT_MS = 5 * 60 * 1000;
+
+/** Whether a restart asked for at restartedAt is still under way: the running pod, if any, started before it. Pods report whole seconds. */
+export function isRestartPending(startedAt: string | undefined, restartedAt: string | undefined, now: number = Date.now()): boolean {
+  if (!restartedAt) return false;
+  const asked = Date.parse(restartedAt);
+  if (now - asked > RESTART_WAIT_MS) return false;
+  return !startedAt || Date.parse(startedAt) < Math.floor(asked / 1000) * 1000;
 }
 
 /** The absolute form of an in-app path, for links people paste elsewhere. */

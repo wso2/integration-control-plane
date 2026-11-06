@@ -113,8 +113,6 @@ const V1 = '/v1';
 /** Grants on the engine itself; every engine uses the same root resource. */
 const grantsPath = (): string => `${V1}/resources/${encodeURIComponent(CONTEXT_ENGINE_ID)}/grants`;
 
-const provisioningRefused = (what: string): Error => new Error(`${what} is not supported yet: an engine keeps the models it was created with.`);
-
 // ── Raw wire shapes — private to this file ──────────────────────────────────
 
 interface RawSource {
@@ -243,6 +241,7 @@ interface BffEngine {
   publicApiUrl?: string;
   apiEnabled?: boolean;
   mcpEnabled?: boolean;
+  startedAt?: string;
 }
 
 interface BffIntegration {
@@ -324,6 +323,7 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   createdAt: raw.createdAt ?? '',
   ...(raw.publicApiUrl ? { publicApiUrl: raw.publicApiUrl.replace(/\/+$/, '') } : {}),
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
+  ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -345,7 +345,7 @@ const toEvidence = (raw: RawEvidence): ContextEvidence => ({
 
 const toModel = (raw: RawModelSummary | null | undefined): ContextModelSummary | null => (raw ? { provider: raw.provider, model: raw.model } : null);
 
-/** The environment's models; they change only by redeploying the engine, so nothing here is editable. */
+/** The environment's models; changing them restarts the engine. */
 const toModels = (raw: RawEngineConfig | null): ContextEngineModels => ({
   embedding: toModel(raw?.models?.embedding),
   llm: toModel(raw?.models?.llm),
@@ -619,9 +619,10 @@ export async function deleteContextEngine(engineId: string): Promise<void> {
   forgetConsoleAccess(engineId);
 }
 
-/** The BFF cannot change an engine's models yet. */
-export async function updateContextModels(_input: UpdateContextModelsInput): Promise<ContextEngineModels> {
-  throw provisioningRefused('Changing the models');
+/** PUT /context-engines/{engine}/environments/{environment}/models: saves, then restarts the engine. A pod that started before restartedAt still runs the old models. */
+export async function updateContextModels({ engineId, ...input }: UpdateContextModelsInput): Promise<{ restartedAt: string }> {
+  const raw = await viaBff(() => bff.put<{ restartedAt: string }>(`${enginePath(engineId)}/models`, input));
+  return { restartedAt: raw.restartedAt };
 }
 
 // ── Integrations and API keys (BFF) ─────────────────────────────────────────
