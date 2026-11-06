@@ -43,13 +43,15 @@ function PlanStep({ step, index, isLast }: { step: AiIntegrationPlanStep; index:
   );
 }
 
-export function CustomPlanCard({ response, onOpenEditor }: { response: CustomIntegrationResponse; onOpenEditor: () => void }): JSX.Element {
+export function CustomPlanCard({ response, onOpenEditor }: { response: CustomIntegrationResponse; onOpenEditor?: () => void }): JSX.Element {
   return (
     <ResponseCard
       actions={
-        <Button variant="contained" color="primary" size="small" endIcon={<Send size={14} />} onClick={onOpenEditor}>
-          Generate &amp; open in editor
-        </Button>
+        onOpenEditor && (
+          <Button variant="contained" color="primary" size="small" endIcon={<Send size={14} />} onClick={onOpenEditor}>
+            Generate &amp; open in editor
+          </Button>
+        )
       }>
       {response.message && (
         <Typography variant="body2" sx={{ mb: 1.5 }}>

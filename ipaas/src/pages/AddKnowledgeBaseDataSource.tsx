@@ -21,6 +21,8 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBaseDataSource, useKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
 import { DAILY_INGESTION } from '../constants/ragIngestion';
@@ -90,6 +92,7 @@ function DataSourceLoader({ scope, name }: { scope: OrgScope; name: string }): J
 function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledgeBase: string }): JSX.Element {
   const navigate = useAppNavigate();
   const create = useCreateKnowledgeBaseDataSource(knowledgeBase);
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
   const [step, setStep] = useState(0);
   const [names, setNames] = useState<NameFields>({ displayName: '', name: '', description: '' });
   const [datasource, setDatasource] = useState<DatasourceConfig | null>(null);
@@ -136,7 +139,7 @@ function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledge
               Next
             </Button>
           ) : (
-            <Button variant="contained" disabled={!stepValid[step] || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
+            <Button variant="contained" disabled={!canManage || !stepValid[step] || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
               {create.isPending ? 'Adding…' : 'Add Data Source'}
             </Button>
           )}

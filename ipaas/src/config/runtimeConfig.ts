@@ -57,6 +57,7 @@ interface RuntimeConfig {
   /** Which tracking codes (GTM container, CookiePro domain script) to load: 'dev' | 'stage' | 'prod', or 'off' for none. Unset or unrecognized defaults to 'dev'. */
   TRACKING_ENV?: string;
   MOESIF_APP_API_KEY?: string;
+  SCOPES_ENFORCED?: string | boolean;
 }
 
 export interface ApiConfig {
@@ -137,6 +138,8 @@ export interface ApiConfig {
   trackingEnv: 'dev' | 'stage' | 'prod' | 'off';
   /** Moesif app key for product-usage analytics. Separate from the API Insights embed above. Unset disables Moesif tracking. */
   moesifAppApiKey?: string;
+  /** Hide actions the user's role doesn't allow. Set from the same deployment variable as ipaas-service's SCOPES_ENFORCED, so the console hides what ipaas-service refuses. */
+  scopesEnforced?: boolean;
 }
 
 // Extend window interface
@@ -250,6 +253,7 @@ export async function loadConfig(): Promise<void> {
       trackingEnv: parseTrackingEnv(config.TRACKING_ENV),
       // config.json is untyped: a non-string value must not throw here and reset the whole config.
       moesifAppApiKey: typeof config.MOESIF_APP_API_KEY === 'string' ? config.MOESIF_APP_API_KEY.trim() || undefined : undefined,
+      scopesEnforced: config.SCOPES_ENFORCED === 'true' || config.SCOPES_ENFORCED === true,
     };
 
     console.info('✓ Runtime configuration loaded from config.json');

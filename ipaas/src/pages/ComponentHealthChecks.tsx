@@ -25,7 +25,7 @@ import HealthCheckCard from '../components/HealthChecks/HealthCheckCard';
 import CreateHealthCheckStepper from '../components/HealthChecks/CreateHealthCheckStepper';
 import EnvironmentSelect from '../components/common/EnvironmentSelect';
 import { useAccessControl } from '../contexts/AccessControlContext';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { useHealthChecks } from '../hooks/useHealthChecks';
 import { useRelease } from '../hooks/useDevopsConfigs';
 import { useComponentByHandler } from '../hooks/useComponents';
@@ -42,7 +42,7 @@ export default function ComponentHealthChecks({ org, project, component }: Compo
   const { projectId } = useProjectId(project);
   const { hasPermission } = useAccessControl();
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
-  const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, comp?.id);
+  const canManage = hasPermission(Scopes.INTEGRATION_UPDATE, projectId, comp?.id);
 
   const { tracks, trackId } = useSelectedTrack(comp);
 

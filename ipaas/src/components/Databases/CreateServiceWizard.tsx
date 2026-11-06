@@ -24,6 +24,8 @@ import PlanCard from './PlanCard';
 import TemporalPlanCard from '../Temporal/TemporalPlanCard';
 import { DatabasePlansSkeleton } from './DatabaseSkeletons';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import { useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import { useCreateDatabaseServer, useDatabaseOffering, useDatabaseServers } from '../../hooks/useDatabases';
 import { useCreateTemporalServer, useTemporalOffering, useTemporalServers } from '../../hooks/useTemporal';
@@ -71,6 +73,7 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
   const createDatabase = useCreateDatabaseServer();
   const createTemporal = useCreateTemporalServer();
   const create = isTemporal ? createTemporal : createDatabase;
+  const canManage = useCan()(Scopes.CONFIG_MANAGE);
 
   const [name, setName] = useState('');
   // An unset pick falls back to the default plan, so the choice is always a valid offering.
@@ -91,7 +94,7 @@ export default function CreateServiceWizard({ scope, onCancel, initialKind }: Cr
   const nameError = validateName(name, takenNames ?? [], offering.data?.maxNameLength);
   const nameReady = name !== '' && !nameError && takenNames !== null;
   const allowLeave = useUnsavedChanges(name !== '' && !create.isSuccess);
-  const canCreate = nameReady && !!planId && !offering.isError && !create.isPending;
+  const canCreate = canManage && nameReady && !!planId && !offering.isError && !create.isPending;
   const createError = create.isError ? (isTemporal ? toCreateTemporalError(create.error) : toCreateDatabaseError(create.error)) : null;
 
   // The heading stays mounted across steps, so it can take focus at once; the details step focuses its name field itself.

@@ -20,6 +20,8 @@ import { Alert, Box, Button, Chip, CircularProgress, IconButton, Skeleton, Stack
 import { Cpu, Eye, EyeOff, Layers, MemoryStick, RefreshCw, Server } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { useRevealTemporalCredentials } from '../../hooks/useTemporal';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import { DATABASE_STATUS_COLORS, DATABASE_STATUS_LABELS } from '../../constants/databases';
 import { cpuLabel, memoryLabel, planLabel } from '../../utils/databases';
 import CopyField from '../Databases/CopyField';
@@ -56,6 +58,7 @@ interface TemporalOverviewTabProps {
 export default function TemporalOverviewTab({ service, plan, planLoading, onRefresh, isRefreshing }: TemporalOverviewTabProps): JSX.Element {
   const reveal = useRevealTemporalCredentials(service.id);
   const [showKey, setShowKey] = useState(false);
+  const canReveal = useCan()(Scopes.CONFIG_MANAGE);
   const credentials = reveal.data;
   // Workers dial host:port as one address.
   const address = service.host && service.port ? `${service.host}:${service.port}` : service.host;
@@ -117,18 +120,20 @@ export default function TemporalOverviewTab({ service, plan, planLoading, onRefr
             />
           </DetailRow>
         ) : (
-          <DetailRow label="API Key:" labelWidth={LABEL_WIDTH}>
-            <Stack gap={0.5} alignItems="flex-start">
-              <Button variant="outlined" size="small" startIcon={reveal.isPending ? <CircularProgress size={14} color="inherit" /> : <Eye size={16} />} disabled={reveal.isPending || service.status !== 'ACTIVE'} onClick={() => reveal.mutate()}>
-                View API Key
-              </Button>
-              {reveal.isError && (
-                <Typography variant="caption" color="error">
-                  {reveal.error.message}
-                </Typography>
-              )}
-            </Stack>
-          </DetailRow>
+          canReveal && (
+            <DetailRow label="API Key:" labelWidth={LABEL_WIDTH}>
+              <Stack gap={0.5} alignItems="flex-start">
+                <Button variant="outlined" size="small" startIcon={reveal.isPending ? <CircularProgress size={14} color="inherit" /> : <Eye size={16} />} disabled={reveal.isPending || service.status !== 'ACTIVE'} onClick={() => reveal.mutate()}>
+                  View API Key
+                </Button>
+                {reveal.isError && (
+                  <Typography variant="caption" color="error">
+                    {reveal.error.message}
+                  </Typography>
+                )}
+              </Stack>
+            </DetailRow>
+          )
         )}
         <Typography variant="caption" color="text.secondary" component="p" sx={{ px: 3, py: 1.5, m: 0, borderTop: '1px solid', borderColor: 'divider' }}>
           Connect workers over TLS to the address above, in the namespace above, sending the API key as a bearer token.

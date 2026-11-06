@@ -50,7 +50,8 @@ import { buildCloudEditorUrl } from '../utils/cloudEditor';
 import { useProjectId } from '../hooks/useProjects';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useOrgComponentLimits, useOrgSubscriptions } from '../hooks/useOrg';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
 import { useSamples } from '../hooks/useSamples';
 import { trackEvent } from '../services/tracking/tracking';
@@ -94,8 +95,9 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const isUpgraded = (subscriptions ?? []).some((sub) => sub.subscriptionType === 'devant-subscription' && sub.subscriptionStatus === 'active');
   const quotaReached = !isUpgraded && (orgLimits?.billableComponentCount ?? 0) >= FREE_COMPONENT_LIMIT;
-  const canManage = hasAnyPermission([Permissions.INTEGRATION_MANAGE], projectId);
+  const canManage = hasAnyPermission([Scopes.INTEGRATION_CREATE], projectId);
   const creationBlocked = !canManage || quotaReached;
+  const canUseEditor = useCan()(Scopes.EDITOR_USE);
   const blockedTooltip = !canManage ? 'You do not have permission to create integrations.' : 'You have exceeded the allocated integration quota. Upgrade your subscription.';
   const { features } = useFeaturePreview();
   const aiBuilderEnabled = !!features['AI Integration Builder'];
@@ -265,21 +267,23 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
               </Box>
             </Box>
           ) : (
-            /* Cloud Editor card */
-            <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-              <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
-                <Typography variant="body2" sx={SECTION_LABEL_SX}>
-                  {standalone ? 'Create an integration on Cloud' : 'Create on Cloud'}
-                </Typography>
-              </Stack>
-              <Card sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
-                <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
-                  <Box sx={{ flex: 1, minHeight: 260, overflow: 'hidden' }}>
-                    <IDEMockup onOpenClick={handleOpenCloudEditor} />
-                  </Box>
-                </CardContent>
-              </Card>
-            </Box>
+            canUseEditor && (
+              /* Cloud Editor card */
+              <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
+                  <Typography variant="body2" sx={SECTION_LABEL_SX}>
+                    {standalone ? 'Create an integration on Cloud' : 'Create on Cloud'}
+                  </Typography>
+                </Stack>
+                <Card inert={creationBlocked} sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
+                  <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
+                    <Box sx={{ flex: 1, minHeight: 260, overflow: 'hidden' }}>
+                      <IDEMockup onOpenClick={handleOpenCloudEditor} />
+                    </Box>
+                  </CardContent>
+                </Card>
+              </Box>
+            )
           )}
 
           {/* Import Integration card */}
@@ -293,7 +297,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                 {standalone ? 'Import your own integration' : 'Import your own'}
               </Typography>
             )}
-            <Card sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
+            <Card inert={creationBlocked} sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
               <CardContent
                 sx={{
                   display: 'flex',
@@ -306,12 +310,16 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                 {aiBuilderEnabled ? (
                   <>
                     {/* Create on Cloud affordance (view1: folded into the "Create it yourself" row) */}
-                    <Button variant="text" onClick={handleOpenCloudEditor} data-cyid="create-on-cloud-btn" startIcon={<Plus size={20} />} sx={{ flexShrink: 0, color: 'primary.main', fontWeight: 500, textTransform: 'none', '&:hover': { opacity: 0.85 } }}>
-                      Create on Cloud
-                    </Button>
+                    {canUseEditor && (
+                      <>
+                        <Button variant="text" onClick={handleOpenCloudEditor} data-cyid="create-on-cloud-btn" startIcon={<Plus size={20} />} sx={{ flexShrink: 0, color: 'primary.main', fontWeight: 500, textTransform: 'none', '&:hover': { opacity: 0.85 } }}>
+                          Create on Cloud
+                        </Button>
 
-                    {/* Vertical divider */}
-                    <Box sx={{ width: '2px', alignSelf: 'stretch', bgcolor: 'divider', flexShrink: 0 }} />
+                        {/* Vertical divider */}
+                        <Box sx={{ width: '2px', alignSelf: 'stretch', bgcolor: 'divider', flexShrink: 0 }} />
+                      </>
+                    )}
 
                     {/* Import label */}
                     <Box sx={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 1 }}>

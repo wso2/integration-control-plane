@@ -20,6 +20,8 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AuthContextValue } from './types';
+import { Scopes } from '../constants/permissions';
+import { sessionPermissions } from '../utils/permissions';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -209,6 +211,18 @@ describe('cloud AuthProvider — settling the session', () => {
     expect(auth).toMatchObject({ isAuthenticated: true, userId: 'u1', username: 'ada@example.com', displayName: 'Ada Lovelace', pictureUrl: 'https://img.example/ada.png', orgHandle: 'acme' });
     expect(localStorage.getItem('icp:org_handle')).toBe('acme');
     expect(getOrgUuidFromToken()).toBe('org-uuid');
+  });
+
+  it("carries the access token's scopes, or none when it has no scope claim", async () => {
+    signedInSdk(accessToken({ scope: 'openid cloud:project:read  cloud:organization:view' }));
+    await render();
+    expect(auth?.scopes).toEqual(['openid', 'cloud:project:read', 'cloud:organization:view']);
+
+    root.unmount();
+    root = createRoot(container);
+    signedInSdk();
+    await render();
+    expect(auth?.scopes).toEqual([]);
   });
 
   it('connects the token for requests made outside React', async () => {
@@ -477,6 +491,15 @@ describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
     expect(auth).toMatchObject({ isAuthenticated: true, userId: 'u1', displayName: 'Ada Lovelace', orgHandle: 'acme' });
     expect(getOrgUuidFromToken()).toBe('org-uuid');
     expect(sdk.get().getAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('has no scopes, since the gateway keeps the access token, and resolves permissions from none', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => ({ ...GATEWAY_CLAIMS, scope: 'openid ipaas:integration:read' })) });
+    await render();
+
+    expect(auth?.scopes).toEqual([]);
+    expect(sessionPermissions(auth!.scopes, true)).toEqual([]);
+    expect(sessionPermissions(auth!.scopes, false)).toEqual(Object.values(Scopes));
   });
 
   it('never tries a silent sign-in: the session check joins the cloud console’s session', async () => {

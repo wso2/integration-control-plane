@@ -52,6 +52,7 @@ export default function LinkRepositoryForm({ project, orgHandler, onDone }: Link
     refetchRepos,
     isAuthenticated,
     authStatus,
+    canConnect,
     startGitHubAuth,
     startGitHubAppInstall,
     isCheckingAuth,
@@ -115,7 +116,9 @@ export default function LinkRepositoryForm({ project, orgHandler, onDone }: Link
             <Button startIcon={<ArrowLeft size={14} />} size="small" onClick={resetSource} sx={{ mb: 2 }}>
               Choose a different provider
             </Button>
-            {gitProvider === 'github' && <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />}
+            {gitProvider === 'github' && (
+              <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} canConnect={canConnect} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />
+            )}
             <RepoSourceFields source={source} />
           </Box>
         )}

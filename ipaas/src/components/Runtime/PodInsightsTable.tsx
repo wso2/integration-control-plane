@@ -40,10 +40,10 @@ interface PodInsightsTableProps {
   /** Replica count or min/max steppers, owned by the page since it holds the scaling state. */
   replicasControl: ReactNode;
   /** Both row actions read live cluster state, so they follow the Integration manage grant. */
-  canManage: boolean;
+  canReadLogs: boolean;
 }
 
-export default function PodInsightsTable({ pods, isLoading, isError, isFetching, onRefresh, scope, replicasControl, canManage }: PodInsightsTableProps): JSX.Element {
+export default function PodInsightsTable({ pods, isLoading, isError, isFetching, onRefresh, scope, replicasControl, canReadLogs }: PodInsightsTableProps): JSX.Element {
   const rows = useMemo(() => pods ?? [], [pods]);
   const { running, total } = runningPodCount(rows);
   // The pod outlives its `open` flag so the drawer can finish sliding out before unmounting.
@@ -146,16 +146,14 @@ export default function PodInsightsTable({ pods, isLoading, isError, isFetching,
                       <ListingTable.Cell>{lastActivity ? <RelativeTime time={formatDistanceToNow(lastActivity)} dateTime={lastActivity} tooltip={formatDateTime(lastActivity)} /> : '—'}</ListingTable.Cell>
                       <ListingTable.Cell align="right">
                         <Stack direction="row" justifyContent="flex-end" gap={0.5}>
-                          <Tooltip title={canManage ? POD_ACTION_LABELS.events : POD_ACTION_LABELS.noPermission}>
-                            <span>
-                              <IconButton size="small" aria-label={POD_ACTION_LABELS.events} disabled={!canManage} onClick={() => openEvents(pod)}>
-                                <Activity size={18} />
-                              </IconButton>
-                            </span>
+                          <Tooltip title={POD_ACTION_LABELS.events}>
+                            <IconButton size="small" aria-label={POD_ACTION_LABELS.events} onClick={() => openEvents(pod)}>
+                              <Activity size={18} />
+                            </IconButton>
                           </Tooltip>
-                          <Tooltip title={canManage ? POD_ACTION_LABELS.logs : POD_ACTION_LABELS.noPermission}>
+                          <Tooltip title={canReadLogs ? POD_ACTION_LABELS.logs : POD_ACTION_LABELS.noPermission}>
                             <span>
-                              <IconButton size="small" aria-label={POD_ACTION_LABELS.logs} disabled={!canManage} onClick={() => openLogs(pod)}>
+                              <IconButton size="small" aria-label={POD_ACTION_LABELS.logs} disabled={!canReadLogs} onClick={() => openLogs(pod)}>
                                 <ScrollText size={18} />
                               </IconButton>
                             </span>

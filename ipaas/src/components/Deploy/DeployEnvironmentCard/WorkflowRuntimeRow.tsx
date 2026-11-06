@@ -20,6 +20,8 @@ import { Box, Button, Chip, Skeleton, Stack, Typography } from '@wso2/oxygen-ui'
 import type { JSX } from 'react';
 import { useEnsureWorkflowRuntime, useWorkflowRuntime } from '../../../hooks/useWorkflowRuntime';
 import type { WorkflowRuntimeStatus } from '../../../types/workflowRuntime';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 
 const STATUS_CHIP: Record<WorkflowRuntimeStatus, { label: string; color: 'success' | 'warning' | 'error' | 'default' }> = {
   READY: { label: 'Ready', color: 'success' },
@@ -44,6 +46,7 @@ interface WorkflowRuntimeRowProps {
 export default function WorkflowRuntimeRow({ environment }: WorkflowRuntimeRowProps): JSX.Element {
   const { data: runtime, isLoading, isError, refetch } = useWorkflowRuntime();
   const ensure = useEnsureWorkflowRuntime();
+  const canEnsure = useCan()(Scopes.INTEGRATION_CREATE);
 
   if (isLoading) return <Skeleton variant="rounded" height={40} sx={{ mt: 2 }} />;
   if (isError || !runtime) {
@@ -87,9 +90,11 @@ export default function WorkflowRuntimeRow({ environment }: WorkflowRuntimeRowPr
           <Typography variant="caption" color={ensure.isError ? 'error' : 'text.secondary'}>
             {ensure.isError ? ensure.error.message : 'The runtime is not running.'}
           </Typography>
-          <Button size="small" onClick={() => ensure.mutate()} disabled={ensure.isPending}>
-            {ensure.isPending ? 'Starting…' : 'Retry'}
-          </Button>
+          {canEnsure && (
+            <Button size="small" onClick={() => ensure.mutate()} disabled={ensure.isPending}>
+              {ensure.isPending ? 'Starting…' : 'Retry'}
+            </Button>
+          )}
         </Stack>
       )}
     </Box>
