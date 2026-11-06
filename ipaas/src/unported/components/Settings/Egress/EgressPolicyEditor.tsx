@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, Stack, Tooltip } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Box, Button, Chip, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, ListingTable, Stack, Tooltip, TextField } from '@wso2/oxygen-ui';
 import { Plus, ShieldOff, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import Authorized from '../../../../components/Authorized';
@@ -139,8 +138,17 @@ export default function EgressPolicyEditor({ projectId }: EgressPolicyEditorProp
 
           <Authorized permissions={Permissions.ENVIRONMENT_MANAGE}>
             <Stack direction="row" gap={1} alignItems="flex-start" sx={{ mb: 3 }}>
-              <TextField label="Rule name" value={ruleName} onChange={(e) => setRuleName(e.target.value)} size="small" sx={{ flex: 1 }} />
-              <TextField label={mode === 'allow-all' ? 'CIDR' : 'CIDR or domain'} value={ruleValue} onChange={(e) => setRuleValue(e.target.value)} size="small" sx={{ flex: 1 }} error={!!valueError || !!formError} helperText={valueError || formError || ' '} />
+              <TextField labelPlacement="top" label="Rule name" value={ruleName} onChange={(e) => setRuleName(e.target.value)} size="small" sx={{ flex: 1 }} />
+              <TextField
+                labelPlacement="top"
+                label={mode === 'allow-all' ? 'CIDR' : 'CIDR or domain'}
+                value={ruleValue}
+                onChange={(e) => setRuleValue(e.target.value)}
+                size="small"
+                sx={{ flex: 1 }}
+                error={!!valueError || !!formError}
+                helperText={valueError || formError || ' '}
+              />
               <Button
                 variant="contained"
                 startIcon={saving ? <CircularProgress size={16} color="inherit" /> : <Plus size={16} />}

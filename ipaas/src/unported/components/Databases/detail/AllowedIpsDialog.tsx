@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateAllowedIps } from '../../../../hooks/usePlatformServices';
@@ -78,6 +77,7 @@ export default function AllowedIpsDialog({ serverId, variant = 'db-servers', cur
             {rows.map((row, i) => (
               <Stack key={i} direction="row" gap={1} alignItems="flex-start">
                 <TextField
+                  labelPlacement="top"
                   size="small"
                   label="CIDR Block"
                   value={row.cidr}
@@ -86,7 +86,7 @@ export default function AllowedIpsDialog({ serverId, variant = 'db-servers', cur
                   helperText={row.cidr.trim() !== '' && !isValidCidr(row.cidr) ? 'Enter a valid CIDR (e.g. 10.0.0.0/24).' : ' '}
                   sx={{ flex: '0 0 40%' }}
                 />
-                <TextField size="small" label="Description" value={row.description} onChange={(e) => patchRow(i, { description: e.target.value })} fullWidth />
+                <TextField labelPlacement="top" size="small" label="Description" value={row.description} onChange={(e) => patchRow(i, { description: e.target.value })} fullWidth />
                 <Tooltip title="Remove">
                   <span>
                     <IconButton size="small" color="error" aria-label="Remove CIDR block" onClick={() => removeRow(i)} disabled={rows.length === 1} sx={{ mt: 0.5 }}>

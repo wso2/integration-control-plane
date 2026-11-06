@@ -18,51 +18,24 @@
 
 import { useEffect } from 'react';
 import type { JSX } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router';
-import { saveRedirectUrl, useAuth } from '#auth';
+import { Navigate, Outlet } from 'react-router';
+import { saveRedirectUrl, useAuth } from '../auth';
 import { useAccessControl } from '../contexts/AccessControlContext';
-import { fetchOrgPermissions } from '#api/auth';
-import { loginUrl, forceChangePasswordUrl } from '../paths';
+import { loginUrl } from '../paths';
 import { Permissions } from '../constants/permissions';
 
 export default function ProtectedRoute(): JSX.Element {
-  const { isAuthenticated, userId, requirePasswordChange, isOidcUser } = useAuth();
+  const { isAuthenticated, userId } = useAuth();
   const { setOrgPermissions } = useAccessControl();
-  const { pathname } = useLocation();
 
   useEffect(() => {
-    if (!isAuthenticated || !userId) {
-      setOrgPermissions([]);
-      return;
-    }
-
-    if (isOidcUser) {
-      // OIDC users are authorized by Choreo/WSO2 Identity Platform with an org-scoped STS token.
-      // The local ICP permission backend does not apply — grant all ipass permissions.
-      setOrgPermissions(Object.values(Permissions));
-      return;
-    }
-
-    // For local-auth users, extract the org handle from the current URL path.
-    // Skip fetching on non-org routes (e.g. /profile, /change-password).
-    const orgMatch = pathname.match(/^\/organizations\/([^/]+)/);
-    if (!orgMatch) return;
-    fetchOrgPermissions(orgMatch[1], userId)
-      .then((data) => setOrgPermissions(data.permissionNames))
-      .catch((err) => {
-        setOrgPermissions([]);
-        console.error('Failed to fetch org permissions', err);
-      });
-  }, [isAuthenticated, userId, isOidcUser, pathname, setOrgPermissions]);
+    // The org-scoped token is the authorization; the console has no permission backend of its own.
+    setOrgPermissions(isAuthenticated && userId ? Object.values(Permissions) : []);
+  }, [isAuthenticated, userId, setOrgPermissions]);
 
   if (!isAuthenticated) {
     saveRedirectUrl(window.location.href);
     return <Navigate to={loginUrl()} replace />;
-  }
-
-  // Only WIP local login sets this; cloud sign-in never does. Remove with the WIP auth.
-  if (requirePasswordChange && pathname !== forceChangePasswordUrl()) {
-    return <Navigate to={forceChangePasswordUrl()} replace />;
   }
 
   return <Outlet />;

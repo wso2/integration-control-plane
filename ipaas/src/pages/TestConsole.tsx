@@ -16,19 +16,16 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, CircularProgress, Divider, IconButton, InputAdornment, OutlinedInput, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, CircularProgress, Divider, IconButton, InputAdornment, OutlinedInput, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Check, Copy, Eye, EyeOff, Key } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import SwaggerUI from 'swagger-ui-react';
 import 'swagger-ui-react/swagger-ui.css';
 import '../swagger-ui-overrides.scss';
-import { IS_CLOUD } from '../features';
 import { endpointLoadNotice } from '../utils/apiSecurity';
 import { isBrowserReachable, visibilityUrlOptions } from '../utils/endpoints';
-import { useApimSwagger, useGenerateTestKey } from '../hooks/useApim';
+import { useApimSwagger } from '../hooks/useApim';
 import { useComponentByHandler } from '../hooks/useComponents';
-import { APIM_TEST_KEY_HEADER } from '../constants/apiConsumption';
 import { useEndpointPolicies } from '../hooks/useConsumers';
 import { useEndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import { useComponentDeployment, useEnvEndpoints } from '../hooks/useDeployments';
@@ -37,7 +34,9 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import NotFound from '../components/NotFound';
 import { useProjectId } from '../hooks/useProjects';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import type { EndpointRef } from '../types/consumers';
+import { trackEvent } from '../services/tracking/tracking';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
 
 import NotDeployedAlert from '../components/NotDeployedAlert';
@@ -60,7 +59,7 @@ const HideTopPlugin = () => ({
 export default function TestConsole(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
 
-  const { projectId, project } = useProjectId(scope.project);
+  const { projectId } = useProjectId(scope.project);
 
   // Component + environments
   const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
@@ -68,9 +67,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   // Deployment track selection (default to latest) — derived rather than synced via an effect,
   // since an effect+render round trip here would delay useComponentDeployment/useEnvEndpoints below.
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  const [selectedTrackIdState, setSelectedTrackId] = useState('');
-  const selectedTrackId = tracks.some((t) => t.id === selectedTrackIdState) ? selectedTrackIdState : (tracks.find((t) => t.latest)?.id ?? tracks[0]?.id ?? '');
+  const { tracks, trackId: selectedTrackId } = useSelectedTrack(component);
 
   // Environment selection (by ID for stability across refetches) — same reasoning.
   const [selectedEnvIdState, setSelectedEnvId] = useState('');
@@ -91,24 +88,26 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
   const selectedEndpoint = endpoints.find((e) => e.id === selectedEndpointId) ?? null;
 
   // environmentName is the environment slug, which toEnvironment puts in `id` — `name` is the label.
-  // Cloud mints the test key from the BFF's test-key route (component/environment/endpoint triple)
-  // and exposes the enforcing API Platform gateway URL via the endpoint's security config; wip/icp
-  // mint from APIM against apimId (below).
+  // The test key comes from the BFF's test-key route (component/environment/endpoint triple), and
+  // the enforcing API Platform gateway URL from endpoint discovery. Security may also return a
+  // URL, in which case useEndpointTestAccess prefers it.
   const testKeyEndpointRef: EndpointRef | null = useMemo(
-    () => (IS_CLOUD && component && selectedEnv && selectedEndpoint ? { componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id } : null),
-    [component, selectedEnv, selectedEndpoint],
+    () => (component && selectedEnv && selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: selectedEnv.id, endpointName: selectedEndpoint.id, deploymentTrackId: selectedTrackId } : null),
+    [projectId, component, selectedEnv, selectedEndpoint, selectedTrackId],
   );
-  const access = useEndpointTestAccess(testKeyEndpointRef, IS_CLOUD && !!testKeyEndpointRef);
+  // Mint the initial test key when the console resolves an api-key-secured endpoint;
+  // the button below explicitly refreshes it on demand after that.
+  const access = useEndpointTestAccess(testKeyEndpointRef, !!testKeyEndpointRef, selectedEndpoint?.publicUrl || '');
   // Try-it-out runs in the browser, so the gateway must return CORS headers for this origin.
-  const { data: endpointPolicies } = useEndpointPolicies(testKeyEndpointRef, IS_CLOUD && !!testKeyEndpointRef);
-  const testKeyHeader = IS_CLOUD ? access.authHeader : APIM_TEST_KEY_HEADER;
-  const corsBlocked = IS_CLOUD && !!endpointPolicies && endpointPolicies.cors?.enabled === false;
+  const { data: endpointPolicies } = useEndpointPolicies(testKeyEndpointRef, !!testKeyEndpointRef);
+  const testKeyHeader = access.authHeader;
+  const corsBlocked = !!endpointPolicies && endpointPolicies.cors?.enabled === false;
 
   // Public is the gateway host where a key is enforced; without one the option is dropped, not downgraded to the endpoint's open route.
   const visibilityOptions = useMemo(() => {
     if (!selectedEndpoint) return [];
     const options = visibilityUrlOptions(selectedEndpoint, access.gatewayUrl);
-    return IS_CLOUD && !access.gatewayUrl ? options.filter((o) => o.key !== 'public') : options;
+    return access.gatewayUrl ? options : options.filter((o) => o.key !== 'public');
   }, [selectedEndpoint, access.gatewayUrl]);
   const [selectedVisibilityKey, setSelectedVisibilityKey] = useState('');
   const selectedVisibility = visibilityOptions.find((v) => v.key === selectedVisibilityKey) ?? visibilityOptions[0] ?? null;
@@ -126,58 +125,39 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
     setSecurityHeader(value);
   };
   const [showKey, setShowKey] = useState(false);
-  const [apimFetching, setApimFetching] = useState(false);
-  const [apimKeyError, setApimKeyError] = useState<string | null>(null);
   const [keyCopied, setKeyCopied] = useState(false);
   const [urlCopied, setUrlCopied] = useState(false);
 
-  const generateKeyMutation = useGenerateTestKey();
   // Not offered for an open endpoint: the BFF's test-key route switches enforcement to api-key,
   // so minting one would secure an endpoint the user deliberately left open.
-  const canGetTestKey = IS_CLOUD ? !!testKeyEndpointRef && (access.mode === 'api-key' || access.mode === 'jwt') : !!selectedEndpoint?.apimId;
-  const fetchingKey = IS_CLOUD ? access.isMinting : apimFetching;
+  const canGetTestKey = !!testKeyEndpointRef && (access.mode === 'api-key' || access.mode === 'jwt');
+  const fetchingKey = access.isMinting;
   const unavailableNotice = endpointLoadNotice(access.securityError, {
     notExposed: 'This endpoint isn’t exposed as an API yet, so there is no gateway URL to test against. Set its visibility to Public and deploy, then come back.',
     unavailable: 'API testing isn’t available in this environment.',
     readFailed: 'Could not read this endpoint’s security configuration.',
   });
-  const keyError = IS_CLOUD ? access.keyError : apimKeyError;
+  const keyError = access.keyError;
 
-  // Cleared, not just replaced: the hook keys a minted key to its endpoint, so selecting one with
-  // no key must not leave the previous endpoint's credential in the field.
+  // Cleared, not just replaced: the hook keys a minted key to its endpoint and track, so selecting one with
+  // no key must not leave the previous one's credential in the field. Each track has its own API, so a track
+  // change resets the field even when neither track has a minted key.
   useEffect(() => {
-    if (IS_CLOUD) updateSecurityHeader(access.apiKey ?? '');
-  }, [access.apiKey]);
+    updateSecurityHeader(access.apiKey ?? '');
+  }, [access.apiKey, selectedTrackId]);
 
   const handleGetTestKey = async () => {
     if (!canGetTestKey) return;
-    if (IS_CLOUD) {
-      const key = await access.mintKey();
-      if (key) updateSecurityHeader(key);
-      return;
-    }
-    setApimFetching(true);
-    setApimKeyError(null);
-    try {
-      const key = (await generateKeyMutation.mutateAsync({ apimId: selectedEndpoint!.apimId!, keyType: selectedEnv?.critical ? 'Production' : 'Development' }))?.apikey;
-      if (key) {
-        updateSecurityHeader(key);
-      } else {
-        setApimKeyError('No test key available. Please check your permissions.');
-      }
-    } catch {
-      setApimKeyError('Failed to fetch test key.');
-    } finally {
-      setApimFetching(false);
+    const key = await access.mintKey();
+    if (key) {
+      updateSecurityHeader(key);
+      trackEvent('component-test-openapi-get-test-key');
     }
   };
 
-  // Swagger spec for the selected endpoint. Cloud carries the endpoint's base64
-  // OpenAPI in `apimRevisionId` (there is no APIM behind it); wip resolves an
-  // APIM revision from the same field.
-  // `||`, not `??`: an empty revision id is as unusable as a missing one and must
-  // still fall through to the apimId.
-  const { data: swaggerRaw, isLoading: loadingSwagger } = useApimSwagger(selectedEndpoint?.apimRevisionId || selectedEndpoint?.apimId || null);
+  // Swagger spec for the selected endpoint: its base64 OpenAPI arrives in `apimRevisionId`.
+  // `||`, not `??`: an empty value is as unusable as a missing one.
+  const { data: swaggerRaw, isLoading: loadingSwagger } = useApimSwagger(selectedEndpoint?.apimRevisionId || null);
   const swagger = swaggerRaw ?? null;
 
   // Override the swagger spec's server URL with the selected invoke URL so
@@ -189,14 +169,14 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   if (loadingComponent) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
   }
 
   if (!component) {
-    return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+    return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
   }
 
   const envSelector = environments.length > 1 && (
@@ -213,11 +193,11 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
 
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? scope.project} componentHandler={component.handler} extra={envSelector} />}
+      {tracks.length > 0 && <DeploymentTrackBar component={component} extra={envSelector} />}
 
-      <PageContent>
+      <PageContent fullWidth>
         <Typography variant="h1" sx={{ mb: 3 }}>
-          Test Console
+          Test console
         </Typography>
 
         {/* Nothing deployed to call — explain rather than render an empty endpoint picker. */}
@@ -287,8 +267,9 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                       sx={{ flex: 1, fontFamily: 'monospace', fontSize: '0.8rem' }}
                       endAdornment={
                         <InputAdornment position="end">
-                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to Clipboard'}>
+                          <Tooltip title={urlCopied ? 'Copied!' : 'Copy to clipboard'}>
                             <IconButton
+                              aria-label="Copy invoke URL"
                               size="small"
                               onClick={() => {
                                 navigator.clipboard.writeText(invokeUrl);
@@ -308,7 +289,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                 {testable && (
                   <Stack direction="row" alignItems="flex-start" gap={2}>
                     <Typography variant="body2" sx={{ minWidth: 140, fontWeight: 500, color: 'text.secondary', pt: 1 }}>
-                      Security Header
+                      Security header
                       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 400 }}>
                         {testKeyHeader}
                       </Typography>
@@ -325,12 +306,13 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                           endAdornment={
                             <InputAdornment position="end">
                               <Tooltip title={showKey ? 'Hide' : 'Show'}>
-                                <IconButton size="small" onClick={() => setShowKey((s) => !s)}>
+                                <IconButton aria-label={showKey ? 'Hide key' : 'Show key'} size="small" onClick={() => setShowKey((s) => !s)}>
                                   {showKey ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </IconButton>
                               </Tooltip>
                               <Tooltip title={keyCopied ? 'Copied!' : 'Copy'}>
                                 <IconButton
+                                  aria-label="Copy key"
                                   size="small"
                                   disabled={!securityHeader}
                                   onClick={() => {
@@ -351,7 +333,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                           disabled={fetchingKey || !canGetTestKey}
                           onClick={handleGetTestKey}
                           sx={{ whiteSpace: 'nowrap', textTransform: 'none' }}>
-                          Get Test Key
+                          Get test key
                         </Button>
                       </Stack>
                       {keyError && (
@@ -372,7 +354,7 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
               <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
                 <CircularProgress />
               </Box>
-            ) : IS_CLOUD && access.isUnavailable ? (
+            ) : access.isUnavailable ? (
               // 409 is a state ("not exposed yet"); any other status is a read that failed and may succeed on a retry.
               <Alert severity={unavailableNotice?.severity ?? 'info'}>{unavailableNotice?.text ?? 'This endpoint is not exposed on the API Platform gateway yet, so it cannot be tested from here.'}</Alert>
             ) : !testable && selectedVisibility ? (
@@ -400,6 +382,10 @@ export default function TestConsole(scope: ComponentScope): JSX.Element {
                         request.headers[testKeyHeaderRef.current] = securityHeaderRef.current;
                       }
                       return request;
+                    }}
+                    responseInterceptor={(response) => {
+                      trackEvent('component-test-execute', { status: response.status });
+                      return response;
                     }}
                   />
                 </Box>

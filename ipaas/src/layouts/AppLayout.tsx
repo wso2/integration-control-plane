@@ -19,7 +19,6 @@
 import {
   AppShell,
   Button,
-  Chip,
   ColorSchemeToggle,
   ComplexSelect,
   Dialog,
@@ -31,20 +30,20 @@ import {
   Footer,
   Header,
   IconButton,
-  InputAdornment,
+  SearchBar,
   MenuItem,
   Box,
   CircularProgress,
   Popover,
   Sidebar,
   Tooltip,
+  TrialBadge,
+  type TrialBadgeUsage,
   Typography,
   UserMenu,
   useAppShell,
 } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
@@ -52,25 +51,30 @@ import Logo from '../components/Logo';
 import NotFound from '../components/NotFound';
 import {
   Activity,
+  BookOpen,
   Boxes,
+  ChartColumn,
   ChevronDown,
   ChevronRight,
   Cog,
+  Database,
   FileLock,
   FlaskConical,
   Gauge,
   Hammer,
   HeartPulse,
   Layers,
+  Box as BoxIcon,
   LayoutDashboard,
   LogOut,
   Logs,
+  Maximize2,
   Plus,
   Rocket,
-  Search,
   Server,
   Settings2,
   SlidersHorizontal,
+  Sparkles,
   Waypoints,
   Workflow,
   X,
@@ -78,13 +82,17 @@ import {
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
 import { useFreshDefaultProject } from '../hooks/useFreshDefaultProject';
-import { useOrgs } from '../hooks/useOrg';
+import { useOrgComponentLimits, useOrgs } from '../hooks/useOrg';
 import { useBillingOrg } from '../hooks/useBillingOrg';
+import { useOrgUuid } from '../hooks/useOrgUuid';
+import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
+import { trialLengthDays } from '../utils/billing';
 import { isSupportedIntegration, GENERIC_SERVICE_TYPES } from '../constants/integrations';
+import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import { identifyIntegration } from '../utils/identifyIntegration';
-import { useOrgPermissions } from '../hooks/useAuth';
+import { useAuth } from '../auth';
 import { isContextEngineEnabled } from '../hooks/useContextEngine';
-import { switchOrgToken, useAuth } from '#auth';
+import { visibleComponentSettingsSections } from '../constants/componentSettingsSections';
 import {
   useScope,
   broaden,
@@ -104,42 +112,56 @@ import {
   type Scope,
 } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
-import { componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, registerOrgUrl, termsOfUseUrl } from '../paths';
+import { trackEvent } from '../services/tracking/tracking';
+import { billingUpgradeUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
+import { useLeaveGuard } from '../contexts/UnsavedChangesContext';
 
 // ComplexSelect is content-sized, and at org level there is no card beside the icon to stretch against.
 import { useLoadedImage } from '../hooks/useLoadedImage';
-import { Permissions } from '../constants/permissions';
+import { withTrackParam } from '../hooks/useSelectedTrack';
 import { DB_TRADEMARK_NOTICE } from '../constants/platformServices';
 import { UUID_RE, userInitials } from '../utils/string';
+import { configuredMoesifOrigin } from '../utils/moesif';
+import { local } from '../utils/storage';
+import { expandedMenusFrom } from '../utils/sidebar';
+
+const trialBadgeSx = { mx: 0.75 } as const;
 
 export default function AppLayout(): JSX.Element {
   const navigate = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
   const scope = useScope();
 
-  const queryClient = useQueryClient();
-  const { username, displayName, pictureUrl, logout, userId, isOidcUser } = useAuth();
+  const { username, displayName, pictureUrl, logout, userId, orgHandle: sessionOrg } = useAuth();
   const userName = displayName || username || 'User';
   // Oxygen falls back to one letter when a picture fails, so it only gets the picture once it has loaded.
   const loadedPicture = useLoadedImage(pictureUrl);
   const userAvatar = loadedPicture ?? userInitials(userName);
-  const { hasAnyPermission, setOrgPermissions } = useAccessControl();
+  const { hasAnyPermission } = useAccessControl();
+  const apiInsightsEnabled = configuredMoesifOrigin() !== null;
 
   // Billing trial indicator shown in the header.
-  const { org: billingOrg } = useBillingOrg('integration-platform');
+  const { org: billingOrg } = useBillingOrg(BILLING_PRODUCT_CODE);
   const billingTrial = billingOrg?.subscription?.status === 'trial' ? billingOrg.subscription.trial : null;
-  const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+  const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined;
+  const orgUuid = useOrgUuid();
+  const upgradeUrl = billingTrial && orgUuid ? billingUpgradeUrl(orgUuid) : null;
+  const openUpgrade = upgradeUrl ? () => window.open(upgradeUrl, '_blank', 'noopener,noreferrer') : undefined;
+  const { data: componentLimits } = useOrgComponentLimits(billingTrial ? (orgUuid ?? '') : '');
+  // The panel's own Upgrade button always renders, so the panel is shown only when it has somewhere to go.
+  const trialUsage: TrialBadgeUsage | undefined =
+    componentLimits && openUpgrade ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, onUpgrade: openUpgrade } : undefined;
 
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
   // a fresh literal here re-triggers it (and its setState) on every render, which on a
   // sub-'md'-breakpoint viewport becomes an infinite render loop.
-  const appShellOptions = useMemo(() => ({ initialCollapsed: localStorage.getItem('sidebar:collapsed') !== 'false' }), []);
+  const appShellOptions = useMemo(() => ({ initialCollapsed: local.get('sidebar:collapsed') === 'true' }), []);
   const { state: shell, actions } = useAppShell(appShellOptions);
 
   const handleToggleSidebar = () => {
-    localStorage.setItem('sidebar:collapsed', String(!shell.sidebarCollapsed));
+    local.set('sidebar:collapsed', String(!shell.sidebarCollapsed));
     actions.toggleSidebar();
   };
 
@@ -155,12 +177,20 @@ export default function AppLayout(): JSX.Element {
     document.title = formatDocumentTitle(pageTitleFor(activeNavId));
   }, [activeNavId]);
 
-  // Auto-expand the parent group when navigating to a child nav item.
+  // Groups start expanded, so only the ones the user closed are tracked.
+  const [collapsedMenus, setCollapsedMenus] = useState<ReadonlySet<string>>(() => new Set());
+  const expandedMenus = useMemo(() => expandedMenusFrom(collapsedMenus), [collapsedMenus]);
+  const toggleMenu = (id: string) =>
+    setCollapsedMenus((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+
+  // Navigating to a child reopens its group if the user had closed it.
   useEffect(() => {
     const parent = parentGroupId(scope, activeNavId);
-    if (parent && !shell.expandedMenus[parent]) {
-      actions.toggleMenu(parent);
-    }
+    if (parent) setCollapsedMenus((prev) => (prev.has(parent) ? new Set([...prev].filter((id) => id !== parent)) : prev));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeNavId]);
 
@@ -176,7 +206,9 @@ export default function AppLayout(): JSX.Element {
   const [componentMenuDir, setComponentMenuDir] = useState<'right' | 'below'>('right');
   const [componentSearch, setComponentSearch] = useState('');
   const componentSearchRef = useRef<HTMLInputElement>(null);
-  const { data: orgsData = [], isLoading: orgsLoading } = useOrgs();
+  const { data: orgsData = [] } = useOrgs();
+  // The handle stays in the URL; the header shows the org's display name when the token carries one.
+  const orgDisplayName = orgsData.find((o) => o.handle === scope.org)?.name || scope.org;
 
   const projectParam = hasProject(scope) ? scope.project : '';
   const isProjectUuid = UUID_RE.test(projectParam);
@@ -235,101 +267,16 @@ export default function AppLayout(): JSX.Element {
     return '';
   };
 
+  // The session is scoped to the org chosen at sign-in and can't be switched, so a link to any
+  // other org shows "no access" with a way back to the user's own org.
+  const orgAccessDenied = !!scope.org && scope.org !== sessionOrg;
+
   // Persist last visited project so post-login can navigate back to it
   useEffect(() => {
-    if (userId && hasProject(scope)) {
-      localStorage.setItem(`last_project:${userId}`, JSON.stringify({ org: scope.org, project: scope.project }));
+    if (userId && hasProject(scope) && !orgAccessDenied) {
+      local.set(`last_project:${userId}`, JSON.stringify({ org: scope.org, project: scope.project }));
     }
-  }, [userId, scope]);
-
-  const { data: orgPermsData, isError: isOrgPermsError } = useOrgPermissions(scope.org, userId, !isOidcUser);
-  useEffect(() => {
-    if (isOidcUser) {
-      // OIDC users are authorized via Choreo STS — grant all ICP permissions locally
-      setOrgPermissions(Object.values(Permissions));
-    } else if (orgPermsData) {
-      setOrgPermissions(orgPermsData.permissionNames);
-    } else if (isOrgPermsError) {
-      setOrgPermissions([]);
-    }
-  }, [isOidcUser, orgPermsData, isOrgPermsError, setOrgPermissions]);
-
-  // Recover org numeric ID if it was not saved during OIDC callback (e.g. old sessions)
-  const [, setOrgIdVersion] = useState(0);
-  useEffect(() => {
-    if (!isOidcUser || !userId || !scope.org || !orgsData.length) return;
-    const match = orgsData.find((o) => o.handle === scope.org);
-    if (match && match.numericId > 0 && window.API_CONFIG.asgardeoOrgNumericId !== match.numericId) {
-      window.API_CONFIG.asgardeoOrgNumericId = match.numericId;
-      localStorage.setItem('org_numeric_id', String(match.numericId));
-      setOrgIdVersion((v) => v + 1); // trigger re-render so queries re-evaluate orgId()
-    }
-  }, [isOidcUser, userId, scope.org, orgsData]);
-
-  // Re-scope auth to the URL's org when it differs from the currently active one — e.g. a
-  // shared link to org A opened by someone whose stored token/org is still scoped to org B.
-  // Without this, breadcrumbs (URL-driven `scope.org`) show org A while every org-scoped query
-  // (useOrgUuid, orgId() in useProjects) keeps fetching org B's data.
-  //
-  // Two distinct failure shapes are both surfaced as "no access", since neither leaves us with
-  // a validly-scoped token to render org A's data with:
-  //  - `scope.org` isn't in this user's own org list at all (they were never a member).
-  //  - it IS in their list, but the STS re-scope call itself failed (e.g. revoked mid-session).
-  const orgSyncingRef = useRef<string | null>(null);
-  // Aborts the in-flight exchange (if any) the moment a newer one starts, so a slow, now-stale
-  // request can't resolve later and persist an older org's token over the one that's since won.
-  const orgSyncAbortRef = useRef<AbortController | null>(null);
-  const [orgAccessDeniedFor, setOrgAccessDeniedFor] = useState<string | null>(null);
-  const [isSyncingOrgToken, setIsSyncingOrgToken] = useState(false);
-  useEffect(() => {
-    // Wait for the org list to actually settle before judging membership — `orgsData` defaults to
-    // `[]` both while the query is still loading AND once it settles with a genuinely empty list,
-    // so gating on `orgsData.length` alone would let a zero-org user's mismatch go undetected forever.
-    if (!scope.org || orgsLoading) return;
-    const activeOrgHandle = localStorage.getItem('org_handle');
-    if (activeOrgHandle === scope.org || orgSyncingRef.current === scope.org) return;
-    const match = orgsData.find((o) => o.handle === scope.org);
-    if (!match) {
-      setOrgAccessDeniedFor(scope.org);
-      return;
-    }
-    orgSyncAbortRef.current?.abort();
-    const abortController = new AbortController();
-    orgSyncAbortRef.current = abortController;
-    orgSyncingRef.current = scope.org;
-    setIsSyncingOrgToken(true);
-    switchOrgToken(scope.org, abortController.signal)
-      .then(() => {
-        if (abortController.signal.aborted) return; // superseded — a newer switch already committed
-        if (match.numericId > 0) {
-          window.API_CONFIG.asgardeoOrgNumericId = match.numericId;
-          localStorage.setItem('org_numeric_id', String(match.numericId));
-        }
-        setOrgAccessDeniedFor(null);
-        // invalidateQueries (not clear()) — components stay mounted here (no navigation follows,
-        // we're already on the right URL), so clear() would nuke the cache out from under their
-        // active subscriptions and leave them stuck loading. invalidateQueries refetches in place.
-        queryClient.invalidateQueries();
-        setOrgIdVersion((v) => v + 1);
-      })
-      .catch(() => {
-        if (abortController.signal.aborted) return; // superseded, not a real failure — ignore
-        orgSyncingRef.current = null;
-        setOrgAccessDeniedFor(scope.org);
-      })
-      .finally(() => {
-        if (!abortController.signal.aborted) setIsSyncingOrgToken(false);
-      });
-  }, [scope.org, orgsData, orgsLoading, queryClient]);
-  const orgAccessDenied = orgAccessDeniedFor === scope.org;
-  // Hold scoped content (rather than render it against a possibly-still-wrong-org token) until
-  // membership is known and any resync above has finished — an unsettled org list or an in-flight
-  // token exchange both mean we can't yet tell whether `scope.org` is the right, active org.
-  const orgSyncUnresolved = !!scope.org && (orgsLoading || isSyncingOrgToken);
-  // Where "back to your organizations" should land: the user's own first accessible org, or the
-  // create-an-org flow if they don't have one yet (both come from the same unscoped org list).
-  const alternativeOrg = orgsData.find((o) => o.handle !== scope.org);
-  const ownOrgFallbackUrl = alternativeOrg ? orgHomeUrl(alternativeOrg.handle) : registerOrgUrl();
+  }, [userId, scope, orgAccessDenied]);
 
   // Find component UUID for permission checks
   const currentComponent = hasComponent(scope) ? components.find((c) => c.handler === scope.component) : undefined;
@@ -347,6 +294,7 @@ export default function AppLayout(): JSX.Element {
   };
 
   const navigateTo = useAppNavigate();
+  const guardNavigation = useLeaveGuard();
 
   // The URL now moves only once the destination's code is in, so the highlight
   // would lag the click by the whole download. Mark the clicked item at once and
@@ -357,8 +305,11 @@ export default function AppLayout(): JSX.Element {
   const handleNavSelect = (id: string) => {
     const url = navUrl(scope, id);
     if (!url) return;
-    setPendingNavId(id);
-    navigateTo(url);
+    // Highlights only once the user agrees to leave a dirty form, so "Stay on page" keeps the current item.
+    guardNavigation(() => {
+      setPendingNavId(id);
+      navigateTo(scope.level === 'components' ? withTrackParam(url, search) : url);
+    });
   };
 
   return (
@@ -368,7 +319,7 @@ export default function AppLayout(): JSX.Element {
           <Header.Toggle collapsed={hideSidebarForEmptyProject || shell.sidebarCollapsed} onToggle={handleHeaderToggle} />
           <Header.Brand>
             <Header.BrandLogo>
-              <NavLink to={orgHomeUrl(scope.org)} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <NavLink to={orgHomeUrl(scope.org)} onClick={() => trackEvent('navbar-home')} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
                 <Logo />
               </NavLink>
             </Header.BrandLogo>
@@ -396,16 +347,17 @@ export default function AppLayout(): JSX.Element {
                 sx={{ minWidth: 180, maxWidth: 220, '& .MuiListItemText-root': { minWidth: 0, overflow: 'hidden' } }}
                 IconComponent={() => null}
                 SelectDisplayProps={{ 'aria-label': 'Select organization' }}
-                renderValue={() => <ComplexSelect.MenuItem.Text primary={scope.org} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: scope.org }} />}
+                renderValue={() => <ComplexSelect.MenuItem.Text primary={orgDisplayName} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: orgDisplayName }} />}
                 label="Organization">
                 <ComplexSelect.MenuItem value={scope.org}>
-                  <ComplexSelect.MenuItem.Text primary={scope.org} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: scope.org }} />
+                  <ComplexSelect.MenuItem.Text primary={orgDisplayName} secondary="Organization" primaryTypographyProps={{ noWrap: true, title: orgDisplayName }} />
                 </ComplexSelect.MenuItem>
               </ComplexSelect>
             </Box>
             {!hasProject(scope) && !projectMenuAnchor && (
               <Tooltip title="Select project">
                 <IconButton
+                  aria-label="Select project"
                   size="small"
                   onClick={() => {
                     setProjectMenuDir('right');
@@ -431,21 +383,7 @@ export default function AppLayout(): JSX.Element {
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                   Project
                 </Typography>
-                <TextField
-                  size="small"
-                  fullWidth
-                  placeholder="Search"
-                  inputRef={projectSearchRef}
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <Search size={16} />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+                <SearchBar size="small" fullWidth placeholder="Search projects" inputRef={projectSearchRef} value={projectSearch} onChange={(e) => setProjectSearch(e.target.value)} />
               </Box>
               <Button
                 variant="text"
@@ -458,11 +396,11 @@ export default function AppLayout(): JSX.Element {
                   setProjectSearch('');
                   navigateTo(newProjectUrl({ org: scope.org }));
                 }}>
-                Create Project
+                Create project
               </Button>
               <Divider />
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
-                All Projects
+                All projects
               </Typography>
               {selectableProjects.filter((p) => !projectSearch.trim() || p.name.toLowerCase().includes(projectSearch.trim().toLowerCase())).length === 0 ? (
                 <MenuItem disabled>No projects found</MenuItem>
@@ -474,6 +412,7 @@ export default function AppLayout(): JSX.Element {
                       key={p.id}
                       selected={hasProject(scope) && (scope.project === p.handler || scope.project === p.id)}
                       onClick={() => {
+                        trackEvent('navbar-project-dropdown-existing');
                         setProjectMenuAnchor(null);
                         setProjectSearch('');
                         const newScope = narrow({ level: 'organizations', org: scope.org }, p.handler);
@@ -565,6 +504,7 @@ export default function AppLayout(): JSX.Element {
                 {!hasComponent(scope) && !componentMenuAnchor && (
                   <Tooltip title="Select integration">
                     <IconButton
+                      aria-label="Select integration"
                       size="small"
                       onClick={() => {
                         setComponentMenuDir('right');
@@ -590,21 +530,7 @@ export default function AppLayout(): JSX.Element {
                     <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
                       Integration
                     </Typography>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      placeholder="Search"
-                      inputRef={componentSearchRef}
-                      value={componentSearch}
-                      onChange={(e) => setComponentSearch(e.target.value)}
-                      InputProps={{
-                        endAdornment: (
-                          <InputAdornment position="end">
-                            <Search size={16} />
-                          </InputAdornment>
-                        ),
-                      }}
-                    />
+                    <SearchBar size="small" fullWidth placeholder="Search integrations" inputRef={componentSearchRef} value={componentSearch} onChange={(e) => setComponentSearch(e.target.value)} />
                   </Box>
                   <Button
                     variant="text"
@@ -617,11 +543,11 @@ export default function AppLayout(): JSX.Element {
                       setComponentSearch('');
                       navigateTo(newComponentUrl({ org: scope.org, project: scope.project }));
                     }}>
-                    Create Integration
+                    Create integration
                   </Button>
                   <Divider />
                   <Typography variant="caption" color="text.secondary" sx={{ display: 'block', px: 2, pt: 1, pb: 0.5 }}>
-                    All Integrations
+                    All integrations
                   </Typography>
                   {components.filter((c) => !componentSearch.trim() || c.displayName.toLowerCase().includes(componentSearch.trim().toLowerCase())).length === 0 ? (
                     <MenuItem disabled>No integrations found</MenuItem>
@@ -657,11 +583,11 @@ export default function AppLayout(): JSX.Element {
                 role="button"
                 tabIndex={0}
                 sx={{ position: 'relative', display: 'inline-flex', cursor: 'pointer' }}
-                onClick={() => navigateTo(overviewUrl(scope))}
+                onClick={() => navigateTo(withTrackParam(overviewUrl(scope), search))}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' || e.key === ' ') {
                     e.preventDefault();
-                    navigateTo(overviewUrl(scope));
+                    navigateTo(withTrackParam(overviewUrl(scope), search));
                   }
                 }}>
                 <ComplexSelect
@@ -728,16 +654,15 @@ export default function AppLayout(): JSX.Element {
           <Header.Spacer />
           <Header.Actions>
             {billingTrial && (
-              <Tooltip title={trialEndLabel}>
-                <Chip label={`Trial · ${billingTrial.days_remaining} day${billingTrial.days_remaining === 1 ? '' : 's'} remaining`} color="warning" size="medium" sx={{ fontWeight: 500, mx: 0.75 }} />
-              </Tooltip>
+              // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
+              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} sx={trialBadgeSx} />
             )}
             <ColorSchemeToggle />
             <UserMenu>
               <UserMenu.Trigger name={userName} avatar={userAvatar} />
               <UserMenu.Header name={userName} email={username} role="Admin" avatar={userAvatar} />
               <UserMenu.Divider />
-              <UserMenu.Logout icon={<LogOut size={18} />} label="Sign Out" onClick={() => setConfirmDialogOpen(true)} />
+              <UserMenu.Logout icon={<LogOut size={18} />} label="Sign out" onClick={() => setConfirmDialogOpen(true)} />
             </UserMenu>
           </Header.Actions>
         </Header>
@@ -748,9 +673,9 @@ export default function AppLayout(): JSX.Element {
           <Sidebar
             collapsed={shell.sidebarCollapsed}
             activeItem={pendingNavId ?? activeNavId}
-            expandedMenus={shell.expandedMenus}
+            expandedMenus={expandedMenus}
             onSelect={handleNavSelect}
-            onToggleExpand={actions.toggleMenu}
+            onToggleExpand={toggleMenu}
             sx={{
               backgroundColor: 'background.acrylic',
               backdropFilter: 'blur(3px)',
@@ -760,11 +685,17 @@ export default function AppLayout(): JSX.Element {
                 ? /* Org-level nav */
                   [
                     <Sidebar.Category key="org-overview">
-                      <Sidebar.Item id="overview">
+                      <Sidebar.Item id="org-overview">
                         <Sidebar.ItemIcon>
                           <LayoutDashboard size={20} />
                         </Sidebar.ItemIcon>
                         <Sidebar.ItemLabel>Overview</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+                      <Sidebar.Item id="org-projects">
+                        <Sidebar.ItemIcon>
+                          <BoxIcon size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Projects</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     </Sidebar.Category>,
 
@@ -790,6 +721,15 @@ export default function AppLayout(): JSX.Element {
                         <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
                       </Sidebar.Item>
 
+                      {apiInsightsEnabled && (
+                        <Sidebar.Item id="org-insights">
+                          <Sidebar.ItemIcon>
+                            <ChartColumn size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>API Insights</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      )}
+
                       <Sidebar.Item id="org-observability">
                         <Sidebar.ItemIcon>
                           <Activity size={20} />
@@ -799,7 +739,7 @@ export default function AppLayout(): JSX.Element {
                           <Sidebar.ItemIcon>
                             <Logs size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                          <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                         </Sidebar.Item>
                         <Sidebar.Item id="org-metrics">
                           <Sidebar.ItemIcon>
@@ -819,7 +759,29 @@ export default function AppLayout(): JSX.Element {
                       )}
                     </Sidebar.Category>,
 
+                    <Sidebar.Category key="org-ai">
+                      <Sidebar.Item id="org-ai-services">
+                        <Sidebar.ItemIcon>
+                          <Sparkles size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>AI Services</Sidebar.ItemLabel>
+                        <Sidebar.Item id="org-knowledge-bases">
+                          <Sidebar.ItemIcon>
+                            <BookOpen size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      </Sidebar.Item>
+                    </Sidebar.Category>,
+
                     <Sidebar.Category key="org-infra">
+                      {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                      <Sidebar.Item id="org-platform-services">
+                        <Sidebar.ItemIcon>
+                          <Database size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
+                      </Sidebar.Item>
                       {/* Environments come before the pipelines that promote across them. */}
                       <Sidebar.Item id="org-admin">
                         <Sidebar.ItemIcon>
@@ -859,6 +821,10 @@ export default function AppLayout(): JSX.Element {
                       // MCP (server + proxy): a single Test tab → the MCP playground
                       // (@wso2-org/mcp-playground). No Console/API-Chat sub-items.
                       const mcpType = integrationType === 'mcp-server' || integrationType === 'mcp-proxy';
+                      // Settings shows only when the integration has a section the user can open.
+                      const hasSettings =
+                        !!currentComponent &&
+                        visibleComponentSettingsSections(identifyIntegration(currentComponent.displayType ?? '', currentComponent.componentSubType ?? null), (perms) => hasAnyPermission(perms, projectId || undefined, componentId)).length > 0;
                       return [
                         <Sidebar.Category key="int-overview">
                           <Sidebar.Item id="overview">
@@ -916,7 +882,7 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemIcon>
                                 <Logs size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                             </Sidebar.Item>
                             <Sidebar.Item id="metrics">
                               <Sidebar.ItemIcon>
@@ -924,10 +890,19 @@ export default function AppLayout(): JSX.Element {
                               </Sidebar.ItemIcon>
                               <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                             </Sidebar.Item>
+                            {/* Only agents are instrumented, so no other integration has traces to show. */}
+                            {aiAgentType && (
+                              <Sidebar.Item id="traces">
+                                <Sidebar.ItemIcon>
+                                  <Waypoints size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Traces</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
                           </Sidebar.Item>
 
                           {/* Day-2 operations on a running integration. Sits beside Observe rather than
-                              under Infrastructure, which is now just the environments and the pipeline. */}
+                              under Infrastructure, which holds the environments and the pipeline. */}
                           <Sidebar.Item id="operate">
                             <Sidebar.ItemIcon>
                               <SlidersHorizontal size={20} />
@@ -949,20 +924,35 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemIcon>
                                 <FileLock size={20} />
                               </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Configs &amp; Secrets</Sidebar.ItemLabel>
+                              <Sidebar.ItemLabel>Configs &amp; secrets</Sidebar.ItemLabel>
                             </Sidebar.Item>
                             {isGenericService && (
                               <Sidebar.Item id="health-checks">
                                 <Sidebar.ItemIcon>
                                   <HeartPulse size={20} />
                                 </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Health Checks</Sidebar.ItemLabel>
+                                <Sidebar.ItemLabel>Health checks</Sidebar.ItemLabel>
+                              </Sidebar.Item>
+                            )}
+                            {isGenericService && (
+                              <Sidebar.Item id="scaling">
+                                <Sidebar.ItemIcon>
+                                  <Maximize2 size={20} />
+                                </Sidebar.ItemIcon>
+                                <Sidebar.ItemLabel>Scaling</Sidebar.ItemLabel>
                               </Sidebar.Item>
                             )}
                           </Sidebar.Item>
                         </Sidebar.Category>,
 
                         <Sidebar.Category key="int-infra">
+                          {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                          <Sidebar.Item id="org-platform-services">
+                            <Sidebar.ItemIcon>
+                              <Database size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
+                          </Sidebar.Item>
                           <Sidebar.Item id="admin">
                             <Sidebar.ItemIcon>
                               <Settings2 size={20} />
@@ -984,6 +974,15 @@ export default function AppLayout(): JSX.Element {
                               <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
                             </Sidebar.Item>
                           </Sidebar.Item>
+
+                          {hasSettings && (
+                            <Sidebar.Item id="component-settings">
+                              <Sidebar.ItemIcon>
+                                <Cog size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
                         </Sidebar.Category>,
                       ];
                     })()
@@ -1029,7 +1028,7 @@ export default function AppLayout(): JSX.Element {
                             <Sidebar.ItemIcon>
                               <Logs size={20} />
                             </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Runtime Logs</Sidebar.ItemLabel>
+                            <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                           </Sidebar.Item>
                           <Sidebar.Item id="proj-metrics">
                             <Sidebar.ItemIcon>
@@ -1041,6 +1040,13 @@ export default function AppLayout(): JSX.Element {
                       </Sidebar.Category>,
 
                       <Sidebar.Category key="proj-infra">
+                        {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                        <Sidebar.Item id="org-platform-services">
+                          <Sidebar.ItemIcon>
+                            <Database size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
+                        </Sidebar.Item>
                         {/* Environments link up to the org page; the pipeline is this project's own. */}
                         <Sidebar.Item id="proj-admin">
                           <Sidebar.ItemIcon>
@@ -1059,13 +1065,6 @@ export default function AppLayout(): JSX.Element {
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Pipelines</Sidebar.ItemLabel>
                           </Sidebar.Item>
-                        </Sidebar.Item>
-
-                        <Sidebar.Item id="proj-settings">
-                          <Sidebar.ItemIcon>
-                            <Cog size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Settings</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       </Sidebar.Category>,
                     ]}
@@ -1092,11 +1091,7 @@ export default function AppLayout(): JSX.Element {
               overflowX: 'auto',
             }}>
             {orgAccessDenied ? (
-              <NotFound message={`You don't have access to "${scope.org}". Ask an admin for an invite, or switch to one of your own organizations.`} backTo={ownOrgFallbackUrl} backLabel="Back to your organizations" />
-            ) : orgSyncUnresolved ? (
-              <Box sx={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <CircularProgress color="primary" />
-              </Box>
+              <NotFound message={`You don't have access to "${scope.org}". Ask an admin for an invite.`} backTo={orgHomeUrl(sessionOrg)} backLabel="Back to your organization" />
             ) : (
               <Suspense
                 fallback={
@@ -1112,14 +1107,14 @@ export default function AppLayout(): JSX.Element {
       </AppShell.Main>
 
       <AppShell.Footer>
-        {pathname.includes('/admin/databases') && (
+        {activeNavId === 'org-platform-services' && (
           <Typography variant="caption" sx={{ display: 'block', textAlign: 'center', fontStyle: 'italic', color: 'text.disabled', px: 2, pb: 1 }}>
             {DB_TRADEMARK_NOTICE}
           </Typography>
         )}
         {/* Matches the sidebar's surface rather than sitting as a white band under it. */}
         <Footer sx={{ backgroundColor: 'background.acrylic', backdropFilter: 'blur(3px)' }}>
-          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer">
+          <Footer.Link href={documentationUrl()} target="_blank" rel="noopener noreferrer" onClick={() => trackEvent('navbar-documentation')}>
             Documentation
           </Footer.Link>
           <Footer.Link href="https://discord.com/invite/wso2" target="_blank" rel="noopener noreferrer">
@@ -1140,20 +1135,23 @@ export default function AppLayout(): JSX.Element {
       <AppShell.NotificationPanel>
         {/* Confirm Dialog - managed locally */}
         <Dialog open={confirmDialogOpen} onClose={() => setConfirmDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Sign Out</DialogTitle>
+          <DialogTitle>Sign out</DialogTitle>
           <DialogContent>
             <DialogContentText>Are you sure you want to sign out of your account?</DialogContentText>
           </DialogContent>
           <DialogActions>
-            <Button onClick={() => setConfirmDialogOpen(false)}>Cancel</Button>
+            <Button variant="outlined" color="inherit" onClick={() => setConfirmDialogOpen(false)}>
+              Cancel
+            </Button>
             <Button
               variant="contained"
               onClick={async () => {
+                trackEvent('navbar-user-logout');
                 await logout();
                 navigate(loginUrl());
                 setConfirmDialogOpen(false);
               }}>
-              Sign Out
+              Sign out
             </Button>
           </DialogActions>
         </Dialog>

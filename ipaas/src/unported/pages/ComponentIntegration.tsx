@@ -18,7 +18,7 @@
 
 import { Box, CircularProgress, PageContent, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
-import { useAuth } from '#auth';
+import { useAuth } from '../../auth';
 import NotFound from '../../components/NotFound';
 import { CloudEditorCard, IntegratorIDECard } from '../components/Integration/IntegrationCards';
 import { useComponentByHandler } from '../../hooks/useComponents';
@@ -27,6 +27,7 @@ import { useProject, useProjectByHandler, useProjects } from '../../hooks/usePro
 import { useCommitHistory, useComponentRepository, useChoreoSampleImages } from '../../hooks/useRepository';
 import { broaden, resourceUrl, type ComponentScope } from '../../nav';
 import { UUID_RE } from '../../utils/string';
+import { withBase } from '../../utils/basePath';
 
 export default function ComponentIntegration(scope: ComponentScope): JSX.Element {
   const isUuid = UUID_RE.test(scope.project);
@@ -75,7 +76,7 @@ export default function ComponentIntegration(scope: ComponentScope): JSX.Element
       codeServerSample: JSON.stringify(codeServerSample),
       sourceCommitHash: latestCommit?.sha ?? '',
     });
-    window.open(`${window.location.origin}/editor?${params}`, '_blank', 'noopener,noreferrer');
+    window.open(`${window.location.origin}${withBase('/editor')}?${params}`, '_blank', 'noopener,noreferrer');
   };
 
   const handleOpenInIntegrator = () => {

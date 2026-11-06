@@ -17,8 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildCloudEditorUrl, derivePodPhase, displayableEditorUrl, highestPodPhase } from './cloudEditor';
-import type { ClusterPod } from '../types/runtime';
+import { buildCloudEditorUrl, displayableEditorUrl } from './cloudEditor';
 
 const base = {
   userId: 'u1',
@@ -45,66 +44,14 @@ describe('buildCloudEditorUrl', () => {
   });
 });
 
-const pod = (conditions: Array<{ type: string; status: string }>): ClusterPod => ({ status: { phase: 'Pending', conditions } }) as ClusterPod;
-
-describe('derivePodPhase', () => {
-  it('is scheduling with no pod or no conditions met', () => {
-    expect(derivePodPhase(undefined)).toBe('scheduling');
-    expect(derivePodPhase(pod([]))).toBe('scheduling');
-  });
-
-  it('is starting once scheduled and initialized', () => {
-    expect(
-      derivePodPhase(
-        pod([
-          { type: 'PodScheduled', status: 'True' },
-          { type: 'Initialized', status: 'True' },
-        ]),
-      ),
-    ).toBe('starting');
-  });
-
-  it('is opening once containers are ready', () => {
-    expect(
-      derivePodPhase(
-        pod([
-          { type: 'PodScheduled', status: 'True' },
-          { type: 'Initialized', status: 'True' },
-          { type: 'PodReadyToStartContainers', status: 'True' },
-          { type: 'ContainersReady', status: 'True' },
-          { type: 'Ready', status: 'True' },
-        ]),
-      ),
-    ).toBe('opening');
-  });
-});
-
-describe('highestPodPhase', () => {
-  it('returns scheduling for an empty pod list', () => {
-    expect(highestPodPhase([])).toBe('scheduling');
-  });
-
-  it('returns the furthest-along phase across pods', () => {
-    const scheduling = pod([]);
-    const opening = pod([
-      { type: 'PodReadyToStartContainers', status: 'True' },
-      { type: 'ContainersReady', status: 'True' },
-      { type: 'Ready', status: 'True' },
-    ]);
-    expect(highestPodPhase([scheduling, opening])).toBe('opening');
-  });
-});
-
 describe('displayableEditorUrl', () => {
   // The address is on screen for the whole of a cold start; the token must not be.
   it('strips the connection token', () => {
-    expect(displayableEditorUrl('https://editor-abc.gateway.example.com/?tkn=deadbeef'))
-      .toBe('https://editor-abc.gateway.example.com/');
+    expect(displayableEditorUrl('https://editor-abc.gateway.example.com/?tkn=deadbeef')).toBe('https://editor-abc.gateway.example.com/');
   });
 
   it('keeps every other query parameter', () => {
-    expect(displayableEditorUrl('https://editor-abc.example.com/?folder=%2Fworkspace&tkn=deadbeef'))
-      .toBe('https://editor-abc.example.com/?folder=%2Fworkspace');
+    expect(displayableEditorUrl('https://editor-abc.example.com/?folder=%2Fworkspace&tkn=deadbeef')).toBe('https://editor-abc.example.com/?folder=%2Fworkspace');
   });
 
   it('is a no-op for a URL with no token', () => {

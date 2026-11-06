@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createAlertRule, deleteAlertRule, getAlertRules, getAlertRulesCount, updateAlertRule, getAlertHistory } from '#api/alerts';
+import { createAlertRule, deleteAlertRule, getAlertRules, getAlertRulesCount, updateAlertRule, getAlertHistory } from '../../api/alerts';
 import { AlertComponentType, AlertTypeConstants } from '../../constants/alerts';
 import type { AlertHistoryResponse, AlertRule, AlertRuleCountUsage } from '../../types/alerts';
 

@@ -22,7 +22,7 @@ import type { JSONSchema } from '../types/schema';
 import type { PrebuiltIntegrationsData, PrebuiltInstructionsResult, PrebuiltConfigSchemaResult, PrebuiltDiagramResult } from '../types/prebuilt';
 import { DEFAULT_PREBUILT_INTEGRATIONS_URL } from '../constants/samples';
 import { getDotChoreoBaseUrl } from '../utils/prebuilt';
-import { fetchPrebuiltIntegrations, fetchPrebuiltAsset } from '#api/prebuilt';
+import { fetchPrebuiltIntegrations, fetchPrebuiltAsset } from '../api/prebuilt';
 
 export function usePrebuiltIntegrations() {
   return useQuery<PrebuiltIntegrationsData>({

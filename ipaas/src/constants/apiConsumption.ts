@@ -23,9 +23,6 @@ import type { SecurityMode } from '../types/consumers';
 /** Gateway default for the `api-key-auth` policy. */
 export const DEFAULT_API_KEY_HEADER = 'X-API-Key';
 
-/** The APIM products mint a test key instead, and read it from its own header. */
-export const APIM_TEST_KEY_HEADER = 'test-key';
-
 export const OAUTH_HEADER = 'Authorization';
 
 /** Stand-in shown wherever a consumer's credential is hidden. */
@@ -34,7 +31,7 @@ export const TOKEN_MASK = '•'.repeat(28);
 export const COMING_SOON_OAUTH = 'Securing with OAuth coming soon';
 export const COMING_SOON_UPSTREAM_ATTRS = 'Passing end-user attributes to upstream coming soon';
 
-export const API_KEY_SCHEME_DESCRIPTION = 'Secure your API with API Key protocol.';
+export const API_KEY_SCHEME_DESCRIPTION = 'Secure your API with API key protocol.';
 export const OAUTH_SCHEME_DESCRIPTION = 'Secure your API with OAuth 2 protocol.';
 
 export const REGENERATE_KEY_WARNING = 'The current key is revoked immediately and replaced. Any client still presenting the previous key will be rejected until it is updated.';
@@ -48,7 +45,7 @@ export const TOKEN_NOT_RETRIEVABLE_NOTICE = 'This key was displayed once at crea
 export const CONSUMER_NAME_TAKEN = 'A consumer with this name already exists for this endpoint.';
 
 export const SECURITY_MODE_LABEL: Record<SecurityMode, string> = {
-  none: 'No Auth',
-  'api-key': 'API Key',
+  none: 'No auth',
+  'api-key': 'API key',
   jwt: 'OAuth',
 };

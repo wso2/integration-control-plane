@@ -19,7 +19,7 @@
 import { Box, Chip, CircularProgress, IconButton, ListingTable, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { CircleCheck, Info, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, type JSX } from 'react';
-import { usePodMetrics, usePods } from '../../../hooks/useScaling';
+import { usePodMetrics, usePods } from '../../hooks/useScaling';
 import { derivePodRows } from '../../utils/scaling';
 import { runningPodCount } from '../../../utils/pods';
 

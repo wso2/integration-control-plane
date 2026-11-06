@@ -139,7 +139,6 @@ export default function PrebuiltConfigForm({ configSchema, onChange, onRequiredC
       setSensitiveMap={setSensitiveMap}
       handleValueChange={handleValueChange}
       handleValidationChange={handleValidationChange}
-      showLinking={false}
     />
   );
 }

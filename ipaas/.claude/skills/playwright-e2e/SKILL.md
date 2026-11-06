@@ -1,255 +1,196 @@
 ---
 name: playwright-e2e
-description: Write, extend, and debug Playwright end-to-end tests for the ipaas frontend. Use this whenever the task touches e2e or browser tests, Playwright specs, page objects, anything under tests/e2e/, pnpm test:e2e, a failing or flaky e2e test, or a request like "add test coverage for the project home page" or "test the create-integration flow" — even when Playwright is never named. Also use it before adding aria-labels or roles to components for the purpose of making the UI testable.
+description: Write, extend, and debug Playwright end-to-end tests for the ipaas console. Use this whenever the task touches e2e or browser tests, the cloud journey spec, anything under tests/e2e/, pnpm test:e2e, a failing or flaky e2e test, or a request like "add test coverage for the environments page" or "test the import flow" — even when Playwright is never named. Also use it before adding aria-labels or roles to components to make the UI testable.
 ---
 
-# Playwright e2e tests — ipaas
+# Playwright e2e tests — ipaas console
 
 ## What's in this skill
 
-- `references/locators.md` — how oxygen-ui/MUI components map onto ARIA roles, plus the selector traps this suite has already hit. Read it before writing locators for tabs, selects, menus, dialogs, alerts or tables.
+- `references/locators.md` — how Oxygen UI / MUI components map onto ARIA roles, plus selector traps this suite has already hit. Read it before writing locators for tabs, selects, menus, dialogs, alerts or tables.
 - `references/triage.md` — failure messages mapped to their usual causes, and how to tell whether the test or the app is wrong. Read it when a run is red.
-- `assets/spec-template.ts`, `assets/PageObjectTemplate.ts` — scaffolds to copy when starting a new file.
+- `assets/journey-group-template.ts` — the shape of a new journey group, to copy into the journey spec.
+
+`tests/e2e/AGENTS.md` holds the suite's rules; `tests/e2e/README.md` covers setup, the two sign-in modes and release validation. This skill is the step-by-step workflow.
 
 ## Orientation
 
 ```text
-playwright.config.ts          testDir, projects, baseURL, timeouts
-.env.test                     credentials (gitignored; template = .env.test.example)
-.auth/user.json               saved storageState — live session tokens, gitignored
-.auth/context.json            { orgHandler, projectHandler } written by setup
+playwright.config.ts                 projects, retries, artifact settings
+.env.test                            credentials (gitignored; template = .env.test.example)
+.auth/cloud-user.json                saved session — live credentials, gitignored
+.auth/cloud-context.json             { orgHandler, projectHandler } and the run's fixture project
 tests/e2e/
-  global.setup.ts             logs in once via WSO2 Identity Platform, completes onboarding
-  helpers/auth-context.ts     getAuthContext() → reads .auth/context.json
-  helpers/gmail.ts            waitForOTP() — reads the login OTP from Gmail
-  pages/                      page objects, one per page (LoginPage, TopNav, ProjectsPage, …)
-  specs/shared/               specs that run against both WIP and cloud
-  specs/wip/                  WIP-only specs (Asgardeo login page)
-  specs/cloud/                cloud-only authenticated specs
-  specs/cloud-anon/           cloud-only specs that need no session
+  cloud.setup.ts                     signs in through Thunder with the GitHub bot (setup-cloud)
+  cloud-token.setup.ts               builds the session from a platform token (setup-cloud-token)
+  specs/cloud/ipaas-e2e-journey.spec.ts   the journey: numbered groups 00–09 (project cloud)
+  specs/cloud-anon/login.spec.ts          sign-in page, no session (project cloud-anon)
+  helpers/
+    journey-session.ts               enterOrgHome / enterProject / enterProjectOrSkip, assertSignedIn, refreshSession
+    journey-project.ts               the run's fixture project name (activeProject)
+    journey-fixtures.ts              shared constants: sample names, timeouts, expected sections
+    journey-integrations.ts          integration rows, delete flows, samples tab
+    journey-envcard.ts               environment card, deployments, consumers, executions
+    console-nav.ts                   sidebar, nav groups, cards, opening projects and integrations
+    cloud-fixtures.ts                expectPageRendered, trackFailedRequests, token reseeding
+    build.ts                         build status and waitForBuildToSettle
+    session-storage.ts               newConsoleContext — every signed-in context goes through it
 ```
 
-Two things about this setup drive nearly every rule below.
+Three facts drive nearly every rule below.
 
-**The suite runs against a live deployment, not a local dev server.** `baseURL` defaults to `https://preview-o2-dev.devant.dev`. So tests face real network latency, real backend state, and a real identity provider. Timing assumptions that would hold against a local server do not hold here.
+**The suite runs against a deployed console**, never a local dev server. Real latency, real backend state, real Thunder sign-in. Timing assumptions that hold locally do not hold here.
 
-**Auth happens once, in the `setup` project.** It logs in, completes onboarding, saves `storageState` to `.auth/user.json`, and records the org and project handles to `.auth/context.json`. Every spec in the `wip` project starts already signed in and reads its handles from `getAuthContext()`. Handles are per-user and per-run — hardcoding one is always a bug.
+**It is a journey, not a pile of page specs.** One browser context and one page are shared by every group in `ipaas-e2e-journey.spec.ts`. Group 01 creates the run's fixture project (`IPAAS-E2E-<yyMMdd-HHmm>-<suffix>`), later groups use it, group 08 deletes it. Groups run in declaration order and are independent: a failed group skips itself without taking later ones down. New coverage almost always means **a new test inside the right group, or a new numbered group** — not a new spec file.
+
+**The session lives in sessionStorage.** Playwright's `storageState` does not save it, so `newConsoleContext` restores it into every tab. A plain `browser.newContext()` starts signed out. In token mode the session has no refresh token, so long waits must reseed it (`refreshSession`, `reseedHere`).
 
 ## The workflow
 
-Work in this order. The most common way an e2e test goes wrong here is not a bad assertion — it is a locator that was *invented* rather than read off the source. It fails on the first run, and then gets "fixed" by loosening it into something that passes without checking anything. Reading the source first costs a couple of minutes and avoids that whole trap.
+Work in this order. The most common way an e2e test goes wrong is not a bad assertion — it is a locator that was _invented_ rather than read off the source. It fails on the first run, then gets "fixed" by loosening it into something that passes without checking anything.
 
-### 1. Find the route
+### 1. Find the route and the nav path
 
-Routes live in `src/config/routes.tsx`; the URL builders live in `src/paths.ts` (`projectHomeUrl`, `componentsNewUrl`, `orgHomeUrl`, …). Reading `paths.ts` is the fastest way to learn the exact URL shape, and its function names tell you what the app calls each surface.
-
-Check whether the route is product-gated. In `routes.tsx`, routes wrapped in `hideable(IS_CLOUD, ...)` are available in the `wip` build (they're redirected away only on cloud); routes added via `IS_CLOUD ? [...] : []` exist only on cloud. The suite runs the `wip` build, so a cloud-only route cannot be tested here — say so rather than writing a spec that 404s.
+Routes live in `src/config/routes.tsx`; scope-based URL builders and the navigation registry live in `src/nav.ts`, the rest in `src/paths.ts`. Every signed-in route sits under `/organizations/:org/`. Pages in `src/unported/` have no route — they cannot be tested, and a URL for one falls back to its level's home. Say so rather than writing a test that asserts a redirect by accident.
 
 ### 2. Read the page component
 
-Open `src/pages/<Name>.tsx` and follow it into whatever it renders from `src/components/`. You are looking for two things.
+Open `src/pages/<Name>.tsx` and follow it into `src/components/`. You are looking for two things.
 
-**Which state the test will actually land in.** Per `HOUSE_RULES.md` every page handles loading, error, not-found, and empty-listing explicitly, with an early return. Those are four different DOMs. Decide which one you are testing, then pick a fixture that produces it reliably — for example the `default` project is provisioned during onboarding with no integrations, which is exactly why `project-home-empty.spec.ts` uses it to exercise the empty branch.
+**Which state the test will land in.** Every page handles loading (a skeleton), error, not-found and empty-listing with early returns. Those are four different DOMs. Decide which one you are testing and make sure the journey puts the fixture project in that state at that point — an empty project before group 04, a populated one from group 06.
 
-**The accessible names.** Headings, button labels, `aria-label`s, placeholders, tab labels. Copy them out verbatim, including capitalisation.
+**The accessible names.** Headings, button labels, `aria-label`s, placeholders, tab labels. Copy them verbatim, including capitalisation.
 
 ### 3. Harvest locators from source, not from imagination
 
-If you are about to type a locator string you have not read in a source file, stop. There are exactly two legitimate exceptions:
+If you are about to type a locator string you have not read in a source file, stop. There are two legitimate exceptions:
 
-- **Third-party pages** — the WSO2 Identity Platform login screens are not in this repo. Confirm those selectors against a real run (`--headed`, or the trace viewer) and comment why the selector looks the way it does, as `global.setup.ts` does.
-- **Backend-supplied content** — project names, integration names, org handles. Derive these at runtime instead of hardcoding. `org-overview.spec.ts` does this nicely: it reads the display name out of the gear button's `aria-label` (`Settings for <name>`) and then clicks the matching text, so the test works whatever the project is called.
+- **Third-party pages** — Thunder's hosted sign-in page and GitHub's sign-in screens are not in this repo. Confirm those selectors against a real run (`--headed` or the trace viewer) and comment why the selector looks the way it does, as `cloud.setup.ts` does.
+- **Backend-supplied content** — project, integration and org names. Derive them at runtime (`activeProject()`, `getAuthContext()`, or read them back off the page) instead of hardcoding.
 
-If the element has no accessible name at all, do not reach for a CSS selector. Go to *Making the UI testable* below.
+If the element has no accessible name, do not reach for a CSS selector. Go to _Making the UI testable_ below.
 
-### 4. Decide: page object or inline
+### 4. Pick the group, then write the test
 
-Add a page object when the surface has navigation plus several elements that more than one spec will touch, or when a multi-step flow needs to be reusable (`CreateProjectPage.fillAndSubmit`). Keep locators inline in the spec when they are used once, in one file — `footer.spec.ts` reads perfectly well without a `FooterPage`.
+- Page renders and its states → group **07 page availability** (`expectPageRendered`) or the group that owns the surface.
+- A flow on the fixture project → the group whose state it needs (02 empty overview, 04x deploy/test, 05 import, 06 populated overview).
+- Something that needs no session → `specs/cloud-anon/`.
+- A genuinely new area → a new numbered group placed where the fixture project is in the state it needs. Copy `assets/journey-group-template.ts`.
 
-### 5. Write the spec, then run it
+Shared logic (navigating somewhere, finding a row, waiting for a deployment) goes into the matching `helpers/journey-*.ts` or `console-nav.ts`, not into the spec.
 
-A spec that has never been run is a draft. Run it before reporting it as done, and if you cannot run it (no `.env.test`, no network), say so explicitly rather than implying it passed.
+### 5. Run it
+
+A test that has never been run is a draft. Run it before reporting it as done; if you cannot (no `.env.test`, no network), say so plainly rather than implying it passed.
 
 ## Locators
 
 Preference order, strongest first:
 
-1. `getByRole('button', { name: 'Create Project', exact: true })` — matches what a user and a screen reader perceive, and survives restyling.
+1. `getByRole('button', { name: 'Import from a Public Repository' })` — what a user and a screen reader perceive; survives restyling.
 2. `getByLabel('Display Name')` — form fields.
 3. `getByPlaceholder('Search projects')` — when there is no label.
-4. `getByText('Get Started Quickly')` — non-interactive copy.
-5. A CSS or `nth` selector — last resort, and worth a comment saying why nothing better exists.
+4. `getByText('Start quickly', { exact: true })` — non-interactive copy.
+5. A CSS or `nth` selector — last resort, with a comment saying why nothing better exists.
 
-Notes that matter in practice:
+- **`exact: true` when a name is a prefix of another.** `{ name: 'Sign Out' }` matches the menu item and the dialog button; scope to the dialog or use `exact`.
+- **Regex for names that vary**, e.g. `/^Import from/` to count providers — but prefer an exact string when the source gives you one.
+- **Oxygen UI is MUI underneath**, so components map onto ARIA roles in specific ways — see `references/locators.md`.
 
-- **`exact: true` when a name is a prefix of another.** `{ name: 'Create' }` also matches "Create Project" and "Create an Integration". `org-overview.spec.ts` uses `exact: true` for precisely this reason.
-- **Regex for names that vary**, e.g. `/create project/i` — but prefer an exact string when the source gives you one, since a loose regex is how a test quietly stops asserting anything.
-- **oxygen-ui is MUI underneath**, so components map onto ARIA roles in specific ways — a `Select` is a `combobox`, a `Tabs` item is a `tab`, an `Alert` is `role="alert"`. See `references/locators.md` for the mapping; guessing here wastes runs.
-
-## Spec anatomy
+## Anatomy of a journey group
 
 ```ts
-import { expect, test } from '@playwright/test';
-import { getAuthContext } from '../../helpers/auth-context.js';
+test.describe('07 page availability @smoke', () => {
+  test.describe.configure({ mode: 'serial' });
 
-test.describe('<surface> @smoke', () => {
-  let orgHandler: string;
-  let projectHandler: string;
-
-  test.beforeEach(async ({ page }) => {
-    const ctx = getAuthContext();
-    orgHandler = ctx.orgHandler;
-    if (!ctx.projectHandler) throw new Error('No projectHandler in auth context — re-run setup');
-    projectHandler = ctx.projectHandler;
-
-    await page.goto(`/organizations/${orgHandler}/projects/${projectHandler}/home`, {
-      waitUntil: 'domcontentloaded',
-    });
-    await page.waitForURL(/\/projects\/[^/]+\/home/, { timeout: 30_000 });
+  test.beforeAll(async () => {
+    await enterProjectOrSkip(page, orgHandler); // skips the group if the fixture project is missing
   });
 
-  test('<observable behaviour, phrased as a claim>', async ({ page }) => {
-    await expect(page.getByRole('heading', { name: 'All Projects' })).toBeVisible();
+  test('TC_IP_SET_004 organization settings offers no unported section', async () => {
+    await expectPageRendered(page, `/organizations/${orgHandler}/settings`);
+    // Positive assertion first: absences pass on a blank page.
+    await expect(page.getByText('Package Registries', { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+    for (const section of UNPORTED_SECTIONS) {
+      await expect(page.getByText(section, { exact: true })).not.toBeVisible();
+    }
   });
 });
 ```
 
-Conventions worth keeping:
-
-- **Tag smoke suites `@smoke`** in the `describe` title. Nightly CI selects on it.
-- **Name tests as claims about behaviour** — `'sign out redirects to login page'`, not `'test signout'`. The name is what a failing nightly run shows you at 2am.
-- **Import helpers with the `.js` extension** (`'../../helpers/auth-context.js'`) — this is an ESM `"type": "module"` package. Page objects are imported without it in the existing specs; follow whichever pattern the neighbouring file uses.
-- **One spec file per page or surface**, named after it: `project-home.spec.ts`, `top-nav.spec.ts`.
-- **Section your file with comment banners** when it covers several groups of behaviour, as the existing specs do. It reads well in review and in the report.
-
-## Page objects
-
-Locators and actions belong in the page object; assertions belong in the spec. The reason is that a page object is a vocabulary — once it starts asserting, two specs that need slightly different assertions end up forking it.
-
-The one accepted exception is a readiness helper: `goto`, `waitForLoad`, `expectPageLoaded` may assert, because "this page finished loading" is the page's own business and every spec needs it identically.
-
-```ts
-import { type Page, expect } from '@playwright/test';
-
-export class EnvironmentsPage {
-  constructor(private readonly page: Page) {}
-
-  async goto(orgHandler: string) {
-    await this.page.goto(`/organizations/${orgHandler}/environments`);
-    await this.page.waitForLoadState('domcontentloaded');
-  }
-
-  createButton() {
-    return this.page.getByRole('button', { name: 'Create Environment', exact: true });
-  }
-
-  async expectPageLoaded() {
-    await expect(this.page.getByRole('heading', { name: 'Environments' })).toBeVisible();
-  }
-}
-```
-
-Name the file after the page (`EnvironmentsPage.ts`), take `Page` as a private readonly constructor arg, and return locators from zero-arg methods rather than exposing them as fields — that keeps them lazy, so constructing the object never touches the DOM.
+- Tests use the shared module-level `page`, not the `{ page }` fixture.
+- **Names:** a case id plus a claim about behaviour — `TC_IP_<AREA>_<NNN> <what the user can observe>`. Continue the numbering of the area. The name is what a red release-validation run shows.
+- **`@smoke`** goes in every `describe` title.
+- **Imports** use the `.js` extension (`'../../helpers/journey-session.js'`) — this is an ESM package.
+- **Comments** explain why an assertion exists or why it is shaped that way, as the existing groups do.
 
 ## Waiting, and why tests here go flaky
 
-**A URL assertion is not a render assertion.** This is the single biggest trap in this codebase. Routes are lazy-loaded (`lazyPage`) and data arrives through React Query, so `toHaveURL` can pass while the page is still a spinner. Assert on something the user would actually see.
+**A URL assertion is not a render assertion.** Routes are lazy-loaded and data arrives through TanStack Query, so `toHaveURL` can pass while the page is still a skeleton. Assert on something the user would see. `expectPageRendered` checks the URL _and_ a heading in `main`.
 
-**Race real readiness against the failure mode.** If the session has expired, the app redirects to `/login` and every content assertion times out for a reason that has nothing to do with what you were testing. `project-home-empty.spec.ts` handles this well: it races the expected heading against the login heading, then asserts the URL with a short timeout so a dead session fails in seconds with a clear message instead of burning 30s on content that will never appear.
+**Fail fast on a dead session.** If the session expired, the console redirects to Thunder's sign-in page and every content assertion times out for an unrelated reason. The `enter*` helpers call `assertSignedIn`, which throws a clear error instead — reuse them rather than calling `page.goto` yourself.
 
-```ts
-await Promise.race([
-  page.getByRole('heading', { name: 'Create an Integration' })
-    .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-  page.getByRole('heading', { name: 'Sign In' })
-    .waitFor({ state: 'visible', timeout: 30_000 }).catch(() => {}),
-]);
-await expect(page, 'Session expired or was never authenticated').toHaveURL(/\/projects\/default\/home/, { timeout: 5_000 });
-```
+**Beware conditions that are already true.** A wait for "some heading" resolves instantly if any heading is already on screen. Wait for the specific next state.
 
-**Beware conditions that are already true.** `waitForURL(url => url.pathname.includes('login.do'))` resolves instantly if you are already on `login.do`, so it waits for nothing. Wait for the *next* state, and when you need to know which of two branches you took, use the `waitForURL(...).then(() => true).catch(() => false)` pattern from `global.setup.ts`.
+**Long waits outlive the token.** Builds and deployments take minutes, and token-mode sessions cannot refresh. Poll in chunks and reseed between them, as `waitForBuildToSettle` and the deployment helpers do. Never wrap a 20-minute wait in one `expect` timeout.
 
-**Click and navigation are a race.** When a click triggers a cross-domain redirect, wrap both in `Promise.all` with the wait listed first, so you cannot miss the navigation.
+**Never `waitForTimeout`.** Use web-first assertions or a polling helper. If you cannot express the condition, the app needs a testable state indicator — not the test a sleep.
 
-**Never `waitForTimeout`.** A sleep either makes the suite slow or makes it flaky, usually both. Use web-first assertions (`expect(...).toBeVisible()` auto-retries) or wait on a specific condition. If you genuinely cannot express the condition, that is a signal the app needs a testable state indicator — not that the test needs a sleep.
+**Assert absence carefully.** `not.toBeVisible()` passes while the page is loading. Assert something visible first.
 
-**Assert absence carefully.** `expect(locator).not.toBeVisible()` passes trivially while the page is still loading. Wait for something that proves the page rendered *first*, then assert the absence — as `project-home-empty.spec.ts` does before checking there is no table.
-
-**Prefer generous explicit timeouts to raising the global one.** Config gives you 60s per test and 15s per action; slow staging surfaces get `{ timeout: 30_000 }` on the specific assertion that needs it.
+**Prefer explicit timeouts on the slow assertion** (`{ timeout: 30_000 }`) to raising the global ones. Use `test.setTimeout` for a test that genuinely runs long.
 
 ## Fixtures and test data
 
-- **Signed-in specs** get `storageState: '.auth/user.json'` from the `wip` project automatically. Read handles from `getAuthContext()`.
-- **Unauthenticated specs** opt out explicitly: `test.use({ storageState: { cookies: [], origins: [] } })`, as `login.spec.ts` does for the login and signup pages.
-- **The `default` project** is created during onboarding and stays empty — a dependable fixture for empty states.
-- **Anything you create needs a unique name**: `e2e-<purpose>-${Date.now()}`. The suite runs `fullyParallel: true`.
-- **Need a fresh resource for a whole suite?** Create it once in `beforeAll` using a separate context (`browser.newContext({ storageState: '.auth/user.json' })`) and close that context, as `integrations.spec.ts` does. Do not create it in `beforeEach` — that multiplies backend calls by the number of tests.
-- **Never share mutable state between tests.** Parallel workers make ordering assumptions untrue.
+- **The fixture project** is the run's own. Read its name with `activeProject()`; never hardcode `IPAAS-E2E…`. Everything a group creates lives in it or is named after the run.
+- **Clean up by listing, not remembering.** Teardown deletes what the page lists (see `deleteAllIntegrations`), because a worker restarted after a failure has lost its memory.
+- **Org handle** comes from `getAuthContext()`.
+- **New browser contexts** go through `newConsoleContext(browser, { storageState: AUTH_STATE_PATH, baseURL })`.
+- **Unauthenticated tests** belong in `specs/cloud-anon/`, which runs with no session at all.
+- **Housekeeping is not a product assertion.** Sweeps (groups 00, 08b) skip with a reason when they cannot finish rather than fail.
 
 ## When not to write the test
 
-If a flow is genuinely unstable or blocked — an unfinished UI, an OAuth provider that blocks automation — write `test.skip` with a real explanation of what is blocking it and what would unblock it. This repo does this deliberately (Google OAuth, the create-project flow, unimplemented settings pages) and it is much more useful than either a flaky test or silence, because it documents intended coverage.
-
-```ts
-test.skip('Continue with Google — redirects to Google OAuth', async () => {
-  // TODO: Google blocks automated OAuth ("This browser or app may not be secure").
-  // Needs a service account or OAuth workaround before this can be enabled.
-});
-```
-
-What earns a skip is an external blocker. A test you could not get passing does not — investigate that instead, and if you truly cannot, report it rather than parking it.
+If a flow is blocked by something outside the repo — an unfinished BFF route, a feature still in `src/unported/`, a third-party page that blocks automation — write `test.skip` with what blocks it and what would unblock it. A test you could not get passing does not earn a skip; investigate it, and if you truly cannot, report it.
 
 ## Running and triaging
 
 ```bash
-pnpm test:e2e                                        # full suite; loads .env.test
-pnpm test:e2e tests/e2e/specs/shared/top-nav.spec.ts  # one file
-pnpm test:e2e --headed                               # watch the browser
-pnpm test:e2e --grep @smoke                          # by tag
-pnpm test:e2e:ui                                     # Playwright's test explorer
-pnpm test:e2e:report                                 # last HTML report
+pnpm test:e2e                                  # cloud-anon + cloud; loads .env.test
+pnpm test:e2e -g "TC_IP_SET_004"               # one test by id
+pnpm test:e2e -g "07 page"                     # one group (earlier groups still run their beforeAll needs)
+pnpm test:e2e:anon                             # sign-in page only, no credentials
+pnpm test:e2e --headed                         # watch the browser
+pnpm test:e2e:ui                               # Playwright UI mode
+pnpm test:e2e:report                           # last HTML report
+E2E_PROJECT=<existing project> pnpm test:e2e -g "<group>"   # run a group against an existing project
 ```
 
-First-time setup is `cp .env.test.example .env.test` plus `pnpm exec playwright install --with-deps chromium`. Auth needs Gmail API credentials for the OTP — `pnpm test:e2e:get-gmail-token` generates the refresh token once. If `.env.test` is missing, stop and say so; do not invent credentials.
+Token mode: add `E2E_TOKEN_MODE=1` plus `E2E_TOKEN_URL` / `E2E_TOKEN_AUTH` to `.env.test`. If `.env.test` is missing, stop and say so — never invent credentials.
 
-On failure, config keeps a trace, video, and screenshot (`trace: 'retain-on-failure'`). Read the trace before changing the test — it shows the DOM at the moment of failure, which usually answers "was my selector wrong, or was the page not there yet?" in one look. `references/triage.md` maps the failure messages you will actually see to their usual causes.
-
-The instinct to avoid: when a locator times out, do not loosen it until it passes. A test that asserts nothing is worse than a red one, because it also lies. Find out what the DOM really contains and fix the locator or the app.
+On failure the config keeps a trace, video and screenshot. Read the trace before changing the test; `references/triage.md` maps the messages you will see to their causes. When a locator times out, do not loosen it until it passes — find out what the DOM contains and fix the locator or the app.
 
 ## Making the UI testable
 
-Sometimes the right fix is in `src/`, not in the test. If a control has no accessible name, a screen reader user has the same problem your test does — so adding one improves the product, which is the only reason it is worth doing.
+Sometimes the fix belongs in `src/`. If a control has no accessible name, a screen-reader user has the same problem your test does, so adding one improves the product.
 
-Prefer, in order: visible text; then `aria-label` on an icon-only control; then a `name`/`id` on a form field. `data-testid` is a last resort — it asserts nothing about whether the UI is usable, and it drifts, because nothing in the app breaks when it disappears.
+Prefer, in order: visible text; then `aria-label` on an icon-only control; then a `name`/`id` on a form field. `data-testid` is a last resort — it asserts nothing about usability and drifts silently.
 
-Make labels unique and stable. `aria-label="Settings for ${project.displayName}"` is a good pattern already in the codebase: unique per row, and it carries data the test can read back. Avoid labels that duplicate another control's name on the same screen, and stay inside the four-layer architecture in `AGENTS.md` — an accessibility label is a UI concern and belongs in the component.
+`aria-label={`Settings for ${project.displayName}`}` is a good existing pattern: unique per row, and it carries data the test can read back. Keep the change inside the component, following `ipaas/AGENTS.md`.
 
 ## Does the test actually test anything
 
-A green spec can lie in two distinct ways, and they need different checks.
+**It asserts too little.** A loosened locator or an assertion that holds on any page is a permanent green that says nothing. Break each new test on purpose once — change the expected string or hide the element — and watch it fail.
 
-**It asserts too little.** A locator that was loosened until it passed, or an assertion that would hold on any page, produces a permanent green that tells you nothing. The check is to break it on purpose: change the expected string, or comment out the element in the component, and re-run. If it still passes, it was never asserting what you thought. Do this once for each new spec — it takes a minute and it is the only way to know an assertion has teeth.
-
-**It never walks the user's path.** `page.goto(url)` jumps straight to a page. That is the right default for page-level smoke coverage — it isolates the page under test, keeps the suite fast, and is what most of this suite does deliberately. But it does not exercise how a user actually reaches that page, so if the nav link or button that leads there breaks, the spec stays green.
-
-Be deliberate about which kind you are writing:
-
-- **Page-level** — `goto` the URL, assert the page's content. Cheap, isolated, parallel-friendly. Right for "does this page render its states correctly". `project-home.spec.ts` and `browse-samples.spec.ts` are this.
-- **Journey** — start where the user starts and click through, asserting the observable outcome at each step. Slower and more fragile, but it is the only thing that catches broken navigation and wiring. Worth one per critical flow, not one per page. `top-nav.spec.ts` is this: it opens the project picker, selects a project, and asserts the URL changed.
-
-Both are legitimate. What is not legitimate is writing a `goto`-based spec and describing it as covering a flow. If the task was "test the create-integration flow", a page-level spec on the options page does not satisfy it — say so and write the journey, or explain what blocks it.
-
-To see what a spec really did rather than what you think it did, watch the recording: `trace: 'retain-on-failure'` gives you one on failure, and `--headed` shows you a passing run. A journey test that visibly jumps between pages without clicking is not a journey test.
+**It never walks the user's path.** `expectPageRendered` jumps straight to a URL; that is right for page availability, and wrong for "does this flow work". For a flow, start where the user starts and click through (open the project from the org home, use the sidebar), asserting the outcome at each step. If the task was a flow, a `goto`-based check does not satisfy it.
 
 ## Before calling it done
 
-- Every locator traces to a real string in `src/`, a third-party page you verified, or a value derived at runtime.
+- Every locator traces to a string in `src/`, a third-party page you verified, or a value derived at runtime.
 - Each test asserts something a user would notice, not just a URL.
-- You broke each new spec on purpose once and watched it fail, so you know the assertions have teeth.
-- The spec's kind matches what was asked: page-level for "does this page render", a click-through journey for "does this flow work".
-- No `waitForTimeout`; absence assertions are preceded by a positive render assertion.
-- Handles come from `getAuthContext()`; created resources have `Date.now()` names.
-- The suite is safe to run in parallel and repeatedly — no shared mutable state, no reliance on leftovers from a previous run.
-- `pnpm lint` is clean. Note that `tsc -b` does **not** cover `tests/` — `tsconfig.app.json` includes only `src` — so ESLint and Playwright's own transpile at run time are what catch type and syntax errors in specs.
-- The spec has actually been run, or you have said plainly why it could not be.
-- New page objects hold locators and actions; assertions live in the spec.
+- You broke each new test once and watched it fail.
+- The test sits in the group whose fixture state it needs, and uses the shared `page` and the `enter*` helpers.
+- No `waitForTimeout`; absence assertions follow a positive render assertion; long waits reseed the session.
+- Nothing hardcodes the org, the fixture project, or a backend-supplied name.
+- `pnpm exec eslint tests/e2e playwright.config.ts` is clean, `pnpm exec vitest run tests` passes, and `pnpm exec playwright test --list` loads. `tsc -b` does **not** cover `tests/`.
+- The test has actually been run, or you have said plainly why it could not be.

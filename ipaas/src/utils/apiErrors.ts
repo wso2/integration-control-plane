@@ -25,9 +25,10 @@ function messageOf(error: unknown): string {
 /**
  * HTTP status behind a rejected API call, or `NaN` when there is none.
  *
- * Cloud rejects with `BffError`, which carries a typed `status` — read that in
- * preference to the message. Wip's GraphQL client throws a plain `Error` whose
- * message starts `HTTP {status}: …`, so the text is the only signal there.
+ * The BFF client rejects with a `BffError`, which carries a typed `status` — read
+ * that in preference to the message. Plain fetches (prebuilt catalog, RAG retrieval)
+ * throw an `Error` whose message holds `HTTP {status}`, and some callers pass a bare
+ * string, so the text is the only signal there.
  */
 export function httpStatusOf(error: unknown): number {
   if (typeof error === 'object' && error !== null && 'status' in error) {
@@ -44,7 +45,7 @@ export function isNotFoundError(error: unknown): boolean {
 
 /**
  * The API layer has no implementation for this call — the `ni()` stubs in
- * `src/api/cloud/` throw `[cloud] domain.fn: not implemented`.
+ * `src/api/` throw `[cloud] domain.fn: not implemented`.
  * A feature absent from the product is not a failure, so callers should treat it
  * as "unavailable here" rather than showing an error.
  */
@@ -55,4 +56,22 @@ export function isUnsupportedError(error: unknown): boolean {
 /** A plan limit, not a malfunction — callers show `error.message` as a warning. */
 export function isQuotaError(error: unknown): boolean {
   return httpStatusOf(error) === 402;
+}
+
+/**
+ * The sentence to show for a failed API call.
+ *
+ * The BFF writes a user-facing sentence for each outcome it distinguishes, and
+ * `BffError.message` carries it unchanged. Those sentences are the only thing
+ * telling one failure from another — a feature switched off in this deployment,
+ * a missing permission and a wrong component type otherwise read alike.
+ *
+ * Anything without a response behind it — a dropped connection, a gateway page —
+ * has no sentence worth showing, so the caller's own wording stands.
+ */
+export function apiErrorMessage(error: unknown, fallback: string): string {
+  if (Number.isNaN(httpStatusOf(error))) return fallback;
+  const message = messageOf(error).trim();
+  // The shape the client falls back to when the body carried no sentence.
+  return !message || /^HTTP \d{3}:/.test(message) ? fallback : message;
 }

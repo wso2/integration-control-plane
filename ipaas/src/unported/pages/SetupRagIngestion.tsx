@@ -19,9 +19,9 @@
 import { Alert, Box, Button, CircularProgress, LinearProgress, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { useEffect, useReducer, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
-import { isRagIngestionEnabled, useCreateRagIngestion } from '../../hooks/useRagIngestion';
+import { isRagIngestionEnabled, useCreateRagIngestion } from '../hooks/useRagIngestion';
 import { useProjects } from '../../hooks/useProjects';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { isChunkingValid, isDatasourceValid, isEmbeddingValid, isVectorStoreValid, isAutomationValid } from '../../utils/ragIngestion';
@@ -30,11 +30,11 @@ import { componentOverviewUrl } from '../../paths';
 import ComingSoon from '../../pages/ComingSoon';
 import RagUpgradeRequired from '../components/RagIngestion/RagUpgradeRequired';
 import VerticalStepper from '../../components/VerticalStepper';
-import VectorStoreStep from '../components/RagIngestion/steps/VectorStoreStep';
-import EmbeddingModelStep from '../components/RagIngestion/steps/EmbeddingModelStep';
-import ChunkingStep from '../components/RagIngestion/steps/ChunkingStep';
+import VectorStoreStep from '../../components/KnowledgeBase/steps/VectorStoreStep';
+import EmbeddingModelStep from '../../components/KnowledgeBase/steps/EmbeddingModelStep';
+import ChunkingStep from '../../components/KnowledgeBase/steps/ChunkingStep';
 import AutomationStep from '../components/RagIngestion/steps/AutomationStep';
-import DatasourceStep from '../components/RagIngestion/steps/DatasourceStep';
+import DatasourceStep from '../../components/KnowledgeBase/steps/DatasourceStep';
 import type { OrgScope } from '../../nav';
 
 const STEP_LABELS = ['Initialize Vector Store', 'Configure Embedding Model', 'Configure Chunking', 'Create Automation', 'Configure Datasource'];

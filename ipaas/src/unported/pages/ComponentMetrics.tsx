@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, CircularProgress, IconButton, MenuItem, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, CircularProgress, IconButton, MenuItem, PageContent, PageTitle, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -47,7 +46,7 @@ const COLOR = { total: '#569CD6', success: '#2E9E5B', failed: '#EF4444', mean: '
  * Integration-level Metrics page — port of Devant's ObservabilityOverview2:
  * request/latency histograms (API-like integrations only) + cpu/memory/network/disk
  * usage graphs for the selected environment's active release, with the runtime
- * logs panel underneath. Data from `choreoobsapi/0.3.0` (see api/wip/observability.ts).
+ * logs panel underneath. Data from `choreoobsapi/0.3.0`.
  */
 export default function ComponentMetrics(scope: ComponentScope): JSX.Element {
   const { projectId, project } = useProjectId(scope.project);
@@ -132,7 +131,7 @@ export default function ComponentMetrics(scope: ComponentScope): JSX.Element {
 
       <MetricsHeader range={range} onRangeChange={setRange} refreshSeconds={refreshSeconds} onRefreshSecondsChange={setRefreshSeconds} onRefresh={handleRefresh} isRefreshing={http.isFetching || usage.isFetching}>
         {environments.length > 1 && (
-          <TextField select size="small" label="Environment" value={envId} onChange={(e) => setEnvId(e.target.value)} sx={{ minWidth: 150 }}>
+          <TextField labelPlacement="top" select size="small" label="Environment" value={envId} onChange={(e) => setEnvId(e.target.value)} sx={{ minWidth: 150 }}>
             {environments.map((e) => (
               <MenuItem key={e.id} value={e.id}>
                 {e.name}
@@ -141,7 +140,7 @@ export default function ComponentMetrics(scope: ComponentScope): JSX.Element {
           </TextField>
         )}
         {tracks.length > 0 && (
-          <TextField select size="small" label="Version" value={trackId} onChange={(e) => setTrackId(e.target.value)} sx={{ minWidth: 120 }}>
+          <TextField labelPlacement="top" select size="small" label="Version" value={trackId} onChange={(e) => setTrackId(e.target.value)} sx={{ minWidth: 120 }}>
             {tracks.map((t) => (
               <MenuItem key={t.id} value={t.id}>
                 {t.branch || t.apiVersion || t.id}

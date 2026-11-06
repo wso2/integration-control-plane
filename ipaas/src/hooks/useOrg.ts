@@ -16,9 +16,8 @@
  * under the License.
  */
 
-import { useCallback } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createDefaultProject, fetchOrgComponentLimits, fetchOrgSubscriptions, fetchOrgs, fetchProjectsByOrgId, initOrg, registerUser, validateOrgName } from '#api/org';
+import { useQuery } from '@tanstack/react-query';
+import { fetchOrgComponentLimits, fetchOrgSubscriptions, fetchOrgs } from '../api/org';
 
 export function useOrgs() {
   return useQuery({
@@ -44,56 +43,5 @@ export function useOrgSubscriptions(orgUuid: string) {
     enabled: !!orgUuid,
     staleTime: 5 * 60 * 1000,
     retry: 0,
-  });
-}
-
-export function useProjectsByOrgId(orgNumericId: number, enabled = true) {
-  return useQuery({
-    queryKey: ['projects-by-org', orgNumericId],
-    queryFn: () => fetchProjectsByOrgId(orgNumericId),
-    enabled: enabled && orgNumericId > 0,
-  });
-}
-
-// Imperative fetcher for use in event flows (login callbacks etc.) — shares cache with useProjectsByOrgId.
-export function useFetchProjectsByOrgId() {
-  const qc = useQueryClient();
-  return useCallback(
-    (orgNumericId: number) =>
-      qc.fetchQuery({
-        queryKey: ['projects-by-org', orgNumericId],
-        queryFn: () => fetchProjectsByOrgId(orgNumericId),
-      }),
-    [qc],
-  );
-}
-
-export function useInitOrg() {
-  return useMutation({
-    mutationFn: ({ orgUuid, region }: { orgUuid: string; region: string }) => initOrg(orgUuid, region),
-  });
-}
-
-export function useCreateDefaultProject() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ orgNumericId, orgHandler, projectHandler }: { orgNumericId: number; orgHandler: string; projectHandler?: string }) => createDefaultProject(orgNumericId, orgHandler, projectHandler),
-    // Without this, AppLayout's own useProjects() call (already mounted throughout onboarding)
-    // keeps serving the pre-creation project list — so the page OrgHome navigates to right after
-    // this succeeds reads a stale, empty list, finds no matching project, and briefly renders
-    // "Project not found" before a later refetch (if any) corrects it.
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['projects'] }),
-  });
-}
-
-export function useValidateOrgName() {
-  return useMutation({
-    mutationFn: (orgName: string) => validateOrgName(orgName),
-  });
-}
-
-export function useRegisterUser() {
-  return useMutation({
-    mutationFn: ({ orgName, termsAccepted, serviceName }: { orgName: string; termsAccepted: boolean; serviceName: string }) => registerUser(orgName, termsAccepted, serviceName),
   });
 }

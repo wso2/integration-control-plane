@@ -16,39 +16,35 @@
  * under the License.
  */
 
-import { Avatar, Box, Button, ButtonGroup, Chip, CircularProgress, ClickAwayListener, Grow, IconButton, InputBase, MenuList, MenuItem, Paper, Popper, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Avatar, Box, Button, Chip, CircularProgress, IconButton, InputBase, Skeleton, Stack, Tooltip, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { useRef, useState, useCallback, useEffect } from 'react';
-import { Tag, Cloud, GitCommitHorizontal, Copy, Check, ChevronDown, Code2, Pencil, Globe, Lock } from '@wso2/oxygen-ui-icons-react';
+import { Tag, Cloud, GitCommitHorizontal, Copy, Check, Pencil, Globe, Lock } from '@wso2/oxygen-ui-icons-react';
 import type { ComponentDetail } from '../../../types/component';
 import { identifyIntegration } from '../../../utils/identifyIntegration';
 import IntegrationIcon from '../../IntegrationIcon';
-import type { Project } from '../../../types/project';
 import type { Repository, Commit } from '../../../types/repository';
 import { useUpdateComponent } from '../../../hooks/useComponents';
 import { useChoreoSampleImages } from '../../../hooks/useRepository';
 import LabelDialog from '../../LabelDialog';
-import { formatDistanceToNow } from '../../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../../utils/time';
 import { getGitProviderIcon } from '../../../utils/build';
 import { buildRepoBrowseUrl } from '../../../utils/gitProviderUrl';
 import { DESCRIPTION_MAX_LENGTH, clampDescription, isAtNewlineLimit } from '../../../utils/description';
-import { useAuth } from '#auth';
+import { useAuth } from '../../../auth';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import { getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';
 import type { IntegrationModule } from '../../../types/integration';
-import { IS_CLOUD } from '../../../features';
+import { withBase } from '../../../utils/basePath';
 
 const REST_API_TYPES = new Set(['restApi', 'byocRestApi', 'miRestApi', 'buildRestApi', 'miApiService', 'ballerinaService', 'byocService', 'byoiService', 'graphql', 'buildpackService']);
 
 interface ComponentHeaderProps {
   component: ComponentDetail;
-  project?: Project | null;
   repository?: Repository | null;
   latestCommit?: Commit | null;
   orgHandler: string;
   projectId: string;
-  projectHandler: string;
-  apimId?: string | null;
   module?: IntegrationModule | null;
   /**
    * Whether the component has a source repo. False for proxy/converted
@@ -61,11 +57,14 @@ interface ComponentHeaderProps {
   isLatestCommitLoading?: boolean;
 }
 
-export default function ComponentHeader({ component, project, repository, latestCommit, orgHandler, projectId, projectHandler, apimId, module, hasSource = true, isRepositoryLoading = false, isLatestCommitLoading = false }: ComponentHeaderProps) {
+const repoLinkSx = { color: 'text.primary', textDecoration: 'none', '&:hover': { color: 'primary.main' }, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const;
+
+/** The repository as `org/repo/...`: the provider icon already says which host it is. */
+const repoPathOf = (url: string): string => url.replace(/^https?:\/\/[^/]+\//, '');
+
+export default function ComponentHeader({ component, repository, latestCommit, orgHandler, projectId, module, hasSource = true, isRepositoryLoading = false, isLatestCommitLoading = false }: ComponentHeaderProps) {
   const { userId } = useAuth();
   const [copied, setCopied] = useState(false);
-  const [splitOpen, setSplitOpen] = useState(false);
-  const splitButtonRef = useRef<HTMLDivElement>(null);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
   const [descHovered, setDescHovered] = useState(false);
 
@@ -193,19 +192,9 @@ export default function ComponentHeader({ component, project, repository, latest
   const showAccessMode = REST_API_TYPES.has(displayType) && !!component.serviceAccessMode;
   const isExternal = component.serviceAccessMode?.toLowerCase() === 'external';
 
-  // Overview header actions are strictly opt-in: a type renders them only by
-  // providing its own `OverviewHeaderActions` slot (integration-as-api → the
-  // shared API block + Generate MCP; ai-agent → the shared block). Types that
-  // don't (file/event/automation/…) show no header actions — just the
-  // Open-in-Cloud split button below. The shell makes no per-type decision.
-  const HeaderActions = module?.OverviewHeaderActions;
-  // Open-in-Cloud/VS Code editor entry: only for components with a source repo
-  // and types that don't opt out of it (e.g. MCP sets `hideOpenInEditor`).
+  // Open-in-Cloud editor entry: only for components with a source repo and types
+  // that don't opt out of it (e.g. MCP sets `hideOpenInEditor`).
   const showOpenInEditor = hasSource && !module?.hideOpenInEditor;
-  // Cloud offers the cloud editor alone: the VS Code deep link addresses an
-  // extension installed on the reader's own machine, which is not where a
-  // cloud integration is edited. One destination needs no menu to choose it.
-  const showEditorMenu = !IS_CLOUD;
 
   const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;
   const ProviderIcon = getGitProviderIcon(repository?.gitProvider);
@@ -225,20 +214,7 @@ export default function ComponentHeader({ component, project, repository, latest
       codeServerSample: JSON.stringify(codeServerSample),
       sourceCommitHash: latestCommit?.sha ?? '',
     });
-    window.open(`${window.location.origin}/editor?${params}`, '_blank', 'noopener,noreferrer');
-    setSplitOpen(false);
-  };
-
-  const handleOpenInVSCode = () => {
-    const isMI = (component.componentType ?? '').toUpperCase() === 'MI';
-    const extensionId = isMI ? 'WSO2.micro-integrator' : 'WSO2.ballerina';
-    const params = new URLSearchParams({ project: project?.handler ?? '', org: orgHandler, component: component.handler });
-    if (displayType) {
-      params.set('integrationType', displayType);
-      params.set('integrationDisplayType', typeLabel ?? displayType);
-    }
-    window.open(`vscode://${extensionId}/open?${params}`, '_blank');
-    setSplitOpen(false);
+    window.open(`${window.location.origin}${withBase('/editor')}?${params}`, '_blank', 'noopener,noreferrer');
   };
 
   // The header sits in a content column of variable width (next to the app sidebar), which can be
@@ -316,6 +292,7 @@ export default function ComponentHeader({ component, project, repository, latest
                   !nameEditing && (
                     <Tooltip title="Edit name">
                       <IconButton
+                        aria-label="Edit name"
                         className="pencil-btn"
                         size="small"
                         sx={{ p: 0.25, opacity: 0 }}
@@ -338,8 +315,8 @@ export default function ComponentHeader({ component, project, repository, latest
                     <Tooltip title={isExternal ? 'External' : 'Internal'}>
                       <Stack direction="row" alignItems="center" gap={0.25} sx={{ color: 'text.secondary' }}>
                         {isExternal ? <Globe size={12} /> : <Lock size={12} />}
-                        <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'capitalize' }}>
-                          {component.serviceAccessMode}
+                        <Typography variant="caption" color="text.secondary">
+                          {isExternal ? 'External' : 'Internal'}
                         </Typography>
                       </Stack>
                     </Tooltip>
@@ -376,6 +353,7 @@ export default function ComponentHeader({ component, project, repository, latest
                       <Box component="span" sx={{ display: 'inline-flex', verticalAlign: 'middle', ml: 0.5 }}>
                         <Tooltip title="Edit description">
                           <IconButton
+                            aria-label="Edit description"
                             size="small"
                             sx={{ p: 0.25, opacity: descHovered ? 1 : 0, transition: 'opacity 0.15s' }}
                             onClick={(e) => {
@@ -443,7 +421,7 @@ export default function ComponentHeader({ component, project, repository, latest
                   <Tag size={12} />
                   {labelList.length === 0 ? (
                     <Typography variant="body2" color="primary" sx={{ cursor: 'pointer' }} onClick={() => setLabelDialogOpen(true)}>
-                      + Add Labels
+                      Add labels
                     </Typography>
                   ) : (
                     <>
@@ -457,6 +435,7 @@ export default function ComponentHeader({ component, project, repository, latest
                       )}
                       <Tooltip title="Edit labels">
                         <IconButton
+                          aria-label="Edit labels"
                           className="pencil-btn"
                           size="small"
                           sx={{ p: 0.25, opacity: 0 }}
@@ -483,19 +462,12 @@ export default function ComponentHeader({ component, project, repository, latest
                 </Typography>
                 {repoUrl ? (
                   <>
-                    <ProviderIcon size={12} />
-                    <Typography
-                      variant="body2"
-                      component="a"
-                      href={repoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      sx={{ color: 'primary.main', textDecoration: 'none', '&:hover': { textDecoration: 'underline' }, maxWidth: 360, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                      title={repoUrl}>
-                      {repoUrl}
+                    <ProviderIcon size={16} />
+                    <Typography variant="body2" component="a" href={repoUrl} target="_blank" rel="noopener noreferrer" sx={repoLinkSx} title={repoUrl}>
+                      {repoPathOf(repoUrl)}
                     </Typography>
                     <Tooltip title={copied ? 'Copied!' : 'Copy URL'}>
-                      <IconButton size="small" onClick={() => handleCopyRepoUrl(repoUrl)} sx={{ p: 0.25 }}>
+                      <IconButton aria-label="Copy URL" size="small" onClick={() => handleCopyRepoUrl(repoUrl)} sx={{ p: 0.25 }}>
                         {copied ? <Check size={12} /> : <Copy size={12} />}
                       </IconButton>
                     </Tooltip>
@@ -506,8 +478,8 @@ export default function ComponentHeader({ component, project, repository, latest
               </Stack>
               <Stack direction="row" flexWrap="wrap" alignItems="center" gap={1}>
                 <Stack direction="row" alignItems="center" gap={1}>
-                  <Typography variant="body2" color="text.secondary" sx={{ minWidth: 110 }}>
-                    Latest Commit on Source:
+                  <Typography variant="body2" color="text.secondary">
+                    Latest commit:
                   </Typography>
                   {latestCommit && (
                     <>
@@ -524,9 +496,7 @@ export default function ComponentHeader({ component, project, repository, latest
                       {latestCommit.message}
                     </Typography>
                     <Stack direction="row" alignItems="center" gap={1} flexWrap="nowrap">
-                      <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-                        {formatDistanceToNow(latestCommit.author.date)}
-                      </Typography>
+                      <RelativeTime time={formatDistanceToNow(latestCommit.author.date)} dateTime={latestCommit.author.date} tooltip={formatDateTime(latestCommit.author.date)} hideIcon sx={{ whiteSpace: 'nowrap' }} />
                       <Avatar src={latestCommit.author.avatarUrl} alt={latestCommit.author.name ?? 'Commit author'} sx={{ width: 16, height: 16, fontSize: 10, flexShrink: 0 }}>
                         {latestCommit.author.name?.[0]?.toUpperCase()}
                       </Avatar>
@@ -545,60 +515,17 @@ export default function ComponentHeader({ component, project, repository, latest
 
         {/* RIGHT COLUMN */}
         <Stack direction="column" gap={1.5} alignItems="flex-end" sx={{ mt: 1, flexShrink: 0, width: 'auto', [NARROW_HEADER_QUERY]: { alignItems: 'flex-start', width: '100%' } }}>
-          {/* Open in Cloud / VS Code — hidden for repo-less / MCP components */}
+          {/* Open in Cloud Editor — hidden for repo-less / MCP components */}
           {showOpenInEditor && (
             <Box sx={{ position: 'relative' }}>
-              {showEditorMenu ? (
-                <ButtonGroup variant="outlined" size="small" ref={splitButtonRef}>
-                  <Button startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
-                    Open in Cloud&nbsp;
-                    <Chip label="Beta" size="small" sx={{ height: 16, fontSize: 10, cursor: 'pointer' }} />
-                  </Button>
-                  <Button size="small" sx={{ px: 0.5 }} aria-label="More options" aria-expanded={splitOpen} onClick={() => setSplitOpen((prev) => !prev)}>
-                    <ChevronDown size={14} />
-                  </Button>
-                </ButtonGroup>
-              ) : (
-                <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
-                  Open in Cloud Editor
-                </Button>
-              )}
-              {showEditorMenu && (
-              <Popper open={splitOpen} anchorEl={splitButtonRef.current} placement="bottom-end" transition disablePortal style={{ zIndex: 1300 }}>
-                {({ TransitionProps }) => (
-                  <Grow {...TransitionProps}>
-                    <Paper elevation={3}>
-                      <ClickAwayListener onClickAway={() => setSplitOpen(false)}>
-                        <MenuList dense sx={{ minWidth: 200 }}>
-                          <MenuItem onClick={handleOpenInCloud} selected disabled={!codeServerSample}>
-                            <Stack direction="row" alignItems="center" gap={1}>
-                              <Cloud size={14} />
-                              <Typography variant="body2">Open in Cloud</Typography>
-                              <Chip label="Beta" size="small" sx={{ height: 16, fontSize: 10 }} />
-                            </Stack>
-                          </MenuItem>
-                          <MenuItem onClick={handleOpenInVSCode}>
-                            <Stack direction="row" alignItems="center" gap={1}>
-                              <Code2 size={14} />
-                              <Typography variant="body2">Open in VS Code</Typography>
-                            </Stack>
-                          </MenuItem>
-                        </MenuList>
-                      </ClickAwayListener>
-                    </Paper>
-                  </Grow>
-                )}
-              </Popper>
-              )}
+              <Button variant="outlined" size="small" startIcon={<Cloud size={14} />} onClick={handleOpenInCloud} disabled={!codeServerSample} sx={{ whiteSpace: 'nowrap' }}>
+                Open in Cloud Editor
+              </Button>
             </Box>
           )}
 
           {/* Prebuilt integrations expose a "How to setup this integration" guide. */}
           <SetupInstructionsButton repository={repository ?? null} />
-
-          {/* Overview-header API actions — rendered only when the type opts in
-              via its module's `OverviewHeaderActions` slot. */}
-          {HeaderActions && <HeaderActions component={component} apimId={apimId} orgHandler={orgHandler} projectHandler={projectHandler} />}
         </Stack>
       </Stack>
     </Box>

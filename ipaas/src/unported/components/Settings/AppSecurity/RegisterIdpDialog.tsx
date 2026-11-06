@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, FormControlLabel, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Autocomplete, Box, Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, FormControlLabel, IconButton, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
 import { useCreateIdentityProvider, useUpdateIdentityProvider } from '../../../hooks/useAppSecurity';
@@ -129,6 +128,7 @@ export default function RegisterIdpDialog({ type, existing, onClose, onSaved, on
         {step === 0 ? (
           <Stack gap={2.5}>
             <TextField
+              labelPlacement="top"
               label="Name"
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, NAME_MAX))}
@@ -139,14 +139,16 @@ export default function RegisterIdpDialog({ type, existing, onClose, onSaved, on
               sx={{ '& .MuiFormLabel-asterisk': { color: 'error.main' } }}
             />
             <TextField
-              label="Description (Optional)"
+              labelPlacement="top"
+              label="Description"
+              optional
               value={description}
               onChange={(e) => setDescription(e.target.value.slice(0, DESC_MAX))}
               fullWidth
               helperText={`${description.length}/${DESC_MAX}`}
               FormHelperTextProps={{ sx: { textAlign: 'right', mr: 0 } }}
             />
-            <TextField label="Well-Known URL" value={wellKnownEndpoint} onChange={(e) => setWellKnownEndpoint(e.target.value)} fullWidth error={!!wellKnownError} helperText={wellKnownError || undefined} />
+            <TextField labelPlacement="top" label="Well-Known URL" value={wellKnownEndpoint} onChange={(e) => setWellKnownEndpoint(e.target.value)} fullWidth error={!!wellKnownError} helperText={wellKnownError || undefined} />
             <FormControlLabel control={<Checkbox checked={applyAllEnvs} onChange={(e) => setApplyAllEnvs(e.target.checked)} />} label="Apply to all environments" />
             {!applyAllEnvs && (
               <Autocomplete
@@ -156,17 +158,17 @@ export default function RegisterIdpDialog({ type, existing, onClose, onSaved, on
                 onChange={(_, v) => setSelectedEnvs(v)}
                 getOptionLabel={(e) => e.name}
                 isOptionEqualToValue={(a, b) => a.id === b.id}
-                renderInput={(params) => <TextField {...params} label="Environments" />}
+                renderInput={(params) => <TextField labelPlacement="top" {...params} label="Environments" />}
               />
             )}
           </Stack>
         ) : (
           <Stack gap={2.5}>
-            <TextField label="Issuer" value={issuer} onChange={(e) => setIssuer(e.target.value)} fullWidth required sx={{ '& .MuiFormLabel-asterisk': { color: 'error.main' } }} />
-            <TextField label="Token Endpoint" value={tokenEndpoint} onChange={(e) => setTokenEndpoint(e.target.value)} fullWidth />
-            <TextField label="Authorize Endpoint" value={authorizeEndpoint} onChange={(e) => setAuthorizeEndpoint(e.target.value)} fullWidth />
-            <TextField label="JWKS Endpoint" value={jwksEndpoint} onChange={(e) => setJwksEndpoint(e.target.value)} fullWidth error={!!jwksError} helperText={jwksError || undefined} />
-            <TextField label="Allowed Token Audience (Alias)" value={alias} onChange={(e) => setAlias(e.target.value)} fullWidth />
+            <TextField labelPlacement="top" label="Issuer" value={issuer} onChange={(e) => setIssuer(e.target.value)} fullWidth required sx={{ '& .MuiFormLabel-asterisk': { color: 'error.main' } }} />
+            <TextField labelPlacement="top" label="Token Endpoint" value={tokenEndpoint} onChange={(e) => setTokenEndpoint(e.target.value)} fullWidth />
+            <TextField labelPlacement="top" label="Authorize Endpoint" value={authorizeEndpoint} onChange={(e) => setAuthorizeEndpoint(e.target.value)} fullWidth />
+            <TextField labelPlacement="top" label="JWKS Endpoint" value={jwksEndpoint} onChange={(e) => setJwksEndpoint(e.target.value)} fullWidth error={!!jwksError} helperText={jwksError || undefined} />
+            <TextField labelPlacement="top" label="Allowed Token Audience (Alias)" value={alias} onChange={(e) => setAlias(e.target.value)} fullWidth />
           </Stack>
         )}
       </DialogContent>

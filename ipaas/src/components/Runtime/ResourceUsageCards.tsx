@@ -19,7 +19,7 @@
 import { Card, CardContent, Chip, Grid, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { type JSX, type ReactNode } from 'react';
 import { formatBytes, formatVcpu } from '../../utils/podMetrics';
-import type { CalculatedUsage } from '../../types/runtime';
+import type { CalculatedUsage, MetricsUnavailableReason, UsageReading } from '../../types/runtime';
 import UsageBar from './UsageBar';
 
 const cardSx = {
@@ -35,25 +35,36 @@ interface UsageCardProps {
   detail: ReactNode;
   usagePercent: number;
   unavailable?: boolean;
+  /** Shows `usagePercent` as a figure beside the title. */
+  showPercent?: boolean;
+  /** The autoscaler's target for this resource, shown under the detail. */
+  target?: number;
 }
 
-function UsageCard({ title, detail, usagePercent, unavailable }: UsageCardProps): JSX.Element {
+function UsageCard({ title, detail, usagePercent, unavailable, showPercent, target }: UsageCardProps): JSX.Element {
   return (
     <Card elevation={0} sx={cardSx}>
       <CardContent>
         <Stack gap={1.5}>
           <Stack direction="row" alignItems="center" justifyContent="space-between">
             <Typography variant="h6">{title}</Typography>
-            {unavailable && (
+            {unavailable ? (
               <Tooltip title={UNAVAILABLE_TOOLTIP}>
                 <Chip size="small" variant="outlined" label="Unavailable" sx={{ height: 20, fontSize: '0.68rem', fontWeight: 500 }} />
               </Tooltip>
+            ) : (
+              showPercent && <Typography variant="h6">{Math.round(usagePercent)}%</Typography>
             )}
           </Stack>
           <Typography variant="body2" color="text.secondary">
             {detail}
           </Typography>
-          {!unavailable && <UsageBar percent={usagePercent} />}
+          {!unavailable && <UsageBar percent={usagePercent} target={target} />}
+          {target !== undefined && (
+            <Typography variant="caption" color="text.secondary">
+              Autoscaling target {target}%
+            </Typography>
+          )}
         </Stack>
       </CardContent>
     </Card>
@@ -64,27 +75,52 @@ interface ResourceUsageCardsProps {
   usage: CalculatedUsage;
   /** True when there's no usage source at all (cloud, componentLevelMetrics absent) — "0 used" would misreport an unknown as a confirmed zero. */
   usageUnavailable?: boolean;
+  /** Shows each card's utilization as a percentage beside its title. */
+  showPercent?: boolean;
+  /** Replaces the utilization derived from `usage` for a resource, in both the figure and the bar. */
+  readings?: { cpu?: UsageReading; memory?: UsageReading };
+  /** Why usage is unavailable, shown under the cards so an empty figure isn't left unexplained. */
+  unavailableReason?: MetricsUnavailableReason;
 }
 
-export default function ResourceUsageCards({ usage, usageUnavailable }: ResourceUsageCardsProps): JSX.Element {
+const UNAVAILABLE_REASONS: Record<MetricsUnavailableReason, string> = {
+  sharedWithOtherTracks: "Usage isn't shown while another deployment track of this integration runs in this environment: the metrics source can't tell the tracks' usage apart.",
+};
+
+export default function ResourceUsageCards({ usage, usageUnavailable, showPercent, readings, unavailableReason }: ResourceUsageCardsProps): JSX.Element {
+  const cpu = readings?.cpu;
+  const memory = readings?.memory;
+  const reason = usageUnavailable && unavailableReason ? UNAVAILABLE_REASONS[unavailableReason] : undefined;
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, md: 6 }}>
         <UsageCard
-          title="CPU Usage"
+          title="CPU usage"
           detail={usageUnavailable ? `${formatVcpu(usage.cpu.limits)} vCPU allocated` : `${formatVcpu(usage.cpu.used)} of ${formatVcpu(usage.cpu.limits)} total allocated vCPU used`}
-          usagePercent={usage.cpu.usagePercent}
-          unavailable={usageUnavailable}
+          usagePercent={cpu?.percent ?? usage.cpu.usagePercent}
+          // A reading is itself a usage source, so the card has a figure to show without the aggregate.
+          unavailable={usageUnavailable && !cpu}
+          showPercent={showPercent}
+          target={cpu?.target}
         />
       </Grid>
       <Grid size={{ xs: 12, md: 6 }}>
         <UsageCard
-          title="Memory Usage"
+          title="Memory usage"
           detail={usageUnavailable ? `${formatBytes(usage.memory.limits)} allocated` : `${formatBytes(usage.memory.used)} of ${formatBytes(usage.memory.limits)} total allocated memory used`}
-          usagePercent={usage.memory.usagePercent}
-          unavailable={usageUnavailable}
+          usagePercent={memory?.percent ?? usage.memory.usagePercent}
+          unavailable={usageUnavailable && !memory}
+          showPercent={showPercent}
+          target={memory?.target}
         />
       </Grid>
+      {reason && (
+        <Grid size={12}>
+          <Typography variant="body2" color="text.secondary">
+            {reason}
+          </Typography>
+        </Grid>
+      )}
     </Grid>
   );
 }

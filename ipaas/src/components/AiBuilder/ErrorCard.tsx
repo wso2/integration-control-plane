@@ -28,7 +28,7 @@ export function ErrorCard({ response, onRetry }: { response: AiIntegrationErrorR
       tone="error"
       actions={
         <Button variant="contained" color="primary" size="small" onClick={onRetry}>
-          Try Again
+          Try again
         </Button>
       }>
       <Typography variant="body2" sx={{ mb: 2, color: 'error.main' }}>

@@ -16,15 +16,15 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, IconButton, InputAdornment, MenuItem, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Grid, IconButton, InputAdornment, MenuItem, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { PUBLIC_REPO_URL_HELP, PUBLIC_REPO_URL_PLACEHOLDER } from '../constants/import';
-import TextField from '../components/common/TextField';
 import { ArrowLeft, Building2, Check, CheckCircle2, Edit, GitHub, GitBranch } from '@wso2/oxygen-ui-icons-react';
 import GitLogoIcon from '../assets/icons/GitLogoIcon';
 import GitProviderCards from '../components/ProjectCreate/GitProviderCards';
 import GitHubAuthArea from '../components/Import/GitHubAuthArea';
 import { useState, useLayoutEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateMonoRepoProject } from '../hooks/useProjects';
 import { useCreateComponent } from '../hooks/useComponents';
@@ -40,8 +40,6 @@ import { external } from '../paths';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems } from '../components/Import/gitHubSelectActions';
 import { toHandler } from '../utils/string';
 import { validateProjectName, validateProjectHandler, normalizeProjectError } from '../utils/projectValidation';
-import AddCredentialDialog from '../components/Settings/Credentials/AddCredentialDialog';
-import { gitProviderIcon } from '../constants/gitProviders';
 import { buildRepoUrl } from '../utils/gitProviderUrl';
 import { GitProvider as CredGitProvider } from '../types/credentials';
 import { useGitRepoSource } from '../hooks/useGitRepoSource';
@@ -57,17 +55,8 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
 
   const {
     gitProvider,
-    credProvider,
-    selectedCredential,
-    isCredentialMode,
     isPublicRepo,
     providerSelected,
-    secretRef,
-    providerLabel,
-    allCredentials,
-    showCredModal,
-    setShowCredModal,
-    modalProvider,
     selectedOrg,
     setSelectedOrg,
     selectedRepo,
@@ -103,13 +92,8 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
     openGitHubManage,
     githubInstallUrl,
     isCheckingAuth,
-    credentialAuthFailed,
     handleProviderSelect,
-    handleCredentialPicked,
-    handleCreateCredential,
-    handleCredentialAdded,
-    resetSource,
-  } = useGitRepoSource(true);
+  } = useGitRepoSource();
 
   // Hold the repo pickers at md:3 so Organization/Repository keep their width when branch/subpath appear.
   const colSize = isPublicRepo ? 4 : 3;
@@ -122,10 +106,12 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   const orgBillableCount = isUpgraded ? 0 : (orgLimits?.billableComponentCount ?? 0);
   const quotaRemaining = isUpgraded ? undefined : Math.max(0, FREE_COMPONENT_LIMIT - orgBillableCount);
 
-  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
+  const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, handlerTaken: isHandlerTaken, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createMonoRepoProject = useCreateMonoRepoProject();
   const createComponent = useCreateComponent();
   const orgHomeUrl = resourceUrl(scope, 'overview');
+  // The provider choice and the auto-selected GitHub org are not input the user would lose.
+  const allowLeave = useUnsavedChanges(displayName !== '' || description !== '' || effectiveHandler !== '' || repoUrl !== '' || selectedRepo !== '');
 
   // Stabilize scrollbar gutter to prevent layout shift when content height changes
   useLayoutEffect(() => {
@@ -137,7 +123,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
 
   const nameError = displayName ? validateProjectName(displayName) : null;
   const handlerError = effectiveHandler ? validateProjectHandler(effectiveHandler) : null;
-  const handlerTaken = availability && !availability.handlerUnique ? 'This project id is already taken.' : null;
+  const handlerTaken = isHandlerTaken ? 'This project id is already taken.' : null;
 
   const availabilityReady = !effectiveHandler || effectiveHandler.length < 2 || availability !== undefined || availabilityError;
   const canSubmit = !!displayName.trim() && !nameError && !!effectiveHandler && !handlerError && !handlerTaken && !isCheckingAvailability && availabilityReady && pathReady && isWorkspace && workspaceModules.length > 0;
@@ -158,9 +144,8 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
         gitOrganization: activeOrg,
         branch: selectedBranch,
         directoryPath: subPath === '/' ? '' : subPath.replace(/^\//, ''),
-        gitProvider: isPublicRepo ? 'public' : isCredentialMode ? (credProvider as string) : 'github',
+        gitProvider: isPublicRepo ? 'public' : 'github',
         isPublicRepo,
-        secretRef,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
@@ -172,7 +157,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
     // Step 2: create workspace module components. The project already exists, so individual
     // component failures don't block navigation — the user can manage them from the project page.
     if (workspaceModules.length > 0) {
-      const srcGitRepoUrl = buildRepoUrl(credProvider ?? CredGitProvider.GITHUB, activeOrg, activeRepo, selectedCredential?.serverUrl);
+      const srcGitRepoUrl = buildRepoUrl(CredGitProvider.GITHUB, activeOrg, activeRepo);
       await Promise.allSettled(
         workspaceModules.map((module) =>
           createComponent.mutateAsync({
@@ -186,12 +171,12 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             repositoryBranch: selectedBranch,
             repositorySubPath: module.path,
             isPublicRepo,
-            ...(isCredentialMode ? { secretRef } : {}),
           }),
         ),
       );
     }
 
+    allowLeave();
     navigate(resourceUrl(narrow(scope, project.handler), 'overview'));
   };
 
@@ -203,6 +188,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       const alt = availability?.alternateHandlerCandidate;
       return alt ? `This project id is already taken. Try "${alt}" instead.` : handlerTaken;
     }
+    if (replacedHandler) return `"${replacedHandler}" is taken, so "${effectiveHandler}" is used instead.`;
     return undefined;
   };
 
@@ -214,6 +200,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       {isPublicRepo ? (
         <Grid size={{ xs: 12, md: colSize }}>
           <TextField
+            labelPlacement="top"
             label="Repository URL"
             required
             value={repoUrl}
@@ -243,6 +230,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
         <>
           <Grid size={{ xs: 12, md: colSize }}>
             <TextField
+              labelPlacement="top"
               label="Organization"
               select
               required
@@ -259,13 +247,16 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
               }}
               fullWidth
               disabled={!isAuthenticated || isReposLoading}
-              error={credentialAuthFailed}
               slotProps={{
                 input: {
-                  startAdornment: <InputAdornment position="start">{isCredentialMode ? gitProviderIcon(credProvider!, 18) : <Building2 size={18} />}</InputAdornment>,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Building2 size={18} />
+                    </InputAdornment>
+                  ),
                 },
               }}>
-              {!isCredentialMode && organizationActionItems(!!githubInstallUrl)}
+              {organizationActionItems(!!githubInstallUrl)}
               {orgOptions.map((org) => (
                 <MenuItem key={org} value={org}>
                   {org}
@@ -275,6 +266,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           </Grid>
           <Grid size={{ xs: 12, md: colSize }}>
             <TextField
+              labelPlacement="top"
               label="Repository"
               select
               required
@@ -297,18 +289,14 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 input: {
                   startAdornment: (
                     <InputAdornment position="start">
-                      {isCredentialMode ? (
-                        gitProviderIcon(credProvider!, 16)
-                      ) : (
-                        <Box sx={{ color: 'text.primary', display: 'flex' }}>
-                          <GitHub size={16} />
-                        </Box>
-                      )}
+                      <Box sx={{ color: 'text.primary', display: 'flex' }}>
+                        <GitHub size={16} />
+                      </Box>
                     </InputAdornment>
                   ),
                 },
               }}>
-              {!isCredentialMode && repositoryActionItems(!!githubInstallUrl)}
+              {repositoryActionItems(!!githubInstallUrl)}
               {reposForOrg.map((repo) => (
                 <MenuItem key={repo} value={repo}>
                   {repo}
@@ -322,6 +310,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       {showBranchAndSubPath && (
         <Grid size={{ xs: 12, md: colSize }}>
           <TextField
+            labelPlacement="top"
             label="Branch"
             select
             required
@@ -367,7 +356,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 <CheckCircle2 size={14} />
               </Box>
               <Typography variant="caption" color="success.main" fontWeight={500}>
-                Ballerina Workspace Detected
+                Ballerina workspace detected
               </Typography>
             </Stack>
           )}
@@ -377,16 +366,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   );
 
   return (
-    <PageContent sx={{ pt: 5, '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
+    <PageContent fullWidth sx={{ pt: 5 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgHomeUrl)} sx={{ mb: 2 }}>
-        Back to Home
+        Back to projects
       </Button>
 
-      <Typography variant="h1" sx={{ mb: 1 }}>
-        Import a Project
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-        Choose a repository with your existing Ballerina workspace project.
+      <Typography variant="h1" sx={{ mb: 4 }}>
+        Import a project
       </Typography>
 
       {submitError && (
@@ -405,26 +391,11 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 startGitHubAuth(refetchRepos);
               }}
               onPublicSelect={() => handleProviderSelect('public')}
-              credentials={allCredentials}
-              onCredentialSelect={handleCredentialPicked}
-              onCreateCredential={handleCreateCredential}
             />
           </Box>
         ) : (
           <Box sx={{ mb: 1 }}>
             {gitProvider === 'github' && <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />}
-            {credentialAuthFailed && (
-              <Alert
-                severity="error"
-                sx={{ mb: 3 }}
-                action={
-                  <Button color="inherit" size="small" onClick={resetSource}>
-                    Retry
-                  </Button>
-                }>
-                Could not access your {providerLabel} repositories. Re-authorize and try again.
-              </Alert>
-            )}
             {renderRepoPickers()}
             {pathReady && !isContentsLoading && !isContentsError && !isWorkspace && (
               <Alert severity="info" sx={{ mb: 3 }}>
@@ -438,12 +409,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
         {isWorkspace && (
           <>
             <Typography variant="h5" component="h2" sx={{ mb: 2 }}>
-              Project Details
+              Project details
             </Typography>
             <Grid container columnSpacing={3} rowSpacing={1} sx={{ mb: 2 }}>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
-                  label="Project Name"
+                  labelPlacement="top"
+                  label="Project name"
                   required
                   value={displayName}
                   onChange={(e) => {
@@ -453,12 +425,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                   fullWidth
                   error={!!nameError}
                   helperText={nameError}
-                  slotProps={{ htmlInput: { 'aria-label': 'Project Name' } }}
+                  slotProps={{ htmlInput: { 'aria-label': 'Project name' } }}
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
                 <TextField
-                  label="Project Id"
+                  labelPlacement="top"
+                  label="Project ID"
                   value={effectiveHandler}
                   onChange={(e) => onHandlerChange(e.target.value)}
                   fullWidth
@@ -466,7 +439,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                   error={!!handlerError || !!handlerTaken}
                   helperText={renderHandlerHelperText()}
                   slotProps={{
-                    htmlInput: { 'aria-label': 'Project Id' },
+                    htmlInput: { 'aria-label': 'Project ID' },
                     input: {
                       endAdornment: (
                         <InputAdornment position="end">
@@ -490,7 +463,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
                 />
               </Grid>
               <Grid size={{ xs: 12, md: 4 }}>
-                <TextField label="Description (Optional)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} slotProps={{ htmlInput: { 'aria-label': 'Description' } }} />
+                <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={1} slotProps={{ htmlInput: { 'aria-label': 'Description' } }} />
               </Grid>
             </Grid>
           </>
@@ -501,19 +474,22 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       </BusyFields>
 
       <Stack direction="row" gap={2} sx={{ mt: 2 }}>
-        <Button variant="outlined" onClick={() => navigate(orgHomeUrl)} disabled={isImporting}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(orgHomeUrl);
+          }}
+          disabled={isImporting}>
           Cancel
         </Button>
         {isWorkspace && (
           <Button variant="contained" onClick={handleImport} disabled={!canSubmit || isImporting} startIcon={isImporting ? <CircularProgress size={16} color="inherit" /> : undefined}>
-            {isImporting ? 'Importing…' : 'Import Project'}
+            {isImporting ? 'Importing…' : 'Import project'}
           </Button>
         )}
       </Stack>
-
-      {showCredModal && modalProvider && (
-        <AddCredentialDialog initialProvider={modalProvider} lockProvider onClose={() => setShowCredModal(false)} onCancel={() => setShowCredModal(false)} onAdded={() => {}} onAddedCredential={handleCredentialAdded} onError={() => {}} />
-      )}
     </PageContent>
   );
 }

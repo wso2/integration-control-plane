@@ -159,19 +159,6 @@ export interface OverviewHeaderSlotProps {
 }
 
 /**
- * Props for the component-header API actions slot (`OverviewHeaderActions`),
- * rendered by the generic `HeaderShell`. A type that wants the standard
- * actions + something extra (e.g. integration-as-api + Generate MCP) provides
- * its own component; types that omit the slot get the shared default block.
- */
-export interface OverviewHeaderActionsProps {
-  component: Component;
-  apimId?: string | null;
-  orgHandler: string;
-  projectHandler: string;
-}
-
-/**
  * The contract each integration type fulfils for the Overview surface.
  *
  * Header composition has two modes:
@@ -195,9 +182,6 @@ export interface IntegrationModule {
   EnvCardActions?: ComponentType<EnvCardActionsProps>;
   // header — full escape hatch (replaces the generic frame header)
   CustomHeader?: ComponentType<CustomHeaderProps>;
-  // component-header API actions (Configure Security / Lifecycle / Dev Portal +
-  // type-specific extras). Omit to get the shared default block.
-  OverviewHeaderActions?: ComponentType<OverviewHeaderActionsProps>;
 
   // body + footer
   EnvCardBody?: ComponentType<EnvCardBodyProps>;

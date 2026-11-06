@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, IconButton, InputAdornment, MenuItem, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Box, Button, CircularProgress, IconButton, InputAdornment, MenuItem, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { Copy, Eye, EyeOff, Plug, RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import type { McpConnectionStatus, McpSwitcher } from '../../types/mcp';
@@ -28,7 +27,6 @@ interface ConnectionSidebarProps {
   status: McpConnectionStatus;
   isTokenFetching?: boolean;
   endpointSwitcher?: McpSwitcher;
-  visibilitySwitcher?: McpSwitcher;
   onConnect: () => void;
   onDisconnect: () => void;
   onReconnect: () => void;
@@ -48,8 +46,8 @@ const readOnlyInputSx = { bgcolor: 'action.hover', fontFamily: 'monospace', font
 const sidebarSx = { width: 300, flexShrink: 0, border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 2.5, alignSelf: 'flex-start' } as const;
 const barSx = { width: '100%', flexWrap: 'wrap', alignItems: 'center', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5 } as const;
 
-/** The playground's left panel: endpoint/visibility selectors, the derived URL + test key, and connect controls. */
-export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, visibilitySwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, layout = 'sidebar' }: ConnectionSidebarProps): JSX.Element {
+/** The playground's left panel: the endpoint selector, the derived URL + test key, and connect controls. */
+export default function ConnectionSidebar({ url, token, status, isTokenFetching, endpointSwitcher, onConnect, onDisconnect, onReconnect, onGetTestKey, layout = 'sidebar' }: ConnectionSidebarProps): JSX.Element {
   const bar = layout === 'bar';
   const [showToken, setShowToken] = useState(false);
   const connected = status === 'connected';
@@ -62,7 +60,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
       {endpointSwitcher && (
         <Tooltip title={connected || connecting ? 'Disconnect to select a different endpoint.' : ''}>
           <Box component="span" sx={{ display: 'block' }}>
-            <TextField select label="Endpoint" size="small" fullWidth value={endpointSwitcher.value} onChange={(e) => endpointSwitcher.onChange(e.target.value)} disabled={connected || connecting}>
+            <TextField labelPlacement="top" select label="Endpoint" size="small" fullWidth value={endpointSwitcher.value} onChange={(e) => endpointSwitcher.onChange(e.target.value)} disabled={connected || connecting}>
               {endpointSwitcher.options.map((o) => (
                 <MenuItem key={o.value} value={o.value}>
                   {o.label}
@@ -73,21 +71,8 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         </Tooltip>
       )}
 
-      {visibilitySwitcher && (
-        <Tooltip title={connected || connecting ? 'Disconnect to change the visibility.' : ''}>
-          <Box component="span" sx={{ display: 'block' }}>
-            <TextField select label="Visibility" size="small" fullWidth value={visibilitySwitcher.value} onChange={(e) => visibilitySwitcher.onChange(e.target.value)} disabled={connected || connecting}>
-              {visibilitySwitcher.options.map((o) => (
-                <MenuItem key={o.value} value={o.value}>
-                  {o.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Box>
-        </Tooltip>
-      )}
-
       <TextField
+        labelPlacement="top"
         label="URL"
         size="small"
         fullWidth={!bar}
@@ -109,6 +94,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
       />
 
       <TextField
+        labelPlacement="top"
         label="Token"
         size="small"
         fullWidth={!bar}
@@ -136,7 +122,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
 
       {onGetTestKey && (
         <Button variant="outlined" size="small" onClick={onGetTestKey} disabled={isTokenFetching}>
-          Get Test Key
+          Get test key
         </Button>
       )}
 

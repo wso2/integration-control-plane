@@ -16,13 +16,12 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Grid, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { isPlatformServicesEnabled, useCreateServer, useDatabaseServers, useServicePlans } from '../../hooks/usePlatformServices';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { CLOUD_PROVIDERS, DATABASE_KIND, FREE_TIER_DISABLED_PROVIDERS, regionLabel, SERVICE_NAME_ERROR, SERVICE_NAME_REGEX, type DbServerKind } from '../../constants/platformServices';
@@ -174,7 +173,7 @@ export function CreateDatabaseServerView({ scope, kind }: { scope: OrgScope; kin
                   );
                 })}
               </Grid>
-              <TextField label="Service Name" required fullWidth value={serviceName} onChange={(e) => setServiceName(e.target.value)} error={!!nameError} helperText={nameError} sx={{ maxWidth: 480, ...REQUIRED_FIELD_SX }} />
+              <TextField labelPlacement="top" label="Service Name" required fullWidth value={serviceName} onChange={(e) => setServiceName(e.target.value)} error={!!nameError} helperText={nameError} sx={{ maxWidth: 480, ...REQUIRED_FIELD_SX }} />
             </>
           ) : (
             <>

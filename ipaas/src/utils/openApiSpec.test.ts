@@ -41,7 +41,7 @@ describe('decodeBase64Spec', () => {
     expect(decodeBase64Spec('not base64!!')).toBeNull();
   });
 
-  // A revision id would decode to junk on WIP, so an all-whitespace result is treated as absent.
+  // An all-whitespace result is treated as no spec rather than an empty one.
   it('returns null when the decoded spec is blank', () => {
     expect(decodeBase64Spec(encode('   \n  '))).toBeNull();
   });

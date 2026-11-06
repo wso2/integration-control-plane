@@ -22,7 +22,6 @@ import { useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
 import { useSchemaConfig } from '../../../hooks/useConfiguration';
-import { IS_CLOUD } from '../../../features';
 import type { CustomHeaderProps } from '../../../types/integration';
 import StatusDot from './StatusDot';
 import ConfigureButton from './ConfigureButton';
@@ -30,6 +29,7 @@ import { hasMissingRequiredConfigs } from './configStatus';
 // Transitional: legacy ConfigureDrawer (defaults to the generic-service form
 // when `isAutomation` is absent) until its genericisation in phase 4.5.
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
+import { capitalize } from '../../../utils/string';
 
 /**
  * Shared header for the two runtime-logs integration types — **file-integration**
@@ -74,8 +74,8 @@ export default function FileEventHeader({
 
   const handleStop = () => {
     stopMutation.mutate(
-      // cloud: OpenChoreo's stop endpoint is per-environment; wip ignores it.
-      { orgHandler, componentId: component.id, releaseId, ...(IS_CLOUD ? { environment: env.id } : {}), type: 'service', clearCron: false },
+      // OpenChoreo's stop endpoint is per-environment.
+      { orgHandler, componentId: component.id, releaseId, environment: env.id, type: 'service', clearCron: false },
       {
         onSuccess: () => {
           requestPoll();
@@ -103,8 +103,8 @@ export default function FileEventHeader({
     <Stack direction="row" alignItems="center" justifyContent="space-between" flexWrap="wrap">
       {/* Left: env name + commit + status dot + Critical chip + Configure */}
       <Stack direction="row" alignItems="center" gap={1.5} sx={{ minWidth: 0 }}>
-        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, textTransform: 'capitalize', flexShrink: 0 }}>
-          {env.name}
+        <Typography variant="h5" component="h2" sx={{ fontWeight: 600, flexShrink: 0 }}>
+          {capitalize(env.name)}
         </Typography>
 
         {hasDeployment && deployedCommit?.sha && (

@@ -18,7 +18,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { fetchOrgInsights } from '#api/insights';
+import { fetchOrgInsights } from '../../api/insights';
 import { useInsightsQueryUrl } from '../../hooks/useInsights';
 import { formatCount as fmt } from '../utils/insightsFormat';
 import type { InsightsEnvironment, InsightsRange, OrgInsightsRaw } from '../../types/insights';

@@ -16,21 +16,22 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Divider, FormControlLabel, Grid, Radio, RadioGroup, Slider, Stack, Switch, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Divider, FormControlLabel, Grid, Radio, RadioGroup, Slider, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState, type JSX } from 'react';
 import ResourceRangeSlider from '../common/ResourceRangeSlider';
-import StringArrayInput from '../common/StringArrayInput';
-import { IS_CLOUD } from '../../features';
 import { useUpdateContainer } from '../../hooks/useDevopsConfigs';
 import { CPU_MAX, CPU_MIN, CPU_STEP, MEMORY_MAX, MEMORY_MIN, MEMORY_STEP, MIN_GAP_CPU, MIN_GAP_MEMORY, containerToForm, formToWriteData } from '../../utils/containers';
 import { IMAGE_PULL_POLICY, type ImagePullPolicy, type ReleaseContainer } from '../../types/devopsConfigs';
+import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
 interface ContainerEditFormProps {
   container: ReleaseContainer;
   projectId: string;
   componentId: string;
   releaseId: string;
+  /** The deployment track the release belongs to. */
+  deploymentTrackId: string;
   /** Paid subscription or Private Data Plane — resource limits are configurable. */
   isPaidOrPdpUser: boolean;
   onClose: () => void;
@@ -41,11 +42,13 @@ interface ContainerEditFormProps {
 const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerEditForm({ container, projectId, componentId, releaseId, isPaidOrPdpUser, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
+export default function ContainerEditForm({ container, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
   const [form, setForm] = useState(() => containerToForm(container));
   const initialForm = useRef(form).current;
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
-  const update = useUpdateContainer(projectId, componentId, releaseId);
+  const update = useUpdateContainer(projectId, componentId, releaseId, deploymentTrackId);
+  useUnsavedChanges(isDirty);
+  const guardNavigation = useLeaveGuard();
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]): void => setForm((prev) => ({ ...prev, [key]: value }));
 
@@ -62,8 +65,8 @@ export default function ContainerEditForm({ container, projectId, componentId, r
   return (
     <Box>
       <Box sx={{ mb: 3 }}>
-        <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={onClose} sx={{ px: 0 }}>
-          Go Back
+        <Button variant="text" size="small" startIcon={<ArrowLeft size={16} />} onClick={() => guardNavigation(onClose)} sx={{ px: 0 }}>
+          Back to container
         </Button>
       </Box>
 
@@ -73,25 +76,11 @@ export default function ContainerEditForm({ container, projectId, componentId, r
         </Alert>
       )}
 
-      {/* Toggling limits on/off isn't supported for cloud; */}
-      {isPaidOrPdpUser && !IS_CLOUD && (
-        <FormControlLabel
-          labelPlacement="start"
-          sx={{ ml: 0, mb: 2 }}
-          control={<Switch checked={form.limitsEnabled} onChange={(e) => set('limitsEnabled', e.target.checked)} />}
-          label={
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mr: 1 }}>
-              {form.limitsEnabled ? 'Limits Enabled' : 'Limits Disabled'}
-            </Typography>
-          }
-        />
-      )}
-
       <Grid container spacing={4} sx={{ mb: 1 }}>
         <Grid size={{ xs: 12, md: 6 }}>
           {form.limitsEnabled ? (
             <ResourceRangeSlider
-              label="CPU Request / Limit"
+              label="CPU request / limit"
               unit="CPU"
               min={CPU_MIN}
               max={CPU_MAX}
@@ -105,13 +94,13 @@ export default function ContainerEditForm({ container, projectId, componentId, r
               format={cpuFmt}
             />
           ) : (
-            <SingleResourceSlider label="CPU Request" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={CPU_STEP} value={form.cpuRequest} onChange={(v) => set('cpuRequest', v)} disabled={!isPaidOrPdpUser} format={cpuFmt} />
+            <SingleResourceSlider label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={CPU_STEP} value={form.cpuRequest} onChange={(v) => set('cpuRequest', v)} disabled={!isPaidOrPdpUser} format={cpuFmt} />
           )}
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
           {form.limitsEnabled ? (
             <ResourceRangeSlider
-              label="Memory Request / Limit"
+              label="Memory request / limit"
               unit="Mi"
               min={MEMORY_MIN}
               max={MEMORY_MAX}
@@ -125,7 +114,7 @@ export default function ContainerEditForm({ container, projectId, componentId, r
               format={memFmt}
             />
           ) : (
-            <SingleResourceSlider label="Memory Request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={MEMORY_STEP} value={form.memRequest} onChange={(v) => set('memRequest', v)} disabled={!isPaidOrPdpUser} format={memFmt} />
+            <SingleResourceSlider label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={MEMORY_STEP} value={form.memRequest} onChange={(v) => set('memRequest', v)} disabled={!isPaidOrPdpUser} format={memFmt} />
           )}
         </Grid>
       </Grid>
@@ -135,34 +124,23 @@ export default function ContainerEditForm({ container, projectId, componentId, r
       <Grid container alignItems="center" spacing={2} sx={{ mb: 1 }}>
         <Grid size={{ xs: 12, md: 3 }}>
           <Typography variant="subtitle2" fontWeight={600}>
-            Image Pull Policy
+            Image pull policy
           </Typography>
         </Grid>
         <Grid size={{ xs: 12, md: 9 }}>
           <RadioGroup row value={form.imagePullPolicy} onChange={(e) => set('imagePullPolicy', e.target.value as ImagePullPolicy)}>
             <FormControlLabel value={IMAGE_PULL_POLICY.ALWAYS} control={<Radio />} label="Always" />
-            <FormControlLabel value={IMAGE_PULL_POLICY.IF_NOT_PRESENT} control={<Radio />} label="If Not Present" />
+            <FormControlLabel value={IMAGE_PULL_POLICY.IF_NOT_PRESENT} control={<Radio />} label="If not present" />
           </RadioGroup>
         </Grid>
       </Grid>
 
-      {/* Command/Args editing isn't supported for cloud */}
-      {!IS_CLOUD && (
-        <>
-          <Divider sx={{ my: 3 }} />
-          <Stack gap={3}>
-            <StringArrayInput label="Command" value={form.command} onChange={(v) => set('command', v)} addLabel="Add Command" />
-            <StringArrayInput label="Arguments" value={form.args} onChange={(v) => set('args', v)} addLabel="Add Arguments" />
-          </Stack>
-        </>
-      )}
-
       <Stack direction="row" gap={1.5} sx={{ mt: 4 }}>
-        <Button variant="outlined" onClick={onClose} disabled={update.isPending}>
+        <Button variant="outlined" color="inherit" onClick={onClose} disabled={update.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={onSubmit} disabled={update.isPending || !isDirty} startIcon={update.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
-          Save Changes
+          Save changes
         </Button>
       </Stack>
     </Box>

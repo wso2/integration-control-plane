@@ -22,7 +22,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { useAuth } from '#auth';
+import { useAuth } from '../auth';
 import { useChoreoSampleImages } from '../hooks/useRepository';
 import { useProjectId } from '../hooks/useProjects';
 import { useOrgUuid } from '../hooks/useOrgUuid';
@@ -128,9 +128,9 @@ function AiIntegrationBuilderView(scope: ProjectScope): JSX.Element {
   if (!initialQuery) return <></>;
 
   return (
-    <PageContent sx={{ pt: 5, pb: 2 }}>
+    <PageContent fullWidth sx={{ pt: 5, pb: 2 }}>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(componentsNewUrl(scope.org, scope.project))} sx={{ mb: 1, alignSelf: 'flex-start' }}>
-        Back to Create Integration
+        Back to create integration
       </Button>
 
       {pageError && (

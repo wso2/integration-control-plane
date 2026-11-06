@@ -17,7 +17,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { listDataPlanes, listPdps } from '#api/dataPlanes';
+import { listDataPlanes, listPdps } from '../api/dataPlanes';
 import { useOrgUuid } from './useOrgUuid';
 
 const ROOT_KEY = 'dataPlanes';

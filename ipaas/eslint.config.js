@@ -43,17 +43,8 @@ export default [
     },
   },
   {
-    // Auth is resolved per product by the #auth alias; a relative import would
-    // pin one product's implementation into every build.
-    files: ['src/**/*.{ts,tsx}'],
-    ignores: ['src/auth/**'],
-    rules: {
-      'no-restricted-imports': ['error', { patterns: [{ group: ['**/auth/**'], message: 'Import auth from #auth (see src/auth/contract.ts).' }] }],
-    },
-  },
-  {
-    // src/unported holds features the cloud BFF can't serve yet. It may import live
-    // code, never the reverse. Repeats the auth pattern: this block replaces the rule above.
+    // Auth is used only through src/auth/index.ts, and src/unported holds features the cloud
+    // BFF can't serve yet: it may import live code, never the reverse.
     files: ['src/**/*.{ts,tsx}'],
     ignores: ['src/auth/**', 'src/unported/**'],
     rules: {
@@ -61,11 +52,23 @@ export default [
         'error',
         {
           patterns: [
-            { group: ['**/auth/**'], message: 'Import auth from #auth (see src/auth/contract.ts).' },
+            { group: ['**/auth/*'], message: 'Import auth from src/auth (its index), not its internal files.' },
             { group: ['**/unported/**'], message: 'Live code must not import from src/unported.' },
           ],
         },
       ],
+    },
+  },
+  {
+    files: ['src/unported/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['**/auth/*'], message: 'Import auth from src/auth (its index), not its internal files.' }] }],
+    },
+  },
+  {
+    files: ['src/auth/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', { patterns: [{ group: ['**/unported/**'], message: 'Live code must not import from src/unported.' }] }],
     },
   },
 ];

@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { MenuItem, Stack, ToggleButton, ToggleButtonGroup } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { MenuItem, Stack, ToggleButton, ToggleButtonGroup, TextField } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { GRANULARITY_LABELS, RANGE_GRANULARITIES, type DeliveryGranularity, type DeliveryRange } from '../../../types/delivery';
 

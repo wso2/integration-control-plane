@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Box, Button, CircularProgress, Drawer, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
-import { X } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, CircularProgress, DrawerPanel } from '@wso2/oxygen-ui';
 import { useExecutionConfigs } from '../../../hooks/useExecutions';
 import { useDeployDeploymentTrack } from '../../../hooks/useDeployments';
 import ScheduleFields from './ScheduleFields';
@@ -35,9 +34,11 @@ interface ScheduleDialogProps {
   buildId?: string;
   versionId: string;
   deploymentPipelineId: string;
+  /** Save with no build: the BFF then releases the current workload. For image-only components such as knowledge base data sources. */
+  allowWithoutBuild?: boolean;
 }
 
-export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, buildId, versionId, deploymentPipelineId }: ScheduleDialogProps) {
+export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, buildId, versionId, deploymentPipelineId, allowWithoutBuild = false }: ScheduleDialogProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -61,29 +62,16 @@ export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveErr
     });
   };
 
-  const drawerSx = {
-    '& .MuiDrawer-paper': {
-      width: 440,
-      position: 'fixed',
-      top: 64,
-      height: 'calc(100% - 64px)',
-      borderLeft: '1px solid',
-      borderColor: 'divider',
-      display: 'flex',
-      flexDirection: 'column',
-    },
-  };
-
   return (
-    <Drawer anchor="right" open={open} onClose={handleClose} variant="temporary" sx={drawerSx}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
-        <Typography variant="h5">Schedule</Typography>
-        <IconButton size="small" aria-label="close" onClick={handleClose}>
-          <X size={16} />
-        </IconButton>
-      </Stack>
+    <DrawerPanel open={open} onClose={handleClose} width={440}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Schedule</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
 
-      <Box sx={{ flex: 1, overflow: 'auto', px: 2, py: 2 }}>
+      <DrawerPanel.Body>
         {loadingConfigs ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
             <CircularProgress size={24} color="primary" />
@@ -91,14 +79,14 @@ export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveErr
         ) : (
           <ScheduleFields form={form} />
         )}
-      </Box>
+      </DrawerPanel.Body>
 
-      <Stack direction="row" justifyContent="flex-end" gap={1} sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider', flexShrink: 0 }}>
+      <DrawerPanel.Footer>
         <Button onClick={onClose}>Back</Button>
-        <Button variant="contained" onClick={handleSave} disabled={deployTrack.isPending || !buildId || !form.isValid} startIcon={deployTrack.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
+        <Button variant="contained" onClick={handleSave} disabled={deployTrack.isPending || (!buildId && !allowWithoutBuild) || !form.isValid} startIcon={deployTrack.isPending ? <CircularProgress color="inherit" size={16} /> : undefined}>
           {deployTrack.isPending ? 'Updating…' : 'Update'}
         </Button>
-      </Stack>
-    </Drawer>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
   );
 }

@@ -61,6 +61,8 @@ export interface DeployEnvironmentCardProps {
    * endpoints — their per-env signal is the runtime log stream.
    */
   hideEndpoints?: boolean;
+  /** The component's real `displayType`; the configure drawer picks its view (e.g. MI) from it. */
+  displayType?: string;
   env: Environment;
   branch: string;
   componentName: string;

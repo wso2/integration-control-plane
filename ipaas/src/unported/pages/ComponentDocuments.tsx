@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, MenuItem, PageContent, Paper, Select, Stack, Tab, Tabs, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, IconButton, MenuItem, PageContent, Paper, Select, Stack, Tab, Tabs, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp, Edit, FileText, Plus, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import ReactMarkdown from 'react-markdown';
@@ -293,9 +292,7 @@ export default function ComponentDocuments(scope: ComponentScope): JSX.Element {
     return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
   }
 
-  const trackBar = aggregatedTracks.length > 0 && (
-    <DeploymentTrackBar tracks={aggregatedTracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? ''} componentHandler={component.handler} versionView extra={endpointPicker} />
-  );
+  const trackBar = aggregatedTracks.length > 0 && <DeploymentTrackBar extra={endpointPicker} />;
 
   // ── Create / Edit view ────────────────────────────────────────────────────
   if (view === 'create' || view === 'edit') {

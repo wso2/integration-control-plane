@@ -17,37 +17,23 @@
  */
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { IS_CLOUD } from '../features';
+import { fetchBallerinaCentralToken, removeBallerinaCentralToken, saveBallerinaCentralToken } from '../api/packageRegistries';
 import type { BallerinaCentralTokenStatus } from '../types/packageRegistries';
 
 const ROOT_KEY = 'ballerinaCentralToken';
 
-/**
- * Ballerina Central access token status for the org.
- *
- * Cloud-exclusive surface (see src/api/cloud/packageRegistries.ts). The query
- * is gated `enabled: IS_CLOUD` so wip/icp never fetch, and the cloud module is
- * loaded lazily inside queryFn/mutationFn (not through `#api`) so it stays out
- * of the non-cloud bundles entirely — same pattern as useBillingOrg.
- */
+/** Ballerina Central access token status for the org. */
 export function useBallerinaCentralToken(): UseQueryResult<BallerinaCentralTokenStatus> {
   return useQuery<BallerinaCentralTokenStatus>({
     queryKey: [ROOT_KEY],
-    queryFn: async () => {
-      const { fetchBallerinaCentralToken } = await import('../api/cloud/packageRegistries');
-      return fetchBallerinaCentralToken();
-    },
-    enabled: IS_CLOUD,
+    queryFn: fetchBallerinaCentralToken,
   });
 }
 
 export function useSaveBallerinaCentralToken() {
   const qc = useQueryClient();
   return useMutation<BallerinaCentralTokenStatus, Error, string>({
-    mutationFn: async (token) => {
-      const { saveBallerinaCentralToken } = await import('../api/cloud/packageRegistries');
-      return saveBallerinaCentralToken(token);
-    },
+    mutationFn: saveBallerinaCentralToken,
     onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY] }),
   });
 }
@@ -55,10 +41,7 @@ export function useSaveBallerinaCentralToken() {
 export function useRemoveBallerinaCentralToken() {
   const qc = useQueryClient();
   return useMutation<void, Error, void>({
-    mutationFn: async () => {
-      const { removeBallerinaCentralToken } = await import('../api/cloud/packageRegistries');
-      return removeBallerinaCentralToken();
-    },
+    mutationFn: () => removeBallerinaCentralToken(),
     onSuccess: () => qc.invalidateQueries({ queryKey: [ROOT_KEY] }),
   });
 }

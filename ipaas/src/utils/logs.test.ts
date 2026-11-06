@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { copyLog, DISPLAY_FIELDS, downloadLogs, filterLogLines, filterLogRows, formatValue, LEVEL_COLORS, levelColor, toLocalInput, mergeLogRows, selectLogSources, filterLogsByScope, findEnvironment, sortLogRows } from './logs';
+import { copyLog, DISPLAY_FIELDS, downloadLogs, downloadTextFile, filterLogLines, filterLogRows, formatValue, LEVEL_COLORS, levelColor, toLocalInput, mergeLogRows, selectLogSources, filterLogsByScope, findEnvironment, sortLogRows } from './logs';
 import type { LogRow } from '../types/logs';
 
 const makeLogRow = (overrides: Partial<LogRow> = {}): LogRow => ({
@@ -114,6 +114,21 @@ describe('copyLog', () => {
       logContext: 'ctx1',
     });
     expect(writeText).toHaveBeenCalledWith(`2026-01-01T00:00:00.000Z hello world ${expectedMeta}`);
+  });
+});
+
+describe('downloadTextFile', () => {
+  it('names the file with the prefix and a .txt extension', () => {
+    Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:mock-url'), revokeObjectURL: vi.fn() });
+    let name = '';
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      name = this.download;
+    });
+
+    downloadTextFile('line', 'build-logs');
+
+    expect(name).toMatch(/^build-logs-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.txt$/);
+    clickSpy.mockRestore();
   });
 });
 

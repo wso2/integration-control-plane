@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createCertificate, deleteCertificate, getCertificateUsage, listCertificateGroups } from '#api/certificates';
+import { createCertificate, deleteCertificate, getCertificateUsage, listCertificateGroups } from '../../api/certificates';
 import type { CreateCertificateInput } from '../../types/certificates';
 
 const ROOT_KEY = 'certificates';

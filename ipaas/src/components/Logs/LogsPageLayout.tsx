@@ -27,7 +27,7 @@ interface LogsPageLayoutProps {
 
 export default function LogsPageLayout({ title, filtersElement, logPanelElement }: LogsPageLayoutProps): JSX.Element {
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Typography variant="h1" sx={{ mb: 2 }}>
         {title}
       </Typography>

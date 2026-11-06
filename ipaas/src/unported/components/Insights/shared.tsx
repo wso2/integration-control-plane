@@ -16,15 +16,13 @@
  * under the License.
  */
 
-import { Box, Button, ListingTable, MenuItem, Paper, Skeleton, Stack, StatCard, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Box, Button, ListingTable, Paper, Skeleton, Stack, StatCard, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
 import { Download } from '@wso2/oxygen-ui-icons-react';
 import { AreaChart, BarChart } from '@wso2/oxygen-ui-charts-react';
 import type { JSX, ReactNode } from 'react';
 import { INSIGHTS_RANGES } from '../../../constants/insights';
 import { KPI_ICONS } from '../../constants/insightsIcons';
 import type { InsightsRange } from '../../../types/insights';
-import { IS_CLOUD } from '../../../features';
 
 const TOGGLE_SX = { px: 1.5, textTransform: 'none' } as const;
 
@@ -198,18 +196,9 @@ interface InsightsControlsProps {
 
 /** Environment select + range toggle + Report button cluster shared by the
  * project and integration insights pages. */
-export function InsightsControls({ envOptions, envId, onEnvChange, range, onRangeChange, onReport, reportDisabled = false }: InsightsControlsProps): JSX.Element {
+export function InsightsControls({ range, onRangeChange, onReport, reportDisabled = false }: InsightsControlsProps): JSX.Element {
   return (
     <Stack direction="row" alignItems="center" gap={1.5} flexWrap="wrap">
-      {!IS_CLOUD && envOptions.length > 1 && (
-        <TextField select size="small" value={envId} onChange={(e) => onEnvChange(e.target.value)} inputProps={{ 'aria-label': 'Environment' }} sx={{ minWidth: 160 }}>
-          {envOptions.map((e) => (
-            <MenuItem key={e.id} value={e.id}>
-              {e.name}
-            </MenuItem>
-          ))}
-        </TextField>
-      )}
       <ToggleButtonGroup exclusive size="small" aria-label="Time range" value={range} onChange={(_, v: InsightsRange | null) => v && onRangeChange(v)}>
         {INSIGHTS_RANGES.map((r) => (
           <ToggleButton key={r.value} value={r.value} sx={TOGGLE_SX}>

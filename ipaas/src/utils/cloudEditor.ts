@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import type { ClusterPod } from '../types/runtime';
-import type { PodPhase } from '../types/cloudEditor';
+import { withBase } from './basePath';
 
 export interface CloudEditorParams {
   userId: string;
@@ -32,7 +31,7 @@ export interface CloudEditorParams {
 
 /** Builds the `/editor` deep link the Cloud Editor is opened with. */
 export function buildCloudEditorUrl(params: CloudEditorParams, origin: string): string {
-  const url = new URL('/editor', origin);
+  const url = new URL(withBase('/editor'), origin);
   url.searchParams.set('userId', params.userId);
   url.searchParams.set('orgUuid', params.orgUuid);
   url.searchParams.set('orgHandle', params.orgHandle);
@@ -43,31 +42,6 @@ export function buildCloudEditorUrl(params: CloudEditorParams, origin: string): 
     url.searchParams.set('scaffoldKey', params.scaffoldKey);
   }
   return url.toString();
-}
-
-type PodConditionType = 'PodScheduled' | 'Initialized' | 'ContainersReady' | 'Ready' | 'PodReadyToStartContainers';
-
-function isConditionTrue(pod: ClusterPod, type: PodConditionType): boolean {
-  return pod.status?.conditions?.find((c) => c.type === type)?.status === 'True';
-}
-
-function allTrue(pod: ClusterPod, types: PodConditionType[]): boolean {
-  return types.every((t) => isConditionTrue(pod, t));
-}
-
-/** Map a pod's conditions to a deployment phase. */
-export function derivePodPhase(pod?: ClusterPod): PodPhase {
-  if (!pod) return 'scheduling';
-  if (allTrue(pod, ['PodReadyToStartContainers', 'ContainersReady', 'Ready'])) return 'opening';
-  if (allTrue(pod, ['PodScheduled', 'Initialized'])) return 'starting';
-  return 'scheduling';
-}
-
-const PHASE_RANK: Record<PodPhase, number> = { scheduling: 0, starting: 1, opening: 2 };
-
-/** The furthest-along phase across a set of pods (empty list → scheduling). */
-export function highestPodPhase(pods: ClusterPod[]): PodPhase {
-  return pods.map(derivePodPhase).reduce<PodPhase>((a, b) => (PHASE_RANK[a] >= PHASE_RANK[b] ? a : b), 'scheduling');
 }
 
 /**

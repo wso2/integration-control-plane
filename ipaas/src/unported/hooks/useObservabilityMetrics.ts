@@ -17,7 +17,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchComponentHttpMetrics, fetchComponentUsageMetrics, fetchProjectMetricsModel } from '#api/observability';
+import { fetchComponentHttpMetrics, fetchComponentUsageMetrics, fetchProjectMetricsModel } from '../../api/observability';
 import { METRICS_RANGES, type ComponentHttpMetricsRows, type ComponentUsageMetricsRows, type MetricsDatum, type MetricsRange, type MetricsTimePoint, type ProjectMetricsModel } from '../../types/observability';
 
 export function rangeToIso(range: MetricsRange): { from: string; to: string } {

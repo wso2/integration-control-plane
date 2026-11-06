@@ -17,9 +17,8 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getOrgUuidFromToken } from '#auth';
-import { createOrgEnvironment, deleteEnvironmentTemplate, fetchAllEnvironments, fetchCloudDataPlanes, fetchEnvironments, fetchEnvironmentTemplates, fetchLoggers, getEnvDeleteEligibility, updateEnvironment, updateLogLevel } from '#api/environments';
-import { IS_CLOUD } from '../features';
+import { getOrgUuidFromToken } from '../auth';
+import { createOrgEnvironment, deleteEnvironmentTemplate, fetchAllEnvironments, fetchCloudDataPlanes, fetchEnvironments, fetchEnvironmentTemplates, fetchLoggers, getEnvDeleteEligibility, updateEnvironment, updateLogLevel } from '../api/environments';
 import type { CreateEnvironmentData, EnvironmentInput } from '../types/environment';
 
 export function useEnvironments(orgUuid: string, projectId: string) {
@@ -80,7 +79,6 @@ export function useEnvironmentTemplates(orgId: string) {
   return useQuery({
     queryKey: ['environment-templates', orgId],
     queryFn: () => fetchEnvironmentTemplates(orgId),
-    enabled: IS_CLOUD || !!orgId, // orgid is false in the cloud path, thus adding the IS_CLOUD
     retry: false,
   });
 }
@@ -88,7 +86,7 @@ export function useEnvironmentTemplates(orgId: string) {
 export function useAddEnvironment() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateEnvironmentData & { orgUuid: string; vhost: string }) => {
+    mutationFn: (input: CreateEnvironmentData & { orgUuid: string }) => {
       const { orgUuid, ...request } = input;
       return createOrgEnvironment(orgUuid, request);
     },

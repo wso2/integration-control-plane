@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   fetchComponents,
   fetchComponentByHandler,
@@ -31,11 +31,13 @@ import {
   updateEndpoint,
   generateComponentEndpoints,
   createDeploymentTrack,
+  updateDeploymentTrack,
   deleteDeploymentTrack,
   checkDeploymentTrackDeletable,
-} from '#api/components';
+} from '../api/components';
+import { trackEvent } from '../services/tracking/tracking';
 import { pollWhileDeleting } from '../utils/deletionPolling';
-import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput } from '../types/component';
+import type { Component, CreateComponentInput, UpdateComponentInput, UpdateAutoDeployInput, UpdateEndpointInput, GenerateComponentEndpointsInput, CreateDeploymentTrackInput, UpdateDeploymentTrackInput } from '../types/component';
 
 export function useComponents(orgHandler: string, projectId: string) {
   return useQuery({
@@ -43,6 +45,21 @@ export function useComponents(orgHandler: string, projectId: string) {
     queryFn: () => fetchComponents(orgHandler, projectId),
     enabled: !!orgHandler && !!projectId,
     refetchInterval: pollWhileDeleting,
+  });
+}
+
+/** Several projects' integrations at once, sharing useComponents' cache. */
+export function useOrgComponents(orgHandler: string, projectIds: string[]) {
+  return useQueries({
+    queries: projectIds.map((projectId) => ({
+      queryKey: ['components', orgHandler, projectId],
+      queryFn: () => fetchComponents(orgHandler, projectId),
+      enabled: !!orgHandler,
+      refetchInterval: pollWhileDeleting,
+    })),
+    combine: (results) => ({
+      byProject: new Map(projectIds.map((id, i) => [id, results[i].data])),
+    }),
   });
 }
 
@@ -66,8 +83,14 @@ export function useComponentEndpoints(componentId: string, versionId: string) {
 export function useCreateComponent() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateComponentInput) => createComponent(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['components'] }),
+    mutationFn: (input: CreateComponentInput) => {
+      trackEvent('component-create-start');
+      return createComponent(input);
+    },
+    onSuccess: () => {
+      trackEvent('component-create-end');
+      qc.invalidateQueries({ queryKey: ['components'] });
+    },
   });
 }
 
@@ -78,6 +101,7 @@ export function useDeleteComponent() {
     onSuccess: async (result, input) => {
       // The backend refuses some deletions without throwing, reporting `canDelete: false`.
       if (!result.canDelete) return;
+      trackEvent('component-delete');
       // Scoped per org+project — names repeat across orgs.
       const listKey = ['components', input.orgHandler, input.projectId];
       // An in-flight fetch would resolve after the mark below and overwrite it.
@@ -131,6 +155,14 @@ export function useCreateDeploymentTrack() {
   });
 }
 
+export function useUpdateDeploymentTrack() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: UpdateDeploymentTrackInput) => updateDeploymentTrack(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['component'] }),
+  });
+}
+
 export function useDeleteDeploymentTrack() {
   const qc = useQueryClient();
   return useMutation({
@@ -154,6 +186,9 @@ export function useUpdateEndpoint() {
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
       qc.invalidateQueries({ queryKey: ['envEndpoints'] });
       qc.invalidateQueries({ queryKey: ['componentEndpoints', input.componentId, input.versionId] });
+      qc.invalidateQueries({ queryKey: ['consumers'] });
+      qc.invalidateQueries({ queryKey: ['endpoint-security'] });
+      qc.invalidateQueries({ queryKey: ['endpoint-policies'] });
     },
   });
 }

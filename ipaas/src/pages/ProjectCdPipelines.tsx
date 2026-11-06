@@ -17,9 +17,8 @@
  */
 
 import { Alert, Box, Button, CircularProgress, IconButton, PageContent, PageTitle, Stack, Tooltip } from '@wso2/oxygen-ui';
-import { GitBranch, Plus, Repeat, Trash2 } from '@wso2/oxygen-ui-icons-react';
+import { GitBranch, Repeat, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
-import { IS_CLOUD } from '../features';
 import { useEnvTemplates, useProjectDeploymentPipelines } from '../hooks/useDeploymentPipelines';
 import { useProjectId } from '../hooks/useProjects';
 import type { DeploymentPipeline } from '../types/deploymentPipeline';
@@ -49,19 +48,19 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
   const currentPipelineIds = useMemo(() => (pipelines ?? []).map((p) => p.id), [pipelines]);
 
   return (
-    <PageContent>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <PageTitle>
-          <PageTitle.Header>Deployment Pipeline</PageTitle.Header>
-          <PageTitle.SubHeader>The promotion path this project's integrations deploy along.</PageTitle.SubHeader>
-        </PageTitle>
+    <PageContent fullWidth>
+      <PageTitle>
+        <PageTitle.Header>Deployment pipeline</PageTitle.Header>
+        <PageTitle.SubHeader>The promotion path this project's integrations deploy along.</PageTitle.SubHeader>
         {/* Cloud binds one pipeline per project, so adding a second is really a swap. */}
         {!!pipelines?.length && (
-          <Button variant="contained" startIcon={IS_CLOUD ? <Repeat size={18} /> : <Plus size={20} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
-            {IS_CLOUD ? 'Change Pipeline' : 'Add Pipeline'}
-          </Button>
+          <PageTitle.Actions>
+            <Button variant="contained" startIcon={<Repeat size={18} />} onClick={() => setAddOpen(true)} sx={{ flexShrink: 0, whiteSpace: 'nowrap' }}>
+              Change pipeline
+            </Button>
+          </PageTitle.Actions>
         )}
-      </Stack>
+      </PageTitle>
 
       {alert && (
         <Alert severity={alert.type} onClose={() => setAlert(null)} sx={{ mb: 2 }}>
@@ -84,7 +83,7 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
           Failed to load deployment pipelines.
         </Alert>
       ) : !pipelines?.length ? (
-        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Add Pipeline" onAction={() => setAddOpen(true)} />
+        <EmptyListing icon={<GitBranch size={48} />} title="No deployment pipelines" description={EMPTY_DESCRIPTION} showAction actionLabel="Add pipeline" onAction={() => setAddOpen(true)} />
       ) : (
         <Stack gap={3}>
           {orderedPipelines?.map((pipeline) => (
@@ -108,12 +107,11 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
                       Set as default
                     </Button>
                   )}
-                  <Tooltip title={pipeline.is_project_default ? 'The default pipeline cannot be removed' : 'Remove'}>
-                    <span>
+                  {!pipeline.is_project_default && (
+                    <Tooltip title="Remove">
                       <IconButton
                         size="small"
                         color="error"
-                        disabled={pipeline.is_project_default}
                         aria-label={`Remove ${pipeline.name}`}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -121,8 +119,8 @@ export default function ProjectCdPipelines(scope: ProjectScope): JSX.Element {
                         }}>
                         <Trash2 size={16} />
                       </IconButton>
-                    </span>
-                  </Tooltip>
+                    </Tooltip>
+                  )}
                 </>
               }
             />

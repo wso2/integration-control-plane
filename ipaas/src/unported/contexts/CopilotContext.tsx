@@ -20,7 +20,6 @@ import { createContext, useCallback, useEffect, useMemo, useRef, useState, type 
 import { useCloudDataPlanes } from '../../hooks/useEnvironments';
 import { useOrgs } from '../../hooks/useOrg';
 import { copilotApiUrl } from '../../config/runtimeConfig';
-import { IS_CLOUD } from '../../features';
 import { COPILOT_REGION_DISPLAY_NAMES, COPILOT_SESSION_MESSAGES_KEY } from '../../constants/copilot';
 import { useScope } from '../../nav';
 import type { CopilotRegion, IMessage } from '../../types/copilot';
@@ -34,6 +33,8 @@ function loadMessagesFromSession(): IMessage[] {
     return [];
   }
 }
+
+const NO_REGIONS = true;
 
 export interface CopilotContextDefinition {
   showCopilot: boolean;
@@ -139,7 +140,8 @@ export function CopilotProvider({ children }: CopilotProviderProps) {
 
   // Build available regions from data planes
   useEffect(() => {
-    if (IS_CLOUD) {
+    // Copilot regions are not served by the BFF yet.
+    if (NO_REGIONS) {
       setAvailableRegions([]);
       return;
     }

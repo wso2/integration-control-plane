@@ -145,10 +145,6 @@ describe('failedStepPhrase', () => {
     expect(failedStepPhrase(logs(named([{ name: 'checkout-source', conclusion: 'success' }]), named([{ name: 'build-image', conclusion: 'failure' }]), stage(null)))).toBe('building the image');
   });
 
-  it('names the failed WIP build step', () => {
-    expect(failedStepPhrase(logs(named([{ name: 'Environment Setup', conclusion: 'failure' }]), stage(null), stage(null)))).toBe('setting up the environment');
-  });
-
   it('reports the earliest failure when several steps fail', () => {
     const failed = logs(named([{ name: 'checkout-source', conclusion: 'failure' }]), named([{ name: 'build-image', conclusion: 'failure' }]), stage(null));
     expect(failedStepPhrase(failed)).toBe('checking out the source');
@@ -200,7 +196,7 @@ describe('buildStepperSteps', () => {
     const state = getBuildStatus('in_progress', '', logs(stage('completed', ['success']), stage('in_progress', [null]), stage(null)));
     expect(buildStepperSteps(state)).toEqual([
       { id: 'init', label: 'Initialization', status: 'success' },
-      { id: 'build', label: 'Build Source & Test', status: 'inProgress' },
+      { id: 'build', label: 'Build source & test', status: 'inProgress' },
       { id: 'deploy', label: 'Finalization', status: 'notStarted' },
     ]);
   });

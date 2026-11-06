@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Collapse, Divider, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Box, Button, Checkbox, Chip, CircularProgress, Collapse, Divider, IconButton, InputAdornment, ListItemText, MenuItem, Select, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp, CircleHelp, Eye, EyeOff, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
 import { useConnectionConfig, useUpdateConnectionConfig } from '../../../hooks/useGenaiServices';
@@ -164,7 +163,7 @@ export default function EndpointsTab({ service, orgHandle, canEdit }: { service:
               <Divider />
               <Box sx={{ p: 2 }}>
                 <Stack gap={2}>
-                  <TextField label="Endpoint URL" required fullWidth size="small" value={card.serviceUrl} onChange={(e) => patchCard(card.id, { serviceUrl: e.target.value })} disabled={!canEdit} sx={requiredSx} />
+                  <TextField labelPlacement="top" label="Endpoint URL" required fullWidth size="small" value={card.serviceUrl} onChange={(e) => patchCard(card.id, { serviceUrl: e.target.value })} disabled={!canEdit} sx={requiredSx} />
 
                   {card.params.length > 0 && (
                     <Box>

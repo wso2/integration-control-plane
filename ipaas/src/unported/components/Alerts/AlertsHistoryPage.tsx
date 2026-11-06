@@ -16,12 +16,9 @@
  * under the License.
  */
 
-import { Autocomplete, Box, CircularProgress, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Autocomplete, Box, CircularProgress, MenuItem, Select, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, TextField } from '@wso2/oxygen-ui';
 import { type JSX, useMemo, useState } from 'react';
 import type { CloudDataPlane, Environment } from '../../../types/environment';
-import { choreoAlertingApiUrl } from '../../../config/runtimeConfig';
-import { IS_CLOUD } from '../../../features';
 import { useGetAlertHistory } from '../../hooks/useAlerts';
 
 interface AlertsHistoryPageProps {
@@ -55,16 +52,12 @@ function formatCellValue(value: unknown, columnType: string): string {
   return String(value);
 }
 
-export default function AlertsHistoryPage({ componentId, environments, cloudDataPlanes }: AlertsHistoryPageProps): JSX.Element {
+export default function AlertsHistoryPage({ componentId, environments }: AlertsHistoryPageProps): JSX.Element {
   const [selectedEnvironment, setSelectedEnvironment] = useState<Environment | undefined>(environments[0]);
   const [timeRangeHours, setTimeRangeHours] = useState(1);
 
-  const alertingBaseUrl = useMemo(() => {
-    if (IS_CLOUD) return '';
-    if (!selectedEnvironment?.dpId || !cloudDataPlanes.length) return '';
-    const cdp = cloudDataPlanes.find((c) => c.id.toLowerCase() === selectedEnvironment.dpId!.toLowerCase());
-    return cdp ? choreoAlertingApiUrl(cdp.external_gateway_virtual_host) : '';
-  }, [selectedEnvironment, cloudDataPlanes]);
+  // Alerting is not served by the BFF yet.
+  const alertingBaseUrl = '';
 
   const { startTime, endTime } = useMemo(() => {
     const now = new Date();
@@ -99,7 +92,7 @@ export default function AlertsHistoryPage({ componentId, environments, cloudData
           onChange={(_, v) => {
             if (v) setSelectedEnvironment(v);
           }}
-          renderInput={(params) => <TextField {...params} size="small" label="Environment" />}
+          renderInput={(params) => <TextField labelPlacement="top" {...params} size="small" label="Environment" />}
           isOptionEqualToValue={(o, v) => o.id === v.id}
           sx={{ minWidth: 200 }}
           size="small"

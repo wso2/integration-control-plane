@@ -137,7 +137,8 @@ export interface StopDeploymentInput {
   orgHandler: string;
   componentId: string;
   releaseId: string;
-  environment?: string;
+  /** OpenChoreo's stop endpoint is per-environment. */
+  environment: string;
   type?: string;
   clearCron?: boolean;
 }

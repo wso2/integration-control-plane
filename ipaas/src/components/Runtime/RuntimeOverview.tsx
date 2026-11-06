@@ -16,12 +16,11 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Grid, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, Grid, Stack, Typography, RelativeTime } from '@wso2/oxygen-ui';
 import { RotateCw } from '@wso2/oxygen-ui-icons-react';
 import { type JSX } from 'react';
 import CopyField from './CopyField';
-import { IS_CLOUD } from '../../features';
-import { formatDistanceToNow } from '../../utils/time';
+import { formatDateTime, formatDistanceToNow } from '../../utils/time';
 import type { PaletteColor } from '../../config/statusColors';
 
 // Normalize whatever casing/format the backend sends (e.g. "Active", "ACTIVE",
@@ -31,7 +30,7 @@ function statusMeta(status: string): { label: string; color: PaletteColor } {
     case 'active':
       return { label: 'Active', color: 'success' };
     case 'inprogress':
-      return { label: 'In Progress', color: 'info' };
+      return { label: 'In progress', color: 'info' };
     case 'error':
     case 'failed':
     case 'failure':
@@ -39,7 +38,7 @@ function statusMeta(status: string): { label: string; color: PaletteColor } {
     case 'suspended':
       return { label: 'Suspended', color: 'warning' };
     case 'notdeployed':
-      return { label: 'Not Deployed', color: 'default' };
+      return { label: 'Not deployed', color: 'default' };
     default:
       return { label: status || 'Unknown', color: 'default' };
   }
@@ -49,7 +48,6 @@ interface RuntimeOverviewProps {
   componentName: string;
   status: string;
   lastDeployedAt?: string;
-  lastDeployedMessage?: string;
   componentId: string;
   releaseId: string;
   namespace?: string;
@@ -60,7 +58,7 @@ interface RuntimeOverviewProps {
   onRedeploy: () => void;
 }
 
-export default function RuntimeOverview({ componentName, status, lastDeployedAt, lastDeployedMessage, componentId, releaseId, namespace, imageUrl, isDeployed, redeploying, canRedeploy, onRedeploy }: RuntimeOverviewProps): JSX.Element {
+export default function RuntimeOverview({ componentName, status, lastDeployedAt, componentId, releaseId, namespace, imageUrl, isDeployed, redeploying, canRedeploy, onRedeploy }: RuntimeOverviewProps): JSX.Element {
   const meta = statusMeta(status);
   return (
     <Grid container spacing={4}>
@@ -71,18 +69,17 @@ export default function RuntimeOverview({ componentName, status, lastDeployedAt,
           </Typography>
           <Chip size="small" variant="outlined" color={meta.color} label={meta.label} sx={{ height: 20, fontSize: '0.68rem', fontWeight: 500 }} />
         </Stack>
-        <Typography variant="body2" color="text.secondary">
-          Last deployed {lastDeployedAt ? formatDistanceToNow(lastDeployedAt) : '—'}
-        </Typography>
-        {!IS_CLOUD && lastDeployedMessage && (
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-            {lastDeployedMessage}
+        {lastDeployedAt ? (
+          <RelativeTime time={formatDistanceToNow(lastDeployedAt)} dateTime={lastDeployedAt} tooltip={formatDateTime(lastDeployedAt)} action="Last deployed" />
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Last deployed —
           </Typography>
         )}
         <Box sx={{ mt: 3 }}>
           {isDeployed ? (
             <Button variant="outlined" startIcon={redeploying ? <CircularProgress size={16} color="inherit" /> : <RotateCw size={18} />} disabled={redeploying || !canRedeploy} onClick={onRedeploy}>
-              Redeploy Release
+              Redeploy release
             </Button>
           ) : (
             <Alert severity="info">No release is currently deployed to this environment.</Alert>

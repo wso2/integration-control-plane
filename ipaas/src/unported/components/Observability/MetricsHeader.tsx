@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { IconButton, MenuItem, Stack, Tooltip } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { IconButton, MenuItem, Stack, Tooltip, TextField } from '@wso2/oxygen-ui';
 import { RefreshCw } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { METRICS_RANGES, METRICS_REFRESH_INTERVALS, type MetricsRange } from '../../../types/observability';
@@ -46,7 +45,7 @@ export default function MetricsHeader({ range, onRangeChange, refreshSeconds, on
           </MenuItem>
         ))}
       </TextField>
-      <TextField select size="small" label="Auto-refresh" value={refreshSeconds} onChange={(e) => onRefreshSecondsChange(Number(e.target.value))} sx={{ minWidth: 130 }}>
+      <TextField labelPlacement="top" select size="small" label="Auto-refresh" value={refreshSeconds} onChange={(e) => onRefreshSecondsChange(Number(e.target.value))} sx={{ minWidth: 130 }}>
         {METRICS_REFRESH_INTERVALS.map((i) => (
           <MenuItem key={i.value} value={i.value}>
             {i.label}

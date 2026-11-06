@@ -156,7 +156,7 @@ export function ArtifactValue({ artifact, envId, componentId }: TabProps) {
 
 export function ArtifactCarbonArtifacts({ artifact }: TabProps) {
   const artifacts = (artifact.artifacts as Array<{ name: string; type: string }> | undefined) ?? [];
-  return <DataTable headers={['Artifact Name', 'Artifact Type']} rows={artifacts.map((a) => [a.name, a.type])} emptyMsg="No artifacts found." />;
+  return <DataTable headers={['Artifact name', 'Artifact type']} rows={artifacts.map((a) => [a.name, a.type])} emptyMsg="No artifacts found." />;
 }
 
 export function ArtifactRuntimes({ artifact }: TabProps) {
@@ -313,7 +313,7 @@ function OperationRow({ op }: { op: WsdlOperation }) {
           {op.soapAction && (
             <Stack direction="row" gap={1} alignItems="baseline">
               <Typography variant="caption" color="text.secondary" sx={{ minWidth: 100 }}>
-                SOAP Action
+                SOAP action
               </Typography>
               <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
                 {op.soapAction}
@@ -373,7 +373,7 @@ export function ProxyApiReference({ envId, componentId, artifactType, artifact }
 
   return (
     <Stack gap={2}>
-      <Card variant="outlined" sx={{ '& .MuiCardContent-root:last-child': { pb: 1.5 } }}>
+      <Card sx={{ '& .MuiCardContent-root:last-child': { pb: 1.5 } }}>
         <CardContent>
           <Typography variant="h6" sx={{ fontWeight: 600 }}>
             {info.serviceName}
@@ -437,7 +437,7 @@ export function AutomationExecutions({ artifact, orgHandler, projectHandler, com
       <ListingTable>
         <ListingTable.Head>
           <ListingTable.Row>
-            <ListingTable.Cell>Execution Time</ListingTable.Cell>
+            <ListingTable.Cell>Execution time</ListingTable.Cell>
             <ListingTable.Cell>Runtime ID</ListingTable.Cell>
             <ListingTable.Cell>Status</ListingTable.Cell>
             <ListingTable.Cell>Actions</ListingTable.Cell>
@@ -467,8 +467,8 @@ export function AutomationExecutions({ artifact, orgHandler, projectHandler, com
                   <Chip label={exec.status} size="small" color={statusColor(exec.status)} />
                 </ListingTable.Cell>
                 <ListingTable.Cell>
-                  <Tooltip title="View Logs">
-                    <IconButton size="small" onClick={() => navigate(logsUrl)}>
+                  <Tooltip title="View logs">
+                    <IconButton aria-label="View logs" size="small" onClick={() => navigate(logsUrl)}>
                       <ScrollText size={16} />
                     </IconButton>
                   </Tooltip>

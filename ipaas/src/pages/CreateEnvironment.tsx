@@ -16,20 +16,20 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, MenuItem, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
-import TextField from '../components/common/TextField';
+import { Alert, Box, Button, Checkbox, CircularProgress, FormControlLabel, FormHelperText, MenuItem, PageContent, Stack, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { useEffect, useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useDataPlanes } from '../hooks/useDataPlanes';
 import { useAddEnvironment } from '../hooks/useEnvironments';
 import { isQuotaError } from '../utils/apiErrors';
 import { useOrgUuid } from '../hooks/useOrgUuid';
-import { IS_CLOUD } from '../features';
 import BusyFields from '../components/common/BusyFields';
-import { buildEnvironmentVhost, EnvironmentValidationError } from '../utils/environment';
 import { resourceUrl, type OrgScope } from '../nav';
 import { CRITICAL_ENVIRONMENT_HELP, CRITICAL_ENVIRONMENT_LABEL } from '../constants/environment';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+
+const DEFAULT_NAME = 'My-New-Environment';
 
 export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
@@ -38,9 +38,8 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   const { data: dataPlanes = [], isLoading: loadingDataPlanes, isError: dataPlanesError, refetch: refetchDataPlanes } = useDataPlanes();
   const create = useAddEnvironment();
 
-  const [name, setName] = useState('My-New-Environment');
+  const [name, setName] = useState(DEFAULT_NAME);
   const [description, setDescription] = useState('');
-  const [dnsPrefix, setDnsPrefix] = useState('my-env');
   const [dataplaneId, setDataplaneId] = useState('');
   const [critical, setCritical] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,10 +50,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
     if (dataPlanes.length) setDataplaneId((prev) => (prev && dataPlanes.some((d) => d.id === prev) ? prev : dataPlanes[0].id));
   }, [dataPlanes]);
 
-  // OpenChoreo derives no per-environment hostname — the gateway host is fixed at
-  // deploy time — so cloud collects a description instead of a DNS prefix.
-  const selectedDataPlane = useMemo(() => dataPlanes.find((d) => d.id === dataplaneId), [dataPlanes, dataplaneId]);
-  const vhostPreview = !IS_CLOUD && orgUuid && dnsPrefix.trim() ? buildEnvironmentVhost(orgUuid, dnsPrefix.trim(), selectedDataPlane?.externalGatewayVirtualHost) : '';
+  const allowLeave = useUnsavedChanges(name !== DEFAULT_NAME || description !== '' || critical || (dataplaneId !== '' && dataPlanes.length > 0 && dataplaneId !== dataPlanes[0].id));
 
   const submit = () => {
     setError(null);
@@ -68,21 +64,18 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
         orgUuid,
         name: name.trim(),
         dataplaneId,
-        dnsPrefix: dnsPrefix.trim(),
         isProd: critical,
-        vhost: IS_CLOUD ? '' : buildEnvironmentVhost(orgUuid, dnsPrefix.trim(), selectedDataPlane?.externalGatewayVirtualHost),
-        ...(IS_CLOUD ? { description: description.trim() } : {}),
+        description: description.trim(),
       },
       {
-        onSuccess: () => navigate(listUrl, { state: { success: true, environmentName: name.trim() } }),
+        onSuccess: () => {
+          allowLeave();
+          navigate(listUrl, { state: { success: true, environmentName: name.trim() } });
+        },
         onError: (err) => {
-          if (err instanceof EnvironmentValidationError) {
-            setError(err.field === 'name' ? 'An environment with this name already exists. Please choose a different name.' : 'The derived hostname is already in use. Try a different DNS prefix.');
-          } else {
-            // The BFF's wording names the resource and its limit, so it is shown as sent.
-            setErrorSeverity(isQuotaError(err) ? 'warning' : 'error');
-            setError(err instanceof Error ? err.message : 'Failed to create the environment. Please try again.');
-          }
+          // The BFF's wording names the resource and its limit, so it is shown as sent.
+          setErrorSeverity(isQuotaError(err) ? 'warning' : 'error');
+          setError(err instanceof Error ? err.message : 'Failed to create the environment. Please try again.');
         },
       },
     );
@@ -91,17 +84,17 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
   // `isSuccess` keeps the control disabled through the deferred navigation:
   // the mutation settles before the route changes, which would otherwise re-enable
   // submit and allow a duplicate.
-  // Cloud falls back to the 'default' plane when none is listed; the devops API has no such default.
-  const canSubmit = !!name.trim() && (IS_CLOUD || (!!dnsPrefix.trim() && !!dataplaneId)) && !create.isPending && !create.isSuccess;
+  // No data plane is required: the BFF falls back to the 'default' plane when none is listed.
+  const canSubmit = !!name.trim() && !create.isPending && !create.isSuccess;
 
   return (
-    <PageContent>
+    <PageContent fullWidth>
       <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(listUrl)} sx={{ mb: 2 }}>
-        Back to Environments
+        Back to environments
       </Button>
 
       <Typography variant="h1" sx={{ mb: 4 }}>
-        Create Environment
+        Create environment
       </Typography>
 
       {error && (
@@ -112,7 +105,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
 
       <BusyFields busy={create.isPending}>
         <Stack gap={3} sx={{ maxWidth: 600, mb: 4 }}>
-          <TextField label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
+          <TextField labelPlacement="top" label="Name" required value={name} onChange={(e) => setName(e.target.value)} fullWidth />
           {loadingDataPlanes ? (
             <CircularProgress size={20} />
           ) : dataPlanesError ? (
@@ -126,7 +119,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
               Failed to load data planes.
             </Alert>
           ) : dataPlanes.length > 1 ? (
-            <TextField select label="Data Plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
+            <TextField labelPlacement="top" select label="Data plane" required value={dataplaneId} onChange={(e) => setDataplaneId(e.target.value)} fullWidth>
               {dataPlanes.map((dp) => (
                 <MenuItem key={dp.id} value={dp.id}>
                   {dp.name}
@@ -134,18 +127,7 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
               ))}
             </TextField>
           ) : null}
-          {IS_CLOUD ? (
-            <TextField label="Description" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
-          ) : (
-            <Box>
-              <TextField label="DNS Prefix" required value={dnsPrefix} onChange={(e) => setDnsPrefix(e.target.value)} fullWidth />
-              {vhostPreview && (
-                <Alert severity="info" sx={{ mt: 1.5 }}>
-                  DNS for the environment will be created as {vhostPreview}. URL customization will be enabled for the new environment after provisioning, which can take about 5 minutes.
-                </Alert>
-              )}
-            </Box>
-          )}
+          <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline minRows={2} />
           <Box>
             <FormControlLabel control={<Checkbox checked={critical} onChange={(_, v) => setCritical(v)} />} label={CRITICAL_ENVIRONMENT_LABEL} />
             <FormHelperText sx={{ mt: 0 }}>{CRITICAL_ENVIRONMENT_HELP}</FormHelperText>
@@ -154,7 +136,14 @@ export default function CreateEnvironment(scope: OrgScope): JSX.Element {
       </BusyFields>
 
       <Stack direction="row" gap={2}>
-        <Button variant="outlined" onClick={() => navigate(listUrl)} disabled={create.isPending}>
+        <Button
+          variant="outlined"
+          color="inherit"
+          onClick={() => {
+            allowLeave();
+            navigate(listUrl);
+          }}
+          disabled={create.isPending}>
           Cancel
         </Button>
         <Button variant="contained" onClick={submit} disabled={!canSubmit} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>

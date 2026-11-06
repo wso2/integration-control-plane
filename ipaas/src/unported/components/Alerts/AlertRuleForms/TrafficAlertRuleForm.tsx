@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Box, Collapse, Grid, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Alert, Autocomplete, Box, Collapse, Grid, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { type JSX, useEffect, useState } from 'react';
 import {
@@ -105,7 +104,7 @@ export default function TrafficAlertRuleForm(props: AlertRuleFormProps): JSX.Ele
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2, '& .MuiFormLabel-asterisk': { color: 'error.main' } }}>
       <Grid container spacing={3}>
         <Grid size={{ xs: 12, md: 4 }}>
-          <TextField required label="Threshold (requests per minute)" size="small" fullWidth value={threshold ?? ''} onChange={handleThresholdChange} error={!!errorThreshold} helperText={errorThreshold} />
+          <TextField labelPlacement="top" required label="Threshold (requests per minute)" size="small" fullWidth value={threshold ?? ''} onChange={handleThresholdChange} error={!!errorThreshold} helperText={errorThreshold} />
         </Grid>
       </Grid>
       <Grid container spacing={3} sx={{ mt: -1 }}>
@@ -143,7 +142,7 @@ export default function TrafficAlertRuleForm(props: AlertRuleFormProps): JSX.Ele
                     setIsAlertRuleHalfConfigured(true);
                   }
                 }}
-                renderInput={(params) => <TextField {...params} label="Period" size="small" />}
+                renderInput={(params) => <TextField labelPlacement="top" {...params} label="Period" size="small" />}
                 isOptionEqualToValue={(o, v) => o.value === v.value}
               />
             </Grid>

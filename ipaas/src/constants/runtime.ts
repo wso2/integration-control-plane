@@ -18,9 +18,6 @@
 
 import type { PodConditionInfo } from '../types/runtime';
 
-/** Cloud pods carry no node name, so the data plane is named instead. */
-export const DATA_PLANE_LABEL = 'Choreo Cloud Data Plane';
-
 export const POD_ACTION_LABELS = {
   events: 'Pod conditions and events',
   logs: 'Real-time container logs',
@@ -37,8 +34,6 @@ export const POD_EVENT_COUNT_TOOLTIP = 'The number of times this event has been 
 /** Typing in the Since Seconds box would otherwise refetch on every keystroke. */
 export const SINCE_SECONDS_DEBOUNCE_MS = 300;
 
-/** Pod drawers open below the app bar; the expanded state takes the full window width. */
-export const POD_DRAWER_TOP_OFFSET = 64;
 export const POD_DRAWER_WIDTH = 960;
 
 /**
@@ -49,27 +44,27 @@ export const POD_DRAWER_WIDTH = 960;
  */
 export const POD_CONDITION_DEFINITIONS: Record<string, PodConditionInfo> = {
   PodScheduled: {
-    displayName: 'Pod Scheduled',
+    displayName: 'Pod scheduled',
     description: 'The container scheduler has assigned this pod to a specific node in the data plane. Until this is completed, the pod will remain in a "Pending" state waiting for node assignment.',
     order: 1,
   },
   PodReadyToStartContainers: {
-    displayName: 'Starting Pod Containers',
+    displayName: 'Starting pod containers',
     description: "This condition indicates that the container runtime has successfully created the pod sandbox and configured the pod's networking. This happens before containers actually start running.",
     order: 2,
   },
   ContainersReady: {
-    displayName: 'Readiness Checks Passed',
+    displayName: 'Readiness checks passed',
     description: 'This condition is met when the container has passed the readiness probe checks (if configured). The container is almost ready to serve external traffic.',
     order: 4,
   },
   Initialized: {
-    displayName: 'Init-Containers Completed',
+    displayName: 'Init containers completed',
     description: 'All prerequisite (init) tasks required to start the main container have completed. The main container is ready to start.',
     order: 3,
   },
   Ready: {
-    displayName: 'Pod Ready',
+    displayName: 'Pod ready',
     description: 'This pod is healthy and active, and is able to serve traffic (if applicable).',
     order: 5,
   },

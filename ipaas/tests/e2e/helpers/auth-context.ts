@@ -19,12 +19,14 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { authContextPath } from './product.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, '../../../');
 
-/** Pass projectName from testInfo when calling outside a test body (beforeAll), where test.info() is unavailable. */
-export function getAuthContext(projectName?: string): { orgHandler: string; projectHandler: string | null } {
-  return JSON.parse(readFileSync(path.join(REPO_ROOT, authContextPath(projectName)), 'utf8'));
+/** Session the setup project saved, relative to the repo root. */
+export const AUTH_STATE_PATH = '.auth/cloud-user.json';
+
+/** The org (and project) the setup project signed in to. */
+export function getAuthContext(): { orgHandler: string; projectHandler: string | null } {
+  return JSON.parse(readFileSync(path.join(REPO_ROOT, '.auth/cloud-context.json'), 'utf8'));
 }

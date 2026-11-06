@@ -16,50 +16,38 @@
  * under the License.
  */
 
-import { Alert, Box, CircularProgress, MenuItem, PageContent, Select, Stack, Typography } from '@wso2/oxygen-ui';
-import { useEffect, useMemo, useState, type JSX } from 'react';
+import { Alert, Box, CircularProgress, PageContent, Stack, Typography } from '@wso2/oxygen-ui';
+import { useMemo, useState, type JSX } from 'react';
 import type { AgentConnectionStatus } from '../types/agentChat';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
-import DeploymentTrackBar from '../components/DeploymentTrackBar';
+import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import NotFound from '../components/NotFound';
 import AgentChat from '../components/AgentChat';
+import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import { broaden, resourceUrl, type ComponentScope } from '../nav';
-import { IS_CLOUD } from '../features';
 
 /**
  * Full-page Test surface for AI Agent integrations (`test/agent-chat`).
  *
- * Mirrors devant's AI test route: pick a non-critical environment + deployment
- * track, then chat with the deployed agent via the shared `AgentChat`. Critical
- * (production) environments are excluded — agents are only chat-testable in
- * non-critical envs.
+ * Chats with the agent deployed in the first non-critical environment via the
+ * shared `AgentChat`. Critical (production) environments are excluded — agents
+ * are only chat-testable in non-critical envs.
  */
 export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
-  const { projectId, project } = useProjectId(scope.project);
+  const { projectId } = useProjectId(scope.project);
   const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
   const { data: environments = [] } = useEnvironments(scope.org, projectId);
 
   // Agents can only be chatted with in non-critical environments.
   const testableEnvs = useMemo(() => environments.filter((e) => !e.critical), [environments]);
 
-  const tracks = useMemo(() => component?.deploymentTracks ?? [], [component?.deploymentTracks]);
-  const [selectedTrackId, setSelectedTrackId] = useState('');
-  useEffect(() => {
-    if (!tracks.length) return;
-    setSelectedTrackId((prev) => (prev && tracks.some((t) => t.id === prev) ? prev : (tracks.find((t) => t.latest)?.id ?? tracks[0].id)));
-  }, [component?.id, tracks]);
-
-  const [selectedEnvId, setSelectedEnvId] = useState('');
-  useEffect(() => {
-    if (!testableEnvs.length) return;
-    setSelectedEnvId((prev) => (prev && testableEnvs.some((e) => e.id === prev) ? prev : testableEnvs[0].id));
-  }, [testableEnvs]);
-  const selectedEnv = testableEnvs.find((e) => e.id === selectedEnvId) ?? null;
+  const { trackId: selectedTrackId } = useSelectedTrack(component);
+  const selectedEnv = testableEnvs[0] ?? null;
 
   const { data: deployment } = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', component?.id ?? '', selectedTrackId, selectedEnv?.id ?? '');
   const releaseId = deployment?.releaseId ?? '';
@@ -69,20 +57,29 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
 
   if (loadingComponent) {
     return (
-      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+      <PageContent fullWidth sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
         <CircularProgress />
       </PageContent>
     );
   }
 
   if (!component) {
-    return <NotFound message="Component not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to Project" />;
+    return <NotFound message="Integration not found" backTo={resourceUrl(broaden(scope)!, 'overview')} backLabel="Back to project" />;
+  }
+
+  // A loaded integration always resolves a track; the check narrows the type for what follows.
+  if (selectedTrackId === undefined) {
+    return (
+      <PageContent sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
+        <CircularProgress />
+      </PageContent>
+    );
   }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      {tracks.length > 0 && <DeploymentTrackBar tracks={tracks} selectedId={selectedTrackId} onChange={setSelectedTrackId} orgHandler={scope.org} projectHandler={project?.handler ?? scope.project} componentHandler={component.handler} />}
-      <PageContent>
+      <DeploymentTrackBar component={component} />
+      <PageContent fullWidth>
         <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3 }} flexWrap="wrap" gap={1}>
           <Stack direction="row" alignItems="center" gap={1.5}>
             <Typography variant="h1">Test</Typography>
@@ -95,15 +92,6 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
               </Stack>
             )}
           </Stack>
-          {!IS_CLOUD && testableEnvs.length > 1 && (
-            <Select size="small" value={selectedEnvId} onChange={(e) => setSelectedEnvId(e.target.value as string)} sx={{ minWidth: 160 }}>
-              {testableEnvs.map((env) => (
-                <MenuItem key={env.id} value={env.id} sx={{ textTransform: 'capitalize' }}>
-                  {env.name}
-                </MenuItem>
-              ))}
-            </Select>
-          )}
         </Stack>
 
         {testableEnvs.length === 0 ? (
@@ -111,7 +99,7 @@ export default function AgentChatConsole(scope: ComponentScope): JSX.Element {
         ) : !releaseId ? (
           <Alert severity="info">This agent is not deployed in {selectedEnv?.name ?? 'the selected environment'}. Deploy it to start chatting.</Alert>
         ) : (
-          <AgentChat componentId={component.id} versionId={selectedTrackId} releaseId={releaseId} environmentName={selectedEnv?.id} envCritical={false} variant="page" onConnectionChange={setConnection} />
+          <AgentChat key={selectedTrackId} projectId={projectId} componentId={component.id} versionId={selectedTrackId} releaseId={releaseId} environmentName={selectedEnv?.id} envCritical={false} variant="page" onConnectionChange={setConnection} />
         )}
       </PageContent>
     </Box>

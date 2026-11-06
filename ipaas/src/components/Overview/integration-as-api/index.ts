@@ -21,7 +21,6 @@ import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from './HeaderStatus';
 import EnvCardActions from './EnvCardActions';
 import EnvCardBody from './EnvCardBody';
-import OverviewHeaderActions from './OverviewHeaderActions';
 
 /**
  * Integration as API integration module. Covers REST API / GraphQL / WebSocket
@@ -31,15 +30,12 @@ import OverviewHeaderActions from './OverviewHeaderActions';
  * Composes the shared `EnvCardShell` frame via `HeaderStatus` (status dot +
  * Configure), `EnvCardActions` (Test / View Logs / Stop / Start), and a
  * content-only `EnvCardBody` (endpoint URLs + swagger + service insights).
- * `OverviewHeaderActions` adds the Generate MCP button to the shared
- * component-header actions — specific to this type.
  */
 const integrationAsApiModule: IntegrationModule = {
   ...INTEGRATION_TYPE_INFO['integration-as-api'],
   HeaderStatus,
   EnvCardActions,
   EnvCardBody,
-  OverviewHeaderActions,
 };
 
 export default integrationAsApiModule;

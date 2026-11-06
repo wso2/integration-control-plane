@@ -68,7 +68,7 @@ export default function PromotionChainBuilder({ envTemplates, value, onChange, d
                   <MenuItem key={t.id} onClick={() => addEnv(t)}>
                     <Stack direction="row" alignItems="center" gap={1}>
                       {t.env_name}
-                      {t.critical && <Chip label="Critical" size="small" color="warning" variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />}
+                      {t.critical && <Chip label="Critical" size="small" color="error" variant="outlined" sx={{ height: 18, fontSize: '0.6rem' }} />}
                     </Stack>
                   </MenuItem>
                 ))}

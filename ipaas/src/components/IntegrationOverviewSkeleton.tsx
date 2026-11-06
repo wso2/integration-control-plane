@@ -26,7 +26,7 @@ import type { JSX } from 'react';
 export default function IntegrationOverviewSkeleton(): JSX.Element {
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-      <PageContent>
+      <PageContent fullWidth>
         {/* Header: icon + name/type on the left, action rows on the right. */}
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" gap={2} sx={{ mb: 3 }}>
           <Stack direction="row" alignItems="center" gap={2}>

@@ -125,11 +125,6 @@ export function formatVcpu(millicores: number): string {
   return (millicores / 1000).toFixed(2);
 }
 
-/** Used-vs-allocated for a single pod (its containers + matching metric). */
-export function calculatePodUsage(pod: ClusterPod, metric?: PodMetrics): CalculatedUsage {
-  return calculateAggregateUsage([pod], metric ? [metric] : []);
-}
-
 /** Total restarts across a pod's containers. */
 export function podRestartCount(pod: ClusterPod): number {
   return (pod.status.containerStatuses ?? []).reduce((total, s) => total + (s.restartCount ?? 0), 0);

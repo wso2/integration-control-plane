@@ -51,11 +51,11 @@ describe('repoPathOf', () => {
 });
 
 describe('componentRepoPath', () => {
-  it('prefers the repository field WIP serves', () => {
+  it('prefers the repository field the repository lookup fills', () => {
     expect(componentRepoPath(component({ repository: { organizationApp: 'WSO2', nameApp: 'Repo' } }))).toBe('wso2/repo');
   });
 
-  it('falls back to the deployment track url cloud serves', () => {
+  it('falls back to the deployment track url', () => {
     expect(componentRepoPath(onTrack('https://github.com/wso2/repo'))).toBe('wso2/repo');
   });
 

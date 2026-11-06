@@ -46,7 +46,7 @@ describe('resolveEndpointInvokeUrl', () => {
 describe('trimEndpointName', () => {
   it('drops a redundant leading "Endpoint" word', () => {
     expect(trimEndpointName('Endpoint Covid Status')).toBe('Covid Status');
-    // The auto-generated shape the wip/GraphQL path relies on.
+    // The auto-generated endpoint name shape.
     expect(trimEndpointName('Endpoint 1')).toBe('1');
     expect(trimEndpointName('  Endpoint   Foo  ')).toBe('Foo');
   });
@@ -141,6 +141,15 @@ describe('visibilityUrlOptions', () => {
   it('falls back to invokeUrl when no visibility-specific URL exists', () => {
     const value = visibilityUrlOptions(ep({ networkVisibilities: ['Public'], invokeUrl: 'https://only.example' }));
     expect(value).toEqual([{ key: 'public', label: 'Public', url: 'https://only.example' }]);
+  });
+
+  it('labels the invoke-URL fallback with the visibility the endpoint has', () => {
+    const value = visibilityUrlOptions(ep({ networkVisibilities: ['Project'], invokeUrl: 'http://svc.cluster.local' }));
+    expect(value).toEqual([{ key: 'project', label: 'Project', url: 'http://svc.cluster.local' }]);
+  });
+
+  it('labels the fallback Public when the endpoint names no visibility', () => {
+    expect(visibilityUrlOptions(ep({ invokeUrl: 'https://only.example' }))).toEqual([{ key: 'public', label: 'Public', url: 'https://only.example' }]);
   });
 });
 

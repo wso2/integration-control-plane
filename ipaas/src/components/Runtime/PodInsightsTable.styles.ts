@@ -42,8 +42,6 @@ export const podName = {
   whiteSpace: 'nowrap',
 } as const;
 
-export const dataPlane = { display: 'block' } as const;
-
 /** Icon and label share the status colour; the chip's own palette only tints the border. */
 export const statusChip = (text: string) =>
   ({

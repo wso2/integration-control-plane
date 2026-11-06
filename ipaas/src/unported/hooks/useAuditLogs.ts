@@ -17,7 +17,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { fetchAuditLogs } from '#api/auditLogs';
+import { fetchAuditLogs } from '../../api/auditLogs';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import type { AuditLogEntry, AuditLogsRequest } from '../../types/auditLogs';
 

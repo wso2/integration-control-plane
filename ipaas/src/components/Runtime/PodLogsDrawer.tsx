@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, IconButton, InputAdornment, Link, MenuItem, OutlinedInput, Select, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../common/TextField';
+import { Alert, Box, Button, CircularProgress, IconButton, InputAdornment, Link, MenuItem, OutlinedInput, Select, Stack, Switch, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { HelpCircle, RefreshCw, Search, X } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
@@ -62,7 +61,7 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
   }, [sinceInput]);
 
   const options = useMemo<PodLogOptions>(() => ({ previous, sinceSeconds, containerName }), [previous, sinceSeconds, containerName]);
-  const { data: logs = '', isLoading, isFetching, isError, error, refetch } = usePodLogs(scope.projectId, scope.componentHandler, scope.releaseId, scope.clusterId, pod?.metadata.namespace ?? scope.namespace, podName, options, open);
+  const { data: logs = '', isLoading, isFetching, isError, error, refetch } = usePodLogs(scope.projectId, scope.componentHandler, scope.releaseId, podName, options, open);
 
   const lines = useMemo(() => filterLogLines(logs, search, filterMode), [logs, search, filterMode]);
   // `previous` reads the prior instance of a container, which only exists after a restart.
@@ -70,17 +69,17 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
   const runtimeLogsUrl = `${componentUrl(scope.orgHandler, scope.projectHandler, scope.componentHandler)}/logs`;
 
   return (
-    <PodDrawerShell open={open} onClose={onClose} onExited={onExited} title={`Real-Time Logs for Pod: ${podName}`}>
+    <PodDrawerShell open={open} onClose={onClose} onExited={onExited} title={`Real-time logs for pod: ${podName}`}>
       <Alert severity="info" sx={styles.banner}>
         To view aggregated and historical logs from all running instances, see{' '}
         <Link component={RouterLink} to={runtimeLogsUrl} onClick={onClose}>
-          Runtime Logs.
+          Runtime logs.
         </Link>
       </Alert>
 
       <Stack direction="row" alignItems="center" flexWrap="wrap" gap={3} sx={styles.actions}>
         <Stack direction="row" alignItems="center" gap={1}>
-          <Typography variant="body2">Since Seconds</Typography>
+          <Typography variant="body2">Since seconds</Typography>
           <Tooltip title={POD_LOGS_TOOLTIPS.sinceSeconds}>
             <Box component="span" tabIndex={0} role="note" aria-label={POD_LOGS_TOOLTIPS.sinceSeconds} sx={styles.helpIcon}>
               <HelpCircle size={13} />
@@ -103,7 +102,7 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
         )}
 
         <Stack direction="row" alignItems="center" gap={1}>
-          <Typography variant="body2">Show Previous Logs</Typography>
+          <Typography variant="body2">Show previous logs</Typography>
           <Tooltip title={POD_LOGS_TOOLTIPS.previousLogs}>
             <Box component="span" tabIndex={0} role="note" aria-label={POD_LOGS_TOOLTIPS.previousLogs} sx={styles.helpIcon}>
               <HelpCircle size={13} />
@@ -113,7 +112,7 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
         </Stack>
 
         <Button size="small" variant="text" startIcon={isFetching ? <CircularProgress size={14} /> : <RefreshCw size={14} />} onClick={() => refetch()} disabled={isFetching}>
-          Refresh Logs
+          Refresh logs
         </Button>
       </Stack>
 

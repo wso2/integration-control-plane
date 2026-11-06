@@ -19,7 +19,6 @@
 import { Divider, Stack, Typography } from '@wso2/oxygen-ui';
 import { Sparkles } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type ReactNode } from 'react';
-import { IS_CLOUD } from '../../../features';
 import { useEndpointSecurity } from '../../../hooks/useConsumers';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
@@ -27,17 +26,16 @@ import AgentChat from '../../AgentChat';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 
 //AI Agent env-card body
-export default function EnvCardBody({ component, env, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
+export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment }: EnvCardBodyProps): ReactNode {
   // Per-env endpoints for the current release (drives the URLs/Download-Spec panel).
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
   const [selectedEpIdx, setSelectedEpIdx] = useState(0);
   const selectedEndpoint = endpoints[selectedEpIdx] ?? endpoints[0];
 
-  // The enforcing API Platform gateway URL for the selected endpoint (cloud-only; the hook is
-  // disabled elsewhere). Shown in place of the raw OpenChoreo external route, as the
+  // The enforcing API Platform gateway URL for the selected endpoint. Shown in place of the raw OpenChoreo external route, as the
   // integration-as-api card does.
-  const securityRef = IS_CLOUD && selectedEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id } : null;
-  const { data: apiSecurity } = useEndpointSecurity(securityRef, IS_CLOUD && !!selectedEndpoint);
+  const securityRef = selectedEndpoint ? { projectName: projectId, componentName: component.id, environmentName: env.id, endpointName: selectedEndpoint.id, deploymentTrackId: versionId } : null;
+  const { data: apiSecurity } = useEndpointSecurity(securityRef, !!selectedEndpoint);
 
   // The panel must never fall back to the raw OpenChoreo route for an agent — it's a second front
   // door with no API key or gateway policy, so it's suppressed even before apiSecurity resolves.
@@ -68,8 +66,8 @@ export default function EnvCardBody({ component, env, versionId, releaseId, hasD
   return (
     <>
       <Divider sx={{ my: 2 }} />
-      {showEndpoints && <EndpointUrlsPanel endpoints={endpointsForPanel} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} componentId={component.id} deploymentTrackId={versionId} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
-      <AgentChat componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
+      {showEndpoints && <EndpointUrlsPanel endpoints={endpointsForPanel} selectedIdx={selectedEpIdx} onSelect={setSelectedEpIdx} externalUrlOverride={apiSecurity?.publicUrl || undefined} />}
+      <AgentChat projectId={projectId} componentId={component.id} versionId={versionId} releaseId={releaseId} environmentName={env.id} envCritical={!!env.critical} />
     </>
   );
 }

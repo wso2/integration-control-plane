@@ -32,7 +32,7 @@ export function repoPathOf(url: string | undefined): string | null {
   return parts.slice(1).join('/').replace(/\.git$/i, '').toLowerCase();
 }
 
-/** Cloud serves an integration's repo only on its deployment track; WIP serves it as `repository`. */
+/** The repository lookup fills `repository`; without it, the deployment track's URL is used. */
 export function componentRepoPath(component: Component): string | null {
   const { organizationApp, nameApp } = component.repository ?? {};
   if (organizationApp && nameApp) return `${organizationApp}/${nameApp}`.toLowerCase();

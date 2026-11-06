@@ -21,8 +21,9 @@ import { FlaskConical, List, RotateCw, Square } from '@wso2/oxygen-ui-icons-reac
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { useAppNavigate } from '../../../hooks/useAppNavigate';
+import { withTrackParam } from '../../../hooks/useSelectedTrack';
+import { useLocation } from 'react-router';
 import { useRedeployDeployment, useStopDeployment } from '../../../hooks/useDeployments';
-import { IS_CLOUD } from '../../../features';
 import type { EnvCardActionsProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import ServiceLogsDrawer from '../integration-as-api/ServiceLogsDrawer';
@@ -40,6 +41,7 @@ export default function EnvCardActions({
   orgHandler,
   projectHandler,
   componentHandler,
+  projectId,
   hasDeployment,
   deploymentStatusV2,
   releaseMgtReleaseId,
@@ -48,6 +50,7 @@ export default function EnvCardActions({
   requestPoll,
 }: EnvCardActionsProps): ReactNode {
   const navigate = useAppNavigate();
+  const location = useLocation();
   const [logsOpen, setLogsOpen] = useState(false);
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
@@ -63,8 +66,8 @@ export default function EnvCardActions({
 
   const handleStop = () => {
     stopMutation.mutate(
-      // cloud: OpenChoreo's stop endpoint is per-environment; wip ignores it.
-      { orgHandler, componentId: component.id, releaseId, ...(IS_CLOUD ? { environment: env.id } : {}), type: 'service', clearCron: false },
+      // OpenChoreo's stop endpoint is per-environment.
+      { orgHandler, componentId: component.id, releaseId, environment: env.id, type: 'service', clearCron: false },
       {
         onSuccess: () => {
           requestPoll();
@@ -93,7 +96,13 @@ export default function EnvCardActions({
       {hasDeployment && (
         <Tooltip title={canTest ? 'Test' : 'Available once the deployment is active'}>
           <span>
-            <Button variant="text" size="small" startIcon={<FlaskConical size={14} />} disabled={!canTest} onClick={() => navigate(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test`)} sx={{ textTransform: 'none' }}>
+            <Button
+              variant="text"
+              size="small"
+              startIcon={<FlaskConical size={14} />}
+              disabled={!canTest}
+              onClick={() => navigate(withTrackParam(`/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/test`, location.search))}
+              sx={{ textTransform: 'none' }}>
               Test
             </Button>
           </span>
@@ -101,7 +110,7 @@ export default function EnvCardActions({
       )}
       {hasDeployment && (
         <Button variant="text" size="small" startIcon={<List size={14} />} onClick={() => setLogsOpen(true)} sx={{ textTransform: 'none' }}>
-          View Logs
+          View logs
         </Button>
       )}
       {(canStop || isInProgress) && (
@@ -131,7 +140,7 @@ export default function EnvCardActions({
           </span>
         </Tooltip>
       )}
-      <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} componentId={component.id} environmentId={env.id} envName={env.name} versionId={versionId} />
+      <ServiceLogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} projectId={projectId} componentHandler={componentHandler} env={env} versionId={versionId} />
     </>
   );
 }

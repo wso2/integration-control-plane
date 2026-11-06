@@ -50,7 +50,6 @@ export interface DeploymentPipeline {
 
 export interface CreateDeploymentPipelineRequest {
   name: string;
-  is_default: boolean;
   promotion_tree: PromotionTreeNode;
 }
 

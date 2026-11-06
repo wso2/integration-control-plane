@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createIdentityProvider, deleteIdentityProvider, fetchDataplanes, fetchIdentityProvider, fetchIdentityProviders, fetchRoleGroupMappings, updateIdentityProvider, updateRoleGroupMapping } from '#api/appSecurity';
+import { createIdentityProvider, deleteIdentityProvider, fetchDataplanes, fetchIdentityProvider, fetchIdentityProviders, fetchRoleGroupMappings, updateIdentityProvider, updateRoleGroupMapping } from '../../api/appSecurity';
 import type { Dataplane, IdentityProvider, IdentityProviderRequest, RoleGroupMappingResponse } from '../../types/appSecurity';
 
 const ROOT_KEY = 'appSecurity';

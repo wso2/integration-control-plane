@@ -3,16 +3,16 @@
 import { expect, type Page } from '@playwright/test';
 import { reseedSessionToken } from './cloud-fixtures.js';
 
-// BuildCard.tsx:118-140. 'Failed' also reads 'Failed while <phrase>', hence the prefix match.
+// BuildCard.tsx (statusLabel). 'Failed' also reads 'Failed while <phrase>', hence the prefix match.
 export const TERMINAL_STATUS = /^(Completed|Failed|Cancelled|Timed Out)/;
-export const STARTING_STATUS = /^(Queued|In Progress)$/;
+export const STARTING_STATUS = /^(Queued|In progress)$/;
 
 /** A dev build can sit in the queue for a long while before it starts moving. */
 export const BUILD_TIMEOUT_MS = 30 * 60_000;
 
-/** The status has no role or accessible name (BuildCard.tsx:194-198), so it is matched by its text. */
+/** The status has no role or accessible name (BuildCard.tsx), so it is matched by its text. */
 export function buildStatus(page: Page) {
-  return page.getByText(/^(Queued|In Progress|Completed|Failed|Cancelled|Timed Out)/).first();
+  return page.getByText(/^(Queued|In progress|Completed|Failed|Cancelled|Timed Out)/).first();
 }
 
 /** Returns the terminal status text; reaching *a* terminal state is the contract. */
@@ -48,8 +48,8 @@ export async function waitForBuildToSettle(page: Page): Promise<string> {
 
 /** Reseeding writes through page.evaluate, so it only reaches the console's own storage. */
 async function reseedFromConsoleOrigin(page: Page, returnTo: string): Promise<void> {
-  await page.goto('/config.json', { waitUntil: 'domcontentloaded' });
+  await page.goto('config.json', { waitUntil: 'domcontentloaded' });
   await reseedSessionToken(page);
   await page.goto(returnTo, { waitUntil: 'domcontentloaded' });
-  await expect(page.getByRole('heading', { name: 'Latest Build' })).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
 }

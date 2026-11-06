@@ -20,8 +20,7 @@ import { useState } from 'react';
 import { useObtainGithubToken } from './useRepository';
 import { GITHUB_AUTH } from '../constants/github';
 import { buildGitHubAppInstallUrl, buildGitHubOAuthUrl } from '../paths';
-import { generateAndSaveGitHubState, validateAndClearGitHubState } from '#auth';
-import { IS_CLOUD } from '../features';
+import { generateAndSaveGitHubState, validateAndClearGitHubState } from '../auth';
 import type { AuthStatus } from '../types/import';
 
 export interface UseGitHubAuthReturn {
@@ -53,7 +52,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
   const [authStatus, setAuthStatus] = useState<AuthStatus>(initialStatus);
   const obtainToken = useObtainGithubToken();
 
-  // Cloud GitHub-App flow: the user authorized the App but has not installed
+  // GitHub-App flow: the user authorized the App but has not installed
   // it on any account (exchange returns needsInstallation, a bind 409 —
   // git-app-service persists nothing in that case). We only flag the state
   // here; the install popup must be opened by startGitHubAppInstall from a
@@ -65,7 +64,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
       onSuccess?.();
       return;
     }
-    if (IS_CLOUD && result.needsInstallation && window.API_CONFIG.githubAppSlug) {
+    if (result.needsInstallation && window.API_CONFIG.githubAppSlug) {
       setAuthStatus('needs-install');
       return;
     }
@@ -74,7 +73,7 @@ export function useGitHubAuth(initialStatus: AuthStatus = 'idle'): UseGitHubAuth
 
   const startGitHubAppInstall = (onClosed?: () => void): void => {
     const slug = window.API_CONFIG.githubAppSlug;
-    if (!IS_CLOUD || !slug) return;
+    if (!slug) return;
     const popup = window.open(buildGitHubAppInstallUrl(slug), 'github-app-install', GITHUB_AUTH.POPUP_DIMENSIONS);
     if (!popup) {
       // Popup blocked: keep the Install CTA on screen so the user can allow

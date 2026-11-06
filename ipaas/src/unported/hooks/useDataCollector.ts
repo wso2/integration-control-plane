@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getCopilotDataCollectionPermission, provideCopilotFeedback, updateCopilotDataCollectionPermission } from '#api/copilot';
+import { getCopilotDataCollectionPermission, provideCopilotFeedback, updateCopilotDataCollectionPermission } from '../../api/copilot';
 
 export function useGetCopilotDataCollectionPermission(orgId: string) {
   return useQuery({

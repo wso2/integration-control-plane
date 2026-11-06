@@ -33,7 +33,7 @@
  */
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
-import { getContextJob, getContextRecordStatus, hashContent, ingestContextFile, retryContextJob, sendContextRecordEvent, updateContextSource } from '#api/contextEngine';
+import { getContextJob, getContextRecordStatus, hashContent, ingestContextFile, retryContextJob, sendContextRecordEvent, updateContextSource } from '../api/contextEngine';
 import {
   CONTEXT_ENGINE_FILES_KEY_PREFIX,
   CONTEXT_ENGINE_RULES_KEY_PREFIX,

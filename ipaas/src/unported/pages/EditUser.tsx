@@ -16,14 +16,13 @@
  * under the License.
  */
 
-import { Alert, Autocomplete, Avatar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListingTable, PageContent, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../components/common/TextField';
+import { Alert, Autocomplete, Avatar, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, ListingTable, PageContent, Stack, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ArrowLeft, Plus, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, useCallback, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import SearchField from '../../components/SearchField';
-import { useAuth } from '#auth';
+import { useAuth } from '../../auth';
 import { useAccessControl } from '../../contexts/AccessControlContext';
 import { Permissions } from '../../constants/permissions';
 import { useUsers, useGroups, useUpdateUserGroups, useRemoveUserFromGroup } from '../../hooks/useAuth';
@@ -71,7 +70,7 @@ function AssignGroupsDialog({ orgHandler, user, onClose, onAssigned }: { orgHand
         value={selected}
         onChange={(_, v) => setSelected(v)}
         isOptionEqualToValue={(a, b) => a.groupId === b.groupId}
-        renderInput={(params) => <TextField {...params} label="Groups" />}
+        renderInput={(params) => <TextField labelPlacement="top" {...params} label="Groups" />}
       />
     </FormDialog>
   );
@@ -117,7 +116,7 @@ function UserDetailView({ orgHandler, user, onBack }: { orgHandler: string; user
       )}
       <ListingTable.Container>
         <ListingTable.Toolbar
-          searchSlot={<SearchField value={search} onChange={setSearch} />}
+          searchSlot={<SearchField value={search} onChange={setSearch} placeholder="Search by name" />}
           actions={
             !isSelf &&
             canManageUsers && (

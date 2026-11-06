@@ -42,7 +42,7 @@ export default function ComponentCompliance(scope: ComponentScope): JSX.Element 
   const { projectId, isLoading: loadingProject } = useProjectId(scope.project);
   const { data: component, isLoading: loadingComponent } = useComponentByHandler(projectId, scope.component);
   const identity = useIntegrationIdentity(component);
-  const { tracks, selectedTrackId, setSelectedTrackId, loadingEndpoints, selectedApimId, setSelectedApimId, endpointsWithApim } = useEndpointSelection(component);
+  const { tracks, selectedTrackId, loadingEndpoints, selectedApimId, setSelectedApimId, endpointsWithApim } = useEndpointSelection(component);
 
   const ruleDetails = useEndpointRuleAdherence(projectId, component?.id ?? '', selectedApimId ?? '');
   const policyAdherence = useEndpointPolicyAdherence(projectId, component?.id ?? '', selectedApimId ?? '');
@@ -85,13 +85,6 @@ export default function ComponentCompliance(scope: ComponentScope): JSX.Element 
   return (
     <Box sx={{ position: 'relative', overflow: 'hidden', flex: 1 }}>
       <DeploymentTrackBar
-        tracks={tracks}
-        selectedId={selectedTrackId}
-        onChange={setSelectedTrackId}
-        orgHandler={scope.org}
-        projectHandler={scope.project}
-        componentHandler={scope.component}
-        versionView
         extra={
           endpointsWithApim.length > 0 && (
             <Select size="small" value={selectedApimId ?? ''} onChange={(e) => setSelectedApimId(e.target.value as string)} disabled={endpointsWithApim.length <= 1} sx={{ ...PILL_SELECT_SX, minWidth: 140 }}>

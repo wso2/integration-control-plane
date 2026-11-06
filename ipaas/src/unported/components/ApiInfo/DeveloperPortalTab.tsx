@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Accordion, AccordionDetails, AccordionSummary, Box, Button, CircularProgress, MenuItem, Tooltip, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Accordion, AccordionDetails, AccordionSummary, Box, Button, CircularProgress, MenuItem, Tooltip, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, CircleHelp, Pencil } from '@wso2/oxygen-ui-icons-react';
 import { useEffect, useRef, useState, type JSX } from 'react';
 import type { ApimApiInfo } from '../../../types/apim';
@@ -200,12 +199,12 @@ export default function DeveloperPortalTab({ apimId, apimInfo, onSave, onCancel,
             </Box>
           </Box>
 
-          <TextField label="Display Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth size="small" />
+          <TextField labelPlacement="top" label="Display Name" value={displayName} onChange={(e) => setDisplayName(e.target.value)} fullWidth size="small" />
 
-          <TextField label="Description (Optional)" value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline rows={4} size="small" />
+          <TextField labelPlacement="top" label="Description" optional value={description} onChange={(e) => setDescription(e.target.value)} fullWidth multiline rows={4} size="small" />
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TextField select label="Visibility" fullWidth size="small" value={visibility} onChange={(e) => setVisibility(e.target.value as string)}>
+            <TextField labelPlacement="top" select label="Visibility" fullWidth size="small" value={visibility} onChange={(e) => setVisibility(e.target.value as string)}>
               {VISIBILITY_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>
                   {opt.label}
@@ -245,8 +244,8 @@ export default function DeveloperPortalTab({ apimId, apimInfo, onSave, onCancel,
               Business Owner
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField label="Name (Optional)" value={bizInfo.businessOwner} onChange={(e) => setBizInfo((prev) => ({ ...prev, businessOwner: e.target.value }))} size="small" fullWidth />
-              <TextField label="Email (Optional)" type="email" value={bizInfo.businessOwnerEmail} onChange={(e) => setBizInfo((prev) => ({ ...prev, businessOwnerEmail: e.target.value }))} size="small" fullWidth />
+              <TextField labelPlacement="top" label="Name" optional value={bizInfo.businessOwner} onChange={(e) => setBizInfo((prev) => ({ ...prev, businessOwner: e.target.value }))} size="small" fullWidth />
+              <TextField labelPlacement="top" label="Email" optional type="email" value={bizInfo.businessOwnerEmail} onChange={(e) => setBizInfo((prev) => ({ ...prev, businessOwnerEmail: e.target.value }))} size="small" fullWidth />
             </Box>
           </Box>
 
@@ -256,8 +255,8 @@ export default function DeveloperPortalTab({ apimId, apimInfo, onSave, onCancel,
               Technical Owner
             </Typography>
             <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
-              <TextField label="Name (Optional)" value={bizInfo.technicalOwner} onChange={(e) => setBizInfo((prev) => ({ ...prev, technicalOwner: e.target.value }))} size="small" fullWidth />
-              <TextField label="Email (Optional)" type="email" value={bizInfo.technicalOwnerEmail} onChange={(e) => setBizInfo((prev) => ({ ...prev, technicalOwnerEmail: e.target.value }))} size="small" fullWidth />
+              <TextField labelPlacement="top" label="Name" optional value={bizInfo.technicalOwner} onChange={(e) => setBizInfo((prev) => ({ ...prev, technicalOwner: e.target.value }))} size="small" fullWidth />
+              <TextField labelPlacement="top" label="Email" optional type="email" value={bizInfo.technicalOwnerEmail} onChange={(e) => setBizInfo((prev) => ({ ...prev, technicalOwnerEmail: e.target.value }))} size="small" fullWidth />
             </Box>
           </Box>
         </AccordionDetails>

@@ -19,17 +19,15 @@
 import { useInfiniteQuery, useQueryClient, type QueryKey } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { InfiniteData } from '@tanstack/react-query';
-import { fetchLogs, fetchComponentLogs, fetchGatewayLogs } from '#api/logs';
-import { IS_CLOUD } from '../features';
+import { fetchLogs, fetchComponentLogs, fetchGatewayLogs } from '../api/logs';
 import { filterLogRows, type LogRowFilter } from '../utils/logs';
 import type { LogsRequest, ComponentLogsRequest, GatewayEnvironmentCursor, GatewayEnvironmentsPage, GatewayLogsPage, GatewayLogsRequest, LogRow } from '../types/logs';
 
-// The cloud log source cannot narrow by level, so leaving levels out of its
-// request keeps the query key — and the pages already loaded — stable while the
-// user retoggles the level control. Sources that do filter server-side must keep
-// sending them.
+// The log source cannot narrow by level, so leaving levels out of the request
+// keeps the query key — and the pages already loaded — stable while the user
+// retoggles the level control. Levels are applied client-side (useVisibleLogs).
 function sourceRequest<T extends { logLevels: string[] }>(req: T | null): T | null {
-  return req && IS_CLOUD ? { ...req, logLevels: [] } : req;
+  return req ? { ...req, logLevels: [] } : req;
 }
 
 // Live means the newest page, refetched: oldest-first lists start at the other end, and a refetch reloads every loaded page.
@@ -67,7 +65,7 @@ export function useVisibleLogs(data: InfiniteData<LogRow[]> | undefined, filter:
   const componentsKey = filter.componentIds?.join(',') ?? '';
   return useMemo(() => {
     const rows = data?.pages.flat() ?? [];
-    return IS_CLOUD ? filterLogRows(rows, filter) : rows;
+    return filterLogRows(rows, filter);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, levelsKey, componentsKey]);
 }

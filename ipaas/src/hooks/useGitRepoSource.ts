@@ -18,30 +18,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useGitHubAuth } from './useGitHubAuth';
-import { useGitCredentials } from './useCredentials';
 import { useGitHubUserRepos, useRepoBranches, useRepoContents } from './useRepository';
 import { parseGitHubUrl } from '../utils/github';
 import { isBallerinaWorkspace } from '../utils/technologyDetection';
-import { GIT_PROVIDER_LABEL } from '../constants/gitProviders';
 import { URL_DEBOUNCE_MS } from '../constants/project';
 import type { GitProvider, WorkspaceModule } from '../types/project';
-import { GitProvider as CredGitProvider, type GitCredential } from '../types/credentials';
 
 /**
  * Shared git-repository source state for the project create/import forms: provider choice
- * (GitHub OAuth, public URL, or a stored Bitbucket/GitLab credential), the org/repo/branch/
- * directory pickers, and Ballerina-workspace detection. The selected credential's id is
- * threaded as `secretRef` into every repo query.
- *
- * @param credentialsEnabled whether to fetch stored credentials (gates the query — e.g. only
- *   once the optional git section is opened).
+ * (GitHub OAuth or public URL), the org/repo/branch/directory pickers, and Ballerina-workspace
+ * detection.
  */
-export function useGitRepoSource(credentialsEnabled: boolean) {
+export function useGitRepoSource() {
   const [gitProvider, setGitProvider] = useState<GitProvider | null>(null);
-  const [credProvider, setCredProvider] = useState<CredGitProvider | null>(null);
-  const [selectedCredential, setSelectedCredential] = useState<GitCredential | null>(null);
-  const [showCredModal, setShowCredModal] = useState(false);
-  const [modalProvider, setModalProvider] = useState<CredGitProvider | null>(null);
 
   const [selectedOrg, setSelectedOrg] = useState('');
   const [selectedRepo, setSelectedRepo] = useState('');
@@ -54,13 +43,8 @@ export function useGitRepoSource(credentialsEnabled: boolean) {
   const [isWorkspace, setIsWorkspace] = useState(false);
   const [workspaceModules, setWorkspaceModules] = useState<WorkspaceModule[]>([]);
 
-  const isCredentialMode = credProvider !== null;
   const isPublicRepo = gitProvider === 'public';
-  const providerSelected = gitProvider !== null || isCredentialMode;
-  const secretRef = isCredentialMode ? (selectedCredential?.id ?? '') : '';
-  const providerLabel = credProvider ? (GIT_PROVIDER_LABEL[credProvider] ?? 'Git provider') : 'Git provider';
-
-  const { data: allCredentials = [] } = useGitCredentials(credentialsEnabled);
+  const providerSelected = gitProvider !== null;
 
   const { authStatus, startGitHubAuth, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth();
 
@@ -69,14 +53,13 @@ export function useGitRepoSource(credentialsEnabled: boolean) {
   const showBranchAndSubPath = !!(activeOrg && activeRepo);
   const pathReady = !!(activeOrg && activeRepo && selectedBranch);
 
-  const reposEnabled = !isPublicRepo && (isCredentialMode ? !!secretRef : authStatus === 'done');
-  const { data: userRepos, isLoading: isReposLoading, isError: isReposError, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled, secretRef);
+  const reposEnabled = !isPublicRepo && authStatus === 'done';
+  const { data: userRepos, isLoading: isReposLoading, isError: isReposError, refetch: refetchRepos } = useGitHubUserRepos(reposEnabled);
   const isAuthenticated = !isPublicRepo && !!userRepos && userRepos.length > 0;
-  const isCheckingAuth = !isPublicRepo && !isCredentialMode && reposEnabled && isReposLoading;
-  const credentialAuthFailed = isCredentialMode && !!secretRef && isReposError;
+  const isCheckingAuth = !isPublicRepo && reposEnabled && isReposLoading;
 
-  const { data: branches, isLoading: isBranchesLoading } = useRepoBranches(activeOrg, activeRepo, isPublicRepo, secretRef);
-  const { data: repoContentsData, isLoading: isContentsLoading, isError: isContentsError, refetch: refetchContents } = useRepoContents(activeOrg, activeRepo, selectedBranch, isPublicRepo, secretRef);
+  const { data: branches, isLoading: isBranchesLoading } = useRepoBranches(activeOrg, activeRepo, isPublicRepo);
+  const { data: repoContentsData, isLoading: isContentsLoading, isError: isContentsError, refetch: refetchContents } = useRepoContents(activeOrg, activeRepo, selectedBranch, isPublicRepo);
   // Stable reference so the workspace-detection effect below doesn't re-run every render.
   const repoContents = useMemo(() => repoContentsData ?? [], [repoContentsData]);
 
@@ -183,53 +166,18 @@ export function useGitRepoSource(credentialsEnabled: boolean) {
 
   const resetSource = () => {
     setGitProvider(null);
-    setCredProvider(null);
-    setSelectedCredential(null);
-    setModalProvider(null);
-    setShowCredModal(false);
     resetPickers();
   };
 
   const handleProviderSelect = (provider: GitProvider) => {
     resetPickers();
-    setCredProvider(null);
-    setSelectedCredential(null);
     setGitProvider(provider);
-  };
-
-  const handleCredentialPicked = (provider: CredGitProvider, credential: GitCredential) => {
-    resetPickers();
-    setGitProvider(null);
-    setCredProvider(provider);
-    setSelectedCredential(credential);
-  };
-
-  const handleCreateCredential = (provider: CredGitProvider) => {
-    setModalProvider(provider);
-    setShowCredModal(true);
-  };
-
-  const handleCredentialAdded = (credential: GitCredential) => {
-    resetPickers();
-    setGitProvider(null);
-    setCredProvider(modalProvider);
-    setSelectedCredential(credential);
-    setShowCredModal(false);
   };
 
   return {
     gitProvider,
-    credProvider,
-    selectedCredential,
-    isCredentialMode,
     isPublicRepo,
     providerSelected,
-    secretRef,
-    providerLabel,
-    allCredentials,
-    showCredModal,
-    setShowCredModal,
-    modalProvider,
     selectedOrg,
     setSelectedOrg,
     selectedRepo,
@@ -267,11 +215,7 @@ export function useGitRepoSource(credentialsEnabled: boolean) {
     openGitHubManage,
     githubInstallUrl,
     isCheckingAuth,
-    credentialAuthFailed,
     handleProviderSelect,
-    handleCredentialPicked,
-    handleCreateCredential,
-    handleCredentialAdded,
     resetSource,
   };
 }

@@ -1,0 +1,13 @@
+# The build context is the repository root for both images; everything the
+# builds do not read stays out of it.
+.git
+.github
+.azure
+.claude
+**/.env
+docs
+tmp
+build
+*.md
+**/node_modules
+up-dp/web/dist

@@ -16,122 +16,108 @@
  * under the License.
  */
 
-import { Box, Button, Chip, Divider, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { GitBranch, HelpCircle, Plus } from '@wso2/oxygen-ui-icons-react';
+import { Box, Chip, Divider, MenuItem, Select, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { GitBranch, HelpCircle } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
+import { useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import type { DeploymentTrack } from '../types/component';
-import { IS_CLOUD } from '../features';
+import { useSelectedTrack, withTrackParam } from '../hooks/useSelectedTrack';
 import { PILL_SELECT_SX } from '../constants/styles';
-import { apiVersionChipSx, bandSx, barCaptionSx, barSx, menuActionButtonSx, menuActionsRowSx, tooltipAnchorSx, trackLabelSx } from './DeploymentTrackBar.styles';
+import { componentSettingsSectionUrl, hasComponent, useScope } from '../nav';
+import type { Component, DeploymentTrack } from '../types/component';
+import { bandSx, barCaptionSx, barSx, defaultChipSx, manageTracksItemSx, tooltipAnchorSx, trackLabelSx } from './DeploymentTrackBar.styles';
 
 interface DeploymentTrackBarProps {
-  tracks: DeploymentTrack[];
-  selectedId: string;
-  onChange: (id: string) => void;
-  orgHandler: string;
-  projectHandler: string;
-  componentHandler: string;
-  /** When true, renders the selected track as just the API version string (e.g. "v1.0") */
-  versionView?: boolean;
+  /** The integration whose tracks are picked from; the selection lives in the URL. */
+  component?: Component;
+  /** The page's environment selector. */
   extra?: ReactNode;
 }
 
-const TOOLTIP_TEXT = 'Deployment tracks control the release path of your component versions through different environments.';
+// The picker's "Manage Tracks" entry. A real option, so keyboard navigation and
+// type-ahead treat it like the others; no track id can take this value.
+const MANAGE_TRACKS = '__manage-tracks__';
 
-function normalizeVersion(v: string): string {
-  return /^v/i.test(v) ? v : `v${v}`;
-}
+const TOOLTIP_TEXT = 'Each deployment track builds one branch and deploys it to its own environments, alongside the others.';
 
-function TrackLabel({ track, versionView }: { track: DeploymentTrack; versionView?: boolean }) {
-  if (versionView) {
-    return (
-      <Typography variant="body2" sx={trackLabelSx}>
-        {track.apiVersion ? normalizeVersion(track.apiVersion) : track.id}
-      </Typography>
-    );
-  }
+function TrackLabel({ track }: { track: DeploymentTrack }) {
   return (
     <Stack direction="row" alignItems="center" gap={0.75}>
-      {track.branch && <GitBranch size={13} />}
+      <GitBranch size={13} />
       <Typography variant="body2" sx={trackLabelSx}>
-        {track.branch || 'None'}
+        {track.branch || track.id}
+        {track.apiVersion && (
+          <Typography component="span" variant="body2" color="text.secondary" sx={trackLabelSx}>
+            {` · ${track.apiVersion}`}
+          </Typography>
+        )}
       </Typography>
-      {track.apiVersion && <Chip label={`API ${normalizeVersion(track.apiVersion)}`} size="small" variant="outlined" color="primary" sx={apiVersionChipSx} />}
+      {track.latest && <Chip label="Default" size="small" variant="outlined" color="primary" sx={defaultChipSx} />}
     </Stack>
   );
 }
 
-export default function DeploymentTrackBar({ tracks, selectedId, onChange, orgHandler, projectHandler, componentHandler, versionView, extra }: DeploymentTrackBarProps) {
+/**
+ * The band at the top of integration-level pages: the deployment track picker,
+ * for an integration with more than one track, and the page's environment
+ * selector. A page with neither has no band.
+ */
+export default function DeploymentTrackBar({ component, extra }: DeploymentTrackBarProps) {
   const navigate = useAppNavigate();
+  const { search } = useLocation();
+  const scope = useScope();
+  const { tracks, trackId, selectTrack } = useSelectedTrack(component);
+  // A single track leaves nothing to pick, whether it is an integration's only
+  // track or the implicit one of an integration created before tracks. More
+  // tracks are created from Settings, and the picker shows once there are two.
+  const picker = !!component?.deploymentTracksEnabled && tracks.length > 1;
+  if (!picker && !extra) return null;
 
-  // Cloud has one implicit track, so the track picker has nothing to offer — but this bar is
-  // where every ComponentScope page puts its environment selector, so keep it for that alone.
-  if (IS_CLOUD)
-    return extra ? (
-      <Box sx={bandSx}>
-        <Box sx={barSx}>{extra}</Box>
-      </Box>
-    ) : null;
-
-  const basePath = `/organizations/${orgHandler}/projects/${projectHandler}/components/${componentHandler}/settings/deployment-tracks`;
+  const tracksUrl = hasComponent(scope) ? componentSettingsSectionUrl(scope, 'deployment-tracks') : '';
 
   return (
     <Box sx={bandSx}>
       <Box sx={barSx}>
-        {/* Label + tooltip */}
-        <Stack direction="row" alignItems="center" gap={0.5}>
-          <Typography variant="body2" color="text.secondary" sx={barCaptionSx}>
-            Deployment Track
-          </Typography>
-          <Tooltip title={TOOLTIP_TEXT} placement="right">
-            <Box role="img" aria-label={TOOLTIP_TEXT} sx={tooltipAnchorSx}>
-              <HelpCircle size={13} aria-hidden="true" />
-            </Box>
-          </Tooltip>
-        </Stack>
-
-        {/* Track selector */}
-        <Select
-          size="small"
-          value={selectedId}
-          onChange={(e) => onChange(e.target.value as string)}
-          renderValue={(value) => {
-            const track = tracks.find((t) => t.id === value);
-            if (!track) return null;
-            return <TrackLabel track={track} versionView={versionView} />;
-          }}
-          inputProps={{ 'aria-label': 'Deployment Track' }}
-          sx={{ ...PILL_SELECT_SX, minWidth: 160 }}>
-          {/* Create New / View All actions */}
-          <Box sx={menuActionsRowSx} onKeyDown={(e) => e.stopPropagation()}>
-            <Button
+        {picker && (
+          <>
+            <Stack direction="row" alignItems="center" gap={0.5}>
+              <Typography variant="body2" color="text.secondary" sx={barCaptionSx}>
+                Deployment track
+              </Typography>
+              <Tooltip title={TOOLTIP_TEXT} placement="right">
+                <Box role="img" aria-label={TOOLTIP_TEXT} sx={tooltipAnchorSx}>
+                  <HelpCircle size={13} aria-hidden="true" />
+                </Box>
+              </Tooltip>
+            </Stack>
+            <Select
               size="small"
-              startIcon={<Plus size={13} />}
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`${basePath}/new`);
+              value={trackId}
+              onChange={(e) => {
+                const value = e.target.value as string;
+                if (value === MANAGE_TRACKS) navigate(withTrackParam(tracksUrl, search));
+                else selectTrack(value);
               }}
-              sx={menuActionButtonSx}>
-              Create New
-            </Button>
-            <Button
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(basePath);
+              renderValue={(value) => {
+                const track = tracks.find((t) => t.id === value);
+                return track ? <TrackLabel track={track} /> : null;
               }}
-              sx={menuActionButtonSx}>
-              View All
-            </Button>
-          </Box>
-          <Divider sx={{ my: 0.5 }} />
-          {tracks.map((track) => (
-            <MenuItem key={track.id} value={track.id}>
-              <TrackLabel track={track} versionView={versionView} />
-            </MenuItem>
-          ))}
-        </Select>
+              inputProps={{ 'aria-label': 'Deployment track' }}
+              sx={{ ...PILL_SELECT_SX, minWidth: 160 }}>
+              {tracksUrl && (
+                <MenuItem value={MANAGE_TRACKS} sx={manageTracksItemSx}>
+                  Manage tracks
+                </MenuItem>
+              )}
+              {tracksUrl && <Divider sx={{ my: 0.5 }} />}
+              {tracks.map((track) => (
+                <MenuItem key={track.id} value={track.id}>
+                  <TrackLabel track={track} />
+                </MenuItem>
+              ))}
+            </Select>
+          </>
+        )}
         {extra}
       </Box>
     </Box>

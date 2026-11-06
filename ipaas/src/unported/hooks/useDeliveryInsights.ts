@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { addDeliveryConfiguration, fetchDeliveryConfigurations, fetchDeliveryDataPlanes, fetchDeliveryInsights, updateDeliveryRejectorCriteria, updateDeliverySelectorCriteria } from '#api/delivery';
+import { addDeliveryConfiguration, fetchDeliveryConfigurations, fetchDeliveryDataPlanes, fetchDeliveryInsights, updateDeliveryRejectorCriteria, updateDeliverySelectorCriteria } from '../../api/delivery';
 import type { DeliveryGranularity, DeliveryInsightsRaw, DeliveryRange } from '../../types/delivery';
 
 /** ISO from/to for a range, computed at fetch time (mirrors Devant's timeValues). */

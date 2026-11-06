@@ -19,11 +19,10 @@
 import { useState, useCallback, useRef } from 'react';
 import { useCreateComponent, useDeleteComponent } from './useComponents';
 import { useDeployPrebuiltImage } from './useDeployments';
-import { getOrgUuidFromToken } from '#auth';
+import { getOrgUuidFromToken } from '../auth';
 import { componentSubTypeFromSample, displayTypeFromSample } from '../constants/integrations';
 import { derivePrebuiltSlug } from '../utils/prebuilt';
-import { checkNameAvailability, fetchComponentDetail, fetchFirstEnvironment, fetchLatestCommitSha, savePrebuiltConfig } from '#api/prebuilt';
-import { IS_CLOUD } from '../features';
+import { checkNameAvailability, fetchComponentDetail, fetchFirstEnvironment, fetchLatestCommitSha, savePrebuiltConfig } from '../api/prebuilt';
 import { isQuotaError } from '../utils/apiErrors';
 import type { DeployPrebuiltIntegrationInput, DeployPrebuiltIntegrationState } from '../types/prebuilt';
 
@@ -107,11 +106,9 @@ export function useDeployPrebuiltIntegration() {
         componentId: detail.id,
         imageUrl: integration.imageUrl,
         appBranch: integration.branch ?? 'main',
-        // Cloud-only: its BFF bakes these onto the Workload at creation (config
-        // saved above is also kept for the Configure form). Devant's deploy
-        // resolver doesn't ignore an unrecognized `configurations` field — it
-        // 500s — so this must stay omitted outside of cloud.
-        ...(IS_CLOUD ? { configurations: configValues } : {}),
+        // The BFF bakes these onto the Workload at creation; the config saved
+        // above is also kept for the Configure form.
+        configurations: configValues,
       });
 
       setState((s) => ({ ...s, progress: 100, stepLabel: 'Deployed!', error: null, isDeploying: false, isSuccess: true, componentHandler: component.handler }));

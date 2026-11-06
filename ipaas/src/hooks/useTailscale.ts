@@ -17,15 +17,19 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createByoiComponent, deployByoiImage, getByoiEndpointsYaml, getSampleRegistryId, updateByoiEndpointsYaml } from '#api/tailscale';
-import { createConfigMap, createSecret, getConfigMapDetails, getConfigMaps, getReleaseById, getSecrets, mountConfig, updateConfigMapData, updateSecret } from '#api/devopsConfigs';
-import { fetchComponents } from '#api/components';
+import { createByoiComponent, deployByoiImage, getByoiEndpointsYaml, getSampleRegistryId, updateByoiEndpointsYaml } from '../api/tailscale';
+import { createConfigMap, createSecret, getConfigMapDetails, getConfigMaps, getReleaseById, getSecrets, mountConfig, updateConfigMapData, updateSecret } from '../api/devopsConfigs';
+import { fetchComponents } from '../api/components';
 import type { Component } from '../types/component';
 import { OAUTH_CLIENT_SECRET, TAILSCALE_COMPONENT_SUBTYPE, TAILSCALE_COMPONENT_TYPE, TAILSCALE_IMAGE, TS_AUTH_KEY } from '../constants/tailscale';
 import type { TailscaleAuthMethod, TailscalePortMapping } from '../types/tailscale';
 import { buildEndpointsYaml, buildPortMappingsYaml, tailscaleConfigMapName, tailscaleSecretName } from '../utils/tailscale';
 import { mainContainer } from '../utils/devopsConfigs';
 import { useOrgUuid } from './useOrgUuid';
+
+// A Tailscale proxy has only its default track. Every env-scoped config call names it, because one that names
+// no track acts on whichever track the environment's last release read was for.
+const DEFAULT_TRACK = '';
 
 const ROOT = 'tailscale';
 
@@ -60,7 +64,7 @@ export function useTailscaleSecrets(projectId: string, environmentId: string | u
   const orgUuid = useOrgUuid();
   return useQuery({
     queryKey: [ROOT, 'secrets', orgUuid, projectId, environmentId],
-    queryFn: () => getSecrets(orgUuid!, projectId, environmentId!),
+    queryFn: () => getSecrets(orgUuid!, projectId, environmentId!, DEFAULT_TRACK),
     enabled: !!orgUuid && !!projectId && !!environmentId,
   });
 }
@@ -70,7 +74,7 @@ export function useTailscaleConfigMaps(projectId: string, environmentId: string 
   const orgUuid = useOrgUuid();
   return useQuery({
     queryKey: [ROOT, 'configmaps', orgUuid, projectId, environmentId],
-    queryFn: () => getConfigMaps(orgUuid!, projectId, environmentId!),
+    queryFn: () => getConfigMaps(orgUuid!, projectId, environmentId!, DEFAULT_TRACK),
     enabled: !!orgUuid && !!projectId && !!environmentId,
   });
 }
@@ -80,7 +84,7 @@ export function useTailscaleConfigMapDetails(projectId: string, environmentId: s
   const orgUuid = useOrgUuid();
   return useQuery({
     queryKey: [ROOT, 'configMapDetails', orgUuid, projectId, environmentId, configMapId],
-    queryFn: () => getConfigMapDetails(orgUuid!, projectId, environmentId!, configMapId!),
+    queryFn: () => getConfigMapDetails(orgUuid!, projectId, environmentId!, configMapId!, DEFAULT_TRACK),
     enabled: !!orgUuid && !!projectId && !!environmentId && !!configMapId,
   });
 }
@@ -163,7 +167,7 @@ export function useSaveAndDeployTailscale(projectId: string) {
       const newSecretId = await runStep('Saving the authentication secret', async () => {
         const credential = authMethod === 'authKey' ? authKey.trim() : clientSecret.trim();
         if (!credential) return null;
-        const existingSecret = (await getSecrets(orgUuid, projectId, envId)).find((s) => s.name === secretName);
+        const existingSecret = (await getSecrets(orgUuid, projectId, envId, DEFAULT_TRACK)).find((s) => s.name === secretName);
         const data: Record<string, string> = { [authMethod === 'authKey' ? TS_AUTH_KEY : OAUTH_CLIENT_SECRET]: credential };
         const base = {
           name: secretName,
@@ -179,15 +183,15 @@ export function useSaveAndDeployTailscale(projectId: string) {
           data,
         };
         if (existingSecret) {
-          await updateSecret(orgUuid, projectId, existingSecret.ID, { ...base, version: existingSecret.version });
+          await updateSecret(orgUuid, projectId, existingSecret.ID, { ...base, version: existingSecret.version }, DEFAULT_TRACK);
           return null;
         }
-        return (await createSecret(orgUuid, projectId, base)).ID;
+        return (await createSecret(orgUuid, projectId, base, DEFAULT_TRACK)).ID;
       });
 
       // 2. Port-mappings ConfigMap — upsert.
       const newConfigMapId = await runStep('Saving the port-mapping configuration', async () => {
-        const existingConfigMap = (await getConfigMaps(orgUuid, projectId, envId)).find((c) => c.name === configMapName);
+        const existingConfigMap = (await getConfigMaps(orgUuid, projectId, envId, DEFAULT_TRACK)).find((c) => c.name === configMapName);
         const configData = {
           name: configMapName,
           metadata: { isDefaultConfig: true },
@@ -200,10 +204,10 @@ export function useSaveAndDeployTailscale(projectId: string) {
           data: { 'config.yaml': buildPortMappingsYaml(mappings) },
         };
         if (existingConfigMap) {
-          await updateConfigMapData(orgUuid, projectId, existingConfigMap.ID, configData);
+          await updateConfigMapData(orgUuid, projectId, existingConfigMap.ID, configData, DEFAULT_TRACK);
           return null;
         }
-        return (await createConfigMap(orgUuid, projectId, configData)).ID;
+        return (await createConfigMap(orgUuid, projectId, configData, DEFAULT_TRACK)).ID;
       });
 
       // 3. BYOI endpoints YAML.
@@ -212,23 +216,35 @@ export function useSaveAndDeployTailscale(projectId: string) {
       // 4. Mount any newly-created Secret/ConfigMap onto the proxy's main container.
       if (newSecretId || newConfigMapId) {
         await runStep('Mounting the configuration onto the proxy', async () => {
-          const release = await getReleaseById(orgUuid, projectId, componentId, releaseId);
+          const release = await getReleaseById(orgUuid, projectId, componentId, releaseId, DEFAULT_TRACK);
           const container = mainContainer(release.containers);
           if (!container) return;
           if (newSecretId) {
-            await mountConfig(orgUuid, projectId, componentId, { app_environment_id: releaseId, container_id: container.ID, secret_id: newSecretId, configmap_id: null, mount_type: 'ENVFile', mount_permissions: '0000', mount_path: '', config_key: '' });
+            await mountConfig(
+              orgUuid,
+              projectId,
+              componentId,
+              { app_environment_id: releaseId, container_id: container.ID, secret_id: newSecretId, configmap_id: null, mount_type: 'ENVFile', mount_permissions: '0000', mount_path: '', config_key: '' },
+              DEFAULT_TRACK,
+            );
           }
           if (newConfigMapId) {
-            await mountConfig(orgUuid, projectId, componentId, {
-              app_environment_id: releaseId,
-              container_id: container.ID,
-              configmap_id: newConfigMapId,
-              secret_id: null,
-              mount_type: 'File',
-              mount_path: '/config.yaml',
-              config_key: 'config.yaml',
-              mount_permissions: '0644',
-            });
+            await mountConfig(
+              orgUuid,
+              projectId,
+              componentId,
+              {
+                app_environment_id: releaseId,
+                container_id: container.ID,
+                configmap_id: newConfigMapId,
+                secret_id: null,
+                mount_type: 'File',
+                mount_path: '/config.yaml',
+                config_key: 'config.yaml',
+                mount_permissions: '0644',
+              },
+              DEFAULT_TRACK,
+            );
           }
         });
       }
@@ -243,7 +259,7 @@ export function useSaveAndDeployTailscale(projectId: string) {
       qc.invalidateQueries({ queryKey: [ROOT, 'secrets', orgUuid, projectId, input.envId] });
       qc.invalidateQueries({ queryKey: [ROOT, 'configmaps', orgUuid, projectId, input.envId] });
       qc.invalidateQueries({ queryKey: [ROOT, 'byoiEndpoints', orgUuid, projectId, input.componentId, input.releaseId] });
-      // The secret/configmap writes go through #api/devopsConfigs — refresh the shared
+      // The secret/configmap writes go through api/devopsConfigs — refresh the shared
       // Configs & Secrets surface, which keys its queries under 'devopsConfigs'.
       qc.invalidateQueries({ queryKey: ['devopsConfigs'] });
     },

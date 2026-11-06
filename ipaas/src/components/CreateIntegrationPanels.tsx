@@ -23,8 +23,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useCreateComponent } from '../hooks/useComponents';
 import { isQuotaError } from '../utils/apiErrors';
 import { useChoreoSampleImages } from '../hooks/useRepository';
-import { generateAndSaveGitHubState, useAuth, validateAndClearGitHubState } from '#auth';
-import { IS_CLOUD } from '../features';
+import { generateAndSaveGitHubState, useAuth, validateAndClearGitHubState } from '../auth';
 import { providerComingSoonLabel } from '../constants/gitProviders';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useFeaturePreview } from '../contexts/FeaturePreviewContext';
@@ -45,6 +44,7 @@ import { PROVIDER_ICON_SX, GITHUB_ICON_SX, SECTION_LABEL_SX } from '../constants
 import { resourceUrl, narrow, type ProjectScope } from '../nav';
 import { importComponentUrl, browseSamplesUrl, prebuiltIntegrationsUrl, componentsNewAiBuilderUrl, buildGitHubOAuthUrl } from '../paths';
 import type { Sample } from '../types/samples';
+import { sampleKey } from '../constants/samples';
 import { toHandler } from '../utils/string';
 import { buildCloudEditorUrl } from '../utils/cloudEditor';
 import { useProjectId } from '../hooks/useProjects';
@@ -53,7 +53,11 @@ import { useOrgComponentLimits, useOrgSubscriptions } from '../hooks/useOrg';
 import { Permissions } from '../constants/permissions';
 import { FREE_COMPONENT_LIMIT } from '../constants/subscription';
 import { useSamples } from '../hooks/useSamples';
+import { trackEvent } from '../services/tracking/tracking';
 import { usePrebuiltIntegrations } from '../hooks/usePrebuiltIntegrations';
+
+/** Static, so the tab-click handler and the PillTabs `tabs` prop reference the same array. */
+const GET_STARTED_TABS = [{ label: 'Prebuilt integrations' }, { label: 'Samples' }];
 
 export interface CreateIntegrationPanelsProps {
   scope: ProjectScope;
@@ -104,7 +108,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
   const { data: sampleImages } = useChoreoSampleImages(orgUuid, projectId);
 
   const [selectedTab, setSelectedTab] = useState(0);
-  const [deployingSample, setDeployingSample] = useState<string | null>(null);
+  const [deployingSample, setDeployingSample] = useState<Sample | null>(null);
   const [isImportAuthenticating, setIsImportAuthenticating] = useState(false);
   const [pageError, setPageError] = useState<{ message: string; severity: 'error' | 'warning' } | null>(null);
 
@@ -120,7 +124,9 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
     const url = buildCloudEditorUrl({ userId, orgUuid, orgHandle: scope.org, projectId, codeServerSample }, window.location.origin);
     if (!window.open(url, '_blank')) {
       setPageError({ message: 'Please allow popups for this site and try again.', severity: 'warning' });
+      return;
     }
+    trackEvent('open-cloud-editor-click', { org: scope.org, project: scope.project });
   };
 
   const importUrl = importComponentUrl(scope.org, scope.project);
@@ -129,11 +135,10 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
     if (creationBlocked) return;
     const { githubAppClientId, githubAppAuthRedirectUrl } = window.API_CONFIG;
     if (!githubAppClientId) {
-      // Cloud only: no GitHub App configured means private-repo authorization
-      // is impossible, so land the import page in public-URL mode instead of
-      // its default (private) mode with a dead Authorize button. Other
-      // variants keep the original navigation.
-      navigate(importUrl, IS_CLOUD ? { state: { mode: 'public' } } : undefined);
+      // No GitHub App configured means private-repo authorization is impossible,
+      // so land the import page in public-URL mode instead of its default
+      // (private) mode with a dead Authorize button.
+      navigate(importUrl, { state: { mode: 'public' } });
       return;
     }
     setIsImportAuthenticating(true);
@@ -148,6 +153,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       setPageError({ message: 'Please allow popups for this site and try again.', severity: 'warning' });
       return;
     }
+    trackEvent('component-create-import-github', { org: scope.org, project: scope.project, provider: GitProvider.GITHUB });
 
     const channel = new BroadcastChannel(GITHUB_AUTH.BROADCAST_CHANNEL);
     channelRef.current = channel;
@@ -181,7 +187,8 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
 
   const handleQuickDeploy = (sample: Sample) => {
     if (!projectId || creationBlocked) return;
-    setDeployingSample(sample.displayName);
+    trackEvent('quick-deploy-click', { org: scope.org, project: scope.project, sample: sample.displayName, buildpack: sample.buildPack });
+    setDeployingSample(sample);
     createComponent.mutate(
       {
         displayName: sample.displayName,
@@ -209,7 +216,7 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
       <Box sx={{ pt: 5, display: 'flex', flexDirection: 'column', flex: 1 }}>
         <IntegrationCreationLoader
           label="Integration"
-          subLabel={deployingSample || undefined}
+          subLabel={deployingSample?.displayName}
           isPending={createComponent.isPending}
           isSuccess={createComponent.isSuccess}
           error={createComponent.isError ? (createComponent.error?.message ?? 'Something went wrong. Please try again.') : null}
@@ -261,10 +268,10 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             <Box sx={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
               <Stack direction="row" alignItems="center" gap={1} sx={{ mb: 1.5 }}>
                 <Typography variant="body2" sx={SECTION_LABEL_SX}>
-                  {standalone ? 'Create an Integration on Cloud' : 'Create on Cloud'}
+                  {standalone ? 'Create an integration on Cloud' : 'Create on Cloud'}
                 </Typography>
               </Stack>
-              <Card variant="outlined" sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
+              <Card sx={{ flex: 1, boxShadow: 'none', borderColor: 'primary.main', ...(creationBlocked ? { opacity: 0.5, pointerEvents: 'none' } : {}) }}>
                 <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
                   <Box sx={{ flex: 1, minHeight: 260, overflow: 'hidden' }}>
                     <IDEMockup onOpenClick={handleOpenCloudEditor} />
@@ -282,10 +289,10 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
               </Typography>
             ) : (
               <Typography variant="body2" sx={{ ...SECTION_LABEL_SX, mb: 1.5 }}>
-                {standalone ? 'Import your own Integration' : 'Import your own'}
+                {standalone ? 'Import your own integration' : 'Import your own'}
               </Typography>
             )}
-            <Card variant="outlined" sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
+            <Card sx={{ boxShadow: 'none', ...(isImportAuthenticating || creationBlocked ? { pointerEvents: 'none', opacity: creationBlocked ? 0.5 : 0.7 } : {}) }}>
               <CardContent
                 sx={{
                   display: 'flex',
@@ -328,11 +335,12 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                     <CircularProgress size={22} />
                   ) : (
                     <>
-                      <Tooltip title="Import from a Public Repository" placement="top">
+                      <Tooltip title="Import from a public repository" placement="top">
                         <IconButton
-                          aria-label="Import from a Public Repository"
+                          aria-label="Import from a public repository"
                           onClick={(e) => {
                             e.stopPropagation();
+                            trackEvent('component-create-import-public-url', { org: scope.org, project: scope.project });
                             navigate(importUrl, { state: { mode: 'public' } });
                           }}
                           sx={PROVIDER_ICON_SX}>
@@ -344,30 +352,37 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           <GitHub size={aiBuilderEnabled ? 23 : 24} />
                         </IconButton>
                       </Tooltip>
-                      <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.GITLAB_SELF_MANAGED) : 'Import from GitLab'} placement="top">
+                      <Tooltip title={providerComingSoonLabel(GitProvider.GITLAB_SELF_MANAGED)} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from GitLab" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.GITLAB_SELF_MANAGED } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton aria-label="Import from GitLab" disabled sx={PROVIDER_ICON_SX}>
                             <GitLabIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.BITBUCKET_CLOUD) : 'Import from Bitbucket'} placement="top">
+                      <Tooltip title={providerComingSoonLabel(GitProvider.BITBUCKET_CLOUD)} placement="top">
                         {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
                         <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Bitbucket" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.BITBUCKET_CLOUD } })} sx={PROVIDER_ICON_SX}>
+                          <IconButton aria-label="Import from Bitbucket" disabled sx={PROVIDER_ICON_SX}>
                             <BitbucketIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
                         </Box>
                       </Tooltip>
-                      <Tooltip title={IS_CLOUD ? providerComingSoonLabel(GitProvider.AZURE_DEVOPS) : 'Import from Azure'} placement="top">
-                        {/* A disabled IconButton fires no pointer events, so the Tooltip needs a live wrapper. */}
-                        <Box component="span" sx={{ display: 'inline-flex' }}>
-                          <IconButton aria-label="Import from Azure" disabled={IS_CLOUD} onClick={() => navigate(importUrl, { state: { provider: GitProvider.AZURE_DEVOPS } })} sx={PROVIDER_ICON_SX}>
+                      {window.API_CONFIG.azureDevOpsClientId && (
+                        <Tooltip title="Import from Azure DevOps" placement="top">
+                          <IconButton
+                            aria-label="Import from Azure DevOps"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              if (creationBlocked) return;
+                              trackEvent('component-create-import-azure-devops', { org: scope.org, project: scope.project, provider: GitProvider.AZURE_DEVOPS });
+                              navigate(importUrl, { state: { mode: GitProvider.AZURE_DEVOPS } });
+                            }}
+                            sx={PROVIDER_ICON_SX}>
                             <AzureDevOpsIcon size={aiBuilderEnabled ? 21 : 22} />
                           </IconButton>
-                        </Box>
-                      </Tooltip>
+                        </Tooltip>
+                      )}
                     </>
                   )}
                 </Box>
@@ -382,7 +397,6 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             Start quickly
           </Typography>
           <Card
-            variant="outlined"
             sx={{
               flex: 1,
               boxShadow: 'none',
@@ -392,7 +406,14 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
             }}>
             <CardContent sx={{ flex: 1, display: 'flex', flexDirection: 'column', p: 3, '&:last-child': { pb: 3 } }}>
               <Box sx={{ mb: 2 }}>
-                <PillTabs value={selectedTab} onChange={setSelectedTab} tabs={[{ label: 'Prebuilt Integrations' }, { label: 'Samples' }]} />
+                <PillTabs
+                  value={selectedTab}
+                  onChange={(tab) => {
+                    trackEvent('components-new-get-started-tab', { org: scope.org, project: scope.project, tab: GET_STARTED_TABS[tab]?.label ?? String(tab) });
+                    setSelectedTab(tab);
+                  }}
+                  tabs={GET_STARTED_TABS}
+                />
               </Box>
 
               <Box sx={{ display: 'grid', flex: 1, minWidth: 0, '& > *': { gridArea: '1 / 1', zIndex: 1, minWidth: 0 } }}>
@@ -419,21 +440,30 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                           disabledTooltip={blockedTooltip}
                           key={integration.displayName}
                           integration={integration}
-                          onClick={() =>
+                          onClick={() => {
+                            trackEvent('featured-prebuilt-integration-click', { org: scope.org, project: scope.project, integration: integration.displayName });
                             navigate(prebuiltIntegrationsUrl(scope.org, scope.project), {
                               state: {
                                 selectedApplications: integration.applications,
                                 selectedIntegration: integration,
                                 fromPath: `/organizations/${scope.org}/projects/${scope.project}/components/new`,
                               },
-                            })
-                          }
+                            });
+                          }}
                         />
                       ))}
                     </Box>
                   )}
                   <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(prebuiltIntegrationsUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
+                    <Button
+                      variant="text"
+                      color="primary"
+                      endIcon={<ArrowRight size={14} />}
+                      onClick={() => {
+                        trackEvent('prebuilt-integration-explore-click', { org: scope.org, project: scope.project });
+                        navigate(prebuiltIntegrationsUrl(scope.org, scope.project));
+                      }}
+                      sx={{ textTransform: 'none', pl: 0 }}>
                       Explore more prebuilt integrations
                     </Button>
                   </Box>
@@ -457,12 +487,27 @@ export default function CreateIntegrationPanels({ scope, heading }: CreateIntegr
                   ) : (
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                       {featuredSamples.map((sample) => (
-                        <SampleRowCard key={sample.displayName} sample={sample} onDeploy={() => handleQuickDeploy(sample)} isDeploying={deployingSample === sample.displayName} deployDisabled={creationBlocked} deployDisabledTooltip={blockedTooltip} />
+                        <SampleRowCard
+                          key={sampleKey(sample)}
+                          sample={sample}
+                          onDeploy={() => handleQuickDeploy(sample)}
+                          isDeploying={deployingSample ? sampleKey(deployingSample) === sampleKey(sample) : false}
+                          deployDisabled={creationBlocked}
+                          deployDisabledTooltip={blockedTooltip}
+                        />
                       ))}
                     </Box>
                   )}
                   <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Button variant="text" color="primary" endIcon={<ArrowRight size={14} />} onClick={() => navigate(browseSamplesUrl(scope.org, scope.project))} sx={{ textTransform: 'none', pl: 0 }}>
+                    <Button
+                      variant="text"
+                      color="primary"
+                      endIcon={<ArrowRight size={14} />}
+                      onClick={() => {
+                        trackEvent('components-new-browse-more-samples', { org: scope.org, project: scope.project });
+                        navigate(browseSamplesUrl(scope.org, scope.project));
+                      }}
+                      sx={{ textTransform: 'none', pl: 0 }}>
                       Explore more samples
                     </Button>
                   </Box>

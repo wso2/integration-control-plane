@@ -18,16 +18,16 @@
 
 import { Alert, Box, Button, CircularProgress, Link, PageContent, PageTitle, Stack, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
-import { isRagIngestionEnabled, useRetrieveChunks } from '../../hooks/useRagIngestion';
-import { useSubscriptions } from '../../hooks/useSubscription';
+import { isRagIngestionEnabled, useRetrieveChunks } from '../hooks/useRagIngestion';
+import { useSubscriptions } from '../hooks/useSubscription';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
 import { PAID_SUBSCRIPTION_TYPE } from '../../constants/subscription';
 import { DEFAULT_RETRIEVAL_QUERY } from '../../constants/ragIngestion';
 import { isEmbeddingValid, isRetrievalQueryValid, isVectorStoreValid } from '../../utils/ragIngestion';
 import ComingSoon from '../../pages/ComingSoon';
 import VerticalStepper from '../../components/VerticalStepper';
-import VectorStoreStep from '../components/RagIngestion/steps/VectorStoreStep';
-import EmbeddingModelStep from '../components/RagIngestion/steps/EmbeddingModelStep';
+import VectorStoreStep from '../../components/KnowledgeBase/steps/VectorStoreStep';
+import EmbeddingModelStep from '../../components/KnowledgeBase/steps/EmbeddingModelStep';
 import QueryRetrieveStep from '../components/RagIngestion/steps/QueryRetrieveStep';
 import RagUpgradeRequired from '../components/RagIngestion/RagUpgradeRequired';
 import type { OrgScope } from '../../nav';

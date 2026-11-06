@@ -1,7 +1,7 @@
 # Contexts
 
 > [!NOTE]
-> This directory contains React Context providers used across the ICP application. Each context is purpose-built for a specific concern and is intentionally kept narrow in scope.
+> This directory contains React Context providers used across the console. Each context is purpose-built for a specific concern and is intentionally kept narrow in scope.
 
 ---
 
@@ -11,26 +11,22 @@
 
 ### Purpose
 
-This context manages **permission state** for the current user session across three scopes: organisation, project, and component. It provides a unified querying interface so any component in the tree can check whether the user holds a given permission without knowing which scope granted it.
+This context holds the **permissions of the signed-in user** and lets any component in the tree check them. The access token is scoped to one organization and carries no finer scope, so permissions are granted for the whole organization: `ProtectedRoute` grants every permission while a session is active and clears them when it ends.
 
-State held (as `Set<string>` collections):
+State held:
 
-- `orgPerms` — permissions that apply across the whole organisation
-- `projectPermsMap` — per-project permission sets, keyed by project ID
-- `componentPermsMap` — per-component permission sets, keyed by component ID
+- `orgPerms` — a `Set<string>` of the user's permissions in the organization
 
 Key query methods:
 
-- `hasPermission(permission, projectId?, componentId?)` — returns `true` if the permission exists at any matching scope
+- `hasPermission(permission, projectId?, componentId?)` — returns `true` if the user holds the permission. The project and integration ids are accepted so call sites can state the scope they act in; they do not narrow the check.
 - `hasAllPermissions` / `hasAnyPermission` — convenience wrappers for bulk checks
-- `isOrgPermissionsLoaded` — lets consumers defer rendering until org-level permissions have been fetched
-
-Scoped `clear*` methods (`clearPermissions`, `clearProjectPermissions`, `clearComponentPermissions`) allow targeted invalidation when the user navigates away from a project or component without wiping unrelated permission state.
+- `isOrgPermissionsLoaded` — lets consumers defer rendering until permissions have been set
 
 #### Why Context
 
 > [!IMPORTANT]
-> Permission data is needed by many unrelated parts of the UI (nav items, action buttons, page guards) with no natural parent-child relationship between them. Context distributes this shared read-only state efficiently without requiring a global state library. All mutating callbacks are stabilised with `useCallback` and the value object with `useMemo`, so consumers only re-render when the underlying permission sets actually change.
+> Permission data is needed by many unrelated parts of the UI (nav items, action buttons, page guards) with no natural parent-child relationship between them. Context distributes this shared read-only state efficiently without requiring a global state library. Callbacks are stabilised with `useCallback` and the value object with `useMemo`, so consumers only re-render when the permission set actually changes.
 
 `useAccessControl()` throws if called outside the provider, enforcing correct usage at the call site rather than silently returning empty results.
 
@@ -63,14 +59,14 @@ State held:
 
 ### Purpose
 
-This context stores **temporary configuration state** during the prebuilt integration creation flow. The flow spans two routes — a setup page where the user fills in config values, and a deploy page that fires the actual API calls. Because the component does not exist in the database at the setup stage, configs cannot be persisted immediately; they must survive the route transition so the deploy page can submit them as part of a single creation request.
+This context stores **temporary configuration state** during the prebuilt integration creation flow. The flow spans two routes — a setup page where the user fills in config values, and a deploy page that fires the actual API calls. Because the integration does not exist in the database at the setup stage, configs cannot be persisted immediately; they must survive the route transition so the deploy page can submit them as part of a single creation request.
 
 State held:
 
 - `integration` — the selected `PrebuiltIntegration` object (display name, applications, component type, etc.)
 - `configValues` — the list of `SchemaConfigItem` values collected from the config form
 
-`clearAll()` is called once deployment succeeds, so the context is wiped before navigating to the new component's overview page.
+`clearAll()` is called once deployment succeeds, so the context is wiped before navigating to the new integration's overview page.
 
 #### Why Context
 
@@ -84,3 +80,32 @@ Other approaches are less suitable:
 - **Global/app-level state** — introduces coupling to an unrelated part of the app.
 
 Context provides the right balance: data is **transient, isolated, and cleaned up as soon as the flow completes**.
+
+---
+
+## 4. Unsaved Changes Context
+
+**File:** `UnsavedChangesContext.tsx`
+
+### Purpose
+
+This context asks the user to confirm before they leave a form they have partly filled in. While any registered form is dirty, it shows an in-app "Leave this page?" dialog for:
+
+- navigations through `useAppNavigate` (which waits on `guardNavigation`);
+- clicks on links to another page of the console (a capture-phase document listener; new-tab, modified and download clicks pass through);
+- browser back and forward (the popped entry is restored with `history.go`, then replayed on Leave);
+- in-page "back" actions wrapped with `useLeaveGuard()`.
+
+Reload and tab close can only show the browser's own `beforeunload` prompt.
+
+Usage:
+
+- `const allowLeave = useUnsavedChanges(isDirty)` — `isDirty` is true when any field differs from its initial value. Call `allowLeave()` right before navigating after a successful save or an explicit Cancel, so that navigation is not prompted.
+- `const guardNavigation = useLeaveGuard()` — `guardNavigation(proceed)` runs `proceed` at once when nothing is dirty, otherwise after the user chooses Leave.
+
+The provider is mounted inside the router in `main.tsx`. The click and history decisions are pure functions in `utils/unsavedChanges.ts`.
+
+#### Why Context
+
+> [!IMPORTANT]
+> The dirty forms (pages, editors inside a page) and the code that navigates away (sidebar, header switchers, links, the browser) have no common parent below the router. The console uses `<BrowserRouter>`, not a data router, so React Router's `useBlocker` is unavailable. A context lets each form register its dirty flag and lets every navigation path consult one guard and one dialog. Dirty flags live in a ref, so registering does not re-render the tree.

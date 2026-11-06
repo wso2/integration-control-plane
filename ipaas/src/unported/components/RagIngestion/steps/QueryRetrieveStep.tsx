@@ -16,13 +16,12 @@
  * under the License.
  */
 
-import { Box, FormControlLabel, ListingTable, Stack, Switch, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../../components/common/TextField';
+import { Box, FormControlLabel, ListingTable, Stack, Switch, Typography, TextField } from '@wso2/oxygen-ui';
 import { useEffect, useState, type JSX } from 'react';
 import { MAX_RETRIEVE_CHUNKS } from '../../../../constants/ragIngestion';
 import { REQUIRED_FIELD_SX } from '../../../../constants/styles';
 import SecretField from '../../../../components/common/SecretField';
-import { fieldStackSx, stepHeadingSx } from '../styles';
+import { fieldStackSx, stepHeadingSx } from '../../../../components/KnowledgeBase/styles';
 import type { RetrievalQuery, RetrievedChunk } from '../../../../types/ragIngestion';
 
 interface QueryRetrieveStepProps {
@@ -54,8 +53,9 @@ export default function QueryRetrieveStep({ value, onChange, chunks, hasQueried 
         Query &amp; Retrieve
       </Typography>
       <Stack sx={fieldStackSx}>
-        <TextField label="Query" required fullWidth size="small" multiline minRows={2} value={value.userQuery} onChange={(e) => onChange({ ...value, userQuery: e.target.value })} sx={REQUIRED_FIELD_SX} />
+        <TextField labelPlacement="top" label="Query" required fullWidth size="small" multiline minRows={2} value={value.userQuery} onChange={(e) => onChange({ ...value, userQuery: e.target.value })} sx={REQUIRED_FIELD_SX} />
         <TextField
+          labelPlacement="top"
           label="Max chunks"
           fullWidth
           size="small"
@@ -70,6 +70,7 @@ export default function QueryRetrieveStep({ value, onChange, chunks, hasQueried 
           helperText={`1–${MAX_RETRIEVE_CHUNKS}`}
         />
         <TextField
+          labelPlacement="top"
           label="Min similarity threshold"
           fullWidth
           size="small"
@@ -88,7 +89,7 @@ export default function QueryRetrieveStep({ value, onChange, chunks, hasQueried 
         {value.rerankingEnabled && (
           <>
             <SecretField label="Cohere API Key" required value={value.rerankerApiKey} onChange={(v) => onChange({ ...value, rerankerApiKey: v })} />
-            <TextField label="Reranker Model" fullWidth size="small" value={value.rerankerModel} onChange={(e) => onChange({ ...value, rerankerModel: e.target.value })} />
+            <TextField labelPlacement="top" label="Reranker Model" fullWidth size="small" value={value.rerankerModel} onChange={(e) => onChange({ ...value, rerankerModel: e.target.value })} />
           </>
         )}
       </Stack>

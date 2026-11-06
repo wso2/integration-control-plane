@@ -16,8 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Chip, ListingTable, MenuItem, Skeleton, Stack, ToggleButton, ToggleButtonGroup, Typography } from '@wso2/oxygen-ui';
-import TextField from '../../../components/common/TextField';
+import { Alert, Box, Chip, ListingTable, MenuItem, Skeleton, Stack, ToggleButton, ToggleButtonGroup, Typography, TextField } from '@wso2/oxygen-ui';
 import { PieChart } from '@wso2/oxygen-ui-charts-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { useApiInsights } from '../../hooks/useApiInsights';
@@ -58,8 +57,7 @@ function errorReasonRows(byCategory: ErrorCategoryRow[]): { label: string; count
 /**
  * Integration-level insights for an "Integration as API" component. Matches
  * the source design's api view: KPI row + Overview/Traffic/Latency/Errors
- * tabs. Every widget is backed by a real, apiId-scoped query (see
- * `fetchApiInsights` in `api/wip/insights.ts`) — these are the queries
+ * tabs. Every widget is backed by a real, apiId-scoped query — these are the queries
  * `choreo-apim-analytics-portal` uses (the actual "filter by integration"
  * Devant's own Insights page provides), ported onto the same
  * `analyticsqueryapi` endpoint the project view already uses.

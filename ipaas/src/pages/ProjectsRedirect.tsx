@@ -23,8 +23,10 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, Link, Typography } from '@wso2/oxygen-ui';
 import { X } from '@wso2/oxygen-ui-icons-react';
 
-import { useAuth } from '#auth';
+import { useAuth } from '../auth';
 import { loginUrl, orgHomeUrl, privacyPolicyUrl } from '../paths';
+import { trackEvent } from '../services/tracking/tracking';
+import { local } from '../utils/storage';
 
 export default function ProjectsRedirect(): JSX.Element {
   const { orgHandler } = useParams<{ orgHandler: string }>();
@@ -36,7 +38,7 @@ export default function ProjectsRedirect(): JSX.Element {
   const tosKey = `tos_accepted:${userId}:${orgHandler}`;
 
   useEffect(() => {
-    if (localStorage.getItem(tosKey) === 'true') {
+    if (local.get(tosKey) === 'true') {
       // Forward state (e.g. a "deleted successfully" flash message) through to the destination —
       // this is a transparent hop, so callers shouldn't need to know it exists.
       navigate(orgHomeUrl(orgHandler!), { replace: true, state: location.state });
@@ -46,7 +48,10 @@ export default function ProjectsRedirect(): JSX.Element {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAccept = () => {
-    localStorage.setItem(tosKey, 'true');
+    // Thunder hosts sign-up, so the console's first sight of a new user is this one-time
+    // Terms of Use acceptance. Identify so the event lands on the user's Moesif profile.
+    trackEvent('signup-success', undefined, true);
+    local.set(tosKey, 'true');
     setOpen(false);
     navigate(orgHomeUrl(orgHandler!), { replace: true, state: location.state });
   };

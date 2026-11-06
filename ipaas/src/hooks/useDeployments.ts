@@ -18,8 +18,9 @@
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Query } from '@tanstack/react-query';
-import { fetchApimSwagger } from '#api/apim';
-import { fetchComponentByHandler } from '#api/components';
+import { fetchApimSwagger } from '../api/apim';
+import { fetchComponentByHandler } from '../api/components';
+import { trackEvent } from '../services/tracking/tracking';
 import { identifyIntegration } from '../utils/identifyIntegration';
 import { TYPE_TO_KIND } from '../constants/insights';
 import {
@@ -35,7 +36,7 @@ import {
   stopDeployment,
   redeployDeployment,
   deployPrebuiltImage,
-} from '#api/deployments';
+} from '../api/deployments';
 import type { ComponentDeployment, BuildRun, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, RecentDeployment } from '../types/deployment';
 import type { DeployComponentInput } from '../types/build';
 import type { ComponentDetail } from '../types/component';
@@ -43,10 +44,17 @@ import type { IntegrationKind } from '../types/insights';
 
 const TERMINAL_CONCLUSIONS = new Set(['success', 'failure', 'cancelled', 'timed_out', 'neutral', 'skipped']);
 
-export function useComponentDeployment(orgHandler: string, orgUuid: string, componentId: string, versionId: string, environmentId: string, options?: { refetchInterval?: number | false | ((query: Query<ComponentDeployment | null>) => number | false) }) {
+export function useComponentDeployment(
+  orgHandler: string,
+  orgUuid: string,
+  componentId: string,
+  versionId: string | undefined,
+  environmentId: string,
+  options?: { refetchInterval?: number | false | ((query: Query<ComponentDeployment | null>) => number | false) },
+) {
   return useQuery<ComponentDeployment | null, Error, ComponentDeployment | null>({
     queryKey: ['componentDeployment', orgHandler, orgUuid, componentId, versionId, environmentId],
-    queryFn: () => fetchComponentDeployment(orgHandler, orgUuid, componentId, versionId, environmentId),
+    queryFn: () => fetchComponentDeployment(orgHandler, orgUuid, componentId, versionId!, environmentId),
     enabled: !!orgHandler && !!orgUuid && !!componentId && !!versionId && !!environmentId,
     retry: false,
     refetchInterval: options?.refetchInterval,
@@ -65,13 +73,20 @@ export function useComponentDeployments(orgHandler: string, orgUuid: string, com
   });
 }
 
-export function useEnvEndpoints(componentId: string, versionId: string, releaseId: string) {
+export function useEnvEndpoints(componentId: string, versionId: string | undefined, releaseId: string) {
   return useQuery({
     queryKey: ['envEndpoints', componentId, versionId, releaseId],
     queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
-    enabled: !!componentId && !!versionId && !!releaseId,
+    // The cloud endpoint request is release-scoped and does not use versionId. Newly created
+    // OpenChoreo components currently carry an empty version, so requiring it here prevents the
+    // request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
+    enabled: !!componentId && !!releaseId,
     staleTime: 30_000,
     retry: false,
+    refetchInterval: (query) => {
+      const endpoints = query.state.data;
+      return endpoints?.some((endpoint) => ['ENABLING', 'DISABLING'].includes(endpoint.visibilityStatus?.public.status ?? '')) ? 2_000 : false;
+    },
   });
 }
 
@@ -85,10 +100,10 @@ export function useApiDefinition(apimRevisionId: string | null | undefined) {
   });
 }
 
-export function useDeploymentStatus(componentId: string, versionId: string) {
+export function useDeploymentStatus(componentId: string, versionId: string | undefined) {
   return useQuery({
     queryKey: ['deploymentStatus', componentId, versionId],
-    queryFn: () => fetchDeploymentStatus(componentId, versionId),
+    queryFn: () => fetchDeploymentStatus(componentId, versionId!),
     enabled: !!componentId && !!versionId,
     retry: false,
     refetchInterval: (query) => {
@@ -162,6 +177,7 @@ export function useDeployDeploymentTrack() {
   return useMutation({
     mutationFn: (input: DeployDeploymentTrackInput) => deployDeploymentTrack(input),
     onSuccess: (_data, input) => {
+      trackEvent('component-deploy');
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId, input.id] });
       qc.invalidateQueries({ queryKey: ['executionConfigs', input.componentId] });
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
@@ -174,6 +190,7 @@ export function useTriggerBuild() {
   return useMutation({
     mutationFn: (input: DeployComponentInput) => triggerBuild(input),
     onSuccess: (_data, input) => {
+      trackEvent('component-build');
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId, input.versionId] });
     },
   });
@@ -184,6 +201,7 @@ export function usePromote() {
   return useMutation({
     mutationFn: (input: PromoteInput) => promote(input),
     onSuccess: (_data, input) => {
+      trackEvent('component-promote');
       qc.invalidateQueries({ queryKey: ['componentDeployment'] });
       qc.invalidateQueries({ queryKey: ['deploymentStatus', input.componentId] });
     },
@@ -205,7 +223,10 @@ export function useRedeployDeployment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { orgHandler: string; componentId: string; releaseId: string; type: string; releaseMgtReleaseId?: string; releaseMgtDeploymentId?: string }) => redeployDeployment(input),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['componentDeployment'] }),
+    onSuccess: () => {
+      trackEvent('component-deploy');
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+    },
   });
 }
 

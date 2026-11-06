@@ -17,7 +17,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ARTIFACT_QUERY_MAP, fetchArtifactTypes, fetchArtifacts, fetchArtifactSource, fetchLocalEntryValue, fetchArtifactParams, fetchArtifactWsdl, updateArtifactStatus, updateListenerState } from '#api/artifacts';
+import { ARTIFACT_QUERY_MAP, fetchArtifactTypes, fetchArtifacts, fetchArtifactSource, fetchLocalEntryValue, fetchArtifactParams, fetchArtifactWsdl, updateArtifactStatus, updateListenerState } from '../api/artifacts';
 import type { Artifact, ArtifactStatusInput, ListenerStateInput } from '../types/artifact';
 
 export { ARTIFACT_QUERY_MAP };

@@ -17,16 +17,21 @@
  */
 
 /**
- * API security & exposure domain. Cloud-only; `wip`/`icp` stub it. The spec calls
+ * API security & exposure domain. The spec calls
  * the credential a subscription token, but the BFF ships no `/subscriptions`
  * routes, so it is an endpoint api-key sent as `X-API-Key`.
  */
 
-/** Identifies one deployed endpoint — the path triple every security call takes. */
+/** Identifies one deployed endpoint's gateway API — the path triple every security call takes, and the deployment track it belongs to. */
 export interface EndpointRef {
   componentName: string;
   environmentName: string;
   endpointName: string;
+  /**
+   * Each deployment track has its own API, with its own URL, security and keys. Required, so a caller can't
+   * silently act on the default track's API; undefined while the page hasn't resolved its track.
+   */
+  deploymentTrackId: string | undefined;
 }
 
 /** One selectable endpoint in the security drawer's endpoint picker. */
@@ -34,6 +39,8 @@ export interface EndpointOption {
   /** Endpoint name — the BFF's `endpointName` path segment. */
   name: string;
   displayName: string;
+  networkVisibilities?: string[] | null;
+  visibilityStatus?: import('./component').EndpointVisibilityStatus | null;
 }
 
 /** A service endpoint exposed as a managed API on the API Platform gateway. */

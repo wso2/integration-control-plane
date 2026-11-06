@@ -20,7 +20,7 @@ import { Grid, PageContent, PageTitle } from '@wso2/oxygen-ui';
 import { useMemo, type JSX } from 'react';
 import { useAppNavigate } from '../../hooks/useAppNavigate';
 import { useProjectCompliance, usePolicyAdherence } from '../hooks/useGovernance';
-import { useProjectsByOrg } from '../../hooks/useProjects';
+import { useProjects } from '../../hooks/useProjects';
 import { projectComplianceUrl, orgGovernancePolicyEditorUrl, orgGovernanceRulesetUrl } from '../../paths';
 import type { OrgScope } from '../../nav';
 import type { ComplianceRow } from '../../types/compliance';
@@ -30,7 +30,7 @@ import ExpandableComplianceTable from '../components/Compliance/ExpandableCompli
 
 export default function OrgCompliance(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
-  const { data: projects } = useProjectsByOrg(scope.org);
+  const { data: projects } = useProjects();
   const compliance = useProjectCompliance();
   const adherence = usePolicyAdherence();
 

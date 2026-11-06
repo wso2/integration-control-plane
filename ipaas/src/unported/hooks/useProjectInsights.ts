@@ -18,7 +18,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
-import { fetchProjectInsights, fetchProjectLatencyTrend } from '#api/insights';
+import { fetchProjectInsights, fetchProjectLatencyTrend } from '../../api/insights';
 import { useInsightsQueryUrl } from '../../hooks/useInsights';
 import { emptyProjectInsightsRaw, toProjectInsightsData } from '../utils/projectInsights';
 import type { InsightsApiRef, InsightsAutomationRef, InsightsEnvironment, InsightsRange, ProjectInsightsRaw } from '../../types/insights';

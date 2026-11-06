@@ -1,10 +1,10 @@
-name: Unit Tests PR Check (WIP)
+name: Unit Tests PR Check
 
 # Runs the Vitest unit test suite on every PR that touches the ipaas frontend.
 # Fast (~2s), requires no secrets or external services — suitable as a required
-# status check. E2E smoke tests run nightly (see e2e-nightly.yml).
+# status check.
 #
-# To make it required: add "Unit Tests PR Check (WIP) / Vitest unit tests" to
+# To make it required: add "Unit Tests PR Check / Vitest unit tests" to
 # your branch protection rules under Settings → Branches → Required status checks.
 
 on:
