@@ -48,7 +48,7 @@ vi.mock('./useDeployments', () => ({ useDeployPrebuiltImage: () => ({ mutateAsyn
 const configValues: SchemaConfigItem[] = [{ key: 'url', values: [{ environmentUuid: '', value: 'https://x' }] }];
 const integration = { displayName: 'Orders', imageUrl: 'registry/orders:1', componentType: 'service', buildPack: 'ballerina' } as PrebuiltIntegration;
 
-let run: () => Promise<void> = async () => {};
+let run: () => Promise<unknown> = async () => {};
 function Deploy() {
   const { deploy, error } = useDeployPrebuiltIntegration();
   run = () => deploy({ integration, orgHandler: 'acme', projectId: 'default', configValues });
