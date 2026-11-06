@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, Divider, FormControlLabel, Grid, Radio, RadioGroup, Slider, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, CircularProgress, Divider, FormControlLabel, Grid, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
 import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useRef, useState, type JSX } from 'react';
 import ResourceRangeSlider from '../common/ResourceRangeSlider';
 import { useUpdateContainer } from '../../hooks/useDevopsConfigs';
-import { CPU_MAX, CPU_MIN, CPU_STEP, MEMORY_MAX, MEMORY_MIN, MEMORY_STEP, MIN_GAP_CPU, MIN_GAP_MEMORY, containerToForm, formToWriteData } from '../../utils/containers';
+import { CPU_MAX, CPU_MIN, CPU_STEP, MEMORY_MAX, MEMORY_MIN, MEMORY_STEP, MIN_GAP_CPU, MIN_GAP_MEMORY, containerToForm, formatCpu, formToWriteData } from '../../utils/containers';
+import type { PlanAccess } from '../../utils/billing';
 import { IMAGE_PULL_POLICY, type ImagePullPolicy, type ReleaseContainer } from '../../types/devopsConfigs';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
@@ -32,17 +33,17 @@ interface ContainerEditFormProps {
   releaseId: string;
   /** The deployment track the release belongs to. */
   deploymentTrackId: string;
-  /** Paid subscription or Private Data Plane — resource limits are configurable. */
-  isPaidOrPdpUser: boolean;
+  /** Resource requests and limits are configurable only on a paid plan. */
+  plan: PlanAccess;
   onClose: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
 }
 
-const cpuFmt = (v: number): string => String(Math.round(v * 100) / 100);
 const memFmt = (v: number): string => String(Math.round(v));
 
-export default function ContainerEditForm({ container, projectId, componentId, releaseId, deploymentTrackId, isPaidOrPdpUser, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
+export default function ContainerEditForm({ container, projectId, componentId, releaseId, deploymentTrackId, plan, onClose, onSaved, onError }: ContainerEditFormProps): JSX.Element {
+  const paid = plan.state === 'paid';
   const [form, setForm] = useState(() => containerToForm(container));
   const initialForm = useRef(form).current;
   const isDirty = JSON.stringify(form) !== JSON.stringify(initialForm);
@@ -54,7 +55,7 @@ export default function ContainerEditForm({ container, projectId, componentId, r
 
   const onSubmit = (): void => {
     update.mutate(
-      { containerId: container.ID, data: formToWriteData(form, container.ports ?? []) },
+      { containerId: container.ID, data: formToWriteData(form, initialForm) },
       {
         onSuccess: () => onSaved('Container updated.'),
         onError: (e) => onError(e instanceof Error ? e.message : 'Failed to update the container.'),
@@ -70,52 +71,56 @@ export default function ContainerEditForm({ container, projectId, componentId, r
         </Button>
       </Box>
 
-      {!isPaidOrPdpUser && (
+      {plan.state === 'free' && (
         <Alert severity="info" sx={{ mb: 2 }}>
-          Resource requests and limits can only be configured with an upgraded subscription or private data plane.
+          Resource requests and limits can only be configured on a paid plan.
+        </Alert>
+      )}
+      {plan.state === 'unavailable' && (
+        <Alert
+          severity="warning"
+          sx={{ mb: 2 }}
+          action={
+            <Button color="inherit" size="small" onClick={plan.retry}>
+              Retry
+            </Button>
+          }>
+          Couldn&apos;t check your plan. Resource sizing is unavailable until it loads.
         </Alert>
       )}
 
       <Grid container spacing={4} sx={{ mb: 1 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-          {form.limitsEnabled ? (
-            <ResourceRangeSlider
-              label="CPU request / limit"
-              unit="CPU"
-              min={CPU_MIN}
-              max={CPU_MAX}
-              step={CPU_STEP}
-              minGap={MIN_GAP_CPU}
-              request={form.cpuRequest}
-              limit={form.cpuLimit}
-              onRequestChange={(v) => set('cpuRequest', v)}
-              onLimitChange={(v) => set('cpuLimit', v)}
-              disabled={!isPaidOrPdpUser}
-              format={cpuFmt}
-            />
-          ) : (
-            <SingleResourceSlider label="CPU request" unit="CPU" min={CPU_MIN} max={CPU_MAX} step={CPU_STEP} value={form.cpuRequest} onChange={(v) => set('cpuRequest', v)} disabled={!isPaidOrPdpUser} format={cpuFmt} />
-          )}
+          <ResourceRangeSlider
+            label="CPU request / limit"
+            unit="CPU"
+            min={CPU_MIN}
+            max={CPU_MAX}
+            step={CPU_STEP}
+            minGap={MIN_GAP_CPU}
+            request={form.cpuRequest}
+            limit={form.cpuLimit}
+            onRequestChange={(v) => set('cpuRequest', v)}
+            onLimitChange={(v) => set('cpuLimit', v)}
+            disabled={!paid}
+            format={formatCpu}
+          />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-          {form.limitsEnabled ? (
-            <ResourceRangeSlider
-              label="Memory request / limit"
-              unit="Mi"
-              min={MEMORY_MIN}
-              max={MEMORY_MAX}
-              step={MEMORY_STEP}
-              minGap={MIN_GAP_MEMORY}
-              request={form.memRequest}
-              limit={form.memLimit}
-              onRequestChange={(v) => set('memRequest', v)}
-              onLimitChange={(v) => set('memLimit', v)}
-              disabled={!isPaidOrPdpUser}
-              format={memFmt}
-            />
-          ) : (
-            <SingleResourceSlider label="Memory request" unit="Mi" min={MEMORY_MIN} max={MEMORY_MAX} step={MEMORY_STEP} value={form.memRequest} onChange={(v) => set('memRequest', v)} disabled={!isPaidOrPdpUser} format={memFmt} />
-          )}
+          <ResourceRangeSlider
+            label="Memory request / limit"
+            unit="Mi"
+            min={MEMORY_MIN}
+            max={MEMORY_MAX}
+            step={MEMORY_STEP}
+            minGap={MIN_GAP_MEMORY}
+            request={form.memRequest}
+            limit={form.memLimit}
+            onRequestChange={(v) => set('memRequest', v)}
+            onLimitChange={(v) => set('memLimit', v)}
+            disabled={!paid}
+            format={memFmt}
+          />
         </Grid>
       </Grid>
 
@@ -143,37 +148,6 @@ export default function ContainerEditForm({ container, projectId, componentId, r
           Save changes
         </Button>
       </Stack>
-    </Box>
-  );
-}
-
-interface SingleResourceSliderProps {
-  label: string;
-  unit: string;
-  min: number;
-  max: number;
-  step: number;
-  value: number;
-  onChange: (value: number) => void;
-  disabled?: boolean;
-  format: (value: number) => string;
-}
-
-/** Request-only slider shown when resource limits are disabled. */
-function SingleResourceSlider({ label, unit, min, max, step, value, onChange, disabled, format }: SingleResourceSliderProps): JSX.Element {
-  return (
-    <Box>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <Typography variant="subtitle2" fontWeight={600}>
-          {label}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {format(value)} {unit}
-        </Typography>
-      </Stack>
-      <Box sx={{ px: 1 }}>
-        <Slider value={value} min={min} max={max} step={step} disabled={disabled} onChange={(_e, v) => onChange(v as number)} valueLabelDisplay="auto" valueLabelFormat={(v) => format(v as number)} aria-label={label} />
-      </Box>
     </Box>
   );
 }

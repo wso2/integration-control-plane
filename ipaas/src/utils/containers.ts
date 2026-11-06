@@ -16,30 +16,20 @@
  * under the License.
  */
 
-import type { ContainerWriteData, ReleaseContainer, ReleaseDetails } from '../types/devopsConfigs';
+import type { ContainerWriteData, ImagePullPolicy, ReleaseContainer } from '../types/devopsConfigs';
 
-// Resource bounds mirror Devant's containerUtils. CPU is in whole CPUs at the
-// UI layer (0.01–4) and converted to milli-CPU (×1000) on the wire; memory is Mi.
-export const CPU_MIN = 0.01;
-export const CPU_MAX = 4;
-export const CPU_STEP = 0.01;
+// Resource bounds. CPU is in milli-CPU, the unit on the wire, and shown in whole
+// CPUs only through formatCpu; memory is Mi. ipaas-service rejects sizes outside
+// the same bounds, so change both together.
+export const CPU_MIN = 10;
+export const CPU_MAX = 4000;
+export const CPU_STEP = 10;
 export const MEMORY_MIN = 20;
 export const MEMORY_MAX = 8192;
 export const MEMORY_STEP = 10;
 /** Minimum gap enforced between a resource's request and limit. */
-export const MIN_GAP_CPU = 0.01;
+export const MIN_GAP_CPU = 10;
 export const MIN_GAP_MEMORY = 10;
-
-/** UTF-8-safe base64 encode (matches Devant's `encodeToBase64`). */
-export function encodeBase64(str: string): string {
-  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_m, p1) => String.fromCharCode(parseInt(p1, 16))));
-}
-
-/** Base64-encode every item of a command/args array (matches Devant's `encodeArrayItems`). */
-export function encodeArrayItems(arr: string[]): string[] {
-  if (!Array.isArray(arr)) return [];
-  return arr.map((item) => encodeBase64(item));
-}
 
 /** A container built from a user-supplied image (no platform build) has `custom_image`. */
 export function hasCustomImage(c: Pick<ReleaseContainer, 'custom_image'>): boolean {
@@ -55,65 +45,48 @@ export function isMainContainer(c: Pick<ReleaseContainer, 'type'>): boolean {
   return c.type === 'MAIN';
 }
 
-/** Container running on a Private Data Plane — resource limits are always configurable there. */
-export function isPrivateDpRelease(release: ReleaseDetails | undefined): boolean {
-  const choreoEnv = release?.metadata?.choreo_env ?? release?.environment?.choreo_env;
-  return choreoEnv === 'private_dp';
+/** milli-CPU → whole CPUs for display, e.g. 125 → "0.125". */
+export function formatCpu(milli: number): string {
+  return String(milli / 1000);
 }
 
-/** milli-CPU (wire) → CPU (display). */
-export function milliToCpu(milli: number): number {
-  return milli / 1000;
-}
-
-/** CPU (display) → milli-CPU (wire), rounded to the CPU step. */
-export function cpuToMilli(cpu: number): number {
-  return (Math.round((cpu + Number.EPSILON) * 100) / 100) * 1000;
-}
-
-/** The editable form state for a container. */
+/** The editable form state for a container, in the wire's units. */
 export interface ContainerFormState {
-  imagePullPolicy: ContainerWriteData['image_pull_policy'];
-  limitsEnabled: boolean;
-  /** CPU request/limit in whole CPUs. */
+  imagePullPolicy: ImagePullPolicy;
+  /** CPU request/limit in milli-CPU. */
   cpuRequest: number;
   cpuLimit: number;
   /** Memory request/limit in Mi. */
   memRequest: number;
   memLimit: number;
-  command: string[];
-  args: string[];
 }
 
-/** Seed the edit form from a container. When limits are disabled the API stores
- *  `0` for the limits, so we synthesise a sensible limit one step above the request. */
+const clamp = (value: number, min: number, max: number): number => Math.min(Math.max(value, min), max);
+
+/**
+ * Seed the edit form from a container. Sizes outside the sliders' range (set before the range was
+ * enforced, or missing and read as 0) are brought into it, request no greater than limit. Every size
+ * goes out once any one is edited, so an out-of-range one would otherwise fail the save.
+ */
 export function containerToForm(c: ReleaseContainer): ContainerFormState {
-  const limitsEnabled = !(c.limit_disabled ?? false);
-  const cpuRequest = milliToCpu(c.cpu ?? 0);
-  const memRequest = c.memory ?? 0;
+  const cpuLimit = clamp(c.cpu_limit ?? 0, CPU_MIN, CPU_MAX);
+  const memLimit = clamp(c.memory_limit ?? 0, MEMORY_MIN, MEMORY_MAX);
   return {
     imagePullPolicy: c.image_pull_policy ?? 'IfNotPresent',
-    limitsEnabled,
-    cpuRequest,
-    cpuLimit: c.limit_disabled ? cpuRequest + CPU_STEP : milliToCpu(c.cpu_limit ?? 0),
-    memRequest,
-    memLimit: c.limit_disabled ? memRequest + MEMORY_STEP : (c.memory_limit ?? 0),
-    command: [...(c.command ?? [])],
-    args: [...(c.args ?? [])],
+    cpuRequest: clamp(c.cpu ?? 0, CPU_MIN, cpuLimit),
+    cpuLimit,
+    memRequest: clamp(c.memory ?? 0, MEMORY_MIN, memLimit),
+    memLimit,
   };
 }
 
-/** Build the PUT body from form state + the container's (unedited) ports. */
-export function formToWriteData(form: ContainerFormState, ports: ContainerWriteData['ports']): ContainerWriteData {
-  return {
-    image_pull_policy: form.imagePullPolicy,
-    args: encodeArrayItems(form.args),
-    command: encodeArrayItems(form.command),
-    ports,
-    cpu: cpuToMilli(form.cpuRequest),
-    cpu_limit: form.limitsEnabled ? cpuToMilli(form.cpuLimit) : 0,
-    memory: form.memRequest,
-    memory_limit: form.limitsEnabled ? form.memLimit : 0,
-    limit_disabled: !form.limitsEnabled,
-  };
+/**
+ * Build the PUT body from what changed since the form was seeded. Sending the sizes needs a paid
+ * plan, so a pull-policy-only change leaves them out, and ipaas-service keeps the current ones.
+ */
+export function formToWriteData(form: ContainerFormState, initial: ContainerFormState): ContainerWriteData {
+  const policy = form.imagePullPolicy !== initial.imagePullPolicy ? { image_pull_policy: form.imagePullPolicy } : {};
+  const sizesChanged = form.cpuRequest !== initial.cpuRequest || form.cpuLimit !== initial.cpuLimit || form.memRequest !== initial.memRequest || form.memLimit !== initial.memLimit;
+  if (!sizesChanged) return policy;
+  return { ...policy, cpu: form.cpuRequest, cpu_limit: form.cpuLimit, memory: form.memRequest, memory_limit: form.memLimit };
 }
