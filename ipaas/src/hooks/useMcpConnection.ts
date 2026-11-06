@@ -17,11 +17,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import type { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import type { ServerCapabilities } from '@modelcontextprotocol/sdk/types.js';
 import { KEY_ACTIVATION_ATTEMPTS, KEY_ACTIVATION_DELAY_MS } from '../constants/mcp';
-import { classifyMcpError, formatMcpError, formatToolResult, isMcpBlockedError, isMcpUnauthorizedError } from '../utils/mcp';
+import { classifyMcpError, createMcpClient, formatMcpError, formatToolResult, isMcpBlockedError, isMcpUnauthorizedError } from '../utils/mcp';
 import type { JsonValue, McpConnectionStatus, McpErrorKind, McpHistoryEvent, McpHistoryEventType, McpPingResult, McpTool, McpToolResult } from '../types/mcp';
 
 /** Per-request timeout, matching the playground library. */
@@ -102,7 +102,7 @@ export function useMcpConnection({ url, token, headerName }: UseMcpConnectionPar
         const endpoint = new URL(url);
         if (!endpoint.searchParams.has('transportType')) endpoint.searchParams.set('transportType', 'streamable-http');
         const transport = new StreamableHTTPClientTransport(endpoint, { requestInit: { headers: { [headerName]: token } } });
-        client = new Client({ name: 'ipaas-console-mcp-playground', version: '1.0.0' }, { capabilities: {} });
+        client = createMcpClient('ipaas-console-mcp-playground');
         await client.connect(transport);
         if (isStale()) {
           await client.close().catch(() => undefined);

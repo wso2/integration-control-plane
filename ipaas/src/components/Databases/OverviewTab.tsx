@@ -20,6 +20,8 @@ import { Alert, Box, Button, Chip, CircularProgress, IconButton, Stack, Tooltip,
 import { Archive, Cpu, Download, Eye, EyeOff, HardDrive, MemoryStick, Power, RefreshCw, Server } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX, type ReactNode } from 'react';
 import { useRevealDatabaseCredentials } from '../../hooks/useDatabases';
+import { Scopes } from '../../constants/permissions';
+import { useCan } from '../../hooks/useCan';
 import { DATABASE_STATUS_COLORS, DATABASE_STATUS_LABELS, DATABASE_UNAVAILABLE } from '../../constants/databases';
 import { caCertificateFileName, cpuLabel, memoryLabel, nodeDescription, planLabel } from '../../utils/databases';
 import CopyField from './CopyField';
@@ -68,6 +70,7 @@ export default function OverviewTab({ service, onRefresh, isRefreshing }: Overvi
   // that came with it is not kept either.
   const caFetch = useRevealDatabaseCredentials(service.id);
   const busy = reveal.isPending || caFetch.isPending;
+  const canReveal = useCan()(Scopes.CONFIG_MANAGE);
   const [showPassword, setShowPassword] = useState(false);
   const [caError, setCaError] = useState(false);
   const credentials = reveal.data;
@@ -166,31 +169,35 @@ export default function OverviewTab({ service, onRefresh, isRefreshing }: Overvi
             </DetailRow>
           </>
         ) : (
-          <DetailRow label="Credentials:" labelWidth={LABEL_WIDTH}>
+          canReveal && (
+            <DetailRow label="Credentials:" labelWidth={LABEL_WIDTH}>
+              <Stack gap={0.5} alignItems="flex-start">
+                <Button variant="outlined" size="small" startIcon={reveal.isPending ? <CircularProgress size={14} color="inherit" /> : <Eye size={16} />} disabled={busy || service.status !== 'ACTIVE'} onClick={() => reveal.mutate()}>
+                  View Credentials
+                </Button>
+                {reveal.isError && (
+                  <Typography variant="caption" color="error">
+                    {reveal.error.message}
+                  </Typography>
+                )}
+              </Stack>
+            </DetailRow>
+          )
+        )}
+        {canReveal && (
+          <DetailRow label="CA Certificate:" labelWidth={LABEL_WIDTH}>
             <Stack gap={0.5} alignItems="flex-start">
-              <Button variant="outlined" size="small" startIcon={reveal.isPending ? <CircularProgress size={14} color="inherit" /> : <Eye size={16} />} disabled={busy || service.status !== 'ACTIVE'} onClick={() => reveal.mutate()}>
-                View Credentials
+              <Button variant="outlined" size="small" startIcon={caFetch.isPending ? <CircularProgress size={14} color="inherit" /> : <Download size={16} />} disabled={busy || service.status !== 'ACTIVE'} onClick={downloadCa}>
+                Download CA Certificate
               </Button>
-              {reveal.isError && (
+              {caError && (
                 <Typography variant="caption" color="error">
-                  {reveal.error.message}
+                  Couldn&apos;t download the certificate. Try again.
                 </Typography>
               )}
             </Stack>
           </DetailRow>
         )}
-        <DetailRow label="CA Certificate:" labelWidth={LABEL_WIDTH}>
-          <Stack gap={0.5} alignItems="flex-start">
-            <Button variant="outlined" size="small" startIcon={caFetch.isPending ? <CircularProgress size={14} color="inherit" /> : <Download size={16} />} disabled={busy || service.status !== 'ACTIVE'} onClick={downloadCa}>
-              Download CA Certificate
-            </Button>
-            {caError && (
-              <Typography variant="caption" color="error">
-                Couldn&apos;t download the certificate. Try again.
-              </Typography>
-            )}
-          </Stack>
-        </DetailRow>
       </Box>
 
       <Typography variant="subtitle1" sx={{ fontWeight: 600, mt: 4, mb: 1.5 }}>

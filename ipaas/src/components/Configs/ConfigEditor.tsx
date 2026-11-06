@@ -21,7 +21,7 @@ import { ArrowLeft, Eye, EyeOff, Trash2, Upload } from '@wso2/oxygen-ui-icons-re
 import BusyFields from '../common/BusyFields';
 import { useEffect, useId, useRef, useState, type JSX, type KeyboardEvent } from 'react';
 import { useConfigMapDetails, useSaveConfig } from '../../hooks/useDevopsConfigs';
-import { parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
+import { isBallerinaConfigKey, keyInOtherGroupError, parseDotEnv, validateConfigKey, validateDisplayName, validateMountPath, validateNewEnvGroupName } from '../../utils/devopsConfigs';
 import type { ConfigKind, ConfigRow } from '../../types/devopsConfigs';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 import * as styles from './ConfigEditor.styles';
@@ -41,6 +41,8 @@ interface ConfigEditorProps {
   ctx: EditorContext;
   /** When set, edit an existing config/secret instead of creating one. */
   existing?: ConfigRow;
+  /** Keys set by the component's other env-var groups, each mapped to its group's name. */
+  otherGroupKeys?: ReadonlyMap<string, string>;
   onBack: () => void;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
@@ -79,8 +81,10 @@ function TypeCard({ title, description, selected, disabled, onSelect }: { title:
   );
 }
 
+const NO_KEYS: ReadonlyMap<string, string> = new Map();
+
 /** The "Create a config or secret" form — env-var set or file mount, optionally a secret. */
-export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }: ConfigEditorProps): JSX.Element {
+export default function ConfigEditor({ ctx, existing, otherGroupKeys = NO_KEYS, onBack, onSaved, onError }: ConfigEditorProps): JSX.Element {
   const isEdit = !!existing;
   const save = useSaveConfig(ctx.projectId, ctx.deploymentTrackId);
   const configId = existing ? (existing.mount.configmap_id ?? existing.mount.secret_id ?? '') : '';
@@ -96,6 +100,8 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
   const [draftKey, setDraftKey] = useState('');
   const [draftValue, setDraftValue] = useState('');
   const [draftError, setDraftError] = useState('');
+  // What the last .env import left out, and why. Not an error: the rest was imported.
+  const [importNotice, setImportNotice] = useState('');
   const [revealedKeys, setRevealedKeys] = useState<ReadonlySet<string>>(new Set());
   const draftMessageId = useId();
   const [mountPath, setMountPath] = useState(existing?.mount.mount_path ?? '');
@@ -113,40 +119,50 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
 
   // An edit keeps the group's stored name, so only a new env-var group is held to the reserved prefix.
   const nameErr = !isEdit && kind === 'envVars' ? validateNewEnvGroupName(name) : validateDisplayName(name);
-  const draftKeyErr = draftKey ? validateConfigKey(draftKey) : '';
+  const draftKeyErr = draftKey ? validateConfigKey(draftKey) || (rows.some((r) => r.key === draftKey.trim()) ? 'A variable with this key already exists.' : '') || keyInOtherGroupError(draftKey.trim(), otherGroupKeys) : '';
   const pathErr = validateMountPath(mountPath);
+  // A key/value typed but not yet added is saved with the rest, as if Add was clicked,
+  // instead of being dropped silently.
+  const pendingRow = kind === 'envVars' && draftKey.trim() ? { key: draftKey.trim(), value: draftValue } : null;
+  const effectiveRows: typeof rows = pendingRow ? [...rows, pendingRow] : rows;
   // A new secret needs a value; a stored one left blank keeps its current value.
-  const hasEmptySecretValue = isSecret && kind === 'envVars' && rows.some((r) => !r.stored && r.value === '');
-  const canSave = !save.isPending && !nameErr && !hasEmptySecretValue && (kind === 'envVars' ? rows.length > 0 : !pathErr && fileContent.trim().length > 0);
+  const hasEmptySecretValue = isSecret && kind === 'envVars' && effectiveRows.some((r) => !r.stored && r.value === '');
 
   // Baselines follow the prefill effect above, so loaded values do not read as edits.
   const initialRows = existing ? (details?.data && existing.kind !== 'fileMount' ? Object.entries(details.data).map(([key, value]) => ({ key, value })) : existing.keys.map((key) => ({ key, value: '' }))) : [];
   const initialFileContent = existing?.kind === 'fileMount' ? (details?.data?.data ?? '') : '';
   const rowsChanged = rows.length !== initialRows.length || rows.some((r, i) => r.key !== initialRows[i].key || r.value !== initialRows[i].value);
-  const isDirty =
-    kind !== (existing?.kind ?? 'envVars') ||
-    isSecret !== (existing?.isSecret ?? false) ||
-    name !== (existing?.name ?? '') ||
-    mountPath !== (existing?.mount.mount_path ?? '') ||
-    fileContent !== initialFileContent ||
-    draftKey !== '' ||
-    draftValue !== '' ||
-    rowsChanged;
+  // What Update would save differs from what is stored.
+  const changed = kind !== (existing?.kind ?? 'envVars') || isSecret !== (existing?.isSecret ?? false) || name !== (existing?.name ?? '') || mountPath !== (existing?.mount.mount_path ?? '') || fileContent !== initialFileContent || rowsChanged || !!pendingRow;
+  // Anything typed counts for the leave guard, even a value with no key (which is not saved).
+  const isDirty = changed || draftKey !== '' || draftValue !== '';
   useUnsavedChanges(isDirty);
   const guardNavigation = useLeaveGuard();
 
+  // An unchanged edit is not saved: with stored secrets kept, it would only restart the workload.
+  // A pending key that can't be added can't be saved either; its field shows why.
+  const canSave = !save.isPending && (!isEdit || changed) && !nameErr && !(pendingRow && draftKeyErr) && !hasEmptySecretValue && (kind === 'envVars' ? effectiveRows.length > 0 : !pathErr && fileContent.trim().length > 0);
+
+  // Why Save is disabled, for causes no field already explains (a filled-in field shows its own error).
+  const blockedReason = (() => {
+    if (canSave || save.isPending) return '';
+    if (!name.trim()) return 'Enter a display name.';
+    if (hasEmptySecretValue) return 'Enter a value for each new secret.';
+    if (kind === 'envVars' && effectiveRows.length === 0) return 'Add at least one variable.';
+    if (kind === 'fileMount' && !mountPath.trim()) return 'Enter the mount path.';
+    if (kind === 'fileMount' && !fileContent.trim()) return 'Enter the file content.';
+    if (isEdit && !changed && draftValue && !draftKey.trim()) return 'Enter a key for the new value.';
+    if (isEdit && !changed) return 'No changes to save.';
+    return '';
+  })();
+
   const addRow = () => {
-    const keyErr = validateConfigKey(draftKey);
-    if (keyErr) {
-      setDraftError(keyErr);
-      return;
-    }
-    if (rows.some((r) => r.key === draftKey.trim())) {
-      setDraftError('A variable with this key already exists.');
-      return;
-    }
+    // draftKeyErr is '' for an empty key; validating it says the key is required.
+    const keyErr = draftKeyErr || validateConfigKey(draftKey);
+    if (keyErr) return setDraftError(keyErr);
     setRows((prev) => [...prev, { key: draftKey.trim(), value: draftValue }]);
     setDraftKey('');
+    setImportNotice('');
     setDraftValue('');
     setDraftError('');
   };
@@ -169,10 +185,20 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
 
   const importEnvFile = (file: File) => {
     void file.text().then((text) => {
-      const parsed = parseDotEnv(text).filter((p) => !validateConfigKey(p.key));
+      const all = parseDotEnv(text);
+      const parsed = all.filter((p) => !validateConfigKey(p.key));
+      // Keys the save would reject are left out, and said so.
+      const reserved = all.filter((p) => isBallerinaConfigKey(p.key)).map((p) => p.key);
+      const invalid = all.filter((p) => validateConfigKey(p.key) && !isBallerinaConfigKey(p.key)).map((p) => p.key);
+      const taken = parsed.filter((p) => otherGroupKeys.has(p.key)).map((p) => p.key);
+      const existingKeys = new Set(rows.map((r) => r.key));
+      const present = parsed.filter((p) => existingKeys.has(p.key) && !otherGroupKeys.has(p.key)).map((p) => p.key);
+      const reason = (keys: string[], why: string) => (keys.length ? `${why}: ${keys.join(', ')}` : '');
+      const skipped = [reason(invalid, 'invalid name'), reason(reserved, 'reserved for Ballerina configuration'), reason(taken, 'already set by another config'), reason(present, 'already in this config')].filter(Boolean);
+      setImportNotice(skipped.length ? `Not imported, ${skipped.join('; ')}.` : '');
       setRows((prev) => {
-        const existingKeys = new Set(prev.map((r) => r.key));
-        return [...prev, ...parsed.filter((p) => !existingKeys.has(p.key))];
+        const prevKeys = new Set(prev.map((r) => r.key));
+        return [...prev, ...parsed.filter((p) => !prevKeys.has(p.key) && !otherGroupKeys.has(p.key))];
       });
     });
   };
@@ -188,8 +214,8 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
     setError('');
     if (!canSave) return;
     // Stored secrets left blank are kept as they are, not re-sent.
-    const kept = rows.filter((r) => r.stored && r.value === '');
-    const sent = rows.filter((r) => !(r.stored && r.value === ''));
+    const kept = effectiveRows.filter((r) => r.stored && r.value === '');
+    const sent = effectiveRows.filter((r) => !(r.stored && r.value === ''));
     const data = kind === 'envVars' ? Object.fromEntries(sent.map((r) => [r.key, r.value])) : { data: fileContent };
     save.mutate(
       {
@@ -211,7 +237,7 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
 
   return (
     <Box sx={{ maxWidth: 720 }}>
-      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={() => guardNavigation(onBack)} sx={{ mb: 2 }}>
+      <Button size="small" startIcon={<ArrowLeft size={14} />} onClick={() => guardNavigation(onBack)} disabled={save.isPending} sx={{ mb: 2 }}>
         Back to configs
       </Button>
       <Typography variant="h5" sx={{ fontWeight: 600, mb: 2 }}>
@@ -230,7 +256,8 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
         </Stack>
 
         <FormControlLabel control={<Checkbox size="small" checked={isSecret} disabled={isEdit} onChange={(e) => setIsSecret(e.target.checked)} />} label="Mark as a secret" sx={{ mb: 1 }} />
-        <TextField labelPlacement="top" label="Display name" value={name} onChange={(e) => setName(e.target.value)} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
+        {/* An env-var group's name is its ID: the BFF keeps the stored name, so a rename would revert. */}
+        <TextField labelPlacement="top" label="Display name" value={name} onChange={(e) => setName(e.target.value)} disabled={isEdit && kind === 'envVars'} fullWidth required error={!!name && !!nameErr} helperText={(!!name && nameErr) || ' '} />
 
         {kind === 'envVars' ? (
           <Box>
@@ -328,6 +355,8 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
                   onChange={(e) => {
                     setDraftKey(e.target.value);
                     setDraftError('');
+                    // The notice is about the last import; typing a new variable moves on from it.
+                    setImportNotice('');
                   }}
                   onKeyDown={addOnEnter}
                   error={!!draftMessage}
@@ -340,7 +369,10 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
                   placeholder="value"
                   type={isSecret ? 'password' : 'text'}
                   value={draftValue}
-                  onChange={(e) => setDraftValue(e.target.value)}
+                  onChange={(e) => {
+                    setDraftValue(e.target.value);
+                    setImportNotice('');
+                  }}
                   onKeyDown={addOnEnter}
                   fullWidth
                   sx={styles.envDraftInput}
@@ -354,9 +386,13 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
                 <FormHelperText id={draftMessageId} error sx={styles.envHelper}>
                   {draftMessage}
                 </FormHelperText>
+              ) : importNotice ? (
+                <FormHelperText id={draftMessageId} sx={styles.envHelper}>
+                  {importNotice}
+                </FormHelperText>
               ) : (
                 <FormHelperText id={draftMessageId} sx={styles.envHelper}>
-                  Press Enter or Add to save. Keys start with a letter or underscore and use letters, digits and underscores.
+                  Press Enter or Add to add it; a variable typed here is also saved on Update. Keys start with a letter or underscore and use letters, digits and underscores.
                 </FormHelperText>
               )}
             </Box>
@@ -404,11 +440,16 @@ export default function ConfigEditor({ ctx, existing, onBack, onSaved, onError }
         )}
       </BusyFields>
 
-      <Box sx={{ mt: 3 }}>
+      <Stack direction="row" alignItems="center" gap={1.5} sx={{ mt: 3 }}>
         <Button variant="contained" onClick={handleSave} disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
           {save.isPending ? 'Saving…' : isEdit ? 'Update' : 'Create'}
         </Button>
-      </Box>
+        {blockedReason && (
+          <Typography variant="body2" color="text.secondary">
+            {blockedReason}
+          </Typography>
+        )}
+      </Stack>
     </Box>
   );
 }

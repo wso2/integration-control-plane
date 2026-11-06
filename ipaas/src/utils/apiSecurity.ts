@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { httpStatusOf } from './apiErrors';
+import { errorField, httpCodeOf, httpStatusOf } from './apiErrors';
 
 /** Helpers for the cloud API security & consumption surface. */
 
@@ -49,6 +49,9 @@ export function userFacingError(message: string, cause?: unknown): Error {
 export function friendlyApiError(error: unknown, fallback: string): string {
   if (error instanceof Error && error.name === USER_FACING_ERROR) return error.message;
 
+  const coded = codedApiError(error);
+  if (coded) return coded;
+
   const raw = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
   const status = httpStatusOf(error);
 
@@ -58,7 +61,7 @@ export function friendlyApiError(error: unknown, fallback: string): string {
     case 401:
       return 'Your session has expired. Sign in again and retry.';
     case 403:
-      return 'You do not have permission to change this API’s security configuration.';
+      return 'You do not have permission to make this change.';
     case 404:
       return `${fallback} This endpoint is not exposed as an API on the gateway yet.`;
     case 409:
@@ -82,6 +85,8 @@ export function friendlyApiError(error: unknown, fallback: string): string {
  */
 export function endpointLoadNotice(error: unknown, copy: { notExposed: string; unavailable: string; readFailed: string }): { text: string; severity: 'info' | 'warning' } | null {
   if (!error) return null;
+  const coded = codedApiError(error);
+  if (coded) return { text: coded, severity: 'warning' };
   switch (httpStatusOf(error)) {
     case 409:
       return { text: copy.notExposed, severity: 'info' };
@@ -90,4 +95,37 @@ export function endpointLoadNotice(error: unknown, copy: { notExposed: string; u
     default:
       return { text: friendlyApiError(error, copy.readFailed), severity: 'warning' };
   }
+}
+
+/**
+ * The wording for a BFF error code, or '' when the code needs none of its own. Codes are checked
+ * before the status: one 409 can mean "not exposed yet", "change it in the entry environment" or
+ * "the source has no build to promote", and only the code tells them apart.
+ */
+export function codedApiError(error: unknown): string {
+  const entry = errorField(error, 'entryEnvironment');
+  const source = errorField(error, 'sourceEnvironment');
+  switch (httpCodeOf(error)) {
+    case 'APIP_QUOTA_EXCEEDED':
+      return 'Your organization has reached its API limit on the API Platform. Remove an API you no longer need, or contact support to raise the limit.';
+    case 'CHANGE_REQUIRES_ENTRY_ENVIRONMENT':
+    case 'APIP_TARGET_PARAMETER_CHANGE_UNSUPPORTED':
+      return entry ? `This environment takes API changes only through promotion. Make the change in ${entry}, then promote.` : 'This environment takes API changes only through promotion. Make the change in the first environment, then promote.';
+    case 'APIP_SOURCE_BUILD_UNAVAILABLE':
+      return source ? `${source} isn’t running this release’s API. Deploy it there, then promote again.` : 'The source environment isn’t running this release’s API. Deploy it there, then promote again.';
+    default:
+      return '';
+  }
+}
+
+/**
+ * The banner for API settings this environment can't change, or null when it can. Outside the
+ * pipeline's entry environment the API changes only by promotion; on a build made before builds
+ * recorded their settings, what the environment enforces isn't known at all.
+ */
+export function readOnlyApiSettingsNotice(config: { editable?: boolean; entryEnvironment?: string; stateUnknown?: boolean } | null | undefined): string | null {
+  const entry = config?.entryEnvironment || 'the first environment';
+  if (config?.stateUnknown) return `This environment runs an API built before its settings were recorded, so they can’t be shown. They are known again after the next promotion from ${entry}.`;
+  if (config?.editable === false) return `Managed in ${entry}. Change it there, then promote to apply it here.`;
+  return null;
 }

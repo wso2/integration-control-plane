@@ -20,7 +20,9 @@ import { Box, Button, CircularProgress, IconButton, Tooltip, Typography } from '
 import { ExternalLink, Rocket } from '@wso2/oxygen-ui-icons-react';
 import type { JSX } from 'react';
 import type { Sample } from '../types/samples';
-import { formatComponentType } from '../constants/integrations';
+import { Scopes } from '../constants/permissions';
+import { useAgentRefusal } from '../hooks/useCan';
+import { formatComponentType, sampleSourceUrl } from '../constants/integrations';
 import { START_QUICKLY_CARD_MIN_HEIGHT } from '../constants/styles';
 
 export default function SampleRowCard({
@@ -38,7 +40,9 @@ export default function SampleRowCard({
   deployDisabledTooltip?: string;
   onClick?: () => void;
 }): JSX.Element {
-  const sourceUrl = `${sample.repositoryUrl}tree/${sample.branch ?? 'main'}${sample.subDirectory ?? ''}${sample.componentPath}`;
+  const agentRefusal = useAgentRefusal()(Scopes.AGENT_CREATE);
+  const refusal = sample.componentType === 'ai-agent' ? agentRefusal : '';
+  const sourceUrl = sampleSourceUrl(sample);
 
   return (
     <Box
@@ -113,7 +117,7 @@ export default function SampleRowCard({
             <ExternalLink size={14} />
           </IconButton>
         </Tooltip>
-        <Tooltip title={deployDisabled ? (deployDisabledTooltip ?? '') : 'Deploy this sample'} placement="top">
+        <Tooltip title={deployDisabled ? (deployDisabledTooltip ?? '') : refusal || 'Deploy this sample'} placement="top">
           <span>
             <Button
               size="small"
@@ -123,7 +127,7 @@ export default function SampleRowCard({
                 e.stopPropagation();
                 onDeploy();
               }}
-              disabled={isDeploying || deployDisabled}
+              disabled={isDeploying || deployDisabled || !!refusal}
               sx={{ height: 30, fontSize: 12, px: 2 }}>
               {isDeploying ? <CircularProgress size={12} color="inherit" /> : 'Deploy'}
             </Button>

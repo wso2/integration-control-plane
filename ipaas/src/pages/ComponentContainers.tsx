@@ -16,13 +16,16 @@
  * under the License.
  */
 
-import { Alert, Box, CircularProgress, PageContent, PageTitle } from '@wso2/oxygen-ui';
+import { Alert, Box, PageContent, PageTitle } from '@wso2/oxygen-ui';
 import { useEffect, useState, type JSX } from 'react';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
 import EnvironmentSelect from '../components/common/EnvironmentSelect';
+import ContainerCardSkeleton from '../components/Containers/ContainerCardSkeleton';
 import ContainerInfoCard from '../components/Containers/ContainerInfoCard';
 import { useAccessControl } from '../contexts/AccessControlContext';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
+import { BILLING_PRODUCT_CODE } from '../constants/subscription';
+import { useBillingOrg, useBillingPlan } from '../hooks/useBillingOrg';
 import { useRelease } from '../hooks/useDevopsConfigs';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
@@ -30,7 +33,7 @@ import { useEnvironments } from '../hooks/useEnvironments';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
-import { isPrivateDpRelease } from '../utils/containers';
+import { isPaidPlan, type PlanAccess } from '../utils/billing';
 import type { ComponentScope } from '../nav';
 
 export default function ComponentContainers({ org, project, component }: ComponentScope): JSX.Element {
@@ -38,7 +41,7 @@ export default function ComponentContainers({ org, project, component }: Compone
   const { projectId } = useProjectId(project);
   const { hasPermission } = useAccessControl();
   const { data: comp, isLoading } = useComponentByHandler(projectId, component);
-  const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, comp?.id);
+  const canManage = hasPermission(Scopes.INTEGRATION_UPDATE, projectId, comp?.id);
 
   const { tracks, trackId } = useSelectedTrack(comp);
 
@@ -52,8 +55,15 @@ export default function ComponentContainers({ org, project, component }: Compone
   const releaseId = deployment?.releaseId ?? '';
   const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId, trackId);
 
-  // Paid subscriptions aren't served by cloud yet, so only a private data plane unlocks the paid fields.
-  const isPaidOrPdpUser = isPrivateDpRelease(release);
+  // Changing CPU and memory is a paid feature, and ipaas-service refuses it on other plans. The plan
+  // summary on the billing org carries no type, so the plan itself is read for whether it is paid.
+  const billingOrgRead = useBillingOrg(BILLING_PRODUCT_CODE);
+  const billingPlanRead = useBillingPlan(billingOrgRead.org?.subscription?.plan?.code);
+  const loadingPlan = billingOrgRead.isLoading || billingPlanRead.isLoading;
+  // A failed read is not a free plan: the sizes stay locked, but the user is told why and can retry.
+  // The plan is read only once the org is, so an org failure is retried first.
+  const planAccess: PlanAccess =
+    billingOrgRead.isError || billingPlanRead.isError ? { state: 'unavailable', retry: billingOrgRead.isError ? billingOrgRead.refetch : billingPlanRead.refetch } : { state: isPaidPlan(billingOrgRead.org, billingPlanRead.plan) ? 'paid' : 'free' };
 
   const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   useEffect(() => setAlert(null), [trackId, envId]);
@@ -76,10 +86,8 @@ export default function ComponentContainers({ org, project, component }: Compone
           </Alert>
         )}
 
-        {isLoading || (loadingRelease && !!releaseId) ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 120px)' }}>
-            <CircularProgress />
-          </Box>
+        {isLoading || loadingPlan || (loadingRelease && !!releaseId) ? (
+          <ContainerCardSkeleton />
         ) : !comp ? (
           <Alert severity="error">Integration not found</Alert>
         ) : trackId === undefined ? null : containers.length === 0 ? (
@@ -93,7 +101,7 @@ export default function ComponentContainers({ org, project, component }: Compone
               componentId={comp.id}
               releaseId={releaseId}
               deploymentTrackId={trackId}
-              isPaidOrPdpUser={isPaidOrPdpUser}
+              plan={planAccess}
               canManage={canManage}
               onSaved={(message) => setAlert({ type: 'success', message })}
               onError={(message) => setAlert({ type: 'error', message })}

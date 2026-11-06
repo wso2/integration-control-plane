@@ -19,14 +19,19 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { fetchBallerinaCentralToken, removeBallerinaCentralToken, saveBallerinaCentralToken } from '../api/packageRegistries';
 import type { BallerinaCentralTokenStatus } from '../types/packageRegistries';
+import { Scopes } from '../constants/permissions';
+import { useCan } from './useCan';
 
 const ROOT_KEY = 'ballerinaCentralToken';
 
 /** Ballerina Central access token status for the org. */
+/** Fetched only for roles that may read it: for others, ipaas-service would refuse. */
 export function useBallerinaCentralToken(): UseQueryResult<BallerinaCentralTokenStatus> {
+  const canRead = useCan()(Scopes.PACKAGE_REGISTRY_READ);
   return useQuery<BallerinaCentralTokenStatus>({
     queryKey: [ROOT_KEY],
     queryFn: fetchBallerinaCentralToken,
+    enabled: canRead,
   });
 }
 

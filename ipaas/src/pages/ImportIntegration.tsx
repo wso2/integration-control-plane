@@ -53,6 +53,7 @@ import IntegrationCreationLoader from '../components/IntegrationCreationLoader';
 import type { IntegrationType, SourceMode, LocationState } from '../types/import';
 import { SAMPLE_REPO_URL } from '../constants/github';
 import { external } from '../paths';
+import ConnectRefused from '../components/Import/ConnectRefused';
 import { GH_SELECT_ACTION, organizationActionItems, repositoryActionItems, selectMenuHeader } from '../components/Import/gitHubSelectActions';
 import { GitProvider } from '../types/credentials';
 import { buildAzureDevOpsRepoUrl, buildRepoUrl } from '../utils/gitProviderUrl';
@@ -67,6 +68,8 @@ import { detectTechnology } from '../utils/technologyDetection';
 import { trackEvent } from '../services/tracking/tracking';
 import { useProjectId } from '../hooks/useProjects';
 import { useWorkflowRuntime } from '../hooks/useWorkflowRuntime';
+import { Scopes } from '../constants/permissions';
+import { CONNECT_REFUSAL, useCan } from '../hooks/useCan';
 
 // One Moesif event per selectable integration type. A type added later without an entry here still
 // reaches Moesif through the generic 'component-create-select-type', with `integrationType` set.
@@ -80,6 +83,7 @@ const INTEGRATION_TYPE_TRACK_EVENT: Partial<Record<IntegrationType, string>> = {
 };
 
 export default function ImportIntegration(scope: ProjectScope): JSX.Element {
+  const canCreate = useCan()(Scopes.INTEGRATION_CREATE);
   const navigate = useAppNavigate();
   const location = useLocation();
 
@@ -93,7 +97,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const isPublicRepo = sourceMode === 'public';
   const isAzureDevOps = sourceMode === GitProvider.AZURE_DEVOPS;
 
-  const { authStatus, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth(preAuthenticated ? 'done' : pendingAuthCode ? 'authenticating' : 'idle');
+  const { authStatus, canConnect, startGitHubAuth, exchangeAuthCode, startGitHubAppInstall, openGitHubManage, githubInstallUrl } = useGitHubAuth(preAuthenticated ? 'done' : pendingAuthCode ? 'authenticating' : 'idle');
   const { authStatus: azureAuthStatus, errorMessage: azureAuthError, startAzureDevOpsAuth } = useAzureDevOpsAuth();
   const [selectedOrg, setSelectedOrg] = useState('');
   const [selectedAdoProject, setSelectedAdoProject] = useState('');
@@ -114,10 +118,10 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
   const [selectedTechnology, setSelectedTechnology] = useState<'MI' | 'BI' | null>(null);
   const [pickedIntegrationType, setSelectedIntegrationType] = useState<IntegrationType | null>(null);
   // Workflows are Ballerina only and need the platform's workflow runtime, and
-  // AI agents cannot be created from Azure DevOps. A pick that a later source or
-  // technology change hides no longer counts as selected.
+  // AI agents are Ballerina only and cannot be created from Azure DevOps. A pick
+  // that a later source or technology change hides no longer counts as selected.
   const { data: workflowRuntime } = useWorkflowRuntime();
-  const hiddenIntegrationTypes: IntegrationType[] = [...(isAzureDevOps ? (['ai-agent'] as const) : []), ...(selectedTechnology === 'MI' || workflowRuntime?.status === 'NOT_CONFIGURED' ? (['workflow'] as const) : [])];
+  const hiddenIntegrationTypes: IntegrationType[] = [...(isAzureDevOps || selectedTechnology === 'MI' ? (['ai-agent'] as const) : []), ...(selectedTechnology === 'MI' || workflowRuntime?.status === 'NOT_CONFIGURED' ? (['workflow'] as const) : [])];
   const selectedIntegrationType = pickedIntegrationType && !hiddenIntegrationTypes.includes(pickedIntegrationType) ? pickedIntegrationType : null;
   const [ballerinaTokenInput, setBallerinaTokenInput] = useState('');
   const [ballerinaDrawerOpen, setBallerinaDrawerOpen] = useState(false);
@@ -391,9 +395,9 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
     return undefined;
   };
 
-  const canSubmit = Boolean(
-    activeOrg && activeRepo && selectedBranch && selectedTechnology && selectedIntegrationType && (!isAzureDevOps || selectedIntegrationType !== 'ai-agent') && displayName.trim() && handlerValid && projectId && (isPublicRepo || isAuthenticated),
-  );
+  const canSubmit =
+    canCreate &&
+    Boolean(activeOrg && activeRepo && selectedBranch && selectedTechnology && selectedIntegrationType && (!isAzureDevOps || selectedIntegrationType !== 'ai-agent') && displayName.trim() && handlerValid && projectId && (isPublicRepo || isAuthenticated));
 
   const handleSubmit = () => {
     // Fires on click, before the API call. 'component-create-end' fires only on success, so the gap
@@ -419,6 +423,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         repositoryBranch: selectedBranch,
         repositorySubPath: subPath || '/',
         isPublicRepo,
+        creation: { method: 'import-repo' },
         // Private repos build through the GitHub App installation that grants access.
         ...(isPublicRepo ? { enableAutoDeploy: true } : isAzureDevOps ? { azureDevOps: { organization: activeOrg, project: selectedAdoProject, repo: activeRepo } } : { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId }),
       },
@@ -468,6 +473,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         </Box>
       );
     }
+    if (!canConnect) return <ConnectRefused label="Authorize with GitHub" icon={<GitHub size={16} />} mb={4} />;
     // Authorized, but the GitHub App is not installed on any
     // account yet. The install popup must open from this button's click —
     // opening it straight from the token exchange gets popup-blocked (no
@@ -548,14 +554,15 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
           severity="error"
           sx={{ mb: 4 }}
           action={
-            <Button color="inherit" size="small" onClick={() => startAzureDevOpsAuth(() => refetchAdoOrganizations(), true)}>
+            <Button color="inherit" size="small" disabled={!canConnect} onClick={() => startAzureDevOpsAuth(() => refetchAdoOrganizations(), true)}>
               Reconnect
             </Button>
           }>
-          {azureAuthError || 'Your Azure DevOps connection needs to be refreshed.'}
+          {azureAuthError || 'Your Azure DevOps connection needs to be refreshed.'} {!canConnect && CONNECT_REFUSAL}
         </Alert>
       );
     }
+    if (!canConnect) return <ConnectRefused label={isAuthenticated ? 'Connect another account' : 'Connect Azure DevOps'} icon={<AzureDevOpsIcon size={16} />} mb={isAuthenticated ? 2 : 4} />;
     if (!isAuthenticated) {
       return (
         <Box sx={{ mb: 4 }}>
@@ -735,7 +742,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
                         ),
                       },
                     }}>
-                    {organizationActionItems(!!githubInstallUrl, isAuthenticated ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
+                    {organizationActionItems(!!githubInstallUrl, isAuthenticated && canConnect ? { label: 'Reconnect GitHub', onClick: () => startGitHubAuth(refetchRepos) } : undefined)}
                     {orgOptions.map((org) => (
                       <MenuItem key={org} value={org}>
                         {org}
@@ -1013,7 +1020,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
             <TechnologySelector selected={selectedTechnology} detectedMode={detectedMode} enabled={showBranchAndSubPath} onSelect={setSelectedTechnology} />
             {selectedTechnology === 'BI' && (
               <>
-                {!ballerinaTokenStatus?.configured && (
+                {ballerinaTokenStatus && !ballerinaTokenStatus.configured && (
                   <Stack direction="row" alignItems="center" gap={1} sx={{ mt: 2 }}>
                     <Typography variant="body2" color="text.secondary">
                       Depend on private packages?

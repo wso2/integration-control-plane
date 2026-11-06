@@ -21,6 +21,8 @@ import { Rocket } from '@wso2/oxygen-ui-icons-react';
 import type { ReactNode } from 'react';
 import { useDeployDeploymentTrack, useDeploymentStatus, useDeploymentTrackImages } from '../../../hooks/useDeployments';
 import type { DeployActionProps } from '../../../types/integration';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 
 /**
  * Deploys the track's newest build to the first environment. With auto deploy
@@ -32,11 +34,12 @@ export default function DeployButton({ component, env, versionId, deploymentPipe
   const { data: images = [], isLoading: imagesLoading } = useDeploymentTrackImages(component.id, versionId);
   const { data: builds = [] } = useDeploymentStatus(component.id, versionId);
   const deploy = useDeployDeploymentTrack();
+  const canDeployRole = useCan()(Scopes.INTEGRATION_DEPLOY);
 
   const latest = images[0];
   // A queued build blocks too: the image it will produce does not exist yet.
   const isBuildPending = builds.some((b) => b.status === 'in_progress' || b.status === 'queued');
-  if (imagesLoading || (latest && latest.imageId === buildId)) return null;
+  if (!canDeployRole || imagesLoading || (latest && latest.imageId === buildId)) return null;
 
   const canDeploy = !!latest && !isBuildPending && !blockedReason;
   const handleDeploy = () => {

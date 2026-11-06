@@ -21,6 +21,8 @@ import { generateAndSaveAzureDevOpsState, validateAndClearAzureDevOpsState } fro
 import { AZURE_DEVOPS_AUTH } from '../constants/azureDevOps';
 import type { AuthStatus } from '../types/import';
 import { useConnectAzureDevOps } from './useRepository';
+import { Scopes } from '../constants/permissions';
+import { useCan } from './useCan';
 
 export interface UseAzureDevOpsAuthReturn {
   authStatus: AuthStatus;
@@ -32,6 +34,7 @@ export function useAzureDevOpsAuth(initialStatus: AuthStatus = 'idle'): UseAzure
   const [authStatus, setAuthStatus] = useState<AuthStatus>(initialStatus);
   const [errorMessage, setErrorMessage] = useState('');
   const connect = useConnectAzureDevOps();
+  const canConnect = useCan()(Scopes.REPOSITORY_CONNECT);
   // Tears down the in-flight attempt's channel and timers. Held so that
   // unmounting, or starting another attempt, never leaves a poll running
   // against a closed popup or a channel that can still deliver a code.
@@ -41,7 +44,7 @@ export function useAzureDevOpsAuth(initialStatus: AuthStatus = 'idle'): UseAzure
 
   const startAzureDevOpsAuth = (onSuccess?: () => void, selectAccount = false): void => {
     const { azureDevOpsClientId, azureDevOpsRedirectUrl } = window.API_CONFIG;
-    if (!azureDevOpsClientId) return;
+    if (!azureDevOpsClientId || !canConnect) return;
     disposeAttemptRef.current?.();
 
     setAuthStatus('authenticating');

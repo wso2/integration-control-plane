@@ -18,6 +18,8 @@
 
 import { Button } from '@wso2/oxygen-ui';
 import { SlidersHorizontal } from '@wso2/oxygen-ui-icons-react';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 
 interface ConfigureButtonProps {
   onClick: () => void;
@@ -32,6 +34,8 @@ interface ConfigureButtonProps {
  * and the missing-config computation live in the type's own `HeaderStatus`.
  */
 export default function ConfigureButton({ onClick, hasMissingConfigs, disabled }: ConfigureButtonProps) {
+  const can = useCan();
+  if (!can(Scopes.CONFIG_MANAGE)) return null;
   return (
     <Button variant="outlined" size="small" color={hasMissingConfigs ? 'error' : 'primary'} startIcon={<SlidersHorizontal size={14} />} onClick={onClick} disabled={disabled} sx={{ mr: 1 }}>
       {hasMissingConfigs ? 'Configure to continue' : 'Configure'}

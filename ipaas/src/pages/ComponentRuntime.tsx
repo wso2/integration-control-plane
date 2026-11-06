@@ -21,7 +21,7 @@ import { useEffect, useMemo, useState, type JSX } from 'react';
 import PodInsightsTable from '../components/Runtime/PodInsightsTable';
 import ResourceUsageCards from '../components/Runtime/ResourceUsageCards';
 import RuntimeOverview from '../components/Runtime/RuntimeOverview';
-import { useAccessControl } from '../contexts/AccessControlContext';
+import { useCan } from '../hooks/useCan';
 import { useComponentByHandler } from '../hooks/useComponents';
 import { useComponentDeployment } from '../hooks/useDeployments';
 import { useEnvironments } from '../hooks/useEnvironments';
@@ -29,7 +29,7 @@ import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useProjectId } from '../hooks/useProjects';
 import { useSelectedTrack } from '../hooks/useSelectedTrack';
 import DeploymentTrackBar from '../components/DeploymentTrackBar';
-import { Permissions } from '../constants/permissions';
+import { Scopes } from '../constants/permissions';
 import { useComponentPodMetrics, useComponentPods, useReleaseDetails, useRedeployRelease } from '../hooks/useRuntime';
 import { DeploymentStatus } from '../types/deployment';
 import { calculateAggregateUsage, usageFromComponentLevelMetrics } from '../utils/podMetrics';
@@ -72,8 +72,9 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
 
   const podScope = useMemo(() => ({ projectId, releaseId, orgHandler: org, projectHandler: project, componentHandler: component }), [projectId, releaseId, org, project, component]);
 
-  const { hasPermission } = useAccessControl();
-  const canManage = hasPermission(Permissions.INTEGRATION_MANAGE, projectId, componentId);
+  const can = useCan();
+  const canRedeploy = can(Scopes.INTEGRATION_DEPLOY);
+  const canReadLogs = can(Scopes.LOG_READ);
 
   const redeploy = useRedeployRelease();
   const onRedeploy = () => redeploy.mutate({ projectId, componentName: component, releaseId });
@@ -125,7 +126,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
           imageUrl={release?.image}
           isDeployed={isDeployed}
           redeploying={redeploy.isPending}
-          canRedeploy={!!releaseId}
+          canRedeploy={canRedeploy && !!releaseId}
           onRedeploy={onRedeploy}
         />
 
@@ -141,7 +142,7 @@ export default function ComponentRuntime({ org, project, component }: ComponentS
                 metrics.refetch();
               }}
               scope={podScope}
-              canManage={canManage}
+              canReadLogs={canReadLogs}
               replicasControl={<Chip variant="outlined" label={`Replicas ${replicaCount}`} />}
             />
             <Box sx={{ mt: 4 }}>

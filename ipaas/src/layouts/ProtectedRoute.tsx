@@ -22,21 +22,29 @@ import { Navigate, Outlet } from 'react-router';
 import { saveRedirectUrl, useAuth } from '../auth';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { loginUrl } from '../paths';
+import PermissionDeniedNotice from '../components/PermissionDeniedNotice';
 import { Permissions } from '../constants/permissions';
+import { sessionPermissions } from '../utils/permissions';
 
 export default function ProtectedRoute(): JSX.Element {
-  const { isAuthenticated, userId } = useAuth();
+  const { isAuthenticated, userId, scopes } = useAuth();
   const { setOrgPermissions } = useAccessControl();
 
   useEffect(() => {
-    // The org-scoped token is the authorization; the console has no permission backend of its own.
-    setOrgPermissions(isAuthenticated && userId ? Object.values(Permissions) : []);
-  }, [isAuthenticated, userId, setOrgPermissions]);
+    // The org-scoped token is the authorization: its scopes gate actions, and the legacy
+    // permissions, which nothing grants, stay open.
+    setOrgPermissions(isAuthenticated && userId ? [...Object.values(Permissions), ...sessionPermissions(scopes, window.API_CONFIG.scopesEnforced === true)] : []);
+  }, [isAuthenticated, userId, scopes, setOrgPermissions]);
 
   if (!isAuthenticated) {
     saveRedirectUrl(window.location.href);
     return <Navigate to={loginUrl()} replace />;
   }
 
-  return <Outlet />;
+  return (
+    <>
+      <Outlet />
+      <PermissionDeniedNotice />
+    </>
+  );
 }

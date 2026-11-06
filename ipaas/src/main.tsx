@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { OxygenUIThemeProvider, AcrylicOrangeTheme, GlobalStyles } from '@wso2/oxygen-ui';
+import { OxygenUIThemeProvider, ChoreoLabsTheme, GlobalStyles } from '@wso2/oxygen-ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router';
 import { StrictMode } from 'react';
@@ -41,7 +41,7 @@ loadConfig().then(() => {
   initTracking();
   createRoot(document.getElementById('root')!).render(
     <StrictMode>
-      <OxygenUIThemeProvider themes={[{ key: 'acrylicOrange', label: 'Acrylic Orange Theme', theme: AcrylicOrangeTheme }]} initialTheme="acrylicOrange">
+      <OxygenUIThemeProvider themes={[{ key: 'choreoLabs', label: 'Choreo Labs', theme: ChoreoLabsTheme }]} initialTheme="choreoLabs">
         <GlobalStyles styles={hideRequiredAsterisk} />
         <QueryClientProvider client={queryClient}>
           <BrowserRouter basename={basePath || '/'}>

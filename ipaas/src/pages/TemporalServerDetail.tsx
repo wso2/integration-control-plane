@@ -21,6 +21,8 @@ import { ArrowLeft, Trash2, Workflow } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import { useTemporalOffering, useTemporalServer } from '../hooks/useTemporal';
 import { isNotFoundError } from '../utils/apiErrors';
 import { orgDatabasesUrl, temporalUrl, type OrgScope } from '../nav';
@@ -72,7 +74,9 @@ export default function TemporalServerDetail(scope: OrgScope): JSX.Element {
   const { data: service, isLoading, isError, error, refetch, isFetching } = useTemporalServer(temporalId);
   // Describes the server's plan; until it loads (or if it fails) the plan shows by name alone.
   const offering = useTemporalOffering();
-  const activeTab: DetailTab = TABS.find((t) => t.value === tab)?.value ?? 'overview';
+  // Advanced Settings holds only Delete.
+  const tabs = useCan()(Scopes.CONFIG_MANAGE) ? TABS : TABS.slice(0, 1);
+  const activeTab: DetailTab = tabs.find((t) => t.value === tab)?.value ?? 'overview';
 
   const backButton = (
     <Button startIcon={<ArrowLeft size={16} />} onClick={() => navigate(orgDatabasesUrl(scope))} sx={{ mb: 2 }}>
@@ -143,7 +147,7 @@ export default function TemporalServerDetail(scope: OrgScope): JSX.Element {
       </Stack>
 
       <Tabs value={activeTab} onChange={(_, v: DetailTab) => navigate(temporalUrl(scope, temporalId, v))} sx={tabsSx}>
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <Tab key={t.value} value={t.value} label={t.label} />
         ))}
       </Tabs>

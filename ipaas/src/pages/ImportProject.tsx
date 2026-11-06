@@ -23,6 +23,8 @@ import GitHubAuthArea from '../components/Import/GitHubAuthArea';
 import { useState, useLayoutEffect, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+import { Scopes } from '../constants/permissions';
+import { useCan } from '../hooks/useCan';
 import BusyFields from '../components/common/BusyFields';
 import { useCreateMonoRepoProject } from '../hooks/useProjects';
 import { useCreateComponent } from '../hooks/useComponents';
@@ -71,6 +73,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
     isContentsLoading,
     isContentsError,
     authStatus,
+    canConnect,
     startGitHubAuth,
     startGitHubAppInstall,
     isCheckingAuth,
@@ -87,6 +90,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
 
   const { handler: effectiveHandler, handlerEdited, isCheckingAvailability, availability, availabilityError, handlerTaken: isHandlerTaken, replacedHandler, startEditing, stopEditing, onHandlerChange } = useProjectHandler(displayName);
   const createMonoRepoProject = useCreateMonoRepoProject();
+  const canCreate = useCan()(Scopes.PROJECT_CREATE);
   const createComponent = useCreateComponent();
   const projectsUrl = orgProjectsUrl(scope.org);
   // The provider choice and the auto-selected GitHub org are not input the user would lose.
@@ -105,7 +109,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
   const handlerTaken = isHandlerTaken ? 'This project id is already taken.' : null;
 
   const availabilityReady = !effectiveHandler || effectiveHandler.length < 2 || availability !== undefined || availabilityError;
-  const canSubmit = !!displayName.trim() && !nameError && !!effectiveHandler && !handlerError && !handlerTaken && !isCheckingAvailability && availabilityReady && pathReady && isWorkspace && workspaceModules.length > 0;
+  const canSubmit = canCreate && !!displayName.trim() && !nameError && !!effectiveHandler && !handlerError && !handlerTaken && !isCheckingAvailability && availabilityReady && pathReady && isWorkspace && workspaceModules.length > 0;
 
   const handleImport = async () => {
     setIsImporting(true);
@@ -150,6 +154,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             repositoryBranch: selectedBranch,
             repositorySubPath: module.path,
             isPublicRepo,
+            creation: { method: 'import-repo' },
           }),
         ),
       );
@@ -178,7 +183,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           <CheckCircle2 size={14} />
         </Box>
         <Typography variant="caption" color="success.main" fontWeight={500}>
-          Ballerina workspace detected
+          WSO2 Integrator: Default workspace detected
         </Typography>
       </Stack>
     ) : null;
@@ -192,6 +197,10 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
       <PageTitle>
         <PageTitle.Header>Import a project</PageTitle.Header>
       </PageTitle>
+
+      <Alert severity="info" sx={{ mb: 3 }}>
+        Import currently supports WSO2 Integrator: Default projects only.
+      </Alert>
 
       {submitError && (
         <Alert severity="error" role="alert" sx={{ mb: 3 }} onClose={() => setSubmitError(null)}>
@@ -213,11 +222,13 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
           </Box>
         ) : (
           <Box sx={{ mb: 1 }}>
-            {gitProvider === 'github' && <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />}
+            {gitProvider === 'github' && (
+              <GitHubAuthArea authStatus={authStatus} isCheckingAuth={isCheckingAuth} isAuthenticated={isAuthenticated} canConnect={canConnect} onAuthorize={() => startGitHubAuth(refetchRepos)} onInstall={() => startGitHubAppInstall(refetchRepos)} />
+            )}
             <RepoSourceFields source={source} directoryHint={workspaceHint} />
             {pathReady && !isContentsLoading && !isContentsError && !isWorkspace && (
               <Alert severity="info" sx={{ mb: 3 }}>
-                No Ballerina workspace detected in the selected directory. Select a directory that contains a Ballerina workspace (a root <code>Ballerina.toml</code> with subdirectories that each have their own <code>Ballerina.toml</code>).
+                No WSO2 Integrator: Default workspace detected in the selected directory. Select a directory that contains a WSO2 Integrator: Default workspace.
               </Alert>
             )}
           </Box>

@@ -27,7 +27,7 @@ import SwaggerOperationsList from '../Overview/integration-as-api/SwaggerOperati
 import { useFetchComponentEndpointSpec } from '../../hooks/useComponents';
 import { useApiDefinition } from '../../hooks/useDeployments';
 import type { EnvEndpoint } from '../../types/component';
-import { trimEndpointName, visibilityUrlOptions } from '../../utils/endpoints';
+import { trimEndpointName, envCardUrlRows } from '../../utils/endpoints';
 import EndpointUrlRows from '../Overview/_shared/EndpointUrlRows';
 import DeploymentNotice from '../DeploymentNotice';
 import EnvEmptyNotice from '../EnvEmptyNotice';
@@ -46,7 +46,7 @@ function EndpointUrlsPanel({ endpoints, selectedIdx, onSelect, componentId, depl
   const ep = endpoints[selectedIdx];
   if (!ep) return null;
 
-  const urlOptions = visibilityUrlOptions(ep);
+  const urlOptions = envCardUrlRows(ep);
 
   const handleDownload = async () => {
     if (!ep.id) return;

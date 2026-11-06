@@ -26,12 +26,14 @@ import { navUrl, useScope } from '../../nav';
 import type { EnvEndpoint } from '../../types/component';
 import type { MiConfig, MiConfigDraft } from '../../types/envGroups';
 import { toEndpointOptions } from '../../utils/endpoints';
-import { isEmptyMiConfigSavePlan, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
-import { EndpointCard } from '../EndpointCard';
+import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, MI_SECRETS_GROUP, planMiConfigSave, validateMiConfigDraft } from '../../utils/miConfigs';
+import { EndpointCardList } from '../EndpointCardList';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
 
+// No Certificate Mount step, unlike ConfigureDrawer: certificate mounts are not wired
+// to the BFF yet (api/configuration.ts reads none and saves nothing), so it would be empty.
 const STEPS = ['Configurations', 'Endpoints'];
 
 interface Row {
@@ -102,16 +104,18 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
       seededRef.current = false;
       return;
     }
-    setShowErrors(false);
-    setSaveError(null);
     if (data && !seededRef.current) seed(data);
   }, [open, data]);
 
-  // Back to the first step on open; not on data refetches, which would move the user mid-edit.
+  // Back to the first step, with no errors, on open. Not on data refetches: those
+  // would move the user mid-edit, and the refetch after a partly failed save would
+  // clear the error that says what was saved.
   useEffect(() => {
     if (!open) return;
     setStep(1);
     setManagingEp(null);
+    setShowErrors(false);
+    setSaveError(null);
   }, [open]);
 
   const draft: MiConfigDraft = useMemo(
@@ -121,8 +125,16 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     }),
     [envVars, secrets],
   );
-  const storedSecrets = useMemo(() => secrets.filter((s) => s.stored).map((s) => s.key), [secrets]);
-  const errors = useMemo(() => validateMiConfigDraft(draft, storedSecrets), [draft, storedSecrets]);
+  // From the latest fetch, not the rows seeded on open: a secret removed elsewhere since
+  // (e.g. on Configs & Secrets) has no value to keep, so its row needs a new one.
+  const storedSecrets = useMemo(() => {
+    const current = new Set(data?.secrets ?? []);
+    return secrets.filter((s) => s.stored && current.has(s.key)).map((s) => s.key);
+  }, [secrets, data]);
+  // Rows hidden because their group is of the wrong kind are never saved, so they are not validated.
+  const envVarsHidden = !!data?.envVarsGroupIsSecret;
+  const secretsHidden = !!data?.secretsGroupIsPlain;
+  const errors = useMemo(() => validateMiConfigDraft({ envVars: envVarsHidden ? [] : draft.envVars, secrets: secretsHidden ? [] : draft.secrets }, storedSecrets, data), [draft, storedSecrets, data, envVarsHidden, secretsHidden]);
   const plan = useMemo(() => (data ? planMiConfigSave(data, draft) : null), [data, draft]);
   const hasChanges = !!plan && !isEmptyMiConfigSavePlan(plan);
   useUnsavedChanges(open && hasChanges);
@@ -159,7 +171,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     if (!plan) return;
     save.mutate(plan, {
       onSuccess: () => {
-        onClose();
+        handleClose();
         onSaved?.();
       },
       onError: (err) => setSaveError(err instanceof Error ? err.message : 'Failed to save the configurations.'),
@@ -229,13 +241,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         </Typography>
       );
     }
-    return (
-      <Box>
-        {endpoints.map((ep, idx) => (
-          <EndpointCard key={ep.id} ep={ep} defaultExpanded={idx === 0} onEdit={setManagingEp} onSettings={setSettingsEp} />
-        ))}
-      </Box>
-    );
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={setSettingsEp} />;
   };
 
   const renderContent = () => {
@@ -280,8 +286,22 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           )}
           .
         </Alert>
-        {renderSection('Environment variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')}
-        {renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')}
+        {data.envVarsGroupIsSecret ? (
+          // Its values can't be read back, and saving variables here would replace them.
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            Environment variables can't be edited here: the <code>{MI_ENV_VARS_GROUP}</code> group on Configs &amp; secrets is stored as a secret. Edit or delete that group there first.
+          </Alert>
+        ) : (
+          renderSection('Environment variables', 'Plain values, visible to anyone who can configure the integration.', envVars, setEnvVars, 'env', 'Add environment variable')
+        )}
+        {data.secretsGroupIsPlain ? (
+          // Saving secrets here would turn that group into a secret one and drop its values.
+          <Alert severity="warning" sx={{ mb: 3 }}>
+            Secrets can&apos;t be edited here: the <code>{MI_SECRETS_GROUP}</code> group on Configs &amp; secrets is not stored as a secret. Edit or delete that group there first.
+          </Alert>
+        ) : (
+          renderSection('Secrets', 'Stored encrypted. Values cannot be viewed after saving.', secrets, setSecrets, 'secret', 'Add secret')
+        )}
         {showErrors && errors.size > 0 && <Alert severity="error">Fix the highlighted keys before saving.</Alert>}
       </>
     );
