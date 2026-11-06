@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { SchemaConfigItem } from '../types/configuration';
-import { hasPersistedSchemaConfigValue, persistedSchemaConfigValue } from './schemaConfig';
+import { hasPersistedSchemaConfigValue, persistedSchemaConfigValue, schemaConfigurationsForSave } from './schemaConfig';
 
 const configuration = (value: string, isSensitive = false): SchemaConfigItem => ({ key: 'requiredValue', values: [{ value }], isSensitive });
 
@@ -40,5 +40,39 @@ describe('persistedSchemaConfigValue', () => {
 
   it('does not seed an empty non-sensitive value', () => {
     expect(persistedSchemaConfigValue(configuration(''))).toBeUndefined();
+  });
+});
+
+describe('schemaConfigurationsForSave', () => {
+  it('preserves untouched redacted secrets when another secret is updated', () => {
+    const existing = [
+      { key: 'firstSecret', values: [{ value: '' }], isSensitive: true },
+      { key: 'secondSecret', values: [{ value: '' }], isSensitive: true },
+    ];
+    const result = schemaConfigurationsForSave(
+      existing,
+      new Map([
+        ['firstSecret', 'replacement'],
+        ['secondSecret', ''],
+      ]),
+      new Map([
+        ['firstSecret', true],
+        ['secondSecret', true],
+      ]),
+      new Map(),
+      'development',
+    );
+
+    expect(result).toEqual([
+      { key: 'firstSecret', values: [{ environmentUuid: 'development', value: 'replacement' }], isSensitive: true, isRequired: undefined, keyId: undefined, configGroupId: undefined, configKeyId: undefined, isDynamic: undefined },
+      { key: 'secondSecret', values: [{ environmentUuid: 'development', value: '' }], isSensitive: true, isRequired: undefined, keyId: undefined, configGroupId: undefined, configKeyId: undefined, isDynamic: undefined },
+    ]);
+  });
+
+  it('includes an existing empty non-sensitive configuration as an explicit deletion', () => {
+    const result = schemaConfigurationsForSave([{ key: 'plainValue', values: [{ value: 'old' }] }], new Map(), new Map(), new Map(), 'development');
+
+    expect(result[0]?.values).toEqual([{ environmentUuid: 'development', value: '' }]);
+    expect(result[0]?.isSensitive).toBeUndefined();
   });
 });

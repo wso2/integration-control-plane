@@ -35,7 +35,7 @@ import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { runtimeFromDisplayType } from '../../utils/identifyIntegration';
-import { persistedSchemaConfigValue } from '../../utils/schemaConfig';
+import { persistedSchemaConfigValue, schemaConfigurationsForSave } from '../../utils/schemaConfig';
 
 // Keys the platform sets (a workflow integration's runtime connection), shown read-only.
 const managedConfigKeys = (configurations: SchemaConfigItem[] | undefined): ReadonlySet<string> => new Set((configurations ?? []).filter((c) => c.isManaged).map((c) => c.key));
@@ -450,24 +450,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       setStep((s) => s + 1);
     } else {
       setSaveError(null);
-      const configurations: SchemaConfigItem[] = [];
-      valueMap.forEach((value, key) => {
-        if (value !== '' && value !== undefined && value !== null) {
-          const linking = linkingMap.get(key);
-          const isSensitive = sensitiveMap.get(key) || false;
-          const existing = data?.configurations?.find((c) => c.key === key);
-          configurations.push({
-            key,
-            keyId: existing?.keyId,
-            values: [{ environmentUuid: envId, value: String(value) }],
-            ...(isSensitive ? { isSensitive } : {}),
-            isRequired: existing?.isRequired,
-            configGroupId: linking?.configGroupId,
-            configKeyId: linking?.configKeyId,
-            isDynamic: linking?.isDynamic,
-          });
-        }
-      });
+      const configurations = schemaConfigurationsForSave(data?.configurations, valueMap, sensitiveMap, linkingMap, envId);
 
       const saveCerts = () => {
         // Build cert mapping configurations
@@ -872,24 +855,7 @@ function GenericServiceConfigureDrawer({
 
   const handleApply = () => {
     setSaveError(null);
-    const configurations: SchemaConfigItem[] = [];
-    valueMap.forEach((value, key) => {
-      if (value !== '' && value !== undefined && value !== null) {
-        const linking = linkingMap.get(key);
-        const isSensitive = sensitiveMap.get(key) || false;
-        const existing = data?.configurations?.find((c) => c.key === key);
-        configurations.push({
-          key,
-          keyId: existing?.keyId,
-          values: [{ environmentUuid: schemaEnvId, value: String(value) }],
-          ...(isSensitive ? { isSensitive } : {}),
-          isRequired: existing?.isRequired,
-          configGroupId: linking?.configGroupId,
-          configKeyId: linking?.configKeyId,
-          isDynamic: linking?.isDynamic,
-        });
-      }
-    });
+    const configurations = schemaConfigurationsForSave(data?.configurations, valueMap, sensitiveMap, linkingMap, schemaEnvId);
 
     const doSaveCerts = () => {
       const certConfigs: CertMappingConfig[] = [];

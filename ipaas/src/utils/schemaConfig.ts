@@ -17,6 +17,13 @@
  */
 
 import type { SchemaConfigItem } from '../types/configuration';
+import type { BaseType } from '../types/schema';
+
+interface SchemaConfigLink {
+  configGroupId?: string;
+  configKeyId?: string;
+  isDynamic?: boolean;
+}
 
 /** Secret values are redacted by the BFF, so their empty value still represents a saved configuration. */
 export function hasPersistedSchemaConfigValue(configuration: SchemaConfigItem): boolean {
@@ -31,4 +38,38 @@ export function persistedSchemaConfigValue(configuration: SchemaConfigItem): str
   const value = configuration.values?.[0]?.value;
   if (configuration.isSensitive) return value ?? '';
   return value !== undefined && value !== '' ? value : undefined;
+}
+
+/**
+ * Builds the complete save payload. Redacted secrets stay present with an empty
+ * value so the backend keeps them, while empty non-sensitive values remain
+ * explicit deletions.
+ */
+export function schemaConfigurationsForSave(
+  existingConfigurations: SchemaConfigItem[] | undefined,
+  valueMap: ReadonlyMap<string, BaseType>,
+  sensitiveMap: ReadonlyMap<string, boolean>,
+  linkingMap: ReadonlyMap<string, SchemaConfigLink>,
+  environmentUuid: string,
+): SchemaConfigItem[] {
+  const existingByKey = new Map((existingConfigurations ?? []).map((configuration) => [configuration.key, configuration]));
+  const keys = new Set([...existingByKey.keys(), ...valueMap.keys()]);
+
+  return Array.from(keys, (key) => {
+    const existing = existingByKey.get(key);
+    const value = valueMap.get(key);
+    const linking = linkingMap.get(key);
+    const isSensitive = sensitiveMap.get(key) || existing?.isSensitive || false;
+
+    return {
+      key,
+      keyId: existing?.keyId,
+      values: [{ environmentUuid, value: value === undefined || value === null ? '' : String(value) }],
+      ...(isSensitive ? { isSensitive } : {}),
+      isRequired: existing?.isRequired,
+      configGroupId: linking?.configGroupId,
+      configKeyId: linking?.configKeyId,
+      isDynamic: linking?.isDynamic,
+    };
+  });
 }
