@@ -22,7 +22,24 @@ import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamable
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
-import { classifyMcpError, coerceFieldValue, createMcpClient, formatFieldLabel, formatMcpError, formatToolResult, generateDefaultValue, getMcpToolParameters, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError, isSimpleObjectSchema } from './mcp';
+import type { JsonSchemaType as SdkJsonSchema } from '@modelcontextprotocol/sdk/validation';
+import { AjvJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/ajv';
+import { CfWorkerJsonSchemaValidator } from '@modelcontextprotocol/sdk/validation/cfworker';
+import {
+  classifyMcpError,
+  coerceFieldValue,
+  createMcpClient,
+  formatFieldLabel,
+  formatMcpError,
+  formatToolResult,
+  generateDefaultValue,
+  getMcpToolParameters,
+  isMcpBlockedError,
+  isMcpForbiddenError,
+  isMcpUnauthorizedError,
+  isSimpleObjectSchema,
+  withNullableTypes,
+} from './mcp';
 import type { McpTool } from '../types/mcp';
 
 describe('createMcpClient', () => {
@@ -107,6 +124,61 @@ describe('createMcpClient', () => {
     } finally {
       await close();
     }
+  });
+
+  it('accepts null for an OpenAPI nullable field where eval is blocked, as the SDK default did', async () => {
+    const client = createMcpClient('test');
+    const tool = greetingTool();
+    const close = await connect(client, tool);
+    try {
+      await client.listTools();
+      await client.callTool({ name: 'greet', arguments: {} });
+      tool.outputSchema = { type: 'object', properties: { nickname: { type: 'string', nullable: true } }, required: ['nickname'] };
+      tool.structuredContent = { nickname: null };
+      await withoutEval(async () => {
+        await client.listTools();
+        await expect(client.callTool({ name: 'greet', arguments: {} })).resolves.toMatchObject({ structuredContent: { nickname: null } });
+        tool.structuredContent = { nickname: 7 };
+        await expect(client.callTool({ name: 'greet', arguments: {} })).rejects.toThrow(/does not match the tool's output schema/);
+      });
+    } finally {
+      await close();
+    }
+  });
+});
+
+describe('withNullableTypes', () => {
+  const object = (properties: Record<string, object>, extra: object = {}): SdkJsonSchema => ({ type: 'object', properties, ...extra }) as SdkJsonSchema;
+
+  // Each case is checked against Ajv, the validator the console used before.
+  it.each<[string, SdkJsonSchema, unknown]>([
+    ['a nullable string', object({ a: { type: 'string', nullable: true } }), { a: null }],
+    ['a nullable string holding a string', object({ a: { type: 'string', nullable: true } }), { a: 'x' }],
+    ['a nullable string holding a number', object({ a: { type: 'string', nullable: true } }), { a: 1 }],
+    ['a string without nullable', object({ a: { type: 'string' } }), { a: null }],
+    ['nullable: false', object({ a: { type: 'string', nullable: false } }), { a: null }],
+    ['a nullable type list', object({ a: { type: ['string', 'integer'], nullable: true } }), { a: null }],
+    ['a nullable enum without null', object({ a: { type: 'string', enum: ['x'], nullable: true } }), { a: null }],
+    ['a nullable root', { type: 'object', nullable: true } as SdkJsonSchema, null],
+    ['nullable array items', object({ a: { type: 'array', items: { type: 'integer', nullable: true } } }), { a: [1, null] }],
+    ['a nullable anyOf branch', object({ a: { anyOf: [{ type: 'string', nullable: true }, { type: 'integer' }] } }), { a: null }],
+    ['nullable additionalProperties', { type: 'object', additionalProperties: { type: 'number', nullable: true } } as SdkJsonSchema, { x: null }],
+    ['a nullable $defs target', object({ a: { $ref: '#/$defs/S' } }, { $defs: { S: { type: 'object', nullable: true } } }), { a: null }],
+    ['a nullable definitions target', object({ a: { $ref: '#/definitions/N' } }, { definitions: { N: { type: 'number', nullable: true } } }), { a: null }],
+  ])('agrees with Ajv on %s', (_label, schema, data) => {
+    // Separate copies: Ajv adds 'null' to a nullable type list in the schema it is given.
+    const ajv = new AjvJsonSchemaValidator().getValidator(structuredClone(schema))(data).valid;
+    const cfworker = new CfWorkerJsonSchemaValidator().getValidator(withNullableTypes(structuredClone(schema)) as SdkJsonSchema)(data).valid;
+    expect(cfworker).toBe(ajv);
+  });
+
+  it('returns a copy and leaves enum, const and default values alone', () => {
+    const schema = { type: 'object', nullable: true, properties: { a: { enum: [{ type: 'string', nullable: true }], const: { type: 'x', nullable: true }, default: { type: 'y', nullable: true } } } };
+    const before = structuredClone(schema);
+    const result = withNullableTypes(schema) as typeof schema & { type: string[] };
+    expect(schema).toEqual(before);
+    expect(result.type).toEqual(['object', 'null']);
+    expect(result.properties.a).toEqual(before.properties.a);
   });
 });
 
