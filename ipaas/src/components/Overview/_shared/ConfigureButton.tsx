@@ -20,11 +20,14 @@ import { Button } from '@wso2/oxygen-ui';
 import { SlidersHorizontal } from '@wso2/oxygen-ui-icons-react';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
+import { configureControl } from '../../../utils/configValues';
 
 interface ConfigureButtonProps {
   onClick: () => void;
   /** When true, renders an error-coloured "Configure to continue" affordance. */
   hasMissingConfigs?: boolean;
+  /** The drawer opens read-only: the button offers a view instead. */
+  readOnly?: boolean;
   disabled?: boolean;
 }
 
@@ -33,12 +36,13 @@ interface ConfigureButtonProps {
  * a configuration drawer (automation, integration-as-api). The drawer itself
  * and the missing-config computation live in the type's own `HeaderStatus`.
  */
-export default function ConfigureButton({ onClick, hasMissingConfigs, disabled }: ConfigureButtonProps) {
+export default function ConfigureButton({ onClick, hasMissingConfigs = false, readOnly = false, disabled }: ConfigureButtonProps) {
   const can = useCan();
-  if (!can(Scopes.CONFIG_MANAGE)) return null;
+  if (!can(Scopes.CONFIG_READ)) return null;
+  const { label, color } = configureControl(readOnly, hasMissingConfigs);
   return (
-    <Button variant="outlined" size="small" color={hasMissingConfigs ? 'error' : 'primary'} startIcon={<SlidersHorizontal size={14} />} onClick={onClick} disabled={disabled} sx={{ mr: 1 }}>
-      {hasMissingConfigs ? 'Configure to continue' : 'Configure'}
+    <Button variant="outlined" size="small" color={color} startIcon={<SlidersHorizontal size={14} />} onClick={onClick} disabled={disabled} sx={{ mr: 1 }}>
+      {label}
     </Button>
   );
 }

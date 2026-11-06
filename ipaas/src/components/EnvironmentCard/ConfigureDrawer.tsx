@@ -16,9 +16,31 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, Collapse, Dialog, DialogActions, DialogContent, DialogTitle, DrawerPanel, MenuItem, Select as MuiSelect, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import {
+  Alert,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  DrawerPanel,
+  MenuItem,
+  Select as MuiSelect,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp, Link, Trash2 } from '@wso2/oxygen-ui-icons-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEnvEndpoints } from '../../hooks/useDeployments';
 import { useSchemaConfig, useCertificateGroups, useCertificateMappings, useConfigGroups } from '../../hooks/useConfiguration';
@@ -27,6 +49,8 @@ import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { useMiConfig } from '../../hooks/useMiConfig';
+import { MASK, miConfigValues, schemaConfigValues, type ConfigValue } from '../../utils/configValues';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCard } from '../EndpointCard';
@@ -675,9 +699,12 @@ export interface ConfigureDrawerProps {
    * even when nothing changed. The schema drawers always save, so only MI reads it.
    */
   continueWithoutChanges?: boolean;
+  /** The role may read the configuration but not change it: show the values, with nothing to save. */
+  readOnly?: boolean;
 }
 
 export default function ConfigureDrawer(props: ConfigureDrawerProps) {
+  if (props.readOnly) return <ReadOnlyConfigureDrawer {...props} />;
   // MI has no configuration schema: it takes free-form env vars and secrets.
   if (runtimeFromDisplayType(props.displayType ?? '') === 'mi') {
     // envId, not envTemplateId: MI configs live on the environment's ReleaseBinding.
@@ -1151,5 +1178,90 @@ function GenericServiceConfigureDrawer({
 
       <ApiSettingsDrawer open={manageDrawerOpen} onClose={() => setManageDrawerOpen(false)} componentName={componentId} envName={envId} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={settingsEp?.id} />
     </>
+  );
+}
+
+// ── Read-only ─────────────────────────────────────────────────────────────────
+
+function ReadOnlyConfigureDrawer({ open, onClose, projectId, componentId, envId, envTemplateId, versionId, commitHash, releaseId, displayType }: ConfigureDrawerProps) {
+  const isMi = runtimeFromDisplayType(displayType ?? '') === 'mi';
+  const schema = useSchemaConfig(projectId, componentId, envTemplateId ?? envId, versionId, commitHash, open && !isMi);
+  const mi = useMiConfig(projectId, componentId, envId, open && isMi && !!releaseId);
+  const isLoading = isMi ? mi.isLoading : schema.isLoading;
+  const values = isMi ? mi.data && miConfigValues(mi.data) : schema.data && schemaConfigValues(schema.data);
+
+  const renderValues = () => {
+    if (isMi && !releaseId) return <Typography color="text.secondary">The integration is not deployed to this environment.</Typography>;
+    if (isLoading) return <CircularProgress size={32} />;
+    if (!values) return <Typography color="text.secondary">Could not load the configurations.</Typography>;
+    if (!values.length) return <Typography color="text.secondary">No configurable values.</Typography>;
+    return (
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            <TableCell>Key</TableCell>
+            <TableCell>
+              {/* Long keys squeeze this column; the floor keeps "Default" whole while longer values still wrap. */}
+              <Box sx={{ minWidth: '10ch' }}>Value</Box>
+            </TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {/* Sectioned as the editor sections them: Required, then Optional, each by module. */}
+          {values.map((v, i) => {
+            const newSection = !!v.section && v.section !== values[i - 1]?.section;
+            const newModule = !!v.module && (newSection || v.module !== values[i - 1]?.module);
+            return (
+              <Fragment key={v.key}>
+                {newSection && <HeadingRow title={v.section!} />}
+                {newModule && <HeadingRow title={v.module!.replace('.', '/')} module />}
+                <ValueRow value={v} />
+              </Fragment>
+            );
+          })}
+        </TableBody>
+      </Table>
+    );
+  };
+
+  return (
+    <DrawerPanel open={open} onClose={onClose}>
+      <DrawerPanel.Header>
+        <DrawerPanel.Title>Configurations</DrawerPanel.Title>
+        <DrawerPanel.Actions>
+          <DrawerPanel.CloseButton />
+        </DrawerPanel.Actions>
+      </DrawerPanel.Header>
+      <DrawerPanel.Body>
+        <Alert severity="info" sx={{ mb: 2 }}>
+          Your role can view these configurations but not change them.
+        </Alert>
+        {renderValues()}
+      </DrawerPanel.Body>
+      <DrawerPanel.Footer>
+        <Button variant="outlined" color="inherit" onClick={onClose}>
+          Close
+        </Button>
+      </DrawerPanel.Footer>
+    </DrawerPanel>
+  );
+}
+
+function HeadingRow({ title, module = false }: { title: string; module?: boolean }) {
+  return (
+    <TableRow>
+      <TableCell colSpan={2} sx={{ fontWeight: 600, pl: module ? 3 : 2 }}>
+        {title}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ValueRow({ value: v }: { value: ConfigValue }) {
+  return (
+    <TableRow>
+      <TableCell>{v.label ?? v.key}</TableCell>
+      <TableCell sx={{ overflowWrap: 'anywhere' }}>{v.secret ? MASK : v.value || (v.optional ? 'Default' : 'Not set')}</TableCell>
+    </TableRow>
   );
 }

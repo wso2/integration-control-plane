@@ -61,6 +61,8 @@ export default function FileEventHeader({
   deployAction,
 }: CustomHeaderProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
+  const can = useCan();
+  const configReadOnly = !can(Scopes.CONFIG_MANAGE);
   const stopMutation = useStopDeployment();
   const redeployMutation = useRedeployDeployment();
   const isActionPending = stopMutation.isPending || redeployMutation.isPending;
@@ -129,7 +131,7 @@ export default function FileEventHeader({
 
         {hasDeployment && (
           <>
-            <ConfigureButton onClick={() => setConfigureOpen(true)} hasMissingConfigs={missingConfigs} />
+            <ConfigureButton onClick={() => setConfigureOpen(true)} hasMissingConfigs={missingConfigs} readOnly={configReadOnly} />
             <ConfigureDrawer
               onSaved={() => {
                 requestPoll();
@@ -150,6 +152,7 @@ export default function FileEventHeader({
               releaseMgtReleaseId={releaseMgtReleaseId}
               releaseMgtDeploymentId={releaseMgtDeploymentId}
               envTemplateId={envTemplateId}
+              readOnly={configReadOnly}
               buildId={buildId}
               // File/event have no endpoints — match devant's ConfigurationWizard
               // (Configurations + Certificate Mount only, no Endpoints step).

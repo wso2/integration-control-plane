@@ -20,12 +20,13 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router';
 import ApiEnvCardActions from './integration-as-api/EnvCardActions';
+import ApiHeaderStatus from './integration-as-api/HeaderStatus';
 import TaskEnvCardActions from './_shared/ScheduledTaskEnvCardActions';
 import ConfigureButton from './_shared/ConfigureButton';
 import PromoteButton from '../EnvironmentCard/PromoteButton';
 import { button, renderWithScopes } from '../../test/renderWithScopes';
 import { DEVELOPER, PLATFORM_ENGINEER, VIEWER } from '../../test/roles';
-import type { EnvCardActionsProps } from '../../types/integration';
+import type { EnvCardActionsProps, HeaderStatusProps } from '../../types/integration';
 
 const mutation = { mutate: vi.fn(), isPending: false };
 const source = { data: { releaseId: 'r1', build: { buildId: 'b1' } }, isLoading: false };
@@ -41,6 +42,7 @@ vi.mock('../../hooks/useAppNavigate', () => ({ useAppNavigate: () => vi.fn() }))
 vi.mock('../../hooks/useOrgUuid', () => ({ useOrgUuid: () => 'acme' }));
 vi.mock('./integration-as-api/ServiceLogsDrawer', () => ({ default: () => null }));
 vi.mock('./_shared/ScheduleButton', () => ({ default: () => null }));
+vi.mock('../EnvironmentCard/ConfigureDrawer', () => ({ default: () => null }));
 
 const production = { id: 'production', name: 'Production', critical: true };
 const slot = (status: string) => ({ component: { id: 'orders' }, env: production, releaseId: 'r1', hasDeployment: true, deploymentStatusV2: status, onNotify: () => {}, requestPoll: () => {}, onTrigger: () => {} }) as unknown as EnvCardActionsProps;
@@ -73,5 +75,9 @@ describe('a production card', () => {
     expect(button(await render(configure, PLATFORM_ENGINEER), 'Configure')?.disabled).toBe(false);
     unmount();
     expect(button(await render(configure, VIEWER), 'Configure')).toBeUndefined();
+  });
+
+  it('offers a Developer, who may only read configuration, View configuration', async () => {
+    expect(button(await render(<ApiHeaderStatus {...(slot('ACTIVE') as unknown as HeaderStatusProps)} />, DEVELOPER), 'View configuration')?.disabled).toBe(false);
   });
 });

@@ -68,6 +68,7 @@ export default function DeployEnvironmentCard({
   const isMI = runtimeFromDisplayType(displayType ?? '') === 'mi';
   const qc = useQueryClient();
   const can = useCan();
+  const configReadOnly = !can(Scopes.CONFIG_MANAGE);
   const [configureOpen, setConfigureOpen] = useState(false);
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -350,7 +351,8 @@ export default function DeployEnvironmentCard({
             envCritical={env.critical}
             endpointCount={endpoints.length}
             scaleToZeroEnabled={env.scaleToZeroEnabled}
-            onConfigClick={can(Scopes.CONFIG_MANAGE) ? () => setConfigureOpen(true) : undefined}
+            onConfigClick={can(Scopes.CONFIG_READ) ? () => setConfigureOpen(true) : undefined}
+            configReadOnly={configReadOnly}
             onJobConfigClick={flags.isAutomation && can(Scopes.INTEGRATION_UPDATE) ? () => setScheduleOpen(true) : undefined}
             onHistoryClick={() => setHistoryOpen(true)}
             configurablesCount={configurablesCount}
@@ -399,6 +401,7 @@ export default function DeployEnvironmentCard({
         isAutomation={flags.isAutomation}
         envTemplateId={envTemplateId}
         hideEndpoints={hideEndpoints}
+        readOnly={configReadOnly}
       />
 
       {flags.isAutomation && hasRelease && scheduleOpen && (

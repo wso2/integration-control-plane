@@ -20,6 +20,8 @@ import { useState, type ReactNode } from 'react';
 import type { HeaderStatusProps } from '../../../types/integration';
 import StatusDot from '../_shared/StatusDot';
 import ConfigureButton from '../_shared/ConfigureButton';
+import { Scopes } from '../../../constants/permissions';
+import { useCan } from '../../../hooks/useCan';
 import RagIngestionConfigureDrawer, { type ConfigureStep } from './configure/RagIngestionConfigureDrawer';
 import { KB_INGESTION_SUBTYPE } from '../../../constants/ragIngestion';
 
@@ -35,11 +37,13 @@ const KB_DATA_SOURCE_STEPS: ConfigureStep[] = ['envVars', 'schedule'];
  */
 export default function HeaderStatus({ component, env, projectId, versionId, orgHandler, deploymentPipelineId, hasDeployment, deploymentStatusV2 }: HeaderStatusProps): ReactNode {
   const [configureOpen, setConfigureOpen] = useState(false);
+  const can = useCan();
 
   return (
     <>
       <StatusDot status={deploymentStatusV2} />
-      {hasDeployment && (
+      {/* The RAG drawer has no read-only view, so only roles that may change the configuration get it. */}
+      {hasDeployment && can(Scopes.CONFIG_MANAGE) && (
         <>
           <ConfigureButton onClick={() => setConfigureOpen(true)} />
           <RagIngestionConfigureDrawer
