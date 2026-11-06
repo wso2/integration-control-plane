@@ -40,10 +40,16 @@ const links: IntegrationLinks = {
   environments: [environment('development'), environment('production')],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0 }));
 vi.mock('../../hooks/useConfiguration', () => ({
-  useIntegrationLinks: () => ({ data: answer.links ?? links }),
-  useLinkWrite: () => ({ isError: false, mutate: (input: { target: unknown }) => writes.push(input.target) }),
+  useIntegrationLinks: () => ({
+    data: answer.cached ? (answer.links ?? links) : undefined,
+    isError: answer.readFailed,
+    isLoading: false,
+    isFetching: false,
+    refetch: async () => void answer.refetches++,
+  }),
+  useLinkWrite: () => ({ isError: false, isPending: answer.pending, mutate: (input: { target: unknown }) => writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useMiConfig', () => ({
   useMiConfig: () => ({ data: { envVars: [{ key: 'DB_URL', value: 'jdbc:x' }], secrets: [], legacySecrets: [], shadowedLegacySecrets: [] }, isLoading: false, isError: false }),
@@ -71,7 +77,7 @@ const supplied = (name: string) => (document.querySelector(`input[aria-label="${
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   writes.length = 0;
-  answer.links = undefined;
+  Object.assign(answer, { links: undefined, pending: false, readFailed: false, cached: true, refetches: 0 });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -123,5 +129,37 @@ describe('the MI Configure form', () => {
     expect(supplied('GITHUB_TOKEN')).toBe('from workload.yaml (GitHub Acme · GITHUB_AUTH_TOKEN)');
     expect(document.querySelectorAll('[aria-label^="Link "]')).toHaveLength(0);
     expect((document.querySelector('[aria-label="Remove GITHUB_TOKEN"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('offers no link action while a link write is on its way', async () => {
+    answer.pending = true;
+    await render('development');
+    const disabled = (label: string) => (document.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement).disabled;
+    expect(['Link GITHUB_TOKEN', 'Link DB_URL', 'Remove GITHUB_TOKEN'].map(disabled)).toEqual([true, true, true]);
+  });
+
+  it("says the links couldn't be read, with Try again, in place of the rows", async () => {
+    Object.assign(answer, { readFailed: true, cached: false });
+    await render('development');
+    expect(document.body.textContent).toContain("Couldn't read this integration's links.");
+    expect(document.querySelector('[aria-label="Link DB_URL"]')).toBeNull();
+    const tryAgain = Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Try again')!;
+    await act(async () => tryAgain.click());
+    expect(answer.refetches).toBe(1);
+  });
+
+  it('keeps the links of the last read, marked as not refreshed, with no link action', async () => {
+    answer.readFailed = true;
+    await render('development');
+    expect(document.body.textContent).toContain("Couldn't refresh this integration's links. These are from the last read.");
+    expect(supplied('GITHUB_TOKEN')).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
+    expect((document.querySelector('[aria-label="Link DB_URL"]') as HTMLButtonElement).disabled).toBe(true);
+    // A changed value can't be saved until the links read.
+    const value = Array.from(document.querySelectorAll('input')).find((i) => i.value === 'jdbc:x')!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(value, 'jdbc:y');
+      value.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Save')?.disabled).toBe(true);
   });
 });

@@ -91,8 +91,12 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const [settingsEp, setSettingsEp] = useState<EnvEndpoint | null>(null);
   const nextId = useRef(0);
   const seededRef = useRef(false);
-  const { data: links } = useIntegrationLinks(projectId, componentId, open);
+  const linksRead = useIntegrationLinks(projectId, componentId, open);
+  const links = linksRead.data;
   const linkWrite = useLinkWrite();
+  // Until the links read, rows can't be told linked or not; while a write is on its way, another could undo it.
+  const linksUnread = !links || linksRead.isError;
+  const linkBusy = linkWrite.isPending || linksUnread;
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id = '') => environments.find((e) => e.id === id)?.name ?? id;
   const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
@@ -204,7 +208,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   // The value box's link icon: Enter a value, or a resource key.
   const renderValue = (name: string, view: TargetView, box: JSX.Element) => {
-    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, onPick: (pick) => link(name, pick) }} />;
+    const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, disabled: linkBusy, onPick: (pick) => link(name, pick) }} />;
     if (!view.source)
       return picker ? (
         <Stack direction="row" alignItems="flex-start" sx={{ flex: 1 }}>
@@ -261,7 +265,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
             size="small"
             color="error"
             aria-label={`Remove ${r.key || 'row'}`}
-            disabled={!!rowLink.source && !rowLink.picker}
+            disabled={!!rowLink.source && (!rowLink.picker || linkBusy)}
             onClick={() => {
               if (rowLink.source) link(name, null);
               removeRow(setRows, r.id);
@@ -280,7 +284,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         <Stack key={name} direction="row" gap={1} alignItems="flex-start" sx={{ mb: 2.5 }}>
           <TextField size="small" value={name} disabled sx={{ flex: 1 }} />
           {renderValue(name, l, <></>)}
-          <IconButton size="small" color="error" aria-label={`Remove ${name}`} disabled={!l.picker} onClick={() => link(name, null)} sx={{ mt: 0.5 }}>
+          <IconButton size="small" color="error" aria-label={`Remove ${name}`} disabled={!l.picker || linkBusy} onClick={() => link(name, null)} sx={{ mt: 0.5 }}>
             <Trash2 size={16} />
           </IconButton>
         </Stack>
@@ -337,7 +341,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     if (!isDeployed) {
       return <Alert severity="info">{continueWithoutChanges ? 'Configurations can be set once the integration is deployed to this environment. Continue to deploy it.' : 'Deploy the integration to this environment to set its configurations.'}</Alert>;
     }
-    if (isLoading) {
+    if (isLoading || linksRead.isLoading) {
       return (
         <Stack gap={1.5}>
           {[0, 1, 2].map((i) => (
@@ -362,8 +366,23 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
         </Alert>
       );
     }
+    const linksError = linksRead.isError && (
+      <Alert
+        severity="error"
+        sx={{ mb: 3 }}
+        action={
+          <Button color="inherit" size="small" disabled={linksRead.isFetching} onClick={() => void linksRead.refetch()}>
+            Try again
+          </Button>
+        }>
+        {links ? "Couldn't refresh this integration's links. These are from the last read." : "Couldn't read this integration's links."}
+      </Alert>
+    );
+    // Without the links, linked rows would read as rows without values.
+    if (!links) return linksError;
     return (
       <>
+        {linksError}
         <Alert severity="info" sx={{ mb: 3 }}>
           The integration reads these as <code>{'${configs.<key>}'}</code>. To mount files, go to{' '}
           {configsUrl ? (
@@ -404,7 +423,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   // The last step saves when something changed. With nothing to save it continues the
   // Configure & Deploy flow, closes the Endpoints step (whose edits apply on their own), or waits.
   const finishLabel = save.isPending ? 'Saving…' : hasChanges ? 'Save' : continueWithoutChanges ? 'Continue' : step === 2 ? 'Done' : 'Save';
-  const finishDisabled = save.isPending || (!hasChanges && !continueWithoutChanges && step !== 2);
+  const finishDisabled = save.isPending || (isDeployed && linksUnread) || (!hasChanges && !continueWithoutChanges && step !== 2);
   const showFinish = isDeployed || continueWithoutChanges;
 
   return (
