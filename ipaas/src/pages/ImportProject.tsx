@@ -150,6 +150,7 @@ export default function ImportProject(scope: OrgScope): JSX.Element {
             repositoryBranch: selectedBranch,
             repositorySubPath: module.path,
             isPublicRepo,
+            creation: { method: 'import-repo' },
           }),
         ),
       );

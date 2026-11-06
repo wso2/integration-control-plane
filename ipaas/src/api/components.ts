@@ -238,6 +238,8 @@ function toBffCreateComponentBody(input: CreateComponentInput) {
           },
         }
       : {}),
+    // Usage analytics only: the BFF reports it and never forwards it to OpenChoreo.
+    ...(input.creation ? { creation: input.creation } : {}),
   };
 }
 

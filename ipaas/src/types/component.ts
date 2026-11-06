@@ -227,6 +227,23 @@ export interface CreateComponentInput {
     project: string;
     repo: string;
   };
+  /**
+   * How the integration was created, reported with the platform's usage
+   * analytics (feature taxonomy create-integration). Only the console can tell
+   * a sample from an import, since both are a repository to the platform.
+   */
+  creation?: ComponentCreation;
+}
+
+/** create-integration's creation_method values the console sends. */
+export type CreationMethod = 'from-scratch' | 'from-sample' | 'import-repo' | 'from-prebuilt';
+
+export interface ComponentCreation {
+  method: CreationMethod;
+  /** The sample a from-sample integration started from. */
+  sampleId?: string;
+  /** The prebuilt integration a from-prebuilt integration is. */
+  prebuiltSlug?: string;
 }
 
 export interface UpdateComponentInput {

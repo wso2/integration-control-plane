@@ -419,6 +419,7 @@ export default function ImportIntegration(scope: ProjectScope): JSX.Element {
         repositoryBranch: selectedBranch,
         repositorySubPath: subPath || '/',
         isPublicRepo,
+        creation: { method: 'import-repo' },
         // Private repos build through the GitHub App installation that grants access.
         ...(isPublicRepo ? { enableAutoDeploy: true } : isAzureDevOps ? { azureDevOps: { organization: activeOrg, project: selectedAdoProject, repo: activeRepo } } : { gitHubAppInstallationId: userRepos?.find((o) => o.orgName === activeOrg)?.installationId }),
       },
