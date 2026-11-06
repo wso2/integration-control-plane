@@ -32,10 +32,9 @@ interface BffKnowledgeBaseDataSource {
   cronExpression?: string;
   cronTimezone?: string;
   status?: string;
+  error?: string;
   releaseName?: string;
   createdAt?: string;
-  ingestionStarted?: boolean;
-  ingestionError?: string;
 }
 
 interface BffKnowledgeBase {
@@ -47,6 +46,7 @@ interface BffKnowledgeBase {
   config?: Record<string, string>;
   secretKeys?: string[];
   status?: string;
+  error?: string;
   serviceUrl?: string;
   dataSources?: BffKnowledgeBaseDataSource[];
   createdAt?: string;
@@ -62,9 +62,9 @@ export function toKnowledgeBaseDataSource(d: BffKnowledgeBaseDataSource): Knowle
     cronExpression: d.cronExpression ?? '',
     cronTimezone: d.cronTimezone ?? '',
     status: d.status ?? '',
+    error: d.error ?? '',
     releaseName: d.releaseName ?? '',
     createdAt: d.createdAt ?? '',
-    ...(d.ingestionStarted === undefined ? {} : { ingestionStarted: d.ingestionStarted, ingestionError: d.ingestionError ?? '' }),
   };
 }
 
@@ -78,6 +78,7 @@ export function toKnowledgeBase(kb: BffKnowledgeBase): KnowledgeBase {
     config: kb.config ?? {},
     secretKeys: kb.secretKeys ?? [],
     status: kb.status ?? '',
+    error: kb.error ?? '',
     serviceUrl: kb.serviceUrl ?? '',
     dataSources: (kb.dataSources ?? []).map(toKnowledgeBaseDataSource),
     createdAt: kb.createdAt ?? '',

@@ -21,10 +21,12 @@ import { createKnowledgeBase, createKnowledgeBaseDataSource, deleteKnowledgeBase
 import type { CreateKnowledgeBaseDataSourceInput, CreateKnowledgeBaseInput, KnowledgeBase, UpdateKnowledgeBaseInput } from '../types/knowledgeBase';
 import type { RetrievalQuery } from '../types/ragIngestion';
 
-// A KB Service and its data sources take a while to roll out after a write, so
-// a knowledge base still deploying is polled until it settles.
+// A create finishes in the background, and a KB Service and its data sources take a
+// while to roll out after a write, so a knowledge base still being created or
+// deploying is polled until it settles.
 const SETTLING_REFETCH_MS = 5000;
-const isSettling = (kb: KnowledgeBase): boolean => kb.status === '' || kb.status === 'IN_PROGRESS' || kb.dataSources.some((d) => d.status === '' || d.status === 'IN_PROGRESS');
+const SETTLING = new Set(['', 'CREATING', 'IN_PROGRESS']);
+const isSettling = (kb: KnowledgeBase): boolean => SETTLING.has(kb.status) || kb.dataSources.some((d) => SETTLING.has(d.status));
 
 export function useKnowledgeBases() {
   return useQuery({
