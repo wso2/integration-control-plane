@@ -187,15 +187,23 @@ export function formatComponentType(type: string): string {
 }
 
 /**
+ * A sample's path in its repository, as the create request's repositorySubPath.
+ * The non-empty parts are joined with one slash, whether or not either supplies
+ * its own, and a leading slash the catalog gives is kept.
+ */
+export function samplePath(sample: { subDirectory?: string; componentPath: string }): string {
+  return [sample.subDirectory, sample.componentPath]
+    .filter(Boolean)
+    .join('/')
+    .replace(/\/{2,}/g, '/');
+}
+
+/**
  * A sample's id for usage analytics: its path in the samples repository, which
- * stays unique and stable when its display name changes. The parts are joined
- * with a slash whether or not the component path starts with one.
+ * stays unique and stable when its display name changes.
  */
 export function sampleId(sample: { subDirectory?: string; componentPath: string }): string {
-  return [sample.subDirectory, sample.componentPath]
-    .join('/')
-    .replace(/\/{2,}/g, '/')
-    .replace(/^\/+/, '');
+  return samplePath(sample).replace(/^\/+/, '');
 }
 
 export function displayTypeFromSample(componentType: string, buildPack: string): DisplayType {

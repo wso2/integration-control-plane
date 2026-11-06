@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration, sampleId } from './integrations';
+import { componentSubTypeFromSample, formatBuildPack, getDisplayLabel, isSupportedIntegration, sampleId, samplePath } from './integrations';
 
 describe('project listing — RAG components', () => {
   it('labels the ingestion cronjob as "RAG Ingestion" (not Automation)', () => {
@@ -86,6 +86,19 @@ describe('formatBuildPack', () => {
 
   it('shows an unknown buildpack as reported', () => {
     expect(formatBuildPack('java')).toBe('java');
+  });
+});
+
+describe('samplePath', () => {
+  it('keeps the catalog path as it is, leading slash included', () => {
+    expect(samplePath({ componentPath: '/integrator-default-profile/samples/hello-world-service' })).toBe('/integrator-default-profile/samples/hello-world-service');
+    expect(samplePath({ subDirectory: '/bi', componentPath: '/hello-world' })).toBe('/bi/hello-world');
+  });
+
+  it('joins the parts with one slash whether or not either supplies one', () => {
+    expect(samplePath({ subDirectory: 'bi', componentPath: 'hello-world' })).toBe('bi/hello-world');
+    expect(samplePath({ subDirectory: 'bi/', componentPath: '/hello-world' })).toBe('bi/hello-world');
+    expect(samplePath({ subDirectory: '', componentPath: '' })).toBe('');
   });
 });
 
