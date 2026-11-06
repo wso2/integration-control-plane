@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings } from '../api/configuration';
-import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput } from '../types/configuration';
+import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings, fetchIntegrationLinks, writeLink } from '../api/configuration';
+import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, LinkWrite, LinkWriteInput } from '../types/configuration';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -100,3 +100,39 @@ export function usePostCertificateMappings() {
     },
   });
 }
+
+export function useIntegrationLinks(projectId: string, componentId: string, enabled: boolean) {
+  const qc = useQueryClient();
+  return useQuery({
+    queryKey: ['integrationLinks', projectId, componentId],
+    queryFn: () => fetchIntegrationLinks(projectId, componentId),
+    enabled: enabled && !!projectId && !!componentId,
+    retry: false,
+    refetchInterval: (query) => (query.state.data?.environments[0]?.linksNeedDeploy && rollingOut(qc, projectId, componentId) ? ROLLOUT_POLL_MS : false),
+  });
+}
+
+export function useLinkWrite() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['linkWrite'],
+    mutationFn: (input: LinkWriteInput) => writeLink(input),
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['integrationLinks', vars.projectId, vars.componentId] });
+      qc.invalidateQueries({ queryKey: ['componentDeployment'] });
+    },
+  });
+}
+
+const ROLLOUT_POLL_MS = 3000;
+const ROLLOUT_WINDOW_MS = 120_000;
+
+// After a write that updates the Workload, OpenChoreo releases it to development; the links follow until the release has them.
+const rollingOut = (qc: QueryClient, projectId: string, componentId: string, now = Date.now()) =>
+  qc
+    .getMutationCache()
+    .findAll({ mutationKey: ['linkWrite'], status: 'success' })
+    .some((m) => {
+      const vars = m.state.variables as LinkWriteInput;
+      return vars.projectId === projectId && vars.componentId === componentId && (m.state.data as LinkWrite).workload === 'updated' && now < m.state.submittedAt + ROLLOUT_WINDOW_MS;
+    });

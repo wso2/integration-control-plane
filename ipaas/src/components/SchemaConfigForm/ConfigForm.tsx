@@ -16,12 +16,13 @@
  * under the License.
  */
 
-import { useEffect, useState, type Dispatch, type SetStateAction } from 'react';
+import { useState, type Dispatch, type ReactNode, type SetStateAction } from 'react';
 import { Box, Collapse, Stack, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import type { BaseType, JSONSchema } from '../../types/schema';
-import { type LinkingInfo, type SchemaAtLevel, getSchemasAtLevel } from './schemaUtils';
+import { type LinkingInfo, type SchemaField, ownPackage, schemaFields } from './schemaUtils';
 import { ConfigElement } from './FormElements/ConfigElement';
+import { FieldLinkContext, type FieldLinks, noFieldLinks } from './linkedFrom';
 import { ManagedConfigContext } from './managedConfig';
 
 interface ConfigGroup {
@@ -29,6 +30,16 @@ interface ConfigGroup {
   groupName: string;
   groupDisplayName?: string;
   configurations: { keyUuid: string; key: string; isSensitive?: boolean }[];
+}
+
+/** A box of fields: a connection's configurables, with its link in the title bar. */
+export interface FormGroup {
+  id: string;
+  title: ReactNode;
+  actions?: ReactNode;
+  note?: ReactNode;
+  /** Config keys, in the schema's order. */
+  keys: string[];
 }
 
 export interface ConfigFormProps {
@@ -42,135 +53,129 @@ export interface ConfigFormProps {
   configGroups?: ConfigGroup[];
   handleValueChange: (jsonPath: string, value: BaseType, configMap?: Map<string, BaseType>) => void;
   handleValidationChange: (jsonPath: string, isValid: boolean, validationMap?: Map<string, boolean>) => void;
+  /** Boxes before "Other configurables", one per connection. */
+  groups?: FormGroup[];
+  fieldLinks?: FieldLinks;
   /** Keys the platform sets; shown read-only. */
   managedKeys?: ReadonlySet<string>;
 }
 
-function SectionAccordion({ title, defaultExpanded = false, children, contentSx, subAccordion = false }: { title: string; defaultExpanded?: boolean; children: React.ReactNode; contentSx?: object; subAccordion?: boolean }) {
-  const [open, setOpen] = useState(defaultExpanded);
-  return (
-    <Box sx={{ mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between" onClick={() => setOpen((p) => !p)} sx={{ px: 2, py: 1.25, cursor: 'pointer', userSelect: 'none', bgcolor: 'action.hover', borderBottom: open ? 1 : 0, borderColor: 'divider' }}>
-        {subAccordion ? (
-          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-            {title}
-          </Typography>
-        ) : (
-          <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
-            {title}
-          </Typography>
-        )}
-        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-      </Stack>
-      <Collapse in={open}>
-        <Box sx={contentSx}>{children}</Box>
-      </Collapse>
-    </Box>
-  );
-}
+const groupSx = { mb: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
+const headSx = { px: 2, py: 1, bgcolor: 'action.hover', borderBottom: 1, borderColor: 'divider' } as const;
 
 const NO_MANAGED_KEYS: ReadonlySet<string> = new Set();
 
-export function ConfigForm({ schema, valueMap, handleValueChange, validationMap, handleValidationChange, linkingMap, setLinkingMap, sensitiveMap, setSensitiveMap, configGroups, managedKeys = NO_MANAGED_KEYS }: ConfigFormProps) {
-  const [isRequiredKeysInSchema, setIsRequiredKeysInSchema] = useState(false);
-  const [isOptionalKeysInSchema, setIsOptionalKeysInSchema] = useState(false);
-  const [schemasAtLevel, setSchemasAtLevel] = useState<SchemaAtLevel[]>([]);
+/** Required fields first, each list in the schema's order. */
+const requiredFirst = (fields: SchemaField[]) => [...fields.filter((f) => f.required), ...fields.filter((f) => !f.required)];
 
-  useEffect(() => {
-    const targetLevel = schema.requiredLevel || 1;
-    const schemas = getSchemasAtLevel(schema, targetLevel);
-    setSchemasAtLevel(schemas);
+export function ConfigForm({
+  schema,
+  valueMap,
+  handleValueChange,
+  validationMap,
+  handleValidationChange,
+  linkingMap,
+  setLinkingMap,
+  sensitiveMap,
+  setSensitiveMap,
+  configGroups,
+  groups = [],
+  fieldLinks = noFieldLinks,
+  managedKeys = NO_MANAGED_KEYS,
+}: ConfigFormProps) {
+  const targetLevel = schema.requiredLevel || 1;
+  const fields = schemaFields(schema);
+  const own = ownPackage(fields);
+  const grouped = new Set(groups.flatMap((g) => g.keys));
+  const other = fields.filter((f) => f.pkg === own && !grouped.has(f.path));
+  const libraries = [...new Set(fields.filter((f) => f.pkg !== own).map((f) => f.pkg))];
 
-    let hasRequired = false;
-    let hasOptional = false;
-    schemas.forEach(({ schema: levelSchema }) => {
-      if (levelSchema.properties) {
-        const required = levelSchema.required || [];
-        const allProps = Object.keys(levelSchema.properties);
-        if (required.length > 0) hasRequired = true;
-        if (allProps.length > required.length) hasOptional = true;
-      }
-    });
-    setIsRequiredKeysInSchema(hasRequired);
-    setIsOptionalKeysInSchema(hasOptional);
-  }, [schema]);
+  const renderField = (f: SchemaField) => (
+    <ConfigElement
+      key={f.path}
+      title={f.label}
+      type={f.schema.properties![f.key].type || 'anyOf'}
+      schema={f.schema}
+      jsonPath={f.path}
+      propertyKey={f.key}
+      valueMap={valueMap}
+      handleValueChange={handleValueChange}
+      validationMap={validationMap}
+      handleValidationChange={handleValidationChange}
+      isRequired={f.required}
+      isRequiredAtRequiredLevel={f.required && targetLevel === 1}
+      // Configuration groups aren't served by the BFF, so fields never link to one.
+      allowLinking={false}
+      configGroups={configGroups}
+      linkingMap={linkingMap}
+      setLinkingMap={setLinkingMap}
+      sensitiveMap={sensitiveMap}
+      setSensitiveMap={setSensitiveMap}
+    />
+  );
 
-  const renderConfigElements = (levelSchema: JSONSchema, path: string, requiredOnly: boolean, targetLevel: number) => {
-    if (!levelSchema.properties) return null;
-    const required = levelSchema.required || [];
-
-    return Object.keys(levelSchema.properties).map((key, _index) => {
-      const property = levelSchema.properties![key];
-      const type = property.type || 'anyOf';
-      const title = property.title || key;
-      const fullPath = path ? `${path}.${key}` : key;
-      const isKeyRequired = required.includes(key);
-
-      if (requiredOnly && !isKeyRequired) return null;
-      if (!requiredOnly && isKeyRequired) return null;
-
-      return (
-        <ConfigElement
-          key={fullPath}
-          title={title}
-          type={type}
-          schema={levelSchema}
-          jsonPath={fullPath}
-          propertyKey={key}
-          valueMap={valueMap}
-          handleValueChange={handleValueChange}
-          validationMap={validationMap}
-          handleValidationChange={handleValidationChange}
-          isRequired={isKeyRequired}
-          isRequiredAtRequiredLevel={requiredOnly && targetLevel === 1}
-          // Configuration groups aren't served by the BFF, so fields never link to one.
-          allowLinking={false}
-          configGroups={configGroups}
-          linkingMap={linkingMap}
-          setLinkingMap={setLinkingMap}
-          sensitiveMap={sensitiveMap}
-          setSensitiveMap={setSensitiveMap}
-        />
-      );
-    });
-  };
-
-  const renderSection = (requiredOnly: boolean) => {
-    const targetLevel = schema.requiredLevel || 1;
-
-    return schemasAtLevel.map(({ schema: levelSchema, path }) => {
-      if (!levelSchema.properties) return null;
-      const required = levelSchema.required || [];
-      const hasMatch = Object.keys(levelSchema.properties).some((key) => (requiredOnly ? required.includes(key) : !required.includes(key)));
-      if (!hasMatch) return null;
-
-      if (targetLevel === 1) {
-        return renderConfigElements(levelSchema, path, requiredOnly, targetLevel);
-      }
-
-      return (
-        <SectionAccordion key={`${path}-${requiredOnly ? 'required' : 'optional'}`} title={path.replace('.', '/')} defaultExpanded contentSx={{ px: 2, pt: 1, pb: 1 }} subAccordion>
-          {renderConfigElements(levelSchema, path, requiredOnly, targetLevel)}
-        </SectionAccordion>
-      );
-    });
-  };
+  const box = (id: string, title: ReactNode, actions: ReactNode, note: ReactNode, list: SchemaField[]) => (
+    <Box key={id} sx={groupSx}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} sx={headSx}>
+        <Box sx={{ minWidth: 0 }}>{title}</Box>
+        {actions}
+      </Stack>
+      <Box sx={{ px: 2, pt: 0.5, pb: 1 }}>
+        {note}
+        {requiredFirst(list).map(renderField)}
+      </Box>
+    </Box>
+  );
 
   return (
     <ManagedConfigContext.Provider value={managedKeys}>
-      <Box>
-        {isRequiredKeysInSchema && (
-          <SectionAccordion title="Required" defaultExpanded contentSx={{ px: 2, pt: 1.5, pb: 1 }}>
-            {renderSection(true)}
-          </SectionAccordion>
+      <FieldLinkContext.Provider value={fieldLinks}>
+        {groups.map((g) =>
+          box(
+            g.id,
+            g.title,
+            g.actions,
+            g.note,
+            fields.filter((f) => g.keys.includes(f.path)),
+          ),
         )}
-
-        {isOptionalKeysInSchema && (
-          <SectionAccordion title="Optional" contentSx={{ px: 2, pt: 1.5, pb: 1.5 }}>
-            {renderSection(false)}
-          </SectionAccordion>
-        )}
-      </Box>
+        {other.length > 0 &&
+          box(
+            'other',
+            <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+              {groups.length > 0 ? 'Other configurables' : 'Configurables'}
+            </Typography>,
+            null,
+            null,
+            other,
+          )}
+        {libraries.map((pkg) => {
+          const list = fields.filter((f) => f.pkg === pkg);
+          return (
+            <LibraryBox key={pkg} title={pkg.replace('.', '/')} expanded={list.some((f) => f.required)}>
+              {requiredFirst(list).map(renderField)}
+            </LibraryBox>
+          );
+        })}
+      </FieldLinkContext.Provider>
     </ManagedConfigContext.Provider>
+  );
+}
+
+/** A library package's configurables, as tuning: collapsed unless one is required. */
+function LibraryBox({ title, expanded, children }: { title: string; expanded: boolean; children: ReactNode }) {
+  const [open, setOpen] = useState(expanded);
+  return (
+    <Box sx={groupSx}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" onClick={() => setOpen((o) => !o)} sx={{ ...headSx, cursor: 'pointer', borderBottom: open ? 1 : 0 }} role="button" aria-expanded={open}>
+        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+          {title}
+        </Typography>
+        {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+      </Stack>
+      <Collapse in={open}>
+        <Box sx={{ px: 2, pt: 0.5, pb: 1 }}>{children}</Box>
+      </Collapse>
+    </Box>
   );
 }

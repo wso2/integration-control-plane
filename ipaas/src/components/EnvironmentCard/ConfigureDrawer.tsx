@@ -26,11 +26,13 @@ import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
+import { useLinkedForm } from './useLinkedForm';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCardList } from '../EndpointCardList';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
+import { linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -788,6 +790,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {
@@ -917,6 +920,8 @@ function GenericServiceConfigureDrawer({
     setSaveError(null);
     const configurations: SchemaConfigItem[] = [];
     valueMap.forEach((value, key) => {
+      // A link supplies it; a value of the form's own would compete with the link's.
+      if (linked.linkedKeys.has(key)) return;
       if (value !== '' && value !== undefined && value !== null) {
         const linking = linkingMap.get(key);
         const isSensitive = sensitiveMap.get(key) || false;
@@ -1019,7 +1024,7 @@ function GenericServiceConfigureDrawer({
   };
 
   const renderConfigurations = () => {
-    if (isLoading) {
+    if (isLoading || linked.linksLoading) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress size={32} color="primary" />
@@ -1030,11 +1035,13 @@ function GenericServiceConfigureDrawer({
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Configuration schema is not available for this component.
+            {linked.unread ?? 'Configuration schema is not available for this component.'}
           </Typography>
         </Box>
       );
     }
+    // Without the links, linked fields would read as empty value boxes.
+    if (linked.linksMissing) return linked.top;
     if (!data?.jsonSchema || !parsedSchema) {
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
@@ -1046,6 +1053,7 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
+        {linked.top}
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -1057,6 +1065,8 @@ function GenericServiceConfigureDrawer({
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          groups={linked.groups}
+          fieldLinks={linked.fieldLinks}
           managedKeys={managedConfigKeys(data?.configurations)}
         />
         {saveError && (
@@ -1088,12 +1098,13 @@ function GenericServiceConfigureDrawer({
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
-  const hasValidationErrors = Array.from(validationMap.values()).some((v) => !v);
+  // A field marked invalid before its link loaded is no longer the form's to fill.
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
   const isApplying = save.isPending || saveCertMappings.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === lastStep ? (isApplying ? 'Applying…' : 'Apply') : step === 1 && generateEp.isPending ? 'Loading…' : 'Next';
-  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
+  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
   const showFooter = !(step === lastStep && managingEp !== null);
 
   return (

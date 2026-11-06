@@ -76,10 +76,24 @@ export const extractUniqueMapKeySet = (valueMap: Map<string, BaseType>, jsonPath
   return uniqueKeySet;
 };
 
+/** A module's node in a Ballerina config schema: it has neither the description every configurable gets nor the name a record type gets. */
+const isModuleNode = (s: JSONSchema): boolean => s.type === 'object' && !!s.properties && s.description === undefined && s.name === undefined;
+
+/**
+ * Splits a package's schema into its root module's configurables and one schema per submodule
+ * (path `<org>.<package>.<module>`), so each module's required configurables count as required.
+ */
+const splitModules = (schema: JSONSchema, path: string): SchemaAtLevel[] => {
+  const entries = Object.entries(schema.properties ?? {});
+  const modules = entries.filter(([, s]) => isModuleNode(s));
+  if (modules.length === 0) return [{ schema, path }];
+  return [{ schema: { ...schema, properties: Object.fromEntries(entries.filter(([, s]) => !isModuleNode(s))) }, path }, ...modules.map(([name, s]) => ({ schema: s, path: `${path}.${name}` }))];
+};
+
 export const getSchemasAtLevel = (schema: JSONSchema, targetLevel: number, currentLevel = 1, currentPath = ''): SchemaAtLevel[] => {
   const schemas: SchemaAtLevel[] = [];
   if (currentLevel === targetLevel) {
-    schemas.push({ schema, path: currentPath });
+    schemas.push(...splitModules(schema, currentPath));
     return schemas;
   }
   if (currentLevel < targetLevel && schema.properties) {
@@ -91,6 +105,44 @@ export const getSchemasAtLevel = (schema: JSONSchema, targetLevel: number, curre
   }
   return schemas.reverse();
 };
+
+/** A configurable at the schema's required level: its config key, its key in its module's schema, its package (`<org>.<package>`), and a label relative to that package. */
+export interface SchemaField {
+  path: string;
+  key: string;
+  pkg: string;
+  label: string;
+  schema: JSONSchema;
+  required: boolean;
+}
+
+/** Every configurable at the schema's required level, labelled relative to its package: a submodule's as `<module>.<name>`. */
+export const schemaFields = (schema: JSONSchema): SchemaField[] => {
+  const targetLevel = schema.requiredLevel || 1;
+  return getSchemasAtLevel(schema, targetLevel).flatMap(({ schema: level, path }) =>
+    Object.keys(level.properties ?? {}).map((key) => {
+      const fullPath = path ? `${path}.${key}` : key;
+      const pkg =
+        targetLevel > 1
+          ? path
+              .split('.')
+              .slice(0, targetLevel - 1)
+              .join('.')
+          : '';
+      return { path: fullPath, key, pkg, label: pkg ? fullPath.slice(pkg.length + 1) : fullPath, schema: level, required: (level.required ?? []).includes(key) };
+    }),
+  );
+};
+
+const SIMPLE_TYPES = ['string', 'integer', 'number', 'float', 'boolean'];
+
+/** The config keys a link can fill: the build's simple-typed configurables, not records, maps, arrays or their members. */
+export const linkableFields = (schema: JSONSchema): string[] => schemaFields(schema).flatMap((f) => (SIMPLE_TYPES.includes(f.schema.properties?.[f.key]?.type ?? '') ? [f.path] : []));
+
+const LIBRARY_ORGS = ['ballerina', 'ballerinax', 'ballerinai'];
+
+/** The integration's own package among the fields': the first not from a library org. */
+export const ownPackage = (fields: SchemaField[]): string => (fields.find((f) => !LIBRARY_ORGS.includes(f.pkg.split('.')[0])) ?? fields[0])?.pkg ?? '';
 
 export function getRequiredPathsAtLevel(schema: JSONSchema): string[] {
   const schemas = getSchemasAtLevel(schema, schema.requiredLevel || 1);

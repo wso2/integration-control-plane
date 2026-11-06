@@ -131,3 +131,84 @@ export interface PostConfigMgtInput {
   commitHash: string;
   configs: ConfigMgtSaveItem[];
 }
+
+/** A key of a resource, as the source of one target. */
+export interface KeyRef {
+  ref: string;
+  key: string;
+}
+
+/** A resource the integration can link: its keys, and the environments where it has values. */
+export interface LinkableResource {
+  id: string;
+  displayName: string;
+  /** The Ballerina package its preset is for. */
+  package?: string;
+  keys: { name: string; secret: boolean }[];
+  valuesIn: string[];
+}
+
+/** A connection in the Workload's build: its link, the resources that suit it, and the key the link gives each of its configurables. */
+export interface LinkConnection {
+  id: string;
+  link?: string;
+  suggestions: string[];
+  fields: { configurable: string; key?: string }[];
+}
+
+/** A link whose target the Workload's build lacks. */
+export interface OrphanedLink {
+  target: string;
+  kind: 'configurable' | 'connection';
+  ref: string;
+  key?: string;
+}
+
+/** What one environment's release uses. */
+export interface EnvironmentLinks {
+  name: string;
+  deployed: boolean;
+  resources: { ref: string; state: 'in_use' | 'needs_restart' }[];
+  valuesChanged: boolean;
+  /** First environment only: the integration's links differ from its release's. */
+  linksNeedDeploy: boolean;
+  connections: Record<string, string>;
+  /** Configurable id → the key it receives, by any source. */
+  configurables: Record<string, KeyRef>;
+  env: Record<string, KeyRef>;
+}
+
+/**
+ * An integration's links. A configurable is `<org>/<module>:<name>`, a connection `<org>/<module>:<connection>`.
+ * `used` is `<resource>|<KEY>` → the target it feeds; `usedByOrphaned` → the orphaned configurable link holding it,
+ * which a write taking the key moves.
+ */
+export interface IntegrationLinks {
+  kind: 'ballerina' | 'mi';
+  resources: LinkableResource[];
+  used: Record<string, string>;
+  usedByOrphaned: Record<string, string>;
+  connections: LinkConnection[];
+  fieldLinks: Record<string, KeyRef>;
+  orphaned: OrphanedLink[];
+  env: Record<string, KeyRef>;
+  environments: EnvironmentLinks[];
+  /** The repository's workload.yaml declares the integration's resources: links are ignored, and writes refused. */
+  sourceDefined?: boolean;
+  /** With sourceDefined: configurable id (or MI env var name) → the key workload.yaml gives it. */
+  declared?: Record<string, KeyRef>;
+}
+
+/** One link change: a target, and its source; without `ref` the target's own link goes. */
+export type LinkTarget = { connection: string; ref?: string } | { configurable: string; ref?: string; key?: string } | { env: string; ref?: string; key?: string };
+
+export interface LinkWriteInput {
+  projectId: string;
+  componentId: string;
+  target: LinkTarget;
+}
+
+/** What a link change did to the Workload: `updated` (development gets it now), `next_deploy`, `unchanged` or `no_workload`. */
+export interface LinkWrite {
+  workload: 'updated' | 'next_deploy' | 'unchanged' | 'no_workload';
+}
