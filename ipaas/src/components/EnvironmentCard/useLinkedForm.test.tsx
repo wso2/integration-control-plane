@@ -43,10 +43,16 @@ const links: IntegrationLinks = {
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: false, connections: {}, configurables: {}, env: {} }],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0 }));
 const failed = vi.hoisted(() => ({ current: undefined as { error: Error; variables: { target: unknown } } | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
-  useIntegrationLinks: () => ({ data: answer.links ?? links }),
+  useIntegrationLinks: () => ({
+    data: answer.cached ? (answer.links ?? links) : undefined,
+    isError: answer.readFailed,
+    isLoading: false,
+    isFetching: false,
+    refetch: async () => void answer.refetches++,
+  }),
   useLinkWrite: () => ({ isPending: answer.pending, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useEnvironments', () => ({ useEnvironments: () => ({ data: [{ id: 'development', name: 'Development' }] }) }));
@@ -96,7 +102,7 @@ beforeEach(async () => {
   writes.length = 0;
   failed.current = undefined;
   answer.links = undefined;
-  answer.pending = false;
+  Object.assign(answer, { pending: false, readFailed: false, cached: true, refetches: 0 });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -126,6 +132,31 @@ describe('the Configure form with links', () => {
       ['Move', true],
       ['Remove', true],
     ]);
+  });
+
+  it("says the links couldn't be read, with Try again, and offers no link action or save", async () => {
+    Object.assign(answer, { readFailed: true, cached: false });
+    const Read = () => {
+      const linked = useLinkedForm('default', 'ghdemo', 'development', true, []);
+      return (
+        <>
+          {linked.top}
+          <span>{`missing ${linked.linksMissing} unread ${linked.linksUnread}`}</span>
+        </>
+      );
+    };
+    await act(async () => root.render(<Read />));
+    expect(container.textContent).toBe("Couldn't read this integration's links.Try againmissing true unread true");
+    await act(async () => button('Try again').click());
+    expect(answer.refetches).toBe(1);
+  });
+
+  it('keeps the links of the last read, marked as not refreshed, with no link action', async () => {
+    answer.readFailed = true;
+    await act(async () => root.render(<Form />));
+    expect(container.textContent).toContain("Couldn't refresh this integration's links. These are from the last read.");
+    expect(container.textContent).toContain('githubLinked to GitHub Acme');
+    expect(['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map((l) => button(l).disabled)).toEqual([true, true, true, true, true]);
   });
 
   it('links a field to the key picked from its link icon', async () => {

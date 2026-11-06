@@ -32,7 +32,10 @@ const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, 
 
 /** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's config keys. */
 export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[]) {
-  const { data: links = noLinks } = useIntegrationLinks(projectId, componentId, open);
+  const read = useIntegrationLinks(projectId, componentId, open);
+  const links = read.data ?? noLinks;
+  // Until the links read, the form can't tell linked fields from others: it offers no link action and no save.
+  const linksUnread = !read.data || read.isError;
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
   const ids = fields.map(configurableId).join();
@@ -45,7 +48,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
     const t = view.target(id);
     return {
       ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }), ...(t.source.declared && { declared: true }) } }),
-      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
+      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
     };
   };
 
@@ -64,7 +67,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
       </Stack>
     ),
     actions: view.editable && !view.sourceDefined && c.link && (
-      <Button size="small" variant="outlined" color="error" startIcon={<Unlink size={14} />} disabled={write.isPending} onClick={() => change({ connection: c.id })} aria-label={`Unlink ${targetName(c.id)}`}>
+      <Button size="small" variant="outlined" color="error" startIcon={<Unlink size={14} />} disabled={write.isPending || linksUnread} onClick={() => change({ connection: c.id })} aria-label={`Unlink ${targetName(c.id)}`}>
         Unlink
       </Button>
     ),
@@ -84,12 +87,24 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
 
   const top: ReactNode = (
     <>
+      {read.isError && (
+        <Alert
+          severity="error"
+          sx={{ mb: 1.5 }}
+          action={
+            <Button size="small" color="inherit" disabled={read.isFetching} onClick={() => void read.refetch()}>
+              Try again
+            </Button>
+          }>
+          {read.data ? "Couldn't refresh this integration's links. These are from the last read." : "Couldn't read this integration's links."}
+        </Alert>
+      )}
       {view.sourceDefined && (
         <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
           Links come from workload.yaml in the repository.
         </Typography>
       )}
-      {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending} change={change} />}
+      {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending || linksUnread} change={change} />}
       {write.data?.workload === 'next_deploy' && (
         <Alert severity="info" sx={{ mb: 1.5 }}>
           Deploy to apply.
@@ -115,7 +130,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   );
 
   // Outside the first environment the form shows the release's build; with its schema unread, it shows no other build's.
-  const unread = links.environments.length > 0 && !view.editable ? `Couldn't read the configurables of the build ${envName(env)} runs.` : undefined;
+  const schemaUnread = links.environments.length > 0 && !view.editable ? `Couldn't read the configurables of the build ${envName(env)} runs.` : undefined;
 
-  return { links, view, groups, fieldLinks, linkedKeys, top, unread };
+  return { links, view, groups, fieldLinks, linkedKeys, top, unread: schemaUnread, linksLoading: read.isLoading, linksUnread, linksMissing: !read.data && read.isError };
 }
