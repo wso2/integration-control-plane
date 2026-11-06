@@ -26,6 +26,7 @@ import { hasMissingRequiredConfigs } from '../_shared/configStatus';
 // Transitional: legacy ConfigureDrawer (defaults to the generic-service form
 // when `isAutomation` is absent) until its genericisation in phase 4.5.
 import ConfigureDrawer from '../../EnvironmentCard/ConfigureDrawer';
+import { isWorkflowIntegration } from '../../../hooks/useUserVisibleEndpoints';
 
 /**
  * Integration-as-API's left-header slot: a deployment status dot plus a
@@ -78,6 +79,7 @@ export default function HeaderStatus({
             commitHash={deployedCommitSha}
             releaseId={releaseId}
             displayType={component.displayType}
+            isWorkflow={isWorkflowIntegration(component)}
             releaseMgtReleaseId={releaseMgtReleaseId}
             releaseMgtDeploymentId={releaseMgtDeploymentId}
             envTemplateId={envTemplateId}
