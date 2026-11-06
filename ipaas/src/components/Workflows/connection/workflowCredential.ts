@@ -32,6 +32,14 @@ import { endpointLoadNotice } from '../../../utils/apiSecurity';
  * role or user (`TEST_KEY_DECISIONS_NOTICE`).
  */
 
+/**
+ * Whether calls name a caller with roles. The test key names none, and the engine serves a run's
+ * details, history, activity tree and reset points, and the human tasks a role is named for, only
+ * to a caller with roles ("caller roles are required to view workflow details"). The views that
+ * need them say they are coming soon, and send none of those reads, until calls carry roles.
+ */
+export const CALLS_CARRY_ROLES = false;
+
 /** Why the engine may refuse a decision: the test key names no user, so it acts for nobody. */
 export const TEST_KEY_DECISIONS_NOTICE = 'The console calls this integration with its test key, which names no user. The workflow engine accepts a decision only on a task or review that is not limited to a role or user.';
 
