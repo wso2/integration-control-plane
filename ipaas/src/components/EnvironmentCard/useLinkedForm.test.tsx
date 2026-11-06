@@ -43,11 +43,11 @@ const links: IntegrationLinks = {
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: false, connections: {}, configurables: {}, env: {} }],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false }));
 const failed = vi.hoisted(() => ({ current: undefined as { error: Error; variables: { target: unknown } } | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
   useIntegrationLinks: () => ({ data: answer.links ?? links }),
-  useLinkWrite: () => ({ isPending: false, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
+  useLinkWrite: () => ({ isPending: answer.pending, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useEnvironments', () => ({ useEnvironments: () => ({ data: [{ id: 'development', name: 'Development' }] }) }));
 
@@ -96,6 +96,7 @@ beforeEach(async () => {
   writes.length = 0;
   failed.current = undefined;
   answer.links = undefined;
+  answer.pending = false;
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -112,6 +113,19 @@ describe('the Configure form with links', () => {
     expect((container.querySelector('input[aria-label="githubAuthToken is supplied by GitHub Acme"]') as HTMLInputElement).value).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
     await act(async () => button('Unlink github').click());
     expect(writes).toEqual([{ connection: id('github') }]);
+  });
+
+  it('offers no link action while a link write is on its way', async () => {
+    answer.pending = true;
+    await act(async () => root.render(<Form />));
+    const actions = ['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map(button);
+    expect(actions.map((b) => [b.getAttribute('aria-label') ?? b.textContent, b.disabled])).toEqual([
+      ['Link githubAuthToken', true],
+      ['Link ordersDatabaseUrl', true],
+      ['Unlink github', true],
+      ['Move', true],
+      ['Remove', true],
+    ]);
   });
 
   it('links a field to the key picked from its link icon', async () => {

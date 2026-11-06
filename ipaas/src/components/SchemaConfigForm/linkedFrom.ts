@@ -47,6 +47,8 @@ export interface FieldLinkPicker {
   selected: string;
   resources: { id: string; name: string; keys: PickerKey[] }[];
   onPick: (pick: { resource: string; key: string } | null) => void;
+  /** Another link change is on its way: one at a time, so no write replaces another's. */
+  disabled?: boolean;
 }
 
 /** One field's link in the form: its source, and the picker when links can change here. */

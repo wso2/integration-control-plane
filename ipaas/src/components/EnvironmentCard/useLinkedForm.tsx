@@ -45,7 +45,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
     const t = view.target(id);
     return {
       ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }), ...(t.source.declared && { declared: true }) } }),
-      ...(t.picker && { picker: { ...t.picker, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
+      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
     };
   };
 
