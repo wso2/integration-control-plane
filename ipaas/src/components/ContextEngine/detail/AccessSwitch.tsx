@@ -16,8 +16,8 @@
  * under the License.
  */
 
-import { CircularProgress, FormControlLabel, Stack, Switch, Typography } from '@wso2/oxygen-ui';
-import type { JSX } from 'react';
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Stack, Switch, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { useState, type JSX } from 'react';
 import { useSetContextEngineAccess } from '../../../hooks/useContextEngine';
 import type { ContextEngineAccess } from '../../../types/contextEngine';
 
@@ -25,24 +25,65 @@ interface AccessSwitchProps {
   engineId: string;
   access: ContextEngineAccess;
   surface: keyof ContextEngineAccess;
+  /** Why the switch can't be used; it is disabled when set. */
+  disabledReason?: string;
 }
 
-const LABELS: Record<keyof ContextEngineAccess, string> = { api: 'API access', mcp: 'MCP access' };
+const SURFACES: Record<keyof ContextEngineAccess, { name: string; clients: string }> = {
+  api: { name: 'API', clients: 'Callers' },
+  mcp: { name: 'MCP', clients: 'Connected agents' },
+};
 
-/** Lets callers through to one public surface, or turns them away with a 403, at the engine's gateway. */
-export default function AccessSwitch({ engineId, access, surface }: AccessSwitchProps): JSX.Element {
+/** Lets callers through to one public surface, or turns them away with a 403, at the engine's gateway. Turning it off asks first. */
+export default function AccessSwitch({ engineId, access, surface, disabledReason }: AccessSwitchProps): JSX.Element {
   const set = useSetContextEngineAccess(engineId);
+  const [confirming, setConfirming] = useState(false);
+  const { name, clients } = SURFACES[surface];
   const checked = set.isPending ? (set.variables[surface] ?? access[surface]) : access[surface];
+  const apply = (on: boolean) => set.mutate({ [surface]: on });
+  const onChange = (on: boolean) => (on ? apply(true) : setConfirming(true));
+
   return (
     <Stack alignItems="flex-end">
       <Stack direction="row" alignItems="center" gap={1}>
-        {set.isPending && <CircularProgress size={16} aria-label="Applying" />}
-        <FormControlLabel label={LABELS[surface]} labelPlacement="start" control={<Switch checked={checked} disabled={set.isPending} onChange={(_e, on) => set.mutate({ [surface]: on })} />} />
+        {set.isPending && (
+          <>
+            <CircularProgress size={14} />
+            <Typography variant="caption" color="text.secondary">
+              Applying…
+            </Typography>
+          </>
+        )}
+        <Tooltip title={disabledReason ?? ''}>
+          <span>
+            <Switch checked={checked} disabled={set.isPending || !!disabledReason} onChange={(_e, on) => onChange(on)} slotProps={{ input: { 'aria-label': `${name} access` } }} />
+          </span>
+        </Tooltip>
       </Stack>
       {set.isError && (
         <Typography variant="caption" color="error">
           {set.error.message || "Couldn't change access. Try again."}
         </Typography>
+      )}
+      {confirming && (
+        <Dialog open onClose={() => setConfirming(false)} maxWidth="xs" fullWidth>
+          <DialogTitle>Turn off {name} access?</DialogTitle>
+          <DialogContent>
+            <DialogContentText>{clients} get a 403 until you turn it back on.</DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setConfirming(false)}>Cancel</Button>
+            <Button
+              variant="contained"
+              color="error"
+              onClick={() => {
+                setConfirming(false);
+                apply(false);
+              }}>
+              Turn off
+            </Button>
+          </DialogActions>
+        </Dialog>
       )}
     </Stack>
   );
