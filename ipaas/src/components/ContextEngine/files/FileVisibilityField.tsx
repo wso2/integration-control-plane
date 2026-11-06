@@ -33,6 +33,8 @@ interface FileVisibilityFieldProps {
   onChange: (value: FileVisibility) => void;
   /** Roles granted query access. Left out where query access is not chosen yet, as in the wizard's first step. */
   queryRoles?: string[];
+  /** The engine the files go to, which knows the caller's groups; absent in the wizard. */
+  engineId?: string;
 }
 
 /**
@@ -40,8 +42,8 @@ interface FileVisibilityFieldProps {
  * org roles. One choice instead of a label plus a rule; warnings say when the
  * choice would hide the files from their uploader or from roles that cannot query.
  */
-export default function FileVisibilityField({ id, label, hint, orgHandle, value, onChange, queryRoles }: FileVisibilityFieldProps): JSX.Element {
-  const { roles, rolesLoading, rolesFailed, roleNames, myGroups, everyone } = useUploadAudience(orgHandle, queryRoles ?? []);
+export default function FileVisibilityField({ id, label, hint, orgHandle, value, onChange, queryRoles, engineId }: FileVisibilityFieldProps): JSX.Element {
+  const { roles, rolesLoading, rolesFailed, roleNames, myGroups, everyone } = useUploadAudience(orgHandle, queryRoles ?? [], engineId ?? null);
   const chosen = value.kind === 'roles' ? value.roles : [];
   const error = visibilityError(value);
   const warnings = visibilityWarnings({ visibility: value, everyone, queryRoles, myGroups, roleNames });

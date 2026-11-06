@@ -39,7 +39,7 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `MOESIF_APP_URL`                                                             | API Insights. See below.                                                                                                 |
 | `TRACKING_ENV`                                                               | Analytics tier: `dev`, `stage`, `prod` or `off`. Picks the GTM container and CookiePro script. Defaults to `dev`.        |
 | `MOESIF_APP_API_KEY`                                                         | Moesif app key for product-usage events, set per deployment. Not API Insights. Unset disables Moesif tracking.           |
-| `CONTEXT_ENGINE_*`, `ENABLE_CONTEXT_ENGINE_FEATURE`                          | Context Engines. See below.                                                                                              |
+| `ENABLE_CONTEXT_ENGINE_FEATURE`                                              | Context Engines. See below.                                                                                              |
 
 Sign-out returns to the page origin. Thunder must list that origin in the client's `postLogoutRedirectUris`.
 
@@ -54,11 +54,7 @@ Moesif only answers an embed from origins it allowlists, so each console origin 
 
 ## Context Engines
 
-Until ipaas-service provisions engines, the org-level Context Engines pages work with one running engine.
-
-- `ENABLE_CONTEXT_ENGINE_FEATURE` set to `true` shows the Context Engines entry. It also needs `CONTEXT_ENGINE_API_URL`.
-- `CONTEXT_ENGINE_API_URL` is the engine's base URL. The browser calls `<base>/v1/...` directly, so the engine must answer CORS for the console origin.
-- `CONTEXT_ENGINE_API_TOKEN` is for local development only: a bearer from the engine's static token file, sent instead of the platform token. Never set it in a shared deployment.
+- `ENABLE_CONTEXT_ENGINE_FEATURE` set to `true` shows the Context Engines entry. Engines are listed, created and deleted through the BFF (`/context-engines`). The browser calls each engine's console API through the org gateway at the URL the BFF returns from `console-access`, sending the BFF's key as `X-API-Key` and the platform token as `Authorization`, so the gateway's CORS policy must allow both headers for the console origin.
 
 ## Verification
 

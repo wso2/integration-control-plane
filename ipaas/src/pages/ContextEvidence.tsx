@@ -21,9 +21,10 @@ import { ArrowLeft, /* Check, */ ChevronRight, Hash, /* Link as LinkIcon, */ Mes
 import { /* useState, */ type JSX /* , type ReactNode */ } from 'react';
 import { useLocation, useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
-import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions } from '../hooks/useContextEngine';
+import { isContextEngineEnabled, useContextEngine, useContextEvidence, useContextPermissions, useRouteEngineId } from '../hooks/useContextEngine';
 import { /* absoluteUrl, */ evidenceBackTarget, /* evidencePart, evidencePlace, */ evidenceVersionLabel, passageLines, sourceTypeName } from '../utils/contextEngine';
-import { contextEngineUrl /* , contextEvidenceUrl */ } from '../paths';
+import { contextEngineUrl, contextEnginesUrl /* , contextEvidenceUrl */ } from '../paths';
+import NotFound from '../components/NotFound';
 import { HttpError } from '../types/http';
 import ComingSoon from './ComingSoon';
 import { mutedSx, summaryCardHeaderSx, summaryCardSx, /* summaryRowSx, */ wrapSx } from '../components/ContextEngine/styles';
@@ -79,9 +80,10 @@ function ChainStep({ label, value, detail, mono = false }: { label: string; valu
  */
 export default function ContextEvidence(scope: OrgScope): JSX.Element {
   const navigate = useAppNavigate();
-  const { engineId = '', evidenceId = '' } = useParams();
+  const { evidenceId = '' } = useParams();
+  const engineId = useRouteEngineId();
   const engine = useContextEngine(engineId);
-  const evidence = useContextEvidence(evidenceId);
+  const evidence = useContextEvidence(engineId, evidenceId);
   const permissions = useContextPermissions(engineId);
   const { state } = useLocation() as { state: ContextEvidenceLocationState | null };
   // Copy link hidden for now.
@@ -89,6 +91,13 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
 
   if (!isContextEngineEnabled()) {
     return <ComingSoon title="Coming Soon" description="Context Engines are currently under development." />;
+  }
+  if (!engineId) {
+    return (
+      <PageContent>
+        <NotFound message="This link does not name a context engine and its environment." backTo={contextEnginesUrl(scope.org)} />
+      </PageContent>
+    );
   }
 
   const engineName = engine.data?.name;
@@ -163,7 +172,7 @@ export default function ContextEvidence(scope: OrgScope): JSX.Element {
   const readerOnly = !!permissions.data && !permissions.data.includes('context.read');
   // Ask about this hidden for now.
   // const subject = l?.heading ?? ev.recordId;
-  // const askAbout = () => navigate(`${contextEngineUrl(scope.org, engineId, 'playground')}?q=${encodeURIComponent(`What else do the sources say about “${subject}”?`)}`);
+  // const askAbout = () => navigate(contextEngineUrl(scope.org, engineId, 'playground', { q: `What else do the sources say about “${subject}”?` }));
   // const copyLink = () =>
   //   navigator.clipboard?.writeText(absoluteUrl(contextEvidenceUrl(scope.org, engineId, ev.id))).then(() => {
   //     setCopied(true);

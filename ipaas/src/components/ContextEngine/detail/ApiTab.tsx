@@ -19,7 +19,8 @@
 import { Alert, Box, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useSearchParams } from 'react-router';
-import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
+import { answerEndpointUrl, buildQueryCurl, buildQueryResponseExample, contextEndpointUrl } from '../../../utils/contextEngine';
+import ApiKeysSection from './ApiKeysSection';
 import CodeViewer from '../../CodeViewer';
 import SurfaceHeader from './SurfaceHeader';
 import { endpointFieldSx, endpointRowSx, mutedSx } from '../styles';
@@ -35,12 +36,23 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
   // "Use in API" on the Playground lands here with the question, and the answer route when it was asked for an answer.
   const question = params.get('q')?.trim() || undefined;
   const route = params.get('mode') === 'answer' && engine.exposure.answers ? 'answer' : 'context';
-  const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
+  const base = engine.publicApiUrl ?? '';
   const endpoints = [
     { label: 'Context', url: contextEndpointUrl(base), off: false },
     // Served only when the engine offers answers; otherwise it returns not-found.
     { label: 'Answer', url: answerEndpointUrl(base), off: !engine.exposure.answers },
   ];
+
+  if (!engine.publicApiUrl) {
+    return (
+      <Box sx={{ maxWidth: 900 }}>
+        <SurfaceHeader title="REST API" description="Send a question and get passages or a cited answer." />
+        <Alert severity="info" variant="outlined">
+          The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ maxWidth: 900 }}>
@@ -57,12 +69,14 @@ export default function ApiTab({ engine }: ApiTabProps): JSX.Element {
 
       <Stack gap={2} sx={{ mb: 3 }}>
         <Alert severity="info" variant="outlined">
-          Send the caller's platform bearer token. Callers get only items they may read.
+          Requests carry one of this engine's API keys in the <code>X-API-Key</code> header. The engine's gateway checks the key; a request without a valid one never reaches the engine.
         </Alert>
         <Typography variant="body2" sx={mutedSx}>
           Send <code>{'{"question": "…"}'}</code>. In <code>answer</code>, <code>[n]</code> cites the nth passage. With no answer, <code>state</code> is <code>"insufficient_evidence"</code>.
         </Typography>
       </Stack>
+
+      <ApiKeysSection engineId={engine.id} />
 
       <CodeViewer title="Example request" language="text" code={buildQueryCurl(base, question, route)} showCopyButton wrapLongLines />
       <Box sx={{ mt: 2 }}>

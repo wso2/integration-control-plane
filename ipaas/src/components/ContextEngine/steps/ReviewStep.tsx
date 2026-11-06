@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, Grid, Link, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, Grid, Link, Skeleton, Stack, Typography } from '@wso2/oxygen-ui';
 import { Check, Pencil } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { STORAGE_BACKENDS } from '../../../constants/contextEngine';
+import { useEngineManagedServer } from '../../../hooks/useContextEngine';
 import { answerChoice, modelProviderName, roleList, sharingMismatches, sourceTypeName, summarizeSource, summarizeSourceVisibility, summarizeStorage } from '../../../utils/contextEngine';
 import { formatDistanceToNow } from '../../../utils/time';
 import SourceMark from '../SourceMark';
@@ -63,6 +64,7 @@ function SummaryCard({ title, editLabel, onEdit, children }: { title: string; ed
 
 /** The last step: confirm what will be created; every card jumps back to its step. */
 export default function ReviewStep({ form, roleNames, everyone, myGroups, draftSavedAt, onEdit }: ReviewStepProps): JSX.Element {
+  const managedServer = useEngineManagedServer();
   // Query access and visibility are set in different steps; say where they disagree before anything is created.
   const mismatch = sharingMismatches(form.sources, form.roles, everyone, myGroups);
   const embeddingName = form.embedding ? modelProviderName('embedding', form.embedding.provider) : '—';
@@ -213,18 +215,28 @@ export default function ReviewStep({ form, roleNames, everyone, myGroups, draftS
           <SummaryCard title="Storage" editLabel="storage" onEdit={() => onEdit(3)}>
             <Stack direction="row" gap={3} flexWrap="wrap">
               {STORAGE_BACKENDS.map((b) => {
-                const sum = summarizeStorage(b.kind, form.storage[b.kind]);
+                // An engine managed store depends on the deployment, which the BFF reports.
+                const sum = managedServer.data ? summarizeStorage(b.kind, form.storage[b.kind], managedServer.data) : null;
                 return (
                   <Box key={b.kind} sx={{ minWidth: 120 }}>
                     <Typography variant="caption" sx={mutedSx}>
                       {b.title.replace(' database', '')}
                     </Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {sum.primary}
-                    </Typography>
-                    <Typography variant="caption" sx={mutedSx}>
-                      {sum.secondary}
-                    </Typography>
+                    {sum ? (
+                      <>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {sum.primary}
+                        </Typography>
+                        <Typography variant="caption" sx={mutedSx}>
+                          {sum.secondary}
+                        </Typography>
+                      </>
+                    ) : (
+                      <>
+                        <Skeleton variant="text" width={110} />
+                        <Skeleton variant="text" width={140} />
+                      </>
+                    )}
                   </Box>
                 );
               })}

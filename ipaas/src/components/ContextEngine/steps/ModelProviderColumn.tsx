@@ -42,6 +42,8 @@ export interface ProviderOption {
   logoDark?: string;
   /** Selectable model ids; empty means the model id is typed in. */
   models: string[];
+  /** Listed, but the engine cannot be configured with it yet. */
+  unavailable?: boolean;
 }
 
 /** Select value for the last option, which swaps the list for a text field. */
@@ -101,9 +103,11 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
             <SelectableCard
               key={p.id}
               title={p.name}
+              description={p.unavailable ? 'Not available yet' : undefined}
               logo={p.logo}
               logoDark={p.logoDark}
               selected={value?.provider === p.id}
+              disabled={p.unavailable}
               onSelect={() => {
                 setOtherChosen(false);
                 onChange(blank(p.id));
@@ -111,6 +115,11 @@ export default function ModelProviderColumn<T extends ModelLike>({ title, purpos
             />
           ))}
         </Box>
+      )}
+      {showProviders && providerInfo?.unavailable && (
+        <Typography variant="caption" color="error">
+          {providerInfo.name} is not available yet. Choose another provider.
+        </Typography>
       )}
 
       {showProviders && value && (

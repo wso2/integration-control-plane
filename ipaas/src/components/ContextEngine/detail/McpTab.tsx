@@ -19,9 +19,9 @@
 import { Alert, Box, Button, ListingTable, Tab, Tabs, TextField, Typography } from '@wso2/oxygen-ui';
 import { Play } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
-import { useContextEngineBearer } from '../../../hooks/useContextEngine';
+import { useCreateContextApiKey } from '../../../hooks/useContextEngine';
 import { CONTEXT_MCP_TOOLS } from '../../../constants/contextEngine';
-import { buildMcpClientConfigs, mcpEndpointUrl, resolveEngineBaseUrl } from '../../../utils/contextEngine';
+import { buildMcpClientConfigs, mcpEndpointUrl } from '../../../utils/contextEngine';
 import CodeViewer from '../../CodeViewer';
 import McpPlayground from '../../McpPlayground/McpPlayground';
 import SurfaceHeader from './SurfaceHeader';
@@ -33,17 +33,31 @@ interface McpTabProps {
 }
 
 const readableSx = { maxWidth: 900 } as const;
+const TEST_KEY_LIFETIME_MS = 60 * 60 * 1000;
 const toolsTableSx = { border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden', mb: 3 } as const;
 
 /** Expose as MCP — endpoint, a config per client, an in-place test, and the tools agents get. */
 export default function McpTab({ engine }: McpTabProps): JSX.Element {
-  const base = resolveEngineBaseUrl(window.API_CONFIG.contextEngineApiUrl, window.location.origin);
+  const base = engine.publicApiUrl ?? '';
   const endpoint = mcpEndpointUrl(base);
   const configs = useMemo(() => buildMcpClientConfigs(base, engine.name), [base, engine.name]);
   const [client, setClient] = useState<McpClientId>('claude-desktop');
   const [testing, setTesting] = useState(false);
-  const bearer = useContextEngineBearer();
+  // The playground calls the public endpoint like any client would, with a short-lived key minted for it.
+  const testKey = useCreateContextApiKey(engine.id);
+  const mintTestKey = () => testKey.mutate({ displayName: 'MCP playground', expiresAt: new Date(Date.now() + TEST_KEY_LIFETIME_MS).toISOString() });
   const selected = configs.find((c) => c.id === client) ?? configs[0];
+
+  if (!engine.publicApiUrl) {
+    return (
+      <Box sx={readableSx}>
+        <SurfaceHeader title="MCP server" description="Agents connect here and call get_context and get_answer." />
+        <Alert severity="info" variant="outlined">
+          The public endpoint isn&apos;t ready yet. It appears here once the engine&apos;s gateway route is set up.
+        </Alert>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -77,7 +91,21 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
       {/* The playground takes the page's full width; the text around it keeps a readable measure. */}
       {testing && (
         <Box sx={playgroundFrameSx}>
-          <McpPlayground url={endpoint} token={bearer} headerName="Authorization" connectionLayout="bar" />
+          {testKey.isError && (
+            <Alert
+              severity="error"
+              variant="outlined"
+              action={
+                <Button size="small" onClick={mintTestKey}>
+                  Try again
+                </Button>
+              }
+              sx={{ mb: 2 }}
+            >
+              Couldn&apos;t create a test key.
+            </Alert>
+          )}
+          <McpPlayground url={endpoint} token={testKey.data?.apiKey ?? null} headerName="X-API-Key" isTokenFetching={testKey.isPending} onTokenRegenerate={mintTestKey} connectionLayout="bar" />
         </Box>
       )}
 
@@ -113,7 +141,7 @@ export default function McpTab({ engine }: McpTabProps): JSX.Element {
         </ListingTable.Container>
 
         <Alert severity="info" variant="outlined">
-          Agents see only what their user may see.
+          Every tool call needs one of this engine's API keys, created on the API tab.
         </Alert>
       </Box>
     </Box>

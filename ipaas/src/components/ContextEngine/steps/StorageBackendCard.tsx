@@ -16,20 +16,22 @@
  * under the License.
  */
 
-import { Alert, Box, Button, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Stack, TextField, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, FormControlLabel, Link, MenuItem, Radio, RadioGroup, Skeleton, Stack, TextField, Typography } from '@wso2/oxygen-ui';
 import { CircleAlert, Database, ExternalLink, Plus, RefreshCw, Waypoints } from '@wso2/oxygen-ui-icons-react';
 import type { JSX, ReactNode } from 'react';
 import { useServerDatabases } from '../../../hooks/usePlatformServices';
 import { STORAGE_DEFAULT_DATABASE, type StorageBackendInfo } from '../../../constants/contextEngine';
 import { REQUIRED_FIELD_SX } from '../../../constants/styles';
-import { isGraphUri } from '../../../utils/contextEngine';
+import { isGraphUri, managedStore } from '../../../utils/contextEngine';
 import SecretField from '../../common/SecretField';
 import { sourceTileMarkSx, storageCardSx, storageEmptySx, storageLinksSx, storageOptionBodySx, storageOptionSx, storageRadioGroupSx } from '../styles';
-import type { ExternalStorage, InfrastructureStorage, StorageSelection } from '../../../types/contextEngine';
+import type { EngineManagedServer, ExternalStorage, InfrastructureStorage, StorageSelection } from '../../../types/contextEngine';
 import type { DatabaseServer } from '../../../types/platformServices';
 
 interface StorageBackendCardProps {
   info: StorageBackendInfo;
+  /** What the engine managed store is in this deployment; undefined until the BFF says. */
+  managedServer: EngineManagedServer | undefined;
   value: StorageSelection;
   onChange: (value: StorageSelection) => void;
   /** Infrastructure servers that can back this store (already filtered for the kind). */
@@ -39,6 +41,8 @@ interface StorageBackendCardProps {
   onRefresh: () => void;
   /** Managed databases are switched off for this deployment; the Infrastructure option is then disabled. */
   infrastructureAvailable: boolean;
+  /** Only the engine managed store can be chosen for now. */
+  alternativeUnavailable?: boolean;
   /** Infrastructure list and create pages for this store, when Infrastructure offers it. */
   listUrl?: string;
   createUrl?: string;
@@ -89,7 +93,7 @@ function DatabaseField({ kind, value, onChange }: { kind: StorageBackendInfo['ki
 }
 
 /** One store's card: Engine managed, or an Infrastructure server (or an external database when Infrastructure has none). */
-export default function StorageBackendCard({ info, value, onChange, servers, serversLoading, serversError, onRefresh, infrastructureAvailable, listUrl, createUrl }: StorageBackendCardProps): JSX.Element {
+export default function StorageBackendCard({ info, managedServer, value, onChange, servers, serversLoading, serversError, onRefresh, infrastructureAvailable, alternativeUnavailable, listUrl, createUrl }: StorageBackendCardProps): JSX.Element {
   const alternativeMode = info.infraSegment ? 'infrastructure' : 'external';
   const chooseMode = (mode: string) => {
     if (mode === 'managed') onChange({ mode: 'managed' });
@@ -243,14 +247,13 @@ export default function StorageBackendCard({ info, value, onChange, servers, ser
             value="managed"
             control={<Radio size="small" />}
             label={
-              <Box>
+              managedServer ? (
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  Engine managed · {info.managedName}
+                  Engine managed · {managedStore(info.kind, managedServer).name}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {info.managedDescription}
-                </Typography>
-              </Box>
+              ) : (
+                <Skeleton variant="text" width={180} />
+              )
             }
           />
         </Box>
@@ -258,26 +261,19 @@ export default function StorageBackendCard({ info, value, onChange, servers, ser
           <FormControlLabel
             value={alternativeMode}
             control={<Radio size="small" />}
-            disabled={alternativeMode === 'infrastructure' && !infrastructureAvailable}
+            disabled={alternativeUnavailable || (alternativeMode === 'infrastructure' && !infrastructureAvailable)}
             label={
               <Box>
                 <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                  {info.alternativeLabel}
+                  Bring your own database
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {info.alternativeDescription}
-                </Typography>
+                {alternativeUnavailable && <Chip label="Coming soon" size="small" sx={{ mt: 0.5 }} />}
               </Box>
             }
           />
           {value.mode !== 'managed' && <Box sx={storageOptionBodySx}>{alternativeMode === 'infrastructure' ? infraBody() : externalBody()}</Box>}
         </Box>
       </RadioGroup>
-      {!info.infraSegment && (
-        <Typography variant="caption" color="text.secondary">
-          Graph databases are not offered under Infrastructure yet.
-        </Typography>
-      )}
     </Box>
   );
 }

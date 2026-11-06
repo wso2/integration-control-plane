@@ -70,23 +70,6 @@ const MS_GRAPH_APP = [F('tenantId', 'Tenant ID', 'text'), F('clientId', 'Client 
 const authIs = (...flows: string[]): SourceFieldDef['showWhen'] => ({ field: 'authType', equals: flows });
 
 /** Connection fields shared by the Google connectors, mirroring the Ballerina `google_auth` module's GoogleAuth: one of three OAuth2 flows, chosen by authType. */
-const GOOGLE_AUTH = [
-  F('authType', 'Authentication', 'select', {
-    defaultValue: 'refresh_token',
-    options: [
-      { value: 'refresh_token', label: 'Refresh token' },
-      { value: 'bearer', label: 'Access token' },
-      { value: 'service_account', label: 'Service account' },
-    ],
-  }),
-  F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token') }),
-  F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token') }),
-  F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.' }),
-  F('clientEmail', 'Service Account Email', 'text', { showWhen: authIs('service_account') }),
-  F('privateKeyPath', 'Private Key Path', 'text', { showWhen: authIs('service_account'), helper: 'PEM file path.' }),
-  O('subject', 'Impersonated User', 'text', { showWhen: authIs('service_account'), helper: 'Optional. Needs domain-wide delegation.' }),
-];
 
 /**
  * Optional RML mapping section, appended to connectors whose `isStructuredData` is
@@ -101,48 +84,60 @@ export const RML_MAPPING = G(
   }),
 );
 
+/**
+ * Sign-in fields of the Google integrations, nested under their `auth` setting. Service accounts
+ * are not offered: the integrations read their key from a file that nothing mounts.
+ */
+const GOOGLE_AUTH = [
+  F('authType', 'Authentication', 'select', {
+    defaultValue: 'refresh_token',
+    options: [
+      { value: 'refresh_token', label: 'Refresh token' },
+      { value: 'bearer', label: 'Access token' },
+    ],
+    setting: 'auth.type',
+  }),
+  F('clientId', 'Client ID', 'text', { showWhen: authIs('refresh_token'), setting: 'auth.clientId' }),
+  F('clientSecret', 'Client Secret', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.clientSecret' }),
+  F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.refreshToken' }),
+  F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.', setting: 'auth.token' }),
+];
+
 const SQL_TABLES = (port: string) => [
   F('host', 'Host', 'text'),
   F('port', 'Port', 'text', { defaultValue: port }),
   F('database', 'Database', 'text'),
   F('tables', 'Tables', 'text', { placeholder: 'public.docs, public.faq', helper: 'Comma-separated, schema-qualified.' }),
   F('user', 'User', 'text'),
-  F('password', 'Password', 'secret'),
+  F('password', 'Password', 'secret', { verbatim: true }),
 ];
 
 /**
- * Grouped form fields for a SQL database connector, mirroring the Ballerina
- * `DatabaseSettings`: connect to a table, pick the columns to ingest, and stream
- * changes with CDC. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
+ * Grouped form fields for a SQL database connector, mirroring the database integrations'
+ * settings: the table, the columns to ingest and the poll for rows that Change Data Capture
+ * missed. `schemaDefault` adds a Schema field (PostgreSQL, SQL Server);
  * MySQL has no schema layer and omits it.
  */
 const DATABASE_FIELDS = (port: string, schemaDefault?: string): SourceFieldDef[] => [
   ...G(
     'Connection',
     F('host', 'Host', 'text', { defaultValue: 'localhost' }),
-    F('port', 'Port', 'text', { defaultValue: port }),
-    F('database', 'Database', 'text'),
+    F('port', 'Port', 'text', { defaultValue: port, valueType: 'integer' }),
+    F('database', 'Database', 'text', { setting: 'databaseName' }),
     ...(schemaDefault !== undefined ? [O('schema', 'Schema', 'text', { defaultValue: schemaDefault })] : []),
     F('username', 'Username', 'text'),
-    F('password', 'Password', 'secret'),
+    F('password', 'Password', 'secret', { verbatim: true }),
   ),
   ...G(
     'Data to sync',
     F('tableName', 'Table', 'text'),
     F('primaryKey', 'Primary Key', 'text'),
-    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated. Leave empty for all columns.' }),
-    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Last-updated time in epoch ms. Recommended.' }),
+    O('columns', 'Columns', 'text', { placeholder: 'id, title, body', helper: 'Comma-separated. Leave empty for all columns.', valueType: 'list' }),
+    O('updatedAtColumn', 'Updated-at Column', 'text', { helper: 'Last-updated time. Recommended.' }),
   ),
   ...G(
     { label: 'Sync options', collapsed: true },
-    F('cdcEnabled', 'Change Data Capture', 'select', {
-      defaultValue: 'true',
-      options: [
-        { value: 'true', label: 'Enabled' },
-        { value: 'false', label: 'Disabled' },
-      ],
-      helper: 'Keep syncing new inserts, updates and deletes after the first import.',
-    }),
+    O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for new rows the change listener missed.', valueType: 'number' }),
   ),
 ];
 
@@ -374,7 +369,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...G(
         'Data to sync',
         F('calendarId', 'Calendar ID', 'text', { defaultValue: 'primary', helper: '"primary" for the connected account’s calendar, or another calendar’s ID.' }),
-        F('eventTypes', 'Event Types', 'text', { defaultValue: 'default, outOfOffice', helper: 'Comma-separated. Any of: default, outOfOffice, focusTime, workingLocation, birthday, fromGmail.' }),
+        F('eventTypes', 'Event Types', 'text', { defaultValue: 'default, outOfOffice', helper: 'Comma-separated. Any of: default, outOfOffice, focusTime, workingLocation, birthday, fromGmail.', valueType: 'list' }),
         F('includePrivateEvents', 'Private Events', 'select', {
           defaultValue: 'false',
           options: [
@@ -382,9 +377,10 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
             { value: 'true', label: 'Include' },
           ],
           helper: 'When excluded, an event made private later is removed.',
+          valueType: 'boolean',
         }),
       ),
-      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.' })),
+      ...G({ label: 'Sync options', collapsed: true }, O('pageSize', 'Page Size', 'text', { defaultValue: '250', helper: 'Events fetched per poll, from 1 to 2500.', valueType: 'integer' })),
     ],
     summaryKeys: ['calendarId'],
     isStructuredData: true,
@@ -424,8 +420,8 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
       ...DATABASE_FIELDS('5432', 'public'),
       ...G(
         { label: 'Sync options', collapsed: true },
-        O('slotName', 'Replication Slot', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Leave empty for the default.' }),
-        O('publicationName', 'Publication', 'text', { showWhen: { field: 'cdcEnabled', equals: ['true'] }, helper: 'Leave empty for the default.' }),
+        O('slotName', 'Replication Slot', 'text', { helper: 'Leave empty for the default.' }),
+        O('publicationName', 'Publication', 'text', { helper: 'Leave empty for the default.' }),
       ),
     ],
     summaryKeys: ['host', 'database'],
@@ -450,7 +446,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     category: 'databases',
     logo: `${CONNECTOR_LOGO_BASE}snowflake.svg`,
     icon: 'database',
-    fields: [F('account', 'Account', 'text'), F('warehouse', 'Warehouse', 'text'), F('database', 'Database', 'text'), F('schema', 'Schema', 'text'), F('table', 'Table', 'text'), F('user', 'User', 'text'), F('password', 'Password', 'secret')],
+    fields: [F('account', 'Account', 'text'), F('warehouse', 'Warehouse', 'text'), F('database', 'Database', 'text'), F('schema', 'Schema', 'text'), F('table', 'Table', 'text'), F('user', 'User', 'text'), F('password', 'Password', 'secret', { verbatim: true })],
     summaryKeys: ['database', 'table'],
   },
   {
@@ -494,8 +490,6 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     popular: true,
     logo: `${CONNECTOR_LOGO_BASE}salesforce.svg`,
     icon: 'cloud',
-    // Mirrors the Ballerina `salesforce` connector's SalesforceSettings: an auth block
-    // (one of three OAuth2 flows, chosen by authType) plus the object, fields and sync options.
     fields: [
       ...G(
         'Connection',
@@ -507,14 +501,19 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
             { value: 'refresh_token', label: 'Refresh token' },
             { value: 'bearer', label: 'Access token' },
           ],
+          setting: 'auth.type',
         }),
-        F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token') }),
-        F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token') }),
-        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token') }),
-        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.' }),
+        F('clientId', 'Consumer Key', 'text', { showWhen: authIs('client_credentials', 'refresh_token'), setting: 'auth.clientId' }),
+        F('clientSecret', 'Consumer Secret', 'secret', { showWhen: authIs('client_credentials', 'refresh_token'), setting: 'auth.clientSecret' }),
+        F('refreshToken', 'Refresh Token', 'secret', { showWhen: authIs('refresh_token'), setting: 'auth.refreshToken' }),
+        F('token', 'Access Token', 'secret', { showWhen: authIs('bearer'), helper: 'Not refreshed. Sync stops when it expires.', setting: 'auth.token' }),
       ),
-      ...G('Data to sync', F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'Must have Change Data Capture enabled.' }), F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated.' })),
-      ...G({ label: 'Sync options', collapsed: true }, O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' })),
+      ...G('Data to sync', F('sobject', 'Object', 'text', { placeholder: 'Account', helper: 'Must have Change Data Capture enabled.' }), F('fields', 'Fields', 'text', { placeholder: 'Name, Industry, Description', helper: 'Comma-separated.', valueType: 'list' })),
+      ...G(
+        { label: 'Sync options', collapsed: true },
+        O('apiVersion', 'API Version', 'text', { defaultValue: '59.0' }),
+        O('pollInterval', 'Poll Interval', 'text', { placeholder: '300', helper: 'Seconds between polls for records the change listener missed.', valueType: 'number' }),
+      ),
     ],
     summaryKeys: ['baseUrl', 'sobject'],
     isStructuredData: true,
@@ -528,7 +527,7 @@ export const SOURCE_CONNECTORS: SourceConnector[] = [
     category: 'saas',
     logo: `${CONNECTOR_LOGO_BASE}servicenow.svg`,
     icon: 'shield',
-    fields: [F('instanceUrl', 'Instance URL', 'url'), F('username', 'Username', 'text'), F('password', 'Password', 'secret')],
+    fields: [F('instanceUrl', 'Instance URL', 'url'), F('username', 'Username', 'text'), F('password', 'Password', 'secret', { verbatim: true })],
     summaryKeys: ['instanceUrl'],
   },
   {
@@ -580,6 +579,14 @@ export const CONNECTOR_BY_ID: Record<string, SourceConnector> = Object.fromEntri
  * other change.
  */
 export const ENABLED_CONNECTOR_IDS = new Set<string>(['upload', 'gdrive', 'google-calendar', 'salesforce', 'mysql', 'postgresql', 'mssql']);
+
+/**
+ * Connectors the browser feeds itself, registered straight on the engine. Every other enabled
+ * connector runs as an integration the BFF deploys, of the type below (its id when not listed).
+ */
+export const ENGINE_NATIVE_CONNECTOR_IDS: ReadonlySet<string> = new Set(['upload']);
+
+export const INTEGRATION_TYPE_BY_CONNECTOR: Record<string, string> = { gdrive: 'google_drive', 'google-calendar': 'google_calendar' };
 
 /** Whether a source can be created from this connector yet. */
 export const isConnectorEnabled = (id: string): boolean => ENABLED_CONNECTOR_IDS.has(id);
@@ -640,20 +647,25 @@ export function blankLlm(provider: LlmProvider): LlmConfig {
 
 // ── Engine limits and access model ──────────────────────────────────────────
 
-/**
- * Each context engine runs as its own instance, and the console shows the one at its configured
- * URL under this id. It is also the engine's root grant resource, so grants and permissions on the
- * engine use it as is.
- */
+/** The engine's root grant resource: every engine uses this id for grants and permissions on itself. */
 export const CONTEXT_ENGINE_ID = 'engine';
 
-/** Shown for an engine set up from another browser, whose name this browser never saw. */
-export const DEFAULT_CONTEXT_ENGINE_NAME = 'Context engine';
+/** The BFF's limit for an engine's name, which becomes part of its address. */
+export const CONTEXT_ENGINE_HANDLE_MAX = 63;
 
-/** localStorage key of the running engine's name and description, which the engine itself does not hold. */
-export const CONTEXT_ENGINE_LOCAL_KEY = 'contextEngine:local';
+/** Fetch an engine's console key again this long before it expires. */
+export const CONSOLE_ACCESS_REFRESH_MARGIN_MS = 2 * 60 * 1000;
 
-/** Limits for an engine's name and description, which the control plane provisions. */
+/** How often an engine that is starting is checked again. */
+export const ENGINE_STATUS_POLL_MS = 4000;
+
+/** How many engines the listing reads a summary from at once. */
+export const SUMMARY_CONCURRENCY = 2;
+
+/** Model providers the engine cannot be configured with yet. */
+export const UNAVAILABLE_MODEL_PROVIDERS: ReadonlySet<string> = new Set(['azure_openai']);
+
+/** Limits for an engine's display name and description. */
 export const CONTEXT_ENGINE_NAME_MAX = 120;
 export const CONTEXT_ENGINE_DESCRIPTION_MAX = 1000;
 /** Shown under the description field: people browsing engines and AI agents connected over MCP both read it. */
@@ -750,9 +762,6 @@ export const ASKED_QUESTIONS_MAX = 20;
 
 /** How many turns a Playground conversation keeps on the page. */
 export const PLAYGROUND_TURNS_MAX = 20;
-
-/** localStorage key of the deletion job started from this browser, per engine, so a failed deletion can be told apart and retried. */
-export const CONTEXT_ENGINE_DELETION_KEY_PREFIX = 'contextEngine:deletion:';
 
 /** How often a list or page with an engine being deleted checks again. */
 export const DELETION_POLL_MS = 3000;
@@ -852,10 +861,8 @@ export interface StorageBackendInfo {
   purpose: string;
   /** The engine's embedded store. */
   managedName: string;
-  managedDescription: string;
-  /** The alternative to the embedded store: an Infrastructure server, or an external database. */
-  alternativeLabel: string;
-  alternativeDescription: string;
+  /** The engine managed store when the deployment gives each engine its own PostgreSQL server. */
+  serverName: string;
   /** Infrastructure list that can supply this store; null when Infrastructure offers none (the alternative is then external). */
   infraSegment: 'vector-databases' | 'databases' | null;
   /** Noun used in empty states and links, e.g. "vector database". */
@@ -871,9 +878,7 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
     title: 'Vector database',
     purpose: 'Embeddings and similarity search over your sources.',
     managedName: 'LanceDB',
-    managedDescription: 'Embedded vector index inside the engine. Good to start with; not shared or backed up.',
-    alternativeLabel: 'From Infrastructure · Vector Databases',
-    alternativeDescription: 'A managed PostgreSQL server with pgvector.',
+    serverName: 'PostgreSQL + pgvector',
     infraSegment: 'vector-databases',
     infraNoun: 'vector database',
     managedProvider: 'lancedb',
@@ -884,9 +889,7 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
     title: 'Relational database',
     purpose: 'Source records, provenance ledger, grants and evidence.',
     managedName: 'SQLite',
-    managedDescription: 'Embedded control-plane store for records, provenance and evidence.',
-    alternativeLabel: 'From Infrastructure · Databases',
-    alternativeDescription: 'A managed PostgreSQL server.',
+    serverName: 'PostgreSQL',
     infraSegment: 'databases',
     infraNoun: 'database',
     managedProvider: 'sqlite',
@@ -897,9 +900,7 @@ export const STORAGE_BACKENDS: StorageBackendInfo[] = [
     title: 'Graph database',
     purpose: 'Entities and relationships the engine extracts.',
     managedName: 'Kuzu',
-    managedDescription: 'Embedded graph index, isolated per engine. Recommended until a shared graph database is available.',
-    alternativeLabel: 'Connect Neo4j',
-    alternativeDescription: 'Bring your own Neo4j instance: Bolt URI, database, user and password.',
+    serverName: 'PostgreSQL',
     infraSegment: null,
     infraNoun: 'graph database',
     managedProvider: 'kuzu',

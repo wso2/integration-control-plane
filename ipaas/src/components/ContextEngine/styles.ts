@@ -662,12 +662,11 @@ export const playgroundFrameSx = { mt: 2, height: { xs: 680, md: 'max(680px, cal
 
 // ── Storage step ────────────────────────────────────────────────────────────
 
-/** Three cards need the widest screens; below that two per row keep the pickers readable. */
+/** Three cards need the widest screens; below that two per row keep the pickers readable. Each card spans three rows its row's cards share, so headers and options line up. */
 export const storageGridSx = {
   display: 'grid',
   gridTemplateColumns: { xs: '1fr', md: 'repeat(2, minmax(0, 1fr))', xl: 'repeat(3, minmax(0, 1fr))' },
   gap: 2,
-  alignItems: 'start',
 } as const;
 
 export const storageCardSx = {
@@ -677,19 +676,18 @@ export const storageCardSx = {
   borderColor: 'divider',
   borderRadius: 1,
   bgcolor: 'background.paper',
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 1.5,
+  display: 'grid',
+  gridRow: 'span 3',
+  gridTemplateRows: 'subgrid',
+  rowGap: 1.5,
 } as const;
 
-/** MUI's FormGroup wraps its column by default, which lets long options escape the card. */
-export const storageRadioGroupSx = { width: '100%', flexWrap: 'nowrap', minWidth: 0 } as const;
+export const storageRadioGroupSx = { width: '100%', minWidth: 0, display: 'grid', gridRow: 'span 2', gridTemplateRows: 'subgrid', rowGap: 1 } as const;
 
 /** One placement option inside a storage card; highlighted when selected. */
 export const storageOptionSx = (selected: boolean) =>
   ({
     p: 1.25,
-    mb: 1,
     width: '100%',
     minWidth: 0,
     boxSizing: 'border-box',

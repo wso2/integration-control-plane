@@ -122,6 +122,7 @@ export default function EditSourceDrawer({ engineId, orgHandle, source, otherNam
               label="Who can see this content"
               orgHandle={orgHandle}
               queryRoles={queryRoles}
+              engineId={engineId}
               value={visibility}
               onChange={(next) => {
                 setVisibility(next);

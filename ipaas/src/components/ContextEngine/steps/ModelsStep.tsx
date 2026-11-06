@@ -20,7 +20,7 @@ import { Box, FormControlLabel, Radio, RadioGroup, Typography } from '@wso2/oxyg
 import type { JSX } from 'react';
 import { blankLlm, CONTEXT_EMBEDDING_PROVIDERS, contextLogoUrl, EMBEDDING_LOGO_DARK, LLM_PROVIDERS } from '../../../constants/contextEngine';
 import { blankEmbedding } from '../../../constants/ragIngestion';
-import { canShareApiKey, type AnswerChoice } from '../../../utils/contextEngine';
+import { canShareApiKey, isModelProviderUnavailable, type AnswerChoice } from '../../../utils/contextEngine';
 import ModelProviderColumn from './ModelProviderColumn';
 import { modelColumnsSx, stepHeadingAloneSx } from '../styles';
 import type { LlmConfig, LlmProvider } from '../../../types/contextEngine';
@@ -39,8 +39,8 @@ interface ModelsStepProps {
   onAnswerLlmChange: (value: LlmConfig) => void;
 }
 
-const EMBEDDING_OPTIONS = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]), models: p.models }));
-const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models }));
+const EMBEDDING_OPTIONS = CONTEXT_EMBEDDING_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: EMBEDDING_LOGO_DARK[p.id] && contextLogoUrl(EMBEDDING_LOGO_DARK[p.id]), models: p.models, unavailable: isModelProviderUnavailable(p.id) }));
+const LLM_OPTIONS = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models, unavailable: isModelProviderUnavailable(p.id) }));
 
 const ANSWER_CHOICES: { value: AnswerChoice; label: string }[] = [
   { value: 'same', label: 'Same as the ingestion model' },
