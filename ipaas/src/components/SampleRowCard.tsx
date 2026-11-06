@@ -22,7 +22,7 @@ import type { JSX } from 'react';
 import type { Sample } from '../types/samples';
 import { Scopes } from '../constants/permissions';
 import { useAgentRefusal } from '../hooks/useCan';
-import { formatComponentType } from '../constants/integrations';
+import { formatComponentType, sampleSourceUrl } from '../constants/integrations';
 import { START_QUICKLY_CARD_MIN_HEIGHT } from '../constants/styles';
 
 export default function SampleRowCard({
@@ -42,7 +42,7 @@ export default function SampleRowCard({
 }): JSX.Element {
   const agentRefusal = useAgentRefusal()(Scopes.AGENT_CREATE);
   const refusal = sample.componentType === 'ai-agent' ? agentRefusal : '';
-  const sourceUrl = `${sample.repositoryUrl}tree/${sample.branch ?? 'main'}${sample.subDirectory ?? ''}${sample.componentPath}`;
+  const sourceUrl = sampleSourceUrl(sample);
 
   return (
     <Box

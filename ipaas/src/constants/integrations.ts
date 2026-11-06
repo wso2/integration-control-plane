@@ -206,6 +206,11 @@ export function sampleId(sample: { subDirectory?: string; componentPath: string 
   return samplePath(sample).replace(/^\/+/, '');
 }
 
+/** The sample's folder on GitHub, for the "Go to source" link. */
+export function sampleSourceUrl(sample: { repositoryUrl: string; branch?: string; subDirectory?: string; componentPath: string }): string {
+  return `${sample.repositoryUrl}tree/${sample.branch ?? 'main'}/${sampleId(sample)}`;
+}
+
 export function displayTypeFromSample(componentType: string, buildPack: string): DisplayType {
   const isMI = buildPack === MI_BUILDPACK;
   switch (componentType) {
