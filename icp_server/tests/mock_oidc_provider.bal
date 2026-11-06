@@ -138,7 +138,11 @@ service /oauth2 on mockOidcListener {
                 "id_token": idToken,
                 "token_type": "Bearer",
                 "expires_in": 3600,
-                "scope": "openid email profile"
+                "scope": "openid email profile",
+                // Extra fields Keycloak adds to every token response
+                "refresh_expires_in": 1800,
+                "not-before-policy": 0,
+                "session_state": "mock-session-state"
             });
 
             log:printInfo("Mock OIDC: Returning successful token response");
