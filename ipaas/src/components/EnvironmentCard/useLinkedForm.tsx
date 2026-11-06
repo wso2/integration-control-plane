@@ -69,7 +69,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
         )}
       </Stack>
     ),
-    actions: view.editable && !view.sourceDefined && <ConnectionLink connection={c} links={links} busy={write.isPending} onLink={(ref) => change(ref ? { connection: c.id, ref } : { connection: c.id })} />,
+    actions: view.editable && !view.sourceDefined && <ConnectionLink connection={c} links={links} busy={write.isPending || linksUnread} onLink={(ref) => change(ref ? { connection: c.id, ref } : { connection: c.id })} />,
     note: note && (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
         {note}

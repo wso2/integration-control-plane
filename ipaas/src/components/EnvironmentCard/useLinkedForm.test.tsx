@@ -169,6 +169,7 @@ describe('the Configure form with links', () => {
       ['Move', true],
       ['Remove', true],
     ]);
+    expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
   });
 
   it("says the links couldn't be read, with Try again, and offers no link action or save", async () => {
@@ -194,6 +195,7 @@ describe('the Configure form with links', () => {
     expect(container.textContent).toContain("Couldn't refresh this integration's links. These are from the last read.");
     expect(container.textContent).toContain('githubLinked to GitHub Acme');
     expect(['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map((l) => button(l).disabled)).toEqual([true, true, true, true, true]);
+    expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
   });
 
   it("offers a link icon on a simple-typed configurable only, not on a record's members", async () => {
