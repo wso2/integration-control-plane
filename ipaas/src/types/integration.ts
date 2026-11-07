@@ -170,6 +170,16 @@ export interface OverviewHeaderSlotProps {
   identity: IntegrationIdentity;
 }
 
+/** Props for an integration-level action in the header's right column, which can span environments. */
+export interface HeaderActionsProps {
+  component: Component;
+  /** The project's environments, in pipeline order. */
+  environments: Environment[];
+  versionId: string;
+  projectId: string;
+  orgHandler: string;
+}
+
 /**
  * The contract each integration type fulfils for the Overview surface.
  *
@@ -194,6 +204,8 @@ export interface IntegrationModule {
   EnvCardActions?: ComponentType<EnvCardActionsProps>;
   /** Replaces the shared Deploy action, for a type whose deploy waits on more than a build. */
   DeployAction?: ComponentType<DeployActionProps>;
+  /** Integration-level actions under the header's Open in Cloud Editor button. */
+  HeaderActions?: ComponentType<HeaderActionsProps>;
   // header — full escape hatch (replaces the generic frame header)
   CustomHeader?: ComponentType<CustomHeaderProps>;
 

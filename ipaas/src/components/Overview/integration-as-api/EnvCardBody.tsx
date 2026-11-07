@@ -27,10 +27,11 @@ import type { ProxyReconciliationStatus } from '../../../types/deployment';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
 import ConsumersPanel from './ConsumersPanel';
+import SecuritySummary from './SecuritySummary';
 import ServiceInsights from './ServiceInsights';
 import SwaggerOperationsList, { type SwaggerDocument } from './SwaggerOperationsList';
 import GraphqlOperationsList from './GraphqlOperationsList';
-import { gatewayExposureState, toEndpointOptions } from '../../../utils/endpoints';
+import { gatewayExposureState } from '../../../utils/endpoints';
 import { friendlyApiError } from '../../../utils/apiSecurity';
 import { isProxyReconciliationActive, proxyReconciliationNotice } from '../../../utils/proxyReconciliation';
 import { Rocket } from '@wso2/oxygen-ui-icons-react';
@@ -78,7 +79,11 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   // The enforcing API Platform gateway URL for the selected endpoint. Passed to EndpointUrlsPanel so an exposed external endpoint shows the apip URL instead
   // of the raw OpenChoreo external route.
   const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id, deploymentTrackId: versionId } : null;
-  const { data: apiSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint && gatewayExposureEnabled);
+  const { data: apiSecurity, isLoading: loadingSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint && gatewayExposureEnabled);
+  // Consumers hold API keys, which an OAuth-secured API refuses: its callers bring tokens from the
+  // key manager instead. Waiting for the mode keeps the panel from showing and then vanishing; a
+  // failed read, or a mode that isn't known, leaves the panel up.
+  const showConsumers = !loadingSecurity && !(apiSecurity?.mode === 'jwt' && !apiSecurity.stateUnknown);
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
   const { data: swagger } = useApiDefinition(hasDeployment && !isGraphql ? activeEndpoint?.apimRevisionId : null);
@@ -141,13 +146,17 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
 
       {serviceNotDeployed && deploymentStatusV2 !== 'IN_PROGRESS' && <EnvEmptyNotice icon={Rocket}>This integration has not been deployed to this environment yet.</EnvEmptyNotice>}
 
-      {/* Cloud-only in-console API consumption: consumer applications and the
-          exposed API's security config. Keyed by the BFF's
+      {/* Cloud-only in-console API consumption: what this environment's API
+          enforces, and its consumer applications. Keyed by the BFF's
           component/environment/endpoint triple and the deployment track, since
           each track has its own API — the component name is the component id
-          and the endpoint name is the endpoint id. */}
-      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && gatewayExposureEnabled && (
-        <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} deploymentTrackId={versionId} endpoints={toEndpointOptions(envEndpoints)} />
+          and the endpoint name is the endpoint id. Security is configured from
+          the header (ApiSecurityAction), not per environment. */}
+      {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !!securityRef && gatewayExposureEnabled && (
+        <>
+          <SecuritySummary endpointRef={securityRef} />
+          {showConsumers && <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} deploymentTrackId={versionId} />}
+        </>
       )}
 
       {/* A project-only endpoint has no consumers, so only an exposure in flight or failing is reported. */}

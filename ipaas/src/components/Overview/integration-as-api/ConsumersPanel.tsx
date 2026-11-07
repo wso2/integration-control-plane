@@ -16,19 +16,18 @@
  * under the License.
  */
 
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, Divider, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { Plus, ShieldCheck, Trash2, Users } from '@wso2/oxygen-ui-icons-react';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, IconButton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Plus, Trash2, Users } from '@wso2/oxygen-ui-icons-react';
 import { useMemo, useState, type JSX } from 'react';
-import { DELETE_CONSUMER_WARNING, SECURITY_MODE_LABEL } from '../../../constants/apiConsumption';
+import { DELETE_CONSUMER_WARNING } from '../../../constants/apiConsumption';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
-import { useConsumers, useDeleteConsumer, useEndpointSecurity } from '../../../hooks/useConsumers';
-import type { Consumer, EndpointOption, EndpointRef } from '../../../types/consumers';
+import { useConsumers, useDeleteConsumer } from '../../../hooks/useConsumers';
+import type { Consumer, EndpointRef } from '../../../types/consumers';
 import { consumerSummary } from '../../../utils/apiConsumption';
 import { friendlyApiError } from '../../../utils/apiSecurity';
 import { isPermissionError } from '../../../utils/apiErrors';
 import ConfirmDeleteDialog from '../../ConfirmDeleteDialog';
-import ApiSecurityDrawer from './ApiSecurityDrawer';
 import ConsumerDrawer from './ConsumerDrawer';
 import * as styles from './apiConsumption.styles';
 
@@ -48,21 +47,17 @@ interface ConsumersPanelProps {
   endpointName: string;
   /** The deployment track whose API this is; each track's API has its own consumers. */
   deploymentTrackId: string;
-  /** All endpoints of this environment, for the security drawer's selector. */
-  endpoints: EndpointOption[];
 }
 
 /** Cloud-only "Consumers" subcard inside the API env card. */
-export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, deploymentTrackId, endpoints }: ConsumersPanelProps): JSX.Element {
+export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, deploymentTrackId }: ConsumersPanelProps): JSX.Element {
   const can = useCan();
   const canManageConsumers = can(Scopes.APPLICATION_MANAGE) && can(Scopes.ENDPOINT_API_KEY_MANAGE);
   const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName, deploymentTrackId }), [componentName, envName, endpointName, deploymentTrackId]);
 
   const { data: consumers = [], isLoading, error } = useConsumers(projectName, endpointRef);
-  const { data: security } = useEndpointSecurity(endpointRef);
   const deleteMutation = useDeleteConsumer(projectName, endpointRef);
 
-  const [securityOpen, setSecurityOpen] = useState(false);
   const [dialogTarget, setDialogTarget] = useState<DialogTarget>(null);
   const [pendingDelete, setPendingDelete] = useState<Consumer | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -90,24 +85,8 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
           <Typography component="span" variant="caption" color="text.secondary">
             ({count})
           </Typography>
-          {security && (
-            <>
-              <Divider orientation="vertical" flexItem sx={styles.titleDivider} />
-              <Typography component="span" variant="body2" color="text.secondary" sx={styles.securityModeGroup}>
-                Security scheme:{' '}
-                <Box component="span" sx={styles.securityModeValue}>
-                  {SECURITY_MODE_LABEL[security.mode]}
-                </Box>
-              </Typography>
-            </>
-          )}
         </Typography>
         <Stack direction="row" alignItems="center" gap={1.5}>
-          {can(Scopes.ENDPOINT_UPDATE) && (
-            <Button variant="text" size="small" startIcon={<ShieldCheck size={14} />} onClick={() => setSecurityOpen(true)} sx={styles.textAction}>
-              Configure security
-            </Button>
-          )}
           {canManageConsumers && (
             <Button variant="contained" size="small" startIcon={count > 0 ? <Plus size={14} /> : undefined} onClick={() => setDialogTarget('new')}>
               {count > 0 ? 'New consumer' : 'Consume API'}
@@ -169,7 +148,6 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
         </Box>
       )}
 
-      <ApiSecurityDrawer open={securityOpen} onClose={() => setSecurityOpen(false)} componentName={componentName} envName={envName} deploymentTrackId={deploymentTrackId} endpoints={endpoints} activeEndpointName={endpointName} />
       <ConsumerDrawer open={dialogTarget !== null} onClose={() => setDialogTarget(null)} projectName={projectName} endpointRef={endpointRef} envLabel={envLabel} consumer={dialogTarget === 'new' ? null : dialogTarget} existingNames={existingNames} />
 
       {pendingDelete && (
