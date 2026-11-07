@@ -163,6 +163,8 @@ export default function Component(scope: ComponentScope): JSX.Element {
               latestCommit={latestCommit}
               orgHandler={scope.org}
               projectId={projectId}
+              environments={environments}
+              versionId={versionId}
               module={overviewModule}
               hasSource={hasSource}
               isRepositoryLoading={loadingRepository}

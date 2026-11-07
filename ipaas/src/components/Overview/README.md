@@ -45,6 +45,9 @@ Overview/
 ├── integration-as-api/          status dot + Configure / Test·Logs·Stop·Start /
 │   │                            endpoint URLs + swagger + service insights
 │   ├── HeaderStatus.tsx  EnvCardActions.tsx  EnvCardBody.tsx  (EndpointUrlsPanel is in _shared/)
+│   ├── ApiSecurityAction.tsx    HeaderActions: a "Configure security" link under Open in Cloud
+│   │                            Editor, for the entry environment; each card's SecuritySummary
+│   │                            shows what its env enforces
 │   └── ServiceInsights / ServiceLogsDrawer / SwaggerOperationsList
 ├── file-integration/            index.ts → shared FileEventHeader + FileEventBody
 ├── event-integration/           index.ts → shared FileEventHeader + FileEventBody
@@ -83,6 +86,7 @@ optional `EnvCardFooter`. A type with no env-card concept (e.g. Tailscale) expor
 | `CustomHeader`   | header outliers               | file- + event-integration (shared `FileEventHeader`)     |
 | `EnvCardFooter`  | optional                      | — none today                                             |
 | `CustomOverview` | full-surface outliers         | Tailscale                                                |
+| `HeaderActions`  | integration-level actions     | integration-as-api's Configure security link             |
 
 `ai-agent` uses the generic-frame slots (`HeaderStatus` + `EnvCardActions` + `EnvCardBody`)
 like integration-as-api — it's a generic service under the hood (`componentSubType: aiAgent`),
@@ -141,6 +145,7 @@ frame + state every type shares; each type fills slots.** For Overview today:
 | `CustomHeader`   | full header override — escape hatch when the header differs a lot    |
 | `EnvCardFooter`  | optional footer                                                      |
 | `CustomOverview` | full-surface override (type has no env-card concept, e.g. Tailscale) |
+| `HeaderActions`  | actions under the page header's Open in Cloud Editor button          |
 
 A type omits any slot it doesn't need — no null-returning placeholders. Bodies shared by
 two types live in `_shared/bodies/` and are parameterised by **behaviour props, not type

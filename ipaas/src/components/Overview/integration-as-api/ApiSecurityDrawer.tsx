@@ -16,18 +16,22 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Checkbox, CircularProgress, DrawerPanel, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { useEffect, useRef, useState, type JSX } from 'react';
-import { API_KEY_SCHEME_DESCRIPTION, COMING_SOON_OAUTH, COMING_SOON_UPSTREAM_ATTRS, DEFAULT_API_KEY_HEADER, OAUTH_HEADER, OAUTH_SCHEME_DESCRIPTION } from '../../../constants/apiConsumption';
+import { Alert, Box, Button, CircularProgress, Divider, DrawerPanel, FormControlLabel, MenuItem, Radio, RadioGroup, Select, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@wso2/oxygen-ui';
+import { useEffect, useMemo, useRef, useState, type JSX } from 'react';
+import { API_KEY_SCHEME_DESCRIPTION, DEFAULT_API_KEY_HEADER, OAUTH_SCHEME_DESCRIPTION } from '../../../constants/apiConsumption';
 import { useEndpointSecurity, useSetEndpointSecurity } from '../../../hooks/useConsumers';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 import type { EndpointOption, SecurityConfig, SecurityMode } from '../../../types/consumers';
-import { isPermissionError } from '../../../utils/apiErrors';
+import { apiErrorMessage, httpStatusOf, isPermissionError } from '../../../utils/apiErrors';
 import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
+import { hasJwtFormErrors, jwtFormErrors, jwtFormOf, toJwtSecurity, type JwtForm } from '../../../utils/jwtSecurity';
+import OAuthSettingsSection from './OAuthSettingsSection';
 import { useEndpointDrawer } from './useEndpointDrawer';
 import * as styles from './apiConsumption.styles';
 import { useLeaveGuard, useUnsavedChanges } from '../../../contexts/UnsavedChangesContext';
+
+const SAVE_FAILED = 'Could not save the security configuration.';
 
 interface ApiSecurityDrawerProps {
   open: boolean;
@@ -36,23 +40,34 @@ interface ApiSecurityDrawerProps {
   componentName: string;
   /** Environment name — the BFF's `environmentName` path segment. */
   envName: string;
+  /** The environment's display name, for the note on where the change applies. */
+  envLabel?: string;
   /** Endpoints of this environment; the drawer configures one at a time. */
   endpoints: EndpointOption[];
-  /** Endpoint selected when the drawer opens (the env card's active endpoint). */
+  /** Endpoint selected when the drawer opens. */
   activeEndpointName?: string;
   /** The deployment track whose API is configured; absent means the default track. */
   deploymentTrackId?: string;
 }
 
+/** The configuration a save sends: PUT replaces it whole, so the jwt block always goes complete. */
+function securityConfigOf(mode: SecurityMode, apiKeyHeader: string, jwtForm: JwtForm, issuers: string[] | undefined): SecurityConfig {
+  if (mode === 'api-key') return { mode, apiKey: { header: apiKeyHeader.trim() || DEFAULT_API_KEY_HEADER } };
+  if (mode === 'jwt') return { mode, jwt: toJwtSecurity(jwtForm, issuers) };
+  return { mode: 'none' };
+}
+
 /**
- * Cloud-only "Configure security" drawer for one exposed endpoint API. Mirrors
- * the APIM SecurityDrawer's layout (endpoint selector + security-scheme table)
- * minus the Resources section, which has no cloud equivalent.
+ * Cloud-only "Configure security" drawer for one exposed endpoint API, in one environment: the
+ * pipeline's entry environment, since later ones take the API only by promotion. Mirrors the APIM
+ * SecurityDrawer's layout (endpoint selector + security-scheme table), with the OAuth options below
+ * the table while OAuth is the scheme.
  */
-export default function ApiSecurityDrawer({ open, onClose, componentName, envName, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
+export default function ApiSecurityDrawer({ open, onClose, componentName, envName, envLabel, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
   const canUpdate = useCan()(Scopes.ENDPOINT_UPDATE);
   const [mode, setMode] = useState<SecurityMode>('none');
   const [apiKeyHeader, setApiKeyHeader] = useState(DEFAULT_API_KEY_HEADER);
+  const [jwtForm, setJwtForm] = useState<JwtForm>(() => jwtFormOf(undefined));
   const [error, setError] = useState<string | null>(null);
 
   const { selectedIdx, selectEndpoint, selectedEndpoint, endpointRef, syncKey } = useEndpointDrawer({ open, componentName, envName, deploymentTrackId, endpoints, activeEndpointName });
@@ -72,6 +87,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
       syncedRef.current = syncKey;
       setMode(security.mode);
       setApiKeyHeader(security.apiKey?.header || DEFAULT_API_KEY_HEADER);
+      setJwtForm(jwtFormOf(security.jwt));
       setError(null);
     }
   }, [open, security, syncKey]);
@@ -87,25 +103,30 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
 
   const isApiKey = mode === 'api-key';
   const isOAuth = mode === 'jwt';
+  const jwtErrors = useMemo(() => (isOAuth ? jwtFormErrors(jwtForm) : {}), [isOAuth, jwtForm]);
+  const invalid = hasJwtFormErrors(jwtErrors);
 
   // Clicking the selected radio again clears back to `none` — the only way to open the API.
   const selectScheme = (scheme: Exclude<SecurityMode, 'none'>) => setMode((m) => (m === scheme ? 'none' : scheme));
 
+  const issuers = security?.jwt?.issuers;
+  const draft = securityConfigOf(mode, apiKeyHeader, jwtForm, issuers);
+  const saved = useMemo(() => (security ? securityConfigOf(security.mode, security.apiKey?.header || DEFAULT_API_KEY_HEADER, jwtFormOf(security.jwt), security.jwt?.issuers) : null), [security]);
+
   const handleApply = async () => {
-    if (!endpointRef) return;
+    if (!endpointRef || invalid) return;
     setError(null);
-    // jwt mode is fetched, never chosen here — carry its issuers/audiences back unchanged.
-    const cfg: SecurityConfig = mode === 'api-key' ? { mode, apiKey: { header: apiKeyHeader.trim() || DEFAULT_API_KEY_HEADER } } : mode === 'jwt' ? { mode, jwt: security?.jwt ?? {} } : { mode: 'none' };
     try {
-      await setSecurityMutation.mutateAsync(cfg);
+      await setSecurityMutation.mutateAsync(draft);
       onClose();
     } catch (err) {
-      if (!isPermissionError(err)) setError(friendlyApiError(err, 'Could not save the security configuration.'));
+      if (isPermissionError(err)) return;
+      // A 400 names the value the gateway can't enforce, so the BFF's sentence is the useful part.
+      setError(httpStatusOf(err) === 400 ? `${SAVE_FAILED} ${apiErrorMessage(err, 'Check the values and try again.')}` : friendlyApiError(err, SAVE_FAILED));
     }
   };
 
-  const savedHeader = security?.apiKey?.header || DEFAULT_API_KEY_HEADER;
-  useUnsavedChanges(open && !!security && (mode !== security.mode || (isApiKey && apiKeyHeader.trim() !== savedHeader)));
+  useUnsavedChanges(open && !!saved && JSON.stringify(draft) !== JSON.stringify(saved));
   const guardNavigation = useLeaveGuard();
 
   const handleCancel = () =>
@@ -125,12 +146,17 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
 
       <DrawerPanel.Body>
         {!selectedEndpoint ? (
-          <Alert severity="info">No endpoint associated with this component.</Alert>
+          <Alert severity="info">No endpoint associated with this integration.</Alert>
         ) : (
           <Stack gap={2.5}>
             {error && <Alert severity="error">{error}</Alert>}
             {notice && !error && <Alert severity={notice.severity}>{notice.text}</Alert>}
             {readOnlyNotice && !notice && !error && <Alert severity="info">{readOnlyNotice}</Alert>}
+            {envLabel && !readOnly && !notice && (
+              <Typography variant="body2" color="text.secondary">
+                Changes apply in <strong>{envLabel}</strong>. Promote to apply them to later environments.
+              </Typography>
+            )}
 
             <Stack direction="row" alignItems="center" gap={2}>
               <Typography variant="body2" fontWeight={500}>
@@ -150,52 +176,59 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
                 <CircularProgress size={20} />
               </Box>
             ) : security?.stateUnknown ? null : (
-              <RadioGroup value={mode} name="security-scheme">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={styles.tableHeadCell}>Security scheme</TableCell>
-                      <TableCell sx={styles.tableHeadCell}>Security header</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    <TableRow>
-                      <TableCell sx={styles.schemeCell}>
-                        <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => !readOnly && selectScheme('api-key')} size="small" disabled={readOnly} />} label="API key" disabled={readOnly} />
-                      </TableCell>
-                      <TableCell>
-                        <TextField size="small" value={apiKeyHeader} onChange={(e) => setApiKeyHeader(e.target.value)} disabled={!isApiKey || readOnly} fullWidth />
-                        <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
-                          {API_KEY_SCHEME_DESCRIPTION}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                    {/* Visible but unselectable until jwt-auth is wired end to end. */}
-                    <TableRow>
-                      <TableCell sx={styles.schemeCell}>
-                        <Tooltip title={COMING_SOON_OAUTH}>
-                          <Box component="span" sx={styles.disabledTooltipTarget}>
-                            <FormControlLabel value="jwt" control={<Radio checked={isOAuth} size="small" disabled />} label="OAuth" disabled />
-                          </Box>
-                        </Tooltip>
-                      </TableCell>
-                      <TableCell>
-                        <TextField size="small" value={OAUTH_HEADER} disabled fullWidth />
-                        <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
-                          {OAUTH_SCHEME_DESCRIPTION}
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  </TableBody>
-                </Table>
-              </RadioGroup>
-            )}
+              <>
+                <RadioGroup value={mode} name="security-scheme">
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={styles.tableHeadCell}>Security scheme</TableCell>
+                        <TableCell sx={styles.tableHeadCell}>Security header</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      <TableRow>
+                        <TableCell sx={styles.schemeCell}>
+                          <FormControlLabel value="api-key" control={<Radio checked={isApiKey} onClick={() => !readOnly && selectScheme('api-key')} size="small" disabled={readOnly} />} label="API key" disabled={readOnly} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField size="small" value={apiKeyHeader} onChange={(e) => setApiKeyHeader(e.target.value)} disabled={!isApiKey || readOnly} fullWidth inputProps={{ 'aria-label': 'API key header' }} />
+                          <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
+                            {API_KEY_SCHEME_DESCRIPTION}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell sx={styles.schemeCell}>
+                          <FormControlLabel value="jwt" control={<Radio checked={isOAuth} onClick={() => !readOnly && selectScheme('jwt')} size="small" disabled={readOnly} />} label="OAuth" disabled={readOnly} />
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            size="small"
+                            value={jwtForm.headerName}
+                            onChange={(e) => setJwtForm({ ...jwtForm, headerName: e.target.value })}
+                            disabled={!isOAuth || readOnly}
+                            fullWidth
+                            error={!!jwtErrors.headerName}
+                            helperText={jwtErrors.headerName}
+                            inputProps={{ 'aria-label': 'OAuth token header' }}
+                          />
+                          <Typography variant="caption" color="text.secondary" sx={styles.schemeDescription}>
+                            {OAUTH_SCHEME_DESCRIPTION}
+                          </Typography>
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </RadioGroup>
 
-            <Tooltip title={COMING_SOON_UPSTREAM_ATTRS}>
-              <Box component="span" sx={styles.disabledTooltipTarget}>
-                <FormControlLabel control={<Checkbox checked={false} size="small" disabled />} label="Pass end-user attributes to upstream" disabled />
-              </Box>
-            </Tooltip>
+                {isOAuth && (
+                  <>
+                    <Divider />
+                    <OAuthSettingsSection value={jwtForm} onChange={setJwtForm} errors={jwtErrors} issuers={issuers} operations={security?.operations ?? []} disabled={readOnly || saving} />
+                  </>
+                )}
+              </>
+            )}
           </Stack>
         )}
       </DrawerPanel.Body>
@@ -205,7 +238,7 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
           Cancel
         </Button>
         {canUpdate && (
-          <Button variant="contained" onClick={() => void handleApply()} disabled={saving || readOnly || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
+          <Button variant="contained" onClick={() => void handleApply()} disabled={saving || readOnly || invalid || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
             {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
           </Button>
         )}

@@ -23,13 +23,20 @@ import type { SecurityMode } from '../types/consumers';
 /** Gateway default for the `api-key-auth` policy. */
 export const DEFAULT_API_KEY_HEADER = 'X-API-Key';
 
+/** jwt-auth defaults, as the gateway applies them when an option is absent. */
 export const OAUTH_HEADER = 'Authorization';
+export const DEFAULT_OAUTH_HEADER_PREFIX = 'Bearer';
+export const DEFAULT_FORWARDED_TOKEN_HEADER = 'X-Forwarded-Authorization';
+/** The environment's ThunderID: the one key manager the gateway trusts today. */
+export const DEFAULT_JWT_KEY_MANAGER = 'ThunderKeyManager';
+
+/** The BFF's limits on a jwt configuration; it refuses a save over them. */
+export const MAX_JWT_AUDIENCES = 20;
+export const MAX_SCOPES_PER_LIST = 20;
+export const MAX_TOKEN_OPTION_LENGTH = 128;
 
 /** Stand-in shown wherever a consumer's credential is hidden. */
 export const TOKEN_MASK = '•'.repeat(28);
-
-export const COMING_SOON_OAUTH = 'Securing with OAuth coming soon';
-export const COMING_SOON_UPSTREAM_ATTRS = 'Passing end-user attributes to upstream coming soon';
 
 export const API_KEY_SCHEME_DESCRIPTION = 'Secure your API with API key protocol.';
 export const OAUTH_SCHEME_DESCRIPTION = 'Secure your API with OAuth 2 protocol.';
