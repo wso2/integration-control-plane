@@ -35,7 +35,10 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
+	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/logging"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/domain"
 )
 
@@ -179,6 +182,34 @@ func TestReadAccepts(t *testing.T) {
 			assert.NoError(t, err)
 		})
 	}
+}
+
+func TestReadLogsAScopeThatIsNotAString(t *testing.T) {
+	core, logs := observer.New(zap.WarnLevel)
+	ctx := logging.WithLogger(context.Background(), zap.New(core))
+	s := newSigner(t, testKid)
+	claims := userToken()
+	claims["scope"] = []string{"automation:trigger"}
+
+	identity, err := newTestTokenService(staticKeys{set: s.public}).Read(ctx, s.sign(t, claims))
+
+	require.NoError(t, err)
+	assert.Empty(t, identity.Scopes)
+	require.Equal(t, 1, logs.Len())
+	assert.Contains(t, logs.All()[0].Message, "scope claim is not a string")
+}
+
+func TestReadDoesNotLogAMissingScope(t *testing.T) {
+	core, logs := observer.New(zap.WarnLevel)
+	ctx := logging.WithLogger(context.Background(), zap.New(core))
+	s := newSigner(t, testKid)
+	claims := userToken()
+	delete(claims, "scope")
+
+	_, err := newTestTokenService(staticKeys{set: s.public}).Read(ctx, s.sign(t, claims))
+
+	require.NoError(t, err)
+	assert.Zero(t, logs.Len())
 }
 
 func TestReadRejects(t *testing.T) {

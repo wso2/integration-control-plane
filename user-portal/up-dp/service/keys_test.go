@@ -43,6 +43,7 @@ type fakeIssuer struct {
 
 	mu         sync.Mutex
 	issuer     string
+	jwksURI    string
 	keys       jwk.Set
 	fail       bool
 	discovered int
@@ -74,13 +75,14 @@ func (f *fakeIssuer) Discover(_ context.Context, wellKnownURL string) (*oidc.Met
 	if wellKnownURL != oidc.WellKnownFor(testIssuer) {
 		return nil, errors.New("unexpected discovery url " + wellKnownURL)
 	}
-	return &oidc.Metadata{Issuer: f.issuer, JWKSURI: testJWKSURI}, nil
+	return &oidc.Metadata{Issuer: f.issuer, JWKSURI: f.jwksURI}, nil
 }
 
+// FetchJWKS answers with the keys published when the fetch reached the issuer.
 func (f *fakeIssuer) FetchJWKS(ctx context.Context, jwksURI string) (json.RawMessage, error) {
 	f.mu.Lock()
 	f.fetched++
-	release, started := f.release, f.started
+	release, started, published := f.release, f.started, f.keys
 	f.mu.Unlock()
 	if started != nil {
 		close(started)
@@ -95,17 +97,17 @@ func (f *fakeIssuer) FetchJWKS(ctx context.Context, jwksURI string) (json.RawMes
 	if f.fail {
 		return nil, errors.New("issuer down")
 	}
-	if jwksURI != testJWKSURI {
+	if jwksURI != f.jwksURI {
 		return nil, errors.New("unexpected jwks uri " + jwksURI)
 	}
-	return json.Marshal(f.keys)
+	return json.Marshal(published)
 }
 
 // newTestKeys is the keys of an issuer publishing kid, on a clock the test moves.
 func newTestKeys(t *testing.T, kid string) (*IssuerKeys, *fakeIssuer, *time.Time) {
 	t.Helper()
 
-	issuer := &fakeIssuer{issuer: testIssuer, keys: newSigner(t, kid).public}
+	issuer := &fakeIssuer{issuer: testIssuer, jwksURI: testJWKSURI, keys: newSigner(t, kid).public}
 	now := testNow
 	keys := NewIssuerKeys(testIssuer, issuer)
 	keys.now = func() time.Time { return now }
@@ -132,8 +134,11 @@ func TestKeysAreFoundThroughDiscoveryOnce(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, []string{"k1"}, kidsOf(t, set))
 
+	// Past the TTL, a Get starts a background fetch, which an unknown kid then joins.
 	*now = now.Add(keysTTL)
 	_, err = keys.Get(context.Background(), "k1")
+	require.NoError(t, err)
+	_, err = keys.Get(context.Background(), "unknown")
 	require.NoError(t, err)
 
 	discovered, fetched := issuer.counts()
@@ -152,6 +157,29 @@ func TestKeysAreCachedForTheirTTL(t *testing.T) {
 
 	_, fetched := issuer.counts()
 	assert.Equal(t, 1, fetched)
+}
+
+func TestAFailedFetchFindsTheKeysThroughDiscoveryAgain(t *testing.T) {
+	keys, issuer, now := newTestKeys(t, "k1")
+	_, err := keys.Get(context.Background(), "k1")
+	require.NoError(t, err)
+
+	// The issuer moves its keys, so the URI held fails.
+	issuer.set(func(f *fakeIssuer) {
+		f.jwksURI = "https://widp-dp.example/t/tenant/oauth2/jwks"
+		f.keys = newSigner(t, "k2").public
+	})
+	*now = now.Add(keysRetry)
+	_, err = keys.Get(context.Background(), "k2")
+	require.NoError(t, err, "the stale keys still serve")
+
+	*now = now.Add(keysRetry)
+	set, err := keys.Get(context.Background(), "k2")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"k2"}, kidsOf(t, set))
+	discovered, fetched := issuer.counts()
+	assert.Equal(t, 2, discovered)
+	assert.Equal(t, 3, fetched)
 }
 
 func TestAnUnknownKidFetchesTheRotatedKeys(t *testing.T) {
@@ -299,18 +327,110 @@ func TestCallersShareOneFetch(t *testing.T) {
 	assert.Equal(t, 1, fetched)
 }
 
-func TestACancelledCallerDoesNotCancelTheFetch(t *testing.T) {
+func TestAHeldKeyPastItsTTLDoesNotWaitOnTheRefresh(t *testing.T) {
+	keys, issuer, now := newTestKeys(t, "k1")
+	_, err := keys.Get(context.Background(), "k1")
+	require.NoError(t, err)
+	*now = now.Add(keysTTL)
+
+	release, started := make(chan struct{}), make(chan struct{})
+	issuer.set(func(f *fakeIssuer) {
+		f.release, f.started = release, started
+		f.keys = newSigner(t, "k2").public
+	})
+	got := make(chan jwk.Set, 1)
+	go func() {
+		set, err := keys.Get(context.Background(), "k1")
+		assert.NoError(t, err)
+		got <- set
+	}()
+	select {
+	case set := <-got:
+		assert.Equal(t, []string{"k1"}, kidsOf(t, set))
+	case <-time.After(2 * time.Second):
+		t.Fatal("a held key waited on the refresh")
+	}
+
+	// The refresh went on in the background, and brings the rotated key.
+	<-started
+	issuer.set(func(f *fakeIssuer) { f.release, f.started = nil, nil })
+	close(release)
+	set, err := keys.Get(context.Background(), "k2")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"k2"}, kidsOf(t, set))
+	_, fetched := issuer.counts()
+	assert.Equal(t, 2, fetched)
+}
+
+func TestAKeyPublishedDuringAFetchIsFetchedAgain(t *testing.T) {
+	keys, issuer, now := newTestKeys(t, "k1")
+	_, err := keys.Get(context.Background(), "k1")
+	require.NoError(t, err)
+	*now = now.Add(keysRetry)
+
+	wait, finish := startSlowFetch(t, keys, issuer, context.Background())
+	issuer.set(func(f *fakeIssuer) { f.keys = newSigner(t, "k2").public })
+	rotated := make(chan jwk.Set, 1)
+	go func() {
+		set, err := keys.Get(context.Background(), "k2")
+		assert.NoError(t, err)
+		rotated <- set
+	}()
+	time.Sleep(50 * time.Millisecond)
+	finish()
+
+	// The caller that started the fetch gets its result; the one that joined it fetches again.
+	require.NoError(t, wait())
+	got := <-rotated
+	assert.Equal(t, []string{"k2"}, kidsOf(t, got))
+	_, fetched := issuer.counts()
+	assert.Equal(t, 3, fetched)
+}
+
+func TestAnUnknownKidGetsOneSecondFetchAtMost(t *testing.T) {
+	keys, issuer, now := newTestKeys(t, "k1")
+	_, err := keys.Get(context.Background(), "k1")
+	require.NoError(t, err)
+	*now = now.Add(keysRetry)
+
+	wait, finish := startSlowFetch(t, keys, issuer, context.Background())
+	joined := make(chan error, 3)
+	for range 3 {
+		go func() {
+			_, err := keys.Get(context.Background(), "garbage")
+			joined <- err
+		}()
+	}
+	time.Sleep(50 * time.Millisecond)
+	finish()
+
+	require.NoError(t, wait())
+	for range 3 {
+		assert.NoError(t, <-joined)
+	}
+	_, err = keys.Get(context.Background(), "garbage")
+	require.NoError(t, err)
+	_, fetched := issuer.counts()
+	assert.Equal(t, 3, fetched, "the first fetch, its one follow-up, and no more")
+}
+
+func TestACancelledCallerStopsWaitingButNotTheFetch(t *testing.T) {
 	keys, issuer, _ := newTestKeys(t, "k1")
 	ctx, cancel := context.WithCancel(context.Background())
 
 	wait, finish := startSlowFetch(t, keys, issuer, ctx)
 	cancel()
-	finish()
-	require.NoError(t, wait())
+	err := wait()
+	assert.ErrorIs(t, err, domain.ErrKeysUnavailable)
+	assert.ErrorIs(t, err, context.Canceled)
 
+	// Another caller joins the fetch, which finishes for it.
+	finish()
+	_, err = keys.Get(context.Background(), "k1")
+	require.NoError(t, err)
+	_, fetched := issuer.counts()
+	assert.Equal(t, 1, fetched)
 	issuer.mu.Lock()
 	defer issuer.mu.Unlock()
 	assert.False(t, issuer.ctxDone, "the fetch saw the caller's cancel")
-	_, err := keys.Get(context.Background(), "k1")
-	assert.NoError(t, err)
 }

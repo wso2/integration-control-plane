@@ -30,6 +30,7 @@ import (
 	"github.com/lestrrat-go/jwx/v3/jws"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/logging"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/domain"
 )
 
@@ -126,8 +127,13 @@ func (svc *TokenService) Read(ctx context.Context, rawToken string) (*domain.Tok
 		return nil, fmt.Errorf("tokenservice:Read: token carries no subject: %w", domain.ErrInvalidToken)
 	}
 
+	// A scope that isn't the RFC 9068 space-separated string reads as no scopes, so the
+	// caller is let in but may do nothing. Log it, or that reaches support as a 403.
 	var scope string
-	_ = token.Get("scope", &scope)
+	if err := token.Get("scope", &scope); err != nil && token.Has("scope") {
+		logging.S(ctx).Warnw("token's scope claim is not a string, so the caller gets no scopes",
+			"subject", subject, "error", err)
+	}
 
 	return &domain.TokenIdentity{
 		UserID: subject,

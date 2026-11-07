@@ -52,47 +52,105 @@ type IssuerKeys struct {
 	set         jwk.Set
 	fetchedAt   time.Time
 	lastAttempt time.Time
-	group       singleflight.Group
+	// started counts the fetches begun, so a caller can tell a fetch it joined began before it came.
+	started uint64
+	group   singleflight.Group
+}
+
+// flight is what one fetch gives every caller that shares it.
+type flight struct {
+	set jwk.Set
+	// n is the fetch's number in started.
+	n uint64
+	// second is a fetch made for callers whose key the fetch before it lacked.
+	second bool
 }
 
 func NewIssuerKeys(issuer string, client oidc.Client) *IssuerKeys {
 	return &IssuerKeys{issuer: issuer, oidc: client, now: time.Now}
 }
 
-// Get returns the keys, fetched again once they are keysTTL old, or sooner when they
-// lack kid, so a rotated key is picked up without waiting out the TTL. A fetch holds no
-// lock, so a caller whose key is held never waits on one.
+// Get returns the keys. Keys that hold kid serve at once for keysStale, and from keysTTL
+// on each Get also starts a fetch in the background, so a caller whose key is held never
+// waits on the issuer. A caller without its key, after a rotation or before the first
+// fetch, waits for one, but no longer than its own context allows. Fetches for unknown
+// kids come at most every keysRetry, so a rotated key works within keysRetry of the
+// issuer publishing it.
 func (k *IssuerKeys) Get(ctx context.Context, kid string) (jwk.Set, error) {
 	k.mu.Lock()
-	set, fetchedAt, lastAttempt := k.set, k.fetchedAt, k.lastAttempt
+	set, fetchedAt, lastAttempt, started := k.set, k.fetchedAt, k.lastAttempt, k.started
 	k.mu.Unlock()
 
 	now := k.now()
-	if set != nil && now.Sub(fetchedAt) < keysTTL {
-		if _, known := set.LookupKeyID(kid); kid == "" || known {
-			return set, nil
-		}
-	}
 	usable := set != nil && now.Sub(fetchedAt) < keysStale
-	if now.Sub(lastAttempt) < keysRetry {
+	due := now.Sub(lastAttempt) >= keysRetry
+	if usable && holds(set, kid) {
+		if due && now.Sub(fetchedAt) >= keysTTL {
+			// DoChan's channel is buffered, so the result can go unread.
+			k.group.DoChan("keys", k.fetch(ctx, false))
+		}
+		return set, nil
+	}
+	if !due {
 		if usable {
 			return set, nil
 		}
 		return nil, fmt.Errorf("issuerkeys:Get: last fetch from %s failed: %w", k.issuer, domain.ErrKeysUnavailable)
 	}
 
-	// One fetch for every caller, under context.WithoutCancel, so one caller's cancel
-	// can't abort it for the others.
-	fetchCtx := context.WithoutCancel(ctx)
-	fetched, err, _ := k.group.Do("keys", func() (any, error) { return k.refresh(fetchCtx) })
+	got, err := k.await(ctx, false)
 	if err != nil {
-		if usable {
-			logging.S(ctx).Warnw("serving stale signing keys after a failed fetch", "issuer", k.issuer, "error", err)
+		if usable && ctx.Err() == nil {
 			return set, nil
 		}
-		return nil, fmt.Errorf("issuerkeys:Get: %w: %w", domain.ErrKeysUnavailable, err)
+		return nil, err
 	}
-	return fetched.(jwk.Set), nil
+	// A fetch that began before this caller came may predate its key, and the attempt it
+	// records holds off another for keysRetry. So the caller gets one more fetch, whose
+	// own callers don't, which bounds the issuer to two fetches per keysRetry.
+	if !holds(got.set, kid) && got.n <= started && !got.second {
+		if again, err := k.await(ctx, true); err == nil {
+			got = again
+		}
+	}
+	return got.set, nil
+}
+
+func holds(set jwk.Set, kid string) bool {
+	_, known := set.LookupKeyID(kid)
+	return kid == "" || known
+}
+
+// await joins the fetch under way, or starts one, and waits for it as long as ctx allows.
+func (k *IssuerKeys) await(ctx context.Context, second bool) (flight, error) {
+	select {
+	case result := <-k.group.DoChan("keys", k.fetch(ctx, second)):
+		if result.Err != nil {
+			return flight{}, fmt.Errorf("issuerkeys:Get: %w: %w", domain.ErrKeysUnavailable, result.Err)
+		}
+		return result.Val.(flight), nil
+	case <-ctx.Done():
+		return flight{}, fmt.Errorf("issuerkeys:Get: gave up waiting for %s: %w: %w", k.issuer, domain.ErrKeysUnavailable, ctx.Err())
+	}
+}
+
+// fetch is the one fetch every caller shares. It runs under context.WithoutCancel, so a
+// caller that stops waiting doesn't abort it for the others.
+func (k *IssuerKeys) fetch(ctx context.Context, second bool) func() (any, error) {
+	fetchCtx := context.WithoutCancel(ctx)
+	return func() (any, error) {
+		k.mu.Lock()
+		k.started++
+		n := k.started
+		k.mu.Unlock()
+
+		set, err := k.refresh(fetchCtx)
+		if err != nil {
+			logging.S(fetchCtx).Warnw("fetching signing keys failed", "issuer", k.issuer, "error", err)
+			return nil, err
+		}
+		return flight{set: set, n: n, second: second}, nil
+	}
 }
 
 // refresh fetches the keys. It records the attempt when it ends, so callers that come
@@ -122,12 +180,21 @@ func (k *IssuerKeys) refresh(ctx context.Context) (jwk.Set, error) {
 		k.mu.Unlock()
 	}
 
+	// A failed fetch forgets the URI, so the next one reads the discovery document again
+	// and follows the issuer if it moved its keys.
+	forget := func() {
+		k.mu.Lock()
+		k.jwksURI = ""
+		k.mu.Unlock()
+	}
 	raw, err := k.oidc.FetchJWKS(ctx, jwksURI)
 	if err != nil {
+		forget()
 		return nil, fmt.Errorf("fetch jwks: %w", err)
 	}
 	set, err := jwk.Parse(raw)
 	if err != nil {
+		forget()
 		return nil, fmt.Errorf("parse jwks: %w", err)
 	}
 

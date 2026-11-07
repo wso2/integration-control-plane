@@ -121,8 +121,10 @@ verifies the token itself:
 - the signature, with the key the token's `kid` names (a token without one is refused), from
   the JWKS the discovery document at `OIDC_ISSUER` names. The algorithm comes from the key, so
   an HMAC token keyed with the public key fails. The keys are cached for 5 minutes; an unknown
-  `kid` reads them again, at most every 30 seconds, so a rotated key works at once. One read
-  serves every request waiting on it, and a request whose key is held never waits. If the
+  `kid` reads them again, at most every 30 seconds, so a rotated key works within 30 seconds
+  of the issuer publishing it, and at once unless a read ran in those 30 seconds. A request
+  that joined a read begun before its key was published reads once more. One read serves
+  every request waiting on it, and a request whose key is held never waits. If the
   issuer can't be reached, the keys UP-DP has keep serving for up to an hour;
 - `iss` equal to `OIDC_ISSUER`, `aud` containing `OIDC_RESOURCE`, and an `exp` in the future,
   with 30 seconds of clock skew (`nbf` and `iat` too, when present);
