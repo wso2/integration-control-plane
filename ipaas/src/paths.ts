@@ -17,8 +17,8 @@ export function projectsRedirectUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/projects/redirect`;
 }
 
-// The WSO2 Cloud console serves the root of this console's own origin, outside this console's base path.
-const cloudConsoleUrl = (path: string): string => `${window.location.origin}${path}`;
+// Deployments share an origin with the WSO2 Cloud console; CLOUD_CONSOLE_URL points elsewhere, as local development does.
+const cloudConsoleUrl = (path: string): string => `${window.API_CONFIG?.cloudConsoleUrl || window.location.origin}${path}`;
 
 export function cloudConsoleOrganizationsUrl(): string {
   return cloudConsoleUrl('/organizations');

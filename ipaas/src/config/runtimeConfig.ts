@@ -24,6 +24,7 @@ interface RuntimeConfig {
   SYSTEM_APIS_BASE_URL?: string;
   BILLING_API_BASE_URL?: string;
   BILLING_CONSOLE_URL?: string;
+  CLOUD_CONSOLE_URL?: string;
   CHOREO_SAAS_OFFER_URL?: string;
   ENABLE_BILLING_FEATURE?: string | boolean;
   ASGARDEO_CLIENT_ID?: string;
@@ -91,6 +92,8 @@ export interface ApiConfig {
   billingApiBaseUrl: string;
   /** External billing console base — the Upgrade button links to `${billingConsoleUrl}/cloud/devant/upgrade`. */
   billingConsoleUrl?: string;
+  /** WSO2 Cloud console origin; unset, the console's own origin, which deployments share with it. */
+  cloudConsoleUrl?: string;
   /** Azure marketplace SaaS offer — shows the "Upgrade via Azure marketplace" split-button option when set. */
   choreoSaasOfferUrl?: string;
   /** Gates the free-tier Upgrade button (mirrors Devant's ENABLE_BILLING_FEATURE). */
@@ -234,6 +237,7 @@ export async function loadConfig(): Promise<void> {
       urlManagerUrl: config.CHOREO_URL_MANAGER_URL ? trim(config.CHOREO_URL_MANAGER_URL) : undefined,
       enableCustomUrlMappings: config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === 'true' || config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === true,
       billingConsoleUrl: config.BILLING_CONSOLE_URL ? trim(config.BILLING_CONSOLE_URL) : undefined,
+      cloudConsoleUrl: config.CLOUD_CONSOLE_URL ? trim(config.CLOUD_CONSOLE_URL) : undefined,
       choreoSaasOfferUrl: config.CHOREO_SAAS_OFFER_URL || undefined,
       enableBillingFeature: config.ENABLE_BILLING_FEATURE === 'true' || config.ENABLE_BILLING_FEATURE === true,
       editorCallbackOrigins: (config.EDITOR_CALLBACK_ORIGINS || '')
