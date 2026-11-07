@@ -16,7 +16,6 @@
  * under the License.
  */
 
-import { CALLS_CARRY_ROLES } from '../connection/workflowCredential';
 import { buildQuery, workflowFetch } from './http';
 import type {
   ActivityTreeNode,
@@ -155,9 +154,7 @@ export function createWorkflowClient({ baseUrl, getHeaders, taskQueue }: Workflo
           })}`,
         ),
 
-      // `all` while calls name no caller (the test key alone): without it the engine counts only the
-      // caller's own tasks. Once calls carry roles, the count is the caller's, as the task list is.
-      pendingCount: async (queue?: string) => (await get<{ count: number }>(`/human-tasks/pending-count${buildQuery({ ...scoped({ taskQueue: queue }), all: !CALLS_CARRY_ROLES || undefined })}`))?.count ?? 0,
+      pendingCount: async (queue?: string) => (await get<{ count: number }>(`/human-tasks/pending-count${buildQuery(scoped({ taskQueue: queue }))}`))?.count ?? 0,
 
       get: (taskId: string) => get<HumanTaskInfo>(`/human-tasks/${encodeURIComponent(taskId)}`),
 

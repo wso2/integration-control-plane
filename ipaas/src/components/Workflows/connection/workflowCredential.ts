@@ -29,7 +29,7 @@ import { endpointLoadNotice } from '../../../utils/apiSecurity';
  * with nothing when the endpoint is open. The management API behind it asks for no credential of
  * its own and trusts the gateway, so the key is the only one sent. It names no user: the engine
  * takes every call as anonymous, and accepts a decision only on a task or review that names no
- * role or user (`TEST_KEY_DECISIONS_NOTICE`).
+ * role or user.
  */
 
 /**
@@ -39,9 +39,6 @@ import { endpointLoadNotice } from '../../../utils/apiSecurity';
  * need them say they are coming soon, and send none of those reads, until calls carry roles.
  */
 export const CALLS_CARRY_ROLES = false;
-
-/** Why the engine may refuse a decision: the test key names no user, so it acts for nobody. */
-export const TEST_KEY_DECISIONS_NOTICE = 'The console calls this integration with its test key, which names no user. The workflow engine accepts a decision only on a task or review that is not limited to a role or user.';
 
 /** What gets a call past the gateway: the test key, in its header, or none for an open API. */
 export interface GatewayCredential {

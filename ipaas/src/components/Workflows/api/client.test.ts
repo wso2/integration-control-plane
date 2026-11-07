@@ -75,11 +75,6 @@ describe('createWorkflowClient task queue scope', () => {
     expect(sentQuery()).toMatchObject({ taskQueue: QUEUE });
   });
 
-  it('counts every caller’s pending tasks while calls name no caller', async () => {
-    await client(QUEUE).humanTasks.pendingCount();
-    expect(sentQuery()).toMatchObject({ all: 'true', taskQueue: QUEUE });
-  });
-
   it('leaves single-run reads alone, which name their run', async () => {
     await client(QUEUE).instances.get('order-42');
     expect(sentQuery()).toEqual({});

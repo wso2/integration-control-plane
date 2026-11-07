@@ -29,7 +29,7 @@ export type WorkflowErrorCode = 'NOT_FOUND' | 'ACCESS_DENIED' | 'INVALID_REQUEST
 
 const DEFAULT_MESSAGE: Record<WorkflowErrorCode, string> = {
   NOT_FOUND: 'The workflow engine could not find what was requested.',
-  ACCESS_DENIED: 'The workflow engine refused this request. The console calls it with the test key, which names no user, so a task or review limited to a role or user cannot be decided here.',
+  ACCESS_DENIED: 'The workflow engine refused this request.',
   INVALID_REQUEST: 'The workflow engine rejected this request as invalid.',
   CONFLICT: 'That is not possible in the workflow’s current state.',
   INVALID_PAYLOAD: 'The workflow engine rejected the submitted value.',
