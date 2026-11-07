@@ -648,7 +648,7 @@ export default function AppLayout(): JSX.Element {
             )}
             {/* A plain link: the WSO2 Cloud console serves this path, not this console's router. */}
             <Tooltip title="Settings">
-              <IconButton component="a" href={cloudConsoleOrganizationsUrl()} aria-label="Settings" sx={{ color: 'text.secondary' }}>
+              <IconButton component="a" href={cloudConsoleOrganizationsUrl()} aria-label="Organization Settings" sx={{ color: 'text.secondary' }}>
                 <Settings />
               </IconButton>
             </Tooltip>
