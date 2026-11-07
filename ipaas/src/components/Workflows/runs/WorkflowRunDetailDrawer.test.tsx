@@ -30,6 +30,19 @@ import WorkflowRunDetailDrawer from './WorkflowRunDetailDrawer';
 
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+// Whether calls carry roles, read as the drawer renders: most tests are of a run's full details,
+// which the engine serves only to a caller with roles.
+const roles = vi.hoisted(() => ({ carried: true }));
+vi.mock('../connection/workflowCredential', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../connection/workflowCredential')>();
+  return {
+    ...original,
+    get CALLS_CARRY_ROLES() {
+      return roles.carried;
+    },
+  };
+});
+
 const RUN: WorkflowInstanceSummary = {
   workflowId: 'order-42',
   runId: 'run-7',
@@ -105,6 +118,7 @@ const click = async (label: string) => {
 };
 
 beforeEach(() => {
+  roles.carried = true;
   localStorage.clear();
   clearSettling();
   container = document.createElement('div');
@@ -215,5 +229,39 @@ describe('WorkflowRunDetailDrawer', () => {
     await flush();
     expect(instances.history.mock.calls.length).toBeGreaterThan(historyCalls);
     expect(instances.activityTree.mock.calls.length).toBeGreaterThan(treeCalls);
+  });
+});
+
+// The test key names no caller, so the engine refuses a run's own reads: the drawer sends none of
+// them, says the flow is coming soon, and offers nothing that needs one.
+describe('WorkflowRunDetailDrawer without caller roles', () => {
+  it('shows the run from its row, marks the flow coming soon, and reads none of its details', async () => {
+    roles.carried = false;
+    const { api } = fakeApi();
+    const instances = (api.client as unknown as { instances: Record<string, ReturnType<typeof vi.fn>> }).instances;
+    await renderDrawer(api);
+    expect(text()).toContain('order-42');
+    expect(text()).toContain('Coming soon');
+    expect(text()).toContain('The execution graph and the activity tree are currently under development.');
+    expect(instances.get).not.toHaveBeenCalled();
+    expect(instances.history).not.toHaveBeenCalled();
+    expect(instances.activityTree).not.toHaveBeenCalled();
+  });
+
+  it('does not say a completed run returned nothing, since its result is not read', async () => {
+    roles.carried = false;
+    const { api } = fakeApi();
+    await renderDrawer(api, { ...RUN, status: 'COMPLETED', closeTime: '2026-10-01T10:00:05Z' });
+    expect(text()).toContain('order-42');
+    expect(text()).not.toContain('Completed with no return value.');
+  });
+
+  it('offers the lifecycle actions, but not Reset or the raw history', async () => {
+    roles.carried = false;
+    const { api } = fakeApi();
+    await renderDrawer(api);
+    expect(buttonLabels()).toEqual(expect.arrayContaining(['Suspend', 'Cancel', 'Terminate']));
+    expect(buttonLabels()).not.toContain('Reset…');
+    expect(document.querySelector('[aria-label="Show the raw event history"]')).toBeNull();
   });
 });

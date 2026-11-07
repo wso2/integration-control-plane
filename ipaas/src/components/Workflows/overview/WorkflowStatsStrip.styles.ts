@@ -45,6 +45,9 @@ export const tile = {
   '&.Mui-focusVisible': { borderColor: 'primary.main', bgcolor: 'action.focus' },
 } as const;
 
+/** A figure with no list to open: framed as the others, without a link's hover. */
+export const staticTile = { ...tile, '&:hover': {}, '&:focus-visible': { outline: 'none', borderColor: 'primary.main' } } as const;
+
 /** A palette colour as CSS: the theme's variable when it has one, so it follows the colour scheme. */
 const errorColor = (theme: Theme) => (theme.vars ?? theme).palette.error.main;
 

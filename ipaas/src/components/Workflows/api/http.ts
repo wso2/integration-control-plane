@@ -20,9 +20,9 @@
  * Transport for the workflow Management API.
  *
  * Deliberately raw `fetch`, not the BFF client (`src/api/_client.ts`): the API is the integration's
- * own, reached through the API Platform gateway, and `authenticatedFetch` would put the console's
- * bearer token in `Authorization`, where the gateway reads its own credentials. The caller's token
- * travels in `X-JWT-Assertion` instead (see `connection/workflowCredential.ts`), set by the client.
+ * own, reached through the API Platform gateway with the endpoint's test key, and
+ * `authenticatedFetch` would add the console's bearer token, which the API does not take (see
+ * `connection/workflowCredential.ts`). The client sets the key on each request.
  */
 
 export type WorkflowErrorCode = 'NOT_FOUND' | 'ACCESS_DENIED' | 'INVALID_REQUEST' | 'CONFLICT' | 'INVALID_PAYLOAD' | 'EXECUTION_ERROR' | 'GATEWAY_REJECTED' | 'NETWORK' | 'UNEXPECTED';
@@ -34,7 +34,7 @@ const DEFAULT_MESSAGE: Record<WorkflowErrorCode, string> = {
   CONFLICT: 'That is not possible in the workflow’s current state.',
   INVALID_PAYLOAD: 'The workflow engine rejected the submitted value.',
   EXECUTION_ERROR: 'The workflow engine failed to handle this request.',
-  GATEWAY_REJECTED: 'The credentials were rejected. The test key or the access token may have expired.',
+  GATEWAY_REJECTED: 'The gateway rejected the test key. It may have expired.',
   // In a browser a blocked CORS preflight is indistinguishable from being offline. The gateway in
   // front of the integration answers preflights itself, so what is left to name is the API not
   // being enabled or the integration not being reachable at all.
