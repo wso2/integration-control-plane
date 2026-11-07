@@ -26,10 +26,6 @@ export function cloudConsoleSubscriptionsUrl(): string {
   return '/billing?tab=subscriptions';
 }
 
-export function cloudConsoleProjectManageUrl(projectHandle: string): string {
-  return `/projects/${encodeURIComponent(projectHandle)}/manage`;
-}
-
 export function oidcCallbackUrl(): string {
   return '/signin';
 }

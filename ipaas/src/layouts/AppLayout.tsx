@@ -135,11 +135,12 @@ export default function AppLayout(): JSX.Element {
   const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined;
   const orgUuid = useOrgUuid();
   const upgradeUrl = billingTrial && orgUuid ? billingUpgradeUrl(orgUuid) : null;
-  const openUpgrade = upgradeUrl ? () => window.open(upgradeUrl, '_blank', 'noopener,noreferrer') : undefined;
   const { data: componentLimits } = useOrgComponentLimits(billingTrial ? (orgUuid ?? '') : '');
-  // The panel's own Upgrade button always renders, so the panel is shown only when it has somewhere to go.
+  // Shown only where billing upgrades are configured; its Upgrade button opens the subscriptions page, as the badge does.
   const trialUsage: TrialBadgeUsage | undefined =
-    componentLimits && openUpgrade ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, onUpgrade: openUpgrade } : undefined;
+    componentLimits && upgradeUrl
+      ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, onUpgrade: () => window.location.assign(cloudConsoleSubscriptionsUrl()) }
+      : undefined;
 
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
   // a fresh literal here re-triggers it (and its setState) on every render, which on a

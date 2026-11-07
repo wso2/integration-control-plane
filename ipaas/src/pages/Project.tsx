@@ -55,7 +55,7 @@ import {
 } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX, SEARCH_STANDARD_WIDTH_SX } from '../constants/styles';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
-import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, SlidersHorizontal } from '@wso2/oxygen-ui-icons-react';
+import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
 import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
@@ -75,10 +75,10 @@ import { useDeleteComponent } from '../hooks/useComponents';
 import DeleteIntegrationButton from '../components/DeleteIntegrationButton';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
-import { newComponentUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
+import { newComponentUrl, editProjectUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
-import { cloudConsoleProjectManageUrl, componentOverviewUrl, orgProjectsUrl } from '../paths';
+import { componentOverviewUrl, orgProjectsUrl } from '../paths';
 import { Scopes } from '../constants/permissions';
 import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
@@ -970,7 +970,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </div>
             </Stack>
           </Stack>
-          {/* Beside the editor, Manage project steps back to a link under it so the editor stays the one prominent action. */}
+          {/* Beside the editor, Edit project steps back to a link under it so the editor stays the one prominent action. */}
           <Stack direction={showEditor ? 'column' : 'row'} alignItems={showEditor ? 'flex-end' : 'center'} gap={showEditor ? 0.5 : 1.5} sx={{ flexShrink: 0 }}>
             {showEditor && (
               <Box sx={{ position: 'relative', flexShrink: 0 }}>
@@ -1038,8 +1038,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </Box>
             )}
             <Authorized permissions={Scopes.PROJECT_UPDATE}>
-              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<SlidersHorizontal size={14} />} href={cloudConsoleProjectManageUrl(scope.project)} sx={{ whiteSpace: 'nowrap' }}>
-                Manage project
+              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
+                Edit project
               </Button>
             </Authorized>
           </Stack>

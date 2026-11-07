@@ -143,6 +143,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
   const { displayName, username } = useAuth();
   const { hasOrgPermission } = useAccessControl();
   const databaseDeniedReason = !hasOrgPermission(Scopes.CONFIG_MANAGE) ? 'You do not have permission to create databases.' : dbAvailability.data && !databasesAvailable ? 'Platform services are not available in this environment.' : undefined;
+  const knowledgeBaseDeniedReason = hasOrgPermission(Scopes.CONFIG_MANAGE) ? undefined : 'You do not have permission to create knowledge bases.';
   const { data: projects = [], isLoading, isError, refetch } = useProjects();
   // The BFF returns projects unordered, so the most recently updated are picked here.
   const listed = [...projects].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)).slice(0, LIST_SIZE);
@@ -214,7 +215,14 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           onAction={isLoading ? undefined : createIntegration}
           disabledReason={createDeniedReason}
         />
-        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" onAction={() => navigate(newKnowledgeBaseUrl(scope))} />
+        <SummaryCard
+          icon={<BookOpen size={24} />}
+          title="Knowledge bases"
+          description="Organize the content your agents and integrations draw on."
+          actionLabel="Create a knowledge base"
+          onAction={() => navigate(newKnowledgeBaseUrl(scope))}
+          disabledReason={knowledgeBaseDeniedReason}
+        />
         <SummaryCard
           icon={<Database size={24} />}
           title="Databases"
