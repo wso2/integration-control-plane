@@ -30,9 +30,9 @@ export function useMiConfig(projectId: string, componentId: string, envId: strin
   return useQuery<MiConfig>({
     queryKey: ['miConfig', projectId, componentId, envId],
     queryFn: async () => {
-      const groups = await listEnvGroups(projectId, componentId, envId);
+      const groups = await listEnvGroups(componentId, envId);
       const hasEnvVars = groups.some((g) => g.name === MI_ENV_VARS_GROUP && !g.sensitive);
-      const values = hasEnvVars ? (await getEnvGroup(projectId, componentId, envId, MI_ENV_VARS_GROUP)).data : {};
+      const values = hasEnvVars ? (await getEnvGroup(componentId, envId, MI_ENV_VARS_GROUP)).data : {};
       return toMiConfig(groups, values);
     },
     enabled: enabled && !!projectId && !!componentId && !!envId,
@@ -45,8 +45,8 @@ export function useSaveMiConfig(projectId: string, componentId: string, envId: s
   return useMutation({
     mutationFn: (plan: MiConfigSavePlan) =>
       applyMiConfigSavePlan(plan, {
-        put: (name, sensitive, data, keep) => putEnvGroup(projectId, componentId, envId, name, sensitive, data, keep),
-        remove: (name) => deleteEnvGroup(projectId, componentId, envId, name),
+        put: (name, sensitive, data, keep) => putEnvGroup(componentId, envId, name, sensitive, data, keep),
+        remove: (name) => deleteEnvGroup(componentId, envId, name),
       }),
     // Settled, not success: a partial failure has still changed some groups.
     // The miConfig refetch is returned so the caller's onSuccess (which closes the

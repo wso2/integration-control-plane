@@ -188,7 +188,7 @@ describe('updateEndpoint visibility reconciliation', () => {
       displayName: 'HTTP',
       networkVisibilities: ['Organization'],
     });
-    expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?projectName=project-a&deploymentTrackId=v1', {
+    expect(put).toHaveBeenCalledWith('/components/orders/environments/development/endpoints/http/visibility?deploymentTrackId=v1', {
       visibility: ['project', 'organization'],
     });
   });

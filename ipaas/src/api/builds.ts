@@ -30,7 +30,7 @@
 
 import type { BuildRunLogs, BuildStage, BuildStep } from '../types/build';
 import type { LogRow } from '../types/logs';
-import { bff, q, seg } from './_client';
+import { bff, seg } from './_client';
 import { queryObsLogs } from './logs';
 
 // Underscored params (_orgHandler, _versionId) are kept for devant contract
@@ -166,13 +166,13 @@ async function fetchObsBuildLogText(runId: string, run: BffBuildRun): Promise<st
 // synthesize the BuildRunLogs the stepper consumes. The build run is required;
 // the log text is sourced solely from the observability proxy (a null result
 // just leaves the stage log empty and the card shows the live step list).
-async function loadBuildRunLogs(componentId: string, runId: string, projectQuery: string): Promise<BuildRunLogs | null> {
-  const run = await bff.get<BffBuildRun | null>(`/components/${seg(componentId)}/builds/${seg(runId)}${projectQuery}`).catch(() => null);
+async function loadBuildRunLogs(componentId: string, runId: string): Promise<BuildRunLogs | null> {
+  const run = await bff.get<BffBuildRun | null>(`/components/${seg(componentId)}/builds/${seg(runId)}`).catch(() => null);
   if (!run) return null;
   const rawLog = await fetchObsBuildLogText(runId, run);
   return buildRunLogsFromTasks(run, rawLog);
 }
 
-export const fetchBuildRunLogs = (_orgHandler: string, projectId: string, componentId: string, runId: string): Promise<BuildRunLogs | null> => loadBuildRunLogs(componentId, runId, q({ projectName: projectId }));
+export const fetchBuildRunLogs = (_orgHandler: string, _projectId: string, componentId: string, runId: string): Promise<BuildRunLogs | null> => loadBuildRunLogs(componentId, runId);
 
-export const fetchBuildLogs = (componentId: string, _versionId: string, workflowName: string): Promise<BuildRunLogs | null> => loadBuildRunLogs(componentId, workflowName, '');
+export const fetchBuildLogs = (componentId: string, _versionId: string, workflowName: string): Promise<BuildRunLogs | null> => loadBuildRunLogs(componentId, workflowName);
