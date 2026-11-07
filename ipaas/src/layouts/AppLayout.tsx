@@ -71,6 +71,7 @@ import {
   Plus,
   Rocket,
   Server,
+  Settings,
   SlidersHorizontal,
   Sparkles,
   Waypoints,
@@ -96,7 +97,7 @@ import { visibleComponentSettingsSections } from '../constants/componentSettings
 import { useScope, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, settingsCrossScopeUrl, resolveActiveNavId, parentGroupId, navUrl, overviewUrl, navScopeSwitchUrl, resolveResourceKey, componentKeepsPage, type Scope } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { trackEvent } from '../services/tracking/tracking';
-import { billingUpgradeUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
+import { billingUpgradeUrl, cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useCan } from '../hooks/useCan';
@@ -643,8 +644,14 @@ export default function AppLayout(): JSX.Element {
           <Header.Actions>
             {billingTrial && (
               // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
-              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} />
+              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} upgradeHref={cloudConsoleSubscriptionsUrl()} usage={trialUsage} title={trialEndLabel} />
             )}
+            {/* A plain link: the WSO2 Cloud console serves this path, not this console's router. */}
+            <Tooltip title="Settings">
+              <IconButton component="a" href={cloudConsoleOrganizationsUrl()} aria-label="Settings" sx={{ color: 'text.secondary' }}>
+                <Settings />
+              </IconButton>
+            </Tooltip>
             <ColorSchemeToggle />
             <UserMenu>
               <UserMenu.Trigger name={userName} avatar={userAvatar} />

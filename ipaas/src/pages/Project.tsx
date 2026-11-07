@@ -75,10 +75,10 @@ import { useDeleteComponent } from '../hooks/useComponents';
 import DeleteIntegrationButton from '../components/DeleteIntegrationButton';
 import NotFound from '../components/NotFound';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
-import { newComponentUrl, editProjectUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
+import { newComponentUrl, linkRepositoryUrl, type ProjectScope } from '../nav';
 import { useOrgUuid } from '../hooks/useOrgUuid';
 import { useAuth } from '../auth';
-import { componentOverviewUrl, orgProjectsUrl } from '../paths';
+import { cloudConsoleProjectManageUrl, componentOverviewUrl, orgProjectsUrl } from '../paths';
 import { Scopes } from '../constants/permissions';
 import { isSupportedIntegration, getDisplayLabel, getNonIntegrationPlatform } from '../constants/integrations';
 import { identifyIntegration } from '../utils/identifyIntegration';
@@ -1038,7 +1038,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </Box>
             )}
             <Authorized permissions={Scopes.PROJECT_UPDATE}>
-              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<SlidersHorizontal size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
+              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<SlidersHorizontal size={14} />} href={cloudConsoleProjectManageUrl(scope.project)} sx={{ whiteSpace: 'nowrap' }}>
                 Manage project
               </Button>
             </Authorized>

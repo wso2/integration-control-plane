@@ -30,7 +30,7 @@ import { useAppNavigate } from '../hooks/useAppNavigate';
 import { useOrgComponents } from '../hooks/useComponents';
 import { useDatabaseAvailability } from '../hooks/useDatabases';
 import { useProjects } from '../hooks/useProjects';
-import { newComponentUrl, newDatabaseUrl, newProjectUrl, type OrgScope } from '../nav';
+import { newComponentUrl, newDatabaseUrl, newKnowledgeBaseUrl, newProjectUrl, type OrgScope } from '../nav';
 import { orgProjectsUrl, projectHomeUrl } from '../paths';
 import type { Project } from '../types/project';
 import { formatDateTime, formatDistanceToNow } from '../utils/time';
@@ -214,7 +214,7 @@ export default function OrgOverview(scope: OrgScope): JSX.Element {
           onAction={isLoading ? undefined : createIntegration}
           disabledReason={createDeniedReason}
         />
-        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" disabledReason="Coming soon" />
+        <SummaryCard icon={<BookOpen size={24} />} title="Knowledge bases" description="Organize the content your agents and integrations draw on." actionLabel="Create a knowledge base" onAction={() => navigate(newKnowledgeBaseUrl(scope))} />
         <SummaryCard
           icon={<Database size={24} />}
           title="Databases"

@@ -17,6 +17,19 @@ export function projectsRedirectUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/projects/redirect`;
 }
 
+// The WSO2 Cloud console serves the root of the origin this console shares with it, outside this console's base path.
+export function cloudConsoleOrganizationsUrl(): string {
+  return '/organizations';
+}
+
+export function cloudConsoleSubscriptionsUrl(): string {
+  return '/billing?tab=subscriptions';
+}
+
+export function cloudConsoleProjectManageUrl(projectHandle: string): string {
+  return `/projects/${encodeURIComponent(projectHandle)}/manage`;
+}
+
 export function oidcCallbackUrl(): string {
   return '/signin';
 }
