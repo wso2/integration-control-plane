@@ -16,8 +16,26 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { buildClassDefs, ensureMermaidInit, extractDefinition, nextDiagramId, purgeMermaidOrphans, renderMermaidSvg, toMermaidSafeColor } from './mermaid';
+
+// Mermaid sanitizes its SVG with DOMPurify, which (since 3.4.8) reads names through the
+// Node.prototype.nodeName getter. Browsers return the node's name there; happy-dom returns '' and
+// leaves the name to subclass getters, so every node is stripped. Defer to those getters, as a
+// browser would, before DOMPurify captures the getter on import.
+vi.hoisted(() => {
+  const baseGetter = Object.getOwnPropertyDescriptor(Node.prototype, 'nodeName')?.get;
+  Object.defineProperty(Node.prototype, 'nodeName', {
+    configurable: true,
+    get(this: Node) {
+      for (let proto = Object.getPrototypeOf(this); proto && proto !== Node.prototype; proto = Object.getPrototypeOf(proto)) {
+        const getter = Object.getOwnPropertyDescriptor(proto, 'nodeName')?.get;
+        if (getter) return getter.call(this);
+      }
+      return baseGetter?.call(this);
+    },
+  });
+});
 
 describe('nextDiagramId', () => {
   it('returns an incrementing mermaid-chart id on each call', () => {

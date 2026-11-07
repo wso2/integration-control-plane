@@ -23,6 +23,7 @@ import { isCompleteRef, useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, u
 import type { ApiKeyResult, EndpointRef, SecurityMode } from '../types/consumers';
 import { friendlyApiError } from '../utils/apiSecurity';
 import { isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
+import { aiGatewayAccessOf, mcpUrlOf, type AiGatewayAccess } from '../utils/mcpGateway';
 import { Scopes } from '../constants/permissions';
 import { useCan } from './useCan';
 
@@ -36,6 +37,13 @@ export interface EndpointTestAccess {
    * unenforced call look like a secured one. Wait, or report `isUnavailable`.
    */
   gatewayUrl: string;
+  /**
+   * Set when Agent Manager's AI gateway fronts the endpoint, as it does an MCP server. No test key is minted for it:
+   * the AI gateway issues keys only to Agent Manager agents. `null` for the API Platform.
+   */
+  aiGateway: AiGatewayAccess | null;
+  /** The URL an MCP client connects to on the gateway, or '' while there is none. */
+  mcpUrl: string;
   /** Active auth mode of the exposed API; `null` until it is known. */
   mode: SecurityMode | null;
   /** Request header the credential must be sent in. */
@@ -195,13 +203,17 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const endpoint = useMemo(() => ref, [refKey]);
   const [switchFailure, setSwitchFailure] = useState<{ refKey: string; message: string } | null>(null);
 
+  const aiGateway = aiGatewayAccessOf(security, securityError);
+  // The test-key routes refuse an AI gateway endpoint, so none of the minting below applies to it.
+  const mintable = canCreateKey && !aiGateway;
+  const switchable = canSwitch && !aiGateway;
   const mode = security?.mode ?? null;
 
   const held = useQuery({
     queryKey: heldKeyQueryKey(refKey),
     queryFn: () => mintHeldKey(createKeyFor, endpoint!),
     // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
-    enabled: enabled && isCompleteRef(endpoint) && canCreateKey && mode === 'api-key',
+    enabled: enabled && isCompleteRef(endpoint) && mintable && mode === 'api-key',
     // Fresh until it is due for renewal, so a view that mounts later uses the held key.
     staleTime: (query) => Math.max((query.state.data?.renewAt ?? 0) - Date.now(), 0),
     gcTime: HELD_KEY_GC_MS,
@@ -223,7 +235,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   });
 
   const apiKey = held.data?.key ?? null;
-  const needsKey = mode === 'api-key' || mode === 'jwt';
+  const needsKey = !aiGateway && (mode === 'api-key' || mode === 'jwt');
   // A mint in flight is the answer to the last failure, so the failure is not shown meanwhile.
   const mintError = held.isFetching ? null : held.error;
   const apiKeyRequired = !!mintError && isApiKeyAuthRequired(mintError);
@@ -232,7 +244,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
 
   const mintFor = useCallback(
     async (target: EndpointRef, refused?: string | null): Promise<string | null> => {
-      if (!canCreateKey) return null;
+      if (!mintable) return null;
       const queryKey = heldKeyQueryKey(keyOf(target));
       if (refused !== undefined) {
         // Another view renewed the refused key already: use theirs rather than mint again.
@@ -248,7 +260,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
         return null;
       }
     },
-    [canCreateKey, queryClient, createKeyFor],
+    [mintable, queryClient, createKeyFor],
   );
   // Mints a view asked for, which it shows as minting even while it holds a key.
   const [requestedMints, setRequestedMints] = useState(0);
@@ -268,15 +280,15 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const retriedFor = useRef<string | null>(null);
   const retryUnauthorized = useCallback(() => {
     // An open endpoint's 401 is not a stale key, and minting would switch it to api-key auth.
-    if (!canCreateKey || mode !== 'api-key') return;
+    if (!mintable || mode !== 'api-key') return;
     if (retriedFor.current === refKey) return;
     retriedFor.current = refKey;
     void renewKey(apiKey);
-  }, [canCreateKey, mode, refKey, renewKey, apiKey]);
+  }, [mintable, mode, refKey, renewKey, apiKey]);
 
   const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
-    if (!endpoint || !canSwitch) return null;
+    if (!endpoint || !switchable) return null;
     const target = endpoint;
     setSwitchFailure(null);
     try {
@@ -287,16 +299,19 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     }
     // Once the mode reads as api-key the held key's query would mint too; it joins this mint instead.
     return mintFor(target);
-  }, [endpoint, canSwitch, enableApiKeyAuthFor, mintFor]);
+  }, [endpoint, switchable, enableApiKeyAuthFor, mintFor]);
 
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
   // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
   // that authoritative gateway address without making a missing optional field look like an
   // unexposed API.
   const gatewayUrl = security?.publicUrl || gatewayUrlFallback;
+  const mcpUrl = mcpUrlOf(gatewayUrl, aiGateway);
 
   return {
     gatewayUrl,
+    aiGateway,
+    mcpUrl,
     mode,
     authHeader: security?.apiKey?.header || DEFAULT_API_KEY_HEADER,
     apiKey,
@@ -307,13 +322,15 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     isMinting: (held.isFetching && !apiKey) || requestedMints > 0,
     canCreateKey,
     keyError,
-    needsApiKeyAuth: canCreateKey && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
-    canSwitch,
+    needsApiKeyAuth: mintable && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
+    canSwitch: switchable,
     isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
     switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never
     // reports unavailable — only a real answer does.
-    isUnavailable: isSecurityError || (mode !== null && !gatewayUrl),
+    // AI gateway deployment states report through `aiGateway`; a resolved mode with no
+    // URL is still terminal, including a deployed open binding whose URL is absent.
+    isUnavailable: (!aiGateway && isSecurityError) || (mode !== null && !mcpUrl),
     securityError,
     mintKey,
     renewKey,

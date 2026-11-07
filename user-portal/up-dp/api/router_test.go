@@ -20,7 +20,6 @@ package api
 
 import (
 	"context"
-	"encoding/base64"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -35,8 +34,16 @@ import (
 
 	"github.com/wso2-enterprise/integration-user-portal-service/shared/upstream"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/config"
+	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/domain"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/service"
 )
+
+// anyCaller admits every bearer token as one user; the token service has its own tests.
+type anyCaller struct{}
+
+func (anyCaller) Read(context.Context, string) (*domain.TokenIdentity, error) {
+	return &domain.TokenIdentity{UserID: "user-1"}, nil
+}
 
 // fixedScopes always answers the same scopes.
 type fixedScopes []string
@@ -64,7 +71,7 @@ func newTestRouter(t *testing.T) http.Handler {
 		Org:  config.Org{Handle: "acme", Name: "Acme Corporation"},
 		OIDC: config.OIDC{Issuer: "https://idp.example", ClientID: "up-portal", Resource: "https://portal.example", Scopes: "openid profile"},
 	}
-	return Mount(&service.Registry{TokenService: service.NewTokenService(), ScopeService: fixedScopes{"openid", "offline_access"}}, cfg, zap.NewNop())
+	return Mount(&service.Registry{TokenService: anyCaller{}, ScopeService: fixedScopes{"openid", "offline_access"}}, cfg, zap.NewNop())
 }
 
 // unknownScopes has never read the published scopes.
@@ -75,7 +82,7 @@ func (unknownScopes) Scopes(context.Context) ([]string, error) {
 }
 
 func TestScopesAnswer503UntilThePublishedOnesAreKnown(t *testing.T) {
-	router := Mount(&service.Registry{TokenService: service.NewTokenService(), ScopeService: unknownScopes{}}, config.Config{SPADir: t.TempDir()}, zap.NewNop())
+	router := Mount(&service.Registry{TokenService: anyCaller{}, ScopeService: unknownScopes{}}, config.Config{SPADir: t.TempDir()}, zap.NewNop())
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/auth/scopes", nil))
@@ -153,7 +160,7 @@ func TestPageIsTheBuildWithItsTitleOnly(t *testing.T) {
 }
 
 func TestPageWithoutABuildIsUnavailable(t *testing.T) {
-	router := Mount(&service.Registry{TokenService: service.NewTokenService()}, config.Config{SPADir: t.TempDir()}, zap.NewNop())
+	router := Mount(&service.Registry{TokenService: anyCaller{}}, config.Config{SPADir: t.TempDir()}, zap.NewNop())
 
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
@@ -163,7 +170,6 @@ func TestPageWithoutABuildIsUnavailable(t *testing.T) {
 }
 
 func TestIntegrationsRefusesAQueryOutOfBounds(t *testing.T) {
-	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user-1","exp":4102444800}`))
 	router := newTestRouter(t)
 
 	queries := []string{
@@ -174,7 +180,7 @@ func TestIntegrationsRefusesAQueryOutOfBounds(t *testing.T) {
 	}
 	for _, query := range queries {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations?"+query, nil)
-		req.Header.Set("Authorization", "Bearer e30."+payload+".c2ln")
+		req.Header.Set("Authorization", "Bearer token")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 
@@ -183,12 +189,11 @@ func TestIntegrationsRefusesAQueryOutOfBounds(t *testing.T) {
 }
 
 func TestExecutionsRefusesALimitOutOfBounds(t *testing.T) {
-	payload := base64.RawURLEncoding.EncodeToString([]byte(`{"sub":"user-1","exp":4102444800}`))
 	router := newTestRouter(t)
 
 	for _, query := range []string{"limit=0", "limit=101", "limit=1000000", "limit=ten"} {
 		req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations/i1/deployment-tracks/t1/executions?"+query, nil)
-		req.Header.Set("Authorization", "Bearer e30."+payload+".c2ln")
+		req.Header.Set("Authorization", "Bearer token")
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, req)
 

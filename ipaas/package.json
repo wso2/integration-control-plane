@@ -51,6 +51,12 @@
     "yaml": "^2.9.0"
   },
   "pnpm": {
+    "overrides": {
+      "axios": "^1.20.0",
+      "dompurify": "^3.4.7",
+      "proxy-addr": "^2.0.8",
+      "uuid": "^14.0.0"
+    },
     "patchedDependencies": {
       "lucide-react@1.16.0": "patches/lucide-react@1.16.0.patch",
       "@wso2/cell-diagram@0.2.0": "patches/@wso2__cell-diagram@0.2.0.patch"

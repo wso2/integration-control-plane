@@ -19,8 +19,6 @@
 package gateway
 
 import (
-	"encoding/base64"
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -48,72 +46,27 @@ func newTestUpDPGateway(t *testing.T) http.Handler {
 	require.NoError(t, err)
 
 	g := &Gateway{
-		cfg: config.GatewayConfig{
-			UPDPUpstream: upstreamURL,
-			Issuer:       "https://widp-dp.example",
-			Audiences:    []string{"up-portal-api"},
-		},
+		cfg:     config.GatewayConfig{UPDPUpstream: upstreamURL},
 		catalog: catalog.New(config.Org{UUID: common.NewID(), Handle: "acme"}, "http://gw.example", time.Second),
 	}
 	return g.Routes()
 }
 
-// testToken is an unsigned user access token: the gateway reads it without a key set.
-func testToken(t *testing.T, edit func(map[string]any)) string {
-	t.Helper()
-
-	claims := map[string]any{
-		"iss":        "https://widp-dp.example",
-		"sub":        "user-1",
-		"aud":        "up-portal-api",
-		"grant_type": "authorization_code",
-		"scope":      "openid automation:trigger",
-		"exp":        time.Now().Add(time.Hour).Unix(),
-	}
-	if edit != nil {
-		edit(claims)
-	}
-	payload, err := json.Marshal(claims)
-	require.NoError(t, err)
-
-	header := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"RS256","typ":"at+jwt"}`))
-	return header + "." + base64.RawURLEncoding.EncodeToString(payload) + ".c2ln"
-}
-
-func TestUpDPRouteChecksTokensAsJWTAuthDoes(t *testing.T) {
+// The route stands in for kgateway, which only routes: UP-DP answers every token itself.
+func TestUpDPRouteSendsEveryPathToUpDP(t *testing.T) {
 	gw := newTestUpDPGateway(t)
-	trigger := "/api/v1/integrations/i1/deployment-tracks/t1/executions"
 
 	for name, tc := range map[string]struct {
 		method string
 		path   string
 		token  string
-		status int
 	}{
-		"the config script":               {path: "/config.js", status: http.StatusOK},
-		"the health check":                {path: "/api/v1/health", status: http.StatusOK},
-		"the scope list":                  {path: "/api/v1/auth/scopes", status: http.StatusOK},
-		"an SPA path":                     {path: "/workflows/abc", status: http.StatusOK},
-		"an API path without a token":     {path: "/api/v1/integrations", status: http.StatusUnauthorized},
-		"an API path with a user's token": {path: "/api/v1/integrations", token: testToken(t, nil), status: http.StatusOK},
-		"another issuer": {
-			path: "/api/v1/integrations", token: testToken(t, func(c map[string]any) { c["iss"] = "https://other.example" }), status: http.StatusUnauthorized,
-		},
-		"another audience": {
-			path: "/api/v1/integrations", token: testToken(t, func(c map[string]any) { c["aud"] = "some-app" }), status: http.StatusUnauthorized,
-		},
-		"an expired token": {
-			path: "/api/v1/integrations", token: testToken(t, func(c map[string]any) { c["exp"] = time.Now().Add(-time.Hour).Unix() }), status: http.StatusUnauthorized,
-		},
-		"a client-credentials token": {
-			path: "/api/v1/integrations", token: testToken(t, func(c map[string]any) { c["grant_type"] = "client_credentials" }), status: http.StatusUnauthorized,
-		},
-		"a trigger without the scope, which UP-DP checks": {
-			method: http.MethodPost, path: trigger, token: testToken(t, func(c map[string]any) { c["scope"] = "openid" }), status: http.StatusOK,
-		},
-		"a run list without the scope": {
-			path: trigger, token: testToken(t, func(c map[string]any) { c["scope"] = "openid" }), status: http.StatusOK,
-		},
+		"the config script":           {path: "/config.js"},
+		"the health check":            {path: "/api/v1/health"},
+		"an SPA path":                 {path: "/workflows/abc"},
+		"an API path without a token": {path: "/api/v1/integrations"},
+		"an API path with any token":  {path: "/api/v1/integrations", token: "not-a-jwt"},
+		"a trigger":                   {method: http.MethodPost, path: "/api/v1/integrations/i1/deployment-tracks/t1/executions", token: "t"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			method := tc.method
@@ -128,22 +81,33 @@ func TestUpDPRouteChecksTokensAsJWTAuthDoes(t *testing.T) {
 			rec := httptest.NewRecorder()
 			gw.ServeHTTP(rec, req)
 
-			assert.Equal(t, tc.status, rec.Code)
-			if tc.status == http.StatusOK {
-				assert.Equal(t, "up-dp "+tc.path, rec.Body.String())
-			}
+			assert.Equal(t, http.StatusOK, rec.Code)
+			assert.Equal(t, "up-dp "+tc.path, rec.Body.String())
 		})
 	}
 }
 
 func TestUpDPRoutePassesTheTokenThroughUnchanged(t *testing.T) {
-	token := testToken(t, nil)
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/integrations", nil)
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer abc.def.ghi")
 
 	rec := httptest.NewRecorder()
 	newTestUpDPGateway(t).ServeHTTP(rec, req)
 
 	require.Equal(t, http.StatusOK, rec.Code)
-	assert.Equal(t, "Bearer "+token, rec.Header().Get("X-Seen-Authorization"))
+	assert.Equal(t, "Bearer abc.def.ghi", rec.Header().Get("X-Seen-Authorization"))
+}
+
+func TestUpDPRouteAnswers502WhenUpDPIsDown(t *testing.T) {
+	down, err := url.Parse("http://127.0.0.1:1")
+	require.NoError(t, err)
+	g := &Gateway{
+		cfg:     config.GatewayConfig{UPDPUpstream: down},
+		catalog: catalog.New(config.Org{UUID: common.NewID(), Handle: "acme"}, "http://gw.example", time.Second),
+	}
+
+	rec := httptest.NewRecorder()
+	g.Routes().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
+
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
 }

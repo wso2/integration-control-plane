@@ -29,10 +29,12 @@ vi.mock('../api/consumers', () => ({ getEndpointSecurity: vi.fn(), createEndpoin
 const a: EndpointRef = { componentName: 'orders', environmentName: 'development', endpointName: 'http', deploymentTrackId: 'main' };
 let select: (ref: EndpointRef) => void = () => {};
 let switchToApiKey: () => Promise<string | null> = async () => null;
+let currentAccess: ReturnType<typeof useEndpointTestAccess> | null = null;
 
 function Selection() {
   const [ref, setRef] = useState(a);
   const access = useEndpointTestAccess(ref);
+  currentAccess = access;
   select = setRef;
   switchToApiKey = access.switchToApiKey;
   return <output>{access.apiKey}</output>;
@@ -42,11 +44,27 @@ let unmount = () => {};
 afterEach(() => unmount());
 beforeEach(() => {
   vi.resetAllMocks();
+  currentAccess = null;
   vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'jwt', publicUrl: 'https://gw.example/orders' } as never);
   vi.mocked(createEndpointTestKey).mockImplementation(async (ref) => ({ keyId: 'k', apiKey: `key-for-${ref.endpointName}-${ref.environmentName}-${ref.deploymentTrackId}` }));
 });
 
 describe('useEndpointTestAccess', () => {
+  it('fails closed without an AI gateway URL and never switches it through API Platform', async () => {
+    vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'none', aiGateway: { deploymentStatus: 'Deployed' } } as never);
+    const r = await renderWithScopes(<Selection />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+
+    expect(currentAccess?.isUnavailable).toBe(true);
+    expect(currentAccess?.canCreateKey).toBe(true);
+    expect(currentAccess?.canSwitch).toBe(false);
+    await act(async () => void (await currentAccess?.switchToApiKey()));
+    await act(async () => void (await currentAccess?.mintKey()));
+    expect(setEndpointApiKeyAuth).not.toHaveBeenCalled();
+    expect(createEndpointTestKey).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['endpoint', { ...a, endpointName: 'admin' }],
     ['environment', { ...a, environmentName: 'production' }],
