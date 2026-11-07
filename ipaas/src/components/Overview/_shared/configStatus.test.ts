@@ -102,6 +102,14 @@ describe('missingConfigsReason', () => {
     expect(missingConfigsReason({ jsonSchema, configurations: [] }, noValues, 'development')).toBe('salesforce-sales has no values in development. Add them on WSO2 Cloud.');
   });
 
+  it('names only a resource that feeds a required configurable without a value', () => {
+    // greeting is optional: its resource without values keeps it at its default and doesn't hold development back.
+    const optional = link({ 'wso2.sftask.greeting': 'GREETING' }, false);
+    expect(missingConfigsReason({ jsonSchema, configurations: [] }, optional, 'development')).toBe('Required configurables have no values in development.');
+    const filled = [value('wso2.sftask.sfSalesBaseUrl', 'http://sf'), value('wso2.sftask.sfSalesAuthClientId', 'id')];
+    expect(missingConfigsReason({ jsonSchema, configurations: filled }, optional, 'development')).toBeUndefined();
+  });
+
   it('says required configurables have no values when no link is the cause', () => {
     expect(missingConfigsReason({ jsonSchema, configurations: [] }, undefined, 'development')).toBe('Required configurables have no values in development.');
   });
