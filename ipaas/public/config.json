@@ -8,6 +8,7 @@
   "BILLING_API_BASE_URL": "http://development-wso2cloud.openchoreoapis.localhost:19080/billing-api-service-user-api/api/v1",
   "ENABLE_BILLING_FEATURE": "true",
   "BILLING_CONSOLE_URL": "https://subscriptions.dv.wso2.com",
+  "CLOUD_CONSOLE_URL": "https://cloud-console-development.gateway.dev.cloud.wso2.com",
   "GITHUB_APP_CLIENT_ID": "Iv1.f6cf2cd585148ee7",
   "GITHUB_APP_AUTH_REDIRECTION_URL": "",
   "GITHUB_APP_SLUG": "wso2-cloud-app-dev",

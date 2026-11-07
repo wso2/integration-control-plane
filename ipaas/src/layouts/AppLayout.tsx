@@ -71,6 +71,7 @@ import {
   Plus,
   Rocket,
   Server,
+  Settings,
   SlidersHorizontal,
   Sparkles,
   Waypoints,
@@ -96,7 +97,7 @@ import { visibleComponentSettingsSections } from '../constants/componentSettings
 import { useScope, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, settingsCrossScopeUrl, resolveActiveNavId, parentGroupId, navUrl, overviewUrl, navScopeSwitchUrl, resolveResourceKey, componentKeepsPage, type Scope } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { trackEvent } from '../services/tracking/tracking';
-import { billingUpgradeUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
+import { cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useCan } from '../hooks/useCan';
@@ -133,12 +134,13 @@ export default function AppLayout(): JSX.Element {
   const billingTrial = billingOrg?.subscription?.status === 'trial' ? billingOrg.subscription.trial : null;
   const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined;
   const orgUuid = useOrgUuid();
-  const upgradeUrl = billingTrial && orgUuid ? billingUpgradeUrl(orgUuid) : null;
-  const openUpgrade = upgradeUrl ? () => window.open(upgradeUrl, '_blank', 'noopener,noreferrer') : undefined;
+  const billingUpgradesConfigured = !!window.API_CONFIG?.enableBillingFeature && !!window.API_CONFIG?.billingConsoleUrl;
   const { data: componentLimits } = useOrgComponentLimits(billingTrial ? (orgUuid ?? '') : '');
-  // The panel's own Upgrade button always renders, so the panel is shown only when it has somewhere to go.
+  // Shown only where billing upgrades are configured; its Upgrade button links to the subscriptions page, as the badge does.
   const trialUsage: TrialBadgeUsage | undefined =
-    componentLimits && openUpgrade ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, onUpgrade: openUpgrade } : undefined;
+    componentLimits && billingUpgradesConfigured
+      ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, upgradeHref: cloudConsoleSubscriptionsUrl() }
+      : undefined;
 
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
   // a fresh literal here re-triggers it (and its setState) on every render, which on a
@@ -643,8 +645,14 @@ export default function AppLayout(): JSX.Element {
           <Header.Actions>
             {billingTrial && (
               // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
-              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} showUpgrade={!!upgradeUrl} onUpgrade={openUpgrade} usage={trialUsage} title={trialEndLabel} />
+              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} upgradeHref={cloudConsoleSubscriptionsUrl()} usage={trialUsage} title={trialEndLabel} />
             )}
+            {/* A plain link: the WSO2 Cloud console serves this path, not this console's router. */}
+            <Tooltip title="Organization settings">
+              <IconButton component="a" href={cloudConsoleOrganizationsUrl()} aria-label="Organization settings" sx={{ color: 'text.secondary' }}>
+                <Settings />
+              </IconButton>
+            </Tooltip>
             <ColorSchemeToggle />
             <UserMenu>
               <UserMenu.Trigger name={userName} avatar={userAvatar} />
