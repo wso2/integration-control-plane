@@ -1,7 +1,7 @@
 {
   "name": "@wso2-enterprise/up-dp-web",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0-SNAPSHOT",
   "type": "module",
   "packageManager": "pnpm@10.15.0",
   "scripts": {
