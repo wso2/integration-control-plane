@@ -39,6 +39,7 @@ export interface User {
   displayName: string;
   email?: string;
   initials: string;
+  picture?: string;
   roles: string[];
 }
 
@@ -59,6 +60,16 @@ function initialsOf(name: string): string {
   const parts = name.replace(/@.*$/, '').split(/[\s._-]+/).filter(Boolean);
   const letters = parts.length > 1 ? `${parts[0][0]}${parts[parts.length - 1][0]}` : (parts[0] ?? '?').slice(0, 2);
   return letters.toUpperCase();
+}
+
+function imageUrlOf(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' || url.protocol === 'http:' ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function listClaim(claims: Record<string, unknown>, name: string): string[] {
@@ -122,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return {
       status: status === 'ready' && !tokens ? 'loading' : status,
       error,
-      user: { id: text('sub') ?? '', displayName, email: text('email'), initials: initialsOf(displayName), roles: listClaim(id, 'roles') },
+      user: { id: text('sub') ?? '', displayName, email: text('email'), initials: initialsOf(displayName), picture: imageUrlOf(text('picture')), roles: listClaim(id, 'roles') },
       hasScope: (scope) => scopes.has(scope),
       retry: start,
       refreshAccess: () => void rejoin().catch((reason: unknown) => {
