@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { aiGatewayAccessOf, aiGatewayNotice, mcpUrlOf } from './mcpGateway';
+import { aiGatewayAccessOf, aiGatewayNotice, mcpTransportUrlOf, mcpUrlOf } from './mcpGateway';
 
 const coded = (status: number, code: string) => ({ status, code, body: JSON.stringify({ code }) });
 
@@ -33,12 +33,13 @@ describe('aiGatewayAccessOf', () => {
   it('leaves API Platform endpoints alone', () => {
     expect(aiGatewayAccessOf({ mode: 'api-key', publicUrl: 'https://apip.example.com/orders/v1.0' }, null)).toBeNull();
     expect(aiGatewayAccessOf(undefined, coded(409, 'API_NOT_EXPOSED'))).toBeNull();
+    expect(aiGatewayAccessOf(undefined, coded(404, 'MCP_PROXY_NOT_PUBLISHED'))).toBeNull();
   });
 });
 
 describe('mcpUrlOf', () => {
-  it('uses the AI gateway URL as is, since it ends in the MCP path', () => {
-    expect(mcpUrlOf('https://gw.example.com/demo/orders-mcp/mcp', { binding: { deploymentStatus: 'Deployed' } })).toBe('https://gw.example.com/demo/orders-mcp/mcp');
+  it('normalizes the AI gateway URL, which already ends in the MCP path', () => {
+    expect(mcpUrlOf('https://gw.example.com/demo/orders-mcp/mcp/', { binding: { deploymentStatus: 'Deployed' } })).toBe('https://gw.example.com/demo/orders-mcp/mcp');
   });
 
   it('adds the MCP path under an API Platform URL', () => {
@@ -47,6 +48,15 @@ describe('mcpUrlOf', () => {
 
   it('is empty without a gateway URL', () => {
     expect(mcpUrlOf('', null)).toBe('');
+  });
+
+  it('is empty for a malformed gateway URL', () => {
+    expect(mcpUrlOf('not a URL', { binding: { deploymentStatus: 'Deployed' } })).toBe('');
+  });
+
+  it('preserves an existing query while adding the transport selector', () => {
+    const mcpUrl = mcpUrlOf('https://gw.example.com/demo/orders-mcp/mcp/?route=blue', { binding: { deploymentStatus: 'Deployed' } });
+    expect(mcpTransportUrlOf(mcpUrl).toString()).toBe('https://gw.example.com/demo/orders-mcp/mcp?route=blue&transportType=streamable-http');
   });
 });
 

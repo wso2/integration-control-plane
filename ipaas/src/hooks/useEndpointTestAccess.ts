@@ -132,6 +132,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const aiGateway = aiGatewayAccessOf(security, securityError);
   // The test-key routes refuse an AI gateway endpoint, so none of the minting below applies to it.
   const mintable = canCreateKey && !aiGateway;
+  const switchable = canSwitch && !aiGateway;
   const mode = security?.mode ?? null;
   const apiKey = minted?.refKey === refKey ? minted.key : null;
   const needsKey = !aiGateway && (mode === 'api-key' || mode === 'jwt');
@@ -156,7 +157,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     },
     [canCreateKey, createKeyFor],
   );
-  const mintKey = useCallback(async () => (endpoint ? mintFor(endpoint) : null), [endpoint, mintFor]);
+  const mintKey = useCallback(async () => (endpoint && mintable ? mintFor(endpoint) : null), [endpoint, mintable, mintFor]);
 
   // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
   const mintingFor = useRef<string | null>(null);
@@ -186,7 +187,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
 
   const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
-    if (!endpoint || !canSwitch) return null;
+    if (!endpoint || !switchable) return null;
     const target = endpoint;
     const targetKey = keyOf(target);
     setFailure(null);
@@ -202,34 +203,36 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     } finally {
       if (mintingFor.current === targetKey) mintingFor.current = null;
     }
-  }, [endpoint, canSwitch, enableApiKeyAuthFor, mintFor]);
+  }, [endpoint, switchable, enableApiKeyAuthFor, mintFor]);
 
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
   // endpoint discovery already returns the APIP Public URL, so callers that have it can provide
   // that authoritative gateway address without making a missing optional field look like an
   // unexposed API.
   const gatewayUrl = security?.publicUrl || gatewayUrlFallback;
+  const mcpUrl = mcpUrlOf(gatewayUrl, aiGateway);
 
   return {
     gatewayUrl,
     aiGateway,
-    mcpUrl: mcpUrlOf(gatewayUrl, aiGateway),
+    mcpUrl,
     mode,
     authHeader: security?.apiKey?.header || DEFAULT_API_KEY_HEADER,
     apiKey,
     // An open (mode `none`) endpoint needs no credential; anything else does.
     isAuthorized: mode === 'none' || !!apiKey,
     isMinting: createTestKey.isPending && keyOf(createTestKey.variables) === refKey,
-    canCreateKey: mintable,
+    canCreateKey,
     keyError,
     needsApiKeyAuth: mintable && ((mode === 'jwt' && !apiKey) || apiKeyRequiredFor === refKey),
-    canSwitch: canSwitch && !aiGateway,
+    canSwitch: switchable,
     isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
     switchToApiKey,
     // A disabled/incomplete ref leaves both terms false, so an idle hook never
     // reports unavailable — only a real answer does.
-    // An AI gateway endpoint reports where it stands through `aiGateway` instead.
-    isUnavailable: !aiGateway && (isSecurityError || (mode !== null && !gatewayUrl)),
+    // AI gateway deployment states report through `aiGateway`; a resolved mode with no
+    // URL is still terminal, including a deployed open binding whose URL is absent.
+    isUnavailable: (!aiGateway && isSecurityError) || (mode !== null && !mcpUrl),
     securityError,
     mintKey,
     retryUnauthorized,

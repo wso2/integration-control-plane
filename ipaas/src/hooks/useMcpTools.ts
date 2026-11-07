@@ -20,6 +20,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { KEY_ACTIVATION_ATTEMPTS, KEY_ACTIVATION_DELAY_MS } from '../constants/mcp';
 import { createMcpClient, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError } from '../utils/mcp';
+import { mcpTransportUrlOf } from '../utils/mcpGateway';
 import type { McpTool } from '../types/mcp';
 
 /** APIM gateways read the test key from this header; cloud uses the api-key-auth header. */
@@ -70,7 +71,7 @@ export function useMcpTools({ mcpUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER, 
     let cancelled = false;
 
     const listOnce = async (): Promise<McpTool[]> => {
-      const transport = new StreamableHTTPClientTransport(new URL(`${mcpUrl}?transportType=streamable-http`), {
+      const transport = new StreamableHTTPClientTransport(mcpTransportUrlOf(mcpUrl), {
         requestInit: { headers: apiKey ? { [authHeader]: apiKey } : {} },
       });
       const client = createMcpClient('ipaas-console');

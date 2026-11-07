@@ -17,7 +17,7 @@
  */
 
 import type { AiGatewayBinding, SecurityConfig, SecurityMode } from '../types/consumers';
-import { httpCodeOf } from './apiErrors';
+import { httpCodeOf, httpStatusOf } from './apiErrors';
 
 /** An MCP server endpoint on Agent Manager's AI gateway, or not published there yet (`binding: null`). */
 export interface AiGatewayAccess {
@@ -33,7 +33,7 @@ const NOT_PUBLISHED = 'MCP_PROXY_NOT_PUBLISHED';
  */
 export function aiGatewayAccessOf(security: SecurityConfig | undefined, securityError: unknown): AiGatewayAccess | null {
   if (security?.aiGateway) return { binding: security.aiGateway };
-  if (securityError && httpCodeOf(securityError) === NOT_PUBLISHED) return { binding: null };
+  if (httpStatusOf(securityError) === 409 && httpCodeOf(securityError) === NOT_PUBLISHED) return { binding: null };
   return null;
 }
 
@@ -43,7 +43,21 @@ export function aiGatewayAccessOf(security: SecurityConfig | undefined, security
  */
 export function mcpUrlOf(gatewayUrl: string, aiGateway: AiGatewayAccess | null): string {
   if (!gatewayUrl) return '';
-  return aiGateway ? gatewayUrl : `${gatewayUrl.replace(/\/+$/, '')}/mcp`;
+  try {
+    const url = new URL(gatewayUrl);
+    url.pathname = url.pathname.replace(/\/+$/, '');
+    if (!aiGateway) url.pathname += '/mcp';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+/** Adds the Streamable HTTP selector without corrupting an existing query string. */
+export function mcpTransportUrlOf(mcpUrl: string): URL {
+  const url = new URL(mcpUrl);
+  url.searchParams.set('transportType', 'streamable-http');
+  return url;
 }
 
 /**
