@@ -167,6 +167,8 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     }
     rereadAfterMint.current = true;
     void renewKey(credential.current.apiKey).then((key) => {
+      // The new key reached this connection first and read everything again already (below).
+      if (!rereadAfterMint.current) return;
       // A new key reads everything again once it reaches this connection (below).
       if (key && key !== credential.current.apiKey) return;
       rereadAfterMint.current = false;

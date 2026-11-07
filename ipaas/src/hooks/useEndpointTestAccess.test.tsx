@@ -100,10 +100,10 @@ describe('the key held for an endpoint', () => {
   beforeEach(() => {
     mints = 0;
     vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'api-key', publicUrl: 'https://gw.example/orders' } as never);
-    // Each mint is a new key, valid for two minutes.
+    // Each mint is a new key, valid for ten minutes.
     vi.mocked(createEndpointTestKey).mockImplementation(async () => {
       mints += 1;
-      return { keyId: `k${mints}`, apiKey: `key-${mints}`, expiresAt: new Date(Date.now() + 2 * 60_000).toISOString() };
+      return { keyId: `k${mints}`, apiKey: `key-${mints}`, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() };
     });
   });
   afterEach(() => vi.useRealTimers());
@@ -135,13 +135,57 @@ describe('the key held for an endpoint', () => {
     await settle();
     expect(mints).toBe(1);
 
-    await act(async () => void (await vi.advanceTimersByTimeAsync(59_000)));
+    await act(async () => void (await vi.advanceTimersByTimeAsync(9 * 60_000 - 1_000)));
     expect(mints).toBe(1);
     await act(async () => void (await vi.advanceTimersByTimeAsync(2_000)));
     await settle();
     expect(mints).toBe(2);
     expect(shown(r.container, 'first')).toBe('key-2');
     expect(shown(r.container, 'second')).toBe('key-2');
+  });
+
+  it('is renewed again after a pause, not every second, when a renewal fails', async () => {
+    vi.useFakeTimers();
+    const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(0)));
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await settle();
+    expect(mints).toBe(1);
+
+    let attempts = 0;
+    vi.mocked(createEndpointTestKey).mockImplementation(async () => {
+      attempts += 1;
+      throw Object.assign(new Error('HTTP 503'), { status: 503 });
+    });
+    await act(async () => void (await vi.advanceTimersByTimeAsync(9 * 60_000 + 1_000)));
+    expect(attempts).toBe(1);
+    // The held key is still in use meanwhile.
+    expect(shown(r.container, 'first')).toBe('key-1');
+    await act(async () => void (await vi.advanceTimersByTimeAsync(20_000)));
+    expect(attempts).toBe(1);
+    await act(async () => void (await vi.advanceTimersByTimeAsync(11_000)));
+    expect(attempts).toBe(2);
+  });
+
+  it('counts an answer without a key as a failed mint, which a view that mounts tries again', async () => {
+    vi.mocked(createEndpointTestKey).mockImplementationOnce(async () => {
+      mints += 1;
+      return { keyId: 'k', apiKey: '' };
+    });
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    // The mint starts once the security read has rendered, and its failure lands a tick later.
+    await vi.waitFor(async () => {
+      await flush();
+      expect(views.first.keyError).toBe('Could not mint a test key.');
+    });
+    expect(shown(r.container, 'first')).toBe('');
+
+    await act(async () => showSecond(true));
+    await flush();
+    expect(mints).toBe(2);
+    expect(shown(r.container, 'second')).toBe('key-2');
+    expect(views.first.keyError).toBeNull();
   });
 
   it('is minted again on an explicit request, and every view moves to the new key', async () => {
@@ -191,8 +235,12 @@ describe('keyRenewalTime', () => {
     expect(keyRenewalTime('soon', mintedAt)).toBe(mintedAt + 59 * 60_000);
   });
 
-  it('keeps a key for at least 30 seconds, so a short or skewed expiry cannot mint in a loop', () => {
-    expect(keyRenewalTime('2026-11-07T10:00:45Z', mintedAt)).toBe(mintedAt + 30_000);
-    expect(keyRenewalTime('2026-11-07T09:00:00Z', mintedAt)).toBe(mintedAt + 30_000);
+  it('never waits past the hour a test key lasts, so a browser clock behind the server’s cannot renew a key after it expired', () => {
+    expect(keyRenewalTime('2026-11-07T12:00:00Z', mintedAt)).toBe(mintedAt + 59 * 60_000);
+  });
+
+  it('keeps a key for at least 5 minutes, so a browser clock ahead of the server’s cannot mint in a loop', () => {
+    expect(keyRenewalTime('2026-11-07T10:00:45Z', mintedAt)).toBe(mintedAt + 5 * 60_000);
+    expect(keyRenewalTime('2026-11-07T09:00:00Z', mintedAt)).toBe(mintedAt + 5 * 60_000);
   });
 });

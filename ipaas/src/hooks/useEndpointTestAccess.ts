@@ -94,8 +94,13 @@ const MINT_REFUSED = "Your role can't create test keys.";
 const DEFAULT_KEY_VALIDITY_MS = 60 * 60_000;
 /** A key is renewed this long before it expires. */
 const RENEW_BEFORE_EXPIRY_MS = 60_000;
-/** The shortest time a key is kept, so a short or skewed expiry can't mint in a loop. */
-const MIN_KEY_LIFE_MS = 30_000;
+/**
+ * The shortest time a key is kept. A stated expiry is read against this browser's clock, so a clock
+ * running ahead of the server's can make it look nearly spent; this bounds what that costs.
+ */
+const MIN_KEY_LIFE_MS = 5 * 60_000;
+/** After a failed renewal, how long until the next try (the held key may still be valid meanwhile). */
+const RENEW_RETRY_MS = 30_000;
 /** A held key outlives the views that use it by this long, so coming back to one reuses it. */
 const HELD_KEY_GC_MS = DEFAULT_KEY_VALIDITY_MS;
 /** The longest delay a browser timer honours; a longer one fires at once. */
@@ -106,7 +111,7 @@ const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.component
 
 /** A minted test key, held once per endpoint for every view of it. */
 interface HeldKey {
-  key: string | null;
+  key: string;
   /** When it was minted (epoch ms). */
   mintedAt: number;
   /** When to mint again (epoch ms): a minute before it expires. */
@@ -115,18 +120,24 @@ interface HeldKey {
 
 const heldKeyQueryKey = (refKey: string) => ['endpoint-test-key', refKey] as const;
 
-/** When a key minted at `mintedAt` is renewed: a minute before `expiresAt`, or before the default validity when the mint states none. */
+/**
+ * When a key minted at `mintedAt` is renewed: a minute before it expires. Its lifetime is the one
+ * `expiresAt` states, capped at the default validity: `expiresAt` comes from the server's clock, and
+ * read against a browser clock running behind, it would put the renewal after the real expiry.
+ */
 export function keyRenewalTime(expiresAt: string | undefined, mintedAt: number): number {
   const stated = expiresAt ? Date.parse(expiresAt) : Number.NaN;
-  const expires = Number.isFinite(stated) ? stated : mintedAt + DEFAULT_KEY_VALIDITY_MS;
-  return Math.max(expires - RENEW_BEFORE_EXPIRY_MS, mintedAt + MIN_KEY_LIFE_MS);
+  const lifetime = Number.isFinite(stated) ? Math.min(stated - mintedAt, DEFAULT_KEY_VALIDITY_MS) : DEFAULT_KEY_VALIDITY_MS;
+  return mintedAt + Math.max(lifetime - RENEW_BEFORE_EXPIRY_MS, MIN_KEY_LIFE_MS);
 }
 
 /** Mints through `mint`, the test-key mutation, so a refusal reaches the mutation cache's listeners (the permission notice). */
 async function mintHeldKey(mint: (target: EndpointRef) => Promise<ApiKeyResult>, target: EndpointRef): Promise<HeldKey> {
   const mintedAt = Date.now();
   const result = await mint(target);
-  return { key: result?.apiKey ?? null, mintedAt, renewAt: keyRenewalTime(result?.expiresAt, mintedAt) };
+  // An answer without a key is a failed mint: held as one, a view that mounts tries again.
+  if (!result?.apiKey) throw new Error('The test-key route answered without a key.');
+  return { key: result.apiKey, mintedAt, renewAt: keyRenewalTime(result.expiresAt, mintedAt) };
 }
 
 /**
@@ -185,8 +196,16 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     gcTime: HELD_KEY_GC_MS,
     // Renewed ahead of expiry while a view is open. A hidden tab renews when it is shown again,
     // since the key is stale by then.
-    refetchInterval: (query) => (query.state.data?.key ? Math.min(Math.max(query.state.data.renewAt - Date.now(), 1_000), MAX_TIMER_MS) : false),
-    // A refused mint is not tried again on its own: the views offer the way out (switch, retry).
+    refetchInterval: (query) => {
+      const { data, status, error } = query.state;
+      if (!data) return false;
+      // A failed renewal keeps the held key, whose renewal time has passed: try again after a pause,
+      // and not at all for a refusal another try can't change.
+      if (status === 'error') return error && (isPermissionError(error) || isApiKeyAuthRequired(error)) ? false : RENEW_RETRY_MS;
+      return Math.min(Math.max(data.renewAt - Date.now(), 1_000), MAX_TIMER_MS);
+    },
+    // A failed mint is not retried on focus or reconnect; a view that mounts tries once more, and
+    // the views offer the way out (switch, retry).
     retry: false,
     refetchOnWindowFocus: (query) => query.state.status !== 'error',
     refetchOnReconnect: (query) => query.state.status !== 'error',
@@ -197,7 +216,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   // A mint in flight is the answer to the last failure, so the failure is not shown meanwhile.
   const mintError = held.isFetching ? null : held.error;
   const apiKeyRequired = !!mintError && isApiKeyAuthRequired(mintError);
-  const mintFailure = mintError ? (apiKeyRequired || isPermissionError(mintError) ? null : friendlyApiError(mintError, MINT_FAILED)) : held.data && !held.data.key ? MINT_FAILED : null;
+  const mintFailure = mintError && !apiKeyRequired && !isPermissionError(mintError) ? friendlyApiError(mintError, MINT_FAILED) : null;
   const keyError = !canCreateKey && needsKey ? MINT_REFUSED : switchFailure?.refKey === refKey ? switchFailure.message : mintFailure;
 
   const mintFor = useCallback(
