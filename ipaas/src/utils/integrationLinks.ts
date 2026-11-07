@@ -93,8 +93,10 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
   const projectEndpoints = connectable.filter((e) => e.scope === 'project');
   const endpointSource = (id: string): FieldSource | undefined => {
     const match = projectEndpoints.find((e) => projectEndpointId(e) === id);
-    const [component, endpoint] = id.split('/');
-    return { ref: id, key: endpoint ?? id, name: match?.displayName ?? component ?? id, endpoint: true, noValues: false };
+    // The component is the first segment; everything after it is the endpoint, which may hold a slash.
+    const slash = id.indexOf('/');
+    const [component, endpoint] = slash < 0 ? [id, id] : [id.slice(0, slash), id.slice(slash + 1)];
+    return { ref: id, key: match?.endpoint ?? endpoint, name: match?.displayName ?? component, endpoint: true, noValues: false };
   };
   const connectionKey = (id: string) => {
     for (const c of links.connections) {
@@ -117,7 +119,7 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
       selected: ownEndpoint ?? (own ? `${own.ref}|${own.key}` : via ? VIA : ENTER),
       endpoints: projectEndpoints.map((e) => {
         const here = e.environments.find((x) => x.name === env);
-        return { id: projectEndpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason) }) };
+        return { id: projectEndpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason, here?.detail) }) };
       }),
       resources: links.resources.map((r) => ({
         id: r.id,
@@ -177,7 +179,11 @@ export const sameLinks = (links: IntegrationLinks, source: string, target: strin
 };
 
 /** A connection's configurables among fields: those named after it (`github` → `githubAuthToken`), as ipaas-service groups them. */
-/** Why an endpoint of this project cannot be chosen in the form's environment, short enough for a menu. */
-const unavailableText = (reason?: string): string => (reason === 'not_deployed' ? 'not deployed here' : 'unavailable here');
+/**
+ * Why an endpoint of this project cannot be chosen in the form's environment, short enough for a
+ * menu. The platform's own wording stands in for a reason this doesn't shorten, so a new one reads
+ * sensibly here before anyone adds it.
+ */
+const unavailableText = (reason?: string, detail?: string): string => (reason === 'not_deployed' ? 'not deployed here' : (detail ?? 'unavailable here'));
 
 const connectionFields = (fields: string[], connection: string) => fields.filter((f) => f.startsWith(connection) && /^[A-Z]/.test(f.slice(connection.length)));

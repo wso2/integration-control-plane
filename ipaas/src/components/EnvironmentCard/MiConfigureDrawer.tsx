@@ -208,7 +208,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
 
   // The value box's link icon: Enter a value, or a resource key.
   const renderValue = (name: string, view: TargetView, box: JSX.Element) => {
-    // An MI integration's env vars take resource keys only: formLinkView offers it no endpoints, so no pick carries one.
+    // An MI integration's env vars take resource keys only, which these two make true: the list is
+    // emptied so none is offered, and a pick carrying one is dropped rather than written.
     const picker = view.picker && name && <FieldLinkPicker field={name} picker={{ ...view.picker, endpoints: [], disabled: linkBusy, onPick: (pick) => link(name, pick && 'endpoint' in pick ? null : pick) }} />;
     if (!view.source)
       return picker ? (

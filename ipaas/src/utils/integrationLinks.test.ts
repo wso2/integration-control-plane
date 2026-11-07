@@ -110,6 +110,19 @@ describe('formLinkView', () => {
     expect(view.target(id('githubTimeout')).picker?.endpoints).toEqual([{ id: 'basket/items', name: 'Basket \u00b7 items', unavailable: 'not deployed here' }]);
   });
 
+  it('keeps the platform\u2019s own wording for a reason it does not shorten', () => {
+    const refused: ConnectableEndpoint[] = [{ ...connectable[0], environments: [{ name: 'development', connectable: false, reason: 'upstream_error', detail: 'the release it runs cannot be read' }] }];
+    const view = formLinkView(linked, 'development', envName, ghdemoFields, refused);
+    expect(view.target(id('githubTimeout')).picker?.endpoints?.[0].unavailable).toBe('the release it runs cannot be read');
+  });
+
+  it('reads an endpoint name that holds a slash', () => {
+    const nested: ConnectableEndpoint[] = [{ ...connectable[0], endpoint: 'v1/items' }];
+    const links: IntegrationLinks = { ...linked, endpointLinks: { [id('githubTimeout')]: 'basket/v1/items' } };
+    const view = formLinkView(links, 'development', envName, ghdemoFields, nested);
+    expect(view.target(id('githubTimeout')).source).toMatchObject({ ref: 'basket/v1/items', key: 'v1/items', name: 'Basket' });
+  });
+
   it('says a field filled from an endpoint comes from it, and selects it in the picker', () => {
     const links: IntegrationLinks = { ...linked, endpointLinks: { [id('githubTimeout')]: 'basket/items' } };
     const view = formLinkView(links, 'development', envName, ghdemoFields, connectable);
