@@ -248,6 +248,14 @@ describe('WorkflowRunDetailDrawer without caller roles', () => {
     expect(instances.activityTree).not.toHaveBeenCalled();
   });
 
+  it('does not say a completed run returned nothing, since its result is not read', async () => {
+    roles.carried = false;
+    const { api } = fakeApi();
+    await renderDrawer(api, { ...RUN, status: 'COMPLETED', closeTime: '2026-10-01T10:00:05Z' });
+    expect(text()).toContain('order-42');
+    expect(text()).not.toContain('Completed with no return value.');
+  });
+
   it('offers the lifecycle actions, but not Reset or the raw history', async () => {
     roles.carried = false;
     const { api } = fakeApi();

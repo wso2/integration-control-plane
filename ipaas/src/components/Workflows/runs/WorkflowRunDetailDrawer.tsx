@@ -204,6 +204,9 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   const workflowId = run?.workflowId ?? '';
   const runId = run?.runId;
   const enabled = !!run;
+  // A run's own reads are served only to a caller with roles (CALLS_CARRY_ROLES): without them none
+  // is sent, the list row stands in for the run, and nothing derived from those reads is shown.
+  const readsDetails = enabled && CALLS_CARRY_ROLES;
 
   // A run opens with nothing selected, never with whatever the last one left behind.
   const [selectionFor, setSelectionFor] = useState(runId);
@@ -217,13 +220,12 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   // Every read of an open run polls, so its timeline, rail and details stay live.
   const isLive = (current: WorkflowStatus | undefined) => OPEN_STATUSES.includes(current ?? 'UNKNOWN') || isSettling(workflowId);
 
-  // The list row is a snapshot; the instance read is what keeps the status current while open.
-  // A run's own reads are served only to a caller with roles (CALLS_CARRY_ROLES): without them
-  // none is sent, and the list row stands in for the run.
+  // The instance read keeps the status current while open; without it, the page passes the run's
+  // current row from the polled list.
   const { data: info } = useQuery({
     queryKey: workflowKeys.instance(scopeId, workflowId, runId),
     queryFn: () => client.instances.get(workflowId, runId),
-    enabled: enabled && CALLS_CARRY_ROLES,
+    enabled: readsDetails,
     retry: false,
     refetchInterval: (query) => whenAutoRefresh(isLive(query.state.data?.status ?? run?.status) ? LIVE_POLL_MS : false),
   });
@@ -239,7 +241,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   } = useQuery({
     queryKey: workflowKeys.history(scopeId, workflowId, runId),
     queryFn: () => client.instances.history(workflowId, runId),
-    enabled: enabled && CALLS_CARRY_ROLES,
+    enabled: readsDetails,
     retry: retryWorkflowRead,
     refetchInterval: pollWhileLive,
   });
@@ -251,7 +253,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   } = useQuery({
     queryKey: workflowKeys.activityTree(scopeId, workflowId, runId),
     queryFn: () => client.instances.activityTree(workflowId, runId),
-    enabled: enabled && CALLS_CARRY_ROLES,
+    enabled: readsDetails,
     retry: retryWorkflowRead,
     refetchInterval: pollWhileLive,
   });
@@ -295,11 +297,12 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
     });
   }, [run, activityNodes, status, metadata]);
   // Until the steps and the descriptor are in, the rail is loading, not missing.
-  const railLoading = enabled && ((treePending && !activityNodes) || metadata.status === 'loading');
+  const railLoading = readsDetails && ((treePending && !activityNodes) || metadata.status === 'loading');
   const railMessage = railLoading ? null : flowUnavailable(instanceGraph);
   // The run's own kind says it is an agent even when no descriptor does.
   const isAgent = run?.kind === 'AGENT' || instanceGraph?.graphKind === 'agent';
-  const completedNoResult = status === 'COMPLETED' && (workflowResult === null || workflowResult === undefined);
+  // Only once the history is read: before that (or without it) the result is unknown, not absent.
+  const completedNoResult = status === 'COMPLETED' && !historyPending && (workflowResult === null || workflowResult === undefined);
 
   // Which step the run reached, for the rail's "you are here" mark. Only meaningful while running.
   const currentStepId = useMemo(() => {
