@@ -36,7 +36,7 @@ export const ENTER = 'Enter a value';
 export interface FieldSource extends KeyRef {
   /** The resource's display name. */
   name: string;
-  /** An own link that beats its connection's. */
+  /** An own link that beats its connection's, to another key. */
   overrides?: boolean;
   noValues: boolean;
   /** Declared in workload.yaml. */
@@ -115,7 +115,7 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
       })),
     };
     const s = own ?? via;
-    return { ...(s && { source: source(s, !!own && !!via) }), picker };
+    return { ...(s && { source: source(s, !!own && !!via && (own.ref !== via.ref || own.key !== via.key)) }), picker };
   };
 
   // Outside the first environment, the release's build may name its connections otherwise than the Workload's build.
