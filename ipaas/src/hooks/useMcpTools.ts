@@ -19,7 +19,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { KEY_ACTIVATION_ATTEMPTS, KEY_ACTIVATION_DELAY_MS } from '../constants/mcp';
-import { createMcpClient, isMcpBlockedError, isMcpForbiddenError, isMcpUnauthorizedError } from '../utils/mcp';
+import { createMcpClient, isMcpBlockedError, isMcpForbiddenError, isMcpRedirectError, isMcpUnauthorizedError } from '../utils/mcp';
 import { mcpTransportUrlOf } from '../utils/mcpGateway';
 import type { McpTool } from '../types/mcp';
 
@@ -48,6 +48,8 @@ interface UseMcpToolsResult {
   isForbidden: boolean;
   /** 401 only: the credential was rejected, so a fresh one can help — a 403 cannot. */
   isUnauthorized: boolean;
+  /** The server answered with a redirect the transport won't follow, so a retry cannot help. */
+  isRedirect: boolean;
   refetch: () => void;
 }
 
@@ -64,6 +66,7 @@ export function useMcpTools({ mcpUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER, 
   const [error, setError] = useState<string | null>(null);
   const [isForbidden, setIsForbidden] = useState(false);
   const [isUnauthorized, setIsUnauthorized] = useState(false);
+  const [isRedirect, setIsRedirect] = useState(false);
   const [refetchTrigger, setRefetchTrigger] = useState(0);
 
   useEffect(() => {
@@ -90,6 +93,7 @@ export function useMcpTools({ mcpUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER, 
       setError(null);
       setIsForbidden(false);
       setIsUnauthorized(false);
+      setIsRedirect(false);
 
       for (let attempt = 1; !cancelled; attempt += 1) {
         try {
@@ -107,6 +111,7 @@ export function useMcpTools({ mcpUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER, 
           setError(err instanceof Error ? err.message : 'Failed to load tools');
           if (isMcpForbiddenError(err)) setIsForbidden(true);
           if (isMcpUnauthorizedError(err)) setIsUnauthorized(true);
+          if (isMcpRedirectError(err)) setIsRedirect(true);
           break;
         }
       }
@@ -119,5 +124,5 @@ export function useMcpTools({ mcpUrl, apiKey, authHeader = DEFAULT_AUTH_HEADER, 
   }, [mcpUrl, apiKey, authHeader, enabled, refetchTrigger]);
 
   const refetch = useCallback(() => setRefetchTrigger((t) => t + 1), []);
-  return { tools, isLoading, error, isForbidden, isUnauthorized, refetch };
+  return { tools, isLoading, error, isForbidden, isUnauthorized, isRedirect, refetch };
 }

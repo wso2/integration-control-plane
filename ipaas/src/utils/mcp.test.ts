@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
@@ -36,8 +36,10 @@ import {
   getMcpToolParameters,
   isMcpBlockedError,
   isMcpForbiddenError,
+  isMcpRedirectError,
   isMcpUnauthorizedError,
   isSimpleObjectSchema,
+  MCP_REDIRECT_MESSAGE,
   withNullableTypes,
 } from './mcp';
 import type { McpTool } from '../types/mcp';
@@ -275,6 +277,10 @@ describe('formatMcpError', () => {
   it('reports a withheld response rather than the browser wording', () => {
     expect(formatMcpError(new TypeError('Failed to fetch'))).toBe('The browser blocked the response, so its status is unknown.');
   });
+  it('explains a redirect the transport did not follow instead of the SDK wording', () => {
+    const raw = "Error POSTing to endpoint: Redirect not followed: this runtime does not expose the redirect target (redirectPolicy: 'same-origin')";
+    expect(formatMcpError(new StreamableHTTPError(0, raw))).toBe(MCP_REDIRECT_MESSAGE);
+  });
   it('strips transport prefixes and falls back to a generic message', () => {
     expect(formatMcpError('Streamable HTTP error: connection refused')).toBe('connection refused');
     expect(formatMcpError('')).toBe('Something went wrong while contacting the MCP server.');
@@ -305,10 +311,36 @@ describe('isMcpBlockedError', () => {
   });
 });
 
+describe('isMcpRedirectError', () => {
+  it('matches each way the transport reports a redirect it did not follow', () => {
+    expect(isMcpRedirectError(new StreamableHTTPError(0, "Error POSTing to endpoint: Redirect not followed: this runtime does not expose the redirect target (redirectPolicy: 'same-origin')"))).toBe(true);
+    expect(isMcpRedirectError(new StreamableHTTPError(307, "Error POSTing to endpoint: Redirect to https://other.example/mcp not followed (redirectPolicy: 'same-origin')"))).toBe(true);
+    expect(isMcpRedirectError(new StreamableHTTPError(301, 'Failed to open SSE stream: Redirect to plain http not followed; try https://gw.example/mcp instead'))).toBe(true);
+  });
+  it('is false for other failures', () => {
+    expect(isMcpRedirectError(new StreamableHTTPError(401, 'nope'))).toBe(false);
+    expect(isMcpRedirectError(new TypeError('Failed to fetch'))).toBe(false);
+    expect(isMcpRedirectError(new Error('connection refused'))).toBe(false);
+  });
+  it('recognises the SDK transport refusing a redirect to another origin', async () => {
+    const redirectingFetch = async () => new Response(null, { status: 307, headers: { location: 'https://elsewhere.example/mcp' } });
+    const transport = new StreamableHTTPClientTransport(new URL('https://gateway.example/mcp'), { fetch: redirectingFetch });
+    const error = await createMcpClient('test')
+      .connect(transport)
+      .then(
+        () => null,
+        (err: unknown) => err,
+      );
+    expect(classifyMcpError(error)).toBe('redirect');
+    expect(formatMcpError(error)).toBe(MCP_REDIRECT_MESSAGE);
+  });
+});
+
 describe('classifyMcpError', () => {
-  it('separates auth, blocked and everything else', () => {
+  it('separates auth, blocked, redirect and everything else', () => {
     expect(classifyMcpError(new StreamableHTTPError(401, 'nope'))).toBe('auth');
     expect(classifyMcpError(new TypeError('Failed to fetch'))).toBe('blocked');
+    expect(classifyMcpError(new StreamableHTTPError(0, 'Error POSTing to endpoint: Redirect not followed: this runtime does not expose the redirect target'))).toBe('redirect');
     expect(classifyMcpError(new Error('connection refused'))).toBe('other');
   });
 });

@@ -84,8 +84,20 @@ export function isMcpBlockedError(error: unknown): boolean {
   return /failed to fetch|load failed|networkerror|network error/i.test(raw);
 }
 
+export const MCP_REDIRECT_MESSAGE = "The MCP server answered with a redirect, which the console doesn't follow. Make the server answer at its MCP URL directly. A trailing-slash redirect is a common cause.";
+
+/**
+ * A 3xx the SDK's transport refused to follow. In browsers it follows none, so that the
+ * API key header never reaches another origin; retrying or a new key cannot help.
+ */
+export function isMcpRedirectError(error: unknown): boolean {
+  const raw = error instanceof Error ? error.message : String(error);
+  return /\bredirect\b.*\bnot followed\b/i.test(raw);
+}
+
 /** What went wrong, at the granularity the UI can act on. */
 export function classifyMcpError(error: unknown): McpErrorKind {
+  if (isMcpRedirectError(error)) return 'redirect';
   if (isMcpForbiddenError(error)) return 'auth';
   if (isMcpBlockedError(error)) return 'blocked';
   return 'other';
@@ -196,6 +208,7 @@ export function formatMcpError(error: unknown): string {
       /* not JSON — fall through */
     }
   }
+  if (isMcpRedirectError(error)) return MCP_REDIRECT_MESSAGE;
   if (/\b(401|403)\b|unauthor|forbidden/i.test(raw)) return 'Not authorized. Check the token and its permissions.';
   if (isMcpBlockedError(error)) return 'The browser blocked the response, so its status is unknown.';
   const cleaned = raw
