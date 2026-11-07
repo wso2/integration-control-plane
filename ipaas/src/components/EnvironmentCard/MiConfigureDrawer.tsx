@@ -102,7 +102,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
   const linkOf = (name: string): TargetView => (name && linkView ? linkView.target(name) : {});
   // Links apply to all environments: a linked name the form has no value for still gets a row; so does a declared one.
-  const linkedNames = useMemo(() => Object.keys((links?.sourceDefined ? links.declared : linkView?.editable ? links?.env : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
+  // The first environment edits the current links; another lists what its release runs.
+  const linkedNames = useMemo(() => Object.keys((linkView?.editable ? (links?.sourceDefined ? links.declared : links?.env) : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
   const linkedOnly = linkedNames.filter((n) => ![...envVars, ...secrets].some((r) => r.key.trim() === n));
 
   const handleClose = () => {
