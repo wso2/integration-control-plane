@@ -161,10 +161,41 @@ export interface LinkConnection {
 /** A link whose target the Workload's build lacks. */
 export interface OrphanedLink {
   target: string;
-  kind: 'configurable' | 'connection';
+  kind: 'configurable' | 'connection' | 'endpoint';
   ref: string;
   key?: string;
 }
+
+/**
+ * An integration of the organization this one may call, and the environments it may be called in.
+ * `project` scope is an integration of this project, reached directly; `organization` scope is one of
+ * another project, reached with an API key. `ref` is the connection standing for it already, absent
+ * until the first link to it makes one.
+ */
+export interface ConnectableEndpoint {
+  project: string;
+  component: string;
+  endpoint: string;
+  displayName: string;
+  scope: 'project' | 'organization';
+  ref?: string;
+  environments: ConnectableEndpointEnvironment[];
+}
+
+/** Whether an endpoint can be connected in one environment, and why not when it cannot. */
+export interface ConnectableEndpointEnvironment {
+  name: string;
+  connectable: boolean;
+  reason?: string;
+  detail?: string;
+}
+
+/**
+ * An endpoint as a link target: `<project>/<component>/<endpoint>`. The project is part of it because
+ * the same field takes either kind — this project's endpoint fills a configurable directly, another
+ * project's is reached as a connection — and the BFF tells them apart by the project.
+ */
+export const endpointId = (e: Pick<ConnectableEndpoint, 'project' | 'component' | 'endpoint'>): string => `${e.project}/${e.component}/${e.endpoint}`;
 
 /** What one environment's release uses. */
 export interface EnvironmentLinks {
@@ -192,6 +223,8 @@ export interface IntegrationLinks {
   usedByOrphaned: Record<string, string>;
   connections: LinkConnection[];
   fieldLinks: Record<string, KeyRef>;
+  /** Configurable id → the endpoint of this project filling it, `<component>/<endpoint>`. */
+  endpointLinks: Record<string, string>;
   orphaned: OrphanedLink[];
   env: Record<string, KeyRef>;
   environments: EnvironmentLinks[];
@@ -201,8 +234,11 @@ export interface IntegrationLinks {
   declared?: Record<string, KeyRef>;
 }
 
-/** One link change: a target, and its source; without `ref` the target's own link goes. */
-export type LinkTarget = { connection: string; ref?: string } | { configurable: string; ref?: string; key?: string } | { env: string; ref?: string; key?: string };
+/**
+ * One link change: a target, and its source; without a source the target's own link goes.
+ * A configurable takes one value, so `ref`/`key` and `endpoint` are alternatives.
+ */
+export type LinkTarget = { connection: string; ref?: string } | { configurable: string; ref?: string; key?: string; endpoint?: string } | { env: string; ref?: string; key?: string };
 
 export interface LinkWriteInput {
   projectId: string;
