@@ -48,6 +48,7 @@ import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import Logo from '../components/Logo';
+import MarketingConsentDialog from '../components/MarketingConsentDialog';
 import NotFound from '../components/NotFound';
 import {
   Activity,
@@ -1105,6 +1106,7 @@ export default function AppLayout(): JSX.Element {
             </Button>
           </DialogActions>
         </Dialog>
+        <MarketingConsentDialog />
       </AppShell.NotificationPanel>
     </AppShell>
   );
