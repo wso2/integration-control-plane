@@ -97,7 +97,7 @@ import { visibleComponentSettingsSections } from '../constants/componentSettings
 import { useScope, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, settingsCrossScopeUrl, resolveActiveNavId, parentGroupId, navUrl, overviewUrl, navScopeSwitchUrl, resolveResourceKey, componentKeepsPage, type Scope } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { trackEvent } from '../services/tracking/tracking';
-import { billingUpgradeUrl, cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
+import { cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useCan } from '../hooks/useCan';
@@ -134,12 +134,12 @@ export default function AppLayout(): JSX.Element {
   const billingTrial = billingOrg?.subscription?.status === 'trial' ? billingOrg.subscription.trial : null;
   const trialEndLabel = billingTrial?.trial_end ? `Trial ends ${new Date(billingTrial.trial_end).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}` : undefined;
   const orgUuid = useOrgUuid();
-  const upgradeUrl = billingTrial && orgUuid ? billingUpgradeUrl(orgUuid) : null;
+  const billingUpgradesConfigured = !!window.API_CONFIG?.enableBillingFeature && !!window.API_CONFIG?.billingConsoleUrl;
   const { data: componentLimits } = useOrgComponentLimits(billingTrial ? (orgUuid ?? '') : '');
-  // Shown only where billing upgrades are configured; its Upgrade button opens the subscriptions page, as the badge does.
+  // Shown only where billing upgrades are configured; its Upgrade button links to the subscriptions page, as the badge does.
   const trialUsage: TrialBadgeUsage | undefined =
-    componentLimits && upgradeUrl
-      ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, onUpgrade: () => window.location.assign(cloudConsoleSubscriptionsUrl()) }
+    componentLimits && billingUpgradesConfigured
+      ? { title: 'Integrations', items: [{ key: 'integrations', label: 'Integrations', count: componentLimits.billableComponentCount, limit: FREE_COMPONENT_LIMIT }], footerText: null, upgradeHref: cloudConsoleSubscriptionsUrl() }
       : undefined;
 
   // useAppShell's internal mobile-collapse effect keys off this options object's identity —
@@ -648,8 +648,8 @@ export default function AppLayout(): JSX.Element {
               <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} upgradeHref={cloudConsoleSubscriptionsUrl()} usage={trialUsage} title={trialEndLabel} />
             )}
             {/* A plain link: the WSO2 Cloud console serves this path, not this console's router. */}
-            <Tooltip title="Settings">
-              <IconButton component="a" href={cloudConsoleOrganizationsUrl()} aria-label="Organization Settings" sx={{ color: 'text.secondary' }}>
+            <Tooltip title="Organization settings">
+              <IconButton component="a" href={cloudConsoleOrganizationsUrl()} aria-label="Organization settings" sx={{ color: 'text.secondary' }}>
                 <Settings />
               </IconButton>
             </Tooltip>

@@ -17,13 +17,15 @@ export function projectsRedirectUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/projects/redirect`;
 }
 
-// The WSO2 Cloud console serves the root of the origin this console shares with it, outside this console's base path.
+// The WSO2 Cloud console serves the root of this console's own origin, outside this console's base path.
+const cloudConsoleUrl = (path: string): string => `${window.location.origin}${path}`;
+
 export function cloudConsoleOrganizationsUrl(): string {
-  return '/organizations';
+  return cloudConsoleUrl('/organizations');
 }
 
 export function cloudConsoleSubscriptionsUrl(): string {
-  return '/billing?tab=subscriptions';
+  return cloudConsoleUrl('/billing?tab=subscriptions');
 }
 
 export function oidcCallbackUrl(): string {
@@ -40,13 +42,6 @@ export function cookiePolicyUrl(): string {
 
 export function termsOfUseUrl(): string {
   return 'https://wso2.com/integration-platform/terms-of-use';
-}
-
-/** The billing console's upgrade page for an org, or null when billing is not configured. */
-export function billingUpgradeUrl(orgUuid: string): string | null {
-  const base = window.API_CONFIG?.billingConsoleUrl;
-  if (!window.API_CONFIG?.enableBillingFeature || !base || !orgUuid) return null;
-  return `${base}/cloud/devant/upgrade?orgId=${encodeURIComponent(orgUuid)}`;
 }
 
 export function documentationUrl(): string {
