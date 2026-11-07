@@ -26,7 +26,7 @@ import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBaseDataSource, useKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
 import { DAILY_INGESTION } from '../constants/ragIngestion';
-import { buildDataSourceSettings, ingestionNotice, isNameValid, type NameFields } from '../utils/knowledgeBase';
+import { buildDataSourceSettings, isNameValid, type NameFields } from '../utils/knowledgeBase';
 import { isDatasourceValid } from '../utils/ragIngestion';
 import type { DatasourceConfig } from '../types/ragIngestion';
 import { isNotFoundError } from '../utils/apiErrors';
@@ -110,7 +110,7 @@ function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledge
         cronExpression: mode === 'scheduled' ? schedule.cron : '',
         cronTimezone: mode === 'scheduled' ? schedule.timezone : '',
       },
-      { onSuccess: (ds) => navigate(knowledgeBaseUrl(scope, knowledgeBase), { state: ingestionNotice([ds]) }) },
+      { onSuccess: () => navigate(knowledgeBaseUrl(scope, knowledgeBase)) },
     );
   };
 

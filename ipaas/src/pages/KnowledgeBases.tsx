@@ -113,7 +113,7 @@ function KnowledgeBaseList({ scope }: { scope: OrgScope }): JSX.Element {
       </Typography>,
       summary.embedding,
       String(kb.dataSources.length),
-      <DeploymentStatusChip key="status" status={kb.status} />,
+      <DeploymentStatusChip key="status" status={kb.status} error={kb.error} />,
       canManage ? (
         <Tooltip key="delete" title="Delete">
           <IconButton size="small" color="error" aria-label={`Delete ${kb.displayName}`} onClick={() => setDeleting(kb)}>

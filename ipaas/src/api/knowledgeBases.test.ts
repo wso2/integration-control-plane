@@ -38,6 +38,7 @@ describe('toKnowledgeBase', () => {
       config: {},
       secretKeys: [],
       status: '',
+      error: '',
       serviceUrl: '',
       dataSources: [],
       createdAt: '',
@@ -54,14 +55,14 @@ describe('toKnowledgeBase', () => {
       dataSources: [{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], status: 'ACTIVE' }],
     });
     expect(kb.secretKeys).toEqual(['PINECONE_APIKEY']);
-    expect(kb.dataSources).toEqual([{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', releaseName: '', createdAt: '' }]);
+    expect(kb.dataSources).toEqual([{ name: 'docs-s3', displayName: 'Docs S3', config: { DATASOURCE: 'amazons3' }, secretKeys: ['AWS_ACCESS_KEY_ID'], cronExpression: '', cronTimezone: '', status: 'ACTIVE', error: '', releaseName: '', createdAt: '' }]);
   });
 });
 
 describe('toKnowledgeBaseDataSource', () => {
-  it('keeps whether a just-created source started its first run', () => {
-    expect(toKnowledgeBaseDataSource({ name: 'docs-drive', ingestionStarted: false, ingestionError: 'Run it with Ingest.' })).toMatchObject({ ingestionStarted: false, ingestionError: 'Run it with Ingest.' });
-    expect(toKnowledgeBaseDataSource({ name: 'docs-drive' })).not.toHaveProperty('ingestionStarted');
+  it('keeps why a create failed', () => {
+    expect(toKnowledgeBaseDataSource({ name: 'docs-drive', status: 'FAILED', error: 'link refused' })).toMatchObject({ status: 'FAILED', error: 'link refused' });
+    expect(toKnowledgeBaseDataSource({ name: 'docs-drive' })).toMatchObject({ status: '', error: '' });
   });
 });
 

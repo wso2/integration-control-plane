@@ -45,7 +45,7 @@ import {
 } from '@wso2/oxygen-ui';
 import { ArrowLeft, Clock, Database, ExternalLink, MoreVertical, Play, Plus, RefreshCw, Search, Trash2 } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
-import { useLocation, useParams } from 'react-router';
+import { useParams } from 'react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { Scopes } from '../constants/permissions';
@@ -59,7 +59,7 @@ import { useTriggerComponent } from '../hooks/useExecutions';
 import { knowledgeBasesUrl, newKnowledgeBaseDataSourceUrl, type OrgScope } from '../nav';
 import { componentOverviewUrl } from '../paths';
 import { describeCron } from '../utils/cronUtils';
-import { buildKnowledgeBaseSettings, chunkingFromConfig, dataSourceLabel, embeddingFromConfig, isEditedSettingsValid, isManualSchedule, knowledgeBaseSummary, secretsForUpdate, vectorStoreFromConfig, type IngestionNoticeState } from '../utils/knowledgeBase';
+import { buildKnowledgeBaseSettings, chunkingFromConfig, dataSourceLabel, embeddingFromConfig, isEditedSettingsValid, isManualSchedule, knowledgeBaseSummary, secretsForUpdate, vectorStoreFromConfig } from '../utils/knowledgeBase';
 import { isChunkingValid, vectorStoreEnvVars } from '../utils/ragIngestion';
 import type { KnowledgeBase, KnowledgeBaseDataSource } from '../types/knowledgeBase';
 import type { ChunkingConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
@@ -141,7 +141,7 @@ function KnowledgeBaseView({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }
         <PageTitle.Header>
           <Stack direction="row" gap={1.5} alignItems="center">
             {kb.displayName}
-            <DeploymentStatusChip status={kb.status} />
+            <DeploymentStatusChip status={kb.status} error={kb.error} />
           </Stack>
         </PageTitle.Header>
         {kb.description && <PageTitle.SubHeader>{kb.description}</PageTitle.SubHeader>}
@@ -236,9 +236,7 @@ function DataSources({ scope, kb }: { scope: OrgScope; kb: KnowledgeBase }): JSX
   const { refetch, isFetching } = useKnowledgeBase(kb.name);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
-  // A create that could not start a source's first run says so on arrival here.
-  const arrivedWith = (useLocation().state as IngestionNoticeState | null)?.ingestionNotice;
-  const [notice, setNotice] = useState<Notice | null>(() => (arrivedWith ? { severity: 'warning', text: arrivedWith } : null));
+  const [notice, setNotice] = useState<Notice | null>(null);
   const [scheduling, setScheduling] = useState<KnowledgeBaseDataSource | null>(null);
   const [viewingLogs, setViewingLogs] = useState<KnowledgeBaseDataSource | null>(null);
   const [deleting, setDeleting] = useState<KnowledgeBaseDataSource | null>(null);
@@ -407,7 +405,7 @@ function DataSourceRow({ scope, kb, dataSource: ds, onNotify, onSchedule, onView
       <TableCell>{deployed ? <LastSuccessfulSync kb={kb} dataSource={ds} /> : '—'}</TableCell>
       <TableCell>{isManualSchedule(ds.cronExpression) ? 'Manual' : describeCron(ds.cronExpression)}</TableCell>
       <TableCell>
-        <DeploymentStatusChip status={ds.status} />
+        <DeploymentStatusChip status={ds.status} error={ds.error} />
       </TableCell>
       <TableCell align="right">
         <Stack direction="row" gap={1} justifyContent="flex-end" alignItems="center" sx={{ whiteSpace: 'nowrap' }}>
@@ -552,7 +550,7 @@ function KnowledgeBaseServiceTable({ scope, kb, onDelete }: { scope: OrgScope; k
             </TableCell>
             <TableCell>{lastDeployed || '—'}</TableCell>
             <TableCell>
-              <DeploymentStatusChip status={kb.status} />
+              <DeploymentStatusChip status={kb.status} error={kb.error} />
             </TableCell>
             <TableCell align="right">
               <IconButton size="small" aria-label={`Actions for ${kb.displayName} Service`} onClick={(e) => setMenuAnchor(e.currentTarget)}>

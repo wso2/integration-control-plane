@@ -17,7 +17,7 @@
  */
 
 import { AZURE_DEFAULT_API_VERSION, CHUNKING_STRATEGIES, DATASOURCES, DEFAULT_CHUNKING, EMBEDDING_PROVIDERS, RAG_SECRET_KEYS, VECTOR_STORE_PROVIDERS } from '../constants/ragIngestion';
-import type { KnowledgeBase, KnowledgeBaseDataSource, KnowledgeBaseSettings } from '../types/knowledgeBase';
+import type { KnowledgeBase, KnowledgeBaseSettings } from '../types/knowledgeBase';
 import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, VectorStoreConfig } from '../types/ragIngestion';
 import { datasourceEnvVars, embeddingEnvVars, isEmbeddingValid, isVectorStoreValid, vectorStoreEnvVars } from './ragIngestion';
 
@@ -206,20 +206,10 @@ export function isManualSchedule(cronExpression: string): boolean {
   return cron === '' || cron === NEVER_FIRES_CRON;
 }
 
-/** Navigation state carrying a warning from a create to the knowledge base page. */
-export interface IngestionNoticeState {
-  ingestionNotice: string;
-}
-
-/** The warning for sources just created whose first run did not start, or null when every one started. */
-export function ingestionNotice(sources: readonly Pick<KnowledgeBaseDataSource, 'displayName' | 'ingestionStarted' | 'ingestionError'>[]): IngestionNoticeState | null {
-  const failed = sources.filter((s) => s.ingestionStarted === false);
-  if (failed.length === 0) return null;
-  return { ingestionNotice: failed.map((s) => `${s.displayName}: ${s.ingestionError || 'its first ingestion could not be started. Run it with Ingest.'}`).join(' ') };
-}
-
 /** Why a knowledge base cannot be queried yet, or null when it can. */
 export function retrievalUnavailableReason(kb: Pick<KnowledgeBase, 'status' | 'serviceUrl'>): string | null {
+  if (kb.status === 'CREATING') return 'The knowledge base is still being created. You can query it once it is active.';
+  if (kb.status === 'FAILED') return 'The knowledge base could not be created, so it cannot be queried.';
   if (kb.status === 'ERROR') return 'The knowledge base service failed to deploy, so it cannot be queried.';
   if (kb.status === 'SUSPENDED') return 'The knowledge base service is stopped, so it cannot be queried.';
   if (kb.status !== 'ACTIVE') return 'The knowledge base service is still deploying. You can query it once it is active.';

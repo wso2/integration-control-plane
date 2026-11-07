@@ -24,7 +24,6 @@ import {
   dataSourceLabel,
   dataSourceNameFor,
   embeddingFromConfig,
-  ingestionNotice,
   isEditedSettingsValid,
   isManualSchedule,
   isNameValid,
@@ -171,6 +170,8 @@ describe('retrievalUnavailableReason', () => {
     [{ status: 'ACTIVE', serviceUrl: 'https://kb' }, null],
     [{ status: 'ACTIVE', serviceUrl: '' }, 'The knowledge base service has no public URL yet.'],
     [{ status: 'IN_PROGRESS', serviceUrl: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
+    [{ status: 'CREATING', serviceUrl: '' }, 'The knowledge base is still being created. You can query it once it is active.'],
+    [{ status: 'FAILED', serviceUrl: '' }, 'The knowledge base could not be created, so it cannot be queried.'],
     [{ status: '', serviceUrl: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
     [{ status: 'ERROR', serviceUrl: 'https://kb' }, 'The knowledge base service failed to deploy, so it cannot be queried.'],
   ])('%j', (kb, reason) => {
@@ -187,20 +188,5 @@ describe('isManualSchedule', () => {
     ['*/30 * * * *', false],
   ])('%j → %s', (cron, manual) => {
     expect(isManualSchedule(cron)).toBe(manual);
-  });
-});
-
-describe('ingestionNotice', () => {
-  it('is null when every first run started, or none was asked for', () => {
-    expect(ingestionNotice([{ displayName: 'Drive', ingestionStarted: true }, { displayName: 'S3' }])).toBeNull();
-  });
-
-  it('names each source whose first run did not start', () => {
-    expect(
-      ingestionNotice([
-        { displayName: 'Drive', ingestionStarted: false, ingestionError: 'Run it with Ingest.' },
-        { displayName: 'S3', ingestionStarted: false },
-      ]),
-    ).toEqual({ ingestionNotice: 'Drive: Run it with Ingest. S3: its first ingestion could not be started. Run it with Ingest.' });
   });
 });

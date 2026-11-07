@@ -33,8 +33,10 @@ export interface KnowledgeBase {
   environment: string;
   config: Record<string, string>;
   secretKeys: string[];
-  /** KB Service deployment status: ACTIVE, IN_PROGRESS, ERROR, SUSPENDED, or '' before the first rollout. */
+  /** KB Service deployment status: ACTIVE, IN_PROGRESS, ERROR, SUSPENDED, or '' before the first rollout; CREATING while its create runs, FAILED if it did not finish. */
   status: string;
+  /** Why the create FAILED; '' otherwise. */
+  error: string;
   /** The KB Service's external URL; '' until routed. */
   serviceUrl: string;
   dataSources: KnowledgeBaseDataSource[];
@@ -53,13 +55,12 @@ export interface KnowledgeBaseDataSource {
   /** '' for a source that runs only when triggered. */
   cronExpression: string;
   cronTimezone: string;
+  /** Deployment status, as for a knowledge base, CREATING and FAILED included. */
   status: string;
+  /** Why the create FAILED; '' otherwise. */
+  error: string;
   releaseName: string;
   createdAt: string;
-  /** Set only on the response that creates a source that runs once: whether its first run started. */
-  ingestionStarted?: boolean;
-  /** Why the first run did not start; the source can still be run with Ingest. */
-  ingestionError?: string;
 }
 
 /** Settings split the way the BFF stores them: plain values and secrets. */

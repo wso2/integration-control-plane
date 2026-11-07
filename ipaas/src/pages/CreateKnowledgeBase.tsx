@@ -25,7 +25,7 @@ import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
 import { DAILY_INGESTION, DATASOURCES, DEFAULT_CHUNKING } from '../constants/ragIngestion';
-import { buildDataSourceSettings, buildKnowledgeBaseSettings, dataSourceNameFor, ingestionNotice, isNameValid, type NameFields } from '../utils/knowledgeBase';
+import { buildDataSourceSettings, buildKnowledgeBaseSettings, dataSourceNameFor, isNameValid, type NameFields } from '../utils/knowledgeBase';
 import { isChunkingValid, isDatasourceValid, isEmbeddingValid, isVectorStoreValid } from '../utils/ragIngestion';
 import type { ChunkingConfig, DatasourceConfig, EmbeddingConfig, VectorStoreConfig } from '../types/ragIngestion';
 import type { CreateKnowledgeBaseDataSourceInput } from '../types/knowledgeBase';
@@ -89,7 +89,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
     }
     create.mutate(
       { name: names.name, displayName: names.displayName.trim(), description: names.description.trim(), ...buildKnowledgeBaseSettings(vectorStore, embedding, chunking), dataSource },
-      { onSuccess: (kb) => navigate(knowledgeBaseUrl(scope, kb.name), { state: ingestionNotice(kb.dataSources) }) },
+      { onSuccess: (kb) => navigate(knowledgeBaseUrl(scope, kb.name)) },
     );
   };
 
