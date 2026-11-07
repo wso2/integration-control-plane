@@ -74,6 +74,8 @@ export interface ApiKeyResult {
   displayName?: string;
   /** Plaintext API key — shown once, not retrievable later. */
   apiKey: string;
+  /** When the key expires (RFC 3339). A test key states it; without it, the default validity applies. */
+  expiresAt?: string;
 }
 
 /** Payload for creating an API key on an exposed endpoint API. */
