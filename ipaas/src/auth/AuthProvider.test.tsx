@@ -31,6 +31,7 @@ interface FakeSdk {
   isSignedIn: boolean;
   getAccessToken: ReturnType<typeof vi.fn>;
   getDecodedIdToken: ReturnType<typeof vi.fn>;
+  getGrantedPermissions: ReturnType<typeof vi.fn>;
   clearSession: ReturnType<typeof vi.fn>;
   signIn: ReturnType<typeof vi.fn>;
   signInSilently: ReturnType<typeof vi.fn>;
@@ -98,6 +99,7 @@ function sdkWith(patch: Partial<FakeSdk> = {}): void {
     isSignedIn: false,
     getAccessToken: vi.fn(async () => ''),
     getDecodedIdToken: vi.fn(async () => ID_CLAIMS),
+    getGrantedPermissions: vi.fn(async () => []),
     clearSession: vi.fn(),
     signIn: vi.fn(async () => undefined),
     signInSilently: vi.fn(async () => false),
@@ -493,8 +495,21 @@ describe('cloud AuthProvider — sign-in on the gateway (BFF)', () => {
     expect(sdk.get().getAccessToken).not.toHaveBeenCalled();
   });
 
-  it('has no scopes, since the gateway keeps the access token, and resolves permissions from none', async () => {
-    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => ({ ...GATEWAY_CLAIMS, scope: 'openid ipaas:integration:read' })) });
+  it('takes its scopes from the gateway session, not from the ID token', async () => {
+    sdkWith({
+      isSignedIn: true,
+      getDecodedIdToken: vi.fn(async () => ({ ...GATEWAY_CLAIMS, scope: 'openid cloud:project:delete' })),
+      getGrantedPermissions: vi.fn(async () => ['openid', 'ipaas:integration:read']),
+    });
+    await render();
+
+    expect(auth?.scopes).toEqual(['openid', 'ipaas:integration:read']);
+    expect(sessionPermissions(auth!.scopes, true)).toEqual(['openid', 'ipaas:integration:read']);
+    expect(sdk.get().getAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('has no scopes when the gateway session reports none, and resolves permissions from none', async () => {
+    sdkWith({ isSignedIn: true, getDecodedIdToken: vi.fn(async () => GATEWAY_CLAIMS), getGrantedPermissions: vi.fn(async () => Promise.reject(new Error('no session'))) });
     await render();
 
     expect(auth?.scopes).toEqual([]);
