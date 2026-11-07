@@ -32,8 +32,9 @@ interface ConnectionLinkProps {
 export function ConnectionLink({ connection: c, links, busy, onLink }: ConnectionLinkProps) {
   const name = (id: string) => links.resources.find((r) => r.id === id)?.displayName ?? id;
   // Linking supplies the connection's keys to its fields without links of their own; one another target uses is
-  // refused. A key only an orphaned link holds (`usedByOrphaned`) is free: the write moves it.
-  const clashes = (resource: string) => c.fields.some((f) => f.key && !links.fieldLinks[f.configurable] && (links.used[`${resource}|${f.key}`] ?? f.configurable) !== f.configurable);
+  // refused. Only a linked connection's fields carry keys, so an unlinked one's pick relies on that refusal's message.
+  // A key only an orphaned link holds (`usedByOrphaned`) is free: the write moves it.
+  const clashes = (resource: string) => !!c.link && c.fields.some((f) => !links.fieldLinks[f.configurable] && (links.used[`${resource}|${f.key}`] ?? f.configurable) !== f.configurable);
   const options = c.link && !c.suggestions.includes(c.link) ? [c.link, ...c.suggestions] : c.suggestions;
 
   return (
