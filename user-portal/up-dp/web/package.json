@@ -11,8 +11,8 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.90.20",
-    "@wso2/oxygen-ui": "^0.15.0",
-    "@wso2/oxygen-ui-icons-react": "^0.15.0",
+    "@wso2/oxygen-ui": "^0.20.0",
+    "@wso2/oxygen-ui-icons-react": "^0.20.0",
     "cron-parser": "^4.9.0",
     "cronstrue": "^2.52.0",
     "react": "19.2.3",

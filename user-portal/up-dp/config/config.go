@@ -106,7 +106,7 @@ func Load(ctx context.Context) (Config, error) {
 		Portal: Portal{
 			Name:         l.String("PORTAL_NAME", "User Portal"),
 			ProductName:  l.String("PRODUCT_NAME", "Integration Platform"),
-			Theme:        l.String("PORTAL_THEME", "acrylicOrange"),
+			Theme:        l.String("PORTAL_THEME", "choreoLabs"),
 			PrimaryColor: l.String("PORTAL_PRIMARY_COLOR", ""),
 			Links: map[string]string{
 				"terms":   l.String("PORTAL_TERMS_URL", "https://wso2.com/terms-of-use/"),
