@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
 import { useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
-import type { EndpointRef, SecurityMode } from '../types/consumers';
+import type { ApiKeyResult, EndpointRef, SecurityMode } from '../types/consumers';
 import { friendlyApiError } from '../utils/apiSecurity';
 import { isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
 import { Scopes } from '../constants/permissions';
@@ -41,6 +42,8 @@ export interface EndpointTestAccess {
   authHeader: string;
   /** Plaintext test key, or `null` when none is held (or none is needed). */
   apiKey: string | null;
+  /** When the held key was minted (epoch ms), or 0 when none is held. */
+  keyMintedAt: number;
   /** True once a credential is held, or none is required because the API is open. */
   isAuthorized: boolean;
   /** A key is being minted right now. */
@@ -69,17 +72,62 @@ export interface EndpointTestAccess {
   isUnavailable: boolean;
   /** The security read's failure, for `endpointLoadNotice` — 409 is a state, other statuses are not. */
   securityError: unknown;
-  /** Mint (or replace) the test key. Resolves to the plaintext, or `null` on failure. */
+  /**
+   * Mint a new test key, for an explicit action such as regenerating one. Every view of the
+   * endpoint moves to it. Resolves to the plaintext, or `null` on failure.
+   */
   mintKey: () => Promise<string | null>;
-  /** Re-mint after a 401, once per key — a test key expires, and another surface may reap it. */
+  /**
+   * Renew the key after `refused` was turned down. Mints only while `refused` is still the held
+   * key; when another view has renewed it already, resolves to that key instead, so views that
+   * hear the same refusal don't mint one key each. Resolves to `null` on failure.
+   */
+  renewKey: (refused: string | null) => Promise<string | null>;
+  /** Renew the key once per endpoint after a 401: a test key expires, and another tab may reap it. */
   retryUnauthorized: () => void;
 }
 
 const MINT_FAILED = 'Could not mint a test key.';
 const MINT_REFUSED = "Your role can't create test keys.";
 
+/** How long a test key lasts when its mint states no expiry: ipaas-service's test-key TTL. */
+const DEFAULT_KEY_VALIDITY_MS = 60 * 60_000;
+/** A key is renewed this long before it expires. */
+const RENEW_BEFORE_EXPIRY_MS = 60_000;
+/** The shortest time a key is kept, so a short or skewed expiry can't mint in a loop. */
+const MIN_KEY_LIFE_MS = 30_000;
+/** A held key outlives the views that use it by this long, so coming back to one reuses it. */
+const HELD_KEY_GC_MS = DEFAULT_KEY_VALIDITY_MS;
+/** The longest delay a browser timer honours; a longer one fires at once. */
+const MAX_TIMER_MS = 2 ** 31 - 1;
+
 /** Identity of the endpoint a minted key belongs to, so a key can never leak across endpoints. */
 const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.componentName ?? ''}|${ref?.environmentName ?? ''}|${ref?.endpointName ?? ''}|${ref?.deploymentTrackId ?? ''}`;
+
+/** A minted test key, held once per endpoint for every view of it. */
+interface HeldKey {
+  key: string | null;
+  /** When it was minted (epoch ms). */
+  mintedAt: number;
+  /** When to mint again (epoch ms): a minute before it expires. */
+  renewAt: number;
+}
+
+const heldKeyQueryKey = (refKey: string) => ['endpoint-test-key', refKey] as const;
+
+/** When a key minted at `mintedAt` is renewed: a minute before `expiresAt`, or before the default validity when the mint states none. */
+export function keyRenewalTime(expiresAt: string | undefined, mintedAt: number): number {
+  const stated = expiresAt ? Date.parse(expiresAt) : Number.NaN;
+  const expires = Number.isFinite(stated) ? stated : mintedAt + DEFAULT_KEY_VALIDITY_MS;
+  return Math.max(expires - RENEW_BEFORE_EXPIRY_MS, mintedAt + MIN_KEY_LIFE_MS);
+}
+
+/** Mints through `mint`, the test-key mutation, so a refusal reaches the mutation cache's listeners (the permission notice). */
+async function mintHeldKey(mint: (target: EndpointRef) => Promise<ApiKeyResult>, target: EndpointRef): Promise<HeldKey> {
+  const mintedAt = Date.now();
+  const result = await mint(target);
+  return { key: result?.apiKey ?? null, mintedAt, renewAt: keyRenewalTime(result?.expiresAt, mintedAt) };
+}
 
 /**
  * Test-time access to a deployed endpoint exposed on the API Platform gateway:
@@ -94,6 +142,11 @@ const keyOf = (ref: EndpointRef | null | undefined): string => `${ref?.component
  * the auto-expose default. For another mode, ipaas-service refuses a test key
  * (`needsApiKeyAuth`) until the caller switches the endpoint with `switchToApiKey()`,
  * which changes how every caller of the API authenticates.
+ *
+ * The key is held once per endpoint, not once per view: every view of an endpoint, and every
+ * later visit to one, uses the same key until shortly before it expires, and only one mint is in
+ * flight for it at a time. ipaas-service keeps only the newest few test keys of an API and revokes
+ * the rest, so a key per view would revoke keys that other views are still using.
  */
 interface TestAccessOptions {
   enabled?: boolean;
@@ -108,7 +161,8 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   const can = useCan();
   const canCreateKey = can(Scopes.ENDPOINT_TEST) && (!agent || can(Scopes.AGENT_API_KEY_MANAGE));
   const canSwitch = canCreateKey && !agent && can(Scopes.ENDPOINT_UPDATE);
-  const createTestKey = useCreateEndpointTestKey();
+  const queryClient = useQueryClient();
+  const { mutateAsync: createKeyFor } = useCreateEndpointTestKey();
   const enableApiKeyAuth = useEnableEndpointApiKeyAuth();
 
   // Each request goes to the endpoint it was started for, and its result is stored against that
@@ -117,52 +171,59 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
   // The endpoint by identity: a caller's new object for the same endpoint must not re-run the auto-mint.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const endpoint = useMemo(() => ref, [refKey]);
-  const [minted, setMinted] = useState<{ refKey: string; key: string | null } | null>(null);
-  const [failure, setFailure] = useState<{ refKey: string; message: string } | null>(null);
-  const [apiKeyRequiredFor, setApiKeyRequiredFor] = useState<string | null>(null);
+  const [switchFailure, setSwitchFailure] = useState<{ refKey: string; message: string } | null>(null);
 
   const mode = security?.mode ?? null;
-  const apiKey = minted?.refKey === refKey ? minted.key : null;
-  const needsKey = mode === 'api-key' || mode === 'jwt';
-  const keyError = !canCreateKey && needsKey ? MINT_REFUSED : failure?.refKey === refKey ? failure.message : null;
 
-  const { mutateAsync: createKeyFor } = createTestKey;
+  const held = useQuery({
+    queryKey: heldKeyQueryKey(refKey),
+    queryFn: () => mintHeldKey(createKeyFor, endpoint!),
+    // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
+    enabled: enabled && !!endpoint && canCreateKey && mode === 'api-key',
+    // Fresh until it is due for renewal, so a view that mounts later uses the held key.
+    staleTime: (query) => Math.max((query.state.data?.renewAt ?? 0) - Date.now(), 0),
+    gcTime: HELD_KEY_GC_MS,
+    // Renewed ahead of expiry while a view is open. A hidden tab renews when it is shown again,
+    // since the key is stale by then.
+    refetchInterval: (query) => (query.state.data?.key ? Math.min(Math.max(query.state.data.renewAt - Date.now(), 1_000), MAX_TIMER_MS) : false),
+    // A refused mint is not tried again on its own: the views offer the way out (switch, retry).
+    retry: false,
+    refetchOnWindowFocus: (query) => query.state.status !== 'error',
+    refetchOnReconnect: (query) => query.state.status !== 'error',
+  });
+
+  const apiKey = held.data?.key ?? null;
+  const needsKey = mode === 'api-key' || mode === 'jwt';
+  // A mint in flight is the answer to the last failure, so the failure is not shown meanwhile.
+  const mintError = held.isFetching ? null : held.error;
+  const apiKeyRequired = !!mintError && isApiKeyAuthRequired(mintError);
+  const mintFailure = mintError ? (apiKeyRequired || isPermissionError(mintError) ? null : friendlyApiError(mintError, MINT_FAILED)) : held.data && !held.data.key ? MINT_FAILED : null;
+  const keyError = !canCreateKey && needsKey ? MINT_REFUSED : switchFailure?.refKey === refKey ? switchFailure.message : mintFailure;
+
   const mintFor = useCallback(
-    async (target: EndpointRef): Promise<string | null> => {
+    async (target: EndpointRef, refused?: string | null): Promise<string | null> => {
       if (!canCreateKey) return null;
-      const targetKey = keyOf(target);
-      setFailure(null);
+      const queryKey = heldKeyQueryKey(keyOf(target));
+      if (refused !== undefined) {
+        // Another view renewed the refused key already: use theirs rather than mint again.
+        const current = queryClient.getQueryData<HeldKey>(queryKey)?.key ?? null;
+        if (current && current !== refused) return current;
+      }
       try {
-        const key = (await createKeyFor(target))?.apiKey ?? null;
-        setMinted({ refKey: targetKey, key });
-        if (!key) setFailure({ refKey: targetKey, message: MINT_FAILED });
-        return key;
-      } catch (err) {
-        if (isApiKeyAuthRequired(err)) setApiKeyRequiredFor(targetKey);
-        else if (!isPermissionError(err)) setFailure({ refKey: targetKey, message: friendlyApiError(err, MINT_FAILED) });
+        // Mints even though a key is held; a mint already in flight for the endpoint is joined, not repeated.
+        const minted = await queryClient.fetchQuery({ queryKey, queryFn: () => mintHeldKey(createKeyFor, target), staleTime: 0, gcTime: HELD_KEY_GC_MS, retry: false });
+        return minted.key;
+      } catch {
+        // The failure is on the held key's query, where every view of the endpoint reads it.
         return null;
       }
     },
-    [canCreateKey, createKeyFor],
+    [canCreateKey, queryClient, createKeyFor],
   );
   const mintKey = useCallback(async () => (endpoint ? mintFor(endpoint) : null), [endpoint, mintFor]);
+  const renewKey = useCallback(async (refused: string | null) => (endpoint ? mintFor(endpoint, refused) : null), [endpoint, mintFor]);
 
-  // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
-  const mintingFor = useRef<string | null>(null);
-  useEffect(() => {
-    if (!enabled || !canCreateKey || mode !== 'api-key') return;
-    // Holding a key already is enough: this effect re-runs whenever the endpoint's queries
-    // refetch, and minting again there would reap the key the surfaces are using.
-    if (minted?.refKey === refKey && minted.key) return;
-    // The held key only appears once the request lands, so an in-flight mint needs its own guard.
-    if (mintingFor.current === refKey) return;
-    mintingFor.current = refKey;
-    void mintKey().finally(() => {
-      if (mintingFor.current === refKey) mintingFor.current = null;
-    });
-  }, [enabled, canCreateKey, mode, mintKey, minted, refKey]);
-
-  // One re-mint per endpoint: a fresh key 401s the same way when the cause is not the key,
+  // One renewal per endpoint: a fresh key 401s the same way when the cause is not the key,
   // so retrying per credential would mint without end.
   const retriedFor = useRef<string | null>(null);
   const retryUnauthorized = useCallback(() => {
@@ -170,27 +231,22 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     if (!canCreateKey || mode !== 'api-key') return;
     if (retriedFor.current === refKey) return;
     retriedFor.current = refKey;
-    void mintKey();
-  }, [canCreateKey, mode, refKey, mintKey]);
+    void renewKey(apiKey);
+  }, [canCreateKey, mode, refKey, renewKey, apiKey]);
 
   const { mutateAsync: enableApiKeyAuthFor } = enableApiKeyAuth;
   const switchToApiKey = useCallback(async (): Promise<string | null> => {
     if (!endpoint || !canSwitch) return null;
     const target = endpoint;
-    const targetKey = keyOf(target);
-    setFailure(null);
-    // This mints itself; the auto-mint must not mint a second key when the mode refetches as api-key.
-    mintingFor.current = targetKey;
+    setSwitchFailure(null);
     try {
       await enableApiKeyAuthFor(target);
-      setApiKeyRequiredFor((current) => (current === targetKey ? null : current));
-      return await mintFor(target);
     } catch (err) {
-      if (!isPermissionError(err)) setFailure({ refKey: targetKey, message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
+      if (!isPermissionError(err)) setSwitchFailure({ refKey: keyOf(target), message: friendlyApiError(err, 'Could not switch the endpoint to API key.') });
       return null;
-    } finally {
-      if (mintingFor.current === targetKey) mintingFor.current = null;
     }
+    // Once the mode reads as api-key the held key's query would mint too; it joins this mint instead.
+    return mintFor(target);
   }, [endpoint, canSwitch, enableApiKeyAuthFor, mintFor]);
 
   // Endpoint security describes enforcement and may not carry an invoke URL. Release-scoped
@@ -204,12 +260,13 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     mode,
     authHeader: security?.apiKey?.header || DEFAULT_API_KEY_HEADER,
     apiKey,
+    keyMintedAt: apiKey ? (held.data?.mintedAt ?? 0) : 0,
     // An open (mode `none`) endpoint needs no credential; anything else does.
     isAuthorized: mode === 'none' || !!apiKey,
-    isMinting: createTestKey.isPending && keyOf(createTestKey.variables) === refKey,
+    isMinting: held.isFetching,
     canCreateKey,
     keyError,
-    needsApiKeyAuth: canCreateKey && ((mode === 'jwt' && !apiKey) || apiKeyRequiredFor === refKey),
+    needsApiKeyAuth: canCreateKey && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
     canSwitch,
     isSwitching: enableApiKeyAuth.isPending && keyOf(enableApiKeyAuth.variables) === refKey,
     switchToApiKey,
@@ -218,6 +275,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     isUnavailable: isSecurityError || (mode !== null && !gatewayUrl),
     securityError,
     mintKey,
+    renewKey,
     retryUnauthorized,
   };
 }

@@ -19,7 +19,7 @@
 import { act, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEndpointTestKey, getEndpointSecurity, setEndpointApiKeyAuth } from '../api/consumers';
-import { useEndpointTestAccess } from './useEndpointTestAccess';
+import { keyRenewalTime, useEndpointTestAccess, type EndpointTestAccess } from './useEndpointTestAccess';
 import { flush, renderWithScopes } from '../test/renderWithScopes';
 import { DEVELOPER } from '../test/roles';
 import type { EndpointRef } from '../types/consumers';
@@ -72,5 +72,127 @@ describe('useEndpointTestAccess', () => {
     expect(r.container.textContent).toBe('');
     await act(async () => select(a));
     expect(r.container.textContent).toBe('key-for-http-development-main');
+  });
+});
+
+describe('the key held for an endpoint', () => {
+  // One view of endpoint `a`, as the Overview card, the Test Console or a workflow page would be.
+  const views: Record<string, EndpointTestAccess> = {};
+  function View({ id }: { id: string }) {
+    const access = useEndpointTestAccess(a);
+    views[id] = access;
+    return <output data-view={id}>{access.apiKey}</output>;
+  }
+  let showSecond: (show: boolean) => void = () => {};
+  function Views() {
+    const [second, setSecond] = useState(false);
+    showSecond = setSecond;
+    return (
+      <>
+        <View id="first" />
+        {second && <View id="second" />}
+      </>
+    );
+  }
+  const shown = (container: HTMLElement, id: string) => container.querySelector(`[data-view="${id}"]`)?.textContent ?? null;
+
+  let mints = 0;
+  beforeEach(() => {
+    mints = 0;
+    vi.mocked(getEndpointSecurity).mockResolvedValue({ mode: 'api-key', publicUrl: 'https://gw.example/orders' } as never);
+    // Each mint is a new key, valid for two minutes.
+    vi.mocked(createEndpointTestKey).mockImplementation(async () => {
+      mints += 1;
+      return { keyId: `k${mints}`, apiKey: `key-${mints}`, expiresAt: new Date(Date.now() + 2 * 60_000).toISOString() };
+    });
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it('is minted once and shared by every view of the endpoint, including one that comes back', async () => {
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    await act(async () => showSecond(true));
+    await flush();
+    expect(shown(r.container, 'first')).toBe('key-1');
+    expect(shown(r.container, 'second')).toBe('key-1');
+
+    // Leaving a view and coming back to it, as navigating does, reuses the key too.
+    await act(async () => showSecond(false));
+    await act(async () => showSecond(true));
+    await flush();
+    expect(shown(r.container, 'second')).toBe('key-1');
+    expect(mints).toBe(1);
+  });
+
+  it('is renewed a minute before it expires, once, for every view', async () => {
+    vi.useFakeTimers();
+    const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(0)));
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await settle();
+    await act(async () => showSecond(true));
+    await settle();
+    expect(mints).toBe(1);
+
+    await act(async () => void (await vi.advanceTimersByTimeAsync(59_000)));
+    expect(mints).toBe(1);
+    await act(async () => void (await vi.advanceTimersByTimeAsync(2_000)));
+    await settle();
+    expect(mints).toBe(2);
+    expect(shown(r.container, 'first')).toBe('key-2');
+    expect(shown(r.container, 'second')).toBe('key-2');
+  });
+
+  it('is minted again on an explicit request, and every view moves to the new key', async () => {
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    await act(async () => showSecond(true));
+    await flush();
+
+    await act(async () => void (await views.second.mintKey()));
+    await flush();
+    expect(mints).toBe(2);
+    expect(shown(r.container, 'first')).toBe('key-2');
+  });
+
+  it('is renewed only while the refused key is still held, so views that hear one refusal mint once', async () => {
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await flush();
+    await act(async () => showSecond(true));
+    await flush();
+
+    // Both views hear key-1 refused at once: one mint answers both.
+    let renewed: (string | null)[] = [];
+    await act(async () => void (renewed = await Promise.all([views.first.renewKey('key-1'), views.second.renewKey('key-1')])));
+    expect(renewed).toEqual(['key-2', 'key-2']);
+    expect(mints).toBe(2);
+
+    // A refusal of key-1 that arrives late finds key-2 held and reuses it.
+    await act(async () => void (renewed = [await views.first.renewKey('key-1')]));
+    expect(renewed).toEqual(['key-2']);
+    expect(mints).toBe(2);
+    await flush();
+    expect(shown(r.container, 'first')).toBe('key-2');
+  });
+});
+
+describe('keyRenewalTime', () => {
+  const mintedAt = Date.parse('2026-11-07T10:00:00Z');
+
+  it('is a minute before the key expires', () => {
+    expect(keyRenewalTime('2026-11-07T11:00:00Z', mintedAt)).toBe(mintedAt + 59 * 60_000);
+  });
+
+  it('assumes the hour a test key lasts when the mint states no expiry, or one that cannot be read', () => {
+    expect(keyRenewalTime(undefined, mintedAt)).toBe(mintedAt + 59 * 60_000);
+    expect(keyRenewalTime('soon', mintedAt)).toBe(mintedAt + 59 * 60_000);
+  });
+
+  it('keeps a key for at least 30 seconds, so a short or skewed expiry cannot mint in a loop', () => {
+    expect(keyRenewalTime('2026-11-07T10:00:45Z', mintedAt)).toBe(mintedAt + 30_000);
+    expect(keyRenewalTime('2026-11-07T09:00:00Z', mintedAt)).toBe(mintedAt + 30_000);
   });
 });

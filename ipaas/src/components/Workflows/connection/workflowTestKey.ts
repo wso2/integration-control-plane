@@ -19,25 +19,13 @@
 import { isWorkflowError } from '../api/http';
 
 /**
- * When the connection mints the management API's test key again.
+ * When the connection renews the management API's test key.
  *
- * The key comes from `useEndpointTestAccess`, which mints it through the BFF's test-key route
- * (`useCreateEndpointTestKey`): a short-lived key, valid for an hour, whose answer states no
- * validity. That hook mints once, and once more after one 401 per endpoint; a workflow page is the
- * kind that is left open for hours, so the connection also mints ahead of expiry, and after any
- * refused read once the key is old enough to have expired (see `useWorkflowConnection`).
+ * The key comes from `useEndpointTestAccess`, which holds one per endpoint for every view of it and
+ * renews it a minute before it expires. A read can still be refused: a sleeping tab may miss the
+ * renewal, or another tab's mint may reap the key. The connection then renews the key once it is
+ * old enough for that (see `useWorkflowConnection`).
  */
-
-/** How long a test key minted by the BFF stays valid. */
-export const TEST_KEY_VALIDITY_SECONDS = 60 * 60;
-
-// The longest delay a browser timer honours; a longer one fires at once, on every tick.
-const MAX_TIMER_MS = 2 ** 31 - 1;
-
-/** Mint again a minute before expiry; without a validity, the key is kept until it is refused. */
-export function testKeyRefreshInterval(validitySeconds: number | undefined): number | false {
-  return validitySeconds && validitySeconds > 0 ? Math.min(Math.max(validitySeconds - 60, 30) * 1000, MAX_TIMER_MS) : false;
-}
 
 /**
  * A credential younger than this that is refused is not the problem (the gateway or the engine
