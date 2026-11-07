@@ -24,7 +24,8 @@ export default defineConfig({
         manualChunks(id: string) {
           if (id.includes('oxygen-ui-icons-react')) return 'icons';
           if (id.includes('@wso2/oxygen-ui') || id.includes('@mui') || id.includes('@emotion')) return 'oxygen';
-          if (id.includes('node_modules/react')) return 'react';
+          // React alone, so this chunk imports no other chunk and the chunks can't form a cycle.
+          if (/[\\/]node_modules[\\/](react|react-dom|scheduler)[\\/]/.test(id)) return 'react';
         },
       },
     },
