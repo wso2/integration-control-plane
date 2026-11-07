@@ -16,9 +16,11 @@
  * under the License.
  */
 
-import { Button, Tooltip } from '@wso2/oxygen-ui';
+import { Button, Dialog, DialogActions, DialogContent, DialogTitle, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ArrowDown } from '@wso2/oxygen-ui-icons-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useIntegrationLinks } from '../../hooks/useConfiguration';
+import { promoteWithoutValues } from '../../utils/integrationLinks';
 import { useComponentDeployment, usePromote } from '../../hooks/useDeployments';
 import { pendingApiChange, PENDING_API_CHANGE_TOOLTIP } from '../../utils/promotion';
 import { useOrgUuid } from '../../hooks/useOrgUuid';
@@ -27,6 +29,7 @@ import { Scopes } from '../../constants/permissions';
 
 interface PromoteButtonProps {
   orgHandler: string;
+  projectId: string;
   componentId: string;
   versionId: string;
   deploymentPipelineId: string;
@@ -39,26 +42,40 @@ interface PromoteButtonProps {
   blockedReason?: string;
 }
 
-export default function PromoteButton({ orgHandler, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason }: PromoteButtonProps) {
+export default function PromoteButton({ orgHandler, projectId, componentId, versionId, deploymentPipelineId, sourceEnvId, targetEnvId, icon, onPromoteStarted, onPromoteSettled, blockedReason }: PromoteButtonProps) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: sourceDeployment, isLoading: sourceLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, sourceEnvId);
   const { data: targetDeployment, isLoading: targetLoading } = useComponentDeployment(orgHandler, orgUuid, componentId, versionId, targetEnvId);
   const promote = usePromote();
+  const links = useIntegrationLinks(projectId, componentId, true);
+  const [checking, setChecking] = useState(false);
+  const [confirming, setConfirming] = useState<{ withoutValues: string[]; unchecked: boolean } | null>(null);
   const can = useCan();
 
   const deploymentsLoading = sourceLoading || targetLoading;
   const buildId = sourceDeployment?.build?.buildId;
   const sourceReleaseId = sourceDeployment?.releaseId;
-  const sameBuild = !deploymentsLoading && !!buildId && buildId === targetDeployment?.build?.buildId;
-  // Two environments on the same build can still differ in API settings or visibility, which only a
-  // promotion carries.
-  const apiChange = sameBuild ? pendingApiChange(sourceDeployment?.proxyReconciliation, targetDeployment?.proxyReconciliation) : null;
-  const alreadyPromoted = sameBuild && !apiChange;
+  // The release, not the build: a ComponentType update gives the same build a new release. Two environments on the
+  // same release can still differ in API settings or visibility, which only a promotion carries.
+  const sameRelease = !deploymentsLoading && !!sourceReleaseId && sourceReleaseId === targetDeployment?.releaseId;
+  const apiChange = sameRelease ? pendingApiChange(sourceDeployment?.proxyReconciliation, targetDeployment?.proxyReconciliation) : null;
+  const alreadyPromoted = sameRelease && !apiChange;
 
   const missingPipeline = !deploymentPipelineId;
   const canPromote = !!buildId && !!sourceReleaseId && !missingPipeline && !alreadyPromoted && !blockedReason;
 
+  // The target starts the release with the resources it carries: decide on a read made now, not on a cached or pending one.
+  const checkThenPromote = async () => {
+    setChecking(true);
+    const read = await links.refetch();
+    setChecking(false);
+    const withoutValues = read.isSuccess ? promoteWithoutValues(read.data, sourceEnvId, targetEnvId) : [];
+    if (!read.isSuccess || withoutValues.length > 0) setConfirming({ withoutValues, unchecked: !read.isSuccess });
+    else handlePromote();
+  };
+
   const handlePromote = () => {
+    setConfirming(null);
     if (!canPromote || !sourceReleaseId) return;
     onPromoteStarted?.();
     promote.mutate(
@@ -92,12 +109,31 @@ export default function PromoteButton({ orgHandler, componentId, versionId, depl
               : '');
 
   return (
-    <Tooltip title={tooltipTitle}>
-      <span>
-        <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || promote.isPending} onClick={handlePromote}>
-          {promote.isPending ? 'Promoting…' : 'Promote'}
-        </Button>
-      </span>
-    </Tooltip>
+    <>
+      <Tooltip title={tooltipTitle}>
+        <span>
+          <Button variant="outlined" size="small" startIcon={icon ?? <ArrowDown size={14} />} disabled={deploymentsLoading || !canPromote || checking || promote.isPending} onClick={checkThenPromote}>
+            {checking ? 'Checking…' : promote.isPending ? 'Promoting…' : 'Promote'}
+          </Button>
+        </span>
+      </Tooltip>
+      <Dialog open={!!confirming} onClose={() => setConfirming(null)}>
+        <DialogTitle>Promote to {targetEnvId}?</DialogTitle>
+        <DialogContent>
+          {confirming?.unchecked && <Typography variant="body2">Couldn&apos;t check resource values in {targetEnvId}.</Typography>}
+          {confirming?.withoutValues.map((r) => (
+            <Typography key={r} variant="body2">
+              {r} has no values in {targetEnvId}.
+            </Typography>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirming(null)}>Cancel</Button>
+          <Button variant="contained" onClick={handlePromote}>
+            Promote
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }

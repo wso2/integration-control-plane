@@ -28,6 +28,7 @@ import type { EnvCardNotification, EnvCardSlotProps, IntegrationModule } from '.
 import { deploymentPollIntervalUntil, REQUESTED_POLL_WINDOW_MS } from '../../../utils/deploymentStatus';
 import DeployButton from './DeployButton';
 import EnvCardHeader from './EnvCardHeader';
+import { ReleaseLinks } from '../../EnvironmentCard/ReleaseLinks';
 
 interface EnvCardShellProps {
   component: Component;
@@ -182,6 +183,8 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
         )}
 
         {EnvCardBody && <EnvCardBody {...slotProps} pendingTriggerTime={pendingTriggerTime} pendingTriggerArgs={pendingTriggerArgs} onTriggerResolved={onTriggerResolved} />}
+
+        <ReleaseLinks projectId={projectId} componentId={component.id} env={slotProps.envTemplateId} />
 
         {EnvCardFooter && <EnvCardFooter {...slotProps} />}
       </CardContent>

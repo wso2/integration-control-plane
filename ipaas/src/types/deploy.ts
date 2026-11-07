@@ -111,6 +111,8 @@ export interface DeployEnvironmentCardBodyProps {
   endpointCount?: number;
   configurablesCount?: number;
   scaleToZeroEnabled?: boolean;
+  /** Why the environment can't start until configured; the card then offers "Configure to Continue". */
+  missingConfigsReason?: string;
   /** Absent when the user's role can't change configuration here: the card hides the control. */
   onConfigClick?: () => void;
   onJobConfigClick?: () => void;
