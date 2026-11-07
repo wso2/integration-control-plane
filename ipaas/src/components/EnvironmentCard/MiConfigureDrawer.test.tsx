@@ -138,6 +138,16 @@ describe('the MI Configure form', () => {
     expect(Array.from(document.querySelectorAll('input')).map((i) => i.value)).not.toContain('NEW_TOKEN');
   });
 
+  it('opens clean, Save disabled, when a linked variable also has a stored empty value', async () => {
+    answer.envVars = [
+      { key: 'GITHUB_TOKEN', value: '' },
+      { key: 'DB_URL', value: 'jdbc:x' },
+    ];
+    await render('development');
+    expect(supplied('GITHUB_TOKEN')).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
+    expect(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Save')?.disabled).toBe(true);
+  });
+
   it('offers no link action while a link write is on its way', async () => {
     answer.pending = true;
     await render('development');

@@ -144,8 +144,12 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     }),
     [envVars, secrets],
   );
-  // A linked name needs no value of its own; one it has stays for when the link goes.
-  const draft = useMemo(() => ({ ...named, envVars: named.envVars.filter((e) => e.value !== '' || !linkedNames.includes(e.key)) }), [named, linkedNames]);
+  // A linked name needs no value of its own; one it has, stored or typed, stays for when the link goes.
+  const draft = useMemo(() => {
+    const stored = new Map(data?.envVars.map((e) => [e.key, e.value]));
+    const envVars = named.envVars.flatMap((e) => (e.value !== '' || !linkedNames.includes(e.key) ? [e] : stored.has(e.key) ? [{ key: e.key, value: stored.get(e.key)! }] : []));
+    return { ...named, envVars };
+  }, [named, linkedNames, data]);
   // From the latest fetch, not the rows seeded on open: a secret removed elsewhere since
   // (e.g. on Configs & Secrets) has no value to keep, so its row needs a new one.
   const storedSecrets = useMemo(() => {
