@@ -35,6 +35,10 @@ describe('expectsConsentPrompt', () => {
     expect(expectsConsentPrompt(200, {})).toBe(true);
   });
 
+  it('expects no prompt for a status the console refuses', () => {
+    expect(expectsConsentPrompt(200, { optoutOfEmails: false, consentStatus: 'Pending' })).toBe(false);
+  });
+
   it('never asks a person who opted out of all WSO2 email', () => {
     expect(expectsConsentPrompt(200, { optoutOfEmails: true, consentStatus: 'No Opt-in' })).toBe(false);
   });

@@ -70,6 +70,44 @@ describe('MarketingConsentDialog', () => {
     expect(shown()).toBe(false);
   });
 
+  it.each<[string, Error]>([
+    ['the token has no email (403)', new BffError(403, '{"error":"token carries no email claim"}')],
+    ['the upstream failed (502)', new BffError(502, '{"error":"Bad Gateway"}')],
+    ['the record has an unknown status', new Error('Unknown marketing consent status: Pending')],
+  ])('shows nothing when %s', async (_, error) => {
+    vi.mocked(fetchMarketingConsent).mockRejectedValue(error);
+    await render();
+    expect(shown()).toBe(false);
+  });
+
+  it('asks a person whose answer is still unconfirmed', async () => {
+    vi.mocked(fetchMarketingConsent).mockResolvedValue({ optoutOfEmails: false, consentStatus: 'Unconfirmed' });
+    await render();
+    expect(shown()).toBe(true);
+  });
+
+  it('disables both answers while one is being saved', async () => {
+    vi.mocked(recordMarketingConsent).mockReturnValue(new Promise(() => {}));
+    const c = await render();
+    await act(async () => button(c, 'Confirm')!.click());
+    await flush();
+    expect(button(c, 'Confirm')?.disabled).toBe(true);
+    expect(button(c, 'Decline')?.disabled).toBe(true);
+    expect(shown()).toBe(true);
+  });
+
+  it('stays open when Escape is pressed', async () => {
+    await render();
+    const dialog = document.querySelector('[role="dialog"]');
+    expect(dialog).not.toBeNull();
+    await act(async () => {
+      dialog!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    await flush();
+    expect(shown()).toBe(true);
+    expect(recordMarketingConsent).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['Confirm', 'Confirmed'],
     ['Decline', 'Unsubscribed'],

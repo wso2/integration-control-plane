@@ -28,7 +28,7 @@ tests/e2e/
 - **Housekeeping groups** (`00` legacy sweep, `08b` sweep of projects older than two hours) skip with a reason instead of failing. Keep it that way: a failed sweep is not a product defect.
 - **New coverage** goes into the group for that surface, or a new numbered group. Add a spec file only for a surface that needs a different session or project, as `cloud-anon` does.
 - **Teardown** deletes everything a group creates, by listing what exists rather than remembering what was created.
-- **Marketing consent prompt.** It is a modal on every signed-in page until the user answers, and it hides the page from role queries while open. The journey's context answers the consent read as already answered (`keepConsentPromptAway` in `helpers/marketing-consent.ts`). Group `07b` checks the prompt in its own context against the real record. No test records consent: the e2e user's consent is one real Pardot record shared across WSO2 Cloud, so decisions are answered in the browser.
+- **Marketing consent prompt.** It is a modal on every signed-in page until the user answers, and it hides the page from role queries while open. The journey's context answers the consent read as already answered (`keepConsentPromptAway` in `helpers/marketing-consent.ts`). Group `07b` has two tests, each in its own context. `TC_IP_MC_001` answers the read as not answered (`answerConsentReadAs`), so the prompt is always tested. `TC_IP_MC_002` reads the e2e user's real record through ipaas-service and checks its status and shape against the console's own mapper. No test records consent: the e2e user's consent is one real Pardot record shared across WSO2 Cloud, so decisions are answered in the browser. Annotate a read's status, never its body.
 
 ## Writing tests
 

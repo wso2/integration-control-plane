@@ -26,6 +26,8 @@
  */
 
 import type { BrowserContext, Request, Route } from '@playwright/test';
+import { toMarketingConsent, type BffMarketingConsent } from '../../../src/api/_marketingConsentShape.js';
+import { shouldAskMarketingConsent } from '../../../src/utils/marketingConsent.js';
 
 /** ipaas-service's GET and POST /marketing-consent. */
 export const MARKETING_CONSENT_PATH = '/marketing-consent';
@@ -58,19 +60,30 @@ async function answerPreflight(route: Route): Promise<void> {
 }
 
 /**
- * Keeps the prompt out of a context: its consent read answers "already confirmed" and any decision
- * is accepted in the browser. For the journey, whose groups would otherwise meet the modal on
- * every page while the e2e user has not answered. Group 07b checks the prompt itself.
+ * Answers the consent read in the browser with `record`, and accepts every decision there too, so
+ * none is recorded in Pardot. Returns the bodies the console sent, in order.
  */
-export async function keepConsentPromptAway(context: BrowserContext): Promise<void> {
+export async function answerConsentReadAs(context: BrowserContext, record: BffMarketingConsent): Promise<unknown[]> {
+  const sent: unknown[] = [];
   await context.route(MARKETING_CONSENT_ROUTE, async (route) => {
     const request = route.request();
     if (request.method() === 'OPTIONS') return answerPreflight(route);
     if (request.method() === 'GET') {
-      return route.fulfill({ status: 200, contentType: 'application/json', headers: corsHeaders(request), body: JSON.stringify({ optoutOfEmails: false, consentStatus: 'Confirmed' }) });
+      return route.fulfill({ status: 200, contentType: 'application/json', headers: corsHeaders(request), body: JSON.stringify(record) });
     }
+    sent.push(request.postDataJSON());
     return route.fulfill({ status: 202, headers: corsHeaders(request), body: '' });
   });
+  return sent;
+}
+
+/**
+ * Keeps the prompt out of a context: its consent read answers "already confirmed". For the
+ * journey, whose groups would otherwise meet the modal on every page while the e2e user has not
+ * answered. Group 07b checks the prompt itself.
+ */
+export async function keepConsentPromptAway(context: BrowserContext): Promise<void> {
+  await answerConsentReadAs(context, { optoutOfEmails: false, consentStatus: 'Confirmed' });
 }
 
 /**
@@ -89,15 +102,19 @@ export async function holdConsentDecisions(context: BrowserContext): Promise<unk
   return sent;
 }
 
+/** The statuses ipaas-service documents for GET /marketing-consent. */
+export const CONSENT_READ_STATUSES: readonly number[] = [200, 403, 404, 502, 503];
+
 /**
- * Whether the console should ask, given ipaas-service's answer to GET /marketing-consent. The same
- * rule as shouldAskMarketingConsent in src/utils: ask only a person who has not answered and has
- * not opted out of all WSO2 email. Any failed read shows no prompt.
+ * Whether the console should ask, given ipaas-service's answer to GET /marketing-consent. It
+ * applies the console's own mapping and rule (toMarketingConsent, shouldAskMarketingConsent), so
+ * the two cannot drift. A failed read or a body the console refuses shows no prompt.
  */
 export function expectsConsentPrompt(status: number, body: unknown): boolean {
   if (status !== 200 || !body || typeof body !== 'object') return false;
-  const { optoutOfEmails, consentStatus } = body as { optoutOfEmails?: boolean | null; consentStatus?: string | null };
-  if (optoutOfEmails) return false;
-  const answer = (consentStatus ?? 'No Opt-in').toLowerCase();
-  return answer === 'no opt-in' || answer === 'unconfirmed';
+  try {
+    return shouldAskMarketingConsent(toMarketingConsent(body as BffMarketingConsent));
+  } catch {
+    return false;
+  }
 }

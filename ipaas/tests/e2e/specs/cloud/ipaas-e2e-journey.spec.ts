@@ -51,7 +51,8 @@ import {
 } from '../../helpers/journey-fixtures.js';
 import { activeProject, listFixtureProjects, STALE_AGE_MS, staleProjects, setActiveProject } from '../../helpers/journey-project.js';
 import { appears, assertSignedIn, enterOrgHome, enterProject, enterProjectOrSkip, filterToProject, openProjectCard, projectDeleteButton, refreshSession, reseedHere } from '../../helpers/journey-session.js';
-import { CONSENT_DIALOG_TITLE, expectsConsentPrompt, holdConsentDecisions, keepConsentPromptAway, MARKETING_CONSENT_PATH } from '../../helpers/marketing-consent.js';
+import { answerConsentReadAs, CONSENT_DIALOG_TITLE, CONSENT_READ_STATUSES, expectsConsentPrompt, holdConsentDecisions, keepConsentPromptAway, MARKETING_CONSENT_PATH } from '../../helpers/marketing-consent.js';
+import { toMarketingConsent, type BffMarketingConsent } from '../../../../src/api/_marketingConsentShape.js';
 import {
   agentRow,
   confirmRemoval,
@@ -1068,17 +1069,41 @@ test.describe('07 page availability @smoke', () => {
   });
 });
 
-// 07b — the marketing consent prompt, against the e2e user's real consent record
+// 07b — the marketing consent prompt. 001 answers the read in the browser, so the prompt is always
+// shown; 002 checks the e2e user's real record through ipaas-service. Neither records a decision:
+// the e2e user's consent is one real Pardot record across WSO2 Cloud.
 
 test.describe('07b marketing consent prompt @smoke', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('TC_IP_MC_001 the consent prompt shows only to a person who has not answered, and an answer closes it', async ({ browser }, testInfo) => {
-    // Its own context: the journey's answers the consent read itself. Decisions are still held in
-    // the browser, because the e2e user's consent is one real Pardot record across WSO2 Cloud.
+  test('TC_IP_MC_001 a person who has not answered is asked, and Decline records Unsubscribed and closes the prompt', async ({ browser }, testInfo) => {
     const own = await newConsoleContext(browser, { storageState: AUTH_STATE_PATH, baseURL: testInfo.project.use.baseURL });
     try {
-      const sent = await holdConsentDecisions(own);
+      const sent = await answerConsentReadAs(own, { optoutOfEmails: false, consentStatus: 'No Opt-in' });
+      const tab = await own.newPage();
+      await refreshSession(tab);
+      await tab.goto(`organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });
+      assertSignedIn(tab);
+
+      const dialog = tab.getByRole('dialog', { name: CONSENT_DIALOG_TITLE });
+      await expect(dialog, 'a person who has not answered was not asked').toBeVisible({ timeout: 60_000 });
+      await expect(dialog.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', 'https://wso2.com/privacy-policy');
+      await dialog.getByRole('button', { name: 'Decline', exact: true }).click();
+      await expect(dialog, 'the prompt stayed open after an answer').toBeHidden({ timeout: 30_000 });
+      expect(sent).toEqual([{ consentstatus: 'Unsubscribed' }]);
+
+      // The page is usable: the modal hides it from role queries while open. Presence before absence.
+      await expect(tab.getByRole('heading', { name: 'All projects' })).toBeVisible({ timeout: 60_000 });
+      await expect(dialog).toHaveCount(0);
+    } finally {
+      await own.close();
+    }
+  });
+
+  test('TC_IP_MC_002 ipaas-service answers the consent read with a documented status and a record the console reads', async ({ browser }, testInfo) => {
+    const own = await newConsoleContext(browser, { storageState: AUTH_STATE_PATH, baseURL: testInfo.project.use.baseURL });
+    try {
+      await holdConsentDecisions(own);
       const tab = await own.newPage();
       await refreshSession(tab);
 
@@ -1086,22 +1111,21 @@ test.describe('07b marketing consent prompt @smoke', () => {
       await tab.goto(`organizations/${orgHandler}/projects`, { waitUntil: 'domcontentloaded' });
       assertSignedIn(tab);
       const read = await consentRead;
-      const body: unknown = read.status() === 200 ? await read.json() : null;
+      // The status only: the body is the e2e user's consent record.
+      testInfo.annotations.push({ type: 'consent', description: `GET /marketing-consent answered ${read.status()}` });
+      expect(CONSENT_READ_STATUSES, `undocumented status ${read.status()}`).toContain(read.status());
 
+      const body: unknown = read.status() === 200 ? await read.json() : null;
+      if (body !== null) expect(() => toMarketingConsent(body as BffMarketingConsent), 'the console refuses the record').not.toThrow();
+
+      // Presence before absence: the page renders, then the prompt matches the console's rule.
       const dialog = tab.getByRole('dialog', { name: CONSENT_DIALOG_TITLE });
       if (expectsConsentPrompt(read.status(), body)) {
         await expect(dialog, 'a person who has not answered was not asked').toBeVisible({ timeout: 30_000 });
-        await expect(dialog.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', 'https://wso2.com/privacy-policy');
-        await dialog.getByRole('button', { name: 'Decline', exact: true }).click();
-        await expect(dialog, 'the prompt stayed open after an answer').toBeHidden({ timeout: 30_000 });
-        expect(sent).toEqual([{ consentstatus: 'Unsubscribed' }]);
       } else {
-        testInfo.annotations.push({ type: 'consent', description: `GET /marketing-consent answered ${read.status()}${body ? ` ${JSON.stringify(body)}` : ''}, so no prompt is expected` });
+        await expect(tab.getByRole('heading', { name: 'All projects' })).toBeVisible({ timeout: 60_000 });
+        await expect(dialog).toHaveCount(0);
       }
-
-      // The page is usable: the modal hides it from role queries while open. Presence before absence.
-      await expect(tab.getByRole('heading', { name: 'All projects' })).toBeVisible({ timeout: 60_000 });
-      await expect(dialog).toHaveCount(0);
     } finally {
       await own.close();
     }

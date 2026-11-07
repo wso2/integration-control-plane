@@ -22,28 +22,12 @@
  */
 
 import { bff } from './_client';
-import type { ConsentDecision, ConsentStatus, MarketingConsent } from '../types/marketingConsent';
+import { toMarketingConsent, type BffMarketingConsent } from './_marketingConsentShape';
+import type { ConsentDecision, MarketingConsent } from '../types/marketingConsent';
+
+export { toMarketingConsent };
 
 const PATH = '/marketing-consent';
-
-interface BffMarketingConsent {
-  optoutOfEmails?: boolean | null;
-  consentStatus?: string | null;
-}
-
-const STATUSES: readonly ConsentStatus[] = ['No Opt-in', 'Unconfirmed', 'Confirmed', 'Unsubscribed'];
-
-/**
- * platform-api already turns a null status into `No Opt-in` and a null opt-out into `false`; the same
- * defaults apply here so a change there cannot make the console ask a person who has answered. A
- * status outside the four is refused rather than guessed: the caller then shows no prompt.
- */
-export function toMarketingConsent(wire: BffMarketingConsent): MarketingConsent {
-  const raw = wire.consentStatus ?? 'No Opt-in';
-  const consentStatus = STATUSES.find((s) => s.toLowerCase() === raw.toLowerCase());
-  if (!consentStatus) throw new Error(`Unknown marketing consent status: ${raw}`);
-  return { optoutOfEmails: wire.optoutOfEmails ?? false, consentStatus };
-}
 
 export const fetchMarketingConsent = async (): Promise<MarketingConsent> => toMarketingConsent(await bff.get<BffMarketingConsent>(PATH));
 
