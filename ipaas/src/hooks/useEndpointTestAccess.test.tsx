@@ -201,6 +201,48 @@ describe('the key held for an endpoint', () => {
     expect(shown(r.container, 'first')).toBe('key-2');
   });
 
+  it('shows a mint while a view has no key or asked for one, not while a held key renews', async () => {
+    vi.useFakeTimers();
+    const settle = () => act(async () => void (await vi.advanceTimersByTimeAsync(0)));
+    let release = () => {};
+    vi.mocked(createEndpointTestKey).mockImplementation(async () => {
+      mints += 1;
+      const n = mints;
+      await new Promise<void>((resolve) => (release = resolve));
+      return { keyId: `k${n}`, apiKey: `key-${n}`, expiresAt: new Date(Date.now() + 10 * 60_000).toISOString() };
+    });
+    const r = await renderWithScopes(<Views />, DEVELOPER);
+    unmount = r.unmount;
+    await settle();
+    expect(mints).toBe(1);
+    expect(views.first.isMinting).toBe(true);
+    await act(async () => release());
+    await settle();
+    expect(views.first.apiKey).toBe('key-1');
+    expect(views.first.isMinting).toBe(false);
+
+    // The renewal before expiry: the view keeps using key-1 meanwhile.
+    await act(async () => void (await vi.advanceTimersByTimeAsync(9 * 60_000 + 1_000)));
+    expect(mints).toBe(2);
+    expect(views.first.isMinting).toBe(false);
+    await act(async () => release());
+    await settle();
+    expect(views.first.apiKey).toBe('key-2');
+
+    // A new key the view asks for, while it holds one.
+    let minted: Promise<string | null> = Promise.resolve(null);
+    await act(async () => void (minted = views.first.mintKey()));
+    expect(mints).toBe(3);
+    expect(views.first.isMinting).toBe(true);
+    await act(async () => {
+      release();
+      await minted;
+    });
+    await settle();
+    expect(views.first.apiKey).toBe('key-3');
+    expect(views.first.isMinting).toBe(false);
+  });
+
   it('is renewed only while the refused key is still held, so views that hear one refusal mint once', async () => {
     const r = await renderWithScopes(<Views />, DEVELOPER);
     unmount = r.unmount;
@@ -239,8 +281,17 @@ describe('keyRenewalTime', () => {
     expect(keyRenewalTime('2026-11-07T12:00:00Z', mintedAt)).toBe(mintedAt + 59 * 60_000);
   });
 
-  it('keeps a key for at least 5 minutes, so a browser clock ahead of the server’s cannot mint in a loop', () => {
-    expect(keyRenewalTime('2026-11-07T10:00:45Z', mintedAt)).toBe(mintedAt + 5 * 60_000);
-    expect(keyRenewalTime('2026-11-07T09:00:00Z', mintedAt)).toBe(mintedAt + 5 * 60_000);
+  it('keeps a key for at least 5 minutes when it states a longer life, so a browser clock ahead of the server’s costs little', () => {
+    expect(keyRenewalTime('2026-11-07T10:06:00Z', mintedAt)).toBe(mintedAt + 5 * 60_000);
+  });
+
+  it('renews a key that states a life of a few minutes before it expires', () => {
+    expect(keyRenewalTime('2026-11-07T10:04:00Z', mintedAt)).toBe(mintedAt + 3 * 60_000);
+    expect(keyRenewalTime('2026-11-07T10:02:00Z', mintedAt)).toBe(mintedAt + 60_000);
+  });
+
+  it('keeps a key that looks spent for 30 seconds, so a browser clock far ahead of the server’s cannot mint in a loop', () => {
+    expect(keyRenewalTime('2026-11-07T10:00:45Z', mintedAt)).toBe(mintedAt + 30_000);
+    expect(keyRenewalTime('2026-11-07T09:00:00Z', mintedAt)).toBe(mintedAt + 30_000);
   });
 });

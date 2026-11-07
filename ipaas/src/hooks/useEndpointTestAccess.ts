@@ -19,7 +19,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { DEFAULT_API_KEY_HEADER } from '../constants/apiConsumption';
-import { useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
+import { isCompleteRef, useCreateEndpointTestKey, useEnableEndpointApiKeyAuth, useEndpointSecurity } from './useConsumers';
 import type { ApiKeyResult, EndpointRef, SecurityMode } from '../types/consumers';
 import { friendlyApiError } from '../utils/apiSecurity';
 import { isApiKeyAuthRequired, isPermissionError } from '../utils/apiErrors';
@@ -46,7 +46,7 @@ export interface EndpointTestAccess {
   keyMintedAt: number;
   /** True once a credential is held, or none is required because the API is open. */
   isAuthorized: boolean;
-  /** A key is being minted right now. */
+  /** A key is being minted for this view: it holds none yet, or it asked for a new one. A held key's background renewal does not count. */
   isMinting: boolean;
   /** The role may create test keys. Without it, no test-key request is sent. */
   canCreateKey: boolean;
@@ -95,13 +95,21 @@ const DEFAULT_KEY_VALIDITY_MS = 60 * 60_000;
 /** A key is renewed this long before it expires. */
 const RENEW_BEFORE_EXPIRY_MS = 60_000;
 /**
- * The shortest time a key is kept. A stated expiry is read against this browser's clock, so a clock
- * running ahead of the server's can make it look nearly spent; this bounds what that costs.
+ * The shortest time a key is kept, unless it states a shorter life, when it is kept for half of it. A
+ * stated expiry is read against this browser's clock, so a clock running ahead of the server's can
+ * make a key look nearly spent; this bounds what that costs, while a key that really is short-lived
+ * is still renewed before it expires.
  */
 const MIN_KEY_LIFE_MS = 5 * 60_000;
+/** However spent a key looks, it is kept this long, so a clock far ahead of the server's can't mint in a loop. */
+const MIN_RENEW_GAP_MS = 30_000;
 /** After a failed renewal, how long until the next try (the held key may still be valid meanwhile). */
 const RENEW_RETRY_MS = 30_000;
-/** A held key outlives the views that use it by this long, so coming back to one reuses it. */
+/**
+ * A held key outlives the views that use it by this long, so coming back to one reuses it. It is a
+ * plaintext credential kept in the shared query cache, so a cache persister added later must leave
+ * out `heldKeyQueryKey` queries.
+ */
 const HELD_KEY_GC_MS = DEFAULT_KEY_VALIDITY_MS;
 /** The longest delay a browser timer honours; a longer one fires at once. */
 const MAX_TIMER_MS = 2 ** 31 - 1;
@@ -123,12 +131,15 @@ const heldKeyQueryKey = (refKey: string) => ['endpoint-test-key', refKey] as con
 /**
  * When a key minted at `mintedAt` is renewed: a minute before it expires. Its lifetime is the one
  * `expiresAt` states, capped at the default validity: `expiresAt` comes from the server's clock, and
- * read against a browser clock running behind, it would put the renewal after the real expiry.
+ * read against a browser clock running behind, it would put the renewal after the real expiry. It is
+ * kept at least `MIN_KEY_LIFE_MS`, or half its stated lifetime if that is shorter, and never less than
+ * `MIN_RENEW_GAP_MS`.
  */
 export function keyRenewalTime(expiresAt: string | undefined, mintedAt: number): number {
   const stated = expiresAt ? Date.parse(expiresAt) : Number.NaN;
   const lifetime = Number.isFinite(stated) ? Math.min(stated - mintedAt, DEFAULT_KEY_VALIDITY_MS) : DEFAULT_KEY_VALIDITY_MS;
-  return mintedAt + Math.max(lifetime - RENEW_BEFORE_EXPIRY_MS, MIN_KEY_LIFE_MS);
+  const shortest = Math.min(Math.max(lifetime / 2, MIN_RENEW_GAP_MS), MIN_KEY_LIFE_MS);
+  return mintedAt + Math.max(lifetime - RENEW_BEFORE_EXPIRY_MS, shortest);
 }
 
 /** Mints through `mint`, the test-key mutation, so a refusal reaches the mutation cache's listeners (the permission notice). */
@@ -190,7 +201,7 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     queryKey: heldKeyQueryKey(refKey),
     queryFn: () => mintHeldKey(createKeyFor, endpoint!),
     // Auto-mint for an api-key-secured endpoint only: for another mode the test-key route answers 409.
-    enabled: enabled && !!endpoint && canCreateKey && mode === 'api-key',
+    enabled: enabled && isCompleteRef(endpoint) && canCreateKey && mode === 'api-key',
     // Fresh until it is due for renewal, so a view that mounts later uses the held key.
     staleTime: (query) => Math.max((query.state.data?.renewAt ?? 0) - Date.now(), 0),
     gcTime: HELD_KEY_GC_MS,
@@ -239,7 +250,17 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     },
     [canCreateKey, queryClient, createKeyFor],
   );
-  const mintKey = useCallback(async () => (endpoint ? mintFor(endpoint) : null), [endpoint, mintFor]);
+  // Mints a view asked for, which it shows as minting even while it holds a key.
+  const [requestedMints, setRequestedMints] = useState(0);
+  const mintKey = useCallback(async () => {
+    if (!endpoint) return null;
+    setRequestedMints((n) => n + 1);
+    try {
+      return await mintFor(endpoint);
+    } finally {
+      setRequestedMints((n) => n - 1);
+    }
+  }, [endpoint, mintFor]);
   const renewKey = useCallback(async (refused: string | null) => (endpoint ? mintFor(endpoint, refused) : null), [endpoint, mintFor]);
 
   // One renewal per endpoint: a fresh key 401s the same way when the cause is not the key,
@@ -282,7 +303,8 @@ export function useEndpointTestAccess(ref: EndpointRef | null | undefined, { ena
     keyMintedAt: apiKey ? (held.data?.mintedAt ?? 0) : 0,
     // An open (mode `none`) endpoint needs no credential; anything else does.
     isAuthorized: mode === 'none' || !!apiKey,
-    isMinting: held.isFetching,
+    // A held key's renewal runs in the background: the view keeps using the key meanwhile.
+    isMinting: (held.isFetching && !apiKey) || requestedMints > 0,
     canCreateKey,
     keyError,
     needsApiKeyAuth: canCreateKey && ((mode === 'jwt' && !apiKey) || apiKeyRequired),
