@@ -23,6 +23,7 @@ import type { McpErrorKind } from '../../types/mcp';
 const ERROR_TITLES: Record<McpErrorKind, string> = {
   auth: 'Not authorized (401)',
   blocked: 'Response blocked by the browser',
+  redirect: 'Redirect not followed',
   other: 'Could not connect',
 };
 
