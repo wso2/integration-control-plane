@@ -220,7 +220,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
       return;
     }
     try {
-      const { runId } = await trigger.mutateAsync({ orgHandler: org, projectId, componentId: comp?.id ?? '', releaseId, args: executionArgs });
+      const { runId } = await trigger.mutateAsync({ orgHandler: org, projectId, componentId: comp?.id ?? '', environmentId: envId, releaseId, args: executionArgs });
       setCurrentRunId(runId);
       setPolling(true);
       setLogsOpen(true);
@@ -232,7 +232,7 @@ export default function AutomationTest({ org, project, component }: ComponentSco
   const handleDirectRun = () => {
     setAlert(null);
     trigger.mutate(
-      { orgHandler: org, projectId, componentId: comp?.id ?? '', releaseId, args: [] },
+      { orgHandler: org, projectId, componentId: comp?.id ?? '', environmentId: envId, releaseId, args: [] },
       {
         onSuccess: () => {
           setPendingTriggerTime(Date.now());

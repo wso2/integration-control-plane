@@ -52,11 +52,11 @@ interface CloudReplicasProps {
  */
 export default function CloudReplicas({ projectId, componentId, componentHandler, releaseId, environmentId, deploymentTrackId, orgHandler, projectHandler, canReadLogs }: CloudReplicasProps): JSX.Element | null {
   // Same queries as the Runtime page, so both pages share one cache entry per release.
-  const { data: release } = useReleaseDetails(projectId, componentHandler, releaseId);
+  const { data: release } = useReleaseDetails(projectId, componentHandler, environmentId, releaseId);
   const { data: autoscaling } = useAutoscaling(projectId, componentId, environmentId, deploymentTrackId);
 
-  const pods = useComponentPods(projectId, componentHandler, releaseId, autoscaling?.enabled ? AUTOSCALING_PODS_POLL_MS : undefined);
-  const metrics = useComponentPodMetrics(projectId, componentHandler, releaseId);
+  const pods = useComponentPods(projectId, componentHandler, environmentId, releaseId, autoscaling?.enabled ? AUTOSCALING_PODS_POLL_MS : undefined);
+  const metrics = useComponentPodMetrics(projectId, componentHandler, environmentId, releaseId);
 
   const componentLevel = metrics.data?.componentLevelMetrics;
   const usage = useMemo(() => (componentLevel ? usageFromComponentLevelMetrics(componentLevel) : calculateAggregateUsage(pods.data ?? [], [])), [componentLevel, pods.data]);
@@ -74,7 +74,7 @@ export default function CloudReplicas({ projectId, componentId, componentHandler
     };
   }, [autoscaling]);
 
-  const scope = useMemo(() => ({ projectId, releaseId, orgHandler, projectHandler, componentHandler }), [projectId, releaseId, orgHandler, projectHandler, componentHandler]);
+  const scope = useMemo(() => ({ projectId, environmentId, releaseId, orgHandler, projectHandler, componentHandler }), [projectId, environmentId, releaseId, orgHandler, projectHandler, componentHandler]);
 
   if (release?.undeployed) return null;
 

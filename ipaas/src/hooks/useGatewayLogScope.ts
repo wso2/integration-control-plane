@@ -46,7 +46,7 @@ export function useGatewayLogScope(orgHandler: string, orgUuid: string, componen
   const deployedIndex = deployments.findIndex((q) => !!q.data?.releaseId);
   const environmentId = deployedIndex >= 0 ? environmentIds[deployedIndex] : '';
   const releaseId = deployedIndex >= 0 ? (deployments[deployedIndex].data?.releaseId ?? '') : '';
-  const { data: envEndpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', versionId, releaseId);
+  const { data: envEndpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(component?.id ?? '', versionId, environmentId, releaseId);
 
   const fronted = useMemo(() => gatewayFrontedEndpoints(envEndpoints), [envEndpoints]);
   const refs = useMemo(

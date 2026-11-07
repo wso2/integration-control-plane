@@ -79,6 +79,7 @@ export interface TriggerComponentInput {
   orgHandler: string;
   projectId: string;
   componentId: string;
+  environmentId: string;
   releaseId: string;
   args?: { argument_name: string; argument_value: string }[];
 }

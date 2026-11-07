@@ -786,7 +786,7 @@ function GenericServiceConfigureDrawer({
   const { data, isLoading, isError } = useSchemaConfig(projectId, componentId, schemaEnvId, versionId, commitHash);
   const { data: existingCertMappings } = useCertificateMappings(projectId, componentId, schemaEnvId, versionId, open);
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
-  const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
+  const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', envId, open && !hideEndpoints && releaseId ? releaseId : '');
   const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();

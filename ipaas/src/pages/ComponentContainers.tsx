@@ -53,7 +53,7 @@ export default function ComponentContainers({ org, project, component }: Compone
 
   const { data: deployment } = useComponentDeployment(org, orgUuid ?? '', comp?.id ?? '', trackId, envId);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, releaseId, trackId);
+  const { data: release, isLoading: loadingRelease } = useRelease(projectId, comp?.id, envId, releaseId, trackId);
 
   // Changing CPU and memory is a paid feature, and ipaas-service refuses it on other plans. The plan
   // summary on the billing org carries no type, so the plan itself is read for whether it is paid.

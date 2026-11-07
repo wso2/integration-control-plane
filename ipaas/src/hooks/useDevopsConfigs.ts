@@ -43,12 +43,12 @@ const ROOT = 'devopsConfigs';
 // can't silently read the default track, and the reads wait while it is undefined, before the component loads.
 
 /** The env's release (app-environment) — used to resolve the main container. */
-export function useRelease(projectId: string, componentId: string | undefined, releaseId: string | undefined, deploymentTrackId: string | undefined) {
+export function useRelease(projectId: string, componentId: string | undefined, environmentId: string, releaseId: string | undefined, deploymentTrackId: string | undefined) {
   const orgUuid = useOrgUuid();
   return useQuery<ReleaseDetails>({
-    queryKey: [ROOT, 'release', orgUuid, projectId, componentId, releaseId, deploymentTrackId],
-    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, releaseId!, deploymentTrackId!),
-    enabled: !!orgUuid && !!projectId && !!componentId && !!releaseId && deploymentTrackId !== undefined,
+    queryKey: [ROOT, 'release', orgUuid, projectId, componentId, environmentId, releaseId, deploymentTrackId],
+    queryFn: () => getReleaseById(orgUuid!, projectId, componentId!, environmentId, releaseId!, deploymentTrackId!),
+    enabled: !!orgUuid && !!projectId && !!componentId && !!environmentId && !!releaseId && deploymentTrackId !== undefined,
   });
 }
 

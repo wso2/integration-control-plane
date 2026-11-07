@@ -63,7 +63,7 @@ export default function ComponentStorage({ org, project, component }: ComponentS
 
   const { data: deployment } = useComponentDeployment(org, orgUuid ?? '', comp?.id ?? '', trackId, envId);
   const releaseId = deployment?.releaseId ?? '';
-  const { data: release } = useRelease(projectId, comp?.id, releaseId, trackId);
+  const { data: release } = useRelease(projectId, comp?.id, envId, releaseId, trackId);
   const container = useMemo(() => mainContainer(release?.containers), [release]);
   const containerId = container?.ID ?? '';
   const containerName = (id: string) => release?.containers?.find((c) => c.ID === id)?.name ?? id;

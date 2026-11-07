@@ -37,7 +37,7 @@ function podLogsError(error: unknown): Error {
   return error instanceof Error ? error : new Error('Failed to fetch container logs');
 }
 
-const releasePath = (componentName: string, releaseId: string): string => `/components/${seg(componentName)}/releases/${seg(releaseId)}`;
+const releasePath = (componentName: string, environmentId: string, releaseId: string): string => `/components/${seg(componentName)}/environments/${seg(environmentId)}/releases/${seg(releaseId)}`;
 
 /** Only replicas/undeployed are guaranteed by the backend — every other key may be omitted. */
 interface CloudReleaseRuntime {
@@ -66,34 +66,35 @@ function toReleaseDetails(raw: CloudReleaseRuntime, releaseId: string): RuntimeR
 }
 
 /** Full runtime detail for a deployed release (replicas, namespace, last-deployed message). */
-export const fetchReleaseDetails = (_projectId: string, componentName: string, releaseId: string): Promise<RuntimeReleaseDetails> =>
-  bff.get<CloudReleaseRuntime>(`${releasePath(componentName, releaseId)}/runtime`).then((raw) => toReleaseDetails(raw, releaseId));
+export const fetchReleaseDetails = (_projectId: string, componentName: string, environmentId: string, releaseId: string): Promise<RuntimeReleaseDetails> =>
+  bff.get<CloudReleaseRuntime>(`${releasePath(componentName, environmentId, releaseId)}/runtime`).then((raw) => toReleaseDetails(raw, releaseId));
 
 /** Pods for a release. An empty array is normal (scaled to zero, or no current binding). */
-export const fetchComponentPods = (_projectId: string, componentName: string, releaseId: string): Promise<ClusterPod[]> => bff.get<ClusterPod[]>(`${releasePath(componentName, releaseId)}/pods`);
+export const fetchComponentPods = (_projectId: string, componentName: string, environmentId: string, releaseId: string): Promise<ClusterPod[]> => bff.get<ClusterPod[]>(`${releasePath(componentName, environmentId, releaseId)}/pods`);
 
 /**
  * OpenChoreo has no pod-level metrics source — `podLevelMetrics` is always `[]`.
  * `componentLevelMetrics` is the real aggregate and is absent (not zeroed) whenever it
  * can't be resolved (no binding, Observer unreachable). Passed straight through.
  */
-export const fetchComponentPodMetrics = (_projectId: string, componentName: string, releaseId: string): Promise<RuntimeMetrics> => bff.get<RuntimeMetrics>(`${releasePath(componentName, releaseId)}/metrics`);
+export const fetchComponentPodMetrics = (_projectId: string, componentName: string, environmentId: string, releaseId: string): Promise<RuntimeMetrics> => bff.get<RuntimeMetrics>(`${releasePath(componentName, environmentId, releaseId)}/metrics`);
 
 /** Redeploy the currently deployed release ("Redeploy Release" button). No request body. */
-export const redeployRelease = (_projectId: string, componentName: string, releaseId: string): Promise<void> => bff.post<{ message: string }>(`${releasePath(componentName, releaseId)}/redeploy`).then(() => undefined);
+export const redeployRelease = (_projectId: string, componentName: string, environmentId: string, releaseId: string): Promise<void> => bff.post<{ message: string }>(`${releasePath(componentName, environmentId, releaseId)}/redeploy`).then(() => undefined);
 
 /** Recent lifecycle events for one pod (~1hr retention) — an empty array is normal. */
-export const fetchPodEvents = (_projectId: string, componentName: string, releaseId: string, podName: string): Promise<PodEvent[]> => bff.get<PodEvent[]>(`${releasePath(componentName, releaseId)}/pods/${seg(podName)}/events`);
+export const fetchPodEvents = (_projectId: string, componentName: string, environmentId: string, releaseId: string, podName: string): Promise<PodEvent[]> =>
+  bff.get<PodEvent[]>(`${releasePath(componentName, environmentId, releaseId)}/pods/${seg(podName)}/events`);
 
 /**
  * Container logs for one pod. `previous` isn't supported by OpenChoreo's log API — a request
  * for it fails with a 400 (the real reason lands in the thrown error's message) rather than
  * silently returning current logs, which would misreport which instance the logs are from.
  */
-export const fetchPodLogs = async (_projectId: string, componentName: string, releaseId: string, podName: string, options: PodLogOptions): Promise<string> => {
+export const fetchPodLogs = async (_projectId: string, componentName: string, environmentId: string, releaseId: string, podName: string, options: PodLogOptions): Promise<string> => {
   try {
     const res = await bff.get<{ logs: string }>(
-      `${releasePath(componentName, releaseId)}/pods/${seg(podName)}/logs${q({ containerName: options.containerName, sinceSeconds: options.sinceSeconds, maxTailLines: options.maxTailLines, previous: options.previous })}`,
+      `${releasePath(componentName, environmentId, releaseId)}/pods/${seg(podName)}/logs${q({ containerName: options.containerName, sinceSeconds: options.sinceSeconds, maxTailLines: options.maxTailLines, previous: options.previous })}`,
     );
     return res.logs ?? '';
   } catch (e) {

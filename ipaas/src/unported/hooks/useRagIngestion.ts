@@ -237,7 +237,7 @@ export function useCreateRagIngestion() {
 
         // 4. Locate the main container to mount configuration onto.
         setState((s) => ({ ...s, progress: 70, stepLabel: 'Applying configuration…' }));
-        const release = await getReleaseById(orgUuid, projectId, created.id, releaseId);
+        const release = await getReleaseById(orgUuid, projectId, created.id, environment.id, releaseId);
         const container = mainContainer(release.containers);
         if (!container) throw new Error('No container found on the component release.');
 

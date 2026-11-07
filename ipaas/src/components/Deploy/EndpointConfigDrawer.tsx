@@ -36,7 +36,7 @@ interface EndpointConfigDrawerProps {
 
 /** Endpoint security settings, scoped to the first environment's endpoints. */
 export default function EndpointConfigDrawer({ open, onClose, componentId, versionId, firstEnvReleaseId, firstEnvId, isWorkflow = false }: EndpointConfigDrawerProps) {
-  const { data: allEndpoints = [] } = useEnvEndpoints(componentId, versionId, firstEnvReleaseId);
+  const { data: allEndpoints = [] } = useEnvEndpoints(componentId, versionId, firstEnvId ?? '', firstEnvReleaseId);
   const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
 
   const handleClose = () => {

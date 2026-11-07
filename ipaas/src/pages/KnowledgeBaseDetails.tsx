@@ -384,7 +384,7 @@ function DataSourceRow({ scope, kb, dataSource: ds, onNotify, onSchedule, onView
 
   const ingest = () =>
     trigger.mutate(
-      { orgHandler: scope.org, projectId: kb.projectName, componentId: ds.name, releaseId: ds.releaseName },
+      { orgHandler: scope.org, projectId: kb.projectName, componentId: ds.name, environmentId: kb.environment, releaseId: ds.releaseName },
       {
         onSuccess: () => {
           onNotify({ severity: 'success', text: `Ingestion started for ${ds.displayName}.` });

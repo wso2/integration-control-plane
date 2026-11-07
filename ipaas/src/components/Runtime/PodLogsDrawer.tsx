@@ -61,7 +61,7 @@ export default function PodLogsDrawer({ open, onClose, onExited, pod, scope }: P
   }, [sinceInput]);
 
   const options = useMemo<PodLogOptions>(() => ({ previous, sinceSeconds, containerName }), [previous, sinceSeconds, containerName]);
-  const { data: logs = '', isLoading, isFetching, isError, error, refetch } = usePodLogs(scope.projectId, scope.componentHandler, scope.releaseId, podName, options, open);
+  const { data: logs = '', isLoading, isFetching, isError, error, refetch } = usePodLogs(scope.projectId, scope.componentHandler, scope.environmentId, scope.releaseId, podName, options, open);
 
   const lines = useMemo(() => filterLogLines(logs, search, filterMode), [logs, search, filterMode]);
   // `previous` reads the prior instance of a container, which only exists after a restart.
