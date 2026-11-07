@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { EnvironmentLinks, IntegrationLinks, KeyRef, LinkableResource, LinkConnection, OrphanedLink } from '../types/configuration';
+import { projectEndpointId, type ConnectableEndpoint, type EnvironmentLinks, type IntegrationLinks, type KeyRef, type LinkableResource, type LinkConnection, type OrphanedLink } from '../types/configuration';
 
 /** `acme.ghdemo.githubAuthToken` → `acme/ghdemo:githubAuthToken`; a submodule joins its package with a dot. */
 export const configurableId = (configKey: string): string => {
@@ -34,8 +34,10 @@ export const VIA = 'Via selected Link';
 export const ENTER = 'Enter a value';
 
 export interface FieldSource extends KeyRef {
-  /** The resource's display name. */
+  /** The resource's display name, or the integration the endpoint belongs to. */
   name: string;
+  /** An endpoint of this project, which supplies an address rather than a stored key. */
+  endpoint?: boolean;
   /** An own link that beats its connection's. */
   overrides?: boolean;
   noValues: boolean;
@@ -45,9 +47,11 @@ export interface FieldSource extends KeyRef {
 
 export interface Picker {
   first: typeof VIA | typeof ENTER;
-  /** `first`, or `<resource>|<KEY>`. */
+  /** `first`, `<resource>|<KEY>`, or an endpoint's `<component>/<endpoint>`. */
   selected: string;
   resources: { id: string; name: string; keys: { key: string; usedBy?: string; orphanOf?: string }[] }[];
+  /** Integrations of this project, which supply an address and need no key. */
+  endpoints: { id: string; name: string; unavailable?: string }[];
 }
 
 /** One target's link in a form: where its value comes from, and the picker's choices where links can change. */
@@ -77,13 +81,21 @@ export interface FormLinkView {
  * The links of a Configure form in env: editable in the first environment, else what env's release uses, read-only.
  * `fields` are the configurable ids of the build env runs: outside the first environment its sections come from them.
  */
-export function formLinkView(links: IntegrationLinks, env: string, envName: (env: string) => string = (e) => e, fields: string[] = []): FormLinkView {
+export function formLinkView(links: IntegrationLinks, env: string, envName: (env: string) => string = (e) => e, fields: string[] = [], connectable: ConnectableEndpoint[] = []): FormLinkView {
   const first = links.environments[0]?.name;
   const editable = first === env;
   const release = links.environments.find((e) => e.name === env);
   const resource = (id: string) => links.resources.find((r) => r.id === id);
   const name = (id: string) => resource(id)?.displayName ?? id;
   const source = (ref: KeyRef, overrides?: boolean): FieldSource => ({ ...ref, name: name(ref.ref), ...(overrides && { overrides }), noValues: !resource(ref.ref)?.valuesIn.includes(env) });
+  // An endpoint of this project is reached directly, so it has no resource and no values of ours:
+  // the platform resolves its address in each environment.
+  const projectEndpoints = connectable.filter((e) => e.scope === 'project');
+  const endpointSource = (id: string): FieldSource | undefined => {
+    const match = projectEndpoints.find((e) => projectEndpointId(e) === id);
+    const [component, endpoint] = id.split('/');
+    return { ref: id, key: endpoint ?? id, name: match?.displayName ?? component ?? id, endpoint: true, noValues: false };
+  };
   const connectionKey = (id: string) => {
     for (const c of links.connections) {
       const key = c.link && c.fields.find((f) => f.configurable === id)?.key;
@@ -98,10 +110,15 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
       return ref ? { source: { ...source(ref), ...(links.sourceDefined && { declared: true }) } } : {};
     }
     const own = links.fieldLinks[id] ?? links.env[id];
+    const ownEndpoint = links.endpointLinks[id];
     const via = connectionKey(id);
     const picker: Picker = {
       first: via ? VIA : ENTER,
-      selected: own ? `${own.ref}|${own.key}` : via ? VIA : ENTER,
+      selected: ownEndpoint ?? (own ? `${own.ref}|${own.key}` : via ? VIA : ENTER),
+      endpoints: projectEndpoints.map((e) => {
+        const here = e.environments.find((x) => x.name === env);
+        return { id: projectEndpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason) }) };
+      }),
       resources: links.resources.map((r) => ({
         id: r.id,
         name: r.displayName,
@@ -114,6 +131,8 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
         }),
       })),
     };
+    // A configurable takes one value, so its endpoint beats a key, as a key beats its connection's.
+    if (ownEndpoint) return { source: endpointSource(ownEndpoint), picker };
     const s = own ?? via;
     return { ...(s && { source: source(s, !!own && !!via) }), picker };
   };
@@ -158,4 +177,7 @@ export const sameLinks = (links: IntegrationLinks, source: string, target: strin
 };
 
 /** A connection's configurables among fields: those named after it (`github` → `githubAuthToken`), as ipaas-service groups them. */
+/** Why an endpoint of this project cannot be chosen in the form's environment, short enough for a menu. */
+const unavailableText = (reason?: string): string => (reason === 'not_deployed' ? 'not deployed here' : 'unavailable here');
+
 const connectionFields = (fields: string[], connection: string) => fields.filter((f) => f.startsWith(connection) && /^[A-Z]/.test(f.slice(connection.length)));

@@ -18,11 +18,16 @@
 
 import { createContext, useContext } from 'react';
 
-/** Where a linked field's value comes from in the form's environment. */
+/**
+ * Where a linked field's value comes from in the form's environment: a resource key, or an
+ * endpoint of this project, whose address the platform resolves per environment.
+ */
 export interface LinkedSource {
-  /** The resource's display name. */
+  /** The resource's display name, or the endpoint's integration. */
   resource: string;
   key: string;
+  /** An endpoint of this project rather than a resource key: it supplies the whole address. */
+  endpoint?: boolean;
   /** The field's own link beats its connection's. */
   overrides?: boolean;
   /** The environment the resource has no values in. */
@@ -32,7 +37,11 @@ export interface LinkedSource {
 }
 
 /** A linked field's read-only value: where it comes from. */
-export const fromText = ({ resource, key, declared }: Pick<LinkedSource, 'resource' | 'key' | 'declared'>): string => (declared ? `from workload.yaml (${resource} · ${key})` : `from ${resource} · ${key}`);
+export const fromText = ({ resource, key, endpoint, declared }: Pick<LinkedSource, 'resource' | 'key' | 'endpoint' | 'declared'>): string => {
+  // An endpoint supplies an address the platform resolves per environment, not a stored key.
+  const source = endpoint ? `address of ${resource} · ${key}` : `${resource} · ${key}`;
+  return declared ? `from workload.yaml (${source})` : `from ${source}`;
+};
 
 /** A resource key the picker offers: the field that uses it already, or the lost target a pick takes it from. */
 export interface PickerKey {
@@ -41,12 +50,23 @@ export interface PickerKey {
   orphanOf?: string;
 }
 
-/** The choices of a field's link icon. `selected` is `first` for no own link, else `resource|key`. */
+/** An integration of this project the field can take the address of, and where it cannot be called. */
+export interface PickerEndpoint {
+  /** `<component>/<endpoint>`, which is what a pick writes. */
+  id: string;
+  name: string;
+  /** Why it cannot be chosen; it is offered disabled, so the reason is visible. */
+  unavailable?: string;
+}
+
+/** The choices of a field's link icon. `selected` is `first` for no own link, else `resource|key` or an endpoint id. */
 export interface FieldLinkPicker {
   first: 'Enter a value' | 'Via selected Link';
   selected: string;
   resources: { id: string; name: string; keys: PickerKey[] }[];
-  onPick: (pick: { resource: string; key: string } | null) => void;
+  /** Endpoints of this project, which supply an address and need no key. */
+  endpoints?: PickerEndpoint[];
+  onPick: (pick: { resource: string; key: string } | { endpoint: string } | null) => void;
   /** Another link change is on its way: one at a time, so no write replaces another's. */
   disabled?: boolean;
 }

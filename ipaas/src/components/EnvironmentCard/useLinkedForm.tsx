@@ -20,7 +20,7 @@ import { useMemo, type ReactNode } from 'react';
 import { Alert, Button, Stack, Typography } from '@wso2/oxygen-ui';
 import { BffError } from '../../api/_client';
 import { useEnvironments } from '../../hooks/useEnvironments';
-import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
+import { useConnectableEndpoints, useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
 import type { IntegrationLinks, LinkTarget } from '../../types/configuration';
 import { configKey, configurableId, formLinkView, targetName } from '../../utils/integrationLinks';
 import { ConnectionLink } from './ConnectionLink';
@@ -28,7 +28,14 @@ import { OrphanedLinks } from './OrphanedLinks';
 import type { FormGroup } from '../SchemaConfigForm/ConfigForm';
 import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
 
-const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, orphaned: [], env: {}, environments: [] };
+const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, endpointLinks: {}, orphaned: [], env: {}, environments: [] };
+
+/** One pick of a field's link icon as a link write: a resource key, an endpoint of this project, or neither, which unlinks the field. */
+const pickedTarget = (configurable: string, pick: { resource: string; key: string } | { endpoint: string } | null): LinkTarget => {
+  if (pick && 'endpoint' in pick) return { configurable, endpoint: pick.endpoint };
+  if (pick) return { configurable, ref: pick.resource, key: pick.key };
+  return { configurable };
+};
 
 /** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's linkable config keys (`linkableFields`). */
 export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[]) {
@@ -38,8 +45,9 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   const linksUnread = !read.data || read.isError;
   const { data: environments = [] } = useEnvironments('', projectId);
   const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
+  const { data: connectable = [] } = useConnectableEndpoints(projectId, componentId, open);
   const ids = fields.map(configurableId).join();
-  const view = useMemo(() => formLinkView(links, env, envName, ids ? ids.split(',') : []), [links, env, environments, ids]); // eslint-disable-line react-hooks/exhaustive-deps
+  const view = useMemo(() => formLinkView(links, env, envName, ids ? ids.split(',') : [], connectable), [links, env, environments, ids, connectable]); // eslint-disable-line react-hooks/exhaustive-deps
   const write = useLinkWrite();
   const change = (target: LinkTarget) => write.mutateAsync({ projectId, componentId, target }).catch(() => undefined);
 
@@ -50,8 +58,17 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
     const id = configurableId(path);
     const t = view.target(id);
     return {
-      ...(t.source && { source: { resource: t.source.name, key: t.source.key, ...(t.source.overrides && { overrides: true }), ...(t.source.noValues && { noValuesIn: envName(env) }), ...(t.source.declared && { declared: true }) } }),
-      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pick ? { configurable: id, ref: pick.resource, key: pick.key } : { configurable: id }) } }),
+      ...(t.source && {
+        source: {
+          resource: t.source.name,
+          key: t.source.key,
+          ...(t.source.endpoint && { endpoint: true }),
+          ...(t.source.overrides && { overrides: true }),
+          ...(t.source.noValues && { noValuesIn: envName(env) }),
+          ...(t.source.declared && { declared: true }),
+        },
+      }),
+      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pickedTarget(id, pick)) } }),
     };
   };
 

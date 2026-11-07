@@ -48,6 +48,7 @@ const link = (configurables: Record<string, string>, hasValues = true): Integrat
   usedByOrphaned: {},
   connections: [],
   fieldLinks: {},
+  endpointLinks: {},
   orphaned: [],
   env: {},
   environments: [

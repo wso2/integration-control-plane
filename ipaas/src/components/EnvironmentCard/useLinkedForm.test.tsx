@@ -20,7 +20,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BffError } from '../../api/_client';
-import type { IntegrationLinks } from '../../types/configuration';
+import type { ConnectableEndpoint, IntegrationLinks } from '../../types/configuration';
 import type { JSONSchema } from '../../types/schema';
 import { ConfigForm } from '../SchemaConfigForm/ConfigForm';
 import { linkableFields, schemaFields } from '../SchemaConfigForm/schemaUtils';
@@ -43,12 +43,13 @@ const links: IntegrationLinks = {
     { id: id('backup'), suggestions: ['github-sandbox', 'github-corp'], fields: [{ configurable: id('backupToken'), key: 'GITHUB_AUTH_TOKEN' }] },
   ],
   fieldLinks: {},
+  endpointLinks: {},
   orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL' }],
   env: {},
   environments: [{ name: 'development', deployed: true, resources: [], valuesChanged: false, linksNeedDeploy: false, connections: {}, configurables: {}, env: {} }],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0 }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0, connectable: [] as ConnectableEndpoint[] }));
 const failed = vi.hoisted(() => ({ current: undefined as { error: Error; variables: { target: unknown } } | undefined }));
 vi.mock('../../hooks/useConfiguration', () => ({
   useIntegrationLinks: () => ({
@@ -58,6 +59,7 @@ vi.mock('../../hooks/useConfiguration', () => ({
     isFetching: false,
     refetch: async () => void answer.refetches++,
   }),
+  useConnectableEndpoints: () => ({ data: answer.connectable }),
   useLinkWrite: () => ({ isPending: answer.pending, isError: !!failed.current, ...failed.current, mutateAsync: async (input: { target: unknown }) => void writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useEnvironments', () => ({ useEnvironments: () => ({ data: [{ id: 'development', name: 'Development' }] }) }));
@@ -241,6 +243,25 @@ describe('the Configure form with links', () => {
     await act(async () => button('Link ordersDatabaseUrl').click());
     await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent === 'Enter a value') as HTMLElement).click());
     expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl') }]);
+  });
+
+  it('fills a field from an integration of this project, which takes no key', async () => {
+    answer.connectable = [
+      { project: 'shop', component: 'basket', endpoint: 'items', displayName: 'Basket', scope: 'project', environments: [{ name: 'development', connectable: true }] },
+      { project: 'library', component: 'catalog', endpoint: 'books', displayName: 'Catalog', scope: 'organization', environments: [{ name: 'development', connectable: true }] },
+    ];
+    try {
+      await act(async () => root.render(<Form />));
+      await act(async () => button('Link ordersDatabaseUrl').click());
+      const options = Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li'));
+      // Another project's integration is reached with an API key, which a field cannot take on its own.
+      expect(options.map((o) => o.textContent)).toContain('Basket \u00b7 items');
+      expect(options.map((o) => o.textContent)).not.toContain('Catalog \u00b7 books');
+      await act(async () => (options.find((o) => o.textContent === 'Basket \u00b7 items') as HTMLElement).click());
+      expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), endpoint: 'basket/items' }]);
+    } finally {
+      answer.connectable = [];
+    }
   });
 
   it('offers a key a link the build lost holds, and takes it in one write', async () => {

@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import type { EnvironmentLinks, IntegrationLinks } from '../types/configuration';
+import type { ConnectableEndpoint, EnvironmentLinks, IntegrationLinks } from '../types/configuration';
 import { configKey, configurableId, formLinkView } from './integrationLinks';
 
 // ipaas-service's answer for the mock's ghdemo: connection github; githubAuthToken is the connection's key, githubTimeout has none.
@@ -43,12 +43,28 @@ const base: IntegrationLinks = {
   usedByOrphaned: {},
   connections: [{ id: id('github'), suggestions: ['github-acme', 'github-sandbox', 'github-corp'], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }, { configurable: id('githubTimeout') }] }],
   fieldLinks: {},
+  endpointLinks: {},
   orphaned: [],
   env: {},
   environments: [environment('development'), environment('production')],
 };
 const linked: IntegrationLinks = { ...base, connections: [{ ...base.connections[0], link: 'github-acme' }], used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken') } };
 const envName = (e: string) => e[0].toUpperCase() + e.slice(1);
+// What the project may call: its own basket, deployed in development only, and another project's catalog.
+const connectable: ConnectableEndpoint[] = [
+  {
+    project: 'shop',
+    component: 'basket',
+    endpoint: 'items',
+    displayName: 'Basket',
+    scope: 'project',
+    environments: [
+      { name: 'development', connectable: true },
+      { name: 'production', connectable: false, reason: 'not_deployed' },
+    ],
+  },
+  { project: 'library', component: 'catalog', endpoint: 'books', displayName: 'Catalog', scope: 'organization', environments: [{ name: 'development', connectable: true }] },
+];
 const ghdemoFields = [id('githubAuthToken'), id('githubTimeout')];
 
 describe('configurableId', () => {
@@ -81,6 +97,30 @@ describe('formLinkView', () => {
     expect(view.target(id('githubAuthToken')).picker?.selected).toBe('github-sandbox|GITHUB_AUTH_TOKEN');
     expect(view.target(id('ordersDbUrl')).picker?.resources.find((r) => r.id === 'orders-db')?.keys).toEqual([{ key: 'URL' }, { key: 'PASSWORD', usedBy: 'ordersDbPassword' }]);
     expect(view.target(id('ordersDbPassword')).picker?.resources.find((r) => r.id === 'orders-db')?.keys[1]).toEqual({ key: 'PASSWORD' });
+  });
+
+  it('offers the project\u2019s own integrations, and not another project\u2019s, as a field\u2019s source', () => {
+    const view = formLinkView(linked, 'development', envName, ghdemoFields, connectable);
+    expect(view.target(id('githubTimeout')).picker?.endpoints).toEqual([{ id: 'basket/items', name: 'Basket \u00b7 items' }]);
+  });
+
+  it('offers an integration not deployed where links are changed disabled, saying so', () => {
+    const notDeployed: ConnectableEndpoint[] = [{ ...connectable[0], environments: [{ name: 'development', connectable: false, reason: 'not_deployed' }] }];
+    const view = formLinkView(linked, 'development', envName, ghdemoFields, notDeployed);
+    expect(view.target(id('githubTimeout')).picker?.endpoints).toEqual([{ id: 'basket/items', name: 'Basket \u00b7 items', unavailable: 'not deployed here' }]);
+  });
+
+  it('says a field filled from an endpoint comes from it, and selects it in the picker', () => {
+    const links: IntegrationLinks = { ...linked, endpointLinks: { [id('githubTimeout')]: 'basket/items' } };
+    const view = formLinkView(links, 'development', envName, ghdemoFields, connectable);
+    expect(view.target(id('githubTimeout')).source).toEqual({ ref: 'basket/items', key: 'items', name: 'Basket', endpoint: true, noValues: false });
+    expect(view.target(id('githubTimeout')).picker?.selected).toBe('basket/items');
+  });
+
+  it('lets an endpoint beat the key a field\u2019s connection gives it', () => {
+    const links: IntegrationLinks = { ...linked, endpointLinks: { [id('githubAuthToken')]: 'basket/items' } };
+    const view = formLinkView(links, 'development', envName, ghdemoFields, connectable);
+    expect(view.target(id('githubAuthToken')).source).toMatchObject({ ref: 'basket/items', endpoint: true });
   });
 
   it('shows another environment its release read-only, with the link now', () => {
