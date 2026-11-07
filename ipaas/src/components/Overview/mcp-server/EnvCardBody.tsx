@@ -25,6 +25,7 @@ import ApiKeyAuthOffer from '../../ApiKeyAuthOffer';
 import { useMcpTools } from '../../../hooks/useMcpTools';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import { aiGatewayNotice } from '../../../utils/mcpGateway';
 import type { EndpointRef } from '../../../types/consumers';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
 import EndpointUrlsPanel from '../_shared/EndpointUrlsPanel';
@@ -36,7 +37,8 @@ import McpToolTile from './McpToolTile';
  * Discovers the deployed endpoint, obtains a test credential for it, then lists
  * tools over the MCP SDK (`useMcpTools`) — mirroring devant's MCP overview, which
  * replaces the swagger/operations view with a tools list. The credential and the
- * enforcing gateway URL come from the API Platform (`useEndpointTestAccess`).
+ * enforcing gateway URL come from `useEndpointTestAccess`: the API Platform for an
+ * MCP proxy, Agent Manager's AI gateway for an MCP server published there.
  * Shared by both MCP flavors (server-from-source and proxy) via the registry.
  */
 export default function EnvCardBody({ component, env, projectId, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 }: EnvCardBodyProps): ReactNode {
@@ -46,8 +48,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   const isDeploymentReady = hasDeployment && isDeploymentHealthy(deploymentStatusV2);
   const { data: endpoints = [] } = useEnvEndpoints(component.id, versionId, releaseId);
 
-  // Default to the MCP-capable endpoint (tools are listed at `${baseUrl}/mcp`). The
-  // user can still switch endpoints in the panel.
+  // Default to the MCP-capable endpoint. The user can still switch endpoints in the panel.
   const mcpIdx = useMemo(() => {
     const i = endpoints.findIndex((e) => e.publicUrl);
     return i >= 0 ? i : 0;
@@ -63,10 +64,12 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   );
   const access = useEndpointTestAccess(accessRef, { enabled: !!accessRef && isDeploymentReady });
 
-  // Tools are listed through the apip gateway and nothing else. The raw external
-  // route is open (no policy engine in its path), so falling back to it would hand
-  // the test key to a host that never validates it.
-  const baseUrl = access.gatewayUrl;
+  // Tools are listed through the gateway and nothing else. The raw external route is
+  // open (no policy engine in its path), so falling back to it would hand the test key
+  // to a host that never validates it.
+  const mcpUrl = access.mcpUrl;
+  // Where an AI gateway MCP server stands, when that rules out listing its tools.
+  const aiGatewayNote = access.aiGateway ? aiGatewayNotice(access.aiGateway, access.mode) : null;
 
   const apiKey = access.apiKey;
   // Wait for the credential before connecting — except on a `none`-mode endpoint,
@@ -75,10 +78,10 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   const keyError = access.keyError;
 
   const { tools, isLoading, error, isForbidden, isUnauthorized, refetch } = useMcpTools({
-    baseUrl,
+    mcpUrl,
     apiKey,
     authHeader: access.authHeader,
-    enabled: isDeploymentReady && !!baseUrl && isAuthorized,
+    enabled: isDeploymentReady && !!mcpUrl && isAuthorized && !aiGatewayNote,
   });
 
   // Another surface can reap this key, so a 401 is worth one re-mint; useMcpTools re-runs on it.
@@ -114,6 +117,10 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
       {!isDeploymentReady ? (
         <Alert severity="info" sx={{ mt: 1.5 }}>
           Deploy to view MCP tools.
+        </Alert>
+      ) : aiGatewayNote ? (
+        <Alert severity={aiGatewayNote.severity} sx={{ mt: 1.5 }}>
+          {aiGatewayNote.text}
         </Alert>
       ) : access.isUnavailable ? (
         // Terminal: with no gateway URL the tools call is never attempted, so this

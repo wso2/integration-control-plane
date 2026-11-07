@@ -113,6 +113,18 @@ export interface SecurityConfig {
   entryEnvironment?: string;
   /** The environment runs a build made before builds recorded their settings, so what it enforces is unknown. */
   stateUnknown?: boolean;
+  /**
+   * Set when Agent Manager's AI gateway fronts the endpoint instead of the API Platform, as it does an MCP server.
+   * `publicUrl` is then the full MCP URL, MCP path included, and the gateway issues keys only to Agent Manager agents.
+   */
+  aiGateway?: AiGatewayBinding;
+}
+
+/** Where an endpoint's deployment on the AI gateway stands. */
+export interface AiGatewayBinding {
+  /** Absent while the environment has no AI gateway; `deploymentStatusReason` is then `NO_GATEWAY`. */
+  deploymentStatus?: 'Deploying' | 'Deployed' | 'Failed';
+  deploymentStatusReason?: string;
 }
 
 /** The non-auth gateway behaviour of an exposed endpoint API (GET/PUT `.../policies`). */
