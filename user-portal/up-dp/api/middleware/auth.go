@@ -40,7 +40,7 @@ func Identity(ctx context.Context) *domain.TokenIdentity {
 	return identity
 }
 
-// WithAuth admits a request only with a bearer token whose claims name a caller.
+// WithAuth admits a request only with a bearer token the token service verifies.
 func WithAuth(tokenSvc domain.TokenService) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -50,7 +50,7 @@ func WithAuth(tokenSvc domain.TokenService) func(http.Handler) http.Handler {
 				return
 			}
 
-			identity, err := tokenSvc.Read(rawToken)
+			identity, err := tokenSvc.Read(r.Context(), rawToken)
 			if err != nil {
 				writeAuthError(w, r, err)
 				return
@@ -76,6 +76,10 @@ func bearerToken(r *http.Request) (string, bool) {
 func writeAuthError(w http.ResponseWriter, r *http.Request, err error) {
 	if domain.IsTokenRejection(err) {
 		web.StatusUnauthorized(w, r, err)
+		return
+	}
+	if errors.Is(err, domain.ErrKeysUnavailable) {
+		web.StatusServiceUnavailable(w, r, err)
 		return
 	}
 	web.StatusInternalServerError(w, r, err, nil)
