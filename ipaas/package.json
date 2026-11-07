@@ -27,7 +27,7 @@
   "dependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
     "@cfworker/json-schema": "4.1.1",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@monaco-editor/react": "^4.7.0",
     "@tanstack/react-query": "^5.90.20",
     "@thunderid/browser": "1.10.0",
@@ -42,7 +42,7 @@
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
-    "react-router": "7.9.4",
+    "react-router": "7.18.5",
     "react-syntax-highlighter": "^16.1.0",
     "rehype-raw": "^7.0.0",
     "rehype-sanitize": "^6.0.0",
@@ -54,6 +54,7 @@
     "overrides": {
       "axios": "^1.20.0",
       "dompurify": "^3.4.7",
+      "js-yaml@<4.3.2": "^4.3.2",
       "proxy-addr": "^2.0.8",
       "uuid": "^14.0.0"
     },
