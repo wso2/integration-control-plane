@@ -190,8 +190,12 @@ export interface ConnectableEndpointEnvironment {
   detail?: string;
 }
 
-/** An endpoint of the integration's own project, as a link target: `<component>/<endpoint>`. */
-export const projectEndpointId = (e: Pick<ConnectableEndpoint, 'component' | 'endpoint'>): string => `${e.component}/${e.endpoint}`;
+/**
+ * An endpoint as a link target: `<project>/<component>/<endpoint>`. The project is part of it because
+ * the same field takes either kind — this project's endpoint fills a configurable directly, another
+ * project's is reached as a connection — and the BFF tells them apart by the project.
+ */
+export const endpointId = (e: Pick<ConnectableEndpoint, 'project' | 'component' | 'endpoint'>): string => `${e.project}/${e.component}/${e.endpoint}`;
 
 /** What one environment's release uses. */
 export interface EnvironmentLinks {

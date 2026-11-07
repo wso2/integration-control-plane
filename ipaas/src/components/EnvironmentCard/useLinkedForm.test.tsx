@@ -258,7 +258,7 @@ describe('the Configure form with links', () => {
       expect(options.map((o) => o.textContent)).toContain('Basket \u00b7 items');
       expect(options.map((o) => o.textContent)).not.toContain('Catalog \u00b7 books');
       await act(async () => (options.find((o) => o.textContent === 'Basket \u00b7 items') as HTMLElement).click());
-      expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), endpoint: 'basket/items' }]);
+      expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), endpoint: 'shop/basket/items' }]);
     } finally {
       answer.connectable = [];
     }

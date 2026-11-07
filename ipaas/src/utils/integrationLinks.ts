@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { projectEndpointId, type ConnectableEndpoint, type EnvironmentLinks, type IntegrationLinks, type KeyRef, type LinkableResource, type LinkConnection, type OrphanedLink } from '../types/configuration';
+import { endpointId, type ConnectableEndpoint, type EnvironmentLinks, type IntegrationLinks, type KeyRef, type LinkableResource, type LinkConnection, type OrphanedLink } from '../types/configuration';
 
 /** `acme.ghdemo.githubAuthToken` → `acme/ghdemo:githubAuthToken`; a submodule joins its package with a dot. */
 export const configurableId = (configKey: string): string => {
@@ -92,10 +92,11 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
   // the platform resolves its address in each environment.
   const projectEndpoints = connectable.filter((e) => e.scope === 'project');
   const endpointSource = (id: string): FieldSource | undefined => {
-    const match = projectEndpoints.find((e) => projectEndpointId(e) === id);
-    // The component is the first segment; everything after it is the endpoint, which may hold a slash.
-    const slash = id.indexOf('/');
-    const [component, endpoint] = slash < 0 ? [id, id] : [id.slice(0, slash), id.slice(slash + 1)];
+    const match = projectEndpoints.find((e) => endpointId(e) === id);
+    // Project and component are one segment each; the rest is the endpoint, which may hold a slash.
+    const parts = /^([^/]+)\/([^/]+)\/(.+)$/.exec(id);
+    const component = parts?.[2] ?? id;
+    const endpoint = parts?.[3] ?? id;
     return { ref: id, key: match?.endpoint ?? endpoint, name: match?.displayName ?? component, endpoint: true, noValues: false };
   };
   const connectionKey = (id: string) => {
@@ -119,7 +120,7 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
       selected: ownEndpoint ?? (own ? `${own.ref}|${own.key}` : via ? VIA : ENTER),
       endpoints: projectEndpoints.map((e) => {
         const here = e.environments.find((x) => x.name === env);
-        return { id: projectEndpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason, here?.detail) }) };
+        return { id: endpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason, here?.detail) }) };
       }),
       resources: links.resources.map((r) => ({
         id: r.id,
