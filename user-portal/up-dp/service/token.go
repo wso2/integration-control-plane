@@ -19,63 +19,124 @@
 package service
 
 import (
-	"encoding/base64"
-	"encoding/json"
+	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
+	"github.com/lestrrat-go/jwx/v3/jwk"
+	"github.com/lestrrat-go/jwx/v3/jws"
+	"github.com/lestrrat-go/jwx/v3/jwt"
+
+	"github.com/wso2-enterprise/integration-user-portal-service/shared/infrastructure/logging"
 	"github.com/wso2-enterprise/integration-user-portal-service/up-dp/domain"
 )
 
 const clockSkew = 30 * time.Second
 
+// userGrants are the grants that issue a token to a signed-in user. ThunderID gives a
+// refreshed access token its original grant's grant_type, so refresh_token never appears.
+var userGrants = []string{"authorization_code"}
+
+// accessTokenTypes are the typ headers of a JWT access token (RFC 9068 §2.1). The WIdP-DP
+// signs ID tokens, refresh tokens and ID-JAGs with the same keys and other types.
+var accessTokenTypes = []string{"at+jwt", "application/at+jwt"}
+
+type KeyProvider interface {
+	Get(ctx context.Context, kid string) (jwk.Set, error)
+}
+
+type TokenConfig struct {
+	Issuer   string
+	Audience string
+	// ClientID is the portal app. Any app on the WIdP-DP may ask for the portal's resource
+	// as its audience, so a token is the portal's only when the portal app was issued it.
+	ClientID string
+}
+
 type TokenService struct {
+	cfg  TokenConfig
+	keys KeyProvider
 	// now is injected so expiry is testable
 	now func() time.Time
 }
 
-func NewTokenService() domain.TokenService {
-	return &TokenService{now: time.Now}
+func NewTokenService(cfg TokenConfig, keys KeyProvider) domain.TokenService {
+	return &TokenService{cfg: cfg, keys: keys, now: time.Now}
 }
 
-type accessTokenClaims struct {
-	Subject string   `json:"sub"`
-	Expiry  *float64 `json:"exp"`
-	Scope   string   `json:"scope"`
-}
-
-// Read returns the identity rawToken's claims carry.
-func (svc *TokenService) Read(rawToken string) (*domain.TokenIdentity, error) {
-	parts := strings.Split(rawToken, ".")
-	if len(parts) != 3 {
-		return nil, fmt.Errorf("tokenservice:Read: token has %d parts, want 3: %w", len(parts), domain.ErrMalformedToken)
-	}
-
-	payload, err := base64.RawURLEncoding.DecodeString(strings.TrimRight(parts[1], "="))
+// Read verifies rawToken as the WIdP-DP's access token for this portal, issued to the
+// portal app for a signed-in user, and returns the identity its claims carry.
+func (svc *TokenService) Read(ctx context.Context, rawToken string) (*domain.TokenIdentity, error) {
+	// A compact JWS always has exactly one signature.
+	msg, err := jws.Parse([]byte(rawToken), jws.WithCompact())
 	if err != nil {
-		return nil, fmt.Errorf("tokenservice:Read: decode payload: %w", domain.ErrMalformedToken)
+		return nil, fmt.Errorf("tokenservice:Read: parse: %v: %w", err, domain.ErrMalformedToken)
+	}
+	headers := msg.Signatures()[0].ProtectedHeaders()
+	typ, _ := headers.Type()
+	if !slices.Contains(accessTokenTypes, strings.ToLower(typ)) {
+		return nil, fmt.Errorf("tokenservice:Read: typ %q is not an access token's: %w", typ, domain.ErrInvalidToken)
+	}
+	kid, _ := headers.KeyID()
+	if kid == "" {
+		return nil, fmt.Errorf("tokenservice:Read: token names no kid: %w", domain.ErrInvalidToken)
 	}
 
-	var claims accessTokenClaims
-	if err := json.Unmarshal(payload, &claims); err != nil {
-		return nil, fmt.Errorf("tokenservice:Read: parse claims: %w", domain.ErrMalformedToken)
+	set, err := svc.keys.Get(ctx, kid)
+	if err != nil {
+		return nil, fmt.Errorf("tokenservice:Read: %w", err)
 	}
 
-	if claims.Subject == "" {
-		return nil, fmt.Errorf("tokenservice:Read: token carries no subject: %w", domain.ErrMalformedToken)
+	token, err := jwt.Parse([]byte(rawToken),
+		jwt.WithKeySet(set, jws.WithInferAlgorithmFromKey(true)),
+		jwt.WithValidate(false))
+	if err != nil {
+		return nil, fmt.Errorf("tokenservice:Read: verify signature: %v: %w", err, domain.ErrInvalidToken)
 	}
 
-	if claims.Expiry == nil {
-		return nil, fmt.Errorf("tokenservice:Read: token carries no exp: %w", domain.ErrMalformedToken)
+	err = jwt.Validate(token,
+		jwt.WithClock(jwt.ClockFunc(svc.now)),
+		jwt.WithAcceptableSkew(clockSkew),
+		jwt.WithRequiredClaim(jwt.ExpirationKey),
+		jwt.WithIssuer(svc.cfg.Issuer),
+		jwt.WithAudience(svc.cfg.Audience),
+		jwt.WithClaimValue("client_id", svc.cfg.ClientID))
+	switch {
+	case errors.Is(err, jwt.TokenExpiredError()):
+		return nil, fmt.Errorf("tokenservice:Read: %v: %w", err, domain.ErrTokenExpired)
+	case err != nil:
+		return nil, fmt.Errorf("tokenservice:Read: %v: %w", err, domain.ErrInvalidToken)
 	}
-	expiry := time.Unix(int64(*claims.Expiry), 0)
-	if !svc.now().Before(expiry.Add(clockSkew)) {
-		return nil, fmt.Errorf("tokenservice:Read: token expired at %s: %w", expiry.UTC().Format(time.RFC3339), domain.ErrTokenExpired)
+
+	// UP-DP checks no DPoP proof, so a sender-constrained token would pass as a bearer one.
+	if token.Has("cnf") {
+		return nil, fmt.Errorf("tokenservice:Read: token is sender-constrained (cnf): %w", domain.ErrInvalidToken)
+	}
+
+	var grantType string
+	_ = token.Get("grant_type", &grantType)
+	if !slices.Contains(userGrants, grantType) {
+		return nil, fmt.Errorf("tokenservice:Read: grant_type %q is not a user's: %w", grantType, domain.ErrInvalidToken)
+	}
+
+	subject, _ := token.Subject()
+	if subject == "" {
+		return nil, fmt.Errorf("tokenservice:Read: token carries no subject: %w", domain.ErrInvalidToken)
+	}
+
+	// A scope that isn't the RFC 9068 space-separated string reads as no scopes, so the
+	// caller is let in but may do nothing. Log it, or that reaches support as a 403.
+	var scope string
+	if err := token.Get("scope", &scope); err != nil && token.Has("scope") {
+		logging.S(ctx).Warnw("token's scope claim is not a string, so the caller gets no scopes",
+			"subject", subject, "error", err)
 	}
 
 	return &domain.TokenIdentity{
-		UserID: claims.Subject,
-		Scopes: strings.Fields(claims.Scope),
+		UserID: subject,
+		Scopes: strings.Fields(scope),
 	}, nil
 }

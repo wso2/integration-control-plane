@@ -86,9 +86,6 @@ type GatewayConfig struct {
 	// an agent's or a workflow's.
 	UPDPUpstream *url.URL
 
-	// Audiences are the aud values a token for UP-DP may carry. None accepts any.
-	Audiences []string
-
 	// StepDuration is how long one workflow step runs.
 	StepDuration time.Duration
 }
@@ -122,7 +119,6 @@ func Load(ctx context.Context) (Config, error) {
 			JWKSURL:        l.String("GATEWAY_JWKS_URL", ""),
 			Issuer:         l.String("GATEWAY_ISSUER", ""),
 			InsecureTLS:    l.Bool("GATEWAY_INSECURE_TLS", false),
-			Audiences:      l.Strings("GATEWAY_AUDIENCES", []string{}),
 			StepDuration:   l.Duration("MOCK_STEP_DURATION", 4*time.Second),
 		},
 	}
