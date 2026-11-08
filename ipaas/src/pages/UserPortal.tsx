@@ -29,6 +29,7 @@ import EnableUserPortalDialog from '../components/UserPortal/EnableUserPortalDia
 import UserPortalCard from '../components/UserPortal/UserPortalCard';
 import UserPortalSkeleton, { UserPortalUnavailable } from '../components/UserPortal/UserPortalSkeleton';
 import * as styles from '../components/UserPortal/UserPortal.styles';
+import { hasSomeEnvironments } from '../utils/userPortal';
 
 const MANAGE_REFUSAL = "Your role can't enable the User Portal.";
 
@@ -49,10 +50,16 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
   const manageRefusal = can(Scopes.ENVIRONMENT_MANAGE) ? '' : MANAGE_REFUSAL;
 
   const enable = useEnableUserPortal();
+  // A card's Retry is an enable of its own, so opening the Enable dialog can't reset it.
+  const retryEnable = useEnableUserPortal();
   const [enableOpen, setEnableOpen] = useState(false);
-  const [notice, setNotice] = useState<{ text: string; severity: 'info' | 'error' } | null>(null);
-  // The enable a card's Retry started, so only that card shows it running.
-  const [retrying, setRetrying] = useState<string | null>(null);
+  // The last notice stays while the snackbar closes, so it doesn't go blank on its way out.
+  const [notice, setNotice] = useState<{ text: string; severity: 'info' | 'error' }>({ text: '', severity: 'info' });
+  const [noticeOpen, setNoticeOpen] = useState(false);
+  const notify = (text: string, severity: 'info' | 'error') => {
+    setNotice({ text, severity });
+    setNoticeOpen(true);
+  };
 
   const rows = envs.map((environment, i) => ({ environment, query: portals[i] }));
   const enabled = rows.flatMap(({ environment, query }) => (shown(query?.data) ? [{ environment, portal: query.data }] : []));
@@ -72,18 +79,15 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
     enable.mutate(environment, {
       onSuccess: () => {
         setEnableOpen(false);
-        setNotice({ text: 'Setting up the User Portal. It opens once it is ready.', severity: 'info' });
+        notify('Setting up the User Portal. It opens once it is ready.', 'info');
       },
     });
 
-  const retry = (environment: string) => {
-    setRetrying(environment);
-    enable.mutate(environment, {
-      onSuccess: () => setNotice({ text: 'Retrying the User Portal setup.', severity: 'info' }),
-      onError: (err) => setNotice({ text: errorText(err), severity: 'error' }),
-      onSettled: () => setRetrying(null),
+  const retry = (environment: string) =>
+    retryEnable.mutate(environment, {
+      onSuccess: () => notify('Retrying the User Portal setup.', 'info'),
+      onError: (err) => notify(errorText(err), 'error'),
     });
-  };
 
   const enableButton = (label: string) => {
     const refusal = manageRefusal || (available.length === 0 ? 'Every environment has a User Portal.' : '');
@@ -150,7 +154,7 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
         )}
         <Box sx={styles.cardGridSx}>
           {enabled.map(({ environment, portal }) => (
-            <UserPortalCard key={environment.id} environment={environment} portal={portal} manageRefusal={manageRefusal} retrying={retrying === environment.id} onRetry={() => retry(environment.id)} />
+            <UserPortalCard key={environment.id} environment={environment} portal={portal} manageRefusal={manageRefusal} retrying={retryEnable.isPending && retryEnable.variables === environment.id} onRetry={() => retry(environment.id)} />
           ))}
         </Box>
       </Stack>
@@ -171,11 +175,11 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
       )}
       {body()}
 
-      {enableOpen && <EnableUserPortalDialog environments={available} isPending={enable.isPending} error={enable.isError ? errorText(enable.error) : null} onEnable={startEnable} onClose={() => setEnableOpen(false)} />}
+      {enableOpen && hasSomeEnvironments(available) && <EnableUserPortalDialog environments={available} isPending={enable.isPending} error={enable.isError ? errorText(enable.error) : null} onEnable={startEnable} onClose={() => setEnableOpen(false)} />}
 
-      <Snackbar open={!!notice} autoHideDuration={4000} onClose={() => setNotice(null)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert onClose={() => setNotice(null)} severity={notice?.severity ?? 'info'} variant="filled">
-          {notice?.text}
+      <Snackbar open={noticeOpen} autoHideDuration={4000} onClose={() => setNoticeOpen(false)} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={() => setNoticeOpen(false)} severity={notice.severity} variant="filled">
+          {notice.text}
         </Alert>
       </Snackbar>
     </PageContent>

@@ -16,9 +16,35 @@
  * under the License.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
-import { toUserPortal, toUserPortalPublishability } from './userPortal';
+import { fetchDeploymentPipeline } from './deploymentPipelines';
+import { fetchAllEnvironments } from './environments';
+import { fetchUserPortalEnvironments, toUserPortal, toUserPortalPublishability } from './userPortal';
+import type { DeploymentPipeline, PromotionTreeNode } from '../types/deploymentPipeline';
+import type { Environment } from '../types/environment';
+
+vi.mock('./environments', () => ({ fetchAllEnvironments: vi.fn() }));
+vi.mock('./deploymentPipelines', () => ({ DEFAULT_PIPELINE_NAME: 'default', fetchDeploymentPipeline: vi.fn() }));
+
+const env = (id: string): Environment => ({ id, name: id, critical: id === 'production' });
+const node = (id: string, ...children: PromotionTreeNode[]): PromotionTreeNode => ({ env_template_id: id, env_name: id, ...(children.length ? { children } : {}) });
+const pipeline = (...roots: PromotionTreeNode[]): DeploymentPipeline => ({ id: 'default', created_at: '', organization_uuid: '', name: 'default', is_default: true, promotion_tree: { name: 'Root', children: roots } });
+
+describe('fetchUserPortalEnvironments', () => {
+  it("lists the default pipeline's environments, in promotion order", async () => {
+    vi.mocked(fetchAllEnvironments).mockResolvedValue([env('production'), env('sandbox'), env('development')]);
+    vi.mocked(fetchDeploymentPipeline).mockResolvedValue(pipeline(node('development', node('production'))));
+    expect((await fetchUserPortalEnvironments()).map((e) => e.id)).toEqual(['development', 'production']);
+  });
+
+  // ipaas-service knows only the environments a promotion path names, so it would refuse every one.
+  it('lists none when the default pipeline has no promotion paths', async () => {
+    vi.mocked(fetchAllEnvironments).mockResolvedValue([env('development'), env('production')]);
+    vi.mocked(fetchDeploymentPipeline).mockResolvedValue(pipeline());
+    expect(await fetchUserPortalEnvironments()).toEqual([]);
+  });
+});
 
 describe('toUserPortal', () => {
   it('reads an environment with no portal as not enabled', () => {
@@ -34,6 +60,12 @@ describe('toUserPortal', () => {
     for (const state of ['PENDING', 'APPLIED', 'MIGRATING']) {
       expect(toUserPortal({ environment: 'prod', enabled: true, state }).state).toBe('setting-up');
     }
+  });
+
+  // Read as setting up, these would poll forever.
+  it('reads an enabled portal in an unknown state, or none, as failed, saying why', () => {
+    expect(toUserPortal({ environment: 'prod', enabled: true, state: 'PAUSED' })).toEqual({ environment: 'prod', state: 'failed', error: "The User Portal is in a state the console doesn't know: PAUSED." });
+    expect(toUserPortal({ environment: 'prod', enabled: true })).toEqual({ environment: 'prod', state: 'failed', error: 'ipaas-service reported no state for the User Portal.' });
   });
 
   it('reads a finished provision as active, with its URL', () => {

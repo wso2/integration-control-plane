@@ -82,6 +82,10 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
     unpublish.reset();
     publish.mutate({ componentId, environment }, { onSuccess: (out) => setRejectedScopes(out.rejectedScopes) });
   };
+  const closeUnpublish = () => {
+    unpublish.reset();
+    setConfirmUnpublish(false);
+  };
   const startUnpublish = () => {
     publish.reset();
     setRejectedScopes([]);
@@ -126,9 +130,10 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
         </Stack>
       )}
 
-      {(publish.isError || unpublish.isError) && (
+      {/* An unpublish failure shows in its confirm dialog, which stays open on it. */}
+      {publish.isError && (
         <Typography variant="caption" color="error" component="p" sx={{ mt: 0.5 }}>
-          {errorText(publish.error ?? unpublish.error)}
+          {errorText(publish.error)}
         </Typography>
       )}
       {rejectedScopes.length > 0 && (
@@ -138,7 +143,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
       )}
 
       {confirmUnpublish && (
-        <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={() => setConfirmUnpublish(false)} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
+        <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
           <Typography variant="body2">The User Portal&apos;s users no longer see this integration there. The integration keeps running.</Typography>
           {unpublish.isError && (
             <Typography variant="body2" color="error" sx={{ mt: 2 }}>

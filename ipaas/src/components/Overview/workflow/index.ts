@@ -21,7 +21,6 @@ import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from '../integration-as-api/HeaderStatus';
 import EnvCardActions from '../integration-as-api/EnvCardActions';
 import EnvCardBody from './EnvCardBody';
-import UserPortalFooter from '../_shared/UserPortalFooter';
 import DeployAction from './DeployAction';
 
 /**
@@ -35,7 +34,6 @@ const workflowModule: IntegrationModule = {
   HeaderStatus,
   EnvCardActions,
   EnvCardBody,
-  EnvCardFooter: UserPortalFooter,
   DeployAction,
 };
 

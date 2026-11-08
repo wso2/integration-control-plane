@@ -36,8 +36,7 @@ import { identifyIntegration } from '../utils/identifyIntegration';
 import { getDisplayLabel } from '../constants/integrations';
 import { AUTO_DEPLOY_AVAILABLE } from '../constants/build';
 import { hasIntegrationTraces } from '../utils/integrationTraces';
-
-const USER_PORTAL_TYPES: ReadonlySet<string> = new Set(['ai-agent', 'automation', 'workflow']);
+import { USER_PORTAL_TYPES } from '../constants/userPortal';
 
 export default function Deploy(scope: ComponentScope): JSX.Element {
   const isProjectUuid = UUID_RE.test(scope.project);

@@ -58,7 +58,7 @@ function useWritePortal(write: (environment: string) => Promise<UserPortal>) {
     onSuccess: (portal) => {
       qc.setQueryData([ROOT_KEY, 'portal', portal.environment], portal);
       // A disable unpublishes the portal's integrations, and an enable changes what can be published.
-      void qc.invalidateQueries({ queryKey: [ROOT_KEY] });
+      void qc.invalidateQueries({ queryKey: [ROOT_KEY, 'publishability'] });
     },
   });
 }
@@ -68,11 +68,11 @@ export const useEnableUserPortal = () => useWritePortal(enableUserPortal);
 export const useDisableUserPortal = () => useWritePortal(disableUserPortal);
 
 /** Whether the integration is, and can be, published to the environment's User Portal. */
-export function useUserPortalPublishability(componentId: string, environment: string, enabled = true) {
+export function useUserPortalPublishability(componentId: string, environment: string) {
   return useQuery({
     queryKey: [ROOT_KEY, 'publishability', componentId, environment],
     queryFn: () => fetchUserPortalPublishability(componentId, environment),
-    enabled: enabled && !!componentId && !!environment,
+    enabled: !!componentId && !!environment,
     retry: (failures, err) => !isUserPortalUnavailable(err) && failures < 2,
     staleTime: 30_000,
   });
