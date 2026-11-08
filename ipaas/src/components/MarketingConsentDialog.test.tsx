@@ -27,7 +27,7 @@ import type { MarketingConsent } from '../types/marketingConsent';
 vi.mock('../api/marketingConsent', () => ({ fetchMarketingConsent: vi.fn(), recordMarketingConsent: vi.fn() }));
 vi.mock('../auth', () => ({ useAuth: () => ({ userId: 'u1' }) }));
 
-const TITLE = 'Welcome to WSO2 Integration Platform!';
+const TITLE = 'Welcome to WSO2 Cloud!';
 const unanswered: MarketingConsent = { optoutOfEmails: false, consentStatus: 'No Opt-in' };
 
 let unmount = () => {};

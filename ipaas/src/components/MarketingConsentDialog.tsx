@@ -40,11 +40,11 @@ export default function MarketingConsentDialog(): JSX.Element | null {
 
   return (
     <Dialog open disableEscapeKeyDown maxWidth="sm" fullWidth aria-labelledby="marketing-consent-title">
-      <DialogTitle id="marketing-consent-title">Welcome to WSO2 Integration Platform!</DialogTitle>
+      <DialogTitle id="marketing-consent-title">Welcome to WSO2 Cloud!</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
           <Typography variant="subtitle1">Don&apos;t miss out on our latest updates and events</Typography>
-          <DialogContentText>Send me product updates, resources, and event invites for WSO2 Integration Platform.</DialogContentText>
+          <DialogContentText>Send me product updates, resources, and event invites for WSO2 Cloud.</DialogContentText>
           <DialogContentText>
             Our usage is always subject to our{' '}
             <Link href={privacyPolicyUrl()} target="_blank" rel="noopener noreferrer">
