@@ -30,7 +30,8 @@ import { savedValue } from '../../../utils/savedConfig';
  * caller fetches `useSchemaConfig` (de-duplicated by react-query) and passes
  * the result here. Drives the Configure button colour/label ("Configure to
  * Continue") and the disabling of Run/Schedule actions. A configurable counts
- * as filled where env's release links it to a resource with values there.
+ * as filled where it has a value of its own, where env's release links it to a
+ * resource with values there, or where an endpoint fills it.
  */
 export function hasMissingRequiredConfigs(schemaConfig: SchemaConfigData | null | undefined, links?: IntegrationLinks, env = ''): boolean {
   if (!schemaConfig?.jsonSchema) return false;
@@ -38,7 +39,11 @@ export function hasMissingRequiredConfigs(schemaConfig: SchemaConfigData | null 
     const schema = JSON.parse(atob(schemaConfig.jsonSchema));
     const allRequired = getRequiredPathsAtLevel(schema).filter((p) => !p.includes('[*]') && !p.includes('.*'));
     if (allRequired.length === 0) return false;
-    const filledKeys = new Set([...(schemaConfig.configurations ?? []).filter((c) => savedValue(c) !== undefined).map((c) => c.key), ...linkedWithValues(links, env)]);
+    const filledKeys = new Set([
+      ...(schemaConfig.configurations ?? []).filter((c) => savedValue(c) !== undefined).map((c) => c.key),
+      ...linkedWithValues(links, env),
+      ...linkedToEndpoints(links),
+    ]);
     return allRequired.some((k) => !filledKeys.has(k));
   } catch {
     return false;
@@ -48,6 +53,12 @@ export function hasMissingRequiredConfigs(schemaConfig: SchemaConfigData | null 
 const release = (links: IntegrationLinks | undefined, env: string) => links?.environments.find((e) => e.name === env);
 const hasValues = (links: IntegrationLinks, ref: string, env: string) => !!links.resources.find((r) => r.id === ref)?.valuesIn.includes(env);
 const linkedWithValues = (links: IntegrationLinks | undefined, env: string) => Object.entries(release(links, env)?.configurables ?? {}).flatMap(([id, { ref }]) => (hasValues(links!, ref, env) ? [configKey(id)] : []));
+
+/**
+ * The configurables an endpoint fills. They are asked for nowhere else: the endpoint has no values of
+ * ours and no resource to hold them, because the platform resolves its address in each environment.
+ */
+const linkedToEndpoints = (links: IntegrationLinks | undefined) => Object.keys(links?.endpointLinks ?? {}).map(configKey);
 
 /** `hasMissingRequiredConfigs` in env with the integration's links, read once the schema has configurables. */
 export function useMissingRequiredConfigs(schemaConfig: SchemaConfigData | null | undefined, projectId: string, componentId: string, env: string): boolean {

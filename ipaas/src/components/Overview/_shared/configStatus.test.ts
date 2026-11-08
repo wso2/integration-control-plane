@@ -79,6 +79,24 @@ describe('hasMissingRequiredConfigs', () => {
     expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, noValues, 'development')).toBe(true);
   });
 
+  // An endpoint fills a configurable with an address the platform resolves in each environment: there
+  // is no resource behind it and no value of ours, so asking for one would keep the card on Configure
+  // to Continue for a setting that is already supplied.
+  it('counts the configurables an endpoint fills as filled', () => {
+    const endpoints = {
+      ...link({}),
+      endpointLinks: { 'wso2/sftask:sfSalesBaseUrl': 'shop/basket/items', 'wso2/sftask:sfSalesAuthClientId': 'shop/basket/items' },
+    };
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, endpoints, 'development')).toBe(false);
+    // And outside the first environment: the address is resolved there too.
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, endpoints, 'production')).toBe(false);
+  });
+
+  it('still asks for a required configurable an endpoint fills only in part', () => {
+    const one = { ...link({}), endpointLinks: { 'wso2/sftask:sfSalesBaseUrl': 'shop/basket/items' } };
+    expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, one, 'development')).toBe(true);
+  });
+
   it('still asks for a required configurable no link supplies', () => {
     const partial = link({ 'wso2.sftask.sfSalesBaseUrl': 'SALESFORCE_BASE_URL' });
     expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, partial, 'development')).toBe(true);
