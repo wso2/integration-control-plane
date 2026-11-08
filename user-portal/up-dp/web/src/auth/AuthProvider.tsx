@@ -128,7 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo<AuthValue>(() => {
     const id = claimsOf(tokens?.idToken);
     const text = (key: string) => (typeof id[key] === 'string' && id[key] ? (id[key] as string) : undefined);
-    const displayName = text('name') || text('preferred_username') || text('email') || i18n.t('common.unnamedUser');
+    // IdPs that leave out `name` often still send its parts; only then fall back to the username or email.
+    const fullName = [text('given_name'), text('family_name')].filter(Boolean).join(' ');
+    const displayName = text('name') || fullName || text('preferred_username') || text('email') || i18n.t('common.unnamedUser');
     const scopes = scopesOf(tokens);
     return {
       status: status === 'ready' && !tokens ? 'loading' : status,
