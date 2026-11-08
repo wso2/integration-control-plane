@@ -35,6 +35,7 @@ import { useOrgUuid } from '../../../hooks/useOrgUuid';
 import { getDisplayLabel } from '../../../constants/integrations';
 import SetupInstructionsButton from './SetupInstructionsButton';
 import type { IntegrationModule } from '../../../types/integration';
+import type { Environment } from '../../../types/environment';
 import { withBase } from '../../../utils/basePath';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
@@ -47,6 +48,9 @@ interface ComponentHeaderProps {
   latestCommit?: Commit | null;
   orgHandler: string;
   projectId: string;
+  /** The project's environments and the selected track, for the module's header actions. */
+  environments: Environment[];
+  versionId: string;
   module?: IntegrationModule | null;
   /**
    * Whether the component has a source repo. False for proxy/converted
@@ -64,7 +68,7 @@ const repoLinkSx = { color: 'text.primary', textDecoration: 'none', '&:hover': {
 /** The repository as `org/repo/...`: the provider icon already says which host it is. */
 const repoPathOf = (url: string): string => url.replace(/^https?:\/\/[^/]+\//, '');
 
-export default function ComponentHeader({ component, repository, latestCommit, orgHandler, projectId, module, hasSource = true, isRepositoryLoading = false, isLatestCommitLoading = false }: ComponentHeaderProps) {
+export default function ComponentHeader({ component, repository, latestCommit, orgHandler, projectId, environments, versionId, module, hasSource = true, isRepositoryLoading = false, isLatestCommitLoading = false }: ComponentHeaderProps) {
   const { userId } = useAuth();
   const [copied, setCopied] = useState(false);
   const [labelDialogOpen, setLabelDialogOpen] = useState(false);
@@ -199,6 +203,7 @@ export default function ComponentHeader({ component, repository, latestCommit, o
   // Open-in-Cloud editor entry: only for components with a source repo and types
   // that don't opt out of it (e.g. MCP sets `hideOpenInEditor`).
   const showOpenInEditor = hasSource && !module?.hideOpenInEditor && can(Scopes.EDITOR_USE);
+  const HeaderActions = module?.HeaderActions;
 
   const repoUrl = repository ? buildRepoBrowseUrl(repository) : null;
   const ProviderIcon = getGitProviderIcon(repository?.gitProvider);
@@ -534,6 +539,8 @@ export default function ComponentHeader({ component, repository, latestCommit, o
               </Button>
             </Box>
           )}
+
+          {HeaderActions && <HeaderActions component={component} environments={environments} versionId={versionId} projectId={projectId} orgHandler={orgHandler} />}
 
           {/* Prebuilt integrations expose a "How to setup this integration" guide. */}
           <SetupInstructionsButton repository={repository ?? null} />

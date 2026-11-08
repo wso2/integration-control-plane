@@ -18,7 +18,9 @@
 
 import { useMutation, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { fetchCertificateGroups, fetchConfigGroups, fetchCertificateMappings, fetchSchemaConfig, fetchConfigMgt, saveSchemaConfig, postConfigMgt, postCertificateMappings, fetchIntegrationLinks, writeLink } from '../api/configuration';
-import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, LinkWrite, LinkWriteInput } from '../types/configuration';
+import type { CertMapping, SchemaConfigItem, SaveSchemaConfigInput, PostConfigMgtInput, IntegrationLinks, LinkWrite, LinkWriteInput } from '../types/configuration';
+import type { PromoteInput } from '../types/deployment';
+import { sameLinks } from '../utils/integrationLinks';
 
 export function useCertificateGroups(projectId: string, componentId: string, enabled: boolean) {
   return useQuery({
@@ -108,7 +110,7 @@ export function useIntegrationLinks(projectId: string, componentId: string, enab
     queryFn: () => fetchIntegrationLinks(projectId, componentId),
     enabled: enabled && !!projectId && !!componentId,
     retry: false,
-    refetchInterval: (query) => (query.state.data?.environments[0]?.linksNeedDeploy && rollingOut(qc, projectId, componentId) ? ROLLOUT_POLL_MS : false),
+    refetchInterval: (query) => (query.state.data && rollingOut(qc, query.state.data, projectId, componentId) ? ROLLOUT_POLL_MS : false),
   });
 }
 
@@ -127,12 +129,18 @@ export function useLinkWrite() {
 const ROLLOUT_POLL_MS = 3000;
 const ROLLOUT_WINDOW_MS = 120_000;
 
-// After a write that updates the Workload, OpenChoreo releases it to development; the links follow until the release has them.
-const rollingOut = (qc: QueryClient, projectId: string, componentId: string, now = Date.now()) =>
+// OpenChoreo changes a release after the write: development's after a link write that updates the Workload, the
+// target's after a promote. The links follow until the release has it.
+const rollingOut = (qc: QueryClient, links: IntegrationLinks, projectId: string, componentId: string, now = Date.now()) =>
   qc
     .getMutationCache()
-    .findAll({ mutationKey: ['linkWrite'], status: 'success' })
+    .findAll({ status: 'success', predicate: (m) => ['linkWrite', 'promote'].includes(m.options.mutationKey?.[0] as string) })
     .some((m) => {
+      if (now >= m.state.submittedAt + ROLLOUT_WINDOW_MS) return false;
+      if (m.options.mutationKey?.[0] === 'promote') {
+        const p = m.state.variables as PromoteInput;
+        return p.componentId === componentId && !sameLinks(links, p.sourceEnvironmentId, p.targetEnvironmentId);
+      }
       const vars = m.state.variables as LinkWriteInput;
-      return vars.projectId === projectId && vars.componentId === componentId && (m.state.data as LinkWrite).workload === 'updated' && now < m.state.submittedAt + ROLLOUT_WINDOW_MS;
+      return vars.projectId === projectId && vars.componentId === componentId && (m.state.data as LinkWrite).workload === 'updated' && !!links.environments[0]?.linksNeedDeploy;
     });

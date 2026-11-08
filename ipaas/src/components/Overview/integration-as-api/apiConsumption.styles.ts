@@ -94,10 +94,6 @@ export const subCardTitle = {
   fontWeight: 500,
 } as const;
 
-export const textAction = {
-  textTransform: 'none',
-} as const;
-
 export const loadingRow = {
   display: 'flex',
   justifyContent: 'center',
@@ -175,28 +171,12 @@ export const consumerDeleteButton = {
   },
 } as const;
 
-/** `divider` disappears at this length, so it borrows the disabled-text tone. */
-export const titleDivider = {
-  mx: 0.5,
-  my: 0.25,
-  borderColor: 'text.disabled',
-} as const;
-
 /** Icon actions inside a credential field (copy, reveal). */
 export const credIconButton = {
   color: 'primary.main',
   '&:hover': {
     bgcolor: 'primary.lighter',
   },
-} as const;
-
-export const securityModeGroup = {
-  whiteSpace: 'nowrap',
-} as const;
-
-export const securityModeValue = {
-  fontWeight: 600,
-  color: 'text.primary',
 } as const;
 
 export const fieldLabel = {
@@ -234,4 +214,90 @@ export const credValue = {
   whiteSpace: 'nowrap',
   fontFamily: 'monospace',
   fontSize: 12.5,
+} as const;
+
+/** A titled group inside the security drawer. */
+export const sectionTitle = {
+  mb: 1.5,
+} as const;
+
+export const sectionDescription = {
+  mt: -0.75,
+  mb: 1.5,
+} as const;
+
+/** One operation's scope inputs in the security drawer. */
+export const operationScopes = {
+  p: 1.5,
+  borderRadius: 1,
+  border: '1px solid',
+  borderColor: 'divider',
+} as const;
+
+export const operationHeading = {
+  mb: 1,
+  minWidth: 0,
+} as const;
+
+export const methodChip = {
+  height: 20,
+  fontSize: '0.65rem',
+  fontWeight: 600,
+} as const;
+
+export const operationPath = {
+  fontFamily: 'monospace',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+} as const;
+
+export const scopeField = {
+  flex: 1,
+  minWidth: 0,
+} as const;
+
+/** A subcard header that opens and closes its body when clicked. */
+export const collapsibleHeader = {
+  ...subCardHeader,
+  cursor: 'pointer',
+} as const;
+
+/** Label/value rows of an environment's security summary. */
+export const summaryGrid = {
+  mt: 1.5,
+  display: 'grid',
+  gridTemplateColumns: { xs: '1fr', sm: 'max-content 1fr' },
+  columnGap: 2,
+  rowGap: 0.75,
+  alignItems: 'baseline',
+} as const;
+
+export const summaryLabel = {
+  color: 'text.secondary',
+} as const;
+
+export const summaryCode = {
+  fontFamily: 'monospace',
+  fontSize: 12.5,
+  wordBreak: 'break-all',
+} as const;
+
+/** Sets the header's "Configure security" link a little apart from Open in Cloud Editor above it. */
+export const securityLinkTarget = {
+  display: 'inline-flex',
+  mt: 1,
+} as const;
+
+/** The header's "Configure security" link. */
+export const securityLink = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 0.5,
+  whiteSpace: 'nowrap',
+  '&:disabled': {
+    color: 'text.disabled',
+    cursor: 'default',
+    textDecoration: 'none',
+  },
 } as const;

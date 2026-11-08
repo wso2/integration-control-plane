@@ -24,12 +24,12 @@ import ProfileRoles from './ProfileRoles';
  * user's name and email, and their roles under them as the Devant User Portal shows them.
  * UserMenu.Header takes no children.
  */
-export default function ProfileHeader({ name, email, avatar, roles, org }: { name: string; email?: string; avatar: string; roles: string[]; org?: string }) {
+export default function ProfileHeader({ name, email, initials, picture, roles, org }: { name: string; email?: string; initials: string; picture?: string; roles: string[]; org?: string }) {
   return (
     <>
       <Box sx={{ p: 2, pb: 1.5, minWidth: 280, maxWidth: 360, display: 'grid', gridTemplateColumns: 'auto minmax(0, 1fr)', alignItems: 'center', columnGap: 2 }}>
-        <Avatar alt={name} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 16, fontWeight: 600 }}>
-          {avatar}
+        <Avatar alt={name} src={picture} sx={{ width: 40, height: 40, bgcolor: 'primary.main', color: 'primary.contrastText', fontSize: 16, fontWeight: 600 }}>
+          {initials}
         </Avatar>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25, minWidth: 0 }}>
           {org && (

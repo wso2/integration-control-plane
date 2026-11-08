@@ -33,10 +33,15 @@ const links: IntegrationLinks = {
   resources: [
     { id: 'github-acme', displayName: 'GitHub Acme', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
     { id: 'orders-db', displayName: 'orders-db', keys: [{ name: 'URL', secret: false }], valuesIn: ['development'] },
+    { id: 'github-sandbox', displayName: 'GitHub Sandbox', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
+    { id: 'github-corp', displayName: 'GitHub Corp', keys: [{ name: 'GITHUB_AUTH_TOKEN', secret: true }], valuesIn: ['development'] },
   ],
-  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken') },
+  used: { 'github-acme|GITHUB_AUTH_TOKEN': id('githubAuthToken'), 'github-corp|GITHUB_AUTH_TOKEN': id('otherToken') },
   usedByOrphaned: { 'orders-db|URL': id('ordersDbUrl') },
-  connections: [{ id: id('github'), link: 'github-acme', suggestions: [], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] }],
+  connections: [
+    { id: id('github'), link: 'github-acme', suggestions: ['github-acme', 'github-sandbox', 'github-corp'], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] },
+    { id: id('backup'), suggestions: ['github-sandbox', 'github-corp'], fields: [{ configurable: id('backupToken') }] },
+  ],
   fieldLinks: {},
   orphaned: [{ target: id('ordersDbUrl'), kind: 'configurable', ref: 'orders-db', key: 'URL' }],
   env: {},
@@ -61,7 +66,16 @@ const schema = {
   type: 'object',
   requiredLevel: 3,
   properties: {
-    acme: { type: 'object', properties: { ghdemo: { type: 'object', required: ['githubAuthToken', 'ordersDatabaseUrl'], properties: { githubAuthToken: { type: 'string', description: '' }, ordersDatabaseUrl: { type: 'string', description: '' } } } } },
+    acme: {
+      type: 'object',
+      properties: {
+        ghdemo: {
+          type: 'object',
+          required: ['githubAuthToken', 'ordersDatabaseUrl'],
+          properties: { githubAuthToken: { type: 'string', description: '' }, ordersDatabaseUrl: { type: 'string', description: '' }, backupToken: { type: 'string', description: '' } },
+        },
+      },
+    },
   },
 } as unknown as JSONSchema;
 
@@ -115,6 +129,45 @@ describe('the Configure form with links', () => {
     expect(writes).toEqual([{ connection: id('github') }]);
   });
 
+  it("offers the resources that suit an unlinked connection in its title bar, leaving a used key to the service's refusal", async () => {
+    const select = container.querySelector('[aria-label="Link backup"]') as HTMLElement;
+    expect(select.textContent).toBe('Link… (2 match)');
+    await act(async () => select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    const options = Array.from(document.querySelectorAll('[role="option"]'));
+    expect(options.map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+      ['GitHub Sandbox', null],
+      ['GitHub Corp', null],
+    ]);
+    await act(async () => (options[0] as HTMLElement).click());
+    expect(writes).toEqual([{ connection: id('backup'), ref: 'github-sandbox' }]);
+  });
+
+  it("offers a linked connection's other resources, except one whose key another target uses", async () => {
+    await act(async () => (container.querySelector('[aria-label="Link github"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(Array.from(document.querySelectorAll('[role="option"]')).map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+      ['GitHub Acme', null],
+      ['GitHub Sandbox', null],
+      ['GitHub Corp (key in use)', 'true'],
+    ]);
+  });
+
+  it('offers a resource whose key only a link the build lost holds, as for a renamed connection', async () => {
+    const [used, usedByOrphaned] = [links.used, links.usedByOrphaned];
+    const { 'github-corp|GITHUB_AUTH_TOKEN': _, ...rest } = used;
+    Object.assign(links, { used: rest, usedByOrphaned: { ...usedByOrphaned, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') } });
+    try {
+      await act(async () => root.render(<Form />));
+      await act(async () => (container.querySelector('[aria-label="Link github"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+      expect(Array.from(document.querySelectorAll('[role="option"]')).map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+        ['GitHub Acme', null],
+        ['GitHub Sandbox', null],
+        ['GitHub Corp', null],
+      ]);
+    } finally {
+      Object.assign(links, { used, usedByOrphaned });
+    }
+  });
+
   it('offers no link action while a link write is on its way', async () => {
     answer.pending = true;
     await act(async () => root.render(<Form />));
@@ -126,6 +179,7 @@ describe('the Configure form with links', () => {
       ['Move', true],
       ['Remove', true],
     ]);
+    expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
   });
 
   it("says the links couldn't be read, with Try again, and offers no link action or save", async () => {
@@ -151,6 +205,7 @@ describe('the Configure form with links', () => {
     expect(container.textContent).toContain("Couldn't refresh this integration's links. These are from the last read.");
     expect(container.textContent).toContain('githubLinked to GitHub Acme');
     expect(['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map((l) => button(l).disabled)).toEqual([true, true, true, true, true]);
+    expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
   });
 
   it("offers a link icon on a simple-typed configurable only, not on a record's members", async () => {

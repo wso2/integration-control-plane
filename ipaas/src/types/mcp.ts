@@ -43,8 +43,8 @@ export interface McpToolParameter {
 
 export type McpConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'error';
 
-/** `blocked` is a response the browser withheld (no CORS headers), so its status is unreadable. */
-export type McpErrorKind = 'auth' | 'blocked' | 'other';
+/** `blocked` is a response the browser withheld (no CORS headers), so its status is unreadable. `redirect` is a 3xx the transport refused to follow. */
+export type McpErrorKind = 'auth' | 'blocked' | 'redirect' | 'other';
 
 export type McpHistoryEventType = 'request' | 'response' | 'error' | 'info';
 

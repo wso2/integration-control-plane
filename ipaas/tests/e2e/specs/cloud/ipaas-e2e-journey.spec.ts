@@ -1045,7 +1045,7 @@ test.describe('07 page availability @smoke', () => {
     await expectPageRendered(page, `organizations/${orgHandler}/settings`);
   });
 
-  const SECTION_IDS: Record<(typeof CLOUD_SECTIONS)[number], string> = { 'Package registries': 'TC_IP_SET_003' };
+  const SECTION_IDS: Record<(typeof CLOUD_SECTIONS)[number], string> = { 'Package registries': 'TC_IP_SET_003', 'User Portal': 'TC_IP_SET_006' };
   for (const section of CLOUD_SECTIONS) {
     test(`${SECTION_IDS[section]} organization settings offers "${section}"`, async () => {
       await expectPageRendered(page, `organizations/${orgHandler}/settings`);
@@ -1066,6 +1066,12 @@ test.describe('07 page availability @smoke', () => {
 
   test('TC_IP_SET_005 package registries page exists', async () => {
     await expectPageRendered(page, `organizations/${orgHandler}/settings/package-registries`);
+  });
+
+  test('TC_IP_SET_007 user portal page exists', async () => {
+    await expectPageRendered(page, `organizations/${orgHandler}/settings/user-portal`);
+    // The Configure heading is on every section, so the selected tab is what says this one rendered.
+    await expect(page.getByRole('tab', { name: 'User Portal', selected: true })).toBeVisible({ timeout: 30_000 });
   });
 });
 

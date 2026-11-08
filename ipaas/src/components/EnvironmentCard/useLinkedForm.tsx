@@ -18,12 +18,12 @@
 
 import { useMemo, type ReactNode } from 'react';
 import { Alert, Button, Stack, Typography } from '@wso2/oxygen-ui';
-import { Unlink } from '@wso2/oxygen-ui-icons-react';
 import { BffError } from '../../api/_client';
 import { useEnvironments } from '../../hooks/useEnvironments';
 import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration';
 import type { IntegrationLinks, LinkTarget } from '../../types/configuration';
 import { configKey, configurableId, formLinkView, targetName } from '../../utils/integrationLinks';
+import { ConnectionLink } from './ConnectionLink';
 import { OrphanedLinks } from './OrphanedLinks';
 import type { FormGroup } from '../SchemaConfigForm/ConfigForm';
 import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
@@ -62,18 +62,14 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
         <Typography variant="subtitle2" sx={{ fontFamily: 'monospace' }}>
           {targetName(c.id)}
         </Typography>
-        {linked && (
+        {!view.editable && linked && (
           <Typography variant="caption" color="text.secondary">
             Linked to {linked.displayName}
           </Typography>
         )}
       </Stack>
     ),
-    actions: view.editable && !view.sourceDefined && c.link && (
-      <Button size="small" variant="outlined" color="error" startIcon={<Unlink size={14} />} disabled={write.isPending || linksUnread} onClick={() => change({ connection: c.id })} aria-label={`Unlink ${targetName(c.id)}`}>
-        Unlink
-      </Button>
-    ),
+    actions: view.editable && !view.sourceDefined && <ConnectionLink connection={c} links={links} busy={write.isPending || linksUnread} onLink={(ref) => change(ref ? { connection: c.id, ref } : { connection: c.id })} />,
     note: note && (
       <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
         {note}

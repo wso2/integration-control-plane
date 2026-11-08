@@ -20,7 +20,10 @@ import { Alert, DialogContentText, TextField } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
 import { useDeleteProject } from '../hooks/useProjects';
 import type { Project } from '../types/project';
+import { apiErrorMessage, httpStatusOf } from '../utils/apiErrors';
 import ConfirmDeleteDialog from './ConfirmDeleteDialog';
+
+const DELETE_FAILED = 'Failed to delete the project. Please try again.';
 
 /** Confirms a project deletion by having the user type the project name. */
 export default function DeleteProjectDialog({ project, onClose }: { project: Project; onClose: () => void }): JSX.Element {
@@ -33,7 +36,9 @@ export default function DeleteProjectDialog({ project, onClose }: { project: Pro
       onSuccess: onClose,
       onError: (e) => {
         console.error('Failed to delete project', e);
-        setError('Failed to delete the project. Please try again.');
+        // A 409 is a refusal a retry can't change (an MCP server Agent Manager agents use, an integration
+        // published to the User Portal), so the BFF's own sentence says what to do first.
+        setError(httpStatusOf(e) === 409 ? apiErrorMessage(e, DELETE_FAILED) : DELETE_FAILED);
       },
     });
 

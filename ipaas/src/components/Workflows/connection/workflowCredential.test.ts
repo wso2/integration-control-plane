@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { CALLER_ASSERTION_HEADER, testKeyNotice, testKeyReasonOf, workflowRequestHeaders } from './workflowCredential';
+import { testKeyNotice, testKeyReasonOf, workflowRequestHeaders } from './workflowCredential';
 
 /** A failed BFF read, as `httpStatusOf` sees it. */
 const failed = (status: number) => Object.assign(new Error(`HTTP ${status}`), { status });
@@ -35,20 +35,16 @@ const access = (patch: Partial<Parameters<typeof testKeyReasonOf>[0]> = {}) => (
 });
 
 describe('workflowRequestHeaders', () => {
-  it('sends the test key in the gateway’s header and the caller’s token as an assertion', () => {
-    expect(workflowRequestHeaders({ authHeader: 'X-API-Key', apiKey: 'key-1' }, 'user-token')).toEqual({
-      'X-API-Key': 'key-1',
-      [CALLER_ASSERTION_HEADER]: 'Bearer user-token',
-    });
+  it('sends the test key in the gateway’s header, and nothing else', () => {
+    expect(workflowRequestHeaders({ authHeader: 'X-API-Key', apiKey: 'key-1' })).toEqual({ 'X-API-Key': 'key-1' });
   });
 
   it('uses whatever header the gateway’s policy names', () => {
-    expect(workflowRequestHeaders({ authHeader: 'Internal-Key', apiKey: 'key-1' }, null)).toEqual({ 'Internal-Key': 'key-1' });
+    expect(workflowRequestHeaders({ authHeader: 'Internal-Key', apiKey: 'key-1' })).toEqual({ 'Internal-Key': 'key-1' });
   });
 
-  it('sends only the assertion to an open API, and never an empty credential', () => {
-    expect(workflowRequestHeaders({ authHeader: 'X-API-Key', apiKey: null }, 'user-token')).toEqual({ 'X-JWT-Assertion': 'Bearer user-token' });
-    expect(workflowRequestHeaders({ authHeader: 'X-API-Key', apiKey: null }, null)).toEqual({});
+  it('sends no credential to an open API, and never an empty one', () => {
+    expect(workflowRequestHeaders({ authHeader: 'X-API-Key', apiKey: null })).toEqual({});
   });
 });
 

@@ -44,6 +44,8 @@ import StructuredValue from '../shared/StructuredValue';
 import { useOpenMaximized } from '../shared/useOpenMaximized';
 import { formatDurationBetween } from '../shared/workflowDuration';
 import { WORKFLOW_STATUS_CHIP_COLOR, WORKFLOW_STATUS_LABEL } from '../shared/workflowStatus';
+import { ComingSoonInline } from '../../../pages/ComingSoon';
+import { CALLS_CARRY_ROLES } from '../connection/workflowCredential';
 import ResetWorkflowDialog from './ResetWorkflowDialog';
 import { invalidateRun } from './runQueries';
 import WorkflowNodeDetailPanel from './WorkflowNodeDetailPanel';
@@ -202,6 +204,9 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   const workflowId = run?.workflowId ?? '';
   const runId = run?.runId;
   const enabled = !!run;
+  // A run's own reads are served only to a caller with roles (CALLS_CARRY_ROLES): without them none
+  // is sent, the list row stands in for the run, and nothing derived from those reads is shown.
+  const readsDetails = enabled && CALLS_CARRY_ROLES;
 
   // A run opens with nothing selected, never with whatever the last one left behind.
   const [selectionFor, setSelectionFor] = useState(runId);
@@ -215,11 +220,12 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   // Every read of an open run polls, so its timeline, rail and details stay live.
   const isLive = (current: WorkflowStatus | undefined) => OPEN_STATUSES.includes(current ?? 'UNKNOWN') || isSettling(workflowId);
 
-  // The list row is a snapshot; the instance read is what keeps the status current while open.
+  // The instance read keeps the status current while open; without it, the page passes the run's
+  // current row from the polled list.
   const { data: info } = useQuery({
     queryKey: workflowKeys.instance(scopeId, workflowId, runId),
     queryFn: () => client.instances.get(workflowId, runId),
-    enabled,
+    enabled: readsDetails,
     retry: false,
     refetchInterval: (query) => whenAutoRefresh(isLive(query.state.data?.status ?? run?.status) ? LIVE_POLL_MS : false),
   });
@@ -235,7 +241,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   } = useQuery({
     queryKey: workflowKeys.history(scopeId, workflowId, runId),
     queryFn: () => client.instances.history(workflowId, runId),
-    enabled,
+    enabled: readsDetails,
     retry: retryWorkflowRead,
     refetchInterval: pollWhileLive,
   });
@@ -247,7 +253,7 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
   } = useQuery({
     queryKey: workflowKeys.activityTree(scopeId, workflowId, runId),
     queryFn: () => client.instances.activityTree(workflowId, runId),
-    enabled,
+    enabled: readsDetails,
     retry: retryWorkflowRead,
     refetchInterval: pollWhileLive,
   });
@@ -291,11 +297,12 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
     });
   }, [run, activityNodes, status, metadata]);
   // Until the steps and the descriptor are in, the rail is loading, not missing.
-  const railLoading = enabled && ((treePending && !activityNodes) || metadata.status === 'loading');
+  const railLoading = readsDetails && ((treePending && !activityNodes) || metadata.status === 'loading');
   const railMessage = railLoading ? null : flowUnavailable(instanceGraph);
   // The run's own kind says it is an agent even when no descriptor does.
   const isAgent = run?.kind === 'AGENT' || instanceGraph?.graphKind === 'agent';
-  const completedNoResult = status === 'COMPLETED' && (workflowResult === null || workflowResult === undefined);
+  // Only once the history is read: before that (or without it) the result is unknown, not absent.
+  const completedNoResult = status === 'COMPLETED' && !historyPending && (workflowResult === null || workflowResult === undefined);
 
   // Which step the run reached, for the rail's "you are here" mark. Only meaningful while running.
   const currentStepId = useMemo(() => {
@@ -400,11 +407,13 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
       <Typography variant="body2" color="text.secondary">
         {formatDurationBetween(run.startTime, closeTime)}
       </Typography>
-      <Tooltip title="Debug information: the raw event history" placement="top">
-        <IconButton size="small" aria-label="Show the raw event history" onClick={() => setHistoryOpen(true)}>
-          <Bug size={15} />
-        </IconButton>
-      </Tooltip>
+      {CALLS_CARRY_ROLES && (
+        <Tooltip title="Debug information: the raw event history" placement="top">
+          <IconButton size="small" aria-label="Show the raw event history" onClick={() => setHistoryOpen(true)}>
+            <Bug size={15} />
+          </IconButton>
+        </Tooltip>
+      )}
       <CopyButton value={jsonPretty(info ?? run)} label="Copy the run as JSON" />
     </Box>
   );
@@ -434,9 +443,11 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
         </Button>
       ))}
       {/* Resetting starts from a reset point, and reset points are a run detail. */}
-      <Button variant="outlined" color="warning" size="small" disabled={actionInFlight !== null} onClick={() => setResetOpen(true)}>
-        Reset…
-      </Button>
+      {CALLS_CARRY_ROLES && (
+        <Button variant="outlined" color="warning" size="small" disabled={actionInFlight !== null} onClick={() => setResetOpen(true)}>
+          Reset…
+        </Button>
+      )}
     </Box>
   );
 
@@ -494,68 +505,74 @@ export default function WorkflowRunDetailDrawer({ run, api, onClose }: WorkflowR
               )}
 
               {/* The flow and the timeline are drawn from the run's details. */}
-              <Box sx={styles.flowHeader}>
-                <Typography variant="caption" color="text.secondary">
-                  {railMessage ? 'No flow details available.' : railCaption(instanceGraph)}
-                </Typography>
-                {selectedStepId && (
-                  <Chip size="small" color="primary" variant="outlined" label={`Filtered: ${selectedStep?.label ?? selectedStepId} · ${selectedCount} ${selectedCount === 1 ? 'execution' : 'executions'}`} onDelete={() => setSelectedStepId(null)} />
-                )}
-                {unplaced.length > 0 && (
-                  <Tooltip
-                    placement="bottom"
-                    title={
-                      <Box sx={styles.unplacedLines}>
-                        <span>These ran, but this diagram has no step to draw them on; see the history for the full run.</span>
-                        {unplacedLines(unplaced).map(({ key, line }) => (
-                          <span key={key}>{line}</span>
-                        ))}
-                      </Box>
-                    }>
-                    <Chip size="small" color="warning" variant="outlined" label={`${unplaced.length} ${unplaced.length === 1 ? 'step is' : 'steps are'} not on this diagram`} />
-                  </Tooltip>
-                )}
-              </Box>
-
-              <Box sx={styles.flowSplit}>
-                <Box ref={splitRef} sx={styles.flowPair}>
-                  <Box sx={styles.railPane} style={{ width: `${railPct}%` }}>
-                    {!railLoading && !railMessage && instanceGraph && (
-                      <Tooltip placement="left" title={railToggleLabel}>
-                        <Box sx={styles.railToggle}>
-                          <IconButton size="small" aria-label={railToggleLabel} onClick={() => setRailVariant((current) => (current === 'chart' ? 'uml' : 'chart'))}>
-                            {railVariant === 'chart' ? <Workflow size={15} /> : <Rows3 size={15} />}
-                          </IconButton>
-                        </Box>
+              {!CALLS_CARRY_ROLES ? (
+                <ComingSoonInline description="The execution graph and the activity tree are currently under development." />
+              ) : (
+                <>
+                  <Box sx={styles.flowHeader}>
+                    <Typography variant="caption" color="text.secondary">
+                      {railMessage ? 'No flow details available.' : railCaption(instanceGraph)}
+                    </Typography>
+                    {selectedStepId && (
+                      <Chip size="small" color="primary" variant="outlined" label={`Filtered: ${selectedStep?.label ?? selectedStepId} · ${selectedCount} ${selectedCount === 1 ? 'execution' : 'executions'}`} onDelete={() => setSelectedStepId(null)} />
+                    )}
+                    {unplaced.length > 0 && (
+                      <Tooltip
+                        placement="bottom"
+                        title={
+                          <Box sx={styles.unplacedLines}>
+                            <span>These ran, but this diagram has no step to draw them on; see the history for the full run.</span>
+                            {unplacedLines(unplaced).map(({ key, line }) => (
+                              <span key={key}>{line}</span>
+                            ))}
+                          </Box>
+                        }>
+                        <Chip size="small" color="warning" variant="outlined" label={`${unplaced.length} ${unplaced.length === 1 ? 'step is' : 'steps are'} not on this diagram`} />
                       </Tooltip>
                     )}
-                    <Box sx={styles.railScroll}>{rail}</Box>
                   </Box>
-                  <Box role="separator" aria-orientation="vertical" aria-label="Resize the flow pane" sx={styles.flowResizer} onPointerDown={startResize}>
-                    <Box sx={styles.flowResizerGrip} />
-                  </Box>
-                  <Box sx={styles.timelinePane}>
-                    {historyPending && <Skeleton variant="rounded" sx={styles.paneSkeleton} />}
-                    {isHistoryError && events === undefined && (
-                      <Alert severity="error" action={retryAction(() => void refetchHistory())}>
-                        Could not load this run’s history.
-                      </Alert>
+
+                  <Box sx={styles.flowSplit}>
+                    <Box ref={splitRef} sx={styles.flowPair}>
+                      <Box sx={styles.railPane} style={{ width: `${railPct}%` }}>
+                        {!railLoading && !railMessage && instanceGraph && (
+                          <Tooltip placement="left" title={railToggleLabel}>
+                            <Box sx={styles.railToggle}>
+                              <IconButton size="small" aria-label={railToggleLabel} onClick={() => setRailVariant((current) => (current === 'chart' ? 'uml' : 'chart'))}>
+                                {railVariant === 'chart' ? <Workflow size={15} /> : <Rows3 size={15} />}
+                              </IconButton>
+                            </Box>
+                          </Tooltip>
+                        )}
+                        <Box sx={styles.railScroll}>{rail}</Box>
+                      </Box>
+                      <Box role="separator" aria-orientation="vertical" aria-label="Resize the flow pane" sx={styles.flowResizer} onPointerDown={startResize}>
+                        <Box sx={styles.flowResizerGrip} />
+                      </Box>
+                      <Box sx={styles.timelinePane}>
+                        {historyPending && <Skeleton variant="rounded" sx={styles.paneSkeleton} />}
+                        {isHistoryError && events === undefined && (
+                          <Alert severity="error" action={retryAction(() => void refetchHistory())}>
+                            Could not load this run’s history.
+                          </Alert>
+                        )}
+                        {events !== undefined && <WorkflowTimeline timeline={timeline} visibleIds={visibleIds} selectedKey={target?.id ?? null} onSelect={selectSpan} />}
+                      </Box>
+                    </Box>
+                    {target && targetDetail && (
+                      <WorkflowNodeDetailPanel
+                        label={target.label}
+                        type={target.type}
+                        detail={targetDetail}
+                        hasHistory={!isHistoryError && history.length > 0}
+                        stepId={targetStepId}
+                        step={targetStepId ? instanceGraph?.steps[targetStepId] : undefined}
+                        onClose={() => selectSpan(null)}
+                      />
                     )}
-                    {events !== undefined && <WorkflowTimeline timeline={timeline} visibleIds={visibleIds} selectedKey={target?.id ?? null} onSelect={selectSpan} />}
                   </Box>
-                </Box>
-                {target && targetDetail && (
-                  <WorkflowNodeDetailPanel
-                    label={target.label}
-                    type={target.type}
-                    detail={targetDetail}
-                    hasHistory={!isHistoryError && history.length > 0}
-                    stepId={targetStepId}
-                    step={targetStepId ? instanceGraph?.steps[targetStepId] : undefined}
-                    onClose={() => selectSpan(null)}
-                  />
-                )}
-              </Box>
+                </>
+              )}
             </Box>
           )}
         </DrawerPanel.Body>

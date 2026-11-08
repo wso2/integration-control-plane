@@ -43,8 +43,11 @@ Each looks like a bug. Don't "fix" it.
 - **The SPA signs in, not the BFF.** It is the WIdP-DP's public client, reads its discovery
   document itself, and keeps the access, refresh and ID tokens as one JSON object in the tab's
   `sessionStorage`. UP-DP has no cookie, session, grant or OIDC call.
-- **UP-DP is reachable only through the published environment's gateway.** It reads the token's
-  claims without verifying them; never add verification or a route around the gateway.
+- **UP-DP verifies every token itself.** The published environment's kgateway routes the portal's
+  host straight to it and checks nothing, so a token's signature (the issuer's discovery
+  document names the keys), `iss`, `aud` (`OIDC_RESOURCE`), `client_id` (`OIDC_CLIENT_ID`) and
+  `exp` are all UP-DP's to check. `aud` alone doesn't make a token the portal's: any app on the
+  WIdP-DP may ask for the portal's resource.
 - **Only `/config.js`, `/api/v1/health`, `/api/v1/auth/scopes` and the SPA answer without a
   token.**
 - **The SPA requests the scopes `/api/v1/auth/scopes` lists, never fixed ones.** They change as
@@ -53,8 +56,8 @@ Each looks like a bug. Don't "fix" it.
 - **Every iPaaS-Service call names the org and the environment** (`ENVIRONMENT_ID`): the portal
   can be enabled in more than one environment of an org.
 - **A client-credentials token is not a user.** ThunderID's `grant_type` claim says which grant
-  issued a token, and the gateway's `jwt-auth` admits only `authorization_code` and
-  `refresh_token`.
+  issued a token, and UP-DP admits only `authorization_code`: ThunderID gives a refreshed token
+  its original grant's `grant_type`, so `refresh_token` never appears.
 - **The browser calls agents and workflows on the gateway directly**, with its WIdP-DP access
   token. The BFF never proxies them.
 - **The catalog is read a page at a time, by cursor, and searched on the server.** It can hold
@@ -62,7 +65,7 @@ Each looks like a bug. Don't "fix" it.
   the task inbox. Each integration names its project (id, name and handle), and the list filters by project id.
 - **UP-DP enforces the portal's permissions itself**, from the token's scopes, in the catalog
   service: `aiagent:view`, `automation:view` and `workflow:view` per kind, `automation:trigger`
-  to run. Never leave them to the gateway; they will get finer than a gateway policy. A kind the
+  to run. They will get finer than a gateway policy could say. A kind the
   caller may not view is left out of lists and not found by id.
 - **Catalog reads are cached; runs are not.** The SPA polls executions to follow a run, so they
   always go to iPaaS-Service.

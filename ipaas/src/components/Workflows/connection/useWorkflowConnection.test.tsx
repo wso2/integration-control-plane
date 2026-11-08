@@ -49,9 +49,7 @@ const access = vi.hoisted(() => {
 });
 const testAccessCalls = vi.hoisted(() => [] as unknown[][]);
 const endpoints = vi.hoisted(() => ({ list: [] as EnvEndpoint[], releaseIds: [] as string[] }));
-const tokens = vi.hoisted(() => ({ next: ['user-token-1'] as string[] }));
 
-vi.mock('../../../auth', () => ({ getAccessToken: vi.fn(async () => tokens.next.shift() ?? 'user-token-last') }));
 vi.mock('../../../hooks/useDeployments', () => ({
   useEnvEndpoints: (_componentId: string, _trackId: string | undefined, releaseId: string) => {
     endpoints.releaseIds.push(releaseId);
@@ -89,9 +87,13 @@ const SCOPE = 'orders|release-1|development';
 function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess {
   return {
     gatewayUrl: GATEWAY_URL,
+    aiGateway: null,
+    mcpUrl: `${GATEWAY_URL}/mcp`,
     mode: 'api-key',
     authHeader: 'X-API-Key',
     apiKey: 'key-1',
+    // Minted as the test starts: a refusal of it is not a stale key.
+    keyMintedAt: Date.now(),
     isAuthorized: true,
     isMinting: false,
     canCreateKey: true,
@@ -103,6 +105,7 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     isUnavailable: false,
     securityError: null,
     mintKey: vi.fn(async () => null),
+    renewKey: vi.fn(async () => null),
     retryUnauthorized: vi.fn(),
     ...patch,
   };
@@ -157,7 +160,6 @@ beforeEach(() => {
   endpoints.releaseIds = [];
   testAccessCalls.length = 0;
   rendered = undefined;
-  tokens.next = ['user-token-1'];
   access.reset(keyAccess());
   fetchMock.mockReset();
   fetchMock.mockResolvedValue(json({ taskQueue: 'orders-queue' }));
@@ -173,27 +175,17 @@ afterEach(() => {
 });
 
 describe('useWorkflowConnection', () => {
-  it('connects to the management endpoint through its gateway URL, with the test key and the caller’s token', async () => {
+  it('connects to the management endpoint through its gateway URL, with the test key alone', async () => {
     mount();
     await vi.waitFor(() => expect(status()).toBe('ready'));
 
-    expect(sentTo(`${GATEWAY_URL}/runtime`)[0]).toMatchObject({ 'X-API-Key': 'key-1', 'X-JWT-Assertion': 'Bearer user-token-1' });
+    expect(sentTo(`${GATEWAY_URL}/runtime`)[0]).toEqual({ 'X-API-Key': 'key-1' });
     expect(current().connection).toMatchObject({ baseUrl: GATEWAY_URL, scopeId: SCOPE, endpointName: 'workflow-ma-cf1', runtime: { taskQueue: 'orders-queue' } });
     // The endpoint the test key is for, and its discovered public URL as the gateway URL fallback.
     expect(testAccessCalls.at(-1)).toEqual([
       { componentName: 'orders', environmentName: 'development', endpointName: 'workflow-ma-cf1', deploymentTrackId: 'track-1' },
       { enabled: true, gatewayUrlFallback: GATEWAY_URL },
     ]);
-  });
-
-  it('reads the caller’s token as each request goes out, so a refreshed one is used at once', async () => {
-    tokens.next = ['user-token-1', 'user-token-2'];
-    mount();
-    await vi.waitFor(() => expect(status()).toBe('ready'));
-
-    fetchMock.mockResolvedValueOnce(json({ definitions: [] }));
-    await readyClient().definitions.list();
-    expect(sentTo(`${GATEWAY_URL}/definitions`)[0]['X-JWT-Assertion']).toBe('Bearer user-token-2');
   });
 
   it('lists only the task queue the integration reports, since every integration in an environment shares its namespace', async () => {
@@ -225,11 +217,11 @@ describe('useWorkflowConnection', () => {
     expect(new URL(listed).searchParams.get('taskQueue')).toBe('moved-queue');
   });
 
-  it('sends only the caller’s token to an endpoint the gateway leaves open', async () => {
+  it('sends no credential to an endpoint the gateway leaves open', async () => {
     access.reset(keyAccess({ mode: 'none', apiKey: null }));
     mount();
     await vi.waitFor(() => expect(status()).toBe('ready'));
-    expect(sentTo(`${GATEWAY_URL}/runtime`)[0]).toEqual({ 'X-JWT-Assertion': 'Bearer user-token-1' });
+    expect(sentTo(`${GATEWAY_URL}/runtime`)[0]).toEqual({});
   });
 
   it('says the track is not deployed, with the status it is in, and asks for nothing', async () => {
@@ -296,21 +288,23 @@ describe('useWorkflowConnection', () => {
 
   it('reports refused credentials when a fresh key is refused, without minting again', async () => {
     const mintKey = vi.fn(async () => null);
-    access.reset(keyAccess({ mintKey }));
+    const renewKey = vi.fn(async () => null);
+    access.reset(keyAccess({ mintKey, renewKey }));
     fetchMock.mockResolvedValue(json({}, 401));
     mount();
-    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'refused', message: 'The credentials were rejected. The test key or the access token may have expired.' }));
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'refused', message: 'The gateway rejected the test key. It may have expired.' }));
     expect(mintKey).not.toHaveBeenCalled();
+    expect(renewKey).not.toHaveBeenCalled();
   });
 
-  it('mints again when an old key is refused, then reads the refused data again with the new one', async () => {
+  it('renews an old key when it is refused, then reads the refused data again with the new one', async () => {
     const start = Date.now();
     const now = vi.spyOn(Date, 'now').mockReturnValue(start);
-    const mintKey = vi.fn(async () => {
+    const renewKey = vi.fn(async () => {
       access.set({ apiKey: 'key-2' });
       return 'key-2';
     });
-    access.reset(keyAccess({ mintKey }));
+    access.reset(keyAccess({ renewKey }));
     mount();
     await vi.waitFor(() => expect(status()).toBe('ready'));
     const client = readyClient();
@@ -320,7 +314,9 @@ describe('useWorkflowConnection', () => {
     fetchMock.mockResolvedValueOnce(json({}, 401));
     await queryClient.fetchQuery({ queryKey: workflowKeys.definitions(SCOPE), queryFn: () => client.definitions.list(), retry: false }).catch(() => undefined);
 
-    await vi.waitFor(() => expect(mintKey).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(renewKey).toHaveBeenCalledTimes(1));
+    // Only the refused key is renewed: one another view had renewed already would be reused.
+    expect(renewKey).toHaveBeenCalledWith('key-1');
     // The probe is read again, now with the new key.
     await vi.waitFor(() => expect(sentTo(`${GATEWAY_URL}/runtime`).at(-1)?.['X-API-Key']).toBe('key-2'));
     expect(status()).toBe('ready');

@@ -68,6 +68,7 @@ export const Scopes = {
   LOG_READ: 'ipaas:observability:log-read',
   CONFIG_MANAGE: 'cloud:resource-type:manage',
   ENVIRONMENT_MANAGE: 'cloud:environment:manage',
+  ENVIRONMENT_READ: 'ipaas:environment:read',
   DEPLOYMENT_PIPELINE_MANAGE: 'cloud:deployment-pipeline:manage',
   ENDPOINT_UPDATE: 'ipaas:endpoint:update',
   ENDPOINT_TEST: 'ipaas:endpoint:test',

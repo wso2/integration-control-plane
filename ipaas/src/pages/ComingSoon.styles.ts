@@ -61,3 +61,11 @@ export const textStackSx = {
 export const descriptionSx = {
   maxWidth: 380,
 } as const;
+
+/** The inline variant: the same art, smaller, in a panel's flow. */
+export const inlineArtSx = { ...artSx, width: 110 } as const;
+
+export const inlineSx = {
+  py: 4,
+  textAlign: 'center',
+} as const;

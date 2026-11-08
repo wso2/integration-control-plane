@@ -17,6 +17,7 @@
  */
 
 import { withBase } from '../utils/basePath';
+import type { PlatformId } from './platformSwitcher';
 
 interface RuntimeConfig {
   VITE_AUTH_BASE_URL?: string;
@@ -25,6 +26,12 @@ interface RuntimeConfig {
   BILLING_API_BASE_URL?: string;
   BILLING_CONSOLE_URL?: string;
   CLOUD_CONSOLE_URL?: string;
+  AGENT_MANAGER_URL?: string;
+  API_PLATFORM_URL?: string;
+  INTEGRATION_PLATFORM_URL?: string;
+  IDENTITY_PLATFORM_URL?: string;
+  /** Comma-separated platform ids the platform switcher shows as coming soon, e.g. "agent-manager". */
+  COMING_SOON_PLATFORMS?: string;
   CHOREO_SAAS_OFFER_URL?: string;
   ENABLE_BILLING_FEATURE?: string | boolean;
   ASGARDEO_CLIENT_ID?: string;
@@ -94,6 +101,10 @@ export interface ApiConfig {
   billingConsoleUrl?: string;
   /** WSO2 Cloud console origin; unset, the console's own origin, which deployments share with it. */
   cloudConsoleUrl?: string;
+  /** Each WSO2 Cloud platform console's URL, for the platform switcher. A platform with no URL is left out; this console defaults to its own. */
+  platformUrls?: Partial<Record<PlatformId, string>>;
+  /** Platform ids the platform switcher shows as coming soon. */
+  comingSoonPlatforms?: string[];
   /** Azure marketplace SaaS offer — shows the "Upgrade via Azure marketplace" split-button option when set. */
   choreoSaasOfferUrl?: string;
   /** Gates the free-tier Upgrade button (mirrors Devant's ENABLE_BILLING_FEATURE). */
@@ -238,6 +249,16 @@ export async function loadConfig(): Promise<void> {
       enableCustomUrlMappings: config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === 'true' || config.ENABLE_CUSTOM_URL_MAPPINGS_FEATURE === true,
       billingConsoleUrl: config.BILLING_CONSOLE_URL ? trim(config.BILLING_CONSOLE_URL) : undefined,
       cloudConsoleUrl: config.CLOUD_CONSOLE_URL ? trim(config.CLOUD_CONSOLE_URL) : undefined,
+      platformUrls: {
+        'agent-manager': config.AGENT_MANAGER_URL?.trim() || undefined,
+        'api-platform': config.API_PLATFORM_URL?.trim() || undefined,
+        'integration-platform': config.INTEGRATION_PLATFORM_URL?.trim() || undefined,
+        'identity-platform': config.IDENTITY_PLATFORM_URL?.trim() || undefined,
+      },
+      comingSoonPlatforms: (config.COMING_SOON_PLATFORMS || '')
+        .split(',')
+        .map((id) => id.trim().toLowerCase())
+        .filter(Boolean),
       choreoSaasOfferUrl: config.CHOREO_SAAS_OFFER_URL || undefined,
       enableBillingFeature: config.ENABLE_BILLING_FEATURE === 'true' || config.ENABLE_BILLING_FEATURE === true,
       editorCallbackOrigins: (config.EDITOR_CALLBACK_ORIGINS || '')

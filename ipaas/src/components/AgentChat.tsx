@@ -135,10 +135,11 @@ export default function AgentChat({ projectId, componentId, versionId, releaseId
       // enforcement to api-key auth — that stays an explicit user action.
       const canRefreshKey = access.mode === 'api-key';
       if (response.status === 401 && allowKeyRefresh && canRefreshKey) {
-        // Key likely expired — regenerate once and retry with the fresh key
-        // passed directly; a setApiKey state update wouldn't reach this
-        // closure in time. If we can't refresh, fall through to surface the 401.
-        const fresh = await access.mintKey();
+        // Key likely expired: renew it once and retry with the fresh key passed
+        // directly; a state update wouldn't reach this closure in time. The renewal
+        // reuses a key another view already renewed. If we can't refresh, fall
+        // through to surface the 401.
+        const fresh = await access.renewKey(key);
         if (fresh) {
           await send(message, false, fresh);
           return;

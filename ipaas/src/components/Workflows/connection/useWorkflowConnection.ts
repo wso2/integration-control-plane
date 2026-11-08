@@ -18,7 +18,6 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getAccessToken } from '../../../auth';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
 import type { EndpointRef } from '../../../types/consumers';
@@ -29,7 +28,7 @@ import { isScopedWorkflowKey, workflowKeys } from '../api/queryKeys';
 import type { WorkflowRuntimeInfo } from '../api/types';
 import { resolveWorkflowBaseUrl, resolveWorkflowEndpoint } from './resolveWorkflowBaseUrl';
 import { testKeyNotice, testKeyReasonOf, workflowRequestHeaders, type GatewayCredential, type TestKeyReason, type WorkflowNotice } from './workflowCredential';
-import { TEST_KEY_VALIDITY_SECONDS, isKeyRefusal, testKeyRefreshInterval } from './workflowTestKey';
+import { isKeyRefusal } from './workflowTestKey';
 
 /**
  * Resolves everything one call to the workflow Management API needs, and says which state the
@@ -38,16 +37,17 @@ import { TEST_KEY_VALIDITY_SECONDS, isKeyRefusal, testKeyRefreshInterval } from 
  * The API is the release's "Workflow Management API" endpoint (`resolveWorkflowEndpoint`), listed
  * by ipaas-service like any other endpoint. The console calls it through the API Platform gateway,
  * at the invoke URL and with the test key `useEndpointTestAccess` holds for it, as the Test Console
- * calls an endpoint. The caller's own access token goes along as `X-JWT-Assertion` on every call,
- * read as the call goes out, so the engine knows who is asking (`workflowCredential.ts`).
+ * calls an endpoint. The key is the only credential sent, and it names no user
+ * (`workflowCredential.ts`).
  *
- * The key is minted again a minute before it expires, and after a read it gets refused once it is
- * old enough to have expired; the refused reads of this connection are then read again. A cheap
+ * The key is the one `useEndpointTestAccess` holds for the endpoint, shared with every other view of
+ * it and renewed there ahead of expiry. When a read is refused and that key is old enough to have
+ * expired, it is renewed, and the refused reads of this connection are read again. A cheap
  * `GET /runtime` probe decides the connection is ready: a 404 there means the integration does not
  * serve the API, and a 401 with a fresh key means the credentials themselves are refused.
  *
- * Call it once per view and environment and pass the result down: each call holds its own key, and
- * minting one for the same endpoint replaces the key the other call is using.
+ * Call it once per view and environment and pass the result down, so one probe and one renewal
+ * serve the whole view.
  */
 
 /** Which deployment of which integration to connect to. */
@@ -125,7 +125,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
   // Release-scoped discovery already returns the gateway's public URL; the security read may too.
   const access = useEndpointTestAccess(ref, { enabled: !!ref, gatewayUrlFallback: endpoint?.publicUrl ?? '' });
-  const { authHeader, apiKey, mintKey } = access;
+  const { authHeader, apiKey, mintKey, renewKey } = access;
   const baseUrl = ref ? resolveWorkflowBaseUrl(access.gatewayUrl) : '';
 
   // The credential as of the last commit, read by each request as it goes out, so a key minted
@@ -135,7 +135,7 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     credential.current = { authHeader, apiKey };
   }, [authHeader, apiKey]);
 
-  const getHeaders = useCallback(async () => workflowRequestHeaders(credential.current, await getAccessToken()), []);
+  const getHeaders = useCallback(async () => workflowRequestHeaders(credential.current), []);
   const client = useMemo(() => (baseUrl ? createWorkflowClient({ baseUrl, getHeaders }) : null), [baseUrl, getHeaders]);
 
   const probe = useQuery({
@@ -146,19 +146,15 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
     retry: retryWorkflowRead,
   });
 
-  // Mint again a minute before the key expires: a page like this is left open for hours.
-  const mintedAt = useRef(0);
-  useEffect(() => {
-    if (!apiKey) return undefined;
-    mintedAt.current = Date.now();
-    const delay = testKeyRefreshInterval(TEST_KEY_VALIDITY_SECONDS);
-    if (delay === false) return undefined;
-    const timer = window.setTimeout(() => void mintKey(), delay);
-    return () => window.clearTimeout(timer);
-  }, [apiKey, mintKey]);
+  // When the held key was minted, to tell a stale key's refusal from any other. The key is shared,
+  // so it can be older than this connection.
+  const keyMintedAt = useRef(access.keyMintedAt);
+  useLayoutEffect(() => {
+    keyMintedAt.current = access.keyMintedAt;
+  }, [access.keyMintedAt]);
 
-  // Renewing: mint a new key, then read again what this connection holds. An open API has no key
-  // to renew, so it is only read again. Every view on the connection hears the same refusal; one
+  // Renewing: renew the refused key, then read again what this connection holds. An open API has no
+  // key to renew, so it is only read again. Every view on the connection hears the same refusal; one
   // renewal serves them all.
   const rereadAfterMint = useRef(false);
   const rereadAll = useCallback(() => queryClient.invalidateQueries({ predicate: (query) => isScopedWorkflowKey(query.queryKey, scopeId) }), [queryClient, scopeId]);
@@ -169,24 +165,30 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
       return;
     }
     rereadAfterMint.current = true;
-    void mintKey().then((key) => {
-      if (!key) rereadAfterMint.current = false;
+    void renewKey(credential.current.apiKey).then((key) => {
+      // The new key reached this connection first and read everything again already (below).
+      if (!rereadAfterMint.current) return;
+      // A new key reads everything again once it reaches this connection (below).
+      if (key && key !== credential.current.apiKey) return;
+      rereadAfterMint.current = false;
+      // Another view had renewed it already, so the key in use is current: read again now.
+      if (key) void rereadAll();
     });
-  }, [mintKey, rereadAll]);
+  }, [renewKey, rereadAll]);
   useEffect(() => {
     if (!rereadAfterMint.current || !apiKey) return;
     rereadAfterMint.current = false;
     void rereadAll();
   }, [apiKey, rereadAll]);
 
-  // A refused read most often means the key expired (a hidden tab's timer can fire late). Only a key
-  // old enough to have expired is renewed, so a refusal with another cause cannot loop.
+  // A refused read most often means the key expired or another tab's mint reaped it. Only a key old
+  // enough for that is renewed, so a refusal with another cause cannot loop.
   useEffect(() => {
     if (!scopeId) return undefined;
     return queryClient.getQueryCache().subscribe((event) => {
       if (event.type !== 'updated' || event.action.type !== 'error') return;
       if (!isScopedWorkflowKey(event.query.queryKey, scopeId)) return;
-      if (credential.current.apiKey && isKeyRefusal(event.action.error, mintedAt.current)) renew();
+      if (credential.current.apiKey && isKeyRefusal(event.action.error, keyMintedAt.current)) renew();
     });
   }, [queryClient, scopeId, renew]);
 

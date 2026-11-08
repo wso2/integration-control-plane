@@ -23,19 +23,30 @@ import { useOrgUuid } from './useOrgUuid';
 import { entryEnvironmentIds, isEntryEnvironment } from '../utils/entryEnvironment';
 
 /**
- * Whether envId is one of the project's entry environments, and the entries' display names for copy that points there.
- * isEntry is false until the pipeline has loaded, so copy that claims an environment is not the entry waits for loading to clear.
+ * The project's entry environment ids, read from its deployment pipeline: the environments that take
+ * API changes, later ones getting them by promotion. `tree` is undefined while the pipeline loads and
+ * null when there is none to read (none, or the read failed); `ids` is then empty.
  */
-export function useEntryEnvironment(projectId: string, envId: string): { isEntry: boolean; loading: boolean; entryEnvironmentName: string } {
+export function useEntryEnvironmentIds(projectId: string) {
   const orgUuid = useOrgUuid() ?? '';
   const { data: pipelines, isError } = useQuery({
     queryKey: ['deploymentPipelines', 'project', orgUuid, projectId],
     queryFn: () => fetchProjectDeploymentPipelines(orgUuid, projectId),
     enabled: !!orgUuid && !!projectId,
   });
-  const { data: environments = [] } = useEnvironments(orgUuid, projectId);
   // A failed read is "no pipeline", not "still loading": the BFF still guards the change.
   const tree = isError ? null : pipelines === undefined ? undefined : (pipelines[0]?.promotion_tree ?? null);
-  const entryNames = entryEnvironmentIds(tree).map((id) => environments.find((env) => env.id === id)?.name ?? id);
-  return { isEntry: isEntryEnvironment(tree, envId), loading: tree === undefined, entryEnvironmentName: entryNames.length ? entryNames.join(' or ') : 'the first environment' };
+  return { tree, ids: entryEnvironmentIds(tree), loading: tree === undefined };
+}
+
+/**
+ * Whether envId is one of the project's entry environments, and the entries' display names for copy that points there.
+ * isEntry is false until the pipeline has loaded, so copy that claims an environment is not the entry waits for loading to clear.
+ */
+export function useEntryEnvironment(projectId: string, envId: string): { isEntry: boolean; loading: boolean; entryEnvironmentName: string } {
+  const orgUuid = useOrgUuid() ?? '';
+  const { tree, ids, loading } = useEntryEnvironmentIds(projectId);
+  const { data: environments = [] } = useEnvironments(orgUuid, projectId);
+  const entryNames = ids.map((id) => environments.find((env) => env.id === id)?.name ?? id);
+  return { isEntry: isEntryEnvironment(tree, envId), loading, entryEnvironmentName: entryNames.length ? entryNames.join(' or ') : 'the first environment' };
 }

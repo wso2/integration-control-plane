@@ -21,7 +21,7 @@ import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, 
 import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
 
 /** Endpoint refs are only usable once every segment is known, the track included: one read before its track resolves would read the default track's API. */
-const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.componentName && !!ref.environmentName && !!ref.endpointName && ref.deploymentTrackId !== undefined;
+export const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.componentName && !!ref.environmentName && !!ref.endpointName && ref.deploymentTrackId !== undefined;
 
 // Each track's API has its own URL, security and consumers, so the track is part of the key.
 const refKey = (ref: EndpointRef | null | undefined) => [ref?.componentName ?? '', ref?.environmentName ?? '', ref?.endpointName ?? '', ref?.deploymentTrackId ?? ''] as const;

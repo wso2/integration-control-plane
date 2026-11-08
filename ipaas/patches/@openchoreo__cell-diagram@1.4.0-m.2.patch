@@ -1,0 +1,17 @@
+diff --git a/dist/components/Component/ComponentNode/ComponentWidget.esm.js b/dist/components/Component/ComponentNode/ComponentWidget.esm.js
+index 8cee71f0f8c6e23bca808062526c54ecfd004b0d..49e58018e4e862f7f070684cc44c68709331e993 100644
+--- a/dist/components/Component/ComponentNode/ComponentWidget.esm.js
++++ b/dist/components/Component/ComponentNode/ComponentWidget.esm.js
+@@ -125,10 +125,10 @@ function ComponentWidget(props) {
+             onFocusOut: handleMouseLeave
+           }
+         ),
+-        /* @__PURE__ */ jsx(Tooltip, { title: tooltip, placement: "bottom", enterNextDelay: 500, arrow: true, children: !previewMode ? /* @__PURE__ */ jsxs(ComponentLabel, { children: [
++        !previewMode && /* @__PURE__ */ jsx(Tooltip, { title: tooltip, placement: "bottom", enterNextDelay: 500, arrow: true, children: /* @__PURE__ */ jsxs(ComponentLabel, { children: [
+           /* @__PURE__ */ jsx(ComponentName, { disabled: isDisabled, children: displayName }),
+           badge && /* @__PURE__ */ jsx(ComponentBadge, { disabled: isDisabled, children: badge })
+-        ] }) : /* @__PURE__ */ jsx(Fragment, {}) }),
++        ] }) }),
+         /* @__PURE__ */ jsxs(PortsContainer, { children: [
+           /* @__PURE__ */ jsx(
+             ComponentPortWidget,

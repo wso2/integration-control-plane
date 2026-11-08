@@ -8,9 +8,19 @@ The console reads its backend URLs from `/config.json` when it starts, so one bu
 2. Each key overrides its default in `DEFAULT_CONFIG` on its own. A key that is missing keeps its default.
 3. If `config.json` fails to load, the app boots on the defaults and logs `Failed to load runtime config, using defaults`. The defaults are placeholders, not a working environment.
 
-`public/config.json` is copied to `dist/config.json` on build. It points at the local k3d stack. Each deployment mounts its own file over it. In wso2cloud-deployment that is the `config.json` in the ipaas-console `ReleaseBinding`.
+`public/config.json` is copied to `dist/config.json` on build. Each deployment mounts its own file over it. In wso2cloud-deployment that is the `config.json` in the ipaas-console `ReleaseBinding`.
 
-`pnpm dev` and `pnpm preview` cannot sign in against the local stack yet. They serve the console over https on `localhost:3000`, so the stack's plain-http Thunder and observability hosts are blocked as mixed content, and the local Thunder only accepts the deployed console's redirect URI. Try changes by deploying the console into the local stack instead.
+## Running `pnpm dev`
+
+`public/config.json` runs the console in gateway sign-in mode (see below): every API and session call goes to same-origin `/_auth` and `/_api`. The dev server, on `https://localhost:3000`, proxies those paths to a deployed console's gateway, by default the dev environment's (`https://cloud-console-development.gateway.dev.cloud.wso2.com`). Set `DEV_PROXY_TARGET` to use another one.
+
+The proxy forwards the browser's cookies, so it needs that console's session:
+
+1. Sign in to the deployed console.
+2. Copy its `__Host-X-CLOUD` and `__Host-X-INTEGRATION` cookies to `https://localhost:3000`. They are `__Host-` cookies, which a browser keeps only on https, so the dev server keeps serving https.
+3. Run `pnpm dev` and open `https://localhost:3000`.
+
+A sign-in started from the dev server completes on the deployed console, whose redirect URI the IdP accepts, so when the session expires, copy the cookies again. The dev server changes the deployed environment's data like the deployed console does. Logs and metrics go to the dev environment's observability proxy, as from the deployed dev console; an empty `VITE_OBSERVABILITY_URL` would fall back to the placeholder default. `pnpm preview` has no proxy.
 
 ## Keys
 
@@ -31,7 +41,9 @@ Some key names come from earlier products (`CHOREO_*`, `ASGARDEO_*`, `VITE_*`). 
 | `SYSTEM_APIS_BASE_URL`, `SYS_API_PREFIX`                                     | System APIs gateway (component logs, usage insights)                                                                     |
 | `BILLING_API_BASE_URL`                                                       | Billing user API. Loading the billing org activates the org's subscription.                                              |
 | `ENABLE_BILLING_FEATURE`, `BILLING_CONSOLE_URL`, `CHOREO_SAAS_OFFER_URL`     | Upgrade button and billing links                                                                                         |
-| `CLOUD_CONSOLE_URL`                                                          | WSO2 Cloud console origin for the header's settings and billing links. Unset, the console's own origin.                  |
+| `CLOUD_CONSOLE_URL`                                                          | WSO2 Cloud console origin for billing links and the switcher's Manage row. Unset, the console's own origin. |
+| `AGENT_MANAGER_URL`, `API_PLATFORM_URL`, `INTEGRATION_PLATFORM_URL`, `IDENTITY_PLATFORM_URL` | The platform consoles in the header's platform switcher, as the Agent Platform console names them. A platform with no URL is left out; `INTEGRATION_PLATFORM_URL` defaults to this console. |
+| `COMING_SOON_PLATFORMS`                                                      | Comma-separated platform ids the platform switcher shows as coming soon, e.g. `agent-manager`. |
 | `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_AUTH_REDIRECTION_URL` | GitHub App authorization and installation. GitHub is off without the client ID.                                          |
 | `AZURE_DEVOPS_CLIENT_ID`                                                     | Entra application client ID for Azure DevOps repository access. Azure DevOps is hidden when this is empty.               |
 | `EDITOR_CALLBACK_ORIGINS`, `EDITOR_CALLBACK_DOMAINS`                         | Comma-separated https origins and parent domains an editor's sign-in or GitHub result may be sent to. Empty allows none. |
@@ -53,6 +65,7 @@ With `AUTH_BFF_CONTEXT` set, the WSO2 API Platform gateway signs the user in and
 
 - API calls go to a same-origin `CHOREO_BASE_API_URL` (`/_api/integration`) with the cookie and no `Authorization` header; the gateway puts the session's token on them. `BILLING_API_BASE_URL` goes the same way, on the cloud console's session (`/_api/billing/api/v1`).
 - The org and profile come from the session's ID token claims (`ouHandle`, `ouId`, `ouName`).
+- The scopes come from the session's `scope` (the SDK's `getGrantedPermissions()`), so `SCOPES_ENFORCED` works in this mode too. The gateway's client config decides which scopes are requested.
 - There is no silent sign-in: the gateway's session check joins the cloud console's session itself.
 - Calls to other hosts with the user's token (`VITE_OBSERVABILITY_URL`, the AI Integration Builder copilot) get no token in this mode. Their 401s go back to the caller and never end the session. A same-origin 401 ends it only when `<AUTH_BFF_CONTEXT>/checksession` reports signed out; otherwise the request is retried once.
 - Same-origin requests carry `X-Requested-With: XMLHttpRequest`, so the gateway can require it against CSRF.

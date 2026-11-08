@@ -33,7 +33,7 @@ vi.mock('../routing/useWorkflowRoutes', async (importOriginal) => ({
   useWorkflowRoutes: () => ({ goToWorkflowRuns: vi.fn() }),
 }));
 // The execution view has its own reads; here only which run it is handed matters.
-vi.mock('./WorkflowRunDetailDrawer', () => ({ default: ({ run }: { run: WorkflowInstanceSummary | null }) => <output>{run ? `drawer: ${run.runId}` : 'drawer closed'}</output> }));
+vi.mock('./WorkflowRunDetailDrawer', () => ({ default: ({ run }: { run: WorkflowInstanceSummary | null }) => <output>{run ? `drawer: ${run.runId} ${run.status}` : 'drawer closed'}</output> }));
 
 const run = (runId: string, workflowType: string, startTime: string, patch: Partial<WorkflowInstanceSummary> = {}): WorkflowInstanceSummary => ({
   workflowId: `wf-${runId}`,
@@ -70,6 +70,7 @@ function fakeClient() {
 
 let root: Root;
 let container: HTMLDivElement;
+let queryClient: QueryClient;
 
 async function flush() {
   for (let i = 0; i < 4; i += 1) {
@@ -83,9 +84,10 @@ async function renderPage(url: string, client: WorkflowClient) {
     api: { client, connection: { status: 'ready', scopeId: 'scope', runtime: { taskQueue: 'orders' } } },
   } as unknown as WorkflowPageSlotProps;
   const page = <WorkflowRunsPage {...slot} />;
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   await act(async () =>
     root.render(
-      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <QueryClientProvider client={queryClient}>
         <MemoryRouter initialEntries={[url]}>
           <Routes>
             <Route path="/workflows" element={page} />
@@ -188,5 +190,22 @@ describe('WorkflowRunsPage', () => {
     expect(container.textContent).toContain('drawer closed');
     await act(async () => container.querySelector<HTMLElement>('tbody tr')?.click());
     expect(container.textContent).toContain('drawer: run-2');
+  });
+
+  it('gives the open run’s drawer the run as the list reads it now, so its status follows a close', async () => {
+    const { client, list } = fakeClient();
+    const withRun2 =
+      (status: WorkflowInstanceSummary['status']) =>
+      async (filters: WorkflowListFilters = {}) =>
+        filters.pageToken === 'next' ? SECOND_PAGE : { ...FIRST_PAGE, items: [FIRST_PAGE.items[0], run('run-2', 'refundWorkflow', '2026-10-01T11:00:00Z', { status })] };
+    list.mockImplementation(withRun2('RUNNING'));
+    await renderPage('/workflows', client);
+    await act(async () => container.querySelector<HTMLElement>('tbody tr')?.click());
+    expect(container.textContent).toContain('drawer: run-2 RUNNING');
+
+    list.mockImplementation(withRun2('COMPLETED'));
+    await act(async () => queryClient.invalidateQueries());
+    await flush();
+    expect(container.textContent).toContain('drawer: run-2 COMPLETED');
   });
 });
