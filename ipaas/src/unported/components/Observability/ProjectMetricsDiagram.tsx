@@ -17,8 +17,8 @@
  */
 
 import { Alert, Box, Skeleton, Stack } from '@wso2/oxygen-ui';
-import { CellDiagram, DiagramLayer } from '@wso2/cell-diagram';
-import type { MoreVertMenuItem } from '@wso2/cell-diagram';
+import { CellDiagram, DiagramLayer } from '@openchoreo/cell-diagram';
+import type { MoreVertMenuItem } from '@openchoreo/cell-diagram';
 import { memo, useMemo, type JSX } from 'react';
 import { buildProjectModel } from '../../../components/Observability/diagramUtils';
 import { applyObservability } from '../../../components/Observability/diagramUtils';
