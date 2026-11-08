@@ -65,7 +65,7 @@ export async function restoreSessionStorage(context: BrowserContext): Promise<vo
  * The OneTrust cookie banner (src/services/tracking) floats over the page and swallows clicks
  * meant for drawers and dialogs. Names are OneTrust's own, read off a run's page snapshot.
  */
-async function rejectCookieBanner(page: Page): Promise<void> {
+export async function rejectCookieBanner(page: Page): Promise<void> {
   const banner = page.getByRole('alertdialog', { name: 'Privacy' });
   await page.addLocatorHandler(banner, async () => {
     await banner.getByRole('button', { name: 'Reject All', exact: true }).click();

@@ -89,13 +89,22 @@ export async function waitForBuildQuiet(page: Page, quietMs = BUILD_QUIET_MS): P
 
 /**
  * Auto deploy is held off for Ballerina integrations, so a finished build waits on the card's Deploy
- * (DeployButton.tsx). A card already running the newest build offers none, so this is a no-op there.
+ * (DeployButton.tsx). The card renders Deploy only while auto deploy is off and the newest build is not
+ * running yet, so a card that shows its deployment status and no Deploy has nothing to deploy.
  */
 export async function deployLatestBuild(page: Page): Promise<void> {
   const deploy = envCard(page).getByRole('button', { name: 'Deploy', exact: true });
+  const status = deploymentStatus(page);
   for (let pass = 0; pass < 2; pass += 1) {
-    const offered = await deploy
+    // Either settles the card: an undeployed track shows only Deploy, a deployed one its status.
+    await deploy
+      .or(status)
+      .first()
       .waitFor({ state: 'visible', timeout: 60_000 })
+      .catch(() => {});
+    // Deploy renders after the track's images load, which can trail the status by a moment.
+    const offered = await deploy
+      .waitFor({ state: 'visible', timeout: 5_000 })
       .then(() => true)
       .catch(() => false);
     if (offered) {
@@ -108,8 +117,8 @@ export async function deployLatestBuild(page: Page): Promise<void> {
       await expect(deploy, 'the card still offers Deploy, so the deployment does not run the latest build').toBeHidden({ timeout: 2 * 60_000 });
       return;
     }
-    if (pass > 0) return;
-    // The overview does not refetch the track's images when a build lands, so the button can lag until a reload.
+    if (pass > 0 || (await status.isVisible())) return;
+    // Neither rendered: the overview does not refetch the track's images when a build lands, so reload once.
     await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(envCard(page), 'the environment card did not come back after the reload').toBeVisible({ timeout: 60_000 });
   }
@@ -178,12 +187,13 @@ const GATEWAY_FAILURE = /^(The API gateway could not be updated|Your organizatio
  */
 export async function gatewayFailure(page: Page): Promise<string | null> {
   const alerts = envCard(page).getByRole('alert');
-  const retry = alerts.getByRole('button', { name: /^Retry(ing…)?$/ });
+  const retryName = /^Retry(ing…)?$/;
   // A failed retry replaces the alert's text with the retry's error but keeps its Retry action.
   const failure = alerts
     .filter({ hasText: GATEWAY_FAILURE })
-    .or(alerts.filter({ has: retry }))
+    .or(alerts.filter({ has: page.getByRole('button', { name: retryName }) }))
     .first();
+  const retry = failure.getByRole('button', { name: retryName });
   const updating = alerts.filter({ hasText: 'Updating the API gateway…' });
   const text = async () => (await failure.textContent())?.replace(/Retry(ing…)?$/, '').trim() || 'the API gateway could not be updated';
 
