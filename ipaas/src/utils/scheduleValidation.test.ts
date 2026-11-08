@@ -38,10 +38,10 @@ describe('validateTimeout', () => {
     expect(validateTimeout('1.5')).toBeDefined();
   });
 
-  it('accepts the bounds and rejects beyond the maximum', () => {
+  it('accepts the minimum, and any longer timeout, which only a free plan limits', () => {
     expect(validateTimeout(String(TIMEOUT_LIMITS.min))).toBeUndefined();
-    expect(validateTimeout(String(TIMEOUT_LIMITS.max))).toBeUndefined();
-    expect(validateTimeout(String(TIMEOUT_LIMITS.max + 1))).toBeDefined();
+    expect(validateTimeout('86401')).toBeUndefined();
+    expect(validateTimeout('604800')).toBeUndefined();
   });
 });
 

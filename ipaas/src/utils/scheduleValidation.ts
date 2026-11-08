@@ -20,8 +20,8 @@ import type { CronField } from './cronUtils';
 
 // Kubernetes rejects a bad timeout or cron only when the CronJob is applied, long after the save returns 200.
 
-/** 24h ceiling is a product guardrail, not a Kubernetes limit; the platform default is 300. */
-export const TIMEOUT_LIMITS = { min: 1, max: 86400 } as const;
+/** Only a free plan has a ceiling (FREE_PLAN_SCHEDULE_LIMITS); the platform default is 300. */
+export const TIMEOUT_LIMITS = { min: 1 } as const;
 
 export const CRON_FIELD_RANGES: Record<CronField, { min: number; max: number }> = {
   minute: { min: 0, max: 59 },
@@ -46,7 +46,6 @@ export function validateTimeout(raw: string): string | undefined {
   if (!/^-?\d+$/.test(value)) return 'Enter a whole number of seconds';
   const n = Number(value);
   if (n < TIMEOUT_LIMITS.min) return `Must be at least ${TIMEOUT_LIMITS.min} second`;
-  if (n > TIMEOUT_LIMITS.max) return `Must be ${TIMEOUT_LIMITS.max} seconds (24 hours) or less`;
   return undefined;
 }
 
