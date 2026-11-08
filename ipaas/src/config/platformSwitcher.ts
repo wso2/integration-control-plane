@@ -24,18 +24,18 @@
 /** This console's id in the switcher. */
 export const CURRENT_PLATFORM = 'integration-platform';
 
-/** The platforms, in display order, with the billing product code each is sold under. */
+/** The platforms, in display order. */
 export const PLATFORMS = [
-  { id: 'agent-manager', name: 'Agent Manager', billingCode: 'agent' },
-  { id: 'api-platform', name: 'API Platform', billingCode: 'bijira' },
-  { id: 'integration-platform', name: 'Integration Platform', billingCode: 'devant' },
-  { id: 'identity-platform', name: 'Identity Platform', billingCode: 'asgardeo' },
+  { id: 'agent-manager', name: 'Agent Manager' },
+  { id: 'api-platform', name: 'API Platform' },
+  { id: 'integration-platform', name: 'Integration Platform' },
+  { id: 'identity-platform', name: 'Identity Platform' },
 ] as const;
 
 export type PlatformId = (typeof PLATFORMS)[number]['id'];
 
 export interface PlatformSwitcherConfig {
-  /** Each platform console's URL, or its path when it shares this origin. */
+  /** Each platform console's URL, or its path when it shares this origin; already trimmed by loadConfig. */
   platformUrls?: Partial<Record<PlatformId, string>>;
   /** Platform ids shown as coming soon. */
   comingSoonPlatforms?: readonly string[];
@@ -46,8 +46,6 @@ export interface SwitcherLink {
   name: string;
   /** null: shown as coming soon. */
   url: string | null;
-  /** Billing's product code, for a platform billing sells. */
-  billingCode?: string;
 }
 
 /**
@@ -57,11 +55,11 @@ export interface SwitcherLink {
 export function buildPlatformSwitcher(config: PlatformSwitcherConfig | undefined, ownUrl: string): SwitcherLink[] {
   const comingSoon = new Set(config?.comingSoonPlatforms ?? []);
   const links: SwitcherLink[] = [];
-  for (const { id, name, billingCode } of PLATFORMS) {
-    const url = config?.platformUrls?.[id]?.trim() || (id === CURRENT_PLATFORM ? ownUrl : undefined);
+  for (const { id, name } of PLATFORMS) {
+    const url = config?.platformUrls?.[id] || (id === CURRENT_PLATFORM ? ownUrl : undefined);
     if (id !== CURRENT_PLATFORM && comingSoon.has(id)) links.push({ id, name, url: null });
     // A platform with no URL in this environment is left out.
-    else if (url) links.push({ id, name, url, billingCode });
+    else if (url) links.push({ id, name, url });
   }
   return links;
 }

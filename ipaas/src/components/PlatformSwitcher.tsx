@@ -16,14 +16,12 @@
  * under the License.
  */
 
-import { AppSwitcher, Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography, type AppSwitcherAppItem } from '@wso2/oxygen-ui';
+import { AppSwitcher, Box, type AppSwitcherAppItem } from '@wso2/oxygen-ui';
 import { House, Settings } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX } from 'react';
-import { buildPlatformSwitcher, CURRENT_PLATFORM, type SwitcherLink } from '../config/platformSwitcher';
-import { usePlatformAccess } from '../hooks/usePlatformAccess';
-import { cloudConsoleBillingActionUrl, cloudConsoleHomeUrl, cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl } from '../paths';
+import { useMemo, type JSX } from 'react';
+import { buildPlatformSwitcher, CURRENT_PLATFORM } from '../config/platformSwitcher';
+import { cloudConsoleHomeUrl, cloudConsoleOrganizationsUrl } from '../paths';
 import { withBase } from '../utils/basePath';
-import { PROMPT_FOR, type PlatformPromptKind } from '../utils/platformAccess';
 
 const ICON_SIZE = 32;
 
@@ -43,11 +41,6 @@ function PulseIcon(): JSX.Element {
   );
 }
 
-interface Prompt {
-  kind: PlatformPromptKind;
-  platform: SwitcherLink & { url: string; billingCode: string };
-}
-
 // On the shared origin the platforms read as one product: the same tab. Elsewhere, a new one.
 const isSameOrigin = (url: string): boolean => {
   try {
@@ -57,131 +50,31 @@ const isSameOrigin = (url: string): boolean => {
   }
 };
 
-function promptCopy({ kind, platform: { name } }: Prompt): { title: string; body: string; action: string } {
-  switch (kind) {
-    case 'start-trial':
-      return {
-        title: `Start your ${name} trial?`,
-        body: `Your organization hasn't used ${name} yet. Opening it starts a free trial for your organization.`,
-        action: 'Start trial',
-      };
-    case 'trial-ended':
-      return {
-        title: `Your ${name} trial has ended`,
-        body: `${name} is unavailable because your organization's trial has ended. Contact support to extend the trial or discuss a plan.`,
-        action: 'Contact support',
-      };
-    case 'unsubscribed':
-      return {
-        title: `You have unsubscribed from ${name}`,
-        body: `Your organization's ${name} subscription was cancelled. Subscribe again to open it.`,
-        action: 'Subscribe',
-      };
-    case 'suspended':
-      return {
-        title: `${name} is suspended`,
-        body: `Your organization's ${name} subscription is suspended. Your subscription details say why.`,
-        action: 'View subscription',
-      };
-  }
-}
-
 const sameTab = (url: string) => (isSameOrigin(url) ? { target: '_self' as const } : {});
 
-// WSO2 Cloud itself, below the platforms, as in the Agent Platform console.
-const manageLinks = () =>
-  [
-    { id: 'cloud-home', name: 'Cloud home', url: cloudConsoleHomeUrl(), icon: <House size={18} /> },
-    { id: 'settings', name: 'Settings', url: cloudConsoleOrganizationsUrl(), icon: <Settings size={18} /> },
-  ].map((link) => ({ ...link, ...sameTab(link.url) }));
-
-const open = (url: string): void => {
-  if (isSameOrigin(url)) window.location.assign(url);
-  else window.open(url, '_blank', 'noopener,noreferrer');
-};
-
-// The prompt's action: the platform itself for a trial, otherwise WSO2 Cloud's billing, as its own switcher does.
-function promptTarget({ kind, platform }: Prompt): string {
-  switch (kind) {
-    case 'start-trial':
-      return platform.url;
-    case 'trial-ended':
-      return cloudConsoleBillingActionUrl('extend-trial', platform.billingCode);
-    // Renews the existing subscription instead of buying a second one.
-    case 'unsubscribed':
-      return cloudConsoleBillingActionUrl('change-plan', platform.billingCode);
-    case 'suspended':
-      return cloudConsoleSubscriptionsUrl();
-  }
-}
-
-/**
- * WSO2 Cloud's nine-dot platform switcher, leading the header as in the WSO2 Cloud and Agent Platform consoles. A
- * platform the organization doesn't hold opens WSO2 Cloud's subscription dialog for it instead.
- */
+/** WSO2 Cloud's nine-dot platform switcher, leading the header as in the WSO2 Cloud and Agent Platform consoles. */
 export default function PlatformSwitcher(): JSX.Element {
-  const links = buildPlatformSwitcher(window.API_CONFIG, withBase('/'));
-  // The switcher is on every page; billing is asked only once it is opened.
-  const [opened, setOpened] = useState(false);
-  const { accessFor, isLoading } = usePlatformAccess(opened);
-  // Kept on close so the dialog doesn't empty while fading out.
-  const [prompt, setPrompt] = useState<Prompt | null>(null);
-  const [promptOpen, setPromptOpen] = useState(false);
-  // Remounting closes the popover, which stays open after a card click.
-  const [closeCount, setCloseCount] = useState(0);
-
-  const apps: AppSwitcherAppItem[] = links.map((link) => {
-    const { id, name, url, billingCode } = link;
-    const app = { id, name, icon: <PulseIcon /> };
-    const kind = url && billingCode && id !== CURRENT_PLATFORM ? PROMPT_FOR[accessFor(billingCode)] : undefined;
-    if (url && billingCode && kind) {
-      return {
-        ...app,
-        onClick: () => {
-          setPrompt({ kind, platform: { ...link, url, billingCode } });
-          setPromptOpen(true);
-          setCloseCount((n) => n + 1);
-        },
-      };
-    }
-    // A URL-less card shows as coming soon.
-    return { ...app, url, ...(url ? sameTab(url) : {}) };
-  });
-
-  const copy = prompt && promptCopy(prompt);
+  // Config is fixed once loaded.
+  const apps = useMemo<AppSwitcherAppItem[]>(
+    () =>
+      // A URL-less card shows as coming soon.
+      buildPlatformSwitcher(window.API_CONFIG, withBase('/')).map(({ id, name, url }) => ({ id, name, url, icon: <PulseIcon />, ...(url ? sameTab(url) : {}) })),
+    [],
+  );
+  const manageLinks = useMemo(
+    () =>
+      [
+        { id: 'cloud-home', name: 'Cloud home', url: cloudConsoleHomeUrl(), icon: <House size={18} /> },
+        { id: 'settings', name: 'Settings', url: cloudConsoleOrganizationsUrl(), icon: <Settings size={18} /> },
+      ].map((link) => ({ ...link, ...sameTab(link.url) })),
+    [],
+  );
 
   return (
-    <>
-      <AppSwitcher key={closeCount} currentAppId={CURRENT_PLATFORM}>
-        <AppSwitcher.Trigger label="Switch platforms" onClick={() => setOpened(true)} />
-        {/* Loading until billing answers, so a click can't skip a dialog. */}
-        <AppSwitcher.Section label="Categories" apps={apps} loading={isLoading} loadingCount={apps.length} />
-        <AppSwitcher.Footer label="Manage" links={manageLinks()} columns={2} />
-      </AppSwitcher>
-
-      <Dialog open={promptOpen} onClose={() => setPromptOpen(false)} maxWidth="xs" fullWidth>
-        {prompt && copy && (
-          <>
-            <DialogTitle>{copy.title}</DialogTitle>
-            <DialogContent>
-              <Typography variant="body2" color="text.secondary">
-                {copy.body}
-              </Typography>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setPromptOpen(false)}>{prompt.kind === 'start-trial' ? 'Cancel' : 'Close'}</Button>
-              <Button
-                variant="contained"
-                onClick={() => {
-                  setPromptOpen(false);
-                  open(promptTarget(prompt));
-                }}>
-                {copy.action}
-              </Button>
-            </DialogActions>
-          </>
-        )}
-      </Dialog>
-    </>
+    <AppSwitcher currentAppId={CURRENT_PLATFORM}>
+      <AppSwitcher.Trigger label="Switch platforms" />
+      <AppSwitcher.Section label="Categories" apps={apps} />
+      <AppSwitcher.Footer label="Manage" links={manageLinks} columns={2} />
+    </AppSwitcher>
   );
 }

@@ -28,7 +28,7 @@
 
 import { authenticatedFetch } from '../auth';
 import { q } from './_client';
-import type { BillingCatalogPlan, BillingOrg, BillingPlan, BillingSubscription } from '../types/billing';
+import type { BillingOrg, BillingPlan } from '../types/billing';
 
 const billingBaseUrl = (): string => window.API_CONFIG?.billingApiBaseUrl ?? '';
 
@@ -67,28 +67,4 @@ export async function fetchBillingPlan(code: string): Promise<BillingPlan> {
   } catch {
     throw new Error(`Billing API returned invalid JSON (HTTP ${res.status})`);
   }
-}
-
-async function fetchBillingList<T>(path: string): Promise<T> {
-  const base = billingBaseUrl();
-  if (!base) throw new Error('billingApiBaseUrl is not configured');
-
-  const res = await authenticatedFetch(`${base}${path}`, { headers: { Accept: 'application/json' } });
-  const text = await res.text().catch(() => '');
-  if (!res.ok) throw new Error(`Billing API error ${res.status}: ${text || res.statusText}`);
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    throw new Error(`Billing API returned invalid JSON (HTTP ${res.status})`);
-  }
-}
-
-/** Every plan of the billing catalog, across products. */
-export async function fetchBillingPlans(): Promise<BillingCatalogPlan[]> {
-  return (await fetchBillingList<{ plans?: BillingCatalogPlan[] }>('/plans')).plans ?? [];
-}
-
-/** The org's subscriptions across products. Unlike fetchBillingOrg, reading them provisions nothing. */
-export async function fetchBillingSubscriptions(): Promise<BillingSubscription[]> {
-  return (await fetchBillingList<{ subscriptions?: BillingSubscription[] }>('/subscriptions')).subscriptions ?? [];
 }

@@ -46,9 +46,4 @@ describe('buildPlatformSwitcher', () => {
       ['identity-platform', null],
     ]);
   });
-
-  it('carries the billing code of each linked platform', () => {
-    const [agent] = buildPlatformSwitcher({ platformUrls: { 'agent-manager': 'https://agent.example' } }, '/');
-    expect(agent.billingCode).toBe('agent');
-  });
 });

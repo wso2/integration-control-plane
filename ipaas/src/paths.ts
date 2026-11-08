@@ -28,11 +28,6 @@ export function cloudConsoleOrganizationsUrl(): string {
   return cloudConsoleUrl('/organizations');
 }
 
-/** WSO2 Cloud's billing page for one action on one product, e.g. renewing a cancelled subscription. */
-export function cloudConsoleBillingActionUrl(action: 'extend-trial' | 'change-plan', product: string): string {
-  return cloudConsoleUrl(`/billing?action=${action}&product=${encodeURIComponent(product)}`);
-}
-
 export function cloudConsoleSubscriptionsUrl(): string {
   return cloudConsoleUrl('/billing?tab=subscriptions');
 }
