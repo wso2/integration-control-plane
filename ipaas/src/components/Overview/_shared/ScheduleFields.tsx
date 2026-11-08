@@ -16,10 +16,11 @@
  * under the License.
  */
 
-import { Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
+import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel, MenuItem, Select, Stack, Tab, Tabs, Typography, TextField } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
+import { FREE_PLAN_SCHEDULE_LIMITS } from '../../../utils/scheduleValidation';
 import type { ScheduleFormApi } from './useScheduleForm';
 
 /**
@@ -29,10 +30,34 @@ import type { ScheduleFormApi } from './useScheduleForm';
  */
 export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors } = form;
+  const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan } = form;
+  const { minIntervalMinutes, maxTimeoutSeconds } = FREE_PLAN_SCHEDULE_LIMITS;
+  const frequencyError = errors.frequency && (
+    <Typography variant="body2" color="error">
+      {errors.frequency}
+    </Typography>
+  );
 
   return (
     <Stack gap={2}>
+      {plan?.state === 'free' && (
+        <Alert severity="info">
+          {executionSettings
+            ? `Schedules that run more often than every ${minIntervalMinutes} minutes, and job timeouts over ${maxTimeoutSeconds} seconds, can only be configured on a paid plan.`
+            : `Schedules that run more often than every ${minIntervalMinutes} minutes can only be configured on a paid plan.`}
+        </Alert>
+      )}
+      {plan?.state === 'unavailable' && (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={plan.retry}>
+              Retry
+            </Button>
+          }>
+          Couldn&apos;t check your plan. Schedules that run more often than every {minIntervalMinutes} minutes are unavailable until it loads.
+        </Alert>
+      )}
       <Tabs value={tab} onChange={(_e, v: number) => setTab(v)}>
         <Tab label="BY INTERVAL" />
         <Tab label="BY CRON" />
@@ -72,6 +97,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
               {description}
             </Typography>
           )}
+          {frequencyError}
         </Stack>
       ) : (
         <Stack gap={1.5}>
@@ -83,6 +109,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
               {description}
             </Typography>
           )}
+          {frequencyError}
           {CRON_FIELD_LABELS.map(({ key, label, placeholder }) => (
             <Box key={key}>
               <Typography variant="caption" color="text.secondary">
@@ -109,7 +136,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
         <Button variant="text" size="small" endIcon={advancedOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />} onClick={() => setAdvancedOpen((v) => !v)} sx={{ px: 0 }}>
           Advanced settings
         </Button>
-        <Collapse in={advancedOpen}>
+        <Collapse in={advancedOpen || !!errors.timeout}>
           <Stack gap={2} sx={{ mt: 1.5 }}>
             <Box>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>

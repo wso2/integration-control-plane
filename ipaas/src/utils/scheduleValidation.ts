@@ -97,3 +97,63 @@ export function validateCronFields(fields: Record<CronField, string>): Partial<R
   });
   return errors;
 }
+
+/** What a scheduled task may use on a free plan. ipaas-service enforces the same limits. */
+export const FREE_PLAN_SCHEDULE_LIMITS = { maxTimeoutSeconds: 300, minIntervalMinutes: 5 } as const;
+
+/** The schedule an environment already runs with; a free plan may keep it unchanged. */
+export interface SavedSchedule {
+  /** Empty when the environment has no schedule. */
+  cron: string;
+  timeoutSeconds: number | null;
+}
+
+/** The values a cron field matches, ascending, or null when the field doesn't parse. */
+function expandCronField(value: string, range: { min: number; max: number }): number[] | null {
+  const matched = new Set<number>();
+  for (const term of value.trim().split(',')) {
+    if (!validateTerm(term.trim(), range)) return null;
+    const [body, stepRaw] = term.trim().split('/');
+    const step = stepRaw === undefined ? 1 : Number(stepRaw);
+    let [start, end] = [range.min, range.max];
+    if (body !== '*' && body !== '?') {
+      const bounds = body.split('-').map(Number);
+      start = bounds[0];
+      // As robfig/cron reads it: "5/10" runs from 5 to the end of the range.
+      end = bounds.length === 2 ? bounds[1] : stepRaw === undefined ? bounds[0] : range.max;
+    }
+    for (let n = start; n <= end; n += step) matched.add(n);
+  }
+  return [...matched].sort((a, b) => a - b);
+}
+
+/**
+ * Shortest time, in minutes, between the starts of two runs of a 5-field cron, or null when it
+ * doesn't parse. The last run of a day and the first of the next count as adjacent, as ipaas-service
+ * counts them.
+ */
+export function shortestRunGapMinutes(cron: string): number | null {
+  const parts = cron.trim().split(/\s+/);
+  if (parts.length !== 5) return null;
+  const minutes = expandCronField(parts[0], CRON_FIELD_RANGES.minute);
+  const hours = expandCronField(parts[1], CRON_FIELD_RANGES.hour);
+  if (!minutes?.length || !hours?.length) return null;
+  const times = hours.flatMap((h) => minutes.map((m) => h * 60 + m));
+  let gap = 24 * 60 - times[times.length - 1] + times[0];
+  for (let i = 1; i < times.length; i++) gap = Math.min(gap, times[i] - times[i - 1]);
+  return gap;
+}
+
+/** Errors for a schedule a free plan does not allow. A value equal to the saved one is not checked. */
+export function validateFreePlanSchedule(cron: string, timeoutRaw: string, saved: SavedSchedule): { frequency?: string; timeout?: string } {
+  const errors: { frequency?: string; timeout?: string } = {};
+  const gap = shortestRunGapMinutes(cron);
+  if (gap !== null && gap < FREE_PLAN_SCHEDULE_LIMITS.minIntervalMinutes && cron.trim() !== saved.cron.trim()) {
+    errors.frequency = `Running more often than every ${FREE_PLAN_SCHEDULE_LIMITS.minIntervalMinutes} minutes needs a paid plan`;
+  }
+  const timeout = timeoutRaw.trim() === '' ? NaN : Number(timeoutRaw);
+  if (timeout > FREE_PLAN_SCHEDULE_LIMITS.maxTimeoutSeconds && timeout !== saved.timeoutSeconds) {
+    errors.timeout = `A timeout over ${FREE_PLAN_SCHEDULE_LIMITS.maxTimeoutSeconds} seconds needs a paid plan`;
+  }
+  return errors;
+}

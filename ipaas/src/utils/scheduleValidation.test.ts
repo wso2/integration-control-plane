@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateTimeout, validateIntervalCount, validateCronField, validateCronFields, TIMEOUT_LIMITS } from './scheduleValidation';
+import { validateTimeout, validateIntervalCount, validateCronField, validateCronFields, TIMEOUT_LIMITS, shortestRunGapMinutes, validateFreePlanSchedule } from './scheduleValidation';
 
 describe('validateTimeout', () => {
   it('accepts an empty value as "no timeout"', () => {
@@ -115,5 +115,57 @@ describe("'?' wildcard", () => {
 
   it('still rejects a zero step on ?', () => {
     expect(validateCronField('minute', '?/0')).toBeDefined();
+  });
+});
+
+// The same cases as ipaas-service's TestRunsMoreOftenThanFiveMinutes, so both read a cron alike.
+describe('shortestRunGapMinutes', () => {
+  it.each([
+    ['* * * * *', 1],
+    ['*/1 * * * *', 1],
+    ['*/4 * * * *', 4],
+    ['0-4 * * * *', 1],
+    ['0,3 * * * *', 3],
+    ['1,59 * * * *', 2], // 59 to 1 of the next hour
+    ['0,58 0,23 * * *', 2], // 23:58 to 00:00
+    ['*/5 * * * *', 5],
+    ['0,5,10 * * * *', 5],
+    ['*/5 9-17 * * 1-5', 5],
+    ['5/20 * * * *', 20], // 5, 25, 45, and 45 to 5 of the next hour
+    ['0 * * * *', 60],
+    ['0 0 * * *', 1440],
+    ['0 0 31 2 *', 1440],
+  ])('%s starts runs at least %i minutes apart', (cron, gap) => {
+    expect(shortestRunGapMinutes(cron)).toBe(gap);
+  });
+
+  it('gives null for a cron it cannot read', () => {
+    expect(shortestRunGapMinutes('not a cron')).toBeNull();
+    expect(shortestRunGapMinutes('61 * * * *')).toBeNull();
+  });
+});
+
+describe('validateFreePlanSchedule', () => {
+  const none = { cron: '', timeoutSeconds: null };
+
+  it('allows a schedule within the free limits', () => {
+    expect(validateFreePlanSchedule('*/5 * * * *', '300', none)).toEqual({});
+    expect(validateFreePlanSchedule('0 * * * *', '', none)).toEqual({});
+  });
+
+  it('refuses runs closer than 5 minutes and a timeout over 300 seconds', () => {
+    const errors = validateFreePlanSchedule('*/1 * * * *', '301', none);
+    expect(errors.frequency).toMatch(/more often than every 5 minutes needs a paid plan/);
+    expect(errors.timeout).toMatch(/over 300 seconds needs a paid plan/);
+  });
+
+  it('keeps the values the environment already runs with', () => {
+    expect(validateFreePlanSchedule('*/2 * * * *', '3600', { cron: '*/2 * * * *', timeoutSeconds: 3600 })).toEqual({});
+  });
+
+  it('checks a value that changes, even from one already over the limit', () => {
+    const errors = validateFreePlanSchedule('*/1 * * * *', '900', { cron: '*/2 * * * *', timeoutSeconds: 3600 });
+    expect(errors.frequency).toBeDefined();
+    expect(errors.timeout).toBeDefined();
   });
 });
