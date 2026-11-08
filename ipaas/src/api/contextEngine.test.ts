@@ -78,6 +78,14 @@ describe('engines', () => {
     expect(engine.exposure).toEqual({ api: false, mcp: true, answers: true });
   });
 
+  it('takes when the engine last restarted from the BFF, so a reload still shows the restart', async () => {
+    bff.get.mockResolvedValueOnce({ items: [{ ...bffEngine, startedAt: '2026-11-06T09:00:00Z', restartedAt: '2026-11-06T09:12:03.512Z' }] });
+
+    const [engine] = await listContextEngines('development');
+
+    expect(engine).toMatchObject({ startedAt: '2026-11-06T09:00:00Z', restartedAt: '2026-11-06T09:12:03.512Z' });
+  });
+
   it('sets access through the BFF', async () => {
     bff.put.mockResolvedValueOnce({ api: true, mcp: false });
 

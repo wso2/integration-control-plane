@@ -64,6 +64,8 @@ export interface ContextEngine {
   access?: ContextEngineAccess;
   /** When the running pod started; set only while the engine runs. */
   startedAt?: string;
+  /** When the engine was last asked to restart; a running pod that started before it is still restarting. */
+  restartedAt?: string;
 }
 
 export interface ContextEngineAccess {

@@ -140,25 +140,22 @@ export function useSeenOnScreen<T extends Element>(): [(el: T | null) => void, b
   return [setEl, seen];
 }
 
-const restartKey = (engineId: string) => [ROOT_KEY, 'restart', engineId];
-
 /** Shown while an engine restarts onto new models and its old pod still runs. */
 export const ENGINE_RESTARTING_REASON = 'Restarting with the new models';
 
 /** One engine; checked again while it starts, restarts or is being deleted. A restart shows the engine as starting until a pod that started after it runs. */
 export function useContextEngine(engineId: string, { pollOnError = false }: { pollOnError?: boolean } = {}) {
-  const { data: restartedAt } = useQuery<string>({ queryKey: restartKey(engineId), queryFn: () => Promise.reject(new Error('set by a models update')), enabled: false });
   return useQuery({
     queryKey: [ROOT_KEY, 'detail', engineId],
     queryFn: () => getContextEngine(engineId),
     enabled: isContextEngineEnabled() && !!engineId,
     retry: false,
-    select: (engine) => (engine.state === 'ready' && isRestartPending(engine.startedAt, restartedAt) ? { ...engine, state: 'starting' as const, statusReason: ENGINE_RESTARTING_REASON } : engine),
+    select: (engine) => (engine.state === 'ready' && isRestartPending(engine.startedAt, engine.restartedAt) ? { ...engine, state: 'starting' as const, statusReason: ENGINE_RESTARTING_REASON } : engine),
     refetchInterval: (query) => {
       if (pollOnError && query.state.status === 'error') return ENGINE_STATUS_POLL_MS;
       const engine = query.state.data;
       if (engine?.state === 'deleting') return DELETION_POLL_MS;
-      if (engine?.state === 'ready' && isRestartPending(engine.startedAt, restartedAt)) return ENGINE_STATUS_POLL_MS;
+      if (engine?.state === 'ready' && isRestartPending(engine.startedAt, engine.restartedAt)) return ENGINE_STATUS_POLL_MS;
       return engine && TRANSIENT_STATES.has(engine.state) ? ENGINE_STATUS_POLL_MS : false;
     },
   });
@@ -180,8 +177,7 @@ export function useUpdateContextModels(engineId: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: Omit<UpdateContextModelsInput, 'engineId'>) => updateContextModels({ ...input, engineId }),
-    onSuccess: ({ restartedAt }) => {
-      qc.setQueryData(restartKey(engineId), restartedAt);
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: [ROOT_KEY, 'list'] });
       return qc.invalidateQueries({ queryKey: [ROOT_KEY, 'detail', engineId] });
     },

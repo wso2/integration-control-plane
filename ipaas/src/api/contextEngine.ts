@@ -239,6 +239,7 @@ interface BffEngine {
   apiEnabled?: boolean;
   mcpEnabled?: boolean;
   startedAt?: string;
+  restartedAt?: string;
 }
 
 interface BffIntegration {
@@ -320,6 +321,7 @@ const toEngine = (raw: BffEngine): ContextEngine => ({
   ...(raw.publicApiUrl ? { publicApiUrl: raw.publicApiUrl.replace(/\/+$/, '') } : {}),
   ...(typeof raw.apiEnabled === 'boolean' && typeof raw.mcpEnabled === 'boolean' ? { access: { api: raw.apiEnabled, mcp: raw.mcpEnabled } } : {}),
   ...(raw.startedAt ? { startedAt: raw.startedAt } : {}),
+  ...(raw.restartedAt ? { restartedAt: raw.restartedAt } : {}),
 });
 
 const toSource = (raw: RawSource): ContextSource => ({ id: raw.id, name: raw.name, type: raw.type, state: raw.state });
@@ -615,10 +617,9 @@ export async function deleteContextEngine(engineId: string): Promise<void> {
   forgetConsoleAccess(engineId);
 }
 
-/** PUT /context-engines/{engine}/environments/{environment}/models: saves, then restarts the engine. A pod that started before restartedAt still runs the old models. */
-export async function updateContextModels({ engineId, ...input }: UpdateContextModelsInput): Promise<{ restartedAt: string }> {
-  const raw = await viaBff(() => bff.put<{ restartedAt: string }>(`${enginePath(engineId)}/models`, input));
-  return { restartedAt: raw.restartedAt };
+/** PUT /context-engines/{engine}/environments/{environment}/models: saves, then restarts the engine. */
+export async function updateContextModels({ engineId, ...input }: UpdateContextModelsInput): Promise<void> {
+  await viaBff(() => bff.put(`${enginePath(engineId)}/models`, input));
 }
 
 // ── Integrations and API keys (BFF) ─────────────────────────────────────────
