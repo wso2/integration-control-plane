@@ -86,10 +86,12 @@ export interface FieldLinkPicker {
   disabled?: boolean;
 }
 
-/** One field's link in the form: its source, and the picker when links can change here. */
+/** One field's link in the form: its source, the picker when links can change here, and whether a link write is on its way. */
 export interface FieldLink {
   source?: LinkedSource;
   picker?: FieldLinkPicker;
+  /** A link write is in flight: what feeds the field is about to change, so it takes no value meanwhile. */
+  busy?: boolean;
 }
 
 export type FieldLinks = (jsonPath: string) => FieldLink | undefined;

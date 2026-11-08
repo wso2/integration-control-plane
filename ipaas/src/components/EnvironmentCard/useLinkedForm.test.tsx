@@ -342,6 +342,21 @@ describe('the Configure form with links', () => {
     }
   });
 
+  // A link write replaces what feeds the field, so a value typed while one is on its way would be
+  // overwritten by it or overwrite it, depending which landed last.
+  it('takes no value and no link while a link write is on its way', async () => {
+    answer.pending = true;
+    try {
+      await act(async () => root.render(<Form />));
+      expect(button('Link ordersDatabaseUrl').disabled).toBe(true);
+      const values = Array.from(container.querySelectorAll('input[placeholder="Enter a value"]'));
+      expect(values.length).toBeGreaterThan(0);
+      expect(values.filter((i) => !(i as HTMLInputElement).disabled)).toEqual([]);
+    } finally {
+      answer.pending = false;
+    }
+  });
+
   it('links a field to the key picked from its link icon', async () => {
     await act(async () => button('Link ordersDatabaseUrl').click());
     await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent === 'Enter a value') as HTMLElement).click());

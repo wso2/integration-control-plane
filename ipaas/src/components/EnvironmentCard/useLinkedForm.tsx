@@ -78,6 +78,9 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
         },
       }),
       ...(offered && t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pickedTarget(id, pick)) } }),
+      // A link write replaces what feeds the field, so its value is not the user's to set until the
+      // write lands. One write is in flight at a time, so this holds for every field at once.
+      ...(write.isPending && { busy: true }),
     };
   };
 
@@ -130,11 +133,6 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
         </Typography>
       )}
       {view.editable && view.orphaned.length > 0 && <OrphanedLinks view={view} connections={links.connections.map((c) => c.id)} configurables={fields.map(configurableId)} busy={write.isPending || linksUnread} change={change} />}
-      {write.data?.workload === 'next_deploy' && (
-        <Alert severity="info" sx={{ mb: 1.5 }}>
-          Deploy to apply.
-        </Alert>
-      )}
       {write.isError && (
         <Alert
           severity="error"

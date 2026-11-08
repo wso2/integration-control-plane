@@ -512,19 +512,18 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
         };
 
+        // Deploying is what puts the saved configuration and the integration's links into a release,
+        // so it runs whether or not a build is named: without one the platform releases the workload
+        // as it stands. Naming none used to close the drawer instead, which applied nothing and said so
+        // nowhere.
         const afterSave = () => {
-          if (buildId) {
-            deployTrack
-              .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId, environmentId: actualEnvId, cronTimezone: '' })
-              .then(() => {
-                onClose();
-                onSaved?.();
-              })
-              .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
-          } else {
-            onClose();
-            onSaved?.();
-          }
+          deployTrack
+            .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId ?? '', environmentId: actualEnvId, cronTimezone: '' })
+            .then(() => {
+              onClose();
+              onSaved?.();
+            })
+            .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
         };
 
         if (certConfigs.length === 0 && !existingCertMappings?.mappingId) {
