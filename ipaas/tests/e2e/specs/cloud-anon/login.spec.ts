@@ -19,6 +19,9 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('cloud login @smoke', () => {
+  // The default 60s also covers beforeEach, whose three waits allow 60s each: on a slow IdP the hand-off alone used most of it.
+  test.describe.configure({ timeout: 3 * 60_000 });
+
   test.beforeEach(async ({ page }) => {
     await page.goto('login', { waitUntil: 'domcontentloaded', timeout: 60_000 });
     await page.waitForURL(/\/gate\/signin/, { timeout: 60_000, waitUntil: 'domcontentloaded' });
@@ -46,7 +49,8 @@ test.describe('cloud login @smoke', () => {
 
     await expect(terms).toBeVisible();
     await expect(privacy).toBeVisible();
-    await expect(terms).toHaveAttribute('href', 'https://wso2.com/cloud/terms-of-use/');
+    // Thunder's page is shared across WSO2 Cloud products and points at a per-product terms page (agent-manager today).
+    await expect(terms).toHaveAttribute('href', /^https:\/\/wso2\.com\/cloud\/([\w-]+\/)?terms-of-use\/?$/);
     await expect(privacy).toHaveAttribute('href', 'https://wso2.com/privacy-policy/');
   });
 

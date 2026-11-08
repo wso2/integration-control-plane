@@ -16,16 +16,16 @@ tests/e2e/
   helpers/                       journey-*, console-nav, build, token, secrets, session-storage, …
 ```
 
-`E2E_TOKEN_MODE` picks which setup the `cloud` project depends on. Both setups write `.auth/cloud-user.json` (session) and `.auth/cloud-context.json` (org and project). Specs cannot tell which setup ran.
+`E2E_TOKEN_MODE` picks which setup the `cloud` project depends on. Release validation uses `setup-cloud` with the GitHub bot: a token cannot start a console that signs in on the gateway (`AUTH_BFF_CONTEXT`), whose session is a cookie. Both setups write `.auth/cloud-user.json` (session) and `.auth/cloud-context.json` (org and project). Specs cannot tell which setup ran.
 
 ## The journey
 
-- **One fixture project, shared context.** `ipaas-e2e-journey.spec.ts` uses a single browser context and a single fixture project. The tests are grouped `00`–`09`; the groups run in order and each one is independent.
+- **One fixture project, shared context.** `ipaas-e2e-journey.spec.ts` uses a single browser context and a single fixture project. The tests are grouped `01`–`09`; the groups run in order and each one is independent.
 - **Fixture project:**
   - Group `01` creates `IPAAS-E2E-<yyMMdd-HHmm>-<suffix>`, and group `08` deletes it.
   - The name is written to `.auth/cloud-context.json`, because Playwright starts a new worker after a failure.
   - Overlapping runs never share a project.
-- **Housekeeping groups** (`00` legacy sweep, `08b` sweep of projects older than two hours) skip with a reason instead of failing. Keep it that way: a failed sweep is not a product defect.
+- **The housekeeping group** (`08b`, a sweep of projects older than two hours) skips with a reason instead of failing. Keep it that way: a failed sweep is not a product defect.
 - **New coverage** goes into the group for that surface, or a new numbered group. Add a spec file only for a surface that needs a different session or project, as `cloud-anon` does.
 - **Teardown** deletes everything a group creates, by listing what exists rather than remembering what was created.
 

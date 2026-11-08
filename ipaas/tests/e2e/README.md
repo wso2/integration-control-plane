@@ -6,7 +6,7 @@ The suite runs in two places:
 
 | Where                             | When                                 | Signs in with       |
 | --------------------------------- | ------------------------------------ | ------------------- |
-| **WSO2 Cloud release validation** | Automatically, for every new release | A platform token    |
+| **WSO2 Cloud release validation** | Automatically, for every new release | GitHub bot          |
 | **Your machine**                  | Whenever you run it                  | GitHub bot or token |
 
 > [!NOTE]
@@ -27,7 +27,6 @@ The suite runs in two places:
 
 | Group   | What it checks                                                                      |
 | ------- | ----------------------------------------------------------------------------------- |
-| 00      | Removes the suite's leftover project from older runs                                |
 | 01      | Creates the run's own fixture project                                               |
 | 02      | Empty project overview                                                              |
 | 03      | Browsing samples                                                                    |
@@ -102,15 +101,12 @@ How it works:
 
 The Job's settings, from the `ipaas-e2e` CronJob in `wso2cloud-deployment`:
 
-| Variable                 | Value                                                                        |
-| ------------------------ | ---------------------------------------------------------------------------- |
-| `E2E_TOKEN_MODE`         | `1`                                                                          |
-| `E2E_TOKEN_URL`          | The environment's `monitoring-token-provider`, `source=integration-platform` |
-| `E2E_TOKEN_AUTH`         | From the `test-secrets` secret                                               |
-| `E2E_TOKEN_TLS_INSECURE` | `1` (the internal gateway's certificate does not match its name)             |
-| `E2E_CLOUD_BASE_URL`     | The console in the same environment                                          |
-| `E2E_ARTIFACT_DIR`       | `/artifacts`                                                                 |
-| `PW_WORKERS`             | `2`                                                                          |
+| Variable                                                               | Value                                                                                                                      |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_GITHUB_USERNAME`, `E2E_GITHUB_PASSWORD`, `E2E_GITHUB_TOTP_SECRET` | The bot's GitHub account, from the suite's own `ipaas-e2e-test-secrets` secret (Vault `application`, `ipaas-e2e-github-*`) |
+| `E2E_CLOUD_BASE_URL`                                                   | The console in the same environment                                                                                        |
+| `E2E_ARTIFACT_DIR`                                                     | `/artifacts`                                                                                                               |
+| `PW_WORKERS`                                                           | `2`                                                                                                                        |
 
 ---
 

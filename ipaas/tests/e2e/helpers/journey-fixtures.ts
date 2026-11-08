@@ -18,12 +18,9 @@
 
 /** What the cloud journey is written against: its fixtures, their copy, and its budgets. */
 
-export const PROJECT = 'IPAAS-E2E';
 export const SAMPLE = 'Hello World Service';
-/** Derived by the import from the sub path's last segment, so it is fixed. */
-export const AUTOMATION = 'Mi Automation';
-export const AUTOMATION_REPO_URL = 'https://github.com/Dilhasha/mi-cloud-samples';
-export const AUTOMATION_SUB_PATH = 'mi-automation';
+/** An MI automation sample (integration-samples' samples.json); Quick deploy names the integration after it. */
+export const AUTOMATION = 'Person Lookup Automation';
 export const MI_TECHNOLOGY = 'WSO2 Integrator: MI';
 export const AGENT_TYPE = 'AI Agent';
 export const ENV = 'Development';

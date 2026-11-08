@@ -61,13 +61,24 @@ export async function readSessionToken(page: Page): Promise<string> {
   return raw ? ((JSON.parse(raw) as { access_token?: string }).access_token ?? '') : '';
 }
 
+// What the console sends the BFF: the session's bearer token, or on gateway sign-in (no token) the cookie plus X-Requested-With.
+async function bffAuthHeaders(page: Page): Promise<Record<string, string>> {
+  const token = await readSessionToken(page);
+  if (token) return { Authorization: `Bearer ${token}` };
+  const sameOrigin = await page.evaluate(() => {
+    const base = (window as unknown as { API_CONFIG?: { choreoBaseApiUrl?: string } }).API_CONFIG?.choreoBaseApiUrl;
+    return !!base && new URL(base, window.location.href).origin === window.location.origin;
+  });
+  return sameOrigin ? { 'X-Requested-With': 'XMLHttpRequest' } : {};
+}
+
 // Resolves with the BFF's verdict rather than throwing, so a caller can record the handle first.
 export async function createFixtureProject(page: Page, name: string, description: string): Promise<FixtureResult> {
-  const token = await readSessionToken(page);
+  const auth = await bffAuthHeaders(page);
   return page.evaluate(
-    async ({ project, desc, bearer }) => {
+    async ({ project, desc, authHeaders }) => {
       const base = (window as unknown as { API_CONFIG: { choreoBaseApiUrl: string } }).API_CONFIG.choreoBaseApiUrl;
-      const headers = { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' };
+      const headers = { ...authHeaders, 'Content-Type': 'application/json' };
 
       // deploymentPipeline is required and its name is environment-specific, so it is looked up.
       const pipelineRes = await fetch(`${base}/deploymentpipelines`, { headers });
@@ -84,17 +95,17 @@ export async function createFixtureProject(page: Page, name: string, description
       });
       return { status: res.status, body: (await res.text()).slice(0, 200) };
     },
-    { project: name, desc: description, bearer: token },
+    { project: name, desc: description, authHeaders: auth },
   );
 }
 
 // Builds and deploys are off: a row in the integrations table needs no running integration.
 export async function createFixtureComponent(page: Page, project: string, name: string, displayName: string): Promise<FixtureResult> {
-  const token = await readSessionToken(page);
+  const auth = await bffAuthHeaders(page);
   return page.evaluate(
-    async ({ projectName, componentName, display, bearer }) => {
+    async ({ projectName, componentName, display, authHeaders }) => {
       const base = (window as unknown as { API_CONFIG: { choreoBaseApiUrl: string } }).API_CONFIG.choreoBaseApiUrl;
-      const headers = { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' };
+      const headers = { ...authHeaders, 'Content-Type': 'application/json' };
 
       const res = await fetch(`${base}/projects/${projectName}/components`, {
         method: 'POST',
@@ -119,7 +130,7 @@ export async function createFixtureComponent(page: Page, project: string, name: 
       });
       return { status: res.status, body: (await res.text()).slice(0, 200) };
     },
-    { projectName: project, componentName: name, display: displayName, bearer: token },
+    { projectName: project, componentName: name, display: displayName, authHeaders: auth },
   );
 }
 
@@ -127,10 +138,9 @@ export async function createFixtureComponent(page: Page, project: string, name: 
 // refused while children remain, and enumerating them covers integrations created by a test
 // that failed before it could record the handle.
 export async function deleteFixtureProjects(page: Page, projects: readonly string[]): Promise<string[]> {
-  const token = await readSessionToken(page);
-  return page.evaluate(async ({ handles, bearer }) => {
+  const headers = await bffAuthHeaders(page);
+  return page.evaluate(async ({ handles, headers }) => {
     const base = (window as unknown as { API_CONFIG: { choreoBaseApiUrl: string } }).API_CONFIG.choreoBaseApiUrl;
-    const headers = { Authorization: `Bearer ${bearer}` };
 
     const out: string[] = [];
     for (const project of handles) {
@@ -145,7 +155,7 @@ export async function deleteFixtureProjects(page: Page, projects: readonly strin
       out.push(`${res.status} ${project}`);
     }
     return out;
-  }, { handles: [...projects], bearer: token });
+  }, { handles: [...projects], headers });
 }
 
 // Reports rather than throws: a throw here would replace the tests' own failures with a
