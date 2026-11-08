@@ -55,3 +55,26 @@ export const emptySx = { display: 'flex', alignItems: 'center', justifyContent: 
 export const emptyStackSx = { maxWidth: 440, textAlign: 'center' } as const;
 
 export const emptyIconSx = { color: 'text.secondary', opacity: 0.5 } as const;
+
+export const emptyGapSx = { pt: 2 } as const;
+
+export const headerSx = { mb: 3 } as const;
+
+export const headerActionSx = { flexShrink: 0 } as const;
+
+/** A disabled button doesn't fire events, so its tooltip hangs on a wrapper. */
+export const tooltipAnchorSx = { display: 'inline-flex' } as const;
+
+// The env card's User Portal row.
+
+export const rowSx = { mt: 2 } as const;
+
+export const rowNoteSx = { mt: 0.5 } as const;
+
+export const rowChipSx = { height: 18, fontSize: '0.65rem' } as const;
+
+export const reasonSx = { display: 'flex', gap: 0.75, alignItems: 'flex-start' } as const;
+
+export const reasonIconSx = { flexShrink: 0, mt: '2px', color: 'warning.main', display: 'inline-flex' } as const;
+
+export const dialogErrorSx = { mt: 2 } as const;

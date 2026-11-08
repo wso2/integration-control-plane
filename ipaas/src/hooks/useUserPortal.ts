@@ -18,8 +18,8 @@
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { disableUserPortal, enableUserPortal, fetchUserPortal, fetchUserPortalEnvironments, fetchUserPortalPublishability, publishToUserPortal, unpublishFromUserPortal } from '../api/userPortal';
-import { BffError } from '../api/_client';
 import type { UserPortal } from '../types/userPortal';
+import { isUserPortalUnavailable } from '../utils/apiErrors';
 
 const ROOT_KEY = 'userPortal';
 
@@ -30,9 +30,6 @@ const ROOT_KEY = 'userPortal';
 const SETTLING_POLL_MS = 3_000;
 
 const settling = (portal: UserPortal | undefined): boolean => portal?.state === 'setting-up' || portal?.state === 'removing';
-
-/** Whether ipaas-service answered that it serves no User Portal: the routes are off (404) or it is not configured (503). */
-export const isUserPortalUnavailable = (err: unknown): boolean => err instanceof BffError && (err.status === 404 || err.status === 503);
 
 /** The environments a User Portal can run in, in promotion order. */
 export function useUserPortalEnvironments() {

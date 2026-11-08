@@ -22,14 +22,12 @@ import { useState, type JSX } from 'react';
 import { Link as RouterLink } from 'react-router';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
-import { isUserPortalUnavailable, usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
+import { usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { userPortalUrl } from '../../nav';
 import type { UserPortalRefusal } from '../../types/userPortal';
+import { apiErrorMessage, isUserPortalUnavailable } from '../../utils/apiErrors';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
-
-const chipSx = { height: 18, fontSize: '0.65rem' } as const;
-const reasonSx = { display: 'flex', gap: 0.75, alignItems: 'flex-start' } as const;
-const reasonIconSx = { flexShrink: 0, mt: '2px', color: 'warning.main', display: 'inline-flex' } as const;
+import * as styles from './UserPortal.styles';
 
 const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
 
@@ -44,7 +42,7 @@ interface UserPortalRowProps {
   envName: string;
 }
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : 'Something went wrong.');
+const errorText = (err: unknown): string => apiErrorMessage(err, 'Something went wrong.');
 
 /**
  * Whether an AI agent, automation or workflow is published to this environment's User Portal, with
@@ -60,12 +58,12 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   // Scopes the last publish's endpoints require that the portal's users' tokens can't carry.
   const [rejectedScopes, setRejectedScopes] = useState<string[]>([]);
 
-  if (isLoading) return <Skeleton variant="rounded" height={40} sx={{ mt: 2 }} />;
+  if (isLoading) return <Skeleton variant="rounded" height={40} sx={styles.rowSx} />;
   // A BFF that serves no User Portal has nothing to publish to.
   if (isError && isUserPortalUnavailable(error)) return null;
   if (isError || !data) {
     return (
-      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mt: 2 }}>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" sx={styles.rowSx}>
         <Typography variant="caption" color="error">
           Could not check the User Portal.
         </Typography>
@@ -111,19 +109,19 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   );
 
   return (
-    <Box sx={{ mt: 2 }}>
+    <Box sx={styles.rowSx}>
       <Stack direction="row" alignItems="center" justifyContent="space-between">
         <Stack direction="row" alignItems="center" gap={1}>
           <Typography variant="caption" color="text.secondary">
             User Portal
           </Typography>
-          <Chip size="small" label={data.published ? 'Published' : 'Not published'} color={data.published ? 'success' : 'default'} sx={chipSx} />
+          <Chip size="small" label={data.published ? 'Published' : 'Not published'} color={data.published ? 'success' : 'default'} sx={styles.rowChipSx} />
         </Stack>
         {action}
       </Stack>
 
       {!data.published && data.reasons.length > 0 && (
-        <Stack gap={0.5} sx={{ mt: 0.5 }} aria-label="Why it can't be published">
+        <Stack gap={0.5} sx={styles.rowNoteSx} role="group" aria-label="Why it can't be published">
           {data.reasons.map((reason) => (
             <Reason key={reason.code + reason.message} reason={reason} orgHandler={orgHandler} />
           ))}
@@ -132,12 +130,12 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
 
       {/* An unpublish failure shows in its confirm dialog, which stays open on it. */}
       {publish.isError && (
-        <Typography variant="caption" color="error" component="p" sx={{ mt: 0.5 }}>
+        <Typography variant="caption" color="error" component="p" sx={styles.rowNoteSx}>
           {errorText(publish.error)}
         </Typography>
       )}
       {rejectedScopes.length > 0 && (
-        <Typography variant="caption" color="warning.main" component="p" sx={{ mt: 0.5 }}>
+        <Typography variant="caption" color="warning.main" component="p" sx={styles.rowNoteSx}>
           The User Portal can&apos;t hold {rejectedScopes.length === 1 ? 'this scope' : 'these scopes'}, so its users&apos; tokens never carry {rejectedScopes.length === 1 ? 'it' : 'them'}: {rejectedScopes.join(', ')}.
         </Typography>
       )}
@@ -146,7 +144,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
         <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
           <Typography variant="body2">The User Portal&apos;s users no longer see this integration there. The integration keeps running.</Typography>
           {unpublish.isError && (
-            <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+            <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
               {errorText(unpublish.error)}
             </Typography>
           )}
@@ -159,8 +157,8 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
 /** One publishing rule the integration breaks, as ipaas-service words it. */
 function Reason({ reason, orgHandler }: { reason: UserPortalRefusal; orgHandler: string }): JSX.Element {
   return (
-    <Box sx={reasonSx}>
-      <Box component="span" sx={reasonIconSx}>
+    <Box sx={styles.reasonSx}>
+      <Box component="span" sx={styles.reasonIconSx}>
         <CircleAlert size={12} />
       </Box>
       <Typography variant="caption" color="text.secondary">

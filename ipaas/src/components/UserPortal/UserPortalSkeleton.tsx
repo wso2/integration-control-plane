@@ -23,7 +23,7 @@ import * as styles from './UserPortal.styles';
 /** Stands in for the User Portal cards while the environments and their portals load. */
 export default function UserPortalSkeleton(): JSX.Element {
   return (
-    <Box sx={styles.cardGridSx} aria-busy="true" aria-label="Loading User Portals">
+    <Box sx={styles.cardGridSx} role="status" aria-busy="true" aria-label="Loading User Portals">
       {[0, 1].map((i) => (
         <Card key={i} variant="outlined" sx={styles.cardSx}>
           <CardContent sx={styles.cardContentSx}>

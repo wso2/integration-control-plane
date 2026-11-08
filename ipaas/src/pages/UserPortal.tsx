@@ -21,8 +21,9 @@ import { AppWindow, Plus } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
-import { isUserPortalUnavailable, useEnableUserPortal, useUserPortalEnvironments, useUserPortals } from '../hooks/useUserPortal';
+import { useEnableUserPortal, useUserPortalEnvironments, useUserPortals } from '../hooks/useUserPortal';
 import type { OrgScope } from '../nav';
+import { apiErrorMessage, isUserPortalUnavailable } from '../utils/apiErrors';
 import type { UserPortal as Portal, UserPortalState } from '../types/userPortal';
 import OrgSettingsTabs from '../components/Settings/OrgConfigureTabs';
 import EnableUserPortalDialog from '../components/UserPortal/EnableUserPortalDialog';
@@ -39,7 +40,7 @@ type ShownPortal = Portal & { state: Exclude<UserPortalState, 'not-enabled'> };
 
 const shown = (portal: Portal | undefined): portal is ShownPortal => !!portal && portal.state !== 'not-enabled';
 
-const errorText = (err: unknown): string => (err instanceof Error ? err.message : 'Something went wrong.');
+const errorText = (err: unknown): string => apiErrorMessage(err, 'Something went wrong.');
 
 /** The org's User Portal, one per environment of its default deployment pipeline. A tab under Configure. */
 export default function UserPortal(_scope: OrgScope): JSX.Element {
@@ -62,9 +63,9 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
   };
 
   const rows = envs.map((environment, i) => ({ environment, query: portals[i] }));
-  const enabled = rows.flatMap(({ environment, query }) => (shown(query?.data) ? [{ environment, portal: query.data }] : []));
-  const available = rows.filter(({ query }) => query?.data?.state === 'not-enabled').map(({ environment }) => environment);
-  const failedRows = rows.filter(({ query }) => query?.isError && !query.data);
+  const enabled = rows.flatMap(({ environment, query }) => (shown(query.data) ? [{ environment, portal: query.data }] : []));
+  const available = rows.filter(({ query }) => query.data?.state === 'not-enabled').map(({ environment }) => environment);
+  const failedRows = rows.filter(({ query }) => query.isError && !query.data);
   const refetchAll = () => {
     void environments.refetch();
     portals.forEach((q) => void q.refetch());
@@ -90,10 +91,11 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
     });
 
   const enableButton = (label: string) => {
-    const refusal = manageRefusal || (available.length === 0 ? 'Every environment has a User Portal.' : '');
+    // An environment whose read failed may still have no portal, so it is never counted as having one.
+    const refusal = manageRefusal || (available.length > 0 ? '' : failedRows.length > 0 ? 'Some User Portals could not be read. Retry first.' : 'Every environment has a User Portal.');
     return (
       <Tooltip title={refusal}>
-        <Box component="span" sx={{ display: 'inline-flex' }}>
+        <Box component="span" sx={styles.tooltipAnchorSx}>
           <Button variant="contained" startIcon={<Plus size={20} />} onClick={openEnable} disabled={!!refusal}>
             {label}
           </Button>
@@ -122,36 +124,41 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
       );
     if (unavailable) return <UserPortalUnavailable />;
     if (envs.length === 0) return <Alert severity="info">The default deployment pipeline has no environments, so there is nowhere to enable the User Portal.</Alert>;
-    if (enabled.length === 0 && failedRows.length === 0)
+    // A failed read sits above either view, so it never hides the empty state and its Enable button.
+    const failedAlert = failedRows.length > 0 && (
+      <Alert
+        severity="warning"
+        action={
+          <Button color="inherit" size="small" onClick={refetchAll}>
+            Retry
+          </Button>
+        }>
+        Could not load the User Portal in {failedRows.map(({ environment }) => environment.name).join(', ')}.
+      </Alert>
+    );
+    if (enabled.length === 0)
       return (
-        <Box sx={styles.emptySx}>
-          <Stack spacing={1} alignItems="center" sx={styles.emptyStackSx}>
-            <Box sx={styles.emptyIconSx}>
-              <AppWindow size={64} />
-            </Box>
-            <Typography variant="h5" component="h2" sx={{ pt: 2 }}>
-              Enable the User Portal
-            </Typography>
-            <Typography variant="body1" color="text.secondary">
-              {SUBHEADER}
-            </Typography>
-            <Box sx={{ pt: 2 }}>{enableButton('Enable User Portal')}</Box>
-          </Stack>
-        </Box>
+        <Stack spacing={2}>
+          {failedAlert}
+          <Box sx={styles.emptySx}>
+            <Stack spacing={1} alignItems="center" sx={styles.emptyStackSx}>
+              <Box sx={styles.emptyIconSx}>
+                <AppWindow size={64} />
+              </Box>
+              <Typography variant="h5" component="h2" sx={styles.emptyGapSx}>
+                Enable the User Portal
+              </Typography>
+              <Typography variant="body1" color="text.secondary">
+                {SUBHEADER}
+              </Typography>
+              <Box sx={styles.emptyGapSx}>{enableButton('Enable User Portal')}</Box>
+            </Stack>
+          </Box>
+        </Stack>
       );
     return (
       <Stack spacing={2}>
-        {failedRows.length > 0 && (
-          <Alert
-            severity="warning"
-            action={
-              <Button color="inherit" size="small" onClick={refetchAll}>
-                Retry
-              </Button>
-            }>
-            Could not load the User Portal in {failedRows.map(({ environment }) => environment.name).join(', ')}.
-          </Alert>
-        )}
+        {failedAlert}
         <Box sx={styles.cardGridSx}>
           {enabled.map(({ environment, portal }) => (
             <UserPortalCard key={environment.id} environment={environment} portal={portal} manageRefusal={manageRefusal} retrying={retryEnable.isPending && retryEnable.variables === environment.id} onRetry={() => retry(environment.id)} />
@@ -166,11 +173,11 @@ export default function UserPortal(_scope: OrgScope): JSX.Element {
       <OrgSettingsTabs active="user-portal" />
       {/* The empty state carries the description and its own Enable button. */}
       {!loading && !unavailable && enabled.length > 0 && (
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={{ mb: 3 }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} sx={styles.headerSx}>
           <Typography variant="body2" color="text.secondary">
             {SUBHEADER}
           </Typography>
-          <Box sx={{ flexShrink: 0 }}>{enableButton('Enable User Portal')}</Box>
+          <Box sx={styles.headerActionSx}>{enableButton('Enable User Portal')}</Box>
         </Stack>
       )}
       {body()}

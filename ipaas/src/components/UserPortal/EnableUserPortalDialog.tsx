@@ -30,7 +30,7 @@ interface EnableUserPortalDialogProps {
   onClose: () => void;
 }
 
-// The production environment is where most portals belong, so it is picked first.
+// Most portals belong in production, so the first critical environment is picked; with none, the first in promotion order.
 const defaultEnvironment = (environments: SomeEnvironments): string => (environments.find((e) => e.critical) ?? environments[0]).id;
 
 /** Picks the environment to enable the User Portal in. */

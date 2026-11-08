@@ -22,8 +22,8 @@ import { integrationModuleLoaders } from '../components/Overview/registry';
 import UserPortalFooter from '../components/Overview/_shared/UserPortalFooter';
 import { USER_PORTAL_TYPES } from '../constants/userPortal';
 
-// The types the User Portal shows get its row under each env card's body.
-const withUserPortal = (type: IntegrationType, module: IntegrationModule): IntegrationModule => (USER_PORTAL_TYPES.has(type) ? { ...module, EnvCardFooter: UserPortalFooter } : module);
+// The types the User Portal shows get its row under each env card's body, unless the type ships a footer of its own.
+const withUserPortal = (type: IntegrationType, module: IntegrationModule): IntegrationModule => (USER_PORTAL_TYPES.has(type) ? { ...module, EnvCardFooter: module.EnvCardFooter ?? UserPortalFooter } : module);
 
 /**
  * Lazily loads the Overview module (one chunk per integration type) for a
