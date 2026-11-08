@@ -85,7 +85,7 @@ const promotionPathsToTree = (paths: BffPromotionPath[]): PromotionTreeNode => {
 };
 
 // OpenChoreo has no default flag; the well-known "default" pipeline stands in.
-const DEFAULT_PIPELINE_NAME = 'default';
+export const DEFAULT_PIPELINE_NAME = 'default';
 
 const toDeploymentPipeline = (p: BffDeploymentPipeline): DeploymentPipeline => ({
   id: p.name,
@@ -112,6 +112,8 @@ export const fetchEnvTemplates = (_orgNumericId: number): Promise<EnvTemplate[]>
         dns_prefix: '',
       })),
   );
+
+export const fetchDeploymentPipeline = (name: string): Promise<DeploymentPipeline> => bff.get<BffDeploymentPipeline>(`/deploymentpipelines/${seg(name)}`).then(toDeploymentPipeline);
 
 // A project references at most one pipeline; return it as a single-item list.
 // Read errors propagate: an unavailable BFF must not be reported to the UI as

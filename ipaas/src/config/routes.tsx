@@ -59,6 +59,7 @@ const McpProxyFromApi = lazyPage(() => import('../pages/McpProxyFromApi'));
 const ComponentTest = lazyPage(() => import('../pages/ComponentTest'));
 const OrgDataPlanes = lazyPage(() => import('../pages/OrgDataPlanes'));
 const OrgDatabases = lazyPage(() => import('../pages/OrgDatabases'));
+const UserPortal = lazyPage(() => import('../pages/UserPortal'));
 const CreateDatabaseServer = lazyPage(() => import('../pages/CreateDatabaseServer'));
 const DatabaseServerDetail = lazyPage(() => import('../pages/DatabaseServerDetail'));
 const TemporalServerDetail = lazyPage(() => import('../pages/TemporalServerDetail'));
@@ -156,6 +157,7 @@ const routes: AppRoute[] = [
               { path: 'organizations/:orgHandler/platform-services/temporal/:temporalId/:tab', element: createElement(RouteErrorBoundary, null, createElement(withScope(TemporalServerDetail, ['organizations']))) },
               { path: 'organizations/:orgHandler/settings', element: createElement(withScope(OrgSettings, ['organizations'])) },
               { path: 'organizations/:orgHandler/settings/package-registries', element: createElement(RouteErrorBoundary, null, createElement(withScope(OrgPackageRegistries, ['organizations']))) },
+              { path: 'organizations/:orgHandler/settings/user-portal', element: createElement(RouteErrorBoundary, null, createElement(withScope(UserPortal, ['organizations']))) },
               ...generateMatrixRoutes(MATRIX),
               { path: 'organizations/:orgHandler/projects/:projectHandler/deploy', element: createElement(withScope(ProjectDeploy, ['projects'])) },
               { path: 'organizations/:orgHandler/projects/:projectHandler/test', element: createElement(withScope(ProjectTest, ['projects'])) },

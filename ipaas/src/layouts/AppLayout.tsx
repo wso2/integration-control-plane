@@ -748,7 +748,7 @@ export default function AppLayout(): JSX.Element {
                         <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                       </Sidebar.Item>
                     )}
-                    {/* Configure carries Package Registries. */}
+                    {/* Configure carries Package Registries and the User Portal. */}
                     <Sidebar.Item id="org-settings">
                       <Sidebar.ItemIcon>
                         <SlidersHorizontal size={20} />

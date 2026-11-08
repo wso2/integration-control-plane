@@ -26,6 +26,9 @@ Overview/
 │   │                            "Configure to Continue" when required configs are unset
 │   ├── configStatus.ts          hasMissingRequiredConfigs() — shared by automation,
 │   │                            file/event, ai-agent (drives the button + Run/Schedule)
+│   ├── UserPortalFooter.tsx     EnvCardFooter: the User Portal row, shared with the
+│   │                            Deploy page. useIntegrationModule adds it to the
+│   │                            types in constants/userPortal.ts USER_PORTAL_TYPES
 │   ├── FileEventHeader.tsx      shared CustomHeader for file- + event-integration
 │   │                            (status dot + Configure + Stop/Start; logs are in the body)
 │   ├── HeaderShell.tsx          integration-level header rendered above the cards
@@ -84,7 +87,7 @@ optional `EnvCardFooter`. A type with no env-card concept (e.g. Tailscale) expor
 | `HeaderStatus`   | types with a status/Configure | service / ai-agent status dot + Configure                |
 | `EnvCardActions` | types with header actions     | Run/Schedule, Stop/Test/Logs                             |
 | `CustomHeader`   | header outliers               | file- + event-integration (shared `FileEventHeader`)     |
-| `EnvCardFooter`  | optional                      | — none today                                             |
+| `EnvCardFooter`  | optional                      | User Portal row, added by the loader (USER_PORTAL_TYPES) |
 | `CustomOverview` | full-surface outliers         | Tailscale                                                |
 | `HeaderActions`  | integration-level actions     | integration-as-api's Configure security link             |
 
