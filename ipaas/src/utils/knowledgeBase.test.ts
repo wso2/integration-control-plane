@@ -32,6 +32,7 @@ import {
   knowledgeBaseNameFrom,
   knowledgeBaseSummary,
   secretsForUpdate,
+  retrievalAccessReason,
   retrievalUnavailableReason,
   vectorStoreFromConfig,
 } from './knowledgeBase';
@@ -168,13 +169,26 @@ describe('isNameValid', () => {
 
 describe('retrievalUnavailableReason', () => {
   it.each([
-    [{ status: 'ACTIVE', serviceUrl: 'https://kb' }, null],
-    [{ status: 'ACTIVE', serviceUrl: '' }, 'The knowledge base service has no public URL yet.'],
-    [{ status: 'IN_PROGRESS', serviceUrl: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
-    [{ status: '', serviceUrl: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
-    [{ status: 'ERROR', serviceUrl: 'https://kb' }, 'The knowledge base service failed to deploy, so it cannot be queried.'],
+    [{ status: 'ACTIVE' }, null],
+    [{ status: 'IN_PROGRESS' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
+    [{ status: '' }, 'The knowledge base service is still deploying. You can query it once it is active.'],
+    [{ status: 'ERROR' }, 'The knowledge base service failed to deploy, so it cannot be queried.'],
   ])('%j', (kb, reason) => {
     expect(retrievalUnavailableReason(kb)).toBe(reason);
+  });
+});
+
+describe('retrievalAccessReason', () => {
+  const ready = { keyError: null, needsApiKeyAuth: false, isUnavailable: false, gatewayUrl: 'https://gw/docs-kb', isAuthorized: true };
+  it.each([
+    [ready, null],
+    [{ ...ready, keyError: "Your role can't create test keys." }, "Your role can't create test keys."],
+    [{ ...ready, needsApiKeyAuth: true, isAuthorized: false }, "The knowledge base's API takes another kind of credential, so it can't be queried with a test key."],
+    [{ ...ready, isUnavailable: true, gatewayUrl: '' }, 'The knowledge base is not on the API gateway yet. Saving its configuration again puts it there.'],
+    [{ ...ready, isAuthorized: false }, 'Getting a test key for the knowledge base…'],
+    [{ ...ready, gatewayUrl: '' }, 'Getting a test key for the knowledge base…'],
+  ])('%j', (access, reason) => {
+    expect(retrievalAccessReason(access)).toBe(reason);
   });
 });
 

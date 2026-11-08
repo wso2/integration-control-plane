@@ -35,7 +35,7 @@ export interface KnowledgeBase {
   secretKeys: string[];
   /** KB Service deployment status: ACTIVE, IN_PROGRESS, ERROR, SUSPENDED, or '' before the first rollout. */
   status: string;
-  /** The KB Service's external URL; '' until routed. */
+  /** The KB Service's URL on the API Platform gateway, which takes an API key; '' until it is exposed there. */
   serviceUrl: string;
   dataSources: KnowledgeBaseDataSource[];
   createdAt: string;

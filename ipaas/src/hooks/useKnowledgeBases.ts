@@ -16,10 +16,14 @@
  * under the License.
  */
 
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createKnowledgeBase, createKnowledgeBaseDataSource, deleteKnowledgeBase, fetchKnowledgeBase, fetchKnowledgeBases, retrieveFromKnowledgeBase, updateKnowledgeBase } from '../api/knowledgeBases';
+import { createKnowledgeBase, createKnowledgeBaseDataSource, deleteKnowledgeBase, fetchKnowledgeBase, fetchKnowledgeBases, KB_SERVICE_ENDPOINT, retrieveFromKnowledgeBase, updateKnowledgeBase } from '../api/knowledgeBases';
+import type { EndpointRef } from '../types/consumers';
 import type { CreateKnowledgeBaseDataSourceInput, CreateKnowledgeBaseInput, KnowledgeBase, UpdateKnowledgeBaseInput } from '../types/knowledgeBase';
 import type { RetrievalQuery } from '../types/ragIngestion';
+import { httpStatusOf } from '../utils/apiErrors';
+import { useEndpointTestAccess } from './useEndpointTestAccess';
 
 // A KB Service and its data sources take a while to roll out after a write, so
 // a knowledge base still deploying is polled until it settles.
@@ -89,8 +93,25 @@ export function useCreateKnowledgeBaseDataSource(knowledgeBase: string) {
   });
 }
 
-export function useRetrieveFromKnowledgeBase(knowledgeBase: string, componentId: string) {
-  return useMutation({
-    mutationFn: (query: Pick<RetrievalQuery, 'userQuery' | 'maxChunks' | 'minSimilarity'>) => retrieveFromKnowledgeBase(knowledgeBase, componentId, query),
+/**
+ * Retrieval from a knowledge base's service on the API Platform gateway, queried as `componentId`.
+ * The test key is minted, and renewed after a refusal, as for any API the console tests; `access`
+ * says whether a query can be sent yet. `enabled` false mints nothing, as while the service is not
+ * active.
+ */
+export function useRetrieveFromKnowledgeBase(kb: Pick<KnowledgeBase, 'name' | 'environment' | 'serviceUrl'>, componentId: string, enabled: boolean) {
+  const ref = useMemo<EndpointRef>(() => ({ componentName: kb.name, environmentName: kb.environment, endpointName: KB_SERVICE_ENDPOINT, deploymentTrackId: '' }), [kb.name, kb.environment]);
+  const access = useEndpointTestAccess(ref, { enabled, gatewayUrlFallback: kb.serviceUrl });
+  const retrieve = useMutation({
+    mutationFn: async (query: Pick<RetrievalQuery, 'userQuery' | 'maxChunks' | 'minSimilarity'>) => {
+      try {
+        return await retrieveFromKnowledgeBase(access.gatewayUrl, { header: access.authHeader, apiKey: access.apiKey }, componentId, query);
+      } catch (err) {
+        // A held key expires, and another tab's mint can reap it.
+        if (httpStatusOf(err) === 401) access.retryUnauthorized();
+        throw err;
+      }
+    },
   });
+  return { retrieve, access };
 }

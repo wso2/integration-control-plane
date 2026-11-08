@@ -23,6 +23,9 @@ import type { CreateKnowledgeBaseDataSourceInput, CreateKnowledgeBaseInput, Know
 import type { RetrievalQuery, RetrievedChunk, RetrieveResponse } from '../types/ragIngestion';
 import { bff, items, seg, type ListResponse, type MessageResponse } from './_client';
 
+/** The KB Service's endpoint, the one its API on the API Platform gateway fronts. */
+export const KB_SERVICE_ENDPOINT = 'knowledge-base';
+
 // The BFF omits empty strings and the subtype-specific fields it has no value for.
 interface BffKnowledgeBaseDataSource {
   name: string;
@@ -100,18 +103,30 @@ export const createKnowledgeBaseDataSource = (knowledgeBase: string, input: Crea
 
 export const RETRIEVE_TIMEOUT_MS = 30_000;
 
+/** The key the gateway takes, in the header it reads it from; no key for an API that takes none. */
+export interface GatewayCredential {
+  header: string;
+  apiKey: string | null;
+}
+
 /**
- * Query a knowledge base through the BFF, which forwards to its KB Service. The
- * service reads a form-encoded query and identifies the caller by
- * `rag_component_id`, the integration the query is made from.
+ * Query a knowledge base on the API Platform gateway, as the console tests any API: with the
+ * endpoint's test key. The gateway routes only `POST /retrieve`. The service reads a form-encoded
+ * query and identifies the caller by `rag_component_id`, the integration the query is made from.
+ * A refusal carries its HTTP status as `status`.
  */
-export const retrieveFromKnowledgeBase = (name: string, componentId: string, query: Pick<RetrievalQuery, 'userQuery' | 'maxChunks' | 'minSimilarity'>): Promise<RetrievedChunk[]> => {
+export async function retrieveFromKnowledgeBase(gatewayUrl: string, credential: GatewayCredential, componentId: string, query: Pick<RetrievalQuery, 'userQuery' | 'maxChunks' | 'minSimilarity'>): Promise<RetrievedChunk[]> {
   const body = new URLSearchParams({
     rag_component_id: componentId,
     user_query: query.userQuery,
     max_retrieve_chunks: String(query.maxChunks),
     min_similarity_threshold: String(query.minSimilarity),
   });
-  // Bounded, so a request the BFF never answers fails instead of holding the chat busy.
-  return bff.post<RetrieveResponse>(`/knowledge-bases/${seg(name)}/retrieve`, body, undefined, AbortSignal.timeout(RETRIEVE_TIMEOUT_MS)).then((r) => r.retrieved_chunks ?? []);
-};
+  const headers: Record<string, string> = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (credential.apiKey) headers[credential.header] = credential.apiKey;
+  // Bounded, so a request the gateway never answers fails instead of holding the chat busy.
+  const res = await fetch(`${gatewayUrl.replace(/\/+$/, '')}/retrieve`, { method: 'POST', headers, body, signal: AbortSignal.timeout(RETRIEVE_TIMEOUT_MS) });
+  if (!res.ok) throw Object.assign(new Error(`The knowledge base answered HTTP ${res.status}`), { status: res.status });
+  const out = (await res.json()) as RetrieveResponse;
+  return out.retrieved_chunks ?? [];
+}

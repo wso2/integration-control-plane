@@ -17,6 +17,7 @@
  */
 
 import { AZURE_DEFAULT_API_VERSION, CHUNKING_STRATEGIES, DATASOURCES, DEFAULT_CHUNKING, EMBEDDING_PROVIDERS, RAG_SECRET_KEYS, VECTOR_STORE_PROVIDERS } from '../constants/ragIngestion';
+import type { EndpointTestAccess } from '../hooks/useEndpointTestAccess';
 import type { KnowledgeBase, KnowledgeBaseDataSource, KnowledgeBaseSettings } from '../types/knowledgeBase';
 import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, VectorStoreConfig } from '../types/ragIngestion';
 import { datasourceEnvVars, embeddingEnvVars, isEmbeddingValid, isVectorStoreValid, vectorStoreEnvVars } from './ragIngestion';
@@ -219,10 +220,18 @@ export function ingestionNotice(sources: readonly Pick<KnowledgeBaseDataSource, 
 }
 
 /** Why a knowledge base cannot be queried yet, or null when it can. */
-export function retrievalUnavailableReason(kb: Pick<KnowledgeBase, 'status' | 'serviceUrl'>): string | null {
+export function retrievalUnavailableReason(kb: Pick<KnowledgeBase, 'status'>): string | null {
   if (kb.status === 'ERROR') return 'The knowledge base service failed to deploy, so it cannot be queried.';
   if (kb.status === 'SUSPENDED') return 'The knowledge base service is stopped, so it cannot be queried.';
   if (kb.status !== 'ACTIVE') return 'The knowledge base service is still deploying. You can query it once it is active.';
-  if (!kb.serviceUrl) return 'The knowledge base service has no public URL yet.';
+  return null;
+}
+
+/** Why an active knowledge base cannot be queried on the gateway with a test key yet, or null when it can. */
+export function retrievalAccessReason(access: Pick<EndpointTestAccess, 'keyError' | 'needsApiKeyAuth' | 'isUnavailable' | 'gatewayUrl' | 'isAuthorized'>): string | null {
+  if (access.keyError) return access.keyError;
+  if (access.needsApiKeyAuth) return "The knowledge base's API takes another kind of credential, so it can't be queried with a test key.";
+  if (access.isUnavailable) return 'The knowledge base is not on the API gateway yet. Saving its configuration again puts it there.';
+  if (!access.gatewayUrl || !access.isAuthorized) return 'Getting a test key for the knowledge base…';
   return null;
 }
