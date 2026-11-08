@@ -23,6 +23,7 @@ import type { JSX, ReactNode } from 'react';
 import { Link as RouterLink } from 'react-router';
 import type { WorkflowClient } from '../api/client';
 import { retryWorkflowRead } from '../api/http';
+import { CALLS_CARRY_ROLES } from '../connection/workflowCredential';
 import type { Page, WorkflowStatusFilter } from '../api/types';
 import type { WorkItemKind } from '../routing/useWorkflowRoutes';
 import { whenAutoRefresh } from '../shared/autoRefresh';
@@ -32,6 +33,8 @@ import { COUNT_PAGE, countOf, countText, workflowCountKey, type FigureCount } fr
 import * as styles from './WorkflowStatsStrip.styles';
 
 const COUNT_POLL_MS = 30_000;
+/** What a figure the console can't read yet says instead of a count, as the Human Tasks page does. */
+const HUMAN_TASKS_COMING_SOON = 'Human tasks are currently under development.';
 /** The window of the Failed and Completed figures. */
 const CLOSED_WITHIN: WorkflowTimeRange = '24h';
 
@@ -55,7 +58,8 @@ interface Figure {
   tone: string;
   count: FigureCount;
   help: string;
-  href: string;
+  /** The list behind the figure; none while that list is not available. */
+  href?: string;
   /** Failures to look at: drawn in the error tone while there are any. */
   alarm?: boolean;
   /** Work waiting on a person: drawn as a notification count while there is any. */
@@ -69,17 +73,19 @@ const toneOf = (color: StatusChipColor): string => (color === 'default' ? 'text.
 
 /**
  * One figure: the first page of a listing, counted, and read again while the card stays open.
- * `keep` narrows the page in the console, for what the engine cannot filter by.
+ * `keep` narrows the page in the console, for what the engine cannot filter by. A listing that is
+ * not `readable` is never sent, and its figure shows as unknown.
  */
-function usePageCount<T>(queryKey: QueryKey, fetchPage: () => Promise<Page<T> | null>, keep?: (item: T) => boolean): FigureCount {
+function usePageCount<T>(queryKey: QueryKey, fetchPage: () => Promise<Page<T> | null>, keep?: (item: T) => boolean, readable = true): FigureCount {
   const { data, isPending, isError } = useQuery({
     queryKey,
     queryFn: fetchPage,
+    enabled: readable,
     retry: retryWorkflowRead,
     refetchInterval: () => whenAutoRefresh(COUNT_POLL_MS),
   });
   // A figure that cannot be read shows as unknown, not as a zero.
-  if (isError) return null;
+  if (!readable || isError) return null;
   if (isPending) return undefined;
   return countOf(data, keep);
 }
@@ -109,19 +115,31 @@ function FigureTile({ figure }: { figure: Figure }): JSX.Element {
       </Box>
     );
 
+  const content = (
+    <>
+      <Avatar sx={styles.icon(tone)}>{icon}</Avatar>
+      <Box sx={styles.text}>
+        <Typography variant="caption" color="text.secondary" sx={styles.label}>
+          {label}
+        </Typography>
+        <Typography variant="h6" component="div" color={alarm ? 'error.main' : 'text.primary'} sx={styles.value}>
+          {value}
+        </Typography>
+      </Box>
+    </>
+  );
   return (
     <Tooltip title={help} describeChild placement="top">
-      <ButtonBase component={RouterLink} to={href} data-testid={`workflow-stat-${key}`} sx={alarm ? [styles.tile, styles.alarmTile] : styles.tile}>
-        <Avatar sx={styles.icon(tone)}>{icon}</Avatar>
-        <Box sx={styles.text}>
-          <Typography variant="caption" color="text.secondary" sx={styles.label}>
-            {label}
-          </Typography>
-          <Typography variant="h6" component="div" color={alarm ? 'error.main' : 'text.primary'} sx={styles.value}>
-            {value}
-          </Typography>
+      {href ? (
+        <ButtonBase component={RouterLink} to={href} data-testid={`workflow-stat-${key}`} sx={alarm ? [styles.tile, styles.alarmTile] : styles.tile}>
+          {content}
+        </ButtonBase>
+      ) : (
+        // Focusable, so the help that says why there is no count reaches a keyboard too.
+        <Box tabIndex={0} data-testid={`workflow-stat-${key}`} sx={styles.staticTile}>
+          {content}
         </Box>
-      </ButtonBase>
+      )}
     </Tooltip>
   );
 }
@@ -140,12 +158,15 @@ export default function WorkflowStatsStrip({ client, scopeId, workflowType, runs
 
   // Reviews cannot be listed by workflow type, so the page is narrowed here; a runtime before
   // workflow 0.10 reports no parent type, and its reviews are counted rather than dropped.
+  // The engine lists no review or task to a caller without roles, so until calls carry roles
+  // (CALLS_CARRY_ROLES) neither is read, and neither figure claims a zero it can't know.
   const reviews = usePageCount(
     workflowCountKey(scopeId, 'reviews'),
     () => client.reviews.list({ status: 'PENDING', limit: COUNT_PAGE }),
     (review) => !workflowType || !review.parentWorkflowType || review.parentWorkflowType === workflowType,
+    CALLS_CARRY_ROLES,
   );
-  const tasks = usePageCount(workflowCountKey(scopeId, 'tasks', workflowType ?? ''), () => client.humanTasks.list({ status: 'PENDING', parentWorkflowType: workflowType, limit: COUNT_PAGE }));
+  const tasks = usePageCount(workflowCountKey(scopeId, 'tasks', workflowType ?? ''), () => client.humanTasks.list({ status: 'PENDING', parentWorkflowType: workflowType, limit: COUNT_PAGE }), undefined, CALLS_CARRY_ROLES);
 
   // The help texts name the selected definition, or workflows in general without one.
   const subject = workflowType || 'Workflow';
@@ -193,8 +214,8 @@ export default function WorkflowStatsStrip({ client, scopeId, workflowType, runs
       icon: <ClipboardCheck size={ICON_SIZE} />,
       tone: 'primary.main',
       count: reviews,
-      help: 'Approval gates and failed activities waiting for a decision. Opens Human Tasks.',
-      href: tasksLink('review'),
+      help: CALLS_CARRY_ROLES ? 'Approval gates and failed activities waiting for a decision. Opens Human Tasks.' : HUMAN_TASKS_COMING_SOON,
+      href: CALLS_CARRY_ROLES ? tasksLink('review') : undefined,
       notify: (reviews?.count ?? 0) > 0,
     },
     {
@@ -203,8 +224,8 @@ export default function WorkflowStatsStrip({ client, scopeId, workflowType, runs
       icon: <ListTodo size={ICON_SIZE} />,
       tone: 'primary.main',
       count: tasks,
-      help: 'Human tasks you can act on, waiting for a person. Opens Human Tasks.',
-      href: tasksLink('task'),
+      help: CALLS_CARRY_ROLES ? 'Human tasks you can act on, waiting for a person. Opens Human Tasks.' : HUMAN_TASKS_COMING_SOON,
+      href: CALLS_CARRY_ROLES ? tasksLink('task') : undefined,
       notify: (tasks?.count ?? 0) > 0,
     },
   ];

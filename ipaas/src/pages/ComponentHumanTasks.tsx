@@ -17,12 +17,18 @@
  */
 
 import type { JSX } from 'react';
+import { CALLS_CARRY_ROLES } from '../components/Workflows/connection/workflowCredential';
 import WorkflowPageShell from '../components/Workflows/shared/WorkflowPageShell';
 import HumanTasksPage from '../components/Workflows/tasks/HumanTasksPage';
 import type { ComponentScope } from '../nav';
+import ComingSoon from './ComingSoon';
 
 /** The work queue of a workflow integration, under Operate at `.../human-tasks`: everything waiting on a person. */
 export default function ComponentHumanTasks(scope: ComponentScope): JSX.Element {
+  // The engine serves the tasks a role is named for only to a caller with roles (CALLS_CARRY_ROLES).
+  if (!CALLS_CARRY_ROLES) {
+    return <ComingSoon description="Human tasks are currently under development." />;
+  }
   return (
     <WorkflowPageShell scope={scope} title="Human Tasks" purpose="workOnTasks">
       {/* Keyed on the connection: an item open or selected in one environment's queue is not another's. */}

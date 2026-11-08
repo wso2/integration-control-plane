@@ -43,6 +43,11 @@ const state = vi.hoisted(() => ({
 
 vi.mock('../../../nav', async (importOriginal) => ({ ...(await importOriginal<typeof import('../../../nav')>()), useScope: () => SCOPE }));
 vi.mock('../../../hooks/useAppNavigate', () => ({ useAppNavigate: () => state.navigate }));
+// The card's task figures link to Human Tasks only once calls carry roles, which these tests are of.
+vi.mock('../connection/workflowCredential', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../connection/workflowCredential')>()),
+  CALLS_CARRY_ROLES: true,
+}));
 // The dialog is the Workflows page's own; here only how the card opens it and follows its run.
 vi.mock('../runs/StartWorkflowDialog', () => ({
   default: (props: NonNullable<typeof state.dialog>) => {

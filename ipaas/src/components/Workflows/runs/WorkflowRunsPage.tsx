@@ -201,6 +201,9 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
   // Newest first: the engine pages open runs ahead of closed ones.
   const allRuns = sortByStartTimeDesc((runPages?.pages ?? []).flatMap((page) => page.items));
   const runs = workflowNameFilter ? allRuns.filter((run) => run.workflowType === workflowNameFilter) : allRuns;
+  // The open run as the polled list has it now, so its status follows a close or a cancel; the row
+  // stored when it was opened stands in once it is off the loaded pages.
+  const shownRun = selectedRun ? (allRuns.find((run) => run.workflowId === selectedRun.workflowId && run.runId === selectedRun.runId) ?? selectedRun) : null;
 
   // A link to a workflow (a task's parent) may name one older than the runs loaded, so it is also
   // looked up by its id. The lookup is a query of its own: a server that cannot filter by workflow
@@ -411,7 +414,7 @@ export default function WorkflowRunsPage({ environment, api }: WorkflowPageSlotP
 
       <StartWorkflowDialog open={startOpen} api={client} scopeId={scopeId} definitions={definitions} onClose={() => setStartOpen(false)} onViewRun={({ workflowType, runId }) => goToWorkflowRuns({ workflowType, envId: environment.id, runId })} />
 
-      <WorkflowRunDetailDrawer run={selectedRun} api={api} onClose={() => setSelectedRun(null)} />
+      <WorkflowRunDetailDrawer run={shownRun} api={api} onClose={() => setSelectedRun(null)} />
     </Box>
   );
 }
