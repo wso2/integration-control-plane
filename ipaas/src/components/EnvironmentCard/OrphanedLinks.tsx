@@ -39,6 +39,9 @@ function Orphan({ orphan: o, name, targets, busy, change }: { orphan: OrphanedLi
   const removal: LinkTarget = o.kind === 'connection' ? { connection: o.target } : { configurable: o.target };
   // Taking the key from the lost target moves the link: the orphan goes in the same write.
   const move = () => change(o.kind === 'connection' ? { connection: to, ref: o.ref } : { configurable: to, ref: o.ref, key: o.key });
+  // An endpoint link holds no resource key, so there is nothing for another
+  // target to take over: only removing it clears it.
+  const movable = o.kind !== 'endpoint';
   return (
     <Stack direction="row" alignItems="center" gap={1} sx={{ py: 0.5 }}>
       <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -49,19 +52,23 @@ function Orphan({ orphan: o, name, targets, busy, change }: { orphan: OrphanedLi
           {o.key ? `from ${name} · ${o.key}` : `Linked to ${name}`}
         </Typography>
       </Box>
-      <TextField select size="small" value={to} onChange={(e) => setTo(e.target.value)} sx={{ minWidth: 160 }} SelectProps={{ displayEmpty: true }} inputProps={{ 'aria-label': `Move ${targetName(o.target)} to` }}>
-        <MenuItem value="" disabled>
-          Move to…
-        </MenuItem>
-        {targets.map((t) => (
-          <MenuItem key={t} value={t}>
-            {targetName(t)}
-          </MenuItem>
-        ))}
-      </TextField>
-      <Button size="small" variant="outlined" disabled={busy || !to} onClick={move}>
-        Move
-      </Button>
+      {movable && (
+        <>
+          <TextField select size="small" value={to} onChange={(e) => setTo(e.target.value)} sx={{ minWidth: 160 }} SelectProps={{ displayEmpty: true }} inputProps={{ 'aria-label': `Move ${targetName(o.target)} to` }}>
+            <MenuItem value="" disabled>
+              Move to…
+            </MenuItem>
+            {targets.map((t) => (
+              <MenuItem key={t} value={t}>
+                {targetName(t)}
+              </MenuItem>
+            ))}
+          </TextField>
+          <Button size="small" variant="outlined" disabled={busy || !to} onClick={move}>
+            Move
+          </Button>
+        </>
+      )}
       <Button size="small" variant="outlined" color="error" disabled={busy} onClick={() => change(removal)}>
         Remove
       </Button>

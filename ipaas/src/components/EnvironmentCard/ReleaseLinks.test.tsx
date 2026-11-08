@@ -31,6 +31,7 @@ const links: IntegrationLinks = {
   usedByOrphaned: {},
   connections: [],
   fieldLinks: {},
+  endpointLinks: {},
   orphaned: [],
   env: {},
   environments: [
