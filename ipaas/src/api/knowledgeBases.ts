@@ -111,8 +111,8 @@ export interface GatewayCredential {
 
 /**
  * Query a knowledge base on the API Platform gateway, as the console tests any API: with the
- * endpoint's test key. The gateway routes only `POST /retrieve`. The service reads a form-encoded
- * query and identifies the caller by `rag_component_id`, the integration the query is made from.
+ * endpoint's test key. The service reads a form-encoded query and identifies the caller by
+ * `rag_component_id`, the integration the query is made from.
  * A refusal carries its HTTP status as `status`.
  */
 export async function retrieveFromKnowledgeBase(gatewayUrl: string, credential: GatewayCredential, componentId: string, query: Pick<RetrievalQuery, 'userQuery' | 'maxChunks' | 'minSimilarity'>): Promise<RetrievedChunk[]> {
