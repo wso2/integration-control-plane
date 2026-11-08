@@ -48,6 +48,7 @@ import type { JSX } from 'react';
 import { useNavigate, Outlet, NavLink, useLocation } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import Logo from '../components/Logo';
+import PlatformSwitcher from '../components/PlatformSwitcher';
 import NotFound from '../components/NotFound';
 import {
   Activity,
@@ -81,7 +82,6 @@ import {
 } from '@wso2/oxygen-ui-icons-react';
 import { useProject, useProjectByHandler, useProjects } from '../hooks/useProjects';
 import { useComponents } from '../hooks/useComponents';
-import { useFreshDefaultProject } from '../hooks/useFreshDefaultProject';
 import { useOrgComponentLimits, useOrgs } from '../hooks/useOrg';
 import { useBillingOrg } from '../hooks/useBillingOrg';
 import { useOrgUuid } from '../hooks/useOrgUuid';
@@ -153,12 +153,6 @@ export default function AppLayout(): JSX.Element {
     actions.toggleSidebar();
   };
 
-  // Lets the user manually bring the sidebar back on an empty project via the hamburger toggle,
-  // which stays visible even while hideSidebarForEmptyProject is auto-hiding the sidebar itself.
-  // Scoped to the project id it was shown for, so switching to a different (also empty) project
-  // doesn't inherit the override.
-  const [manuallyShownProjectId, setManuallyShownProjectId] = useState<string | null>(null);
-
   const activeNavId = useMemo(() => resolveActiveNavId(pathname, scope), [pathname, scope]);
 
   useEffect(() => {
@@ -210,25 +204,6 @@ export default function AppLayout(): JSX.Element {
   const projectId = project?.id ?? '';
   const { data: allComponents = [] } = useComponents(scope.org, projectId);
   const components = allComponents.filter((c) => isSupportedIntegration(c.displayType, c.componentSubType ?? null, c.buildpackType));
-
-  // Shared with Project.tsx's overview-header hiding, so both surfaces hide on exactly the same
-  // one-shot "just landed here right after onboarding" signal and can't drift out of sync. This
-  // only fires on that first landing — navigating elsewhere and back always shows the sidebar
-  // again, even if the project is still empty, so it never vanishes on a repeat visit.
-  const justProvisionedDefaultProject = useFreshDefaultProject();
-  // Compared against projectParam (the route segment), not projectId — projectId is '' until the
-  // project record resolves over the network, so a toggle click during that window would store ''
-  // and then stop matching the instant projectId resolves, silently re-hiding the sidebar right
-  // after the user revealed it. projectParam is stable and known synchronously from the URL.
-  const hideSidebarForEmptyProject = activeNavId === 'proj-overview' && justProvisionedDefaultProject && manuallyShownProjectId !== projectParam;
-
-  const handleHeaderToggle = () => {
-    if (hideSidebarForEmptyProject) {
-      setManuallyShownProjectId(projectParam);
-      return;
-    }
-    handleToggleSidebar();
-  };
 
   // Helper to get project display name with fallback to projects list
   const getProjectDisplayName = () => {
@@ -304,7 +279,8 @@ export default function AppLayout(): JSX.Element {
     <AppShell>
       <AppShell.Navbar>
         <Header>
-          <Header.Toggle collapsed={hideSidebarForEmptyProject || shell.sidebarCollapsed} onToggle={handleHeaderToggle} />
+          {/* Platforms lead the bar, as in the WSO2 Cloud console; the sidebar collapses from its own foot. */}
+          <PlatformSwitcher />
           <Header.Brand>
             <Header.BrandLogo>
               <NavLink to={orgHomeUrl(scope.org)} onClick={() => trackEvent('navbar-home')} style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
@@ -664,299 +640,142 @@ export default function AppLayout(): JSX.Element {
         </Header>
       </AppShell.Navbar>
 
-      {!hideSidebarForEmptyProject && (
-        <AppShell.Sidebar>
-          <Sidebar
-            collapsed={shell.sidebarCollapsed}
-            activeItem={pendingNavId ?? activeNavId}
-            expandedMenus={expandedMenus}
-            onSelect={handleNavSelect}
-            onToggleExpand={toggleMenu}
-            sx={{
-              backgroundColor: 'background.acrylic',
-              backdropFilter: 'blur(3px)',
-            }}>
-            <Sidebar.Nav>
-              {!hasProject(scope)
-                ? /* Org-level nav */
-                  [
-                    <Sidebar.Category key="org-overview">
-                      <Sidebar.Item id="org-overview">
-                        <Sidebar.ItemIcon>
-                          <LayoutDashboard size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Overview</Sidebar.ItemLabel>
-                      </Sidebar.Item>
-                      <Sidebar.Item id="org-projects">
-                        <Sidebar.ItemIcon>
-                          <BoxIcon size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Projects</Sidebar.ItemLabel>
-                      </Sidebar.Item>
-                    </Sidebar.Category>,
+      <AppShell.Sidebar>
+        <Sidebar
+          collapsed={shell.sidebarCollapsed}
+          activeItem={pendingNavId ?? activeNavId}
+          expandedMenus={expandedMenus}
+          onSelect={handleNavSelect}
+          onToggleExpand={toggleMenu}
+          sx={{
+            backgroundColor: 'background.acrylic',
+            backdropFilter: 'blur(3px)',
+          }}>
+          <Sidebar.Nav>
+            {!hasProject(scope)
+              ? /* Org-level nav */
+                [
+                  <Sidebar.Category key="org-overview">
+                    <Sidebar.Item id="org-overview">
+                      <Sidebar.ItemIcon>
+                        <LayoutDashboard size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>Overview</Sidebar.ItemLabel>
+                    </Sidebar.Item>
+                    <Sidebar.Item id="org-projects">
+                      <Sidebar.ItemIcon>
+                        <BoxIcon size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>Projects</Sidebar.ItemLabel>
+                    </Sidebar.Item>
+                  </Sidebar.Category>,
 
-                    <Sidebar.Category key="org-main">
-                      <Sidebar.Item id="build">
+                  <Sidebar.Category key="org-main">
+                    <Sidebar.Item id="build">
+                      <Sidebar.ItemIcon>
+                        <Hammer size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>Build</Sidebar.ItemLabel>
+                    </Sidebar.Item>
+
+                    <Sidebar.Item id="org-deploy">
+                      <Sidebar.ItemIcon>
+                        <Rocket size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>Deploy</Sidebar.ItemLabel>
+                    </Sidebar.Item>
+
+                    <Sidebar.Item id="org-test">
+                      <Sidebar.ItemIcon>
+                        <FlaskConical size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                    </Sidebar.Item>
+
+                    {apiInsightsEnabled && (
+                      <Sidebar.Item id="org-insights">
                         <Sidebar.ItemIcon>
-                          <Hammer size={20} />
+                          <ChartColumn size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Build</Sidebar.ItemLabel>
+                        <Sidebar.ItemLabel>API Insights</Sidebar.ItemLabel>
                       </Sidebar.Item>
+                    )}
 
-                      <Sidebar.Item id="org-deploy">
+                    <Sidebar.Item id="org-observability">
+                      <Sidebar.ItemIcon>
+                        <Activity size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>Observe</Sidebar.ItemLabel>
+                      <Sidebar.Item id="org-logs">
                         <Sidebar.ItemIcon>
-                          <Rocket size={20} />
+                          <Logs size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Deploy</Sidebar.ItemLabel>
+                        <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                       </Sidebar.Item>
-
-                      <Sidebar.Item id="org-test">
+                      <Sidebar.Item id="org-metrics">
                         <Sidebar.ItemIcon>
-                          <FlaskConical size={20} />
+                          <Gauge size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                        <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                       </Sidebar.Item>
+                    </Sidebar.Item>
+                  </Sidebar.Category>,
 
-                      {apiInsightsEnabled && (
-                        <Sidebar.Item id="org-insights">
-                          <Sidebar.ItemIcon>
-                            <ChartColumn size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>API Insights</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                      )}
-
-                      <Sidebar.Item id="org-observability">
-                        <Sidebar.ItemIcon>
-                          <Activity size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Observe</Sidebar.ItemLabel>
-                        <Sidebar.Item id="org-logs">
-                          <Sidebar.ItemIcon>
-                            <Logs size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                        <Sidebar.Item id="org-metrics">
-                          <Sidebar.ItemIcon>
-                            <Gauge size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
-                        </Sidebar.Item>
-                      </Sidebar.Item>
-                    </Sidebar.Category>,
-
-                    <Sidebar.Category key="org-ai">
-                      <Sidebar.Item id="org-ai-services">
-                        <Sidebar.ItemIcon>
-                          <Sparkles size={20} />
-                        </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>AI Services</Sidebar.ItemLabel>
-                        {canReadIntegrations && (
-                          <Sidebar.Item id="org-knowledge-bases">
-                            <Sidebar.ItemIcon>
-                              <BookOpen size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        )}
-                      </Sidebar.Item>
-                    </Sidebar.Category>,
-
-                    <Sidebar.Category key="org-infra">
-                      {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                  <Sidebar.Category key="org-ai">
+                    <Sidebar.Item id="org-ai-services">
+                      <Sidebar.ItemIcon>
+                        <Sparkles size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>AI Services</Sidebar.ItemLabel>
                       {canReadIntegrations && (
-                        <Sidebar.Item id="org-platform-services">
+                        <Sidebar.Item id="org-knowledge-bases">
                           <Sidebar.ItemIcon>
-                            <Database size={20} />
+                            <BookOpen size={20} />
                           </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
+                          <Sidebar.ItemLabel>Knowledge Bases</Sidebar.ItemLabel>
                         </Sidebar.Item>
                       )}
-                      {/* Configure carries Package Registries. */}
-                      <Sidebar.Item id="org-settings">
+                    </Sidebar.Item>
+                  </Sidebar.Category>,
+
+                  <Sidebar.Category key="org-infra">
+                    {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                    {canReadIntegrations && (
+                      <Sidebar.Item id="org-platform-services">
                         <Sidebar.ItemIcon>
-                          <SlidersHorizontal size={20} />
+                          <Database size={20} />
                         </Sidebar.ItemIcon>
-                        <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
+                        <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                       </Sidebar.Item>
-                    </Sidebar.Category>,
-                  ]
-                : hasComponent(scope)
-                  ? (() => {
-                      const isGenericService = GENERIC_SERVICE_TYPES.has(currentComponent?.displayType ?? '');
-                      // External CI is a paid, Bring-Your-Own-Image-only feature.
-                      const integrationType = identifyIntegration(currentComponent?.displayType ?? '', currentComponent?.componentSubType ?? null).type;
-                      const runtimeLogsType = ['file-integration', 'event-integration'].includes(integrationType);
-                      const aiAgentType = integrationType === 'ai-agent';
-                      // A workflow integration's runs and the human tasks they wait on.
-                      const workflowType = integrationType === 'workflow';
-                      // MCP (server + proxy): a single Test tab → the MCP playground
-                      // (@wso2-org/mcp-playground). No Console/API-Chat sub-items.
-                      const mcpType = integrationType === 'mcp-server' || integrationType === 'mcp-proxy';
-                      // Settings shows only when the integration has a section the user can open.
-                      const hasSettings =
-                        !!currentComponent &&
-                        visibleComponentSettingsSections(identifyIntegration(currentComponent.displayType ?? '', currentComponent.componentSubType ?? null), (perms) => hasAnyPermission(perms, projectId || undefined, componentId)).length > 0;
-                      return [
-                        <Sidebar.Category key="int-overview">
-                          <Sidebar.Item id="overview">
-                            <Sidebar.ItemIcon>
-                              <LayoutDashboard size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Overview</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-                        </Sidebar.Category>,
-
-                        <Sidebar.Category key="int-main">
-                          <Sidebar.Item id="build">
-                            <Sidebar.ItemIcon>
-                              <Hammer size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Build</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-
-                          <Sidebar.Item id="deploy">
-                            <Sidebar.ItemIcon>
-                              <Rocket size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Deploy</Sidebar.ItemLabel>
-                          </Sidebar.Item>
-
-                          {aiAgentType ? (
-                            <Sidebar.Item id="agent-chat">
-                              <Sidebar.ItemIcon>
-                                <FlaskConical size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          ) : mcpType || !isGenericService || runtimeLogsType ? (
-                            <Sidebar.Item id="test">
-                              <Sidebar.ItemIcon>
-                                <FlaskConical size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          ) : (
-                            <Sidebar.Item id="test">
-                              <Sidebar.ItemIcon>
-                                <FlaskConical size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          )}
-
-                          <Sidebar.Item id="observability">
-                            <Sidebar.ItemIcon>
-                              <Activity size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Observe</Sidebar.ItemLabel>
-                            <Sidebar.Item id="logs">
-                              <Sidebar.ItemIcon>
-                                <Logs size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="metrics">
-                              <Sidebar.ItemIcon>
-                                <Gauge size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            {/* Agents and Ballerina integrations are instrumented; no other integration has traces to show. */}
-                            {canReadLogs && (aiAgentType || (!!currentComponent && hasIntegrationTraces(currentComponent))) && (
-                              <Sidebar.Item id="traces">
-                                <Sidebar.ItemIcon>
-                                  <Waypoints size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Traces</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                          </Sidebar.Item>
-
-                          <Sidebar.Item id="operate">
-                            <Sidebar.ItemIcon>
-                              <Wrench size={20} />
-                            </Sidebar.ItemIcon>
-                            <Sidebar.ItemLabel>Operate</Sidebar.ItemLabel>
-                            {workflowType && (
-                              <Sidebar.Item id="workflows">
-                                <Sidebar.ItemIcon>
-                                  <Workflow size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Workflows</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {workflowType && (
-                              <Sidebar.Item id="human-tasks">
-                                <Sidebar.ItemIcon>
-                                  <ClipboardCheck size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Human Tasks</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            <Sidebar.Item id="runtime">
-                              <Sidebar.ItemIcon>
-                                <Server size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Runtime</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="containers">
-                              <Sidebar.ItemIcon>
-                                <Boxes size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Containers</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            <Sidebar.Item id="configs-secrets">
-                              <Sidebar.ItemIcon>
-                                <FileLock size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Configs &amp; secrets</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                            {isGenericService && (
-                              <Sidebar.Item id="health-checks">
-                                <Sidebar.ItemIcon>
-                                  <HeartPulse size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Health checks</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                            {isGenericService && (
-                              <Sidebar.Item id="scaling">
-                                <Sidebar.ItemIcon>
-                                  <Maximize2 size={20} />
-                                </Sidebar.ItemIcon>
-                                <Sidebar.ItemLabel>Scaling</Sidebar.ItemLabel>
-                              </Sidebar.Item>
-                            )}
-                          </Sidebar.Item>
-                        </Sidebar.Category>,
-
-                        <Sidebar.Category key="int-infra">
-                          {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
-                          {canReadIntegrations && (
-                            <Sidebar.Item id="org-platform-services">
-                              <Sidebar.ItemIcon>
-                                <Database size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          )}
-                          {hasSettings && (
-                            <Sidebar.Item id="component-settings">
-                              <Sidebar.ItemIcon>
-                                <SlidersHorizontal size={20} />
-                              </Sidebar.ItemIcon>
-                              <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
-                            </Sidebar.Item>
-                          )}
-                        </Sidebar.Category>,
-                      ];
-                    })()
-                  : /* Project-level nav */
-                    [
-                      <Sidebar.Category key="proj-overview">
-                        <Sidebar.Item id="proj-overview">
+                    )}
+                    {/* Configure carries Package Registries. */}
+                    <Sidebar.Item id="org-settings">
+                      <Sidebar.ItemIcon>
+                        <SlidersHorizontal size={20} />
+                      </Sidebar.ItemIcon>
+                      <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
+                    </Sidebar.Item>
+                  </Sidebar.Category>,
+                ]
+              : hasComponent(scope)
+                ? (() => {
+                    const isGenericService = GENERIC_SERVICE_TYPES.has(currentComponent?.displayType ?? '');
+                    // External CI is a paid, Bring-Your-Own-Image-only feature.
+                    const integrationType = identifyIntegration(currentComponent?.displayType ?? '', currentComponent?.componentSubType ?? null).type;
+                    const runtimeLogsType = ['file-integration', 'event-integration'].includes(integrationType);
+                    const aiAgentType = integrationType === 'ai-agent';
+                    // A workflow integration's runs and the human tasks they wait on.
+                    const workflowType = integrationType === 'workflow';
+                    // MCP (server + proxy): a single Test tab → the MCP playground
+                    // (@wso2-org/mcp-playground). No Console/API-Chat sub-items.
+                    const mcpType = integrationType === 'mcp-server' || integrationType === 'mcp-proxy';
+                    // Settings shows only when the integration has a section the user can open.
+                    const hasSettings =
+                      !!currentComponent &&
+                      visibleComponentSettingsSections(identifyIntegration(currentComponent.displayType ?? '', currentComponent.componentSubType ?? null), (perms) => hasAnyPermission(perms, projectId || undefined, componentId)).length > 0;
+                    return [
+                      <Sidebar.Category key="int-overview">
+                        <Sidebar.Item id="overview">
                           <Sidebar.ItemIcon>
                             <LayoutDashboard size={20} />
                           </Sidebar.ItemIcon>
@@ -964,49 +783,131 @@ export default function AppLayout(): JSX.Element {
                         </Sidebar.Item>
                       </Sidebar.Category>,
 
-                      <Sidebar.Category key="proj-main">
-                        <Sidebar.Item id="proj-build">
+                      <Sidebar.Category key="int-main">
+                        <Sidebar.Item id="build">
                           <Sidebar.ItemIcon>
                             <Hammer size={20} />
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Build</Sidebar.ItemLabel>
                         </Sidebar.Item>
 
-                        <Sidebar.Item id="proj-deploy">
+                        <Sidebar.Item id="deploy">
                           <Sidebar.ItemIcon>
                             <Rocket size={20} />
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Deploy</Sidebar.ItemLabel>
                         </Sidebar.Item>
 
-                        <Sidebar.Item id="proj-test">
-                          <Sidebar.ItemIcon>
-                            <FlaskConical size={20} />
-                          </Sidebar.ItemIcon>
-                          <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
-                        </Sidebar.Item>
+                        {aiAgentType ? (
+                          <Sidebar.Item id="agent-chat">
+                            <Sidebar.ItemIcon>
+                              <FlaskConical size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        ) : mcpType || !isGenericService || runtimeLogsType ? (
+                          <Sidebar.Item id="test">
+                            <Sidebar.ItemIcon>
+                              <FlaskConical size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        ) : (
+                          <Sidebar.Item id="test">
+                            <Sidebar.ItemIcon>
+                              <FlaskConical size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        )}
 
-                        <Sidebar.Item id="proj-observability">
+                        <Sidebar.Item id="observability">
                           <Sidebar.ItemIcon>
                             <Activity size={20} />
                           </Sidebar.ItemIcon>
                           <Sidebar.ItemLabel>Observe</Sidebar.ItemLabel>
-                          <Sidebar.Item id="proj-logs">
+                          <Sidebar.Item id="logs">
                             <Sidebar.ItemIcon>
                               <Logs size={20} />
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
                           </Sidebar.Item>
-                          <Sidebar.Item id="proj-metrics">
+                          <Sidebar.Item id="metrics">
                             <Sidebar.ItemIcon>
                               <Gauge size={20} />
                             </Sidebar.ItemIcon>
                             <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
                           </Sidebar.Item>
+                          {/* Agents and Ballerina integrations are instrumented; no other integration has traces to show. */}
+                          {canReadLogs && (aiAgentType || (!!currentComponent && hasIntegrationTraces(currentComponent))) && (
+                            <Sidebar.Item id="traces">
+                              <Sidebar.ItemIcon>
+                                <Waypoints size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Traces</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                        </Sidebar.Item>
+
+                        <Sidebar.Item id="operate">
+                          <Sidebar.ItemIcon>
+                            <Wrench size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Operate</Sidebar.ItemLabel>
+                          {workflowType && (
+                            <Sidebar.Item id="workflows">
+                              <Sidebar.ItemIcon>
+                                <Workflow size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Workflows</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                          {workflowType && (
+                            <Sidebar.Item id="human-tasks">
+                              <Sidebar.ItemIcon>
+                                <ClipboardCheck size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Human Tasks</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                          <Sidebar.Item id="runtime">
+                            <Sidebar.ItemIcon>
+                              <Server size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Runtime</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                          <Sidebar.Item id="containers">
+                            <Sidebar.ItemIcon>
+                              <Boxes size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Containers</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                          <Sidebar.Item id="configs-secrets">
+                            <Sidebar.ItemIcon>
+                              <FileLock size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Configs &amp; secrets</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                          {isGenericService && (
+                            <Sidebar.Item id="health-checks">
+                              <Sidebar.ItemIcon>
+                                <HeartPulse size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Health checks</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
+                          {isGenericService && (
+                            <Sidebar.Item id="scaling">
+                              <Sidebar.ItemIcon>
+                                <Maximize2 size={20} />
+                              </Sidebar.ItemIcon>
+                              <Sidebar.ItemLabel>Scaling</Sidebar.ItemLabel>
+                            </Sidebar.Item>
+                          )}
                         </Sidebar.Item>
                       </Sidebar.Category>,
 
-                      <Sidebar.Category key="proj-infra">
+                      <Sidebar.Category key="int-infra">
                         {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
                         {canReadIntegrations && (
                           <Sidebar.Item id="org-platform-services">
@@ -1016,12 +917,88 @@ export default function AppLayout(): JSX.Element {
                             <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
                           </Sidebar.Item>
                         )}
+                        {hasSettings && (
+                          <Sidebar.Item id="component-settings">
+                            <Sidebar.ItemIcon>
+                              <SlidersHorizontal size={20} />
+                            </Sidebar.ItemIcon>
+                            <Sidebar.ItemLabel>Configure</Sidebar.ItemLabel>
+                          </Sidebar.Item>
+                        )}
                       </Sidebar.Category>,
-                    ]}
-            </Sidebar.Nav>
-          </Sidebar>
-        </AppShell.Sidebar>
-      )}
+                    ];
+                  })()
+                : /* Project-level nav */
+                  [
+                    <Sidebar.Category key="proj-overview">
+                      <Sidebar.Item id="proj-overview">
+                        <Sidebar.ItemIcon>
+                          <LayoutDashboard size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Overview</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+                    </Sidebar.Category>,
+
+                    <Sidebar.Category key="proj-main">
+                      <Sidebar.Item id="proj-build">
+                        <Sidebar.ItemIcon>
+                          <Hammer size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Build</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+
+                      <Sidebar.Item id="proj-deploy">
+                        <Sidebar.ItemIcon>
+                          <Rocket size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Deploy</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+
+                      <Sidebar.Item id="proj-test">
+                        <Sidebar.ItemIcon>
+                          <FlaskConical size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Test</Sidebar.ItemLabel>
+                      </Sidebar.Item>
+
+                      <Sidebar.Item id="proj-observability">
+                        <Sidebar.ItemIcon>
+                          <Activity size={20} />
+                        </Sidebar.ItemIcon>
+                        <Sidebar.ItemLabel>Observe</Sidebar.ItemLabel>
+                        <Sidebar.Item id="proj-logs">
+                          <Sidebar.ItemIcon>
+                            <Logs size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Runtime logs</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                        <Sidebar.Item id="proj-metrics">
+                          <Sidebar.ItemIcon>
+                            <Gauge size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Metrics</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      </Sidebar.Item>
+                    </Sidebar.Category>,
+
+                    <Sidebar.Category key="proj-infra">
+                      {/* Managed services integrations connect to: databases today, caches and brokers to come. */}
+                      {canReadIntegrations && (
+                        <Sidebar.Item id="org-platform-services">
+                          <Sidebar.ItemIcon>
+                            <Database size={20} />
+                          </Sidebar.ItemIcon>
+                          <Sidebar.ItemLabel>Platform Services</Sidebar.ItemLabel>
+                        </Sidebar.Item>
+                      )}
+                    </Sidebar.Category>,
+                  ]}
+          </Sidebar.Nav>
+          <Sidebar.Footer>
+            <Sidebar.CollapseToggle onToggle={handleToggleSidebar} />
+          </Sidebar.Footer>
+        </Sidebar>
+      </AppShell.Sidebar>
 
       <AppShell.Main>
         {/* Navigation progress: a GitHub-style line under the navbar. The page

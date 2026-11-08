@@ -23,11 +23,10 @@ import { useLocation } from 'react-router';
  * True only on the single navigation that immediately follows provisioning a fresh org's default
  * project during onboarding (see OrgHome.tsx, which sets `state: { freshDefaultProject: true }` on
  * that `navigate` call). This is a one-shot signal, not a recomputed "is this project still empty"
- * check — the left nav (AppLayout) and the project overview header (Project.tsx) both hide on it
- * for that first landing only. The moment the user navigates anywhere else and comes back — even
- * if the project is still empty — this is false again and both surfaces show normally, so neither
- * one vanishes and reappears on repeat visits, which would read as broken chrome rather than a
- * deliberate first-run empty state.
+ * check — the project overview header (Project.tsx) hides on it for that first landing only. The
+ * moment the user navigates anywhere else and comes back — even if the project is still empty —
+ * this is false again and the header shows normally, so it never vanishes and reappears on repeat
+ * visits, which would read as broken chrome rather than a deliberate first-run empty state.
  */
 export function useFreshDefaultProject(): boolean {
   const { state } = useLocation();
@@ -37,7 +36,7 @@ export function useFreshDefaultProject(): boolean {
     if (!isFresh) return;
     // Consume the flag directly on the browser's history entry rather than via react-router's
     // navigate(), which would trigger a reactive re-render here and flip `isFresh` back to false
-    // immediately — flashing the nav/header back on right after hiding them. A plain
+    // immediately — flashing the header back on right after hiding it. A plain
     // history.replaceState only affects what a future reload of this exact URL sees; it doesn't
     // notify react-router's own location listeners, so this render's already-returned value is
     // unaffected. Without this, `history.state` persists across a plain reload of the same URL,
