@@ -37,6 +37,8 @@ import { getDisplayLabel } from '../constants/integrations';
 import { AUTO_DEPLOY_AVAILABLE } from '../constants/build';
 import { hasIntegrationTraces } from '../utils/integrationTraces';
 
+const USER_PORTAL_TYPES: ReadonlySet<string> = new Set(['ai-agent', 'automation', 'workflow']);
+
 export default function Deploy(scope: ComponentScope): JSX.Element {
   const isProjectUuid = UUID_RE.test(scope.project);
   const { projectId: projectIdFromHook, project, isLoading: loadingProject } = useProjectId(scope.project);
@@ -101,6 +103,8 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
   // user-configurable endpoints — devant opens the endpoint-less
   // ConfigurationWizard for all three. Suppress the endpoint UI accordingly.
   const hideEndpoints = integrationType === 'file-integration' || integrationType === 'event-integration' || integrationType === 'ai-agent';
+  // The User Portal shows AI agents, automations and workflows; ipaas-service refuses to publish any other kind.
+  const publishesToUserPortal = USER_PORTAL_TYPES.has(integrationType);
 
   if (flags.isProxy) {
     return <ComingSoon title="Proxy deploy coming soon" description="Deploy management for REST API proxy integrations will be available in a future release." />;
@@ -163,6 +167,7 @@ export default function Deploy(scope: ComponentScope): JSX.Element {
                     hideEndpoints={hideEndpoints}
                     displayType={component.displayType}
                     isWorkflow={isWorkflow}
+                    publishesToUserPortal={publishesToUserPortal}
                     env={env}
                     branch={branch}
                     componentName={component.name}

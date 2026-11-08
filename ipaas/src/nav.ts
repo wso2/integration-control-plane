@@ -245,6 +245,11 @@ export function componentSettingsSectionUrl(scope: { org: string; project: strin
   return `/organizations/${scope.org}/projects/${scope.project}/components/${scope.component}/settings/${sectionPath}`;
 }
 
+/** The org's User Portal tab under Configure: a portal per environment, enabled and disabled there. */
+export function userPortalUrl(scope: { org: string }): string {
+  return orgSettingsSectionUrl(scope, 'user-portal');
+}
+
 // The workflow integration pages under Operate; their NAV entries use the same segments.
 const WORKFLOWS_SEGMENT = 'workflows';
 const HUMAN_TASKS_SEGMENT = 'human-tasks';

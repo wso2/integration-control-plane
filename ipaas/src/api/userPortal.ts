@@ -1,0 +1,113 @@
+/**
+ * Copyright (c) 2026, WSO2 LLC. (https://www.wso2.com).
+ *
+ * WSO2 LLC. licenses this file to you under the Apache License,
+ * Version 2.0 (the "License"); you may not use this file except
+ * in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied. See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+/**
+ * The org's User Portal, per environment, and publishing integrations to it. Calls ipaas-service:
+ *   GET|PUT|DELETE /user-portal/environments/{environment}
+ *   GET|PUT|DELETE /components/{component}/user-portal/environments/{environment}
+ */
+
+import type { Environment } from '../types/environment';
+import type { UserPortal, UserPortalPublication, UserPortalPublishability, UserPortalState } from '../types/userPortal';
+import { bff, seg } from './_client';
+import { fetchAllEnvironments } from './environments';
+import { DEFAULT_PIPELINE_NAME, fetchDeploymentPipeline } from './deploymentPipelines';
+import { restrictEnvironmentsToPipeline } from '../utils/environmentOrder';
+
+// models.UserPortalStatus. `state` is the orchestrator provision's: PENDING, APPLIED (in
+// progress), DONE, FAILED, MIGRATING, DELETING. It is missing when the environment has no portal.
+interface BffUserPortalStatus {
+  environment: string;
+  enabled: boolean;
+  suspended?: boolean;
+  state?: string;
+  portalUrl?: string;
+  error?: string;
+}
+
+// A suspended portal only carries the portal's API to a later environment, so it reads as not
+// enabled: enabling it there makes it active.
+function portalState(s: BffUserPortalStatus): UserPortalState {
+  const state = s.state?.toUpperCase();
+  if (state === 'DELETING') return 'removing';
+  if (state === 'FAILED') return 'failed';
+  if (!s.enabled) return 'not-enabled';
+  return state === 'DONE' ? 'active' : 'setting-up';
+}
+
+export const toUserPortal = (s: BffUserPortalStatus): UserPortal => {
+  const state = portalState(s);
+  return {
+    environment: s.environment,
+    state,
+    ...(s.portalUrl && state === 'active' ? { url: s.portalUrl } : {}),
+    ...(s.error && state === 'failed' ? { error: s.error } : {}),
+  };
+};
+
+/**
+ * The environments a User Portal can run in: those of the org's default deployment pipeline, in
+ * promotion order. The portal's own API moves along that pipeline, so ipaas-service refuses others.
+ */
+export const fetchUserPortalEnvironments = async (): Promise<Environment[]> => {
+  const [environments, pipeline] = await Promise.all([fetchAllEnvironments(), fetchDeploymentPipeline(DEFAULT_PIPELINE_NAME)]);
+  return restrictEnvironmentsToPipeline(environments, pipeline.promotion_tree);
+};
+
+const portalPath = (environment: string) => `/user-portal/environments/${seg(environment)}`;
+
+export const fetchUserPortal = (environment: string): Promise<UserPortal> => bff.get<BffUserPortalStatus>(portalPath(environment)).then(toUserPortal);
+
+/** Starts provisioning; the portal reads as setting up until it is ready. Enabling a failed portal retries it. */
+export const enableUserPortal = (environment: string): Promise<UserPortal> => bff.put<BffUserPortalStatus>(portalPath(environment)).then(toUserPortal);
+
+/** Unpublishes the portal's integrations, then stops it; the portal reads as removing until it is gone. */
+export const disableUserPortal = (environment: string): Promise<UserPortal> => bff.delete<BffUserPortalStatus>(portalPath(environment)).then(toUserPortal);
+
+// models.UserPortalPublishability; `reasons` is always a list.
+interface BffUserPortalPublishability {
+  environment: string;
+  published: boolean;
+  publishable: boolean;
+  reasons?: { code: string; message: string }[];
+}
+
+// models.UserPortalPublication.
+interface BffUserPortalPublication {
+  environment: string;
+  published: boolean;
+  rejectedScopes?: string[];
+}
+
+const publicationPath = (componentId: string, environment: string) => `/components/${seg(componentId)}/user-portal/environments/${seg(environment)}`;
+
+export const toUserPortalPublishability = (p: BffUserPortalPublishability): UserPortalPublishability => ({
+  environment: p.environment,
+  published: p.published,
+  publishable: p.publishable,
+  reasons: p.reasons ?? [],
+});
+
+/** Runs a publish's rules without publishing: whether it is published there, and every rule it breaks. */
+export const fetchUserPortalPublishability = (componentId: string, environment: string): Promise<UserPortalPublishability> => bff.get<BffUserPortalPublishability>(publicationPath(componentId, environment)).then(toUserPortalPublishability);
+
+const toPublication = (p: BffUserPortalPublication): UserPortalPublication => ({ environment: p.environment, published: p.published, rejectedScopes: p.rejectedScopes ?? [] });
+
+export const publishToUserPortal = (componentId: string, environment: string): Promise<UserPortalPublication> => bff.put<BffUserPortalPublication>(publicationPath(componentId, environment)).then(toPublication);
+
+export const unpublishFromUserPortal = (componentId: string, environment: string): Promise<UserPortalPublication> => bff.delete<BffUserPortalPublication>(publicationPath(componentId, environment)).then(toPublication);

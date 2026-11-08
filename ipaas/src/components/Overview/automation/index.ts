@@ -21,6 +21,7 @@ import type { IntegrationModule } from '../../../types/integration';
 import HeaderStatus from './HeaderStatus';
 import EnvCardActions from '../_shared/ScheduledTaskEnvCardActions';
 import EnvCardBody from './EnvCardBody';
+import UserPortalFooter from '../_shared/UserPortalFooter';
 
 /**
  * Automation integration module. Composes the shared `EnvCardShell` frame via
@@ -32,6 +33,7 @@ const automationModule: IntegrationModule = {
   HeaderStatus,
   EnvCardActions,
   EnvCardBody,
+  EnvCardFooter: UserPortalFooter,
 };
 
 export default automationModule;
