@@ -29,6 +29,7 @@ import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/use
 import { useLinkedForm } from './useLinkedForm';
 import { savedValue } from '../../utils/savedConfig';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCardList } from '../EndpointCardList';
@@ -753,6 +754,7 @@ function GenericServiceConfigureDrawer({
   releaseMgtReleaseId: _releaseMgtReleaseId,
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
+  buildId,
   hideEndpoints = false,
   isWorkflow = false,
 }: ConfigureDrawerProps) {
@@ -789,6 +791,7 @@ function GenericServiceConfigureDrawer({
   const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
+  const deployTrack = useDeployDeploymentTrack();
   const generateEp = useGenerateComponentEndpoints();
 
   const parsedSchema = useMemo<JSONSchema | null>(() => {
@@ -973,11 +976,25 @@ function GenericServiceConfigureDrawer({
         configurations: certConfigs,
         ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
       };
-      const afterSave = () => {
+      const done = () => {
         queryClient.invalidateQueries({ queryKey: ['envEndpoints'] });
         queryClient.invalidateQueries({ queryKey: ['componentDeployment'] });
         onClose();
         onSaved?.();
+      };
+      // Applying deploys, because a release is what carries the configuration and the
+      // integration's links to the running integration: saving alone changes nothing it reads.
+      // Where OpenChoreo releases a changed Workload itself this is redundant, so it goes
+      // whole when AUTO_DEPLOY_AVAILABLE turns true, leaving done() as afterSave.
+      const afterSave = () => {
+        if (AUTO_DEPLOY_AVAILABLE) {
+          done();
+          return;
+        }
+        deployTrack
+          .mutateAsync({ componentId, id: versionId, imageId: buildId ?? '', environmentId: envId, cronTimezone: '' })
+          .then(done)
+          .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to deploy the configuration'));
       };
       if (certConfigs.length === 0 && !existingCertMappings?.mappingId) {
         afterSave();
@@ -1110,7 +1127,7 @@ function GenericServiceConfigureDrawer({
   // A field marked invalid before its link loaded is no longer the form's to fill.
   const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
-  const isApplying = save.isPending || saveCertMappings.isPending;
+  const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === lastStep ? (isApplying ? 'Applying…' : 'Apply') : step === 1 && generateEp.isPending ? 'Loading…' : 'Next';
   const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
