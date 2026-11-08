@@ -25,14 +25,12 @@ import { useCan } from '../../hooks/useCan';
 import { usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { userPortalUrl } from '../../nav';
 import type { UserPortalRefusal } from '../../types/userPortal';
-import { apiErrorMessage, isUserPortalUnavailable } from '../../utils/apiErrors';
+import { isUserPortalUnavailable } from '../../utils/apiErrors';
+import { refusalText, shownRefusals, USER_PORTAL_NOT_ENABLED, userPortalErrorText } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
 import * as styles from './UserPortal.styles';
 
 const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
-
-// The portal itself isn't enabled here: the fix is on the User Portal page, so the reason links there.
-const NOT_ENABLED = 'USER_PORTAL_NOT_ENABLED';
 
 interface UserPortalRowProps {
   orgHandler: string;
@@ -42,12 +40,10 @@ interface UserPortalRowProps {
   envName: string;
 }
 
-const errorText = (err: unknown): string => apiErrorMessage(err, 'Something went wrong.');
-
 /**
  * Whether an AI agent, automation or workflow is published to this environment's User Portal, with
  * Publish or Unpublish. Publish is offered only when ipaas-service's publishing rules all pass; when
- * they don't, the row lists each rule broken, in ipaas-service's words, so the user knows what to change.
+ * they don't, the row lists each rule broken, worded from its code, so the user knows what to change.
  */
 export default function UserPortalRow({ orgHandler, componentId, environment, envName }: UserPortalRowProps): JSX.Element | null {
   const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
@@ -74,6 +70,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
     );
   }
 
+  const reasons = shownRefusals(data.reasons);
   const pending = publish.isPending || unpublish.isPending;
   const startPublish = () => {
     setRejectedScopes([]);
@@ -120,10 +117,10 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
         {action}
       </Stack>
 
-      {!data.published && data.reasons.length > 0 && (
+      {!data.published && reasons.length > 0 && (
         <Stack gap={0.5} sx={styles.rowNoteSx} role="group" aria-label="Why it can't be published">
-          {data.reasons.map((reason) => (
-            <Reason key={reason.code + reason.message} reason={reason} orgHandler={orgHandler} />
+          {reasons.map((reason) => (
+            <Reason key={reason.code + reason.message} reason={reason} envName={envName} orgHandler={orgHandler} />
           ))}
         </Stack>
       )}
@@ -131,7 +128,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
       {/* An unpublish failure shows in its confirm dialog, which stays open on it. */}
       {publish.isError && (
         <Typography variant="caption" color="error" component="p" sx={styles.rowNoteSx}>
-          {errorText(publish.error)}
+          {userPortalErrorText(publish.error, envName)}
         </Typography>
       )}
       {rejectedScopes.length > 0 && (
@@ -145,7 +142,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
           <Typography variant="body2">The User Portal&apos;s users no longer see this integration there. The integration keeps running.</Typography>
           {unpublish.isError && (
             <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
-              {errorText(unpublish.error)}
+              {userPortalErrorText(unpublish.error, envName)}
             </Typography>
           )}
         </ConfirmDeleteDialog>
@@ -154,16 +151,16 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   );
 }
 
-/** One publishing rule the integration breaks, as ipaas-service words it. */
-function Reason({ reason, orgHandler }: { reason: UserPortalRefusal; orgHandler: string }): JSX.Element {
+/** One publishing rule the integration breaks. The portal not being enabled is fixed on the User Portal page, so that one links there. */
+function Reason({ reason, envName, orgHandler }: { reason: UserPortalRefusal; envName: string; orgHandler: string }): JSX.Element {
   return (
     <Box sx={styles.reasonSx}>
       <Box component="span" sx={styles.reasonIconSx}>
         <CircleAlert size={12} />
       </Box>
       <Typography variant="caption" color="text.secondary">
-        {reason.message}
-        {reason.code === NOT_ENABLED && (
+        {refusalText(reason, envName)}
+        {reason.code === USER_PORTAL_NOT_ENABLED && (
           <>
             {' '}
             <Link component={RouterLink} to={userPortalUrl({ org: orgHandler })}>

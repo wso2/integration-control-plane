@@ -66,7 +66,10 @@ describe("the deploy card's User Portal row", () => {
     publishability.mockResolvedValue(refused);
     const container = await row(DEVELOPER);
     expect(button(container, 'Publish')?.disabled).toBe(true);
-    for (const reason of refused.reasons) expect(container.textContent).toContain(reason.message);
+    // Each is worded from its code, not ipaas-service's sentence.
+    expect(container.textContent).toContain('Only integrations of projects on the default deployment pipeline can be published to the User Portal.');
+    expect(container.textContent).toContain('The User Portal is not enabled in Production.');
+    for (const reason of refused.reasons) expect(container.textContent).not.toContain(reason.message);
     // The portal itself is the fix for one of them, and that one links to it.
     const link = container.querySelector('a');
     expect(link?.textContent).toBe('Enable it');
@@ -99,7 +102,35 @@ describe("the deploy card's User Portal row", () => {
     const container = await row(DEVELOPER);
     expect(container.textContent).toContain('Published');
     expect(button(container, 'Unpublish')?.disabled).toBe(false);
-    expect(container.textContent).not.toContain(refused.reasons[0].message);
+    expect(container.textContent).not.toContain('default deployment pipeline');
+  });
+
+  // With nothing deployed, every rule about what runs there fails too; deploying is the one fix.
+  it('asks for a deployment first, not for what follows from one', async () => {
+    publishability.mockResolvedValue({
+      environment: 'production',
+      published: false,
+      publishable: false,
+      reasons: [
+        { code: 'USER_PORTAL_NOT_DEPLOYED', message: 'the integration is not deployed in this environment; deploy it first' },
+        { code: 'USER_PORTAL_NO_MANAGEMENT_API', message: 'the workflow has no Workflow Management API endpoint deployed in this environment' },
+        { code: 'USER_PORTAL_NO_PUBLIC_ENDPOINT', message: 'the endpoint the User Portal calls is not exposed publicly in this environment; expose it first' },
+      ],
+    });
+    const container = await row(DEVELOPER);
+    expect(button(container, 'Publish')?.disabled).toBe(true);
+    const reasons = container.querySelector('[role="group"]');
+    expect(reasons?.textContent).toBe('Deploy it to Production first. The User Portal lists only what runs there.');
+  });
+
+  it('words a refused publish from its code', async () => {
+    publishability.mockResolvedValue({ environment: 'production', published: false, publishable: true, reasons: [] });
+    publish.mockRejectedValue(new BffError(409, '{"code":"USER_PORTAL_NOT_DEPLOYED","message":"the integration is not deployed in this environment; deploy it first"}'));
+    const container = await row(DEVELOPER);
+    await act(async () => button(container, 'Publish')?.click());
+    await flush();
+    expect(container.textContent).toContain('Deploy it to Production first.');
+    expect(container.textContent).not.toContain('deploy it first');
   });
 
   it('shows nothing where the BFF serves no User Portal', async () => {
