@@ -17,7 +17,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateTimeout, validateIntervalCount, validateCronField, validateCronFields, TIMEOUT_LIMITS, shortestRunGapMinutes, validatePlanSchedule, describeSeconds } from './scheduleValidation';
+import { validateTimeout, validateIntervalCount, validateCronField, validateCronFields, TIMEOUT_LIMITS, shortestRunGapMinutes, validatePlanSchedule, describeSeconds, describeMinutes } from './scheduleValidation';
+import type { ScheduleLimits } from '../types/schedule';
 
 describe('validateTimeout', () => {
   it('accepts an empty value as "no timeout"', () => {
@@ -145,43 +146,51 @@ describe('shortestRunGapMinutes', () => {
   });
 });
 
-describe('describeSeconds', () => {
-  it('names the limit in seconds with its minutes or hours', () => {
+describe('describeMinutes and describeSeconds', () => {
+  it('names a limit in whole days, hours or minutes', () => {
+    expect(describeMinutes(5)).toBe('5 minutes');
+    expect(describeMinutes(1)).toBe('1 minute');
+    expect(describeMinutes(60)).toBe('1 hour');
+    expect(describeMinutes(1440)).toBe('1 day');
     expect(describeSeconds(300)).toBe('300 seconds (5 minutes)');
-    expect(describeSeconds(7200)).toBe('7200 seconds (2 hours)');
     expect(describeSeconds(3600)).toBe('3600 seconds (1 hour)');
+    expect(describeSeconds(45)).toBe('45 seconds');
   });
 });
 
+// The service's default limits (GET /schedule-limits).
+const automationFree: ScheduleLimits = { minRunIntervalMinutes: 5, maxTimeoutSeconds: 300, allowOverlap: true };
+const ingestionFree: ScheduleLimits = { minRunIntervalMinutes: 1440, maxTimeoutSeconds: 3600, allowOverlap: false };
+const ingestionPaid: ScheduleLimits = { minRunIntervalMinutes: 0, maxTimeoutSeconds: 0, allowOverlap: true };
+
 describe('validatePlanSchedule', () => {
-  const none = { cron: '', timeoutSeconds: null };
+  const none = { cron: '', timeoutSeconds: null, allowConcurrency: null };
 
   it('holds an automation on a free plan to runs 5 minutes apart and 300 seconds', () => {
-    expect(validatePlanSchedule('*/5 * * * *', '300', none, 'free', 'automation')).toEqual({});
-    const errors = validatePlanSchedule('*/4 * * * *', '301', none, 'free', 'automation');
+    expect(validatePlanSchedule('*/5 * * * *', '300', true, none, automationFree, true)).toEqual({});
+    const errors = validatePlanSchedule('*/4 * * * *', '301', false, none, automationFree, true);
     expect(errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan');
     expect(errors.timeout).toBe('A timeout over 300 seconds (5 minutes) needs a paid plan');
   });
 
-  it('holds an ingestion on a free plan to runs 5 minutes apart and 2 hours', () => {
-    expect(validatePlanSchedule('*/5 * * * *', '7200', none, 'free', 'ingestion')).toEqual({});
-    expect(validatePlanSchedule('0 2 * * *', '3600', none, 'free', 'ingestion')).toEqual({});
-    const errors = validatePlanSchedule('*/1 * * * *', '7201', none, 'free', 'ingestion');
-    expect(errors.frequency).toBeDefined();
-    expect(errors.timeout).toBe('A timeout over 7200 seconds (2 hours) needs a paid plan');
+  it('holds an ingestion on a free plan to one run a day, 1 hour, and no overlap', () => {
+    expect(validatePlanSchedule('0 0 */1 * *', '3600', false, none, ingestionFree, true)).toEqual({});
+    const errors = validatePlanSchedule('0 0,12 * * *', '3601', true, none, ingestionFree, true);
+    expect(errors.frequency).toBe('Running more often than every 1 day needs a paid plan');
+    expect(errors.timeout).toBe('A timeout over 3600 seconds (1 hour) needs a paid plan');
+    expect(errors.overlap).toBe('Overlapping executions need a paid plan');
   });
 
-  it('lets a paid plan run every minute with any timeout, for both kinds', () => {
-    expect(validatePlanSchedule('* * * * *', '604800', none, 'paid', 'automation')).toEqual({});
-    expect(validatePlanSchedule('* * * * *', '604800', none, 'paid', 'ingestion')).toEqual({});
+  it('lets a paid plan run an ingestion every minute, for any time, overlapping', () => {
+    expect(validatePlanSchedule('* * * * *', '604800', true, none, ingestionPaid, false)).toEqual({});
   });
 
   it('keeps the values the environment already runs with', () => {
-    expect(validatePlanSchedule('*/2 * * * *', '3600', { cron: '*/2 * * * *', timeoutSeconds: 3600 }, 'free', 'automation')).toEqual({});
+    expect(validatePlanSchedule('0 */2 * * *', '7200', true, { cron: '0 */2 * * *', timeoutSeconds: 7200, allowConcurrency: true }, ingestionFree, true)).toEqual({});
   });
 
   it('checks a value that changes, even from one already over the limit', () => {
-    const errors = validatePlanSchedule('*/1 * * * *', '900', { cron: '*/2 * * * *', timeoutSeconds: 3600 }, 'free', 'automation');
+    const errors = validatePlanSchedule('*/1 * * * *', '900', false, { cron: '*/2 * * * *', timeoutSeconds: 3600, allowConcurrency: null }, automationFree, true);
     expect(errors.frequency).toBeDefined();
     expect(errors.timeout).toBeDefined();
   });

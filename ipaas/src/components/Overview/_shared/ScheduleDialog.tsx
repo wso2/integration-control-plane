@@ -22,7 +22,8 @@ import { usePlanAccess } from '../../../hooks/useBillingOrg';
 import { useDeployDeploymentTrack } from '../../../hooks/useDeployments';
 import ScheduleFields from './ScheduleFields';
 import { buildScheduleDeployInput, useScheduleForm } from './useScheduleForm';
-import type { ScheduleKind } from '../../../utils/scheduleValidation';
+import type { ScheduleKind } from '../../../types/schedule';
+import { useSchedulePolicy } from '../../../hooks/useScheduleLimits';
 
 interface ScheduleDialogProps {
   open: boolean;
@@ -50,7 +51,7 @@ export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveErr
 
   const { data: existingConfigs, isLoading: loadingConfigs } = useExecutionConfigs(componentId, releaseId, envId);
   const deployTrack = useDeployDeploymentTrack();
-  const form = useScheduleForm(existingConfigs, usePlanAccess(), kind);
+  const form = useScheduleForm(existingConfigs, usePlanAccess(), useSchedulePolicy(kind));
 
   const handleSave = () => {
     deployTrack.mutate(buildScheduleDeployInput(form, { componentId, versionId, imageId: buildId ?? '', envId, deploymentPipelineId }), {

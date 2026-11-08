@@ -21,6 +21,7 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useAppNavigate } from '../hooks/useAppNavigate';
 import { usePlanAccess } from '../hooks/useBillingOrg';
+import { useSchedulePolicy } from '../hooks/useScheduleLimits';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBase } from '../hooks/useKnowledgeBases';
@@ -70,7 +71,7 @@ function CreateKnowledgeBaseWizard({ scope }: { scope: OrgScope }): JSX.Element 
   const [chunking, setChunking] = useState<ChunkingConfig>(DEFAULT_CHUNKING);
   const [datasource, setDatasource] = useState<DatasourceConfig | null>(null);
   const [mode, setMode] = useState<IngestionMode>('scheduled');
-  const schedule = useScheduleForm(null, usePlanAccess(), 'ingestion');
+  const schedule = useScheduleForm(null, usePlanAccess(), useSchedulePolicy('ingestion'));
 
   const stepValid = [isNameValid(names), isVectorStoreValid(vectorStore), isEmbeddingValid(embedding), isChunkingValid(chunking), isDatasourceValid(datasource), mode === 'once' || schedule.isValid];
 
