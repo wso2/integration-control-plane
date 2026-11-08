@@ -95,6 +95,9 @@ export function useDeleteConsumer(projectName: string | null | undefined, ref: E
 
 const securityKey = (ref: EndpointRef | null | undefined) => ['endpoint-security', ...refKey(ref)] as const;
 
+/** The query key of an endpoint's security read, for a view that reads it again on its own schedule. */
+export const endpointSecurityQueryKey = securityKey;
+
 /** Read the exposed API's active auth mode so the security drawer reflects real state. */
 export function useEndpointSecurity(ref: EndpointRef | null | undefined, enabled = true) {
   return useQuery<SecurityConfig>({

@@ -18,6 +18,7 @@
 
 import { AZURE_DEFAULT_API_VERSION, CHUNKING_STRATEGIES, DATASOURCES, DEFAULT_CHUNKING, EMBEDDING_PROVIDERS, RAG_SECRET_KEYS, VECTOR_STORE_PROVIDERS } from '../constants/ragIngestion';
 import type { EndpointTestAccess } from '../hooks/useEndpointTestAccess';
+import { httpStatusOf } from './apiErrors';
 import type { KnowledgeBase, KnowledgeBaseApiStatus, KnowledgeBaseDataSource, KnowledgeBaseSettings } from '../types/knowledgeBase';
 import type { ChunkingConfig, ChunkingStrategy, DatasourceConfig, EmbeddingConfig, EmbeddingProvider, VectorStoreConfig } from '../types/ragIngestion';
 import { datasourceEnvVars, embeddingEnvVars, isEmbeddingValid, isVectorStoreValid, vectorStoreEnvVars } from './ragIngestion';
@@ -228,12 +229,20 @@ export function retrievalUnavailableReason(kb: Pick<KnowledgeBase, 'status'>): s
 }
 
 /** Why an active knowledge base cannot be queried on the gateway with a test key yet, or null when it can. */
-export function retrievalAccessReason(access: Pick<EndpointTestAccess, 'keyError' | 'needsApiKeyAuth' | 'isUnavailable' | 'gatewayUrl' | 'isAuthorized'>, apiStatus?: KnowledgeBaseApiStatus): string | null {
+export function retrievalAccessReason(access: Pick<EndpointTestAccess, 'keyError' | 'needsApiKeyAuth' | 'securityError' | 'mode' | 'gatewayUrl' | 'isAuthorized' | 'isMinting'>, apiStatus?: KnowledgeBaseApiStatus): string | null {
   if (access.keyError) return access.keyError;
   if (access.needsApiKeyAuth) return "The knowledge base's API takes another kind of credential, so it can't be queried with a test key.";
-  if (access.isUnavailable) return notOnGatewayReason(apiStatus);
-  if (!access.gatewayUrl || !access.isAuthorized) return 'Getting a test key for the knowledge base…';
-  return null;
+  if (access.securityError) {
+    // Only a 409 says the API is not on the gateway; anything else is a read that failed, read again.
+    if (httpStatusOf(access.securityError) === 409) return notOnGatewayReason(apiStatus);
+    return "Could not check the knowledge base's API on the gateway. Trying again…";
+  }
+  if (access.mode === null) return "Checking the knowledge base's API on the gateway…";
+  if (!access.gatewayUrl) return notOnGatewayReason(apiStatus);
+  if (access.isAuthorized) return null;
+  if (access.isMinting) return 'Getting a test key for the knowledge base…';
+  // The hook leaves a permission refusal out of keyError: it is what stops a key without saying why.
+  return "Your role can't create test keys for this knowledge base, so it can't be queried here.";
 }
 
 /** Why the knowledge base's API is not on the gateway, from how putting it there is going. */

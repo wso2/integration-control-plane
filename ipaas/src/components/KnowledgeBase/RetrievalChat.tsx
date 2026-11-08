@@ -94,7 +94,7 @@ function ChunksModal({ chunks, onClose }: { chunks: RetrievedChunk[] | null; onC
 }
 
 interface RetrievalChatProps {
-  knowledgeBase: Pick<KnowledgeBase, 'name' | 'environment' | 'serviceUrl' | 'apiStatus'>;
+  knowledgeBase: Pick<KnowledgeBase, 'name' | 'environment' | 'apiStatus'>;
   /** The integration the query is made from, sent as `rag_component_id`. */
   componentId: string;
   /** Why queries cannot be sent yet (e.g. the KB Service is still deploying); null when they can. */
