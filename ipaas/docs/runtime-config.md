@@ -8,9 +8,19 @@ The console reads its backend URLs from `/config.json` when it starts, so one bu
 2. Each key overrides its default in `DEFAULT_CONFIG` on its own. A key that is missing keeps its default.
 3. If `config.json` fails to load, the app boots on the defaults and logs `Failed to load runtime config, using defaults`. The defaults are placeholders, not a working environment.
 
-`public/config.json` is copied to `dist/config.json` on build. It points at the local k3d stack. Each deployment mounts its own file over it. In wso2cloud-deployment that is the `config.json` in the ipaas-console `ReleaseBinding`.
+`public/config.json` is copied to `dist/config.json` on build. Each deployment mounts its own file over it. In wso2cloud-deployment that is the `config.json` in the ipaas-console `ReleaseBinding`.
 
-`pnpm dev` and `pnpm preview` cannot sign in against the local stack yet. They serve the console over https on `localhost:3000`, so the stack's plain-http Thunder and observability hosts are blocked as mixed content, and the local Thunder only accepts the deployed console's redirect URI. Try changes by deploying the console into the local stack instead.
+## Running `pnpm dev`
+
+`public/config.json` runs the console in gateway sign-in mode (see below): every API and session call goes to same-origin `/_auth` and `/_api`. The dev server, on `https://localhost:3000`, proxies those paths to a deployed console's gateway, by default the dev environment's (`https://cloud-console-development.gateway.dev.cloud.wso2.com`). Set `DEV_PROXY_TARGET` to use another one.
+
+The proxy forwards the browser's cookies, so it needs that console's session:
+
+1. Sign in to the deployed console.
+2. Copy its `__Host-X-CLOUD` and `__Host-X-INTEGRATION` cookies to `https://localhost:3000`. They are `__Host-` cookies, which a browser keeps only on https, so the dev server keeps serving https.
+3. Run `pnpm dev` and open `https://localhost:3000`.
+
+A sign-in started from the dev server completes on the deployed console, whose redirect URI the IdP accepts, so when the session expires, copy the cookies again. The dev server changes the deployed environment's data like the deployed console does. Logs and metrics go to the dev environment's observability proxy, as from the deployed dev console; an empty `VITE_OBSERVABILITY_URL` would fall back to the placeholder default. `pnpm preview` has no proxy.
 
 ## Keys
 

@@ -103,13 +103,11 @@ export interface SecurityConfig {
     /** Request header carrying the key (default `X-API-Key`). */
     header?: string;
   };
-  jwt?: {
-    /** Gateway key-manager names to trust; empty defaults to the org key manager. */
-    issuers?: string[];
-    audiences?: string[];
-  };
+  jwt?: JwtSecurity;
   /** Gateway invoke URL, distinct from the component's open raw route. Populated on GET, ignored on PUT. */
   publicUrl?: string;
+  /** Routes the API secures, CORS preflights left out: the keys `jwt.operations` accepts. Read-only: ignored on PUT. */
+  operations?: EndpointPolicyOperation[];
   /** False outside the pipeline's entry environment, where the API only changes by promotion. Absent from older BFFs: editable. */
   editable?: boolean;
   entryEnvironment?: string;
@@ -127,6 +125,38 @@ export interface AiGatewayBinding {
   /** Absent while the environment has no AI gateway; `deploymentStatusReason` is then `NO_GATEWAY`. */
   deploymentStatus?: 'Deploying' | 'Deployed' | 'Failed';
   deploymentStatusReason?: string;
+}
+
+/**
+ * Options of the jwt mode. The key manager, audiences and token options apply to every operation;
+ * scopes are set per operation. GET fills every token option with the value in force. PUT replaces
+ * the whole block, so an option left out takes its default.
+ */
+export interface JwtSecurity {
+  /** Gateway key-manager names to trust (not URLs). Empty defaults to `ThunderKeyManager`, the only name accepted today. */
+  issuers?: string[];
+  /** Accepted `aud` claim values; a token must carry at least one. Empty skips the audience check. */
+  audiences?: string[];
+  /** Each operation's scope requirement, keyed `"<METHOD> <path>"`. An operation left out needs no scope. */
+  operations?: Record<string, ScopeRequirement>;
+  /** Request header clients send the token in (default `Authorization`). */
+  headerName?: string;
+  /** Scheme in front of the token, as in `Bearer <token>` (default `Bearer`). */
+  authHeaderPrefix?: string;
+  /** Whether the backend receives the token (default true). */
+  forwardToken?: boolean;
+  /** Header the backend receives the token in (default `X-Forwarded-Authorization`). */
+  forwardedTokenHeader?: string;
+  /** Forward only the token, without the prefix (default false). */
+  forwardTokenStripScheme?: boolean;
+}
+
+/** The scopes one operation requires, checked against the token's `scope` claim. When both lists are set, both must hold. */
+export interface ScopeRequirement {
+  /** Every scope listed must be in the token. */
+  allOf?: string[];
+  /** At least one scope listed must be in the token. */
+  anyOf?: string[];
 }
 
 /** The non-auth gateway behaviour of an exposed endpoint API (GET/PUT `.../policies`). */

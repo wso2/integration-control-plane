@@ -42,7 +42,7 @@ import {
 } from '../api/deployments';
 import type { ComponentDeployment, BuildRun, DeployDeploymentTrackInput, PromoteInput, StopDeploymentInput, DeployPrebuiltImageInput, RecentDeployment } from '../types/deployment';
 import type { DeployComponentInput } from '../types/build';
-import type { ComponentDetail } from '../types/component';
+import type { ComponentDetail, EnvEndpoint } from '../types/component';
 import type { IntegrationKind } from '../types/insights';
 
 const TERMINAL_CONCLUSIONS = new Set(['success', 'failure', 'cancelled', 'timed_out', 'neutral', 'skipped']);
@@ -76,21 +76,29 @@ export function useComponentDeployments(orgHandler: string, orgUuid: string, com
   });
 }
 
+/** One release's endpoints, shared by the single- and multi-release hooks so they read one cache. */
+const envEndpointsQuery = (componentId: string, versionId: string | undefined, releaseId: string) => ({
+  queryKey: ['envEndpoints', componentId, versionId, releaseId],
+  queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
+  // The cloud endpoint request is release-scoped and does not use versionId. Newly created
+  // OpenChoreo components currently carry an empty version, so requiring it here prevents the
+  // request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
+  enabled: !!componentId && !!releaseId,
+  staleTime: 30_000,
+  retry: false,
+  refetchInterval: (query: Query<EnvEndpoint[]>) => {
+    const endpoints = query.state.data;
+    return endpoints?.some((endpoint) => isExposureTransitioning(endpoint.visibilityStatus)) ? 2_000 : false;
+  },
+});
+
 export function useEnvEndpoints(componentId: string, versionId: string | undefined, releaseId: string) {
-  return useQuery({
-    queryKey: ['envEndpoints', componentId, versionId, releaseId],
-    queryFn: () => fetchEnvEndpoints(componentId, versionId, releaseId),
-    // The cloud endpoint request is release-scoped and does not use versionId. Newly created
-    // OpenChoreo components currently carry an empty version, so requiring it here prevents the
-    // request entirely and hides the endpoint URL, OpenAPI resources, and Try It UI.
-    enabled: !!componentId && !!releaseId,
-    staleTime: 30_000,
-    retry: false,
-    refetchInterval: (query) => {
-      const endpoints = query.state.data;
-      return endpoints?.some((endpoint) => isExposureTransitioning(endpoint.visibilityStatus)) ? 2_000 : false;
-    },
-  });
+  return useQuery(envEndpointsQuery(componentId, versionId, releaseId));
+}
+
+/** Several releases' endpoints at once, in the order of `releaseIds`. */
+export function useEnvEndpointsOfReleases(componentId: string, versionId: string, releaseIds: string[]) {
+  return useQueries({ queries: releaseIds.map((releaseId) => envEndpointsQuery(componentId, versionId, releaseId)) });
 }
 
 export function useApiDefinition(apimRevisionId: string | null | undefined) {
