@@ -109,8 +109,8 @@ export default function AppLayout() {
           <Header.Actions>
             <ColorSchemeToggle />
             <UserMenu>
-              <UserMenu.Trigger name={user.displayName} avatar={user.initials} />
-              <ProfileHeader name={user.displayName} email={user.email} avatar={user.initials} roles={user.roles} org={orgName} />
+              <UserMenu.Trigger name={user.displayName} avatar={user.picture ?? user.initials} />
+              <ProfileHeader name={user.displayName} email={user.email} initials={user.initials} picture={user.picture} roles={user.roles} org={orgName} />
               <UserMenu.Logout icon={<LogOut size={18} />} label={t('common.actions.signOut')} onClick={() => setConfirmSignOut(true)} />
             </UserMenu>
           </Header.Actions>
