@@ -25,6 +25,7 @@ import ApiKeyAuthOffer from '../../ApiKeyAuthOffer';
 import { useMcpTools } from '../../../hooks/useMcpTools';
 import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
+import { MCP_REDIRECT_MESSAGE } from '../../../utils/mcp';
 import { aiGatewayNotice } from '../../../utils/mcpGateway';
 import type { EndpointRef } from '../../../types/consumers';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
@@ -77,7 +78,7 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
   const isAuthorized = access.isAuthorized;
   const keyError = access.keyError;
 
-  const { tools, isLoading, error, isForbidden, isUnauthorized, refetch } = useMcpTools({
+  const { tools, isLoading, error, isForbidden, isUnauthorized, isRedirect, refetch } = useMcpTools({
     mcpUrl,
     apiKey,
     authHeader: access.authHeader,
@@ -148,13 +149,13 @@ export default function EnvCardBody({ component, env, projectId, versionId, rele
             <Alert
               severity={isForbidden ? 'warning' : 'error'}
               action={
-                isForbidden ? undefined : (
+                isForbidden || isRedirect ? undefined : (
                   <Button color="inherit" size="small" onClick={refetch}>
                     Retry
                   </Button>
                 )
               }>
-              {isForbidden ? "You don't have permission to view this MCP server's tools." : 'Failed to fetch MCP tools.'}
+              {isForbidden ? "You don't have permission to view this MCP server's tools." : isRedirect ? MCP_REDIRECT_MESSAGE : 'Failed to fetch MCP tools.'}
             </Alert>
           )}
 
