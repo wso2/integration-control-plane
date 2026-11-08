@@ -106,8 +106,11 @@ export const SCHEDULE_LIMITS = {
   paid: { minIntervalMinutes: 1, maxTimeoutSeconds: { automation: null, ingestion: null } },
 } as const;
 
-/** What a new schedule starts with on every plan. An ingestion's timeout is set by ipaas-service. */
-export const SCHEDULE_DEFAULTS = { intervalMinutes: 5, timeoutSeconds: { automation: 300, ingestion: 3600 } } as const;
+/**
+ * What a new schedule starts with on every plan: an automation every 5 minutes, an ingestion daily at
+ * 00:00 UTC. An ingestion's timeout is set by ipaas-service.
+ */
+export const SCHEDULE_DEFAULTS = { cron: { automation: '*/5 * * * *', ingestion: '0 0 */1 * *' }, timeoutSeconds: { automation: 300, ingestion: 3600 } } as const;
 
 /** A limit in seconds as the timeout field takes it, with its whole minutes or hours, e.g. "300 seconds (5 minutes)". */
 export function describeSeconds(seconds: number): string {

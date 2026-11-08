@@ -62,8 +62,6 @@ export interface ScheduleFormApi extends ScheduleValues {
   kind: ScheduleKind;
 }
 
-const DEFAULT_MINUTES = SCHEDULE_DEFAULTS.intervalMinutes;
-
 /**
  * Owns the schedule form state (interval/cron, timezone, execution behaviour),
  * seeded from an existing schedule. Shared by the standalone Schedule drawer and
@@ -72,9 +70,11 @@ const DEFAULT_MINUTES = SCHEDULE_DEFAULTS.intervalMinutes;
  */
 export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined, plan: PlanAccess | null, kind: ScheduleKind): ScheduleFormApi {
   const [tab, setTab] = useState(0);
-  const [intervalCount, setIntervalCount] = useState<number | ''>(DEFAULT_MINUTES);
-  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>('Minute');
-  const [cronFields, setCronFields] = useState<Record<CronField, string>>({ minute: `*/${DEFAULT_MINUTES}`, hour: '*', dom: '*', month: '*', dow: '*' });
+  const defaultCron = SCHEDULE_DEFAULTS.cron[kind];
+  const defaultInterval = cronToInterval(defaultCron);
+  const [intervalCount, setIntervalCount] = useState<number | ''>(defaultInterval?.count ?? 1);
+  const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>(defaultInterval?.unit ?? 'Minute');
+  const [cronFields, setCronFields] = useState<Record<CronField, string>>(() => parseCronParts(defaultCron));
   const [timezone, setTimezone] = useState('UTC');
   const [timeoutSeconds, setTimeoutSeconds] = useState('');
   const [allowConcurrency, setAllowConcurrency] = useState(false);

@@ -57,6 +57,23 @@ describe('useScheduleForm defaults', () => {
     expect(form.isValid).toBe(true);
   });
 
+  it.each([
+    ['free', free],
+    ['paid', paid],
+  ])('starts a new ingestion daily at 00:00 on a %s plan', async (_name, plan) => {
+    await render(null, plan, 'ingestion');
+    expect(form.cron).toBe('0 0 */1 * *');
+    expect(form.tab).toBe(0);
+    expect(form.intervalCount).toBe(1);
+    expect(form.intervalUnit).toBe('Day');
+    expect(form.isValid).toBe(true);
+  });
+
+  it('starts an ingestion with no schedule, such as one ingested once, daily', async () => {
+    await render(saved(''), free, 'ingestion');
+    expect(form.cron).toBe('0 0 */1 * *');
+  });
+
   it('starts an environment with no schedule at every 5 minutes', async () => {
     await render(saved(''), free);
     expect(form.cron).toBe('*/5 * * * *');
