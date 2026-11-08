@@ -223,7 +223,7 @@ export interface IntegrationLinks {
   usedByOrphaned: Record<string, string>;
   connections: LinkConnection[];
   fieldLinks: Record<string, KeyRef>;
-  /** Configurable id → the endpoint of this project filling it, `<component>/<endpoint>`. */
+  /** Configurable id → the endpoint of this project filling it, `<project>/<component>/<endpoint>`. */
   endpointLinks: Record<string, string>;
   orphaned: OrphanedLink[];
   env: Record<string, KeyRef>;

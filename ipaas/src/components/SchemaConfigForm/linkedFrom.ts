@@ -52,7 +52,7 @@ export interface PickerKey {
 
 /** An integration of this project the field can take the address of, and where it cannot be called. */
 export interface PickerEndpoint {
-  /** `<component>/<endpoint>`, which is what a pick writes. */
+  /** `<project>/<component>/<endpoint>`, which is what a pick writes. */
   id: string;
   name: string;
   /** Why it cannot be chosen; it is offered disabled, so the reason is visible. */

@@ -47,7 +47,7 @@ export interface FieldSource extends KeyRef {
 
 export interface Picker {
   first: typeof VIA | typeof ENTER;
-  /** `first`, `<resource>|<KEY>`, or an endpoint's `<component>/<endpoint>`. */
+  /** `first`, `<resource>|<KEY>`, or an endpoint's `<project>/<component>/<endpoint>`. */
   selected: string;
   resources: { id: string; name: string; keys: { key: string; usedBy?: string; orphanOf?: string }[] }[];
   /** Integrations of this project, which supply an address and need no key. */

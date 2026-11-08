@@ -103,6 +103,13 @@ function Form({ env = 'development', form = schema }: { env?: string; form?: JSO
   );
 }
 
+// linkedKeys decides which fields the form treats as supplied: it skips their validation and
+// does not save a value for them. Only the set is of interest, so nothing else is rendered.
+function LinkedKeys({ form = schema }: { form?: JSONSchema }) {
+  const linked = useLinkedForm('default', 'ghdemo', 'development', true, linkableFields(form));
+  return <span data-testid="linked-keys">{[...linked.linkedKeys].sort().join(' ')}</span>;
+}
+
 let container: HTMLDivElement;
 let root: Root;
 const button = (label: string) => Array.from(document.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === label || b.textContent === label) as HTMLButtonElement;
@@ -124,6 +131,15 @@ afterEach(() => {
 });
 
 describe('the Configure form with links', () => {
+  // A configurable filled from an endpoint has no value of its own: its address comes from the
+  // Workload dependency, so the form must not ask for one or keep an earlier one.
+  it('counts a configurable filled from an endpoint as linked', async () => {
+    answer.links = { ...links, endpointLinks: { [id('ordersDatabaseUrl')]: 'default/basket/items' } };
+    await act(async () => root.render(<LinkedKeys />));
+
+    expect(container.querySelector('[data-testid="linked-keys"]')?.textContent?.split(' ')).toContain('acme.ghdemo.ordersDatabaseUrl');
+  });
+
   it("shows a connection's box with its link and Unlink, and fills its field from the link", async () => {
     expect(container.textContent).toContain('githubLinked to GitHub Acme');
     expect((container.querySelector('input[aria-label="githubAuthToken is supplied by GitHub Acme"]') as HTMLInputElement).value).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
@@ -293,6 +309,19 @@ describe('the Configure form with links', () => {
     await act(async () => (Array.from(document.querySelectorAll('li')).find((li) => li.textContent === 'ordersDatabaseUrl') as HTMLElement).click());
     await act(async () => button('Move').click());
     expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
+  });
+
+  // An endpoint link holds no resource key, so no other target can take it over: offering Move
+  // would only ever produce a write the BFF refuses, because the endpoint id is no resource.
+  it('offers only Remove for an endpoint link the build lost', async () => {
+    answer.links = { ...links, usedByOrphaned: {}, orphaned: [{ target: id('ordersDbUrl'), kind: 'endpoint', ref: 'default/basket/items' }] };
+    await act(async () => root.render(<Form />));
+
+    expect(container.textContent).toContain('ordersDbUrl is no longer in the code');
+    expect(container.querySelector('[aria-label="Move ordersDbUrl to"]')).toBeNull();
+    expect(button('Move')).toBeUndefined();
+    await act(async () => button('Remove').click());
+    expect(writes).toEqual([{ configurable: id('ordersDbUrl') }]);
   });
 
   it("shows production's sections from the build it runs, not the Workload's renamed one", async () => {

@@ -96,7 +96,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   }));
 
   const linkedKeys = new Set(
-    [...Object.keys(links.fieldLinks), ...Object.keys(links.declared ?? {}), ...links.connections.flatMap((c) => c.fields.map((f) => f.configurable)), ...Object.keys(links.environments.find((e) => e.name === env)?.configurables ?? {})]
+    [...Object.keys(links.fieldLinks), ...Object.keys(links.endpointLinks), ...Object.keys(links.declared ?? {}), ...links.connections.flatMap((c) => c.fields.map((f) => f.configurable)), ...Object.keys(links.environments.find((e) => e.name === env)?.configurables ?? {})]
       .filter((id) => view.target(id).source)
       .map(configKey),
   );
