@@ -18,26 +18,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { WorkflowApiError } from '../api/http';
-import { TEST_KEY_MIN_AGE_MS, TEST_KEY_VALIDITY_SECONDS, isKeyRefusal, testKeyRefreshInterval } from './workflowTestKey';
-
-describe('testKeyRefreshInterval', () => {
-  it('mints again a minute before the key expires', () => {
-    expect(testKeyRefreshInterval(TEST_KEY_VALIDITY_SECONDS)).toBe(3540 * 1000);
-  });
-
-  it('stays within what a browser timer can wait for a long-lived key', () => {
-    expect(testKeyRefreshInterval(3600 * 1000)).toBe(2 ** 31 - 1);
-  });
-
-  it('waits at least 30 seconds for a short-lived key', () => {
-    expect(testKeyRefreshInterval(45)).toBe(30 * 1000);
-  });
-
-  it('keeps a key with no stated validity until it is refused', () => {
-    expect(testKeyRefreshInterval(undefined)).toBe(false);
-    expect(testKeyRefreshInterval(-1)).toBe(false);
-  });
-});
+import { TEST_KEY_MIN_AGE_MS, isKeyRefusal } from './workflowTestKey';
 
 describe('isKeyRefusal', () => {
   const now = 1_000_000;

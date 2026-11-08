@@ -59,10 +59,17 @@ async function refusedTestKey(scopes: string[], agent = false) {
   return r.container;
 }
 
+/** Waits for the auto-minted key's refusal to reach the page: the mint starts only once the security read has rendered. */
+const refusalShown = () =>
+  vi.waitFor(async () => {
+    await flush();
+    expect(document.body.textContent).toContain("can't issue a test key");
+  });
+
 describe('ApiKeyAuthOffer', () => {
   it('explains a 409 and switches the endpoint to API key, then mints', async () => {
     const c = await refusedTestKey(DEVELOPER);
-    expect(document.body.textContent).toContain("can't issue a test key");
+    await refusalShown();
     expect(document.body.textContent).toContain('changes how every caller of this API authenticates');
 
     vi.mocked(createEndpointTestKey).mockResolvedValue({ keyId: 'k', apiKey: 'test-key-1' });
@@ -75,13 +82,13 @@ describe('ApiKeyAuthOffer', () => {
 
   it('only explains to a role that may test the endpoint but not change its security', async () => {
     const c = await refusedTestKey(DEVELOPER.filter((s) => s !== Scopes.ENDPOINT_UPDATE));
-    expect(document.body.textContent).toContain("can't issue a test key");
+    await refusalShown();
     expect(button(c, 'Switch to API key')).toBeUndefined();
   });
 
   it("only explains for an AI agent, whose security Agent Manager owns, not the API Platform's API the switch edits", async () => {
     const c = await refusedTestKey(DEVELOPER, true);
-    expect(document.body.textContent).toContain("can't issue a test key");
+    await refusalShown();
     expect(document.body.textContent).not.toContain('Switching it');
     expect(button(c, 'Switch to API key')).toBeUndefined();
   });

@@ -22,18 +22,23 @@ import { httpStatusOf } from '../../../utils/apiErrors';
 import { endpointLoadNotice } from '../../../utils/apiSecurity';
 
 /**
- * How a call to the workflow Management API authenticates, twice over.
+ * How a call to the workflow Management API authenticates: as the Test Console calls any endpoint.
  *
  * The API Platform gateway in front of the integration lets a call through with the endpoint's
  * test key, sent in the header the gateway's api-key policy names (`useEndpointTestAccess`), or
- * with nothing when the endpoint is open. The management API behind it takes the caller from a
- * JWT: the signed-in user's platform access token, sent as `X-JWT-Assertion`. It validates that
- * token (issuer platform_idp, audience IPAAS_CONSOLE) and reads the caller and their roles from it,
- * so every call names the person using the console; no exchange and no identity headers are needed.
+ * with nothing when the endpoint is open. The management API behind it asks for no credential of
+ * its own and trusts the gateway, so the key is the only one sent. It names no user: the engine
+ * takes every call as anonymous, and accepts a decision only on a task or review that names no
+ * role or user.
  */
 
-/** The header the management API reads the caller's token from. */
-export const CALLER_ASSERTION_HEADER = 'X-JWT-Assertion';
+/**
+ * Whether calls name a caller with roles. The test key names none, and the engine serves a run's
+ * details, history, activity tree and reset points, and the human tasks a role is named for, only
+ * to a caller with roles ("caller roles are required to view workflow details"). The views that
+ * need them say they are coming soon, and send none of those reads, until calls carry roles.
+ */
+export const CALLS_CARRY_ROLES = false;
 
 /** What gets a call past the gateway: the test key, in its header, or none for an open API. */
 export interface GatewayCredential {
@@ -41,12 +46,9 @@ export interface GatewayCredential {
   apiKey: string | null;
 }
 
-/** The credential headers of one request. The token is read per request, never cached here. */
-export function workflowRequestHeaders({ authHeader, apiKey }: GatewayCredential, accessToken: string | null): Record<string, string> {
-  return {
-    ...(apiKey ? { [authHeader]: apiKey } : {}),
-    ...(accessToken ? { [CALLER_ASSERTION_HEADER]: `Bearer ${accessToken}` } : {}),
-  };
+/** The credential headers of one request: the test key, in the header the gateway reads it from. */
+export function workflowRequestHeaders({ authHeader, apiKey }: GatewayCredential): Record<string, string> {
+  return apiKey ? { [authHeader]: apiKey } : {};
 }
 
 /**

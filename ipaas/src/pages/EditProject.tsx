@@ -161,7 +161,7 @@ export default function EditProject(scope: ProjectScope): JSX.Element {
       </Button>
 
       <PageTitle>
-        <PageTitle.Header>Manage project</PageTitle.Header>
+        <PageTitle.Header>Edit project</PageTitle.Header>
       </PageTitle>
 
       <EditProjectForm key={project.id} scope={scope} project={project} />

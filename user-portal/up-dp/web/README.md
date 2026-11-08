@@ -71,7 +71,7 @@ The access token goes to `/api/v1` and to the gateway, where the agents and work
 ## Look
 
 The config from `/config.js` names the theme and the portal. `PORTAL_THEME` is one of
-`acrylicOrange` (default; the WSO2 Cloud consoles' theme, with its faint orange glow), `oxygen`, `acrylicPurple`, `classic`, `wso2`,
+`choreoLabs` (default; the integration console's blue theme), `acrylicOrange` (the WSO2 Cloud consoles' theme, with its faint orange glow), `oxygen`, `acrylicPurple`, `classic`, `wso2`,
 `highContrast`, `paleBase`, `paleGray` or `paleIndigo`. `PORTAL_PRIMARY_COLOR` (`#RRGGBB`)
 replaces the theme's primary colour. The colour scheme follows the system until the user picks
 one with the toggle in the header. `PORTAL_LOGO_LIGHT_URL` and `PORTAL_LOGO_DARK_URL` replace the

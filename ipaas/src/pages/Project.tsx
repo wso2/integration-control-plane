@@ -55,7 +55,7 @@ import {
 } from '@wso2/oxygen-ui';
 import { CARD_TABLE_SX, SEARCH_STANDARD_WIDTH_SX } from '../constants/styles';
 import ProjectHomeSkeleton from '../components/ProjectHomeSkeleton';
-import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search, SlidersHorizontal } from '@wso2/oxygen-ui-icons-react';
+import { Box as BoxIcon, ChevronDown, ChevronUp, Cloud, ExternalLink, FileText, Filter, GitHub, GitBranch, Info, Link2, Pencil, Plus, PlugZap, Search } from '@wso2/oxygen-ui-icons-react';
 import CreateIntegrationPanels from '../components/CreateIntegrationPanels';
 import EmptyListing from '../components/EmptyListing';
 import IntegrationTypesCard from '../components/IntegrationTypesCard';
@@ -634,10 +634,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
   // list reports isLoading false with its data still pre-creation.
   const loadingProject = !project && (isUuid ? loadingById : loadingByHandle || loadingProjects || fetchingProjects);
   const projectId = project?.id ?? '';
-  // Shared with AppLayout's left-nav hiding, so both surfaces hide on exactly the same one-shot
-  // "just landed here right after onboarding" signal and can't drift out of sync. This only fires
-  // on that first landing — navigating elsewhere and back always shows the header again, even if
-  // the project is still empty, so it never vanishes on a repeat visit.
+  // Only the first landing after onboarding: navigating elsewhere and back shows the header again.
   const justProvisionedDefaultProject = useFreshDefaultProject();
   const { data: components = [], isLoading: loadingComponents, isSuccess: isComponentsSuccess } = useComponents(scope.org, projectId);
   // The component list carries no repository, so a linked project looks each integration's up.
@@ -970,7 +967,7 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </div>
             </Stack>
           </Stack>
-          {/* Beside the editor, Manage project steps back to a link under it so the editor stays the one prominent action. */}
+          {/* Beside the editor, Edit project steps back to a link under it so the editor stays the one prominent action. */}
           <Stack direction={showEditor ? 'column' : 'row'} alignItems={showEditor ? 'flex-end' : 'center'} gap={showEditor ? 0.5 : 1.5} sx={{ flexShrink: 0 }}>
             {showEditor && (
               <Box sx={{ position: 'relative', flexShrink: 0 }}>
@@ -1038,8 +1035,8 @@ export default function Project(scope: ProjectScope): JSX.Element {
               </Box>
             )}
             <Authorized permissions={Scopes.PROJECT_UPDATE}>
-              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<SlidersHorizontal size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
-                Manage project
+              <Button variant={showEditor ? 'text' : 'outlined'} size="small" startIcon={<Pencil size={14} />} onClick={() => navigate(editProjectUrl(scope))} sx={{ whiteSpace: 'nowrap' }}>
+                Edit project
               </Button>
             </Authorized>
           </Stack>

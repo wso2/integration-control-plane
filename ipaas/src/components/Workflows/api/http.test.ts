@@ -58,7 +58,7 @@ describe('workflowFetch', () => {
     fetchMock.mockResolvedValueOnce(new Response('Unauthorized', { status: 401 }));
     await expect(workflowFetch('https://gw/x/runtime', { headers: {} })).rejects.toMatchObject({
       code: 'GATEWAY_REJECTED',
-      message: 'The credentials were rejected. The test key or the access token may have expired.',
+      message: 'The gateway rejected the test key. It may have expired.',
     });
   });
 

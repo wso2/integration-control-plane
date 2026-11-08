@@ -75,6 +75,9 @@ type OIDC struct {
 	ClientID string
 	Resource string
 	Scopes   string
+	// InsecureTLS skips the issuer's certificate check when UP-DP reads its signing keys:
+	// a local ThunderID's certificate is self-signed.
+	InsecureTLS bool
 }
 
 type CacheConfig struct {
@@ -103,7 +106,7 @@ func Load(ctx context.Context) (Config, error) {
 		Portal: Portal{
 			Name:         l.String("PORTAL_NAME", "User Portal"),
 			ProductName:  l.String("PRODUCT_NAME", "Integration Platform"),
-			Theme:        l.String("PORTAL_THEME", "acrylicOrange"),
+			Theme:        l.String("PORTAL_THEME", "choreoLabs"),
 			PrimaryColor: l.String("PORTAL_PRIMARY_COLOR", ""),
 			Links: map[string]string{
 				"terms":   l.String("PORTAL_TERMS_URL", "https://wso2.com/terms-of-use/"),
@@ -120,6 +123,8 @@ func Load(ctx context.Context) (Config, error) {
 			ClientID: l.String("OIDC_CLIENT_ID"),
 			Resource: l.String("OIDC_RESOURCE"),
 			Scopes:   l.String("OIDC_SCOPES", "openid profile email roles"),
+
+			InsecureTLS: l.Bool("OIDC_INSECURE_TLS", false),
 		},
 		IPaaS: ipaasportal.Config{
 			BaseURL:      strings.TrimSuffix(l.String("IPAAS_BASE_URL", "http://localhost:9090/user-portal"), "/"),

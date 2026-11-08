@@ -26,6 +26,19 @@ import { WorkflowApiError } from '../api/http';
 import type { WorkflowListFilters } from '../api/types';
 import WorkflowStatsStrip from './WorkflowStatsStrip';
 
+// Whether calls carry roles, read as the strip renders: most tests are of the figures as they read
+// with roles, which the engine needs to list any review or task.
+const roles = vi.hoisted(() => ({ carried: true }));
+vi.mock('../connection/workflowCredential', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../connection/workflowCredential')>();
+  return {
+    ...original,
+    get CALLS_CARRY_ROLES() {
+      return roles.carried;
+    },
+  };
+});
+
 (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const page = <T,>(items: T[], hasMore = false) => ({ items, nextPageToken: hasMore ? 'next' : null, hasMore });
@@ -50,6 +63,7 @@ beforeEach(() => {
 afterEach(async () => {
   await act(async () => root.unmount());
   container.remove();
+  roles.carried = true;
 });
 
 /** `null` renders the figures of the whole integration. */
@@ -129,6 +143,21 @@ describe('WorkflowStatsStrip', () => {
     // A runtime that names no parent type has its reviews counted rather than dropped.
     expect(badge('Pending Reviews')?.textContent).toBe('2');
     expect(badge('Pending Tasks')?.textContent).toBe('3');
+  });
+
+  it('neither reads nor counts reviews and tasks while calls carry no roles, and links to neither', async () => {
+    roles.carried = false;
+    const client = fakeClient({ reviews: [{ parentWorkflowType: 'orderWorkflow' }], tasks: 3 });
+    await renderStrip(client);
+    expect(client.reviews.list).not.toHaveBeenCalled();
+    expect(client.humanTasks.list).not.toHaveBeenCalled();
+    for (const key of ['Pending Reviews', 'Pending Tasks']) {
+      // The engine would list none to an anonymous caller: a 0 would be a guess.
+      expect(tile(key).textContent).toMatch(/–$/);
+      expect(tile(key).getAttribute('href')).toBeNull();
+      expect(badge(key)).toBeNull();
+    }
+    expect(tile('Running').getAttribute('href')).toBe('/runs/RUNNING');
   });
 
   it('leaves a zero plain', async () => {

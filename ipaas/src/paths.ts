@@ -17,6 +17,21 @@ export function projectsRedirectUrl(orgHandler: string): string {
   return `/organizations/${orgHandler}/projects/redirect`;
 }
 
+// Deployments share an origin with the WSO2 Cloud console; CLOUD_CONSOLE_URL points elsewhere, as local development does.
+const cloudConsoleUrl = (path: string): string => `${window.API_CONFIG?.cloudConsoleUrl || window.location.origin}${path}`;
+
+export function cloudConsoleHomeUrl(): string {
+  return cloudConsoleUrl('/');
+}
+
+export function cloudConsoleOrganizationsUrl(): string {
+  return cloudConsoleUrl('/organizations');
+}
+
+export function cloudConsoleSubscriptionsUrl(): string {
+  return cloudConsoleUrl('/billing?tab=subscriptions');
+}
+
 export function oidcCallbackUrl(): string {
   return '/signin';
 }
@@ -31,13 +46,6 @@ export function cookiePolicyUrl(): string {
 
 export function termsOfUseUrl(): string {
   return 'https://wso2.com/integration-platform/terms-of-use';
-}
-
-/** The billing console's upgrade page for an org, or null when billing is not configured. */
-export function billingUpgradeUrl(orgUuid: string): string | null {
-  const base = window.API_CONFIG?.billingConsoleUrl;
-  if (!window.API_CONFIG?.enableBillingFeature || !base || !orgUuid) return null;
-  return `${base}/cloud/devant/upgrade?orgId=${encodeURIComponent(orgUuid)}`;
 }
 
 export function documentationUrl(): string {

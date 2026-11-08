@@ -80,7 +80,7 @@ export interface WorkflowClientConnection {
   baseUrl: string;
   /**
    * The headers of one request, resolved as it goes out: the gateway credential as it stands then,
-   * and the caller's current access token, which the session may have refreshed since the last call.
+   * so a test key minted again reaches the next call.
    */
   getHeaders: () => Promise<Record<string, string>>;
   /**

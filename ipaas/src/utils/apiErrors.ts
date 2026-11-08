@@ -62,6 +62,16 @@ export function isNotFoundError(error: unknown): boolean {
 }
 
 /**
+ * ipaas-service serves no User Portal: its routes are off (404), or it says the portal is not
+ * configured (503 `USER_PORTAL_NOT_CONFIGURED`). Any other 503, from a gateway or a rollout, is
+ * transient and stays an error the caller retries.
+ */
+export function isUserPortalUnavailable(error: unknown): boolean {
+  const status = httpStatusOf(error);
+  return status === 404 || (status === 503 && httpCodeOf(error) === 'USER_PORTAL_NOT_CONFIGURED');
+}
+
+/**
  * The API layer has no implementation for this call — the `ni()` stubs in
  * `src/api/` throw `[cloud] domain.fn: not implemented`.
  * A feature absent from the product is not a failure, so callers should treat it

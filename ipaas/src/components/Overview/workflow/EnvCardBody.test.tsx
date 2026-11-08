@@ -26,8 +26,14 @@ import EnvCardBody from './EnvCardBody';
 
 const state = vi.hoisted(() => ({ targets: [] as unknown[] }));
 
-// The endpoints and insights are the webhook body's; here only what goes between them is under test.
-vi.mock('../webhook/EnvCardBody', () => ({ default: ({ children }: { children?: ReactNode }) => <section data-testid="deployed">{children}</section> }));
+// Rendering the webhook body would list the endpoints; the workflow card must not.
+const webhookBody = vi.hoisted(() => ({ rendered: 0 }));
+vi.mock('../webhook/EnvCardBody', () => ({
+  default: ({ children }: { children?: ReactNode }) => {
+    webhookBody.rendered += 1;
+    return <section>{children}</section>;
+  },
+}));
 vi.mock('../../Workflows/overview/WorkflowEnvCardContent', () => ({
   default: ({ target }: { target: unknown }) => {
     state.targets.push(target);
@@ -47,6 +53,7 @@ let container: HTMLDivElement;
 
 beforeEach(() => {
   state.targets = [];
+  webhookBody.rendered = 0;
   container = document.createElement('div');
   document.body.append(container);
   root = createRoot(container);
@@ -61,30 +68,30 @@ async function renderBody(deployment: Pick<EnvCardBodyProps, 'hasDeployment' | '
   await act(async () => root.render(<EnvCardBody {...PROPS} {...deployment} />));
 }
 
-const deployedSection = () => container.querySelector('[data-testid="deployed"]');
-
 describe('workflow EnvCardBody', () => {
-  it('shows the workflows of an active deployment under its endpoints, from this environment and track', async () => {
+  it('shows only the workflows of an active deployment, from this environment and track, and no endpoints', async () => {
     await renderBody({ hasDeployment: true, loadingDeployment: false, deploymentStatusV2: 'ACTIVE' });
-    expect(deployedSection()?.textContent).toBe('workflow content');
+    expect(container.textContent).toBe('workflow content');
+    expect(webhookBody.rendered).toBe(0);
     expect(state.targets.at(-1)).toEqual({ componentId: 'orders', environmentId: 'production', trackId: 'track-2', deployment: { releaseId: 'release-1', deploymentStatusV2: 'ACTIVE' }, isDeploymentLoading: false });
   });
 
   it.each(['IN_PROGRESS', 'SUSPENDED', 'ERROR'])('says the workflows come once a %s deployment is active', async (status) => {
     await renderBody({ hasDeployment: true, loadingDeployment: false, deploymentStatusV2: status });
-    expect(deployedSection()?.textContent).toBe('The workflows show here once the deployment is active.');
+    expect(container.textContent).toBe('The workflows show here once the deployment is active.');
+    expect(webhookBody.rendered).toBe(0);
     expect(state.targets).toHaveLength(0);
   });
 
   it('says when the environment has no deployment at all', async () => {
     await renderBody({ hasDeployment: false, loadingDeployment: false, deploymentStatusV2: null });
-    expect(deployedSection()).toBeNull();
+    expect(state.targets).toHaveLength(0);
     expect(container.textContent).toBe('This integration has not been deployed to this environment yet.');
   });
 
   it('holds the card’s shape while the deployment loads', async () => {
     await renderBody({ hasDeployment: false, loadingDeployment: true, deploymentStatusV2: null });
     expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
-    expect(deployedSection()).toBeNull();
+    expect(state.targets).toHaveLength(0);
   });
 });

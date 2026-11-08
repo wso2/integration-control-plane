@@ -27,8 +27,13 @@ var ErrForbidden = errors.New("token lacks the scope for this operation")
 var (
 	ErrMalformedToken = errors.New("token is malformed")
 	ErrTokenExpired   = errors.New("token is expired")
+	ErrInvalidToken   = errors.New("token is not valid for this portal")
 )
 
+// ErrKeysUnavailable is the issuer's signing keys being out of reach, which says nothing
+// about the token.
+var ErrKeysUnavailable = errors.New("issuer signing keys are unavailable")
+
 func IsTokenRejection(err error) bool {
-	return errors.Is(err, ErrMalformedToken) || errors.Is(err, ErrTokenExpired)
+	return errors.Is(err, ErrMalformedToken) || errors.Is(err, ErrTokenExpired) || errors.Is(err, ErrInvalidToken)
 }
