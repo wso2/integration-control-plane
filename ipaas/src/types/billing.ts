@@ -43,3 +43,19 @@ export interface BillingPlan {
   name?: string;
   type?: 'free' | 'paid' | string;
 }
+
+/** A plan as GET /plans lists it: the switcher reads which product it sells and whether it is a trial plan. */
+export interface BillingCatalogPlan {
+  code: string;
+  product: string;
+  type?: 'free' | 'paid' | string;
+  free_forever?: boolean;
+}
+
+/** A subscription as GET /subscriptions lists it, as far as the platform switcher reads it. */
+export interface BillingSubscription {
+  status: 'inactive' | 'active' | 'trial' | 'past_due' | 'suspended' | 'cancelled';
+  plan: { code: string };
+  trial?: { trial_end?: string };
+  product?: { code: string };
+}
