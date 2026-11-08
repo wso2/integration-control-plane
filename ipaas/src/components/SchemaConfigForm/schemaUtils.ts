@@ -152,8 +152,8 @@ export const linkableFields = (schema: JSONSchema): string[] =>
   schemaFields(schema).flatMap((f) => (SIMPLE_TYPES.includes(fieldType(f)) && !ofLibrary(f) ? [f.path] : []));
 
 /**
- * The config keys an endpoint can fill: the linkable ones typed string. An endpoint supplies one address, so a
- * key that cannot hold one — a boolean, a port number — takes a resource key or a value, never an endpoint.
+ * The config keys an endpoint can fill: the linkable ones typed string. Everything an endpoint feeds is text —
+ * an address, a URL, an API key — so a key that cannot hold text takes a resource key or a value of its own.
  */
 export const addressableFields = (schema: JSONSchema): string[] =>
   schemaFields(schema).flatMap((f) => (fieldType(f) === 'string' && !ofLibrary(f) ? [f.path] : []));

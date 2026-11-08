@@ -54,6 +54,22 @@ export function FieldLinkPicker({ field, picker }: { field: string; picker: Pick
               )}
             </MenuItem>
           ))}
+          {!!picker.connections?.length && <ListSubheader sx={{ lineHeight: 2 }}>Integrations in other projects</ListSubheader>}
+          {picker.connections?.flatMap((c) => [
+            <ListSubheader key={c.id} sx={{ lineHeight: 2, pl: 3 }}>
+              {c.name}
+              {c.unavailable && (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  {c.unavailable}
+                </Typography>
+              )}
+            </ListSubheader>,
+            ...c.outputs.map((o) => (
+              <MenuItem key={`${c.id}|${o.name}`} selected={picker.selected === `${c.id}|${o.name}`} disabled={!!c.unavailable} onClick={() => pick({ endpoint: c.id, key: o.name })} sx={{ pl: 4 }}>
+                {o.name}
+              </MenuItem>
+            )),
+          ])}
           {picker.resources.flatMap((r) => [
             <ListSubheader key={r.id} sx={{ lineHeight: 2 }}>
               {r.name}

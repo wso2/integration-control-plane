@@ -30,9 +30,12 @@ import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
 
 const noLinks: IntegrationLinks = { kind: 'ballerina', resources: [], used: {}, usedByOrphaned: {}, connections: [], fieldLinks: {}, endpointLinks: {}, orphaned: [], env: {}, environments: [] };
 
-/** One pick of a field's link icon as a link write: a resource key, an endpoint of this project, or neither, which unlinks the field. */
-const pickedTarget = (configurable: string, pick: { resource: string; key: string } | { endpoint: string } | null): LinkTarget => {
-  if (pick && 'endpoint' in pick) return { configurable, endpoint: pick.endpoint };
+/**
+ * One pick of a field's link icon as a link write: a resource key, an endpoint, or neither, which unlinks the
+ * field. An endpoint of another project carries the output picked with it; one of this project has none.
+ */
+const pickedTarget = (configurable: string, pick: { resource: string; key: string } | { endpoint: string; key?: string } | null): LinkTarget => {
+  if (pick && 'endpoint' in pick) return { configurable, endpoint: pick.endpoint, ...(pick.key && { key: pick.key }) };
   if (pick) return { configurable, ref: pick.resource, key: pick.key };
   return { configurable };
 };

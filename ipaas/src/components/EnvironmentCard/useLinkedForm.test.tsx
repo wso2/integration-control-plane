@@ -294,6 +294,54 @@ describe('the Configure form with links', () => {
     expect(container.textContent).toContain('from orders-db \u00b7 URL');
   });
 
+  // Another project's endpoint is reached as a connection feeding several values, and no name says
+  // which one a field wants, so the pick names it. Picking makes the connection and links in one step.
+  it("fills a field from another project's integration by the output it picks", async () => {
+    answer.connectable = [
+      {
+        project: 'library',
+        component: 'catalog',
+        endpoint: 'books',
+        displayName: 'Catalog',
+        scope: 'organization',
+        outputs: [
+          { name: 'url', secret: false },
+          { name: 'apiKeyHeader', secret: false },
+          { name: 'apiKey', secret: true },
+        ],
+        environments: [{ name: 'development', connectable: true }],
+      },
+    ];
+    try {
+      await act(async () => root.render(<Form />));
+      await act(async () => button('Link ordersDatabaseUrl').click());
+      const options = Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).map((o) => o.textContent);
+      expect(options).toContain('Catalog \u00b7 books');
+      expect(options).toEqual(expect.arrayContaining(['url', 'apiKeyHeader', 'apiKey']));
+
+      await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent === 'url') as HTMLElement).click());
+      expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), endpoint: 'library/catalog/books', key: 'url' }]);
+    } finally {
+      answer.connectable = [];
+    }
+  });
+
+  // Once a connection stands for it, the endpoint is an ordinary resource with its outputs as keys:
+  // offering it here as well would list the same integration twice.
+  it("offers no endpoint for another project's integration a connection already stands for", async () => {
+    answer.connectable = [
+      { project: 'library', component: 'catalog', endpoint: 'books', displayName: 'Catalog', scope: 'organization', ref: 'library-catalog-f1fe', outputs: [{ name: 'url', secret: false }], environments: [{ name: 'development', connectable: true }] },
+    ];
+    try {
+      await act(async () => root.render(<Form />));
+      await act(async () => button('Link ordersDatabaseUrl').click());
+      const options = Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).map((o) => o.textContent);
+      expect(options).not.toContain('Catalog \u00b7 books');
+    } finally {
+      answer.connectable = [];
+    }
+  });
+
   it('links a field to the key picked from its link icon', async () => {
     await act(async () => button('Link ordersDatabaseUrl').click());
     await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li')).find((li) => li.textContent === 'Enter a value') as HTMLElement).click());
@@ -309,9 +357,8 @@ describe('the Configure form with links', () => {
       await act(async () => root.render(<Form />));
       await act(async () => button('Link ordersDatabaseUrl').click());
       const options = Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li'));
-      // Another project's integration is reached with an API key, which a field cannot take on its own.
       expect(options.map((o) => o.textContent)).toContain('Basket \u00b7 items');
-      expect(options.map((o) => o.textContent)).not.toContain('Catalog \u00b7 books');
+      // This project's integration is reached directly, so the pick carries no output to take.
       await act(async () => (options.find((o) => o.textContent === 'Basket \u00b7 items') as HTMLElement).click());
       expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), endpoint: 'shop/basket/items' }]);
     } finally {

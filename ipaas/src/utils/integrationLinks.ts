@@ -91,7 +91,10 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
   // An endpoint of this project is reached directly, so it has no resource and no values of ours:
   // the platform resolves its address in each environment.
   const projectEndpoints = connectable.filter((e) => e.scope === 'project');
-  const takesAnAddress = new Set(addressable);
+  // Another project's endpoint is offered until a connection stands for it. After that the connection
+  // is an ordinary resource with its outputs as keys, so offering the endpoint too would list it twice.
+  const newConnections = connectable.filter((e) => e.scope === 'organization' && !e.ref);
+  const takesText = new Set(addressable);
   const endpointSource = (id: string): FieldSource | undefined => {
     const match = projectEndpoints.find((e) => endpointId(e) === id);
     // Project and component are one segment each; the rest is the endpoint, which may hold a slash.
@@ -119,12 +122,24 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
     const picker: Picker = {
       first: via ? VIA : ENTER,
       selected: ownEndpoint ?? (own ? `${own.ref}|${own.key}` : via ? VIA : ENTER),
-      // An endpoint supplies an address, so it is offered only where the key can hold one.
-      endpoints: !takesAnAddress.has(id)
+      // Everything a link feeds is text — an address, a URL, a key — so one is offered only where
+      // the key can hold text.
+      endpoints: !takesText.has(id)
         ? []
         : projectEndpoints.map((e) => {
             const here = e.environments.find((x) => x.name === env);
             return { id: endpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason, here?.detail) }) };
+          }),
+      connections: !takesText.has(id)
+        ? []
+        : newConnections.map((e) => {
+            const here = e.environments.find((x) => x.name === env);
+            return {
+              id: endpointId(e),
+              name: `${e.displayName} · ${e.endpoint}`,
+              outputs: e.outputs ?? [],
+              ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason, here?.detail) }),
+            };
           }),
       resources: links.resources.map((r) => ({
         id: r.id,

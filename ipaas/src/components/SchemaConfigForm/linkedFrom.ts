@@ -50,6 +50,16 @@ export interface PickerKey {
   orphanOf?: string;
 }
 
+/** An integration of another project the field can take a value of, with the values it offers. */
+export interface PickerConnection {
+  /** `<project>/<component>/<endpoint>`, which a pick writes with the chosen output. */
+  id: string;
+  name: string;
+  outputs: { name: string; secret: boolean }[];
+  /** Why it cannot be chosen; it is offered disabled, so the reason is visible. */
+  unavailable?: string;
+}
+
 /** An integration of this project the field can take the address of, and where it cannot be called. */
 export interface PickerEndpoint {
   /** `<project>/<component>/<endpoint>`, which is what a pick writes. */
@@ -66,7 +76,12 @@ export interface FieldLinkPicker {
   resources: { id: string; name: string; keys: PickerKey[] }[];
   /** Endpoints of this project, which supply an address and need no key. */
   endpoints?: PickerEndpoint[];
-  onPick: (pick: { resource: string; key: string } | { endpoint: string } | null) => void;
+  /**
+   * Endpoints of other projects no connection stands for yet. Each is picked by one of its outputs,
+   * which makes the connection and feeds the field that value; thereafter it is an ordinary resource.
+   */
+  connections?: PickerConnection[];
+  onPick: (pick: { resource: string; key: string } | { endpoint: string; key?: string } | null) => void;
   /** Another link change is on its way: one at a time, so no write replaces another's. */
   disabled?: boolean;
 }

@@ -179,7 +179,19 @@ export interface ConnectableEndpoint {
   displayName: string;
   scope: 'project' | 'organization';
   ref?: string;
+  /**
+   * What a link to it feeds the target, on an endpoint of another project. A link names one of them,
+   * since nothing else says which of several values fills the target. An endpoint of this project
+   * carries none: reached directly, it has only its address to give.
+   */
+  outputs?: ConnectableEndpointOutput[];
   environments: ConnectableEndpointEnvironment[];
+}
+
+/** One value a connection to the endpoint feeds, and whether it must be delivered as a secret. */
+export interface ConnectableEndpointOutput {
+  name: string;
+  secret: boolean;
 }
 
 /** Whether an endpoint can be connected in one environment, and why not when it cannot. */
@@ -238,7 +250,7 @@ export interface IntegrationLinks {
  * One link change: a target, and its source; without a source the target's own link goes.
  * A configurable takes one value, so `ref`/`key` and `endpoint` are alternatives.
  */
-export type LinkTarget = { connection: string; ref?: string } | { configurable: string; ref?: string; key?: string; endpoint?: string } | { env: string; ref?: string; key?: string };
+export type LinkTarget = { connection: string; ref?: string } | { configurable: string; ref?: string; key?: string; endpoint?: string } | { env: string; ref?: string; key?: string; endpoint?: string };
 
 export interface LinkWriteInput {
   projectId: string;
