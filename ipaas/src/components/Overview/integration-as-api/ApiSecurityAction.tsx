@@ -21,11 +21,13 @@ import { ShieldCheck } from '@wso2/oxygen-ui-icons-react';
 import { useState, type ReactNode } from 'react';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
-import { useComponentDeployment, useEnvEndpoints } from '../../../hooks/useDeployments';
+import { useComponentDeployments, useEnvEndpointsOfReleases } from '../../../hooks/useDeployments';
 import { useEntryEnvironmentIds } from '../../../hooks/useEntryEnvironment';
 import { useOrgUuid } from '../../../hooks/useOrgUuid';
+import type { Environment } from '../../../types/environment';
 import type { HeaderActionsProps } from '../../../types/integration';
 import { toEndpointOptions } from '../../../utils/endpoints';
+import { securityEnvironments, securityLinkState, targetFromEndpoints, type SecurityTarget } from '../../../utils/securityTargets';
 import ApiSecurityDrawer from './ApiSecurityDrawer';
 import * as styles from './apiConsumption.styles';
 
@@ -33,41 +35,89 @@ import * as styles from './apiConsumption.styles';
  * Integration-as-API's header action: one "Configure security" link for the exposed APIs.
  *
  * An API's security changes only in the pipeline's entry environment and reaches later ones by
- * promotion, so it is configured once here, against the entry environment's endpoints, and each
- * env card shows what that environment enforces (SecuritySummary). With no pipeline to read, the
- * first environment stands in, and the BFF refuses a change outside the entry with a message naming it.
+ * promotion, so it is configured here, against an entry environment's exposed endpoints, and each
+ * env card shows what that environment enforces (SecuritySummary). Which environments qualify is
+ * securityEnvironments' rule; with more than one ready, the drawer offers a choice.
  */
 export default function ApiSecurityAction({ component, environments, versionId, projectId, orgHandler }: HeaderActionsProps): ReactNode {
   const canUpdate = useCan()(Scopes.ENDPOINT_UPDATE);
-  const orgUuid = useOrgUuid() ?? '';
+  const orgUuid = useOrgUuid();
+  const { tree } = useEntryEnvironmentIds(projectId);
+
+  // Nothing to offer until the pipeline has been read: it decides which environments take changes.
+  if (!canUpdate || !orgUuid || tree === undefined || environments.length === 0) return null;
+  return <SecurityLink componentId={component.id} versionId={versionId} orgHandler={orgHandler} orgUuid={orgUuid} environments={securityEnvironments(tree, environments)} />;
+}
+
+interface SecurityLinkProps {
+  componentId: string;
+  versionId: string;
+  orgHandler: string;
+  orgUuid: string;
+  /** The environments security can be changed in, in pipeline order. */
+  environments: Environment[];
+}
+
+function SecurityLink({ componentId, versionId, orgHandler, orgUuid, environments }: SecurityLinkProps): ReactNode {
   const [open, setOpen] = useState(false);
+  const [chosenEnvId, setChosenEnvId] = useState<string | null>(null);
 
-  const { ids: entryIds, loading: loadingEntry } = useEntryEnvironmentIds(projectId);
-  const entryEnv = loadingEntry ? undefined : (environments.find((env) => entryIds.includes(env.id)) ?? environments[0]);
+  const deployments = useComponentDeployments(
+    orgHandler,
+    orgUuid,
+    componentId,
+    versionId,
+    environments.map((env) => env.id),
+  );
+  // Promoted environments can run the same release, so each release's endpoints are read once.
+  const releaseIds = [...new Set(deployments.flatMap((d) => (d.data?.releaseId ? [d.data.releaseId] : [])))];
+  const endpointReads = useEnvEndpointsOfReleases(componentId, versionId, releaseIds);
 
-  const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(orgHandler, orgUuid, component.id, versionId, entryEnv?.id ?? '');
-  const releaseId = deployment?.releaseId ?? '';
-  const { data: endpoints = [], isLoading: loadingEndpoints } = useEnvEndpoints(releaseId ? component.id : '', versionId, releaseId);
+  const targets = environments.map((env, i): SecurityTarget => {
+    const deployment = deployments[i];
+    if (deployment.isLoading) return { env, status: 'loading' };
+    if (deployment.isError) return { env, status: 'error' };
+    const releaseId = deployment.data?.releaseId;
+    if (!releaseId) return { env, status: 'notDeployed' };
+    const endpoints = endpointReads[releaseIds.indexOf(releaseId)];
+    if (endpoints.isError) return { env, status: 'error' };
+    if (!endpoints.data) return { env, status: 'loading' };
+    return targetFromEndpoints(env, endpoints.data);
+  });
 
-  if (!canUpdate || !entryEnv) return null;
+  const { action, hint } = securityLinkState(targets);
+  const ready = targets.flatMap((t) => (t.status === 'ready' ? [t] : []));
+  const target = ready.find((t) => t.env.id === chosenEnvId) ?? ready[0];
 
-  const loading = loadingDeployment || loadingEndpoints;
-  const blocked = !releaseId ? `Deploy to ${entryEnv.name} to configure security.` : endpoints.length === 0 ? `${entryEnv.name} has no endpoints to secure.` : null;
-  const hint = loading ? '' : (blocked ?? `Set in ${entryEnv.name}. Promote to apply it to later environments.`);
+  const retry = () => {
+    deployments.forEach((d) => d.isError && void d.refetch());
+    endpointReads.forEach((e) => e.isError && void e.refetch());
+  };
 
   return (
     <>
       <Tooltip title={hint}>
         {/* A disabled button swallows pointer events, so the tooltip hangs off this wrapper. */}
         <Box component="span" sx={styles.securityLinkTarget}>
-          <Link component="button" type="button" variant="body2" underline="hover" onClick={() => setOpen(true)} disabled={loading || !!blocked} sx={styles.securityLink}>
+          <Link component="button" type="button" variant="body2" underline="hover" onClick={action === 'retry' ? retry : () => setOpen(true)} disabled={action === 'wait' || action === 'blocked'} sx={styles.securityLink}>
             <ShieldCheck size={14} />
             Configure security
           </Link>
         </Box>
       </Tooltip>
-      {!blocked && (
-        <ApiSecurityDrawer open={open} onClose={() => setOpen(false)} componentName={component.id} envName={entryEnv.id} envLabel={entryEnv.name} deploymentTrackId={versionId} endpoints={toEndpointOptions(endpoints)} activeEndpointName={endpoints[0]?.id} />
+      {target && (
+        <ApiSecurityDrawer
+          open={open}
+          onClose={() => setOpen(false)}
+          componentName={componentId}
+          envName={target.env.id}
+          envLabel={target.env.name}
+          environments={ready.length > 1 ? ready.map((t) => t.env) : undefined}
+          onEnvironmentChange={setChosenEnvId}
+          deploymentTrackId={versionId}
+          endpoints={toEndpointOptions(target.endpoints)}
+          activeEndpointName={target.endpoints[0].id}
+        />
       )}
     </>
   );

@@ -194,8 +194,8 @@ export default function ApiSettingsDrawer({ open, onClose, componentName, envNam
           Cancel
         </Button>
         {canUpdate && (
-          <Button variant="contained" onClick={() => void handleApply()} disabled={!canApply}>
-            {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
+          <Button variant="contained" onClick={() => void handleApply()} disabled={!canApply} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
+            {saving ? 'Applying…' : 'Apply'}
           </Button>
         )}
       </DrawerPanel.Footer>

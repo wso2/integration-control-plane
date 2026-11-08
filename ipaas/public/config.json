@@ -4,7 +4,7 @@
   "AUTH_BFF_PROXY_CONTEXT": "/_api",
   "CHOREO_BASE_API_URL": "/_api/integration",
   "BILLING_API_BASE_URL": "/_api/billing/api/v1",
-  "VITE_OBSERVABILITY_URL": "",
+  "VITE_OBSERVABILITY_URL": "https://cloud-obs-proxy.obs.dp.dev.cloud.wso2.com",
   "SYSTEM_APIS_BASE_URL": "",
   "ENABLE_BILLING_FEATURE": "true",
   "BILLING_CONSOLE_URL": "https://subscriptions.dv.wso2.com",

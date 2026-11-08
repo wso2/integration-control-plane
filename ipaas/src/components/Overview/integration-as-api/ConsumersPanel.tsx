@@ -47,10 +47,15 @@ interface ConsumersPanelProps {
   endpointName: string;
   /** The deployment track whose API this is; each track's API has its own consumers. */
   deploymentTrackId: string;
+  /**
+   * The API takes OAuth tokens and refuses API keys. Consumers are then listed only so their keys,
+   * still live for a switch back to API key, can be revoked: no new ones, no managing.
+   */
+  oauth: boolean;
 }
 
 /** Cloud-only "Consumers" subcard inside the API env card. */
-export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, deploymentTrackId }: ConsumersPanelProps): JSX.Element {
+export default function ConsumersPanel({ componentName, projectName, envName, envLabel, endpointName, deploymentTrackId, oauth }: ConsumersPanelProps): JSX.Element | null {
   const can = useCan();
   const canManageConsumers = can(Scopes.APPLICATION_MANAGE) && can(Scopes.ENDPOINT_API_KEY_MANAGE);
   const endpointRef: EndpointRef = useMemo(() => ({ componentName, environmentName: envName, endpointName, deploymentTrackId }), [componentName, envName, endpointName, deploymentTrackId]);
@@ -76,6 +81,9 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
     }
   };
 
+  // Under OAuth with no consumers, there is no key to revoke and none to add.
+  if (oauth && !isLoading && !error && count === 0) return null;
+
   return (
     <Box sx={styles.subCard}>
       <Box sx={styles.subCardHeader}>
@@ -87,13 +95,19 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
           </Typography>
         </Typography>
         <Stack direction="row" alignItems="center" gap={1.5}>
-          {canManageConsumers && (
+          {canManageConsumers && !oauth && (
             <Button variant="contained" size="small" startIcon={count > 0 ? <Plus size={14} /> : undefined} onClick={() => setDialogTarget('new')}>
               {count > 0 ? 'New consumer' : 'Consume API'}
             </Button>
           )}
         </Stack>
       </Box>
+
+      {oauth && (
+        <Alert severity="info" sx={styles.panelAlert}>
+          This API takes OAuth tokens, so it refuses these consumers’ API keys. The keys work again if the API goes back to API key, so delete any consumer you no longer trust.
+        </Alert>
+      )}
 
       {isLoading ? (
         <Box sx={styles.loadingRow}>
@@ -126,9 +140,11 @@ export default function ConsumersPanel({ componentName, projectName, envName, en
                 </Box>
                 {canManageConsumers && (
                   <>
-                    <Button variant="outlined" size="small" onClick={() => setDialogTarget(c)}>
-                      Manage
-                    </Button>
+                    {!oauth && (
+                      <Button variant="outlined" size="small" onClick={() => setDialogTarget(c)}>
+                        Manage
+                      </Button>
+                    )}
                     <Tooltip title="Delete consumer">
                       <IconButton size="small" aria-label={`Delete ${c.displayName}`} onClick={() => setPendingDelete(c)} sx={styles.consumerDeleteButton}>
                         <Trash2 size={15} />

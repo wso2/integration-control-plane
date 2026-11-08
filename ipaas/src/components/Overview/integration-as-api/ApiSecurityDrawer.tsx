@@ -23,6 +23,7 @@ import { useEndpointSecurity, useSetEndpointSecurity } from '../../../hooks/useC
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
 import type { EndpointOption, SecurityConfig, SecurityMode } from '../../../types/consumers';
+import type { Environment } from '../../../types/environment';
 import { apiErrorMessage, httpStatusOf, isPermissionError } from '../../../utils/apiErrors';
 import { endpointLoadNotice, friendlyApiError, readOnlyApiSettingsNotice } from '../../../utils/apiSecurity';
 import { hasJwtFormErrors, jwtFormErrors, jwtFormOf, toJwtSecurity, type JwtForm } from '../../../utils/jwtSecurity';
@@ -42,6 +43,9 @@ interface ApiSecurityDrawerProps {
   envName: string;
   /** The environment's display name, for the note on where the change applies. */
   envLabel?: string;
+  /** Environments to choose between, when more than one takes security changes; envName is the chosen one. */
+  environments?: Environment[];
+  onEnvironmentChange?: (envName: string) => void;
   /** Endpoints of this environment; the drawer configures one at a time. */
   endpoints: EndpointOption[];
   /** Endpoint selected when the drawer opens. */
@@ -63,7 +67,7 @@ function securityConfigOf(mode: SecurityMode, apiKeyHeader: string, jwtForm: Jwt
  * SecurityDrawer's layout (endpoint selector + security-scheme table), with the OAuth options below
  * the table while OAuth is the scheme.
  */
-export default function ApiSecurityDrawer({ open, onClose, componentName, envName, envLabel, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
+export default function ApiSecurityDrawer({ open, onClose, componentName, envName, envLabel, environments, onEnvironmentChange, deploymentTrackId, endpoints, activeEndpointName }: ApiSecurityDrawerProps): JSX.Element {
   const canUpdate = useCan()(Scopes.ENDPOINT_UPDATE);
   const [mode, setMode] = useState<SecurityMode>('none');
   const [apiKeyHeader, setApiKeyHeader] = useState(DEFAULT_API_KEY_HEADER);
@@ -158,6 +162,21 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
               </Typography>
             )}
 
+            {environments && onEnvironmentChange && (
+              <Stack direction="row" alignItems="center" gap={2}>
+                <Typography variant="body2" fontWeight={500}>
+                  Environment:
+                </Typography>
+                <Select size="small" value={envName} onChange={(e) => guardNavigation(() => onEnvironmentChange(String(e.target.value)))} sx={styles.endpointSelect}>
+                  {environments.map((env) => (
+                    <MenuItem key={env.id} value={env.id}>
+                      {env.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </Stack>
+            )}
+
             <Stack direction="row" alignItems="center" gap={2}>
               <Typography variant="body2" fontWeight={500}>
                 Endpoints:
@@ -238,8 +257,8 @@ export default function ApiSecurityDrawer({ open, onClose, componentName, envNam
           Cancel
         </Button>
         {canUpdate && (
-          <Button variant="contained" onClick={() => void handleApply()} disabled={saving || readOnly || invalid || !selectedEndpoint || loadingSecurity || Boolean(securityError)}>
-            {saving ? <CircularProgress size={16} color="inherit" /> : 'Apply'}
+          <Button variant="contained" onClick={() => void handleApply()} disabled={saving || readOnly || invalid || !selectedEndpoint || loadingSecurity || Boolean(securityError)} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}>
+            {saving ? 'Applying…' : 'Apply'}
           </Button>
         )}
       </DrawerPanel.Footer>

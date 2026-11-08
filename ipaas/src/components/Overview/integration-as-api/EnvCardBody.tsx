@@ -80,10 +80,11 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
   // of the raw OpenChoreo external route.
   const securityRef = activeEndpoint ? { componentName: component.id, environmentName: env.id, endpointName: activeEndpoint.id, deploymentTrackId: versionId } : null;
   const { data: apiSecurity, isLoading: loadingSecurity } = useEndpointSecurity(securityRef, !!activeEndpoint && gatewayExposureEnabled);
-  // Consumers hold API keys, which an OAuth-secured API refuses: its callers bring tokens from the
-  // key manager instead. Waiting for the mode keeps the panel from showing and then vanishing; a
-  // failed read, or a mode that isn't known, leaves the panel up.
-  const showConsumers = !loadingSecurity && !(apiSecurity?.mode === 'jwt' && !apiSecurity.stateUnknown);
+  // Consumers hold API keys, which an OAuth-secured API refuses. The keys stay live, though, and work
+  // again if the API goes back to API key, so under OAuth the panel still lists them for revoking.
+  // Waiting for the mode keeps the panel from switching between the two; a failed read, or a mode
+  // that isn't known, counts as API key.
+  const oauth = apiSecurity?.mode === 'jwt' && !apiSecurity.stateUnknown;
 
   // GraphQL is introspected live (GraphqlOperationsList) — the swagger/contract path is REST-only.
   const { data: swagger } = useApiDefinition(hasDeployment && !isGraphql ? activeEndpoint?.apimRevisionId : null);
@@ -155,7 +156,7 @@ export default function EnvCardBody({ component, env, prevEnv, projectId, versio
       {showEndpointPanel && deploymentStatusV2 !== 'IN_PROGRESS' && !!activeEndpoint && !!securityRef && gatewayExposureEnabled && (
         <>
           <SecuritySummary endpointRef={securityRef} />
-          {showConsumers && <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} deploymentTrackId={versionId} />}
+          {!loadingSecurity && <ConsumersPanel componentName={component.id} projectName={projectId} envName={env.id} envLabel={env.name} endpointName={activeEndpoint.id} deploymentTrackId={versionId} oauth={oauth} />}
         </>
       )}
 
