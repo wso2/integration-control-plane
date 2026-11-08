@@ -21,7 +21,9 @@ package httpclient
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -458,18 +460,23 @@ func TestDoStopsWhenContextIsCancelledDuringBackoff(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// A long backoff guarantees the cancellation lands while Do is sleeping
-	// between attempts rather than mid-request.
-	c := newTestClient(t, WithRetry(RetryParams{
-		MaxAttempts: 3,
-		BaseDelay:   10 * time.Second,
-		MaxDelay:    10 * time.Second,
-	}))
+	// Cancel only once the client has read the 500 and closed its body: the
+	// server counting the request is too early, as the cancellation can then
+	// land before the response arrives. A long backoff keeps Do sleeping there.
+	answered := make(chan struct{})
+	var once sync.Once
+	transport := onBodyClose{next: http.DefaultTransport, closed: func() { once.Do(func() { close(answered) }) }}
+	c := newTestClient(t,
+		WithRetry(RetryParams{
+			MaxAttempts: 3,
+			BaseDelay:   10 * time.Second,
+			MaxDelay:    10 * time.Second,
+		}),
+		WithHTTPClient(&http.Client{Transport: transport}),
+	)
 
 	go func() {
-		for calls.Load() == 0 {
-			time.Sleep(time.Millisecond)
-		}
+		<-answered
 		cancel()
 	}()
 
@@ -487,6 +494,32 @@ func TestDoStopsWhenContextIsCancelledDuringBackoff(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, statusErr.StatusCode)
 	assert.Equal(t, int64(1), calls.Load())
 	assert.Less(t, elapsed, 5*time.Second, "the backoff must be abandoned, not slept out")
+}
+
+// onBodyClose is a transport that calls closed whenever a response body is closed.
+type onBodyClose struct {
+	next   http.RoundTripper
+	closed func()
+}
+
+func (t onBodyClose) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.next.RoundTrip(req)
+	if err != nil {
+		return nil, err
+	}
+	resp.Body = closeHook{ReadCloser: resp.Body, closed: t.closed}
+	return resp, nil
+}
+
+type closeHook struct {
+	io.ReadCloser
+	closed func()
+}
+
+func (b closeHook) Close() error {
+	err := b.ReadCloser.Close()
+	b.closed()
+	return err
 }
 
 // A deadline is an outage wherever it runs out: mid-request or mid-backoff.
