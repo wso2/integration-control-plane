@@ -23,7 +23,7 @@ import { BffError } from '../../api/_client';
 import type { ConnectableEndpoint, IntegrationLinks } from '../../types/configuration';
 import type { JSONSchema } from '../../types/schema';
 import { ConfigForm } from '../SchemaConfigForm/ConfigForm';
-import { linkableFields, schemaFields } from '../SchemaConfigForm/schemaUtils';
+import { addressableFields, linkableFields, schemaFields } from '../SchemaConfigForm/schemaUtils';
 import { useLinkedForm } from './useLinkedForm';
 
 // ipaas-service's answer: github linked to GitHub Acme; ordersDbUrl's link lost its target when the code renamed it.
@@ -82,7 +82,7 @@ const schema = {
 } as unknown as JSONSchema;
 
 function Form({ env = 'development', form = schema }: { env?: string; form?: JSONSchema }) {
-  const linked = useLinkedForm('default', 'ghdemo', env, true, linkableFields(form));
+  const linked = useLinkedForm('default', 'ghdemo', env, true, linkableFields(form), addressableFields(form));
   return (
     <>
       {linked.top}
@@ -106,7 +106,7 @@ function Form({ env = 'development', form = schema }: { env?: string; form?: JSO
 // linkedKeys decides which fields the form treats as supplied: it skips their validation and
 // does not save a value for them. Only the set is of interest, so nothing else is rendered.
 function LinkedKeys({ form = schema }: { form?: JSONSchema }) {
-  const linked = useLinkedForm('default', 'ghdemo', 'development', true, linkableFields(form));
+  const linked = useLinkedForm('default', 'ghdemo', 'development', true, linkableFields(form), addressableFields(form));
   return <span data-testid="linked-keys">{[...linked.linkedKeys].sort().join(' ')}</span>;
 }
 
@@ -193,7 +193,7 @@ describe('the Configure form with links', () => {
   it("says the links couldn't be read, with Try again, and offers no link action or save", async () => {
     Object.assign(answer, { readFailed: true, cached: false });
     const Read = () => {
-      const linked = useLinkedForm('default', 'ghdemo', 'development', true, []);
+      const linked = useLinkedForm('default', 'ghdemo', 'development', true, [], []);
       return (
         <>
           {linked.top}
@@ -253,6 +253,45 @@ describe('the Configure form with links', () => {
     await act(async () => button('Link ordersVerbose').click());
     await act(async () => (Array.from(document.querySelectorAll('[aria-label="Source of ordersVerbose"] li')).find((li) => li.textContent?.startsWith('URL')) as HTMLElement).click());
     expect(writes).toEqual([{ configurable: id('ordersVerbose'), ref: 'orders-db', key: 'URL' }]);
+  });
+
+  // An endpoint supplies one address. A boolean cannot hold one, so offering it would only ever
+  // produce a write that puts a URL where the build expects true or false.
+  it('offers no endpoint for a key that cannot hold an address', async () => {
+    answer.connectable = [{ project: 'shop', component: 'basket', endpoint: 'items', displayName: 'Basket', scope: 'project', environments: [{ name: 'development', connectable: true }] }];
+    const withBoolean = {
+      type: 'object',
+      requiredLevel: 3,
+      properties: { acme: { type: 'object', properties: { ghdemo: { type: 'object', required: ['ordersVerbose'], properties: { ordersVerbose: { type: 'boolean', description: '' } } } } } },
+    } as unknown as JSONSchema;
+    try {
+      await act(async () => root.render(<Form form={withBoolean} />));
+      await act(async () => button('Link ordersVerbose').click());
+      const options = Array.from(document.querySelectorAll('[aria-label="Source of ordersVerbose"] li')).map((o) => o.textContent);
+      expect(options).not.toContain('Basket \u00b7 items');
+      // The resource keys it can take are still offered.
+      expect(options.some((o) => o?.startsWith('URL'))).toBe(true);
+    } finally {
+      answer.connectable = [];
+    }
+  });
+
+  // A library's settings configure the runtime, not the integration, so no link fills one.
+  it('offers no link for a library setting, and still shows one it holds', async () => {
+    const withLibrary = {
+      type: 'object',
+      requiredLevel: 3,
+      properties: {
+        acme: { type: 'object', properties: { ghdemo: { type: 'object', required: ['ordersDatabaseUrl'], properties: { ordersDatabaseUrl: { type: 'string', description: '' } } } } },
+        ballerina: { type: 'object', properties: { log: { type: 'object', properties: { level: { type: 'string', description: '' } } } } },
+      },
+    } as unknown as JSONSchema;
+    expect(linkableFields(withLibrary)).toEqual(['acme.ghdemo.ordersDatabaseUrl']);
+
+    answer.links = { ...links, fieldLinks: { 'ballerina/log:level': { ref: 'orders-db', key: 'URL' } } };
+    await act(async () => root.render(<Form form={withLibrary} />));
+    expect(Array.from(container.querySelectorAll('button[aria-label^="Link "]')).map((b) => b.getAttribute('aria-label'))).toEqual(['Link ordersDatabaseUrl']);
+    expect(container.textContent).toContain('from orders-db \u00b7 URL');
   });
 
   it('links a field to the key picked from its link icon', async () => {
@@ -353,7 +392,7 @@ describe('the Configure form with links', () => {
   });
 
   it("says production's schema couldn't be read, naming the environment, and not the first environment's", async () => {
-    const Unread = ({ env }: { env: string }) => <>{useLinkedForm('default', 'ghdemo', env, true, []).unread ?? 'none'}</>;
+    const Unread = ({ env }: { env: string }) => <>{useLinkedForm('default', 'ghdemo', env, true, [], []).unread ?? 'none'}</>;
     answer.links = { ...links, environments: [links.environments[0], { ...links.environments[0], name: 'production' }] };
     await act(async () => root.render(<Unread env="production" />));
     expect(container.textContent).toBe("Couldn't read the configurables of the build production runs.");

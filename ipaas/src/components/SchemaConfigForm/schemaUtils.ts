@@ -136,13 +136,30 @@ export const schemaFields = (schema: JSONSchema): SchemaField[] => {
 
 const SIMPLE_TYPES = ['string', 'integer', 'number', 'float', 'boolean'];
 
-/** The config keys a link can fill: the build's simple-typed configurables, not records, maps, arrays or their members. */
-export const linkableFields = (schema: JSONSchema): string[] => schemaFields(schema).flatMap((f) => (SIMPLE_TYPES.includes(f.schema.properties?.[f.key]?.type ?? '') ? [f.path] : []));
-
 const LIBRARY_ORGS = ['ballerina', 'ballerinax', 'ballerinai'];
 
+/** Whether f belongs to a library rather than to the integration: a runtime setting of its own, which no link fills. */
+const ofLibrary = (f: SchemaField): boolean => LIBRARY_ORGS.includes(f.pkg.split('.')[0]);
+
+const fieldType = (f: SchemaField): string => f.schema.properties?.[f.key]?.type ?? '';
+
+/**
+ * The config keys a link can fill: the build's own simple-typed configurables. A record, map or array holds
+ * several values and a member of one is no configurable, so neither takes a link; a library's settings are the
+ * runtime's rather than the integration's.
+ */
+export const linkableFields = (schema: JSONSchema): string[] =>
+  schemaFields(schema).flatMap((f) => (SIMPLE_TYPES.includes(fieldType(f)) && !ofLibrary(f) ? [f.path] : []));
+
+/**
+ * The config keys an endpoint can fill: the linkable ones typed string. An endpoint supplies one address, so a
+ * key that cannot hold one — a boolean, a port number — takes a resource key or a value, never an endpoint.
+ */
+export const addressableFields = (schema: JSONSchema): string[] =>
+  schemaFields(schema).flatMap((f) => (fieldType(f) === 'string' && !ofLibrary(f) ? [f.path] : []));
+
 /** The integration's own package among the fields': the first not from a library org. */
-export const ownPackage = (fields: SchemaField[]): string => (fields.find((f) => !LIBRARY_ORGS.includes(f.pkg.split('.')[0])) ?? fields[0])?.pkg ?? '';
+export const ownPackage = (fields: SchemaField[]): string => (fields.find((f) => !ofLibrary(f)) ?? fields[0])?.pkg ?? '';
 
 export function getRequiredPathsAtLevel(schema: JSONSchema): string[] {
   const schemas = getSchemasAtLevel(schema, schema.requiredLevel || 1);

@@ -38,7 +38,7 @@ const pickedTarget = (configurable: string, pick: { resource: string; key: strin
 };
 
 /** A Configure form's links in env: the connection boxes, each field's link, the links the build lost, and the config keys a link fills. `fields` are the build's linkable config keys (`linkableFields`). */
-export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[]) {
+export function useLinkedForm(projectId: string, componentId: string, env: string, open: boolean, fields: string[], addressable: string[]) {
   const read = useIntegrationLinks(projectId, componentId, open);
   const links = read.data ?? noLinks;
   // Until the links read, the form can't tell linked fields from others: it offers no link action and no save.
@@ -47,16 +47,22 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
   const envName = (id: string) => environments.find((e) => e.id === id)?.name ?? id;
   const { data: connectable = [] } = useConnectableEndpoints(projectId, componentId, open);
   const ids = fields.map(configurableId).join();
-  const view = useMemo(() => formLinkView(links, env, envName, ids ? ids.split(',') : [], connectable), [links, env, environments, ids, connectable]); // eslint-disable-line react-hooks/exhaustive-deps
+  const addressableIds = addressable.map(configurableId).join();
+  const view = useMemo(
+    () => formLinkView(links, env, envName, ids ? ids.split(',') : [], connectable, addressableIds ? addressableIds.split(',') : []),
+    [links, env, environments, ids, addressableIds, connectable], // eslint-disable-line react-hooks/exhaustive-deps
+  );
   const write = useLinkWrite();
   const change = (target: LinkTarget) => write.mutateAsync({ projectId, componentId, target }).catch(() => undefined);
 
   const linkable = new Set(fields);
   const fieldLinks: FieldLinks = (path) => {
-    // A member of a record, map or array is no configurable of its own: nothing links it.
-    if (!linkable.has(path)) return undefined;
     const id = configurableId(path);
     const t = view.target(id);
+    // Only a linkable key is offered a picker. One that is not keeps showing a link it already holds, so a
+    // key the rules no longer cover does not look unlinked while a write still feeds it.
+    const offered = linkable.has(path);
+    if (!offered && !t.source) return undefined;
     return {
       ...(t.source && {
         source: {
@@ -68,7 +74,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
           ...(t.source.declared && { declared: true }),
         },
       }),
-      ...(t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pickedTarget(id, pick)) } }),
+      ...(offered && t.picker && { picker: { ...t.picker, disabled: write.isPending || linksUnread, onPick: (pick) => change(pickedTarget(id, pick)) } }),
     };
   };
 

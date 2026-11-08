@@ -81,7 +81,7 @@ export interface FormLinkView {
  * The links of a Configure form in env: editable in the first environment, else what env's release uses, read-only.
  * `fields` are the configurable ids of the build env runs: outside the first environment its sections come from them.
  */
-export function formLinkView(links: IntegrationLinks, env: string, envName: (env: string) => string = (e) => e, fields: string[] = [], connectable: ConnectableEndpoint[] = []): FormLinkView {
+export function formLinkView(links: IntegrationLinks, env: string, envName: (env: string) => string = (e) => e, fields: string[] = [], connectable: ConnectableEndpoint[] = [], addressable: string[] = fields): FormLinkView {
   const first = links.environments[0]?.name;
   const editable = first === env;
   const release = links.environments.find((e) => e.name === env);
@@ -91,6 +91,7 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
   // An endpoint of this project is reached directly, so it has no resource and no values of ours:
   // the platform resolves its address in each environment.
   const projectEndpoints = connectable.filter((e) => e.scope === 'project');
+  const takesAnAddress = new Set(addressable);
   const endpointSource = (id: string): FieldSource | undefined => {
     const match = projectEndpoints.find((e) => endpointId(e) === id);
     // Project and component are one segment each; the rest is the endpoint, which may hold a slash.
@@ -118,10 +119,13 @@ export function formLinkView(links: IntegrationLinks, env: string, envName: (env
     const picker: Picker = {
       first: via ? VIA : ENTER,
       selected: ownEndpoint ?? (own ? `${own.ref}|${own.key}` : via ? VIA : ENTER),
-      endpoints: projectEndpoints.map((e) => {
-        const here = e.environments.find((x) => x.name === env);
-        return { id: endpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason, here?.detail) }) };
-      }),
+      // An endpoint supplies an address, so it is offered only where the key can hold one.
+      endpoints: !takesAnAddress.has(id)
+        ? []
+        : projectEndpoints.map((e) => {
+            const here = e.environments.find((x) => x.name === env);
+            return { id: endpointId(e), name: `${e.displayName} · ${e.endpoint}`, ...(here?.connectable ? {} : { unavailable: unavailableText(here?.reason, here?.detail) }) };
+          }),
       resources: links.resources.map((r) => ({
         id: r.id,
         name: r.displayName,

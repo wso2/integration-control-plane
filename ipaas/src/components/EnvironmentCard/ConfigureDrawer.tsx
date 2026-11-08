@@ -33,7 +33,7 @@ import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer'
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCardList } from '../EndpointCardList';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
-import { linkableFields } from '../SchemaConfigForm/schemaUtils';
+import { addressableFields, linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -329,7 +329,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return null;
     }
   }, [data?.jsonSchema]);
-  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? linkableFields(parsedSchema) : []);
+  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? linkableFields(parsedSchema) : [], parsedSchema ? addressableFields(parsedSchema) : []);
 
   // Seed values only on open; avoid clobbering edits on background refetches.
   const seededRef = useRef(false);
@@ -800,7 +800,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
-  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : []);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : [], parsedSchema ? addressableFields(parsedSchema) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {
