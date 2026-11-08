@@ -22,7 +22,7 @@ export type IntervalUnit = (typeof INTERVAL_UNITS)[number];
 export type CronField = 'minute' | 'hour' | 'dom' | 'month' | 'dow';
 
 export const CRON_FIELD_LABELS = [
-  { key: 'minute', label: 'minute (0 - 59)', placeholder: '*/1' },
+  { key: 'minute', label: 'minute (0 - 59)', placeholder: '*/5' },
   { key: 'hour', label: 'hour (0 - 23)', placeholder: '*' },
   { key: 'dom', label: 'day of month (1 - 31)', placeholder: '*' },
   { key: 'month', label: 'month (1 - 12)', placeholder: '*' },

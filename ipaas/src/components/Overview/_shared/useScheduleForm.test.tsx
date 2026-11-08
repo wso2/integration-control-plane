@@ -46,12 +46,46 @@ beforeEach(() => {
 afterEach(() => act(() => root.unmount()));
 
 describe('useScheduleForm plan limits', () => {
-  it('blocks a free plan from saving a new every-minute schedule, and says why', async () => {
+  it('starts a new schedule at every 5 minutes, which a free plan can save', async () => {
     await render(null, free);
+    expect(form.cron).toBe('*/5 * * * *');
+    expect(form.isValid).toBe(true);
+    expect(container.textContent).toContain('Schedules that run more often than every 5 minutes, and job timeouts over 300 seconds, can only be configured on a paid plan.');
+  });
+
+  it('starts a new schedule at every minute on a paid plan', async () => {
+    await render(null, paid);
+    expect(form.cron).toBe('*/1 * * * *');
+    expect(form.isValid).toBe(true);
+  });
+
+  it('moves an untouched new schedule to the paid default once the plan loads, but keeps an edited one', async () => {
+    await render(null, null);
+    expect(form.cron).toBe('*/5 * * * *');
+    await render(null, paid);
+    expect(form.cron).toBe('*/1 * * * *');
+
+    await act(() => root.unmount());
+    root = createRoot(container);
+    await render(null, null);
+    await act(() => form.setIntervalCount(10));
+    await render(null, paid);
+    expect(form.cron).toBe('*/10 * * * *');
+  });
+
+  it('keeps a saved schedule whatever the plan', async () => {
+    await render(saved('*/2 * * * *'), null);
+    await render(saved('*/2 * * * *'), paid);
+    expect(form.cron).toBe('*/2 * * * *');
+  });
+
+  it('blocks a free plan from running more often, and says why', async () => {
+    await render(null, free);
+    await act(() => form.setIntervalCount(1));
     expect(form.cron).toBe('*/1 * * * *');
     expect(form.errors.frequency).toMatch(/needs a paid plan/);
     expect(form.isValid).toBe(false);
-    expect(container.textContent).toContain('Schedules that run more often than every 5 minutes, and job timeouts over 300 seconds, can only be configured on a paid plan.');
+    expect(container.textContent).toContain('Running more often than every 5 minutes needs a paid plan');
   });
 
   it('lets a paid plan save any schedule, with no plan notice', async () => {
@@ -64,6 +98,7 @@ describe('useScheduleForm plan limits', () => {
 
   it('applies the free limits while the plan loads', async () => {
     await render(null, null);
+    await act(() => form.setIntervalCount(1));
     expect(form.isValid).toBe(false);
   });
 
@@ -80,10 +115,10 @@ describe('useScheduleForm plan limits', () => {
     expect(form.errors.frequency).toBeDefined();
   });
 
-  it('does not take the every-minute fallback for a saved schedule', async () => {
+  it('starts an environment with no schedule at every 5 minutes', async () => {
     await render(saved(''), free);
-    expect(form.cron).toBe('*/1 * * * *');
-    expect(form.isValid).toBe(false);
+    expect(form.cron).toBe('*/5 * * * *');
+    expect(form.isValid).toBe(true);
   });
 
   it('names only the schedule when the timeout is not shown', async () => {

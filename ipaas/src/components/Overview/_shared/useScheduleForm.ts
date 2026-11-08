@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { type IntervalUnit, type CronField, intervalToCron, cronToInterval, parseCronParts, buildCronFromParts, describeCron } from '../../../utils/cronUtils';
-import { validateCronFields, validateFreePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
+import { FREE_PLAN_SCHEDULE_LIMITS, validateCronFields, validateFreePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
 import type { ExecutionConfigs } from '../../../types/executions';
 import type { PlanAccess } from '../../../utils/billing';
 import type { DeployDeploymentTrackInput } from '../../../types/deployment';
@@ -61,6 +61,11 @@ export interface ScheduleFormApi extends ScheduleValues {
   plan: PlanAccess | null;
 }
 
+/** Minutes between runs of a new schedule: the most frequent its plan allows. */
+function defaultMinutes(plan: PlanAccess | null): number {
+  return plan?.state === 'paid' ? 1 : FREE_PLAN_SCHEDULE_LIMITS.minIntervalMinutes;
+}
+
 /**
  * Owns the schedule form state (interval/cron, timezone, execution behaviour),
  * seeded from an existing schedule. Shared by the standalone Schedule drawer and
@@ -69,19 +74,22 @@ export interface ScheduleFormApi extends ScheduleValues {
  */
 export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined, plan: PlanAccess | null): ScheduleFormApi {
   const [tab, setTab] = useState(0);
-  const [intervalCount, setIntervalCount] = useState<number | ''>(1);
+  const [intervalCount, setIntervalCount] = useState<number | ''>(defaultMinutes(plan));
   const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>('Minute');
-  const [cronFields, setCronFields] = useState<Record<CronField, string>>({ minute: '*/1', hour: '*', dom: '*', month: '*', dow: '*' });
+  const [cronFields, setCronFields] = useState<Record<CronField, string>>({ minute: `*/${defaultMinutes(plan)}`, hour: '*', dom: '*', month: '*', dow: '*' });
+  // Until the user edits it, a new schedule follows its default, which changes when the plan loads.
+  const [scheduleEdited, setScheduleEdited] = useState(false);
   const [timezone, setTimezone] = useState('UTC');
   const [timeoutSeconds, setTimeoutSeconds] = useState('');
   const [allowConcurrency, setAllowConcurrency] = useState(false);
 
   useEffect(() => {
     if (!existingConfigs) return;
-    const freq = existingConfigs.cronjobFrequency || '*/1 * * * *';
+    const freq = existingConfigs.cronjobFrequency;
     setTimezone(existingConfigs.cronjobTimezone || 'UTC');
     if (existingConfigs.timeoutSeconds != null) setTimeoutSeconds(String(existingConfigs.timeoutSeconds));
     if (existingConfigs.cronjobAllowConcurrency != null) setAllowConcurrency(existingConfigs.cronjobAllowConcurrency);
+    if (!freq) return;
     const parsed = cronToInterval(freq);
     if (parsed) {
       setTab(0);
@@ -92,6 +100,22 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
       setCronFields(parseCronParts(freq));
     }
   }, [existingConfigs]);
+
+  const hasSchedule = !!existingConfigs?.cronjobFrequency || scheduleEdited;
+  const newScheduleMinutes = hasSchedule ? null : defaultMinutes(plan);
+  useEffect(() => {
+    if (newScheduleMinutes === null) return;
+    setTab(0);
+    setIntervalCount(newScheduleMinutes);
+    setIntervalUnit('Minute');
+    setCronFields((prev) => ({ ...prev, minute: `*/${newScheduleMinutes}` }));
+  }, [newScheduleMinutes]);
+  const edit =
+    <T>(set: (v: T) => void) =>
+    (v: T) => {
+      setScheduleEdited(true);
+      set(v);
+    };
 
   const cron = tab === 0 ? intervalToCron(intervalCount || 1, intervalUnit) : buildCronFromParts(cronFields);
   const limited = plan?.state !== 'paid';
@@ -112,13 +136,13 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
 
   return {
     tab,
-    setTab,
+    setTab: edit(setTab),
     intervalCount,
-    setIntervalCount,
+    setIntervalCount: edit(setIntervalCount),
     intervalUnit,
-    setIntervalUnit,
+    setIntervalUnit: edit(setIntervalUnit),
     cronFields,
-    setCronFields,
+    setCronFields: edit(setCronFields),
     timezone,
     setTimezone,
     timeoutSeconds,
