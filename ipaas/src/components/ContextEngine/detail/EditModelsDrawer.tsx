@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Drawer, FormControlLabel, IconButton, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
+import { Alert, Box, Button, Chip, CircularProgress, ColorSchemeImage, Drawer, FormControlLabel, IconButton, Radio, RadioGroup, Stack, Typography } from '@wso2/oxygen-ui';
 import { Info, Lock, X } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useUpdateContextModels } from '../../../hooks/useContextEngine';
@@ -43,10 +43,10 @@ interface EditModelsDrawerProps {
 const LLM_OPTIONS: ProviderOption[] = LLM_PROVIDERS.map((p) => ({ id: p.id, name: p.name, logo: contextLogoUrl(p.logo), logoDark: p.logoDark && contextLogoUrl(p.logoDark), models: p.models, unavailable: isModelProviderUnavailable(p.id) }));
 
 const KEEP_KEY_TEXT = 'Leave empty to keep the current key';
-const RESTART_TEXT = 'Saving restarts the engine. It is unavailable for about a minute; ingestion in progress resumes after it restarts.';
 
 const lockRowSx = { p: 1.5, border: '1px solid', borderColor: 'divider', borderRadius: 1 } as const;
 const infoIconStyle = { marginTop: 2, flexShrink: 0 } as const;
+const footerSx = { ...drawerFooterSx, flexDirection: 'column' } as const;
 
 /** Why the save failed, in words. */
 function saveFailure(e: Error): { title: string; body: string } {
@@ -69,11 +69,10 @@ const blankFor =
 /**
  * Change a running engine's language models and their keys, laid out as the create wizard lays them
  * out. An empty key keeps the stored one. The embedding model is shown but never changes: every
- * stored vector came from it. Saving restarts the engine, so it asks first.
+ * stored vector came from it. Saving restarts the engine.
  */
 export default function EditModelsDrawer({ engineId, models, answersEnabled, focusEmbeddingKey = false, open, onClose }: EditModelsDrawerProps): JSX.Element {
   const [draft, setDraft] = useState<ModelsDraft>(() => modelsDraftOf(models));
-  const [confirming, setConfirming] = useState(false);
   const save = useUpdateContextModels(engineId);
   const errors = modelsDraftErrors(models, draft, answersEnabled);
   const update = modelsUpdate(models, draft, answersEnabled);
@@ -91,7 +90,6 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
     onClose();
   };
   const submit = () => {
-    setConfirming(false);
     if (update) save.mutate(update, { onSuccess: close });
   };
 
@@ -181,31 +179,17 @@ export default function EditModelsDrawer({ engineId, models, answersEnabled, foc
         )}
       </Box>
 
-      <Box sx={{ ...drawerFooterSx, justifyContent: 'flex-end' }}>
-        <Stack direction="row" gap={1.5}>
+      <Box sx={footerSx}>
+        <Alert severity="warning">Saving restarts the engine. Queries fail for about a minute.</Alert>
+        <Stack direction="row" gap={1.5} justifyContent="flex-end">
           <Button variant="outlined" onClick={close} disabled={save.isPending}>
             Cancel
           </Button>
-          <Button variant="contained" disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={() => setConfirming(true)}>
-            {save.isPending ? 'Saving…' : 'Save models'}
+          <Button variant="contained" disabled={!canSave} startIcon={save.isPending ? <CircularProgress size={14} color="inherit" /> : undefined} onClick={submit}>
+            {save.isPending ? 'Saving…' : 'Save and restart'}
           </Button>
         </Stack>
       </Box>
-
-      {confirming && (
-        <Dialog open onClose={() => setConfirming(false)} maxWidth="xs" fullWidth>
-          <DialogTitle>Restart the engine?</DialogTitle>
-          <DialogContent>
-            <DialogContentText>{RESTART_TEXT}</DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setConfirming(false)}>Keep editing</Button>
-            <Button variant="contained" onClick={submit}>
-              Save and restart
-            </Button>
-          </DialogActions>
-        </Dialog>
-      )}
     </Drawer>
   );
 }
