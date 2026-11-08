@@ -190,6 +190,16 @@ describe('retrievalAccessReason', () => {
   ])('%j', (access, reason) => {
     expect(retrievalAccessReason(access)).toBe(reason);
   });
+
+  const off = { ...ready, isUnavailable: true, gatewayUrl: '' };
+  it.each([
+    [{ status: 'FAILED', error: 'GATEWAY_UNAVAILABLE' }, 'The API gateway for this environment is being set up. The knowledge base can be queried once it is published there.'],
+    [{ status: 'RUNNING', error: 'GATEWAY_PROVISIONING' }, 'The API gateway for this environment is being set up. The knowledge base can be queried once it is published there.'],
+    [{ status: 'FAILED', error: 'APIP_ERROR' }, 'Publishing the knowledge base on the API gateway failed. It is retried automatically.'],
+    [{ status: 'PENDING' }, 'The knowledge base is being published on the API gateway.'],
+  ])('says why it is not on the gateway: %j', (apiStatus, reason) => {
+    expect(retrievalAccessReason(off, apiStatus)).toBe(reason);
+  });
 });
 
 describe('isManualSchedule', () => {

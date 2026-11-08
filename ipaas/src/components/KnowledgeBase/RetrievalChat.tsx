@@ -94,7 +94,7 @@ function ChunksModal({ chunks, onClose }: { chunks: RetrievedChunk[] | null; onC
 }
 
 interface RetrievalChatProps {
-  knowledgeBase: Pick<KnowledgeBase, 'name' | 'environment' | 'serviceUrl'>;
+  knowledgeBase: Pick<KnowledgeBase, 'name' | 'environment' | 'serviceUrl' | 'apiStatus'>;
   /** The integration the query is made from, sent as `rag_component_id`. */
   componentId: string;
   /** Why queries cannot be sent yet (e.g. the KB Service is still deploying); null when they can. */
@@ -128,7 +128,7 @@ function retrieveErrorMessage(err: unknown): string {
 export default function RetrievalChat({ knowledgeBase, componentId, unavailableReason: refusal }: RetrievalChatProps): ReactNode {
   // No key is minted while the service can't be queried anyway.
   const { retrieve, access } = useRetrieveFromKnowledgeBase(knowledgeBase, componentId, !refusal);
-  const unavailableReason = refusal ?? retrievalAccessReason(access);
+  const unavailableReason = refusal ?? retrievalAccessReason(access, knowledgeBase.apiStatus);
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [input, setInput] = useState('');
   const [inputFocused, setInputFocused] = useState(false);

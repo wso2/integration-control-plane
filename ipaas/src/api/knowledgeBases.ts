@@ -19,7 +19,7 @@
 // RAG knowledge bases (`/knowledge-bases`). A data source is also an ordinary
 // scheduled integration, so its schedule, runs and deletion go through the
 // component, schedule and execution APIs.
-import type { CreateKnowledgeBaseDataSourceInput, CreateKnowledgeBaseInput, KnowledgeBase, KnowledgeBaseDataSource, UpdateKnowledgeBaseInput } from '../types/knowledgeBase';
+import type { CreateKnowledgeBaseDataSourceInput, CreateKnowledgeBaseInput, KnowledgeBase, KnowledgeBaseApiStatus, KnowledgeBaseDataSource, UpdateKnowledgeBaseInput } from '../types/knowledgeBase';
 import type { RetrievalQuery, RetrievedChunk, RetrieveResponse } from '../types/ragIngestion';
 import { bff, items, seg, type ListResponse, type MessageResponse } from './_client';
 
@@ -51,6 +51,7 @@ interface BffKnowledgeBase {
   secretKeys?: string[];
   status?: string;
   serviceUrl?: string;
+  apiStatus?: KnowledgeBaseApiStatus;
   dataSources?: BffKnowledgeBaseDataSource[];
   createdAt?: string;
   updatedAt?: string;
@@ -82,6 +83,7 @@ export function toKnowledgeBase(kb: BffKnowledgeBase): KnowledgeBase {
     secretKeys: kb.secretKeys ?? [],
     status: kb.status ?? '',
     serviceUrl: kb.serviceUrl ?? '',
+    ...(kb.apiStatus ? { apiStatus: kb.apiStatus } : {}),
     dataSources: (kb.dataSources ?? []).map(toKnowledgeBaseDataSource),
     createdAt: kb.createdAt ?? '',
     updatedAt: kb.updatedAt ?? '',

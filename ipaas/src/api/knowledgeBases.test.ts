@@ -45,6 +45,11 @@ describe('toKnowledgeBase', () => {
     });
   });
 
+  it('keeps how publishing the service on the gateway is going', () => {
+    const apiStatus = { status: 'FAILED', error: 'GATEWAY_UNAVAILABLE', nextRetryAt: '2026-11-08T10:00:00Z' };
+    expect(toKnowledgeBase({ name: 'docs-kb', projectName: 'ai-services', environment: 'development', apiStatus }).apiStatus).toEqual(apiStatus);
+  });
+
   it('maps data sources, keeping a stopped schedule as none', () => {
     const kb = toKnowledgeBase({
       name: 'docs-kb',
