@@ -18,7 +18,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { type IntervalUnit, type CronField, intervalToCron, cronToInterval, parseCronParts, buildCronFromParts, describeCron } from '../../../utils/cronUtils';
-import { FREE_PLAN_SCHEDULE_LIMITS, validateCronFields, validateFreePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
+import { SCHEDULE_DEFAULTS, type ScheduleKind, validateCronFields, validatePlanSchedule, validateIntervalCount, validateTimeout } from '../../../utils/scheduleValidation';
 import type { ExecutionConfigs } from '../../../types/executions';
 import type { PlanAccess } from '../../../utils/billing';
 import type { DeployDeploymentTrackInput } from '../../../types/deployment';
@@ -59,12 +59,10 @@ export interface ScheduleFormApi extends ScheduleValues {
   description: string;
   /** The org's plan, null while it loads. Anything but a paid plan gets the free plan's limits. */
   plan: PlanAccess | null;
+  kind: ScheduleKind;
 }
 
-/** Minutes between runs of a new schedule: the most frequent its plan allows. */
-function defaultMinutes(plan: PlanAccess | null): number {
-  return plan?.state === 'paid' ? 1 : FREE_PLAN_SCHEDULE_LIMITS.minIntervalMinutes;
-}
+const DEFAULT_MINUTES = SCHEDULE_DEFAULTS.intervalMinutes;
 
 /**
  * Owns the schedule form state (interval/cron, timezone, execution behaviour),
@@ -72,13 +70,11 @@ function defaultMinutes(plan: PlanAccess | null): number {
  * the RAG ingestion Configure drawer's Schedule step — the single source of the
  * cron editing logic. Pair with the `ScheduleFields` presentational component.
  */
-export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined, plan: PlanAccess | null): ScheduleFormApi {
+export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undefined, plan: PlanAccess | null, kind: ScheduleKind): ScheduleFormApi {
   const [tab, setTab] = useState(0);
-  const [intervalCount, setIntervalCount] = useState<number | ''>(defaultMinutes(plan));
+  const [intervalCount, setIntervalCount] = useState<number | ''>(DEFAULT_MINUTES);
   const [intervalUnit, setIntervalUnit] = useState<IntervalUnit>('Minute');
-  const [cronFields, setCronFields] = useState<Record<CronField, string>>({ minute: `*/${defaultMinutes(plan)}`, hour: '*', dom: '*', month: '*', dow: '*' });
-  // Until the user edits it, a new schedule follows its default, which changes when the plan loads.
-  const [scheduleEdited, setScheduleEdited] = useState(false);
+  const [cronFields, setCronFields] = useState<Record<CronField, string>>({ minute: `*/${DEFAULT_MINUTES}`, hour: '*', dom: '*', month: '*', dow: '*' });
   const [timezone, setTimezone] = useState('UTC');
   const [timeoutSeconds, setTimeoutSeconds] = useState('');
   const [allowConcurrency, setAllowConcurrency] = useState(false);
@@ -101,48 +97,32 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
     }
   }, [existingConfigs]);
 
-  const hasSchedule = !!existingConfigs?.cronjobFrequency || scheduleEdited;
-  const newScheduleMinutes = hasSchedule ? null : defaultMinutes(plan);
-  useEffect(() => {
-    if (newScheduleMinutes === null) return;
-    setTab(0);
-    setIntervalCount(newScheduleMinutes);
-    setIntervalUnit('Minute');
-    setCronFields((prev) => ({ ...prev, minute: `*/${newScheduleMinutes}` }));
-  }, [newScheduleMinutes]);
-  const edit =
-    <T>(set: (v: T) => void) =>
-    (v: T) => {
-      setScheduleEdited(true);
-      set(v);
-    };
-
   const cron = tab === 0 ? intervalToCron(intervalCount || 1, intervalUnit) : buildCronFromParts(cronFields);
-  const limited = plan?.state !== 'paid';
+  const planLimits = plan?.state === 'paid' ? 'paid' : 'free';
   const savedCron = existingConfigs?.cronjobFrequency ?? '';
   const savedTimeout = existingConfigs?.timeoutSeconds ?? null;
 
   // Only the active tab's fields are validated: the other tab's state is not written.
   const errors = useMemo<ScheduleFormErrors>(() => {
-    const planErrors = limited ? validateFreePlanSchedule(cron, timeoutSeconds, { cron: savedCron, timeoutSeconds: savedTimeout }) : {};
+    const planErrors = validatePlanSchedule(cron, timeoutSeconds, { cron: savedCron, timeoutSeconds: savedTimeout }, planLimits, kind);
     return {
       timeout: validateTimeout(timeoutSeconds) ?? planErrors.timeout,
       intervalCount: tab === 0 ? validateIntervalCount(intervalCount) : undefined,
       cron: tab === 1 ? validateCronFields(cronFields) : {},
       frequency: planErrors.frequency,
     };
-  }, [timeoutSeconds, tab, intervalCount, cronFields, cron, limited, savedCron, savedTimeout]);
+  }, [timeoutSeconds, tab, intervalCount, cronFields, cron, planLimits, kind, savedCron, savedTimeout]);
   const isValid = !errors.timeout && !errors.intervalCount && !errors.frequency && Object.keys(errors.cron).length === 0;
 
   return {
     tab,
-    setTab: edit(setTab),
+    setTab,
     intervalCount,
-    setIntervalCount: edit(setIntervalCount),
+    setIntervalCount,
     intervalUnit,
-    setIntervalUnit: edit(setIntervalUnit),
+    setIntervalUnit,
     cronFields,
-    setCronFields: edit(setCronFields),
+    setCronFields,
     timezone,
     setTimezone,
     timeoutSeconds,
@@ -154,6 +134,7 @@ export function useScheduleForm(existingConfigs: ExecutionConfigs | null | undef
     errors,
     isValid,
     plan,
+    kind,
   };
 }
 

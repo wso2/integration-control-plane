@@ -17,7 +17,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { validateTimeout, validateIntervalCount, validateCronField, validateCronFields, TIMEOUT_LIMITS, shortestRunGapMinutes, validateFreePlanSchedule } from './scheduleValidation';
+import { validateTimeout, validateIntervalCount, validateCronField, validateCronFields, TIMEOUT_LIMITS, shortestRunGapMinutes, validatePlanSchedule, describeSeconds } from './scheduleValidation';
 
 describe('validateTimeout', () => {
   it('accepts an empty value as "no timeout"', () => {
@@ -145,26 +145,43 @@ describe('shortestRunGapMinutes', () => {
   });
 });
 
-describe('validateFreePlanSchedule', () => {
+describe('describeSeconds', () => {
+  it('names the limit in seconds with its minutes or hours', () => {
+    expect(describeSeconds(300)).toBe('300 seconds (5 minutes)');
+    expect(describeSeconds(7200)).toBe('7200 seconds (2 hours)');
+    expect(describeSeconds(3600)).toBe('3600 seconds (1 hour)');
+  });
+});
+
+describe('validatePlanSchedule', () => {
   const none = { cron: '', timeoutSeconds: null };
 
-  it('allows a schedule within the free limits', () => {
-    expect(validateFreePlanSchedule('*/5 * * * *', '300', none)).toEqual({});
-    expect(validateFreePlanSchedule('0 * * * *', '', none)).toEqual({});
+  it('holds an automation on a free plan to runs 5 minutes apart and 300 seconds', () => {
+    expect(validatePlanSchedule('*/5 * * * *', '300', none, 'free', 'automation')).toEqual({});
+    const errors = validatePlanSchedule('*/4 * * * *', '301', none, 'free', 'automation');
+    expect(errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan');
+    expect(errors.timeout).toBe('A timeout over 300 seconds (5 minutes) needs a paid plan');
   });
 
-  it('refuses runs closer than 5 minutes and a timeout over 300 seconds', () => {
-    const errors = validateFreePlanSchedule('*/1 * * * *', '301', none);
-    expect(errors.frequency).toMatch(/more often than every 5 minutes needs a paid plan/);
-    expect(errors.timeout).toMatch(/over 300 seconds needs a paid plan/);
+  it('holds an ingestion on a free plan to runs 5 minutes apart and 2 hours', () => {
+    expect(validatePlanSchedule('*/5 * * * *', '7200', none, 'free', 'ingestion')).toEqual({});
+    expect(validatePlanSchedule('0 2 * * *', '3600', none, 'free', 'ingestion')).toEqual({});
+    const errors = validatePlanSchedule('*/1 * * * *', '7201', none, 'free', 'ingestion');
+    expect(errors.frequency).toBeDefined();
+    expect(errors.timeout).toBe('A timeout over 7200 seconds (2 hours) needs a paid plan');
+  });
+
+  it('lets a paid plan run every minute with any timeout, for both kinds', () => {
+    expect(validatePlanSchedule('* * * * *', '604800', none, 'paid', 'automation')).toEqual({});
+    expect(validatePlanSchedule('* * * * *', '604800', none, 'paid', 'ingestion')).toEqual({});
   });
 
   it('keeps the values the environment already runs with', () => {
-    expect(validateFreePlanSchedule('*/2 * * * *', '3600', { cron: '*/2 * * * *', timeoutSeconds: 3600 })).toEqual({});
+    expect(validatePlanSchedule('*/2 * * * *', '3600', { cron: '*/2 * * * *', timeoutSeconds: 3600 }, 'free', 'automation')).toEqual({});
   });
 
   it('checks a value that changes, even from one already over the limit', () => {
-    const errors = validateFreePlanSchedule('*/1 * * * *', '900', { cron: '*/2 * * * *', timeoutSeconds: 3600 });
+    const errors = validatePlanSchedule('*/1 * * * *', '900', { cron: '*/2 * * * *', timeoutSeconds: 3600 }, 'free', 'automation');
     expect(errors.frequency).toBeDefined();
     expect(errors.timeout).toBeDefined();
   });

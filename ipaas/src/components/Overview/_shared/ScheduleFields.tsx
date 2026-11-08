@@ -20,7 +20,7 @@ import { Alert, Autocomplete, Box, Button, Checkbox, Collapse, FormControlLabel,
 import { ChevronDown, ChevronUp } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { INTERVAL_UNITS, TIMEZONE_OPTIONS, CRON_FIELD_LABELS, type IntervalUnit, type CronField, getTimezoneLabel } from '../../../utils/cronUtils';
-import { FREE_PLAN_SCHEDULE_LIMITS } from '../../../utils/scheduleValidation';
+import { SCHEDULE_DEFAULTS, SCHEDULE_LIMITS, describeSeconds } from '../../../utils/scheduleValidation';
 import type { ScheduleFormApi } from './useScheduleForm';
 
 /**
@@ -30,8 +30,9 @@ import type { ScheduleFormApi } from './useScheduleForm';
  */
 export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan } = form;
-  const { minIntervalMinutes, maxTimeoutSeconds } = FREE_PLAN_SCHEDULE_LIMITS;
+  const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan, kind } = form;
+  const { minIntervalMinutes } = SCHEDULE_LIMITS.free;
+  const maxTimeoutSeconds = SCHEDULE_LIMITS.free.maxTimeoutSeconds[kind];
   const frequencyError = errors.frequency && (
     <Typography variant="body2" color="error">
       {errors.frequency}
@@ -43,7 +44,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
       {plan?.state === 'free' && (
         <Alert severity="info">
           {executionSettings
-            ? `Schedules that run more often than every ${minIntervalMinutes} minutes, and job timeouts over ${maxTimeoutSeconds} seconds, can only be configured on a paid plan.`
+            ? `Schedules that run more often than every ${minIntervalMinutes} minutes, and job timeouts over ${describeSeconds(maxTimeoutSeconds)}, can only be configured on a paid plan.`
             : `Schedules that run more often than every ${minIntervalMinutes} minutes can only be configured on a paid plan.`}
         </Alert>
       )}
@@ -157,7 +158,16 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 0.5 }}>
                     Job Timeout (in seconds) (Optional)
                   </Typography>
-                  <TextField fullWidth size="small" type="number" value={form.timeoutSeconds} onChange={(e) => form.setTimeoutSeconds(e.target.value)} placeholder="No timeout" error={!!errors.timeout} helperText={errors.timeout || ' '} />
+                  <TextField
+                    fullWidth
+                    size="small"
+                    type="number"
+                    value={form.timeoutSeconds}
+                    onChange={(e) => form.setTimeoutSeconds(e.target.value)}
+                    placeholder={`Default: ${SCHEDULE_DEFAULTS.timeoutSeconds[kind]}`}
+                    error={!!errors.timeout}
+                    helperText={errors.timeout || ' '}
+                  />
                 </Box>
                 <FormControlLabel control={<Checkbox checked={form.allowConcurrency} onChange={(e) => form.setAllowConcurrency(e.target.checked)} size="small" />} label="Allow overlapping executions" />
               </>

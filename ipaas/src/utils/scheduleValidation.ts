@@ -20,7 +20,7 @@ import type { CronField } from './cronUtils';
 
 // Kubernetes rejects a bad timeout or cron only when the CronJob is applied, long after the save returns 200.
 
-/** Only a free plan has a ceiling (FREE_PLAN_SCHEDULE_LIMITS); the platform default is 300. */
+/** Only a free plan has a ceiling (SCHEDULE_LIMITS). */
 export const TIMEOUT_LIMITS = { min: 1 } as const;
 
 export const CRON_FIELD_RANGES: Record<CronField, { min: number; max: number }> = {
@@ -97,8 +97,23 @@ export function validateCronFields(fields: Record<CronField, string>): Partial<R
   return errors;
 }
 
-/** What a scheduled task may use on a free plan. ipaas-service enforces the same limits. */
-export const FREE_PLAN_SCHEDULE_LIMITS = { maxTimeoutSeconds: 300, minIntervalMinutes: 5 } as const;
+/** What a scheduled component runs. A knowledge base ingestion has its own free plan timeout. */
+export type ScheduleKind = 'automation' | 'ingestion';
+
+/** What each plan allows a scheduled task; null is no limit. ipaas-service enforces the same. */
+export const SCHEDULE_LIMITS = {
+  free: { minIntervalMinutes: 5, maxTimeoutSeconds: { automation: 300, ingestion: 7200 } },
+  paid: { minIntervalMinutes: 1, maxTimeoutSeconds: { automation: null, ingestion: null } },
+} as const;
+
+/** What a new schedule starts with on every plan. An ingestion's timeout is set by ipaas-service. */
+export const SCHEDULE_DEFAULTS = { intervalMinutes: 5, timeoutSeconds: { automation: 300, ingestion: 3600 } } as const;
+
+/** A limit in seconds as the timeout field takes it, with its whole minutes or hours, e.g. "300 seconds (5 minutes)". */
+export function describeSeconds(seconds: number): string {
+  const [n, unit] = seconds % 3600 === 0 ? [seconds / 3600, 'hour'] : [seconds / 60, 'minute'];
+  return `${seconds} seconds (${n} ${unit}${n === 1 ? '' : 's'})`;
+}
 
 /** The schedule an environment already runs with; a free plan may keep it unchanged. */
 export interface SavedSchedule {
@@ -143,16 +158,18 @@ export function shortestRunGapMinutes(cron: string): number | null {
   return gap;
 }
 
-/** Errors for a schedule a free plan does not allow. A value equal to the saved one is not checked. */
-export function validateFreePlanSchedule(cron: string, timeoutRaw: string, saved: SavedSchedule): { frequency?: string; timeout?: string } {
+/** Errors for a schedule the plan does not allow. A value equal to the saved one is not checked. */
+export function validatePlanSchedule(cron: string, timeoutRaw: string, saved: SavedSchedule, plan: 'free' | 'paid', kind: ScheduleKind): { frequency?: string; timeout?: string } {
   const errors: { frequency?: string; timeout?: string } = {};
+  const limits = SCHEDULE_LIMITS[plan];
   const gap = shortestRunGapMinutes(cron);
-  if (gap !== null && gap < FREE_PLAN_SCHEDULE_LIMITS.minIntervalMinutes && cron.trim() !== saved.cron.trim()) {
-    errors.frequency = `Running more often than every ${FREE_PLAN_SCHEDULE_LIMITS.minIntervalMinutes} minutes needs a paid plan`;
+  if (gap !== null && gap < limits.minIntervalMinutes && cron.trim() !== saved.cron.trim()) {
+    errors.frequency = plan === 'free' ? `Running more often than every ${limits.minIntervalMinutes} minutes needs a paid plan` : `Runs must start at least ${limits.minIntervalMinutes} minute apart`;
   }
+  const maxTimeout = limits.maxTimeoutSeconds[kind];
   const timeout = timeoutRaw.trim() === '' ? NaN : Number(timeoutRaw);
-  if (timeout > FREE_PLAN_SCHEDULE_LIMITS.maxTimeoutSeconds && timeout !== saved.timeoutSeconds) {
-    errors.timeout = `A timeout over ${FREE_PLAN_SCHEDULE_LIMITS.maxTimeoutSeconds} seconds needs a paid plan`;
+  if (maxTimeout !== null && timeout > maxTimeout && timeout !== saved.timeoutSeconds) {
+    errors.timeout = `A timeout over ${describeSeconds(maxTimeout)} needs a paid plan`;
   }
   return errors;
 }

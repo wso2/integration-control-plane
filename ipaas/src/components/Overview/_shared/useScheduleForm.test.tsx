@@ -23,20 +23,22 @@ import ScheduleFields from './ScheduleFields';
 import { useScheduleForm, type ScheduleFormApi } from './useScheduleForm';
 import type { ExecutionConfigs } from '../../../types/executions';
 import type { PlanAccess } from '../../../utils/billing';
+import type { ScheduleKind } from '../../../utils/scheduleValidation';
 
 let container: HTMLDivElement;
 let root: Root;
 let form: ScheduleFormApi;
 
-function Probe({ saved, plan, executionSettings }: { saved: ExecutionConfigs | null; plan: PlanAccess | null; executionSettings?: boolean }) {
-  form = useScheduleForm(saved, plan);
+function Probe({ saved, plan, kind, executionSettings }: { saved: ExecutionConfigs | null; plan: PlanAccess | null; kind: ScheduleKind; executionSettings?: boolean }) {
+  form = useScheduleForm(saved, plan, kind);
   return <ScheduleFields form={form} executionSettings={executionSettings} />;
 }
 
-const render = (saved: ExecutionConfigs | null, plan: PlanAccess | null, executionSettings?: boolean) => act(() => root.render(<Probe saved={saved} plan={plan} executionSettings={executionSettings} />));
+const render = (saved: ExecutionConfigs | null, plan: PlanAccess | null, kind: ScheduleKind = 'automation', executionSettings?: boolean) => act(() => root.render(<Probe saved={saved} plan={plan} kind={kind} executionSettings={executionSettings} />));
 const saved = (cron: string, timeoutSeconds?: number): ExecutionConfigs => ({ cronjobFrequency: cron, cronjobTimezone: 'UTC', timeoutSeconds }) as ExecutionConfigs;
 const free: PlanAccess = { state: 'free' };
 const paid: PlanAccess = { state: 'paid' };
+const timeoutField = () => container.querySelector<HTMLInputElement>('input[type="number"]');
 
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
@@ -45,52 +47,62 @@ beforeEach(() => {
 });
 afterEach(() => act(() => root.unmount()));
 
-describe('useScheduleForm plan limits', () => {
-  it('starts a new schedule at every 5 minutes, which a free plan can save', async () => {
-    await render(null, free);
+describe('useScheduleForm defaults', () => {
+  it.each([
+    ['free', free],
+    ['paid', paid],
+  ])('starts a new schedule at every 5 minutes on a %s plan', async (_name, plan) => {
+    await render(null, plan);
     expect(form.cron).toBe('*/5 * * * *');
     expect(form.isValid).toBe(true);
-    expect(container.textContent).toContain('Schedules that run more often than every 5 minutes, and job timeouts over 300 seconds, can only be configured on a paid plan.');
   });
 
-  it('starts a new schedule at every minute on a paid plan', async () => {
-    await render(null, paid);
-    expect(form.cron).toBe('*/1 * * * *');
-    expect(form.isValid).toBe(true);
-  });
-
-  it('moves an untouched new schedule to the paid default once the plan loads, but keeps an edited one', async () => {
-    await render(null, null);
+  it('starts an environment with no schedule at every 5 minutes', async () => {
+    await render(saved(''), free);
     expect(form.cron).toBe('*/5 * * * *');
-    await render(null, paid);
-    expect(form.cron).toBe('*/1 * * * *');
-
-    await act(() => root.unmount());
-    root = createRoot(container);
-    await render(null, null);
-    await act(() => form.setIntervalCount(10));
-    await render(null, paid);
-    expect(form.cron).toBe('*/10 * * * *');
   });
 
-  it('keeps a saved schedule whatever the plan', async () => {
-    await render(saved('*/2 * * * *'), null);
+  it('shows the default timeout of each kind in the empty field', async () => {
+    await render(null, paid);
+    expect(timeoutField()?.placeholder).toBe('Default: 300');
+    await render(null, paid, 'ingestion');
+    expect(timeoutField()?.placeholder).toBe('Default: 3600');
+  });
+
+  it('keeps a saved schedule', async () => {
     await render(saved('*/2 * * * *'), paid);
     expect(form.cron).toBe('*/2 * * * *');
   });
+});
 
-  it('blocks a free plan from running more often, and says why', async () => {
+describe('useScheduleForm plan limits', () => {
+  it('tells a free plan the automation limits, and blocks running more often', async () => {
     await render(null, free);
+    expect(container.textContent).toContain('Schedules that run more often than every 5 minutes, and job timeouts over 300 seconds (5 minutes), can only be configured on a paid plan.');
     await act(() => form.setIntervalCount(1));
-    expect(form.cron).toBe('*/1 * * * *');
-    expect(form.errors.frequency).toMatch(/needs a paid plan/);
+    expect(form.errors.frequency).toBe('Running more often than every 5 minutes needs a paid plan');
     expect(form.isValid).toBe(false);
-    expect(container.textContent).toContain('Running more often than every 5 minutes needs a paid plan');
   });
 
-  it('lets a paid plan save any schedule, with no plan notice', async () => {
+  it('holds an automation on a free plan to 300 seconds', async () => {
+    await render(null, free);
+    await act(() => form.setTimeoutSeconds('301'));
+    expect(form.errors.timeout).toBe('A timeout over 300 seconds (5 minutes) needs a paid plan');
+  });
+
+  it('holds an ingestion on a free plan to 2 hours, and says so', async () => {
+    await render(saved('0 2 * * *', 3600), free, 'ingestion');
+    expect(container.textContent).toContain('job timeouts over 7200 seconds (2 hours), can only be configured on a paid plan.');
+    await act(() => form.setTimeoutSeconds('7200'));
+    expect(form.isValid).toBe(true);
+    await act(() => form.setTimeoutSeconds('7201'));
+    expect(form.errors.timeout).toBe('A timeout over 7200 seconds (2 hours) needs a paid plan');
+  });
+
+  it('lets a paid plan run every minute with any timeout, with no plan notice', async () => {
     await render(null, paid);
-    await act(() => form.setTimeoutSeconds('3600'));
+    await act(() => form.setIntervalCount(1));
+    await act(() => form.setTimeoutSeconds('86400'));
     expect(form.errors).toEqual({ timeout: undefined, intervalCount: undefined, cron: {}, frequency: undefined });
     expect(form.isValid).toBe(true);
     expect(container.textContent).not.toContain('paid plan');
@@ -105,24 +117,12 @@ describe('useScheduleForm plan limits', () => {
   it('lets a free plan save the schedule it already runs, but not raise it', async () => {
     await render(saved('*/2 * * * *', 3600), free);
     expect(form.isValid).toBe(true);
-
     await act(() => form.setTimeoutSeconds('900'));
-    expect(form.errors.timeout).toMatch(/over 300 seconds needs a paid plan/);
-    expect(form.isValid).toBe(false);
-
-    await act(() => form.setTimeoutSeconds('3600'));
-    await act(() => form.setIntervalCount(1));
-    expect(form.errors.frequency).toBeDefined();
-  });
-
-  it('starts an environment with no schedule at every 5 minutes', async () => {
-    await render(saved(''), free);
-    expect(form.cron).toBe('*/5 * * * *');
-    expect(form.isValid).toBe(true);
+    expect(form.errors.timeout).toBeDefined();
   });
 
   it('names only the schedule when the timeout is not shown', async () => {
-    await render(saved('0 0 * * *'), free, false);
+    await render(null, free, 'ingestion', false);
     expect(container.textContent).toContain('Schedules that run more often than every 5 minutes can only be configured on a paid plan.');
     expect(container.textContent).not.toContain('job timeouts');
   });

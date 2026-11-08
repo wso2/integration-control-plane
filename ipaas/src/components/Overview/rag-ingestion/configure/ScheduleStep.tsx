@@ -43,7 +43,7 @@ interface ScheduleStepProps {
 export default function ScheduleStep({ componentId, versionId, envId, releaseId, deploymentPipelineId, buildId, onNotify }: ScheduleStepProps): JSX.Element {
   const { data: existingConfigs, isLoading } = useExecutionConfigs(componentId, releaseId, envId);
   const deployTrack = useDeployDeploymentTrack();
-  const form = useScheduleForm(existingConfigs, usePlanAccess());
+  const form = useScheduleForm(existingConfigs, usePlanAccess(), 'ingestion');
 
   const save = () => {
     deployTrack.mutate(buildScheduleDeployInput(form, { componentId, versionId, imageId: buildId, envId, deploymentPipelineId }), {
