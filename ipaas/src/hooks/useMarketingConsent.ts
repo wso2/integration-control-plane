@@ -18,9 +18,16 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { fetchMarketingConsent, recordMarketingConsent } from '../api/marketingConsent';
+import { useAuth } from '../auth';
 import type { ConsentDecision, MarketingConsent } from '../types/marketingConsent';
+import { withSessionAnswer } from '../utils/marketingConsent';
+import { session } from '../utils/storage';
 
-const KEY = ['marketingConsent'] as const;
+const key = (userId: string) => ['marketingConsent', userId] as const;
+
+// The answer saved in this tab, per person. platform-api accepts a decision before Pardot has it, so
+// a read straight after, a reload included, can still say `No Opt-in` and would ask again.
+const answeredKey = (userId: string) => `marketing_consent_answered:${userId}`;
 
 /**
  * The signed-in person's marketing consent. Read once per session: it only changes when they answer,
@@ -28,9 +35,10 @@ const KEY = ['marketingConsent'] as const;
  * not configured in this environment, and any failure only means the prompt is not shown.
  */
 export function useMarketingConsent(): UseQueryResult<MarketingConsent> {
+  const { userId } = useAuth();
   return useQuery<MarketingConsent>({
-    queryKey: KEY,
-    queryFn: fetchMarketingConsent,
+    queryKey: key(userId),
+    queryFn: async () => withSessionAnswer(await fetchMarketingConsent(), session.get(answeredKey(userId))),
     staleTime: Infinity,
     retry: false,
     refetchOnWindowFocus: false,
@@ -38,14 +46,17 @@ export function useMarketingConsent(): UseQueryResult<MarketingConsent> {
 }
 
 /**
- * Records the person's answer. The cached record takes the answer on success instead of being
- * refetched: platform-api accepts the decision before Pardot has it, so a read straight after can
- * still say `No Opt-in` and would ask again.
+ * Records the person's answer. On success the answer goes into the cached record and into this tab's
+ * session instead of being refetched, so neither Pardot's delay nor a reload asks again.
  */
 export function useRecordMarketingConsent() {
   const qc = useQueryClient();
+  const { userId } = useAuth();
   return useMutation<void, Error, ConsentDecision>({
     mutationFn: recordMarketingConsent,
-    onSuccess: (_, decision) => qc.setQueryData<MarketingConsent>(KEY, (prev) => prev && { ...prev, consentStatus: decision }),
+    onSuccess: (_, decision) => {
+      session.set(answeredKey(userId), decision);
+      qc.setQueryData<MarketingConsent>(key(userId), (prev) => prev && { ...prev, consentStatus: decision });
+    },
   });
 }

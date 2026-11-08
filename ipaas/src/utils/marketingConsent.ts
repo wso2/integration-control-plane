@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import type { MarketingConsent } from '../types/marketingConsent';
+import type { ConsentDecision, MarketingConsent } from '../types/marketingConsent';
 
 /**
  * Whether to ask a person for marketing consent: only when they have not answered anywhere in WSO2
@@ -25,4 +25,15 @@ import type { MarketingConsent } from '../types/marketingConsent';
 export function shouldAskMarketingConsent(consent: MarketingConsent): boolean {
   if (consent.optoutOfEmails) return false;
   return consent.consentStatus === 'No Opt-in' || consent.consentStatus === 'Unconfirmed';
+}
+
+const DECISIONS: readonly string[] = ['Confirmed', 'Unsubscribed'] satisfies ConsentDecision[];
+
+/**
+ * The record with an answer saved earlier in this session, which wins over the read: Pardot can still
+ * say `No Opt-in` for a while after it accepts a decision. Anything stored that is not a decision is ignored.
+ */
+export function withSessionAnswer(consent: MarketingConsent, saved: string | null): MarketingConsent {
+  if (saved === null || !DECISIONS.includes(saved)) return consent;
+  return { ...consent, consentStatus: saved as ConsentDecision };
 }

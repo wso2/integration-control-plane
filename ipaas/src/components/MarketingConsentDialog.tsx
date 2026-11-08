@@ -29,6 +29,8 @@ import { shouldAskMarketingConsent } from '../utils/marketingConsent';
  * While the record loads, or when it cannot be read (consent not configured in this environment, or
  * any failure), nothing is shown: the prompt is optional and must never get in the way of the console.
  * The dialog cannot be dismissed without an answer. A failed save keeps it open with the error.
+ * `AppLayout` does not mount it on the Terms of Use page, so it never stacks on that dialog; it opens
+ * once the person accepts and moves on.
  */
 export default function MarketingConsentDialog(): JSX.Element | null {
   const { data: consent } = useMarketingConsent();

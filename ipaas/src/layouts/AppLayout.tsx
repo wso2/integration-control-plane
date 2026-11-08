@@ -98,7 +98,7 @@ import { visibleComponentSettingsSections } from '../constants/componentSettings
 import { useScope, broaden, narrow, newProjectUrl, newComponentUrl, hasProject, hasComponent, settingsCrossScopeUrl, resolveActiveNavId, parentGroupId, navUrl, overviewUrl, navScopeSwitchUrl, resolveResourceKey, componentKeepsPage, type Scope } from '../nav';
 import { isSettingsSectionVisible, type SettingsSectionDef } from '../constants/orgSettingsSections';
 import { trackEvent } from '../services/tracking/tracking';
-import { cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, termsOfUseUrl } from '../paths';
+import { cloudConsoleOrganizationsUrl, cloudConsoleSubscriptionsUrl, componentOverviewUrl, documentationUrl, loginUrl, orgHomeUrl, privacyPolicyUrl, projectsRedirectUrl, termsOfUseUrl } from '../paths';
 import { formatDocumentTitle, pageTitleFor } from '../utils/documentTitle';
 import { useAccessControl } from '../contexts/AccessControlContext';
 import { useCan } from '../hooks/useCan';
@@ -1106,7 +1106,8 @@ export default function AppLayout(): JSX.Element {
             </Button>
           </DialogActions>
         </Dialog>
-        <MarketingConsentDialog />
+        {/* Not over the Terms of Use dialog on the projects redirect: that one comes first, and modals never stack. */}
+        {pathname !== projectsRedirectUrl(scope.org) && <MarketingConsentDialog />}
       </AppShell.NotificationPanel>
     </AppShell>
   );

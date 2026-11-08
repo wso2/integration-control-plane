@@ -25,12 +25,16 @@ import { button, flush, renderWithScopes } from '../test/renderWithScopes';
 import type { MarketingConsent } from '../types/marketingConsent';
 
 vi.mock('../api/marketingConsent', () => ({ fetchMarketingConsent: vi.fn(), recordMarketingConsent: vi.fn() }));
+vi.mock('../auth', () => ({ useAuth: () => ({ userId: 'u1' }) }));
 
 const TITLE = 'Welcome to WSO2 Integration Platform!';
 const unanswered: MarketingConsent = { optoutOfEmails: false, consentStatus: 'No Opt-in' };
 
 let unmount = () => {};
-afterEach(() => unmount());
+afterEach(() => {
+  unmount();
+  sessionStorage.clear();
+});
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(fetchMarketingConsent).mockResolvedValue(unanswered);
@@ -119,6 +123,24 @@ describe('MarketingConsentDialog', () => {
     expect(shown()).toBe(false);
     // Pardot may not have the answer yet, so a read now could still say No Opt-in.
     expect(fetchMarketingConsent).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not ask again after a reload once this session has answered', async () => {
+    const c = await render();
+    await act(async () => button(c, 'Decline')!.click());
+    await flush();
+    unmount();
+
+    // A fresh page: the cache is gone and Pardot still says No Opt-in.
+    await render();
+    expect(fetchMarketingConsent).toHaveBeenCalledTimes(2);
+    expect(shown()).toBe(false);
+  });
+
+  it('asks another person signed in later in the same tab', async () => {
+    sessionStorage.setItem('icp:marketing_consent_answered:someone-else', 'Confirmed');
+    await render();
+    expect(shown()).toBe(true);
   });
 
   it('stays open with an error when the answer cannot be saved', async () => {

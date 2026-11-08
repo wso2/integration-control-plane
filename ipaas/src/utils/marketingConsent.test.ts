@@ -17,8 +17,8 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { shouldAskMarketingConsent } from './marketingConsent';
-import type { ConsentStatus } from '../types/marketingConsent';
+import { shouldAskMarketingConsent, withSessionAnswer } from './marketingConsent';
+import type { ConsentStatus, MarketingConsent } from '../types/marketingConsent';
 
 describe('shouldAskMarketingConsent', () => {
   it.each<[ConsentStatus, boolean]>([
@@ -32,5 +32,17 @@ describe('shouldAskMarketingConsent', () => {
 
   it('never asks a person who opted out of all WSO2 email', () => {
     expect(shouldAskMarketingConsent({ optoutOfEmails: true, consentStatus: 'No Opt-in' })).toBe(false);
+  });
+});
+
+describe('withSessionAnswer', () => {
+  const read: MarketingConsent = { optoutOfEmails: false, consentStatus: 'No Opt-in' };
+
+  it.each(['Confirmed', 'Unsubscribed'] as const)('takes %s saved in this session over a read Pardot has not caught up with', (saved) => {
+    expect(withSessionAnswer(read, saved)).toEqual({ optoutOfEmails: false, consentStatus: saved });
+  });
+
+  it.each([null, '', 'No Opt-in', 'confirmed'])('keeps the read when the session holds %s', (saved) => {
+    expect(withSessionAnswer(read, saved)).toBe(read);
   });
 });

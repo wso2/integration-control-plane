@@ -1115,8 +1115,10 @@ test.describe('07b marketing consent prompt @smoke', () => {
       testInfo.annotations.push({ type: 'consent', description: `GET /marketing-consent answered ${read.status()}` });
       expect(CONSENT_READ_STATUSES, `undocumented status ${read.status()}`).toContain(read.status());
 
-      const body: unknown = read.status() === 200 ? await read.json() : null;
-      if (body !== null) expect(() => toMarketingConsent(body as BffMarketingConsent), 'the console refuses the record').not.toThrow();
+      // Every 200 goes through the mapper, a null body included: the console would get no record from it.
+      const answered = read.status() === 200;
+      const body: unknown = answered ? await read.json() : null;
+      if (answered) expect(() => toMarketingConsent(body as BffMarketingConsent), 'the console refuses the record').not.toThrow();
 
       // Presence before absence: the page renders, then the prompt matches the console's rule.
       const dialog = tab.getByRole('dialog', { name: CONSENT_DIALOG_TITLE });
