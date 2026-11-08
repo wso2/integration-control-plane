@@ -76,10 +76,8 @@ func New(ttl, stale time.Duration, opts ...Option) *Cache {
 // Get answers key from memory while it is fresh, and otherwise from fill. A copy
 // stands in for a fill that fails with upstream.ErrUnavailable, up to stale old.
 func (c *Cache) Get(ctx context.Context, key string, fill func(context.Context) (any, error)) (any, error) {
-	c.mu.Lock()
-	held, ok := c.entries[key]
-	c.mu.Unlock()
-	if ok && c.now().Sub(held.fetchedAt) < c.ttl {
+	held, ok := c.lookup(key)
+	if ok && c.fresh(held) {
 		return held.value, nil
 	}
 
@@ -87,6 +85,11 @@ func (c *Cache) Get(ctx context.Context, key string, fill func(context.Context) 
 	// can't abort the others.
 	fillCtx := context.WithoutCancel(ctx)
 	val, err, _ := c.group.Do(key, func() (any, error) {
+		// A caller that missed just before another fill finished and left the
+		// group would otherwise fill the key a second time.
+		if stored, ok := c.lookup(key); ok && c.fresh(stored) {
+			return stored.value, nil
+		}
 		value, err := fill(fillCtx)
 		if err != nil {
 			return nil, err
@@ -102,6 +105,17 @@ func (c *Cache) Get(ctx context.Context, key string, fill func(context.Context) 
 		return nil, err
 	}
 	return val, nil
+}
+
+func (c *Cache) lookup(key string) (entry, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	held, ok := c.entries[key]
+	return held, ok
+}
+
+func (c *Cache) fresh(held entry) bool {
+	return c.now().Sub(held.fetchedAt) < c.ttl
 }
 
 // store keeps value, and at most once per keep drops the entries too old to serve, fresh or stale.
