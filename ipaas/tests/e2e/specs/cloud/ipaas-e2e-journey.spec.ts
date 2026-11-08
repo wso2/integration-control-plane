@@ -358,7 +358,8 @@ test.describe('04b endpoint and consumers @smoke', () => {
   });
 
   test('TC_IP_DEPLOY_007 the deployment settles out of In Progress into Active', async () => {
-    test.setTimeout(DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    // deployLatestBuild alone can take about five minutes (two waits for the button, a reload, the enable and the alert).
+    test.setTimeout(DEPLOY_TIMEOUT_MS + 7 * 60_000);
     await expect(envCard(page), `no ${ENV} card on ${SAMPLE}`).toBeVisible({ timeout: 2 * 60_000 });
     await deployLatestBuild(page);
     await expect(deploymentStatus(page)).toHaveText(/^(Active|Error)$/, { timeout: DEPLOY_TIMEOUT_MS });

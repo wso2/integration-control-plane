@@ -104,6 +104,8 @@ export async function deployLatestBuild(page: Page): Promise<void> {
       await deploy.click();
       // The card's own alert, shown for four seconds (EnvCardShell.tsx); an error alert carries the BFF's reason instead.
       await expect(envCard(page).getByText('Deployment started successfully'), 'the deploy request was refused').toBeVisible({ timeout: 60_000 });
+      // DeployButton hides once the deployment runs the latest image, so a status read after this is the new deployment's.
+      await expect(deploy, 'the card still offers Deploy, so the deployment does not run the latest build').toBeHidden({ timeout: 2 * 60_000 });
       return;
     }
     if (pass > 0) return;
@@ -113,6 +115,7 @@ export async function deployLatestBuild(page: Page): Promise<void> {
   }
 }
 
+/** Fails unless the latest build completed and its deployment to the environment settled as Active. */
 export async function requireActiveDeployment(page: Page, name = SAMPLE): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
   const build = await waitForBuildQuiet(page);
@@ -166,34 +169,57 @@ export async function requireAutomationReady(page: Page): Promise<void> {
   await expect(envCard(page).getByRole('button', { name: 'Test', exact: true }), `${AUTOMATION} offers no Test action, so it is not deployed`).toBeEnabled({ timeout: MI_DEPLOY_TIMEOUT_MS });
 }
 
+// proxyReconciliation.ts: the generic failure, or the wording codedApiError (apiSecurity.ts) gives a known code.
+const GATEWAY_FAILURE = /^(The API gateway could not be updated|Your organization has reached its API limit|This environment takes API changes only through promotion|.+ isn’t running this release’s API)/;
+
 /**
- * The card's proxy reconciliation alert (proxyReconciliation.ts) when the API never reached the gateway.
- * Retried once, as a user would; answers the alert's text if it is still there, or null.
+ * The card's proxy reconciliation alert (EnvCardBody.tsx) when the API never reached the gateway.
+ * Retried once, as a user would; answers the alert's text if a failure remains, or null.
  */
 export async function gatewayFailure(page: Page): Promise<string | null> {
-  const alert = envCard(page)
-    .getByRole('alert')
-    .filter({ hasText: /^The API gateway could not be updated/ });
-  const shown = await alert
+  const alerts = envCard(page).getByRole('alert');
+  const retry = alerts.getByRole('button', { name: /^Retry(ing…)?$/ });
+  // A failed retry replaces the alert's text with the retry's error but keeps its Retry action.
+  const failure = alerts
+    .filter({ hasText: GATEWAY_FAILURE })
+    .or(alerts.filter({ has: retry }))
+    .first();
+  const updating = alerts.filter({ hasText: 'Updating the API gateway…' });
+  const text = async () => (await failure.textContent())?.replace(/Retry(ing…)?$/, '').trim() || 'the API gateway could not be updated';
+
+  const shown = await failure
     .waitFor({ state: 'visible', timeout: 10_000 })
     .then(() => true)
     .catch(() => false);
   if (!shown) return null;
-  const retry = alert.getByRole('button', { name: 'Retry', exact: true });
-  if (await retry.isVisible().catch(() => false)) {
-    await retry.click();
-    if (
-      await expect(alert)
-        .toHaveCount(0, { timeout: 2 * 60_000 })
-        .then(() => true)
-        .catch(() => false)
-    ) {
-      return null;
-    }
-  }
-  return (await alert.textContent())?.replace(/Retry(ing…)?$/, '').trim() ?? 'the API gateway could not be updated';
+  if (!(await retry.isEnabled().catch(() => false))) return text();
+
+  const before = await text();
+  await retry.click();
+  // Accepted: the gateway update restarts, or clears at once. Refused: the alert names the retry's error instead.
+  const state = async (): Promise<string> => {
+    if (await updating.isVisible()) return 'updating';
+    if (!(await failure.isVisible())) return 'cleared';
+    return (await text()) !== before ? 'refused' : '';
+  };
+  let outcome = '';
+  await expect
+    .poll(async () => (outcome = await state()), { timeout: 60_000 })
+    .not.toBe('')
+    .catch(() => {});
+  if (outcome === 'cleared') return null;
+  if (outcome !== 'updating') return text();
+
+  // Wait for the reconciliation to end before reading its result.
+  await expect(updating, 'the API gateway update did not finish').toBeHidden({ timeout: 2 * 60_000 });
+  const failedAgain = await failure
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  return failedAgain ? text() : null;
 }
 
+/** A consumer's row on the env card, found from its name up to the row that carries Manage. */
 export function consumerRow(page: Page, name: string): Locator {
   return envCard(page).getByText(name, { exact: true }).locator('xpath=ancestor::*[.//button[normalize-space()="Manage"]][1]');
 }
