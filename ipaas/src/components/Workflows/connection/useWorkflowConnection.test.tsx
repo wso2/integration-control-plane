@@ -92,6 +92,8 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     mode: 'api-key',
     authHeader: 'X-API-Key',
     apiKey: 'key-1',
+    // Minted as the test starts: a refusal of it is not a stale key.
+    keyMintedAt: Date.now(),
     isAuthorized: true,
     isMinting: false,
     canCreateKey: true,
@@ -103,6 +105,7 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     isUnavailable: false,
     securityError: null,
     mintKey: vi.fn(async () => null),
+    renewKey: vi.fn(async () => null),
     retryUnauthorized: vi.fn(),
     ...patch,
   };
@@ -285,21 +288,23 @@ describe('useWorkflowConnection', () => {
 
   it('reports refused credentials when a fresh key is refused, without minting again', async () => {
     const mintKey = vi.fn(async () => null);
-    access.reset(keyAccess({ mintKey }));
+    const renewKey = vi.fn(async () => null);
+    access.reset(keyAccess({ mintKey, renewKey }));
     fetchMock.mockResolvedValue(json({}, 401));
     mount();
     await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'refused', message: 'The gateway rejected the test key. It may have expired.' }));
     expect(mintKey).not.toHaveBeenCalled();
+    expect(renewKey).not.toHaveBeenCalled();
   });
 
-  it('mints again when an old key is refused, then reads the refused data again with the new one', async () => {
+  it('renews an old key when it is refused, then reads the refused data again with the new one', async () => {
     const start = Date.now();
     const now = vi.spyOn(Date, 'now').mockReturnValue(start);
-    const mintKey = vi.fn(async () => {
+    const renewKey = vi.fn(async () => {
       access.set({ apiKey: 'key-2' });
       return 'key-2';
     });
-    access.reset(keyAccess({ mintKey }));
+    access.reset(keyAccess({ renewKey }));
     mount();
     await vi.waitFor(() => expect(status()).toBe('ready'));
     const client = readyClient();
@@ -309,7 +314,9 @@ describe('useWorkflowConnection', () => {
     fetchMock.mockResolvedValueOnce(json({}, 401));
     await queryClient.fetchQuery({ queryKey: workflowKeys.definitions(SCOPE), queryFn: () => client.definitions.list(), retry: false }).catch(() => undefined);
 
-    await vi.waitFor(() => expect(mintKey).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(renewKey).toHaveBeenCalledTimes(1));
+    // Only the refused key is renewed: one another view had renewed already would be reused.
+    expect(renewKey).toHaveBeenCalledWith('key-1');
     // The probe is read again, now with the new key.
     await vi.waitFor(() => expect(sentTo(`${GATEWAY_URL}/runtime`).at(-1)?.['X-API-Key']).toBe('key-2'));
     expect(status()).toBe('ready');
