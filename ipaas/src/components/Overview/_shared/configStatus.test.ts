@@ -88,7 +88,6 @@ describe('hasMissingRequiredConfigs', () => {
       endpointLinks: { 'wso2/sftask:sfSalesBaseUrl': 'shop/basket/items', 'wso2/sftask:sfSalesAuthClientId': 'shop/basket/items' },
     };
     expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, endpoints, 'development')).toBe(false);
-    // And outside the first environment: the address is resolved there too.
     expect(hasMissingRequiredConfigs({ jsonSchema, configurations: [] }, endpoints, 'production')).toBe(false);
   });
 

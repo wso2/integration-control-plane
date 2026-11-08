@@ -279,7 +279,6 @@ describe('the Configure form with links', () => {
       await act(async () => button('Link ordersVerbose').click());
       const options = Array.from(document.querySelectorAll('[aria-label="Source of ordersVerbose"] li')).map((o) => o.textContent);
       expect(options).not.toContain('Basket \u00b7 items');
-      // The resource keys it can take are still offered.
       expect(options.some((o) => o?.startsWith('URL'))).toBe(true);
     } finally {
       answer.connectable = [];
@@ -383,7 +382,6 @@ describe('the Configure form with links', () => {
       await act(async () => button('Link ordersDatabaseUrl').click());
       const options = Array.from(document.querySelectorAll('[aria-label="Source of ordersDatabaseUrl"] li'));
       expect(options.map((o) => o.textContent)).toContain('Basket \u00b7 items');
-      // This project's integration is reached directly, so the pick carries no output to take.
       await act(async () => (options.find((o) => o.textContent === 'Basket \u00b7 items') as HTMLElement).click());
       expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), endpoint: 'shop/basket/items' }]);
     } finally {
@@ -422,8 +420,7 @@ describe('the Configure form with links', () => {
     expect(writes).toEqual([{ configurable: id('ordersDatabaseUrl'), ref: 'orders-db', key: 'URL' }]);
   });
 
-  // An endpoint link holds no resource key, so no other target can take it over: offering Move
-  // would only ever produce a write the BFF refuses, because the endpoint id is no resource.
+  // An endpoint link holds no resource key, so a Move could only produce a write the BFF refuses.
   it('offers only Remove for an endpoint link the build lost', async () => {
     answer.links = { ...links, usedByOrphaned: {}, orphaned: [{ target: id('ordersDbUrl'), kind: 'endpoint', ref: 'default/basket/items' }] };
     await act(async () => root.render(<Form />));

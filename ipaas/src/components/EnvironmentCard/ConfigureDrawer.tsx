@@ -513,10 +513,9 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
         };
 
-        // Deploying is what puts the saved configuration and the integration's links into a release,
-        // so it runs whether or not a build is named: without one the platform releases the workload
-        // as it stands. Naming none used to close the drawer instead, which applied nothing and said so
-        // nowhere.
+        // Deploying is what puts the saved configuration and the integration's links into a
+        // release, so it runs whether or not a build is named: with none the platform releases
+        // the workload as it stands.
         const afterSave = () => {
           deployTrack
             .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId ?? '', environmentId: actualEnvId, cronTimezone: '' })
@@ -982,10 +981,9 @@ function GenericServiceConfigureDrawer({
         onClose();
         onSaved?.();
       };
-      // Applying deploys, because a release is what carries the configuration and the
-      // integration's links to the running integration: saving alone changes nothing it reads.
-      // Where OpenChoreo releases a changed Workload itself this is redundant, so it goes
-      // whole when AUTO_DEPLOY_AVAILABLE turns true, leaving done() as afterSave.
+      // A release is what carries the configuration and the links to the running integration,
+      // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
+      // OpenChoreo releases a changed Workload itself then.
       const afterSave = () => {
         if (AUTO_DEPLOY_AVAILABLE) {
           done();
