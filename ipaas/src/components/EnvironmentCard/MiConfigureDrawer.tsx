@@ -102,7 +102,8 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
   const linkView = useMemo(() => links && formLinkView(links, envId), [links, envId]);
   const linkOf = (name: string): TargetView => (name && linkView ? linkView.target(name) : {});
   // Links apply to all environments: a linked name the form has no value for still gets a row; so does a declared one.
-  const linkedNames = useMemo(() => Object.keys((links?.sourceDefined ? links.declared : linkView?.editable ? links?.env : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
+  // The first environment edits the current links; another lists what its release runs.
+  const linkedNames = useMemo(() => Object.keys((linkView?.editable ? (links?.sourceDefined ? links.declared : links?.env) : links?.environments.find((e) => e.name === envId)?.env) ?? {}), [linkView, links, envId]);
   const linkedOnly = linkedNames.filter((n) => ![...envVars, ...secrets].some((r) => r.key.trim() === n));
 
   const handleClose = () => {
@@ -143,8 +144,12 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
     }),
     [envVars, secrets],
   );
-  // A linked name needs no value of its own; one it has stays for when the link goes.
-  const draft = useMemo(() => ({ ...named, envVars: named.envVars.filter((e) => e.value !== '' || !linkedNames.includes(e.key)) }), [named, linkedNames]);
+  // A linked name needs no value of its own; one it has, stored or typed, stays for when the link goes.
+  const draft = useMemo(() => {
+    const stored = new Map(data?.envVars.map((e) => [e.key, e.value]));
+    const envVars = named.envVars.flatMap((e) => (e.value !== '' || !linkedNames.includes(e.key) ? [e] : stored.has(e.key) ? [{ key: e.key, value: stored.get(e.key)! }] : []));
+    return { ...named, envVars };
+  }, [named, linkedNames, data]);
   // From the latest fetch, not the rows seeded on open: a secret removed elsewhere since
   // (e.g. on Configs & Secrets) has no value to keep, so its row needs a new one.
   const storedSecrets = useMemo(() => {

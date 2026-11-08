@@ -34,21 +34,24 @@ import { savedValue } from '../../../utils/savedConfig';
  * resource with values there, or where an endpoint fills it.
  */
 export function hasMissingRequiredConfigs(schemaConfig: SchemaConfigData | null | undefined, links?: IntegrationLinks, env = ''): boolean {
-  if (!schemaConfig?.jsonSchema) return false;
+  return missingRequired(schemaConfig, links, env).length > 0;
+}
+
+const missingRequired = (schemaConfig: SchemaConfigData | null | undefined, links: IntegrationLinks | undefined, env: string): string[] => {
+  if (!schemaConfig?.jsonSchema) return [];
   try {
     const schema = JSON.parse(atob(schemaConfig.jsonSchema));
     const allRequired = getRequiredPathsAtLevel(schema).filter((p) => !p.includes('[*]') && !p.includes('.*'));
-    if (allRequired.length === 0) return false;
     const filledKeys = new Set([
       ...(schemaConfig.configurations ?? []).filter((c) => savedValue(c) !== undefined).map((c) => c.key),
       ...linkedWithValues(links, env),
       ...linkedToEndpoints(links),
     ]);
-    return allRequired.some((k) => !filledKeys.has(k));
+    return allRequired.filter((k) => !filledKeys.has(k));
   } catch {
-    return false;
+    return [];
   }
-}
+};
 
 const release = (links: IntegrationLinks | undefined, env: string) => links?.environments.find((e) => e.name === env);
 const hasValues = (links: IntegrationLinks, ref: string, env: string) => !!links.resources.find((r) => r.id === ref)?.valuesIn.includes(env);
@@ -67,12 +70,15 @@ export function useMissingRequiredConfigs(schemaConfig: SchemaConfigData | null 
 }
 
 /**
- * Why env can't start until configured, for a card to say beside "Configure to Continue": the linked resources its
- * release uses without values there, else the required configurables without one. Undefined when nothing is missing.
+ * Why env can't start until configured, for a card to say beside "Configure to Continue": the resources without values
+ * there that env's release links to a required configurable without a value, else just those configurables. A resource
+ * without values that feeds none doesn't hold env back. Undefined when nothing is missing.
  */
 export function missingConfigsReason(schemaConfig: SchemaConfigData | null | undefined, links?: IntegrationLinks, env = ''): string | undefined {
-  if (!hasMissingRequiredConfigs(schemaConfig, links, env)) return undefined;
-  const withoutValues = (release(links, env)?.resources ?? []).filter((r) => !hasValues(links!, r.ref, env)).map((r) => links!.resources.find((x) => x.id === r.ref)?.displayName ?? r.ref);
+  const missing = missingRequired(schemaConfig, links, env);
+  if (missing.length === 0) return undefined;
+  const refs = new Set(Object.entries(release(links, env)?.configurables ?? {}).flatMap(([id, { ref }]) => (missing.includes(configKey(id)) ? [ref] : [])));
+  const withoutValues = [...refs].map((ref) => links!.resources.find((r) => r.id === ref)?.displayName ?? ref);
   if (withoutValues.length === 0) return `Required configurables have no values in ${env}.`;
   return `${withoutValues.join(', ')} ${withoutValues.length === 1 ? 'has' : 'have'} no values in ${env}. Add them on WSO2 Cloud.`;
 }

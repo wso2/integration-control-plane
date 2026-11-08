@@ -41,7 +41,7 @@ const links: IntegrationLinks = {
   environments: [environment('development'), environment('production')],
 };
 const writes = vi.hoisted(() => [] as unknown[]);
-const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0 }));
+const answer = vi.hoisted(() => ({ links: undefined as IntegrationLinks | undefined, pending: false, readFailed: false, cached: true, refetches: 0, envVars: [{ key: 'DB_URL', value: 'jdbc:x' }] }));
 vi.mock('../../hooks/useConfiguration', () => ({
   useIntegrationLinks: () => ({
     data: answer.cached ? (answer.links ?? links) : undefined,
@@ -53,7 +53,7 @@ vi.mock('../../hooks/useConfiguration', () => ({
   useLinkWrite: () => ({ isError: false, isPending: answer.pending, mutate: (input: { target: unknown }) => writes.push(input.target) }),
 }));
 vi.mock('../../hooks/useMiConfig', () => ({
-  useMiConfig: () => ({ data: { envVars: [{ key: 'DB_URL', value: 'jdbc:x' }], secrets: [], legacySecrets: [], shadowedLegacySecrets: [] }, isLoading: false, isError: false }),
+  useMiConfig: () => ({ data: { envVars: answer.envVars, secrets: [], legacySecrets: [], shadowedLegacySecrets: [] }, isLoading: false, isError: false }),
   useSaveMiConfig: () => ({ isPending: false, mutate: vi.fn() }),
 }));
 vi.mock('../../hooks/useDeployments', () => ({ useEnvEndpoints: () => ({ data: [] }) }));
@@ -78,7 +78,7 @@ const supplied = (name: string) => (document.querySelector(`input[aria-label="${
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
   writes.length = 0;
-  Object.assign(answer, { links: undefined, pending: false, readFailed: false, cached: true, refetches: 0 });
+  Object.assign(answer, { links: undefined, pending: false, readFailed: false, cached: true, refetches: 0, envVars: [{ key: 'DB_URL', value: 'jdbc:x' }] });
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
@@ -130,6 +130,23 @@ describe('the MI Configure form', () => {
     expect(supplied('GITHUB_TOKEN')).toBe('from workload.yaml (GitHub Acme · GITHUB_AUTH_TOKEN)');
     expect(document.querySelectorAll('[aria-label^="Link "]')).toHaveLength(0);
     expect((document.querySelector('[aria-label="Remove GITHUB_TOKEN"]') as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("lists what production's release runs after development's workload.yaml renamed a variable", async () => {
+    answer.links = { ...links, env: {}, used: {}, sourceDefined: true, declared: { NEW_TOKEN: github } };
+    await render('production');
+    expect(supplied('GITHUB_TOKEN')).toBe('from workload.yaml (GitHub Acme · GITHUB_AUTH_TOKEN)');
+    expect(Array.from(document.querySelectorAll('input')).map((i) => i.value)).not.toContain('NEW_TOKEN');
+  });
+
+  it('opens clean, Save disabled, when a linked variable also has a stored empty value', async () => {
+    answer.envVars = [
+      { key: 'GITHUB_TOKEN', value: '' },
+      { key: 'DB_URL', value: 'jdbc:x' },
+    ];
+    await render('development');
+    expect(supplied('GITHUB_TOKEN')).toBe('from GitHub Acme · GITHUB_AUTH_TOKEN');
+    expect(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Save')?.disabled).toBe(true);
   });
 
   it('offers no link action while a link write is on its way', async () => {

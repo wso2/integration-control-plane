@@ -40,7 +40,7 @@ const links: IntegrationLinks = {
   usedByOrphaned: { 'orders-db|URL': id('ordersDbUrl') },
   connections: [
     { id: id('github'), link: 'github-acme', suggestions: ['github-acme', 'github-sandbox', 'github-corp'], fields: [{ configurable: id('githubAuthToken'), key: 'GITHUB_AUTH_TOKEN' }] },
-    { id: id('backup'), suggestions: ['github-sandbox', 'github-corp'], fields: [{ configurable: id('backupToken'), key: 'GITHUB_AUTH_TOKEN' }] },
+    { id: id('backup'), suggestions: ['github-sandbox', 'github-corp'], fields: [{ configurable: id('backupToken') }] },
   ],
   fieldLinks: {},
   endpointLinks: {},
@@ -147,17 +147,26 @@ describe('the Configure form with links', () => {
     expect(writes).toEqual([{ connection: id('github') }]);
   });
 
-  it('offers the resources that suit a connection in its title bar, except one whose key another target uses', async () => {
+  it("offers the resources that suit an unlinked connection in its title bar, leaving a used key to the service's refusal", async () => {
     const select = container.querySelector('[aria-label="Link backup"]') as HTMLElement;
     expect(select.textContent).toBe('Link… (2 match)');
     await act(async () => select.dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
     const options = Array.from(document.querySelectorAll('[role="option"]'));
     expect(options.map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
       ['GitHub Sandbox', null],
-      ['GitHub Corp (key in use)', 'true'],
+      ['GitHub Corp', null],
     ]);
     await act(async () => (options[0] as HTMLElement).click());
     expect(writes).toEqual([{ connection: id('backup'), ref: 'github-sandbox' }]);
+  });
+
+  it("offers a linked connection's other resources, except one whose key another target uses", async () => {
+    await act(async () => (container.querySelector('[aria-label="Link github"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+    expect(Array.from(document.querySelectorAll('[role="option"]')).map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+      ['GitHub Acme', null],
+      ['GitHub Sandbox', null],
+      ['GitHub Corp (key in use)', 'true'],
+    ]);
   });
 
   it('offers a resource whose key only a link the build lost holds, as for a renamed connection', async () => {
@@ -166,8 +175,9 @@ describe('the Configure form with links', () => {
     Object.assign(links, { used: rest, usedByOrphaned: { ...usedByOrphaned, 'github-corp|GITHUB_AUTH_TOKEN': id('ordersDbUrl') } });
     try {
       await act(async () => root.render(<Form />));
-      await act(async () => (container.querySelector('[aria-label="Link backup"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
+      await act(async () => (container.querySelector('[aria-label="Link github"]') as HTMLElement).dispatchEvent(new MouseEvent('mousedown', { bubbles: true })));
       expect(Array.from(document.querySelectorAll('[role="option"]')).map((o) => [o.textContent, o.getAttribute('aria-disabled')])).toEqual([
+        ['GitHub Acme', null],
         ['GitHub Sandbox', null],
         ['GitHub Corp', null],
       ]);

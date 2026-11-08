@@ -135,9 +135,11 @@ export default function DeployEnvironmentCardBody({
             <Typography variant="caption" color="error.main">
               {missingConfigsReason}
             </Typography>
-            <Button size="small" variant="outlined" color="error" startIcon={<Settings size={14} />} onClick={onConfigClick}>
-              Configure to Continue
-            </Button>
+            {onConfigClick && (
+              <Button size="small" variant="outlined" color="error" startIcon={<Settings size={14} />} onClick={onConfigClick}>
+                Configure to Continue
+              </Button>
+            )}
           </Stack>
         )}
       </Stack>
