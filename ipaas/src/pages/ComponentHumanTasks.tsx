@@ -29,9 +29,9 @@ import { ComingSoonInline } from './ComingSoon';
  * Human tasks as the console can't serve them yet, for the environment shown, with the way to them in the User
  * Portal there: enable it, publish the workflow to it, or open it.
  */
-function HumanTasksComingSoon({ scope, component, environment }: WorkflowPagePlaceholderProps): JSX.Element {
+function HumanTasksComingSoon({ component, environment }: WorkflowPagePlaceholderProps): JSX.Element {
   const portalServed = useUserPortalServed(environment.id);
-  return <ComingSoonInline description={humanTasksComingSoon(portalServed)} action={portalServed && <UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} />} />;
+  return <ComingSoonInline description={humanTasksComingSoon(portalServed)} action={portalServed && <UserPortalPrompt componentId={component.id} environment={environment} />} />;
 }
 
 /** The work queue of a workflow integration, under Operate at `.../human-tasks`: everything waiting on a person. */

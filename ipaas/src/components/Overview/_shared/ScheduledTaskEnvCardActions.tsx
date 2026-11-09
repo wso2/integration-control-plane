@@ -29,9 +29,11 @@ import NextRunLabel from '../../NextRunLabel';
 import ScheduleButton from './ScheduleButton';
 import { Scopes } from '../../../constants/permissions';
 import { useCan } from '../../../hooks/useCan';
+import type { ScheduleKind } from '../../../types/schedule';
 
 /**
- * Automation's right-header slot. Test only leaves the card when the task takes runtime arguments.
+ * The right-header slot of a scheduled task: an automation's, or with `scheduleKind="ingestion"` a
+ * knowledge base data source's. Test only leaves the card when the task takes runtime arguments.
  */
 export default function EnvCardActions({
   component,
@@ -48,7 +50,8 @@ export default function EnvCardActions({
   deploymentStatusV2,
   onNotify,
   onTrigger,
-}: EnvCardActionsProps): ReactNode {
+  scheduleKind = 'automation',
+}: EnvCardActionsProps & { scheduleKind?: ScheduleKind }): ReactNode {
   const queryClient = useQueryClient();
 
   const { data: scheduleConfig } = useExecutionConfigs(component.id, releaseId, env.id);
@@ -104,6 +107,7 @@ export default function EnvCardActions({
         versionId={versionId}
         deploymentPipelineId={deploymentPipelineId}
         hasSchedule={!!scheduleConfig?.cronjobFrequency}
+        kind={scheduleKind}
         disabled={actionsDisabled}
         disabledReason={blockedReason}
         onSaveSuccess={() => onNotify({ text: 'Schedule updated successfully', severity: 'success' })}

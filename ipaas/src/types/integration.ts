@@ -144,8 +144,8 @@ export interface EnvCardBodyProps extends EnvCardSlotProps {
   onTriggerResolved: () => void;
 }
 
-/** Optional footer slot, rendered below the body: the User Portal row, for the types the portal shows. */
-export type EnvCardFooterProps = EnvCardSlotProps;
+/** An action the loader adds in the card's footer, below the body: the User Portal's, for the types the portal shows. */
+export type EnvCardSharedActionProps = EnvCardSlotProps;
 
 /**
  * Full-header escape hatch for types whose header differs a lot from the
@@ -189,8 +189,9 @@ export interface HeaderActionsProps {
  *     around them.
  *   - escape hatch: provide `CustomHeader` to take over the whole header.
  *
- * `EnvCardBody` is the type's content (the shell wraps it in the Card frame);
- * `EnvCardFooter` is an optional below-body slot. A type may instead provide
+ * `EnvCardBody` is the type's content (the shell wraps it in the Card frame).
+ * The loader may add `EnvCardSharedAction`, rendered in the card's footer under either
+ * header mode. A type may instead provide
  * `CustomOverview` to bypass the env-card concept entirely (Tailscale-style).
  *
  * Any slot a type doesn't need is omitted — no null-returning placeholders.
@@ -204,14 +205,15 @@ export interface IntegrationModule {
   EnvCardActions?: ComponentType<EnvCardActionsProps>;
   /** Replaces the shared Deploy action, for a type whose deploy waits on more than a build. */
   DeployAction?: ComponentType<DeployActionProps>;
+  /** Added by the loader and rendered in the card's footer, never set by a type (see `useIntegrationModule`). */
+  EnvCardSharedAction?: ComponentType<EnvCardSharedActionProps>;
   /** Integration-level actions under the header's Open in Cloud Editor button. */
   HeaderActions?: ComponentType<HeaderActionsProps>;
   // header — full escape hatch (replaces the generic frame header)
   CustomHeader?: ComponentType<CustomHeaderProps>;
 
-  // body + footer
+  // body
   EnvCardBody?: ComponentType<EnvCardBodyProps>;
-  EnvCardFooter?: ComponentType<EnvCardFooterProps>;
 
   // above-cards slot + full-overview escape hatch
   OverviewHeaderExtras?: ComponentType<OverviewHeaderSlotProps>;

@@ -61,7 +61,7 @@ beforeEach(() => {
 async function prompt(scopes: string[]) {
   const r = await renderWithScopes(
     <MemoryRouter>
-      <UserPortalPrompt orgHandler="acme" componentId="orders" environment={{ id: 'production', name: 'Production', critical: true }} />
+      <UserPortalPrompt componentId="orders" environment={{ id: 'production', name: 'Production', critical: true }} />
     </MemoryRouter>,
     scopes,
   );
@@ -115,7 +115,7 @@ describe('the way to a workflow in the User Portal', () => {
     function Switching() {
       const [env, setEnv] = useState('production');
       show = setEnv;
-      return <UserPortalPrompt orgHandler="acme" componentId="orders" environment={{ id: env, name: env === 'production' ? 'Production' : 'Development', critical: false }} />;
+      return <UserPortalPrompt componentId="orders" environment={{ id: env, name: env === 'production' ? 'Production' : 'Development', critical: false }} />;
     }
     const r = await renderWithScopes(
       <MemoryRouter>

@@ -20,7 +20,6 @@ import { expect, test as setup, type Page } from '@playwright/test';
 import { mkdir, writeFile } from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { waitForOTP } from './helpers/gmail.js';
 import { projectNameFor } from './helpers/journey-project.js';
 import { fillSecret, readSecret } from './helpers/secrets.js';
 import { parkSessionStorage, rejectCookieBanner } from './helpers/session-storage.js';
@@ -63,6 +62,8 @@ async function handleTwoFactor(page: Page, options: { totpSecret?: string; after
   }
 
   if (!options.totpSecret) {
+    // Loaded here so the runner image, which signs in with TOTP, need not ship googleapis.
+    const { waitForOTP } = await import('./helpers/gmail.js');
     const code = await waitForOTP({
       subjectPattern: /verify your device|device verification|sign-in attempt/i,
       afterMs: options.afterMs,

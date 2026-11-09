@@ -18,7 +18,7 @@
 
 import { DEFAULT_FORWARDED_TOKEN_HEADER } from '../constants/apiConsumption';
 import type { Environment } from '../types/environment';
-import type { UserPortalRefusal } from '../types/userPortal';
+import type { UserPortalPublishability, UserPortalRefusal } from '../types/userPortal';
 import { apiErrorMessage, httpCodeOf } from './apiErrors';
 import { WORKFLOW_MANAGEMENT_API_TITLE } from './workflowIntegration';
 
@@ -29,6 +29,15 @@ export const hasSomeEnvironments = (environments: Environment[]): environments i
 
 export const USER_PORTAL_NOT_ENABLED = 'USER_PORTAL_NOT_ENABLED';
 export const USER_PORTAL_NOT_DEPLOYED = 'USER_PORTAL_NOT_DEPLOYED';
+
+/** Why a role without the deploy scope can't publish or unpublish. */
+export const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
+
+/** The environment has no User Portal, so none of the other publishing rules can be met yet. */
+export const userPortalIsOff = ({ published, reasons }: UserPortalPublishability): boolean => !published && reasons.some((r) => r.code === USER_PORTAL_NOT_ENABLED);
+
+/** A publish's scopes that the User Portal can't hold, and so its users' tokens never carry. */
+export const rejectedScopesText = (scopes: string[]): string => `The User Portal can't hold ${scopes.length === 1 ? 'this scope' : 'these scopes'}, so its users' tokens never carry ${scopes.length === 1 ? 'it' : 'them'}: ${scopes.join(', ')}.`;
 
 /** ipaas-service's User Portal error codes, each worded for the environment `env` it was refused in. */
 const MESSAGES: Record<string, (env: string) => string> = {

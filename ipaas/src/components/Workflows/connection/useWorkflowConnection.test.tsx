@@ -115,6 +115,7 @@ function keyAccess(patch: Partial<EndpointTestAccess> = {}): EndpointTestAccess 
     switchToApiKey: vi.fn(async () => null),
     isUnavailable: false,
     securityError: null,
+    isResolving: false,
     mintKey: vi.fn(async () => null),
     renewKey: vi.fn(async () => null),
     retryUnauthorized: vi.fn(),

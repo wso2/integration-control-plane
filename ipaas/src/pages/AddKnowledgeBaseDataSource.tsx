@@ -21,11 +21,12 @@ import { ArrowLeft } from '@wso2/oxygen-ui-icons-react';
 import { useState, type JSX } from 'react';
 import { useParams } from 'react-router';
 import { useAppNavigate } from '../hooks/useAppNavigate';
+import { usePlanAccess } from '../hooks/useBillingOrg';
+import { SCHEDULE_POLICIES } from '../constants/scheduleLimits';
 import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBaseDataSource, useKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
-import { DAILY_INGESTION } from '../constants/ragIngestion';
 import { buildDataSourceSettings, ingestionNotice, isNameValid, type NameFields } from '../utils/knowledgeBase';
 import { isDatasourceValid } from '../utils/ragIngestion';
 import type { DatasourceConfig } from '../types/ragIngestion';
@@ -97,7 +98,7 @@ function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledge
   const [names, setNames] = useState<NameFields>({ displayName: '', name: '', description: '' });
   const [datasource, setDatasource] = useState<DatasourceConfig | null>(null);
   const [mode, setMode] = useState<IngestionMode>('scheduled');
-  const schedule = useScheduleForm(DAILY_INGESTION);
+  const schedule = useScheduleForm(null, usePlanAccess(), SCHEDULE_POLICIES.ingestion);
   const stepValid = [isNameValid(names), isDatasourceValid(datasource), mode === 'once' || schedule.isValid];
 
   const submit = () => {

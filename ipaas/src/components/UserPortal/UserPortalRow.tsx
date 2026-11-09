@@ -20,16 +20,17 @@ import { Box, Button, Chip, Skeleton, Stack, Tooltip, Typography } from '@wso2/o
 import { useState, type JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
-import { useEntryEnvironment } from '../../hooks/useEntryEnvironment';
 import { useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { shownRefusals, userPortalErrorText } from '../../utils/userPortal';
+import { DEPLOY_REFUSAL, shownRefusals, userPortalErrorText, userPortalIsOff } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
-import PublishButton, { DEPLOY_REFUSAL } from './PublishButton';
+import PublishButton from './PublishButton';
 import PublishRefusals from './PublishRefusals';
 import RejectedScopes from './RejectedScopes';
 import * as styles from './UserPortal.styles';
+import UnpublishNote from './UnpublishNote';
 import { usePublishFlow } from './usePublishFlow';
+import UserPortalOffRow from './UserPortalOffRow';
 
 interface UserPortalRowProps {
   orgHandler: string;
@@ -53,8 +54,6 @@ interface UserPortalRowProps {
  */
 export default function UserPortalRow({ orgHandler, projectId, componentId, environment, envName, isWorkflow = false }: UserPortalRowProps): JSX.Element | null {
   const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
-  const entry = useEntryEnvironment(projectId, environment);
-  const keepsPortalSignIn = isWorkflow && !entry.loading && !entry.isEntry;
   const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
@@ -75,6 +74,9 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
       </Stack>
     );
   }
+
+  // With no portal in the environment, none of the other rules can be met yet, so the row asks only for one.
+  if (userPortalIsOff(data)) return <UserPortalOffRow orgHandler={orgHandler} envName={envName} />;
 
   const reasons = shownRefusals(data.reasons);
   const pending = publish.isPending || unpublish.isPending;
@@ -111,7 +113,7 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
         {action}
       </Stack>
 
-      {!data.published && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={envName} orgHandler={orgHandler} />}
+      {!data.published && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={envName} />}
 
       {/* An unpublish failure shows in its confirm dialog, and so does a publish that was confirmed; each stays open on it. */}
       {publish.error && (
@@ -125,20 +127,7 @@ export default function UserPortalRow({ orgHandler, projectId, componentId, envi
 
       {confirmUnpublish && (
         <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
-          <Typography variant="body2">The User Portal&apos;s users no longer see this integration there.{isWorkflow ? '' : ' The integration keeps running.'}</Typography>
-          {isWorkflow && (
-            <Typography variant="body2" sx={styles.dialogBodySx}>
-              The workflow is redeployed in {envName} so its Workflow Management API takes the console&apos;s API key again.{' '}
-              {keepsPortalSignIn ? (
-                <>
-                  {envName} takes its API security from {entry.entryEnvironmentName} by promotion, though, so the gateway keeps taking only User Portal sign-ins here, and the console&apos;s workflow views stay off. To turn them on again, put the API back on
-                  API key in {entry.entryEnvironmentName}, as unpublishing the workflow there does, then promote it here.
-                </>
-              ) : (
-                <>The console&apos;s workflow views work there again.</>
-              )}
-            </Typography>
-          )}
+          <UnpublishNote isWorkflow={isWorkflow} projectId={projectId} environment={environment} envName={envName} />
           {unpublish.isError && (
             <Typography variant="body2" color="error" sx={styles.dialogErrorSx}>
               {userPortalErrorText(unpublish.error, envName)}

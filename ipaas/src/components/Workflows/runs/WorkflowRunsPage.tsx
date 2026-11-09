@@ -79,7 +79,7 @@ function MessageRow({ children }: { children: ReactNode }): JSX.Element {
  * back for both. The status and the definition are held in the URL (`?status=`, `?type=`), so an
  * overview figure links to them and the page follows a later link.
  */
-export default function WorkflowRunsPage({ scope, component, environment, api }: WorkflowPageSlotProps): JSX.Element {
+export default function WorkflowRunsPage({ component, environment, api }: WorkflowPageSlotProps): JSX.Element {
   const portalServed = useUserPortalServed(environment.id);
   const { client } = api;
   const { scopeId } = api.connection;
@@ -417,7 +417,7 @@ export default function WorkflowRunsPage({ scope, component, environment, api }:
 
       <StartWorkflowDialog open={startOpen} api={client} scopeId={scopeId} definitions={definitions} onClose={() => setStartOpen(false)} onViewRun={({ workflowType, runId }) => goToWorkflowRuns({ workflowType, envId: environment.id, runId })} />
 
-      <WorkflowRunDetailDrawer run={shownRun} api={api} onClose={() => setSelectedRun(null)} comingSoonAction={portalServed ? <UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} /> : undefined} />
+      <WorkflowRunDetailDrawer run={shownRun} api={api} onClose={() => setSelectedRun(null)} comingSoonAction={portalServed ? <UserPortalPrompt componentId={component.id} environment={environment} /> : undefined} />
     </Box>
   );
 }

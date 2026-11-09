@@ -113,6 +113,10 @@ export function codedApiError(error: unknown): string {
       return entry ? `This environment takes API changes only through promotion. Make the change in ${entry}, then promote.` : 'This environment takes API changes only through promotion. Make the change in the first environment, then promote.';
     case 'APIP_SOURCE_BUILD_UNAVAILABLE':
       return source ? `${source} isn’t running this release’s API. Deploy it there, then promote again.` : 'The source environment isn’t running this release’s API. Deploy it there, then promote again.';
+    case 'SERVED_BY_AI_GATEWAY':
+      return 'This MCP server is public through the AI gateway, so its visibility can’t be changed.';
+    case 'MCP_POLICIES_IN_AGENT_MANAGER':
+      return 'This MCP server’s gateway policies are managed on the AI gateway in Agent Manager.';
     default:
       return '';
   }

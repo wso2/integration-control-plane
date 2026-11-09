@@ -32,39 +32,14 @@ export const placeholderTitleSx = (hasSubtitle: boolean) =>
     mb: hasSubtitle ? 1 : 0,
   }) as const;
 
-export const headerRowSx = (expanded: boolean) =>
-  ({
-    mb: expanded ? 1.5 : 0,
-  }) as const;
-
-export const minWidthZeroSx = { minWidth: 0 } as const;
-
-export const noShrinkSx = { flexShrink: 0 } as const;
-
-export const statusDotSx = (color: string) =>
-  ({
-    width: 8,
-    height: 8,
-    borderRadius: '50%',
-    bgcolor: color,
-    flexShrink: 0,
-  }) as const;
-
+// Pushed to the header's right edge.
 export const logsButtonSx = {
   textTransform: 'none',
   fontSize: '0.75rem',
-  ml: 1,
+  flexShrink: 0,
+  ml: 'auto',
 } as const;
 
-export const centeredRowSx = {
-  display: 'flex',
-  justifyContent: 'center',
-  py: 2,
-} as const;
-
-export const stepperWrapSx = (hasLogsBelow: boolean) =>
-  ({
-    mb: hasLogsBelow ? 2 : 0,
-  }) as const;
-
-export const alertSx = { my: 1 } as const;
+// The gap above the divider lives inside the log panel's Collapse, so it closes with the panel
+// instead of snapping shut the moment the logs are hidden.
+export const dividerSx = { mt: 1.5, mb: 2 } as const;

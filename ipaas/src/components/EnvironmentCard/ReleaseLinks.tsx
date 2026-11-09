@@ -46,7 +46,7 @@ export function ReleaseLinks({ projectId, componentId, env }: { projectId: strin
           </Stack>
         </>
       )}
-      {release.linksNeedDeploy && <Chip label="Links need a deploy" size="small" color="info" variant="outlined" sx={{ ...chipSx, alignSelf: 'flex-start' }} />}
+      {release.linksNeedDeploy && <Chip label="Links apply on the next Apply" size="small" color="info" variant="outlined" sx={{ ...chipSx, alignSelf: 'flex-start' }} />}
       {release.valuesChanged && <Chip label="Values changed · Stop and start to apply" size="small" color="warning" variant="outlined" sx={{ ...chipSx, alignSelf: 'flex-start' }} />}
     </Stack>
   );

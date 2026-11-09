@@ -29,11 +29,13 @@ import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/use
 import { useLinkedForm } from './useLinkedForm';
 import { savedValue } from '../../utils/savedConfig';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
+import { AUTO_DEPLOY_AVAILABLE } from '../../constants/build';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCardList } from '../EndpointCardList';
+import { useAiGatewayUrls } from '../../hooks/useAiGatewayUrls';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
-import { linkableFields } from '../SchemaConfigForm/schemaUtils';
+import { addressableFields, linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -297,9 +299,10 @@ interface AutomationConfigureDrawerProps {
   releaseMgtReleaseId?: string;
   releaseMgtDeploymentId?: string;
   buildId?: string;
+  continueWithoutChanges?: boolean;
 }
 
-function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId }: AutomationConfigureDrawerProps) {
+function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componentId, envId, actualEnvId, deploymentTrackId, commitHash, orgHandler: _orgHandler, buildId, continueWithoutChanges = false }: AutomationConfigureDrawerProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -329,7 +332,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return null;
     }
   }, [data?.jsonSchema]);
-  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? linkableFields(parsedSchema) : []);
+  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? linkableFields(parsedSchema) : [], parsedSchema ? addressableFields(parsedSchema) : []);
 
   // Seed values only on open; avoid clobbering edits on background refetches.
   const seededRef = useRef(false);
@@ -512,19 +515,26 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
         };
 
+        const done = () => {
+          onClose();
+          onSaved?.();
+        };
+        // A release is what carries the configuration and the links to the running integration,
+        // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
+        // OpenChoreo releases a changed Workload itself then.
+        //
+        // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
+        // hands back to it rather than releasing first: a deploy made here is one its Cancel
+        // cannot undo, and it would release the current Workload rather than that image.
         const afterSave = () => {
-          if (buildId) {
-            deployTrack
-              .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId, environmentId: actualEnvId, cronTimezone: '' })
-              .then(() => {
-                onClose();
-                onSaved?.();
-              })
-              .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
-          } else {
-            onClose();
-            onSaved?.();
+          if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
+            done();
+            return;
           }
+          deployTrack
+            .mutateAsync({ componentId, id: deploymentTrackId, imageId: buildId ?? '', environmentId: actualEnvId, cronTimezone: '' })
+            .then(done)
+            .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to update deployment track'));
         };
 
         if (certConfigs.length === 0 && !existingCertMappings?.mappingId) {
@@ -683,6 +693,8 @@ export interface ConfigureDrawerProps {
   hideEndpoints?: boolean;
   /** A workflow integration, whose management endpoint the Endpoints step leaves out (see isUserVisibleEndpoint). */
   isWorkflow?: boolean;
+  /** An MCP server, whose endpoints the AI gateway may front instead of the API Platform. */
+  isMcpServer?: boolean;
   envTemplateId?: string;
   buildId?: string;
   /**
@@ -731,6 +743,7 @@ export default function ConfigureDrawer(props: ConfigureDrawerProps) {
         releaseMgtReleaseId={props.releaseMgtReleaseId}
         releaseMgtDeploymentId={props.releaseMgtDeploymentId}
         buildId={props.buildId}
+        continueWithoutChanges={props.continueWithoutChanges}
       />
     );
   }
@@ -754,8 +767,11 @@ function GenericServiceConfigureDrawer({
   releaseMgtReleaseId: _releaseMgtReleaseId,
   releaseMgtDeploymentId: _releaseMgtDeploymentId,
   envTemplateId,
+  buildId,
+  continueWithoutChanges = false,
   hideEndpoints = false,
   isWorkflow = false,
+  isMcpServer = false,
 }: ConfigureDrawerProps) {
   const schemaEnvId = envTemplateId ?? envId;
   // File/event integrations have no endpoints (devant: they open the
@@ -788,8 +804,10 @@ function GenericServiceConfigureDrawer({
   const { data: configGroups } = useConfigGroups(projectId, componentId, open);
   const { data: allEndpoints = [] } = useEnvEndpoints(open && !hideEndpoints ? componentId : '', open && !hideEndpoints ? versionId : '', open && !hideEndpoints && releaseId ? releaseId : '');
   const endpoints = useUserVisibleEndpoints(allEndpoints, isWorkflow);
+  const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId, envId, versionId }, open && isMcpServer && !hideEndpoints);
   const save = useSaveSchemaConfig();
   const saveCertMappings = usePostCertificateMappings();
+  const deployTrack = useDeployDeploymentTrack();
   const generateEp = useGenerateComponentEndpoints();
 
   const parsedSchema = useMemo<JSONSchema | null>(() => {
@@ -800,7 +818,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
-  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : []);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : [], parsedSchema ? addressableFields(parsedSchema) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {
@@ -974,11 +992,28 @@ function GenericServiceConfigureDrawer({
         configurations: certConfigs,
         ...(existingCertMappings?.mappingId ? { mappingId: existingCertMappings.mappingId } : {}),
       };
-      const afterSave = () => {
+      const done = () => {
         queryClient.invalidateQueries({ queryKey: ['envEndpoints'] });
         queryClient.invalidateQueries({ queryKey: ['componentDeployment'] });
         onClose();
         onSaved?.();
+      };
+      // A release is what carries the configuration and the links to the running integration,
+      // so applying deploys. Delete this branch whole when AUTO_DEPLOY_AVAILABLE turns true:
+      // OpenChoreo releases a changed Workload itself then.
+      //
+      // Configure & Deploy asks before deploying and deploys the image picked there, so Apply
+      // hands back to it rather than releasing first: a deploy made here is one its Cancel
+      // cannot undo, and it would release the current Workload rather than that image.
+      const afterSave = () => {
+        if (AUTO_DEPLOY_AVAILABLE || continueWithoutChanges) {
+          done();
+          return;
+        }
+        deployTrack
+          .mutateAsync({ componentId, id: versionId, imageId: buildId ?? '', environmentId: envId, cronTimezone: '' })
+          .then(done)
+          .catch((err: unknown) => setSaveError(err instanceof Error ? err.message : 'Failed to deploy the configuration'));
       };
       if (certConfigs.length === 0 && !existingCertMappings?.mappingId) {
         afterSave();
@@ -1103,7 +1138,7 @@ function GenericServiceConfigureDrawer({
         </Box>
       );
     }
-    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} />;
+    return <EndpointCardList endpoints={endpoints} projectId={projectId} envId={envId} onEdit={setManagingEp} onSettings={handleSettings} aiGatewayUrls={aiGateway.urls} aiGatewayPending={aiGateway.pending} />;
   };
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();
@@ -1111,7 +1146,7 @@ function GenericServiceConfigureDrawer({
   // A field marked invalid before its link loaded is no longer the form's to fill.
   const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
-  const isApplying = save.isPending || saveCertMappings.isPending;
+  const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === lastStep ? (isApplying ? 'Applying…' : 'Apply') : step === 1 && generateEp.isPending ? 'Loading…' : 'Next';
   const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);

@@ -18,7 +18,9 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { fetchBillingOrg, fetchBillingPlan } from '../api/billing';
+import { BILLING_PRODUCT_CODE } from '../constants/subscription';
 import type { BillingOrg, BillingPlan } from '../types/billing';
+import { isPaidPlan, type PlanAccess } from '../utils/billing';
 
 /** A billing read. `isError` tells a failed read apart from a missing record, which both leave the value null. */
 interface BillingRead {
@@ -52,4 +54,13 @@ export function useBillingPlan(code: string | undefined): { plan: BillingPlan | 
     retry: false,
   });
   return { plan: data ?? null, isLoading, isError, refetch: () => void refetch() };
+}
+
+/** Whether the org's plan unlocks paid features, or null while billing is read. */
+export function usePlanAccess(): PlanAccess | null {
+  const orgRead = useBillingOrg(BILLING_PRODUCT_CODE);
+  const planRead = useBillingPlan(orgRead.org?.subscription?.plan?.code);
+  if (orgRead.isError || planRead.isError) return { state: 'unavailable', retry: orgRead.isError ? orgRead.refetch : planRead.refetch };
+  if (orgRead.isLoading || planRead.isLoading) return null;
+  return { state: isPaidPlan(orgRead.org, planRead.plan) ? 'paid' : 'free' };
 }

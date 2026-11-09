@@ -57,7 +57,7 @@ const REFRESH_QUERY_KEYS = ['componentDeployment', 'envEndpoints', 'executionCon
  *   - the Refresh control.
  *
  * Everything type-specific — status dot, Configure, action buttons, body
- * content, footer — is rendered by the module's slot components, which receive
+ * content — is rendered by the module's slot components, which receive
  * the shared deployment data + callbacks via `EnvCardSlotProps` and fetch any
  * type-specific data themselves. A module whose header differs entirely ships a
  * `CustomHeader`, rendered in place of the generic `EnvCardHeader`.
@@ -136,7 +136,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
     onTrigger,
   };
 
-  const { CustomHeader, HeaderStatus, EnvCardActions, EnvCardBody, EnvCardFooter, DeployAction = DeployButton } = module;
+  const { CustomHeader, HeaderStatus, EnvCardActions, EnvCardSharedAction, EnvCardBody, DeployAction = DeployButton } = module;
   // With auto deploy off a build reaches no environment by itself, so the first one offers to deploy it.
   const autoDeployEnabled = component.deploymentTracks?.find((t) => t.id === versionId)?.autoDeployEnabled ?? false;
   const deployAction = !prevEnv && !autoDeployEnabled && !loadingDeployment ? <DeployAction {...slotProps} /> : undefined;
@@ -186,7 +186,7 @@ export default function EnvCardShell({ component, env, prevEnv, versionId, proje
 
         <ReleaseLinks projectId={projectId} componentId={component.id} env={slotProps.envTemplateId} />
 
-        {EnvCardFooter && <EnvCardFooter {...slotProps} />}
+        {EnvCardSharedAction && !loadingDeployment && <EnvCardSharedAction {...slotProps} />}
       </CardContent>
     </Card>
   );

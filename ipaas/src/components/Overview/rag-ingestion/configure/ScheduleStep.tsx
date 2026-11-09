@@ -19,6 +19,8 @@
 import { Button, CircularProgress, Stack } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { useExecutionConfigs } from '../../../../hooks/useExecutions';
+import { usePlanAccess } from '../../../../hooks/useBillingOrg';
+import { SCHEDULE_POLICIES } from '../../../../constants/scheduleLimits';
 import { useDeployDeploymentTrack } from '../../../../hooks/useDeployments';
 import ScheduleFields from '../../_shared/ScheduleFields';
 import { buildScheduleDeployInput, useScheduleForm } from '../../_shared/useScheduleForm';
@@ -42,7 +44,7 @@ interface ScheduleStepProps {
 export default function ScheduleStep({ componentId, versionId, envId, releaseId, deploymentPipelineId, buildId, onNotify }: ScheduleStepProps): JSX.Element {
   const { data: existingConfigs, isLoading } = useExecutionConfigs(componentId, releaseId, envId);
   const deployTrack = useDeployDeploymentTrack();
-  const form = useScheduleForm(existingConfigs);
+  const form = useScheduleForm(existingConfigs, usePlanAccess(), SCHEDULE_POLICIES.ingestion);
 
   const save = () => {
     deployTrack.mutate(buildScheduleDeployInput(form, { componentId, versionId, imageId: buildId, envId, deploymentPipelineId }), {

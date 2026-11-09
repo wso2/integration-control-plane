@@ -78,7 +78,7 @@ export async function waitForBuildQuiet(page: Page, quietMs = BUILD_QUIET_MS): P
   for (let pass = 0; pass < 4; pass += 1) {
     status = await waitForBuildToSettle(page);
     if (!/^Completed/.test(status)) return status;
-    const restarted = await expect(buildCard(page).getByText(STARTING_STATUS))
+    const restarted = await expect(buildCard(page).getByRole('img', { name: STARTING_STATUS }))
       .toBeVisible({ timeout: quietMs })
       .then(() => true)
       .catch(() => false);
@@ -174,7 +174,7 @@ export async function requireAutomationReady(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Latest build' })).toBeVisible({ timeout: 60_000 });
   const build = await waitForBuildQuiet(page);
   expect(build, `${AUTOMATION} build ended as ${build}`).toMatch(/^Completed/);
-  await expect(buildCard(page).getByText('Completed', { exact: true }), `${AUTOMATION}'s build card does not report Completed`).toBeVisible({ timeout: 60_000 });
+  await expect(buildCard(page).getByRole('img', { name: 'Completed', exact: true }), `${AUTOMATION}'s build card does not report Completed`).toBeVisible({ timeout: 60_000 });
 
   await dismissStrayDialog(page);
   await deployLatestBuild(page);

@@ -20,10 +20,8 @@ import { Button, CircularProgress, Tooltip } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
+import { DEPLOY_REFUSAL } from '../../utils/userPortal';
 import type { PublishFlow } from './usePublishFlow';
-
-/** Why a role can't publish to the User Portal, or unpublish from it. */
-export const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
 
 interface PublishButtonProps {
   flow: PublishFlow;

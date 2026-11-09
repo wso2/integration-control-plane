@@ -76,10 +76,24 @@ export interface EndpointCardProps {
   onSettings?: (ep: EnvEndpoint) => void;
   defaultExpanded?: boolean;
   readOnly?: boolean;
+  /**
+   * Set when Agent Manager's AI gateway fronts the endpoint, as it does an MCP server: its public proxy URL, or ''
+   * before the proxy has one. The gateway serves public callers only and the BFF refuses visibility and API settings
+   * for it, so the card offers neither and shows the proxy as the one way in.
+   */
+  aiGatewayUrl?: string;
+  /**
+   * Whether the AI gateway fronts the endpoint is still being read. Its URLs wait: shown now, an AI gateway
+   * endpoint's would be its own route, which callers are not meant to use.
+   */
+  urlsPending?: boolean;
 }
 
-export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, readOnly = false }: EndpointCardProps) {
+export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, readOnly = false, aiGatewayUrl, urlsPending = false }: EndpointCardProps) {
   const [open, setOpen] = useState(defaultExpanded);
+  const onAiGateway = aiGatewayUrl !== undefined;
+  const canEdit = !readOnly && !onAiGateway && !!onEdit;
+  const openSettings = onAiGateway ? undefined : onSettings;
   const visRows = VISIBILITY_OPTS.map((v) => {
     const url = v.key === 'Public' ? ep.publicUrl || ep.defaultPublicUrl || ep.invokeUrl || '' : v.key === 'Organization' ? ep.organizationUrl || ep.defaultOrganizationUrl || '' : ep.projectUrl || '';
     const active = ep.networkVisibilities?.length ? ep.networkVisibilities.includes(v.key) : ep.visibility === v.key;
@@ -99,7 +113,7 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
           {ep.displayName}
         </Typography>
         {/* Edit — hidden in readOnly mode */}
-        {!readOnly && onEdit && (
+        {canEdit && (
           <Tooltip title="Edit endpoint">
             <IconButton
               aria-label="Edit endpoint"
@@ -107,14 +121,14 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
               sx={{ p: 0.5, flexShrink: 0 }}
               onClick={(e) => {
                 e.stopPropagation();
-                onEdit(ep);
+                onEdit?.(ep);
               }}>
               <Pencil size={14} />
             </IconButton>
           </Tooltip>
         )}
         {/* Settings — always shown when provided (even in readOnly) */}
-        {onSettings && (
+        {openSettings && (
           <Tooltip title="API settings">
             <IconButton
               aria-label="API settings"
@@ -122,7 +136,7 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
               sx={{ p: 0.5, flexShrink: 0 }}
               onClick={(e) => {
                 e.stopPropagation();
-                onSettings(ep);
+                openSettings(ep);
               }}>
               <Settings size={14} />
             </IconButton>
@@ -159,7 +173,7 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
                 </Stack>
               ) : null,
             )}
-            {ep.networkVisibilities && ep.networkVisibilities.length > 0 && (
+            {!onAiGateway && ep.networkVisibilities && ep.networkVisibilities.length > 0 && (
               <Stack direction="row" alignItems="center" sx={{ py: 0.3 }}>
                 <Typography variant="caption" sx={{ fontWeight: 600, width: 72, flexShrink: 0 }}>
                   Visibility
@@ -174,38 +188,68 @@ export function EndpointCard({ ep, onEdit, onSettings, defaultExpanded = false, 
           </Box>
 
           {/* URLs box */}
-          {(visRows.length > 0 || fallbackUrl) && (
-            <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
-              {visRows.map((r, i) => (
-                <Box key={r.key} sx={{ px: 1.5, py: 0.75, borderBottom: i < visRows.length - 1 || !!fallbackUrl ? '1px solid' : 'none', borderColor: 'divider' }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.25 }}>
-                    {r.label} URL
-                  </Typography>
-                  <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
-                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                      {r.url}
+          {urlsPending ? null : onAiGateway ? (
+            <AiGatewayUrl url={aiGatewayUrl} />
+          ) : (
+            (visRows.length > 0 || fallbackUrl) && (
+              <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, overflow: 'hidden' }}>
+                {visRows.map((r, i) => (
+                  <Box key={r.key} sx={{ px: 1.5, py: 0.75, borderBottom: i < visRows.length - 1 || !!fallbackUrl ? '1px solid' : 'none', borderColor: 'divider' }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.25 }}>
+                      {r.label} URL
                     </Typography>
-                    <CopyBtn text={r.url} />
-                  </Stack>
-                </Box>
-              ))}
-              {fallbackUrl && (
-                <Box sx={{ px: 1.5, py: 0.75 }}>
-                  <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.25 }}>
-                    Public URL
-                  </Typography>
-                  <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
-                    <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
-                      {fallbackUrl}
+                    <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
+                      <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                        {r.url}
+                      </Typography>
+                      <CopyBtn text={r.url} />
+                    </Stack>
+                  </Box>
+                ))}
+                {fallbackUrl && (
+                  <Box sx={{ px: 1.5, py: 0.75 }}>
+                    <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.25 }}>
+                      Public URL
                     </Typography>
-                    <CopyBtn text={fallbackUrl} />
-                  </Stack>
-                </Box>
-              )}
-            </Box>
+                    <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
+                      <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+                        {fallbackUrl}
+                      </Typography>
+                      <CopyBtn text={fallbackUrl} />
+                    </Stack>
+                  </Box>
+                )}
+              </Box>
+            )
           )}
         </Box>
       </Collapse>
+    </Box>
+  );
+}
+
+/** An AI gateway endpoint's one way in: its public proxy URL, or a note while the proxy has none. */
+function AiGatewayUrl({ url }: { url: string }) {
+  return (
+    <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, px: 1.5, py: 0.75 }}>
+      <Typography variant="caption" sx={{ fontWeight: 600, display: 'block', mb: 0.25 }}>
+        Public URL
+      </Typography>
+      {url ? (
+        <Stack direction="row" alignItems="center" gap={0.5} sx={{ minWidth: 0 }}>
+          <Typography variant="caption" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
+            {url}
+          </Typography>
+          <CopyBtn text={url} />
+        </Stack>
+      ) : (
+        <Typography variant="caption" color="text.secondary">
+          Not published on the AI gateway yet.
+        </Typography>
+      )}
+      <Typography variant="caption" color="text.secondary" component="p" sx={{ mt: 0.5 }}>
+        Served publicly through the AI gateway.
+      </Typography>
     </Box>
   );
 }

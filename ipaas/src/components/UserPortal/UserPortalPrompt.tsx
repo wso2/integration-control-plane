@@ -40,7 +40,6 @@ const OUT_OF_REACH = new Set(['USER_PORTAL_NOT_PUBLISHABLE', 'USER_PORTAL_PIPELI
 const NOT_A_PORTAL_ENVIRONMENT = { code: 'USER_PORTAL_INVALID_ENVIRONMENT', message: '' };
 
 interface UserPortalPromptProps {
-  orgHandler: string;
   componentId: string;
   environment: Environment;
 }
@@ -55,7 +54,7 @@ export default function UserPortalPrompt(props: UserPortalPromptProps): JSX.Elem
   return <EnvironmentPrompt key={props.environment.id} {...props} />;
 }
 
-function EnvironmentPrompt({ orgHandler, componentId, environment }: UserPortalPromptProps): JSX.Element | null {
+function EnvironmentPrompt({ componentId, environment }: UserPortalPromptProps): JSX.Element | null {
   const [portalQuery] = useUserPortals([environment.id]);
   // The environments a User Portal can run in. Where the read fails, Enable is still offered, and refused with the reason.
   const portalEnvironments = useUserPortalEnvironments();
@@ -100,13 +99,13 @@ function EnvironmentPrompt({ orgHandler, componentId, environment }: UserPortalP
 
   // A published workflow is managed in the User Portal whatever rule it breaks now, so it is still opened there.
   const outOfReach = report.published ? [] : report.reasons.filter((r) => OUT_OF_REACH.has(r.code));
-  if (outOfReach.length > 0) return <PublishRefusals reasons={outOfReach} envName={environment.name} orgHandler={orgHandler} />;
+  if (outOfReach.length > 0) return <PublishRefusals reasons={outOfReach} envName={environment.name} />;
 
   switch (portal.state) {
     case 'not-enabled':
     case 'failed': {
       if (portalEnvironments.data && !portalEnvironments.data.some((env) => env.id === environment.id)) {
-        return <PublishRefusals reasons={[NOT_A_PORTAL_ENVIRONMENT]} envName={environment.name} orgHandler={orgHandler} />;
+        return <PublishRefusals reasons={[NOT_A_PORTAL_ENVIRONMENT]} envName={environment.name} />;
       }
       const refusal = can(Scopes.ENVIRONMENT_MANAGE) ? '' : ENABLE_REFUSAL;
       const openEnable = () => {
@@ -171,7 +170,7 @@ function EnvironmentPrompt({ orgHandler, componentId, environment }: UserPortalP
   return (
     <Stack alignItems="center" gap={1}>
       <PublishButton flow={publish} publishable={report.publishable} redeploys={report.redeploys} busy={publishability.isFetching} label="Publish to User Portal" variant="contained" size="medium" />
-      {reasons.length > 0 && <PublishRefusals reasons={reasons} envName={environment.name} orgHandler={orgHandler} />}
+      {reasons.length > 0 && <PublishRefusals reasons={reasons} envName={environment.name} />}
       {publish.error && (
         <Typography variant="caption" color="error">
           {publish.error}

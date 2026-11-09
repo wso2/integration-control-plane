@@ -3,16 +3,25 @@
 import { expect, type Page } from '@playwright/test';
 import { reseedSessionToken } from './cloud-fixtures.js';
 
-// BuildCard.tsx (statusLabel). 'Failed' also reads 'Failed while <phrase>', hence the prefix match.
+// describeBuildStatus (utils/buildProgress.ts). 'Failed' also reads 'Failed while <phrase>', and a running
+// build's name goes on to its stage ('In progress: Build source & test, stage 2 of 3'), hence prefix matches.
 export const TERMINAL_STATUS = /^(Completed|Failed|Cancelled|Timed Out)/;
-export const STARTING_STATUS = /^(Queued|In progress)$/;
+export const STARTING_STATUS = /^(Queued|In progress)\b/;
 
 /** A dev build can sit in the queue for a long while before it starts moving. */
 export const BUILD_TIMEOUT_MS = 30 * 60_000;
 
-/** The status has no role or accessible name (BuildCard.tsx), so it is matched by its text. */
+/**
+ * The build's status (BuildStatusPill.tsx): an image whose accessible name leads with the status. Its
+ * visible text names the running stage instead, so the name, not the text, is what is matched.
+ */
 export function buildStatus(page: Page) {
-  return page.getByText(/^(Queued|In progress|Completed|Failed|Cancelled|Timed Out)/).first();
+  return page.getByRole('img', { name: /^(Queued|In progress|Completed|Failed|Cancelled|Timed Out)/ }).first();
+}
+
+/** The status the build reads now, from its accessible name. */
+export async function buildStatusText(page: Page): Promise<string> {
+  return (await buildStatus(page).getAttribute('aria-label'))?.trim() ?? '';
 }
 
 /** Returns the terminal status text; reaching *a* terminal state is the contract. */
@@ -34,16 +43,16 @@ export async function waitForBuildToSettle(page: Page): Promise<string> {
 
   while (Date.now() < deadline) {
     const finished = await expect(buildStatus(page))
-      .toHaveText(TERMINAL_STATUS, { timeout: Math.min(CHUNK_MS, deadline - Date.now()) })
+      .toHaveAccessibleName(TERMINAL_STATUS, { timeout: Math.min(CHUNK_MS, deadline - Date.now()) })
       .then(() => true)
       .catch(() => false);
-    if (finished) return (await buildStatus(page).textContent())?.trim() ?? '';
+    if (finished) return buildStatusText(page);
 
     if (Date.now() >= deadline) break;
     await reseedFromConsoleOrigin(page, buildPage);
   }
 
-  throw new Error(`Build did not reach a terminal state within ${BUILD_TIMEOUT_MS / 60_000} minutes; last status: ${await buildStatus(page).textContent()}`);
+  throw new Error(`Build did not reach a terminal state within ${BUILD_TIMEOUT_MS / 60_000} minutes; last status: ${await buildStatusText(page)}`);
 }
 
 /** Reseeding writes through page.evaluate, so it only reaches the console's own storage. */

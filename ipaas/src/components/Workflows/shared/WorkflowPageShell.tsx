@@ -203,7 +203,7 @@ export default function WorkflowPageShell({ scope, title, purpose, children, pla
     body = placeholder({ scope, component, environment, environments });
   } else {
     body = (
-      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} />}>
+      <ConnectionBody api={api} purpose={purpose} portalPrompt={<UserPortalPrompt componentId={component.id} environment={environment} />}>
         {(ready) => children({ scope, component, environment, environments, api: ready })}
       </ConnectionBody>
     );

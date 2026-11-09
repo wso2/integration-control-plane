@@ -22,6 +22,7 @@ import type { EnvEndpoint } from '../../../types/component';
 import { EndpointCardList } from '../../EndpointCardList';
 import ApiSettingsDrawer from '../../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../../utils/endpoints';
+import { useAiGatewayUrls } from '../../../hooks/useAiGatewayUrls';
 
 interface EndpointsDrawerProps {
   open: boolean;
@@ -35,9 +36,12 @@ interface EndpointsDrawerProps {
   environmentId: string;
   /** The deployment track whose endpoints these are; its APIs are its own. */
   versionId?: string;
+  /** An MCP server, whose endpoints the AI gateway may front instead of the API Platform. */
+  isMcpServer?: boolean;
 }
 
-export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, projectId, componentId, environmentId, versionId }: EndpointsDrawerProps) {
+export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, envName, projectId, componentId, environmentId, versionId, isMcpServer = false }: EndpointsDrawerProps) {
+  const aiGateway = useAiGatewayUrls(endpoints, { projectId, componentId: componentId ?? '', envId: environmentId, versionId: versionId ?? '' }, open && isMcpServer && !!componentId);
   const [manageDrawerOpen, setManageDrawerOpen] = useState(false);
   const [selectedEndpoint, setSelectedEndpoint] = useState<EnvEndpoint | null>(null);
 
@@ -78,7 +82,7 @@ export default function EndpointsDrawer({ open, onClose, endpoints, isLoading, e
               </Typography>
             </Box>
           ) : (
-            <EndpointCardList endpoints={endpoints} projectId={projectId} envId={environmentId} onSettings={handleSettings} />
+            <EndpointCardList endpoints={endpoints} projectId={projectId} envId={environmentId} onSettings={handleSettings} aiGatewayUrls={aiGateway.urls} aiGatewayPending={aiGateway.pending} />
           )}
         </DrawerPanel.Body>
       </DrawerPanel>

@@ -24,7 +24,7 @@ import type { FieldLinkPicker as Picker } from './linkedFrom';
 /** The link icon at the end of a field's box: where the field gets its value, as one choice of a list. */
 export function FieldLinkPicker({ field, picker }: { field: string; picker: Picker }) {
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
-  const pick = (choice: { resource: string; key: string } | null) => {
+  const pick = (choice: { resource: string; key: string } | { endpoint: string } | null) => {
     setAnchor(null);
     picker.onPick(choice);
   };
@@ -43,6 +43,33 @@ export function FieldLinkPicker({ field, picker }: { field: string; picker: Pick
           <MenuItem selected={picker.selected === picker.first} onClick={() => pick(null)}>
             {picker.first}
           </MenuItem>
+          {!!picker.endpoints?.length && <ListSubheader sx={{ lineHeight: 2 }}>Integrations in this project</ListSubheader>}
+          {picker.endpoints?.map((e) => (
+            <MenuItem key={e.id} selected={picker.selected === e.id} disabled={!!e.unavailable} onClick={() => pick({ endpoint: e.id })}>
+              {e.name}
+              {e.unavailable && (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  {e.unavailable}
+                </Typography>
+              )}
+            </MenuItem>
+          ))}
+          {!!picker.connections?.length && <ListSubheader sx={{ lineHeight: 2 }}>Integrations in other projects</ListSubheader>}
+          {picker.connections?.flatMap((c) => [
+            <ListSubheader key={c.id} sx={{ lineHeight: 2, pl: 3 }}>
+              {c.name}
+              {c.unavailable && (
+                <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                  {c.unavailable}
+                </Typography>
+              )}
+            </ListSubheader>,
+            ...c.outputs.map((o) => (
+              <MenuItem key={`${c.id}|${o.name}`} selected={picker.selected === `${c.id}|${o.name}`} disabled={!!c.unavailable} onClick={() => pick({ endpoint: c.id, key: o.name })} sx={{ pl: 4 }}>
+                {o.name}
+              </MenuItem>
+            )),
+          ])}
           {picker.resources.flatMap((r) => [
             <ListSubheader key={r.id} sx={{ lineHeight: 2 }}>
               {r.name}

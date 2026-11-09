@@ -18,13 +18,14 @@
 
 import { Typography, type SxProps, type Theme } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
+import { rejectedScopesText } from '../../utils/userPortal';
 
 /** The scopes a publish's endpoints require that the User Portal couldn't hold, so its users' tokens never carry them. */
 export default function RejectedScopes({ scopes, sx }: { scopes: string[]; sx?: SxProps<Theme> }): JSX.Element | null {
   if (scopes.length === 0) return null;
   return (
     <Typography variant="caption" color="warning.main" component="p" sx={sx}>
-      The User Portal can&apos;t hold {scopes.length === 1 ? 'this scope' : 'these scopes'}, so its users&apos; tokens never carry {scopes.length === 1 ? 'it' : 'them'}: {scopes.join(', ')}.
+      {rejectedScopesText(scopes)}
     </Typography>
   );
 }

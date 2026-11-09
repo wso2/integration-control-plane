@@ -17,8 +17,9 @@
  */
 
 import { useMutation, useQueries, useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query';
-import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, regenerateConsumerToken, revokeConsumer, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
+import { createConsumer, createEndpointTestKey, deleteConsumer, fetchConsumers, getEndpointPolicies, getEndpointSecurity, getMcpServerTools, regenerateConsumerToken, revokeConsumer, setEndpointApiKeyAuth, setEndpointPolicies, setEndpointSecurity } from '../api/consumers';
 import type { ApiKeyResult, Consumer, CreateConsumerInput, EndpointPolicyConfig, EndpointRef, SecurityConfig, ConsumerCredential } from '../types/consumers';
+import type { McpTool } from '../types/mcp';
 
 /** Endpoint refs are only usable once every segment is known, the track included: one read before its track resolves would read the default track's API. */
 export const isCompleteRef = (ref: EndpointRef | null | undefined): ref is EndpointRef => !!ref?.componentName && !!ref.environmentName && !!ref.endpointName && ref.deploymentTrackId !== undefined;
@@ -103,6 +104,17 @@ export function useEndpointSecurity(ref: EndpointRef | null | undefined, enabled
   return useQuery<SecurityConfig>({
     queryKey: securityKey(ref),
     queryFn: () => getEndpointSecurity(ref!),
+    enabled: enabled && isCompleteRef(ref),
+    staleTime: 30_000,
+    retry: false,
+  });
+}
+
+/** The tools an MCP server on the AI gateway exposes, listed by the BFF. */
+export function useMcpServerTools(ref: EndpointRef | null | undefined, enabled = true) {
+  return useQuery<McpTool[]>({
+    queryKey: ['mcp-server-tools', ...refKey(ref)] as const,
+    queryFn: () => getMcpServerTools(ref!),
     enabled: enabled && isCompleteRef(ref),
     staleTime: 30_000,
     retry: false,
