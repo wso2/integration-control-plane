@@ -10,10 +10,10 @@
  * `browser` fixture, and a second start throws.
  */
 
-import { expect, test, type BrowserContext, type Locator, type Page } from '@playwright/test';
+import { expect, test, type BrowserContext, type Page } from '@playwright/test';
 import { AUTH_STATE_PATH, getAuthContext } from '../../helpers/auth-context.js';
 import { expectPageRendered } from '../../helpers/cloud-fixtures.js';
-import { newConsoleContext } from '../../helpers/session-storage.js';
+import { newConsoleContext, rejectCookieBanner } from '../../helpers/session-storage.js';
 import { BUILD_TIMEOUT_MS, waitForBuildToSettle } from '../../helpers/build.js';
 import { cardFor, expandSidebar, expectNavItems, openIntegration, openNavGroup, openProject } from '../../helpers/console-nav.js';
 import { fillSecret, readSecret } from '../../helpers/secrets.js';
@@ -25,10 +25,9 @@ import {
   AGENT_REPO_URL,
   AGENT_TYPE,
   AUTOMATION,
-  AUTOMATION_REPO_URL,
-  AUTOMATION_SUB_PATH,
   CLOUD_SECTIONS,
   CONSUMER,
+  DEPLOY_ACTION_MS,
   DEPLOY_TIMEOUT_MS,
   ENV,
   EXECUTE_ATTEMPTS,
@@ -42,7 +41,6 @@ import {
   NO_CONSUMERS,
   NO_SCHEDULE,
   PROBE_TIMEOUT_MS,
-  PROJECT,
   PROJECT_REMOVAL_TIMEOUT_MS,
   REDEPLOY_SETTLE_MS,
   REMOVAL_TIMEOUT_MS,
@@ -69,10 +67,12 @@ import {
 import {
   consumerRow,
   deleteAllConsumers,
+  deployLatestBuild,
   dismissStrayDialog,
   deploymentStatus,
   envCard,
   finishedExecutions,
+  gatewayFailure,
   openConsumerDrawer,
   probeEndpoint,
   requireActiveDeployment,
@@ -113,108 +113,12 @@ test.beforeAll(async ({ browser }, testInfo) => {
   // The consent prompt is a modal on every page until the e2e user answers; 07b checks it on its own.
   await keepConsentPromptAway(context);
   page = await context.newPage();
+  // Awaited for the journey's own page, so its first navigation is covered; the context listener covers pages it did not open.
+  await rejectCookieBanner(page);
 });
 
 test.afterAll(async () => {
   await context?.close();
-});
-
-// 00 — A Temporary test case: the undated IPAAS-E2E project an older suite created, which 08b cannot date and so never collects
-
-// Exact matches only: the search box merely narrows the list, and every run's own dated project starts with this name.
-async function filterToLegacyProject(page: Page): Promise<Locator> {
-  await enterOrgHome(page, orgHandler);
-  const search = page.getByPlaceholder('Search projects');
-  if (await search.isVisible({ timeout: 15_000 }).catch(() => false)) await search.fill(PROJECT);
-  return page.locator('.MuiCard-root').filter({ has: page.getByText(PROJECT, { exact: true }) });
-}
-
-/** Deletes every integration the overview still lists and waits the deletions out. */
-async function emptyLegacyProject(page: Page): Promise<number> {
-  const card = await filterToLegacyProject(page);
-  await card.first().click();
-  await expect(page.getByRole('heading', { name: PROJECT, exact: true })).toBeVisible({ timeout: 60_000 });
-  await waitForIntegrationsToLoad(page);
-  const removed = await deleteAllIntegrations(page);
-  await waitForDeletionsToFinish(page);
-  return removed;
-}
-
-/** Empties and deletes the legacy project; throws with the reason when it cannot. */
-async function sweepLegacyProject(page: Page, note: (description: string) => void): Promise<void> {
-  const card = await filterToLegacyProject(page);
-  if (
-    !(await card
-      .first()
-      .isVisible({ timeout: 15_000 })
-      .catch(() => false))
-  ) {
-    note(`no ${PROJECT} project to sweep`);
-    return;
-  }
-
-  // A project already being deleted keeps its card but loses the delete button, so it is only waited out.
-  const deleteProject = projectDeleteButton(page, PROJECT);
-  if (await appears(deleteProject)) {
-    // The card's delete stays disabled while integrations remain, so a disabled button sends the sweep back to the overview.
-    let enabled = false;
-    for (let round = 0; round < 2 && !enabled; round++) {
-      note(`removed ${await emptyLegacyProject(page)} integration(s) from ${PROJECT}`);
-      // The card fetches its integration count only once hovered.
-      await (await filterToLegacyProject(page)).first().hover();
-      enabled = await expect(deleteProject)
-        .toBeEnabled({ timeout: 30_000 })
-        .then(() => true)
-        .catch(() => false);
-    }
-    if (!enabled) throw new Error(`the project delete stayed disabled — ${PROJECT} still holds integrations`);
-
-    await deleteProject.click();
-    await confirmRemoval(page, 'Enter project name to confirm', PROJECT);
-  } else {
-    note(`${PROJECT} is already being deleted; waiting for it to finish`);
-  }
-
-  await filterToLegacyProject(page);
-  await expect(page.getByText(PROJECT, { exact: true }), `the ${PROJECT} card is still on the org home`).toHaveCount(0, { timeout: PROJECT_REMOVAL_TIMEOUT_MS });
-  note(`swept ${PROJECT}`);
-}
-
-// Below the test timeout, so a stuck sweep is skipped by its own deadline rather than failed by Playwright's.
-const LEGACY_SWEEP_BUDGET_MS = 2 * PROJECT_REMOVAL_TIMEOUT_MS;
-
-test.describe('00 sweep the legacy IPAAS-E2E project @smoke', () => {
-  test.describe.configure({ mode: 'serial' });
-
-  test('TC_IP_PROJ_008 a project named exactly IPAAS-E2E is emptied and deleted', async () => {
-    test.setTimeout(LEGACY_SWEEP_BUDGET_MS + 2 * 60_000);
-
-    // Housekeeping, not a product assertion, as in 08b: a sweep that cannot finish is skipped with its reason.
-    const reason = (error: unknown): string => (error instanceof Error ? error.message.split('\n')[0] : String(error));
-    const note = (description: string): void => {
-      test.info().annotations.push({ type: 'fixture', description });
-    };
-
-    // A run pointed at this very project with E2E_PROJECT must not delete it out from under itself.
-    test.skip(activeProject() === PROJECT, `this run's own project is ${PROJECT}, so it is not swept`);
-
-    // Its own tab, so closing it at the deadline aborts whatever is still in flight without touching the journey's page.
-    const sweepPage = await context.newPage();
-    let deadline: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        sweepLegacyProject(sweepPage, note),
-        new Promise<never>((_, reject) => {
-          deadline = setTimeout(() => reject(new Error(`not finished within ${LEGACY_SWEEP_BUDGET_MS / 60_000} minutes`)), LEGACY_SWEEP_BUDGET_MS);
-        }),
-      ]);
-    } catch (error) {
-      test.skip(true, `${PROJECT} could not be swept, left for the next run: ${reason(error)}`);
-    } finally {
-      clearTimeout(deadline);
-      await sweepPage.close().catch(() => {});
-    }
-  });
 });
 
 // 01 — the fixture project. Everything else depends on this one.
@@ -461,8 +365,9 @@ test.describe('04b endpoint and consumers @smoke', () => {
   });
 
   test('TC_IP_DEPLOY_007 the deployment settles out of In Progress into Active', async () => {
-    test.setTimeout(DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await expect(envCard(page), `no ${ENV} card on ${SAMPLE}`).toBeVisible({ timeout: 2 * 60_000 });
+    await deployLatestBuild(page);
     await expect(deploymentStatus(page)).toHaveText(/^(Active|Error)$/, { timeout: DEPLOY_TIMEOUT_MS });
     const status = (await deploymentStatus(page).textContent())?.trim() ?? '';
     test.info().annotations.push({ type: 'deployment', description: `${SAMPLE} in ${ENV}: ${status}` });
@@ -478,9 +383,15 @@ test.describe('04b endpoint and consumers @smoke', () => {
   });
 
   test('TC_IP_CONS_001 the consumers section is offered with its security scheme', async () => {
+    // Covers gatewayFailure's Retry and its two-minute wait for the alert to clear.
+    test.setTimeout(4 * 60_000);
     const card = envCard(page);
     await expect(card.getByText(/^Consumers\s*\(\d+\)/)).toBeVisible({ timeout: 60_000 });
-    await expect(card.getByText(/^Security scheme:/)).toBeVisible();
+    // Fails on the card's own reason, rather than on a missing label, when the API never reached the gateway.
+    const failure = await gatewayFailure(page);
+    expect(failure, `the API was not provisioned on the gateway: ${failure}`).toBeNull();
+    // SecuritySummary: a collapsible Security section whose toggle names its state.
+    await expect(card.getByRole('button', { name: /^(Show|Hide) security settings$/ })).toBeVisible();
   });
 
   // Skipped where deletion is unavailable: creating and revoking are still worth exercising.
@@ -546,7 +457,7 @@ test.describe('04c test console @smoke', () => {
   });
 
   test('TC_IP_TEST_001 the build completed and the deployment is Active', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await requireActiveDeployment(page);
   });
 
@@ -563,7 +474,13 @@ test.describe('04c test console @smoke', () => {
       await expect(page.getByText(label, { exact: true }), `the console is missing the ${label} field`).toBeVisible({ timeout: 60_000 });
     }
     // Not exact: the label carries the header's name as a caption inside it, so its text is both.
-    await expect(page.getByText(/^Security header\S/), 'the console is missing the Security Header field, or it names no header').toBeVisible({ timeout: 60_000 });
+    const header = page.getByText(/^Security header\S/);
+    // TestConsole.tsx's notExposed alert: with no API on the gateway there is no header to name.
+    const notExposed = page.getByText(/^This endpoint isn’t exposed as an API yet/);
+    await expect(header.or(notExposed), 'the console is missing the Security Header field, or it names no header').toBeVisible({ timeout: 60_000 });
+    if (await notExposed.isVisible()) {
+      throw new Error(`the API was not provisioned on the gateway: ${(await notExposed.textContent())?.trim()}`);
+    }
   });
 
   test('TC_IP_TEST_004 a test key is held, or fetched on demand', async () => {
@@ -608,7 +525,7 @@ test.describe('04c test console @smoke', () => {
   });
 });
 
-// 04d — an MI automation imported from a public repository: schedule it, then watch it run
+// 04d — an MI automation deployed from Browse samples: schedule it, then watch it run
 
 async function stopSchedule(page: Page): Promise<void> {
   await envCard(page).getByRole('button', { name: 'Stop schedule' }).click();
@@ -659,44 +576,32 @@ test.describe('04d schedule an automation @smoke', () => {
     if (await stop.isVisible()) await stopSchedule(page);
   });
 
-  test('TC_IP_AUTO_001 the import form resolves the repository and its MI sub path', async () => {
+  test('TC_IP_AUTO_001 Browse samples offers the Person Lookup Automation MI sample', async () => {
     test.setTimeout(3 * 60_000);
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
-    const importButton = page.getByRole('button', { name: 'Import from a public repository' });
-    await reachCreateControl(page, importButton);
-    await importButton.click();
-    await expect(page.getByRole('heading', { name: 'Import an integration' })).toBeVisible({ timeout: 30_000 });
+    await reachCreateControl(page, samplesTab(page));
+    await samplesTab(page).click();
+    await page.getByRole('button', { name: 'Explore more samples', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Browse samples' })).toBeVisible({ timeout: 30_000 });
 
-    await page.getByRole('textbox', { name: 'Repository URL' }).fill(AUTOMATION_REPO_URL);
-    await expect(page.getByRole('combobox', { name: /^Branch/ }), 'the repository did not resolve into a branch — GitHub public API rate limit is the usual cause').toContainText('main', { timeout: 60_000 });
-
-    await page.getByRole('textbox', { name: 'Repository sub path' }).click();
-    const picker = page.getByRole('dialog').filter({ hasText: 'Repository sub path' });
-    // Prefix match: an expanded folder's name would also carry its children's.
-    await picker.getByRole('treeitem', { name: new RegExp(`^${AUTOMATION_SUB_PATH}`) }).click();
-    await picker.getByRole('button', { name: 'Continue', exact: true }).click();
-
-    await expect(page.getByRole('textbox', { name: 'Repository sub path' })).toHaveValue(`/${AUTOMATION_SUB_PATH}`);
-    await expect(page.getByRole('textbox', { name: 'Integration name' })).toHaveValue(AUTOMATION);
+    await page.getByPlaceholder('Search samples').fill(AUTOMATION);
+    // The card title appends the technology in brackets: "<name> (WSO2 Integrator: MI)".
+    await expect(page.getByText(`${AUTOMATION} (${MI_TECHNOLOGY})`, { exact: true }), `the samples catalog offers no ${AUTOMATION} MI sample`).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Quick deploy' }), 'the search should narrow the grid to this one sample').toHaveCount(1);
   });
 
-  test('TC_IP_AUTO_002 WSO2 Integrator: MI is selected and importing provisions the automation', async () => {
+  test('TC_IP_AUTO_002 Quick deploy provisions the automation and lands on its overview', async () => {
     test.setTimeout(4 * 60_000);
     test.skip(alreadyDeployed, `${AUTOMATION} is already in the project`);
+    // Unscoped on purpose: TC_IP_AUTO_001 left the search narrowed to this one card, and serial mode keeps it so.
+    await page.getByRole('button', { name: 'Quick deploy' }).click();
 
-    await expect(page.getByText(MI_TECHNOLOGY, { exact: true })).toBeVisible({ timeout: 60_000 });
-    await page.getByRole('button', { name: /^Automation/ }).click();
-
-    // The cards expose no selected state, so an enabled submit (it needs a technology) is the closest check that detection picked one.
-    const submit = page.getByRole('button', { name: 'Import integration' });
-    await expect(submit, 'Import integration stayed disabled — technology detection did not select WSO2 Integrator: MI').toBeEnabled({ timeout: 60_000 });
-    await submit.click();
-
-    await expect(page.getByRole('heading', { name: AUTOMATION }), 'the import did not land on the automation overview').toBeVisible({ timeout: 2 * 60_000 });
+    // The deploy runs through a progress page before settling on the integration's overview.
+    await expect(page.getByRole('heading', { name: AUTOMATION }), 'the deploy did not land on the automation overview').toBeVisible({ timeout: 2 * 60_000 });
   });
 
   test('TC_IP_AUTO_003 the build completed and the automation offers Schedule and Test', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + MI_DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + MI_DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await requireAutomationReady(page);
   });
 
@@ -794,7 +699,10 @@ test.describe('05 import an AI agent @smoke', () => {
 
   test('TC_IP_AGENT_004 the imported agent reports its source and type', async () => {
     await expect(page.getByText(AGENT_TYPE, { exact: true }).first()).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByRole('link', { name: new RegExp(AGENT_REPO_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')) })).toBeVisible();
+    // HeaderShell names the link by the repository path (repoPathOf) and keeps the full URL in its href.
+    const source = page.getByRole('link', { name: new RegExp(`^${new URL(AGENT_REPO_URL).pathname.slice(1)}(/|$)`) });
+    await expect(source).toBeVisible();
+    await expect(source).toHaveAttribute('href', new RegExp(`^${AGENT_REPO_URL.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(/|$)`));
   });
 
   test('TC_IP_AGENT_005 the build section collapses and expands', async () => {
@@ -825,7 +733,7 @@ test.describe('05 import an AI agent @smoke', () => {
   });
 
   test('TC_IP_AGENT_007 the build completed and the deployment is Active', async () => {
-    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
+    test.setTimeout(BUILD_TIMEOUT_MS + DEPLOY_ACTION_MS + DEPLOY_TIMEOUT_MS + 2 * 60_000);
     await requireActiveDeployment(page, agentName || AGENT_TYPE);
   });
 

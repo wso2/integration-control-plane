@@ -61,10 +61,23 @@ export async function restoreSessionStorage(context: BrowserContext): Promise<vo
   }, PARKED_SESSION_KEY);
 }
 
+/**
+ * The OneTrust cookie banner (src/services/tracking) floats over the page and swallows clicks
+ * meant for drawers and dialogs. Names are OneTrust's own, read off a run's page snapshot.
+ */
+export async function rejectCookieBanner(page: Page): Promise<void> {
+  const banner = page.getByRole('alertdialog', { name: 'Privacy' });
+  await page.addLocatorHandler(banner, async () => {
+    await banner.getByRole('button', { name: 'Reject All', exact: true }).click();
+  });
+}
+
 /** browser.newContext for the console: the saved storageState plus its sessionStorage. */
 export async function newConsoleContext(browser: Browser, options: BrowserContextOptions): Promise<BrowserContext> {
   const context = await browser.newContext(options);
   await restoreSessionStorage(context);
+  // Caught: registering on a page that has already closed (an OAuth popup, a tab a teardown shut) rejects.
+  context.on('page', (page) => void rejectCookieBanner(page).catch(() => {}));
   return context;
 }
 
