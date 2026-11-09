@@ -46,13 +46,30 @@ interface ConnectionAlertProps {
 }
 
 /** Names what a failed connect means, since a rejected or withheld response reads the same to the transport. */
+/**
+ * A failure's own message. Through the relay a refusal is ipaas-service's, which the MCP SDK reports with the
+ * response body appended ("… (HTTP 502): {\"code\":…,\"message\":…}"); its message is the readable part.
+ */
+// eslint-disable-next-line react-refresh/only-export-components
+export function relayErrorMessage(error: string): string {
+  const start = error.indexOf('{');
+  if (start < 0) return error;
+  try {
+    const body = JSON.parse(error.slice(start)) as { message?: unknown; error?: unknown };
+    const message = typeof body.message === 'string' ? body.message : typeof body.error === 'string' ? body.error : '';
+    return message || error;
+  } catch {
+    return error;
+  }
+}
+
 export default function ConnectionAlert({ error, errorKind, isTokenFetching, onGetTestKey, keyless = false }: ConnectionAlertProps): JSX.Element | null {
   if (!error) return null;
   if (keyless) {
     return (
       <Alert severity={errorKind === 'auth' ? 'warning' : 'error'}>
         <AlertTitle>{errorKind === 'auth' ? 'Not permitted' : ERROR_TITLES[errorKind ?? 'other']}</AlertTitle>
-        {errorKind === 'auth' ? KEYLESS_AUTH_HINT : error}
+        {errorKind === 'auth' ? KEYLESS_AUTH_HINT : relayErrorMessage(error)}
       </Alert>
     );
   }

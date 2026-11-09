@@ -19,7 +19,7 @@
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import ConnectionAlert from './ConnectionAlert';
+import ConnectionAlert, { relayErrorMessage } from './ConnectionAlert';
 
 let container: HTMLDivElement;
 let root: Root;
@@ -53,5 +53,17 @@ describe('ConnectionAlert', () => {
   it('shows a key-free connection its other failures as they are', async () => {
     await act(async () => root.render(<ConnectionAlert error="the MCP server did not answer" errorKind="other" keyless />));
     expect(container.textContent).toContain('the MCP server did not answer');
+  });
+});
+
+describe('relayErrorMessage', () => {
+  it("reads ipaas-service's message out of the SDK's error", () => {
+    const raw = 'Streamable HTTP error: Error POSTing to endpoint (HTTP 502): {"error":"Bad Gateway","code":"MCP_SERVER_REFUSED","message":"the MCP server refused the request"}';
+    expect(relayErrorMessage(raw)).toBe('the MCP server refused the request');
+  });
+
+  it('keeps an error with no readable body as it is', () => {
+    expect(relayErrorMessage('Failed to fetch')).toBe('Failed to fetch');
+    expect(relayErrorMessage('HTTP 502: {not json')).toBe('HTTP 502: {not json');
   });
 });

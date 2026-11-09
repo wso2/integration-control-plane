@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, MenuItem, PageContent, PageTitle, Select, Stack } from '@wso2/oxygen-ui';
+import { Alert, Box, CircularProgress, MenuItem, PageContent, PageTitle, Select, Stack } from '@wso2/oxygen-ui';
 import { useEffect, useMemo, useState, type JSX } from 'react';
 import ComingSoon from './ComingSoon';
 import McpPlayground from '../components/McpPlayground/McpPlayground';
@@ -121,6 +121,10 @@ export default function McpTest(scope: ComponentScope): JSX.Element {
         </Stack>
         {!isActive ? (
           <NotDeployedAlert status={deployment?.deploymentStatusV2} />
+        ) : access.isResolving ? (
+          <Stack alignItems="center" sx={{ py: 6 }}>
+            <CircularProgress size={24} />
+          </Stack>
         ) : relay ? (
           // Keyed by where it connects: a session is to one environment's endpoint, and the environment can
           // change while it is open, so a new target starts a new playground rather than reusing the old session.

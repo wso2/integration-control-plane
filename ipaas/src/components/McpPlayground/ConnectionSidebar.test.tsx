@@ -63,4 +63,10 @@ describe('ConnectionSidebar', () => {
     await act(async () => button?.click());
     expect(onConnect).toHaveBeenCalledOnce();
   });
+
+  it('connects through the relay before the AI gateway has given the server a URL', async () => {
+    await render({ keyless: true, url: '' });
+    expect(connectButton()?.disabled).toBe(false);
+    expect(container.querySelector('input[placeholder="Not published on the AI gateway yet"]')).not.toBeNull();
+  });
 });

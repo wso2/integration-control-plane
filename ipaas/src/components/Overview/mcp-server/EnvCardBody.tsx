@@ -203,6 +203,7 @@ function AiGatewayTools({ tools, isLoading, error, refetch }: AiGatewayToolsProp
   }
   if (error) {
     const notRoutable = httpCodeOf(error) === 'MCP_SERVER_NOT_ROUTABLE';
+    const unreachable = httpCodeOf(error) === 'MCP_SERVER_UNREACHABLE';
     const forbidden = isPermissionError(error);
     return (
       <Alert
@@ -215,7 +216,13 @@ function AiGatewayTools({ tools, isLoading, error, refetch }: AiGatewayToolsProp
             </Button>
           )
         }>
-        {notRoutable ? "This MCP server isn't reachable in this environment yet. Its tools show once it's running." : forbidden ? "You don't have permission to view this MCP server's tools." : 'Failed to fetch MCP tools.'}
+        {notRoutable
+          ? "This MCP server isn't reachable in this environment yet. Its tools show once it's running."
+          : forbidden
+            ? "You don't have permission to view this MCP server's tools."
+            : unreachable
+              ? "This MCP server didn't answer. Check that it's running, then retry."
+              : 'Failed to fetch MCP tools.'}
       </Alert>
     );
   }

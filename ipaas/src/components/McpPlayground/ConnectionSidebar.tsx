@@ -78,6 +78,9 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
         size="small"
         fullWidth
         value={url}
+        // Through the relay the page needs no URL to connect; the one shown is where agents call, which
+        // the AI gateway gives only once it has published the server.
+        placeholder={keyless ? 'Not published on the AI gateway yet' : undefined}
         InputProps={{
           readOnly: true,
           sx: readOnlyInputSx,
@@ -141,7 +144,7 @@ export default function ConnectionSidebar({ url, token, status, isTokenFetching,
           </Button>
         </Stack>
       ) : (
-        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || !url || (!token && !keyless)}>
+        <Button variant="contained" size="small" startIcon={connecting ? <CircularProgress size={14} color="inherit" /> : <Plug size={14} />} onClick={onConnect} disabled={connecting || (keyless ? false : !url || !token)}>
           {connecting ? 'Connecting…' : 'Connect'}
         </Button>
       )}
