@@ -567,7 +567,7 @@ function IntegrationsTable({
                     {filteredNonIntegrations.map((c) => {
                       const init = getInitProgress(c, isWorkspace);
                       return (
-                        <Tooltip key={c.id} followCursor title={`This component is not part of WSO2 Integration Platform. Switch to ${getNonIntegrationPlatform(c.originCloud)} to view and manage it.`}>
+                        <Tooltip key={c.id} followCursor title={`This component is not part of WSO2 Integration. Switch to ${getNonIntegrationPlatform(c.originCloud)} to view and manage it.`}>
                           <ListingTable.Row variant="card" aria-disabled tabIndex={-1} sx={{ opacity: 0.5, cursor: 'default' }}>
                             <ListingTable.Cell>
                               <ComponentNameCell component={c} isWorkspace={isWorkspace} external isExternalRepo={isExternalRepo(c)} />

@@ -18,7 +18,7 @@
 
 import { AppSwitcher, Box, type AppSwitcherAppItem } from '@wso2/oxygen-ui';
 import { House, Settings } from '@wso2/oxygen-ui-icons-react';
-import { useMemo, type JSX } from 'react';
+import { useCallback, useMemo, useState, type JSX } from 'react';
 import { buildPlatformSwitcher, CURRENT_PLATFORM } from '../config/platformSwitcher';
 import { cloudConsoleHomeUrl, cloudConsoleOrganizationsUrl } from '../paths';
 import { withBase } from '../utils/basePath';
@@ -46,24 +46,28 @@ const SAME_TAB = { target: '_self' as const };
 
 /** WSO2 Cloud's nine-dot platform switcher, leading the header as in the WSO2 Cloud and Agent Platform consoles. */
 export default function PlatformSwitcher(): JSX.Element {
+  // oxygen-ui closes the popover only for the current app and doesn't export its close handler, so a same-tab card
+  // remounts the switcher after its click, closing the popover while the next console loads.
+  const [instance, setInstance] = useState(0);
+  const closeAfterClick = useCallback(() => window.setTimeout(() => setInstance((n) => n + 1)), []);
   // Config is fixed once loaded.
   const apps = useMemo<AppSwitcherAppItem[]>(
     () =>
       // A URL-less card shows as coming soon.
-      buildPlatformSwitcher(window.API_CONFIG, withBase('/')).map(({ id, name, url }) => ({ id, name, url, icon: <PulseIcon />, ...(url ? SAME_TAB : {}) })),
-    [],
+      buildPlatformSwitcher(window.API_CONFIG, withBase('/')).map(({ id, name, url }) => ({ id, name, url, icon: <PulseIcon />, ...(url ? { ...SAME_TAB, onClick: closeAfterClick } : {}) })),
+    [closeAfterClick],
   );
   const manageLinks = useMemo(
     () =>
       [
         { id: 'cloud-home', name: 'Cloud home', url: cloudConsoleHomeUrl(), icon: <House size={18} /> },
         { id: 'settings', name: 'Settings', url: cloudConsoleOrganizationsUrl(), icon: <Settings size={18} /> },
-      ].map((link) => ({ ...link, ...SAME_TAB })),
-    [],
+      ].map((link) => ({ ...link, ...SAME_TAB, onClick: closeAfterClick })),
+    [closeAfterClick],
   );
 
   return (
-    <AppSwitcher currentAppId={CURRENT_PLATFORM}>
+    <AppSwitcher key={instance} currentAppId={CURRENT_PLATFORM}>
       <AppSwitcher.Trigger label="Switch platforms" />
       <AppSwitcher.Section label="Categories" apps={apps} />
       <AppSwitcher.Footer label="Manage" links={manageLinks} columns={2} />

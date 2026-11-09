@@ -118,9 +118,9 @@ import { expandedMenusFrom } from '../utils/sidebar';
 // The theme's paper is 78% opaque and relies on a backdrop blur, which the trial usage panel (inside the header's own
 // blur) doesn't get, so the page showed through.
 const trialPanelSx = (theme: Theme) => ({
-  backgroundColor: (theme.vars ?? theme).palette.common.white,
+  // The paper token at full opacity: white in light mode, midnight ink in dark.
+  backgroundColor: `rgb(from ${(theme.vars ?? theme).palette.background.paper} r g b / 1)`,
   backdropFilter: 'none',
-  ...theme.applyStyles('dark', { backgroundColor: (theme.vars ?? theme).palette.background.default }),
 });
 
 // Matches Agent Manager's level switcher arrow.
