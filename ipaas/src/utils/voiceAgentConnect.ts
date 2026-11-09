@@ -31,7 +31,7 @@ export const VOICE_AGENT_BACKEND_SAMPLE = `const express = require('express');
 const app = express();
 
 app.get('/getToken', async (req, res) => {
-  // Call the voice agent's getToken API, forwarding the client's params
+  // Forward the client's query parameters to the voice agent's token service.
   const url = new URL(process.env.VOICE_AGENT_TOKEN_URL);
   for (const [key, value] of Object.entries(req.query)) {
     url.searchParams.set(key, value);

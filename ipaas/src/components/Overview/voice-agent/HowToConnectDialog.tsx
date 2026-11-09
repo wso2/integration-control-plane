@@ -72,44 +72,44 @@ export default function HowToConnectDialog({ open, onClose, envName, componentId
             <Skeleton variant="rounded" height={240} />
           </Stack>
         ) : isError ? (
-          <Alert severity="error">Could not load the token service endpoint.</Alert>
+          <Alert severity="error">Couldn&apos;t load the token service endpoint.</Alert>
         ) : !tokenServiceUrl ? (
-          <Alert severity="info">The token service endpoint isn&apos;t deployed in {envName} yet.</Alert>
+          <Alert severity="info">The token service isn&apos;t deployed in {envName} yet.</Alert>
         ) : (
           <Stack gap={3.5}>
             <Typography variant="body2" color="text.secondary">
-              Connect your application through a backend service: your backend calls this voice agent&apos;s token service and passes the result to your application, which joins the voice session directly. The application never needs the token service URL itself.
+              Your application connects to this voice agent through your own backend. The backend requests a room token from the voice agent&apos;s token service and returns it to the application, which then joins the voice session directly. This keeps the token service URL out of your application.
             </Typography>
 
             <Section title="Step 1: Set up your backend">
-              <Typography variant="body2">Configure your backend with this voice agent&apos;s token service:</Typography>
+              <Typography variant="body2">Add the token service URL to your backend&apos;s environment variables.</Typography>
               <CodeViewer language="bash" showLineNumbers={false} code={voiceAgentBackendEnv(tokenServiceUrl)} />
-              <Typography variant="body2">The token service returns both the room token and the LiveKit server URL:</Typography>
+              <Typography variant="body2">The token service responds with a room token and the LiveKit server URL.</Typography>
               <CodeViewer language="json" showLineNumbers={false} showCopyButton={false} code={VOICE_AGENT_TOKEN_RESPONSE} />
               <Typography variant="body2">
-                Example Node.js server (<code>npm install express</code>):
+                The following Node.js example forwards token requests to the voice agent. Install its dependency with <code>npm install express</code>.
               </Typography>
               <CodeViewer language="javascript" showLineNumbers={false} code={VOICE_AGENT_BACKEND_SAMPLE} maxHeight={360} />
             </Section>
 
             <Section title="Step 2: Connect your application">
               <Typography variant="body2">
-                Fetch the room token from your backend and join the session (<code>npm install livekit-client @livekit/components-react</code>):
+                Request a room token from your backend, then use it to join the voice session. The following React example requires <code>npm install livekit-client @livekit/components-react</code>.
               </Typography>
               <CodeViewer language="jsx" showLineNumbers={false} code={VOICE_AGENT_CLIENT_SAMPLE} maxHeight={420} />
               <Typography variant="body2" color="text.secondary">
-                Any LiveKit client SDK (web, iOS, Android, Flutter) can join the same way with the returned <code>url</code> and <code>token</code>. The voice agent also sends the conversation&apos;s transcript on the <code>voice-text</code> data topic.
+                You can also join from any other LiveKit client SDK, such as iOS, Android or Flutter, using the returned <code>url</code> and <code>token</code>. The voice agent publishes the conversation transcript on the <code>voice-text</code> data topic.
               </Typography>
             </Section>
 
-            <Section title="Security notes">
-              <Alert severity="warning">The token service is public: anyone who has its URL can start calls that use your LiveKit and provider accounts. Keep it on your backend, and stop the voice agent when you are not using it.</Alert>
+            <Section title="Security considerations">
+              <Alert severity="warning">The token service is publicly accessible. Anyone with its URL can start calls that consume your LiveKit and speech provider quotas. Call it only from your backend, and stop the voice agent when it is not in use.</Alert>
               <Box component="ul" sx={NOTES_SX}>
                 <li>
-                  <Typography variant="body2">Add authentication between your application and your backend before exposing it publicly.</Typography>
+                  <Typography variant="body2">Authenticate requests between your application and your backend before you make it publicly available.</Typography>
                 </li>
                 <li>
-                  <Typography variant="body2">Restrict your backend&apos;s CORS allowed origins to your application&apos;s domains.</Typography>
+                  <Typography variant="body2">Limit your backend&apos;s CORS allowed origins to your application&apos;s domains.</Typography>
                 </li>
               </Box>
             </Section>

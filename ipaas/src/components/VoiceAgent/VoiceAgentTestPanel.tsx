@@ -64,7 +64,7 @@ export default function VoiceAgentTestPanel({ agentName, tokenServiceUrl, unavai
           Voice tester
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          {unavailableReason ?? (status === 'connected' ? `${agentName} is listening. Speak, and the conversation appears below.` : `${agentName} — click "Start session" to talk to the deployed voice agent.`)}
+          {unavailableReason ?? (status === 'connected' ? `${agentName} is listening. Start speaking to see the conversation below.` : `Start a session to talk to ${agentName}.`)}
         </Typography>
         {error && <Alert severity="error">{error}</Alert>}
         {transcript.length > 0 && (

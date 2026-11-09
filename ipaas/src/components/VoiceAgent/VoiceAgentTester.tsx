@@ -34,7 +34,7 @@ export default function VoiceAgentTester({ tokenServiceUrl, unavailableReason }:
   const { status, error, transcript, start, stop, audioContainerRef } = useVoiceTesterSession(tokenServiceUrl ?? '');
   const inCall = status === 'connecting' || status === 'connected';
   const canStart = !!tokenServiceUrl && !unavailableReason;
-  const hint = unavailableReason ?? (status === 'connected' ? 'Live — speak, and the conversation appears below.' : status === 'connecting' ? 'Connecting to the voice agent…' : 'Start a session to talk to the voice agent.');
+  const hint = unavailableReason ?? (status === 'connected' ? 'The session is live. Start speaking to see the conversation below.' : status === 'connecting' ? 'Connecting to the voice agent…' : 'Start a session to talk to the voice agent.');
 
   return (
     <Box>
