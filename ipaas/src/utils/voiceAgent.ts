@@ -256,16 +256,21 @@ export function tokenServiceUrlOf(endpoints: readonly { id: string; publicUrl?: 
   return endpoints?.find((e) => e.id === VOICE_AGENT_TOKEN_ENDPOINT)?.publicUrl || null;
 }
 
-export const VOICE_TARGET_LABEL_PREFIX = 'voice-target-agent:';
-
-export function voiceTargetLabel(agentHandler: string): string {
-  return `${VOICE_TARGET_LABEL_PREFIX}${agentHandler}`;
+interface VoiceTesterState {
+  hasDeployment: boolean;
+  deploymentStatus: string | null;
+  endpointsFailed: boolean;
+  tokenServiceUrl: string | null;
 }
 
-export function linkedAgentHandlerOf(labels: string | readonly string[] | undefined): string | null {
-  const list = typeof labels === 'string' ? labels.split(',') : (labels ?? []);
-  const label = list.map((l) => l.trim()).find((l) => l.startsWith(VOICE_TARGET_LABEL_PREFIX));
-  return label ? label.slice(VOICE_TARGET_LABEL_PREFIX.length) || null : null;
+export function voiceTesterUnavailableReason({ hasDeployment, deploymentStatus, endpointsFailed, tokenServiceUrl }: VoiceTesterState): string | undefined {
+  if (!hasDeployment) return 'Deploy the voice agent to this environment to test it.';
+  if (deploymentStatus === 'IN_PROGRESS') return 'The voice agent is starting. You can test it once it is active.';
+  if (deploymentStatus === 'ERROR') return 'The voice agent failed to start. Check its logs, then redeploy it.';
+  if (deploymentStatus !== 'ACTIVE') return 'The voice agent is stopped. Start it to test it.';
+  if (endpointsFailed) return "Couldn't load the voice agent's endpoints. Refresh the page to try again.";
+  if (!tokenServiceUrl) return 'The voice agent is active, but its token service has no public URL yet.';
+  return undefined;
 }
 
 interface AgentEndpointLike {

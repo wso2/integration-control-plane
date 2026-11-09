@@ -27,6 +27,7 @@ interface CreateVoiceAgentComponentInput {
   name: string;
   displayName: string;
   description: string;
+  targetAgentHandler?: string;
 }
 
 export const createVoiceAgentComponent = (input: CreateVoiceAgentComponentInput): Promise<Component> =>
@@ -37,6 +38,7 @@ export const createVoiceAgentComponent = (input: CreateVoiceAgentComponentInput)
         'openchoreo.dev/display-name': input.displayName,
         'openchoreo.dev/description': input.description,
         'ipaas.wso2.com/component-type': VOICE_AGENT_COMPONENT_TYPE,
+        ...(input.targetAgentHandler && { 'ipaas.wso2.com/voice-target-agent': input.targetAgentHandler }),
       },
     },
     spec: {

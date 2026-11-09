@@ -20,8 +20,7 @@ import { Divider, Skeleton } from '@wso2/oxygen-ui';
 import type { ReactNode } from 'react';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import type { EnvCardBodyProps } from '../../../types/integration';
-import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
-import { tokenServiceUrlOf } from '../../../utils/voiceAgent';
+import { tokenServiceUrlOf, voiceTesterUnavailableReason } from '../../../utils/voiceAgent';
 import VoiceAgentTester from '../../VoiceAgent/VoiceAgentTester';
 
 const DIVIDER_SX = { my: 2 } as const;
@@ -30,15 +29,7 @@ export default function EnvCardBody({ component, versionId, releaseId, hasDeploy
   const { data: endpoints, isLoading, isError } = useEnvEndpoints(component.id, versionId, releaseId);
   const tokenServiceUrl = tokenServiceUrlOf(endpoints);
 
-  const unavailableReason = !hasDeployment
-    ? "the voice agent isn't deployed in this environment."
-    : isError
-      ? "the token service endpoint couldn't be loaded."
-      : !tokenServiceUrl
-        ? "the token service endpoint isn't deployed yet."
-        : !isDeploymentHealthy(deploymentStatusV2)
-          ? 'start the voice agent to try it.'
-          : undefined;
+  const unavailableReason = voiceTesterUnavailableReason({ hasDeployment, deploymentStatus: deploymentStatusV2, endpointsFailed: isError, tokenServiceUrl });
 
   return (
     <>

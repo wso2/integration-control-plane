@@ -27,8 +27,7 @@ import {
   effectiveVoiceAgentHandler,
   isVoiceEndpoint,
   isWebSocketUrl,
-  linkedAgentHandlerOf,
-  voiceTargetLabel,
+  voiceTesterUnavailableReason,
   tokenServiceUrlOf,
   validateAgentStep,
   validateLiveKitStep,
@@ -222,12 +221,20 @@ describe('tokenServiceUrlOf', () => {
   });
 });
 
-describe('voice target link', () => {
-  it('reads back the agent a label names, from a list or the comma-joined form', () => {
-    expect(linkedAgentHandlerOf([voiceTargetLabel('support-agent')])).toBe('support-agent');
-    expect(linkedAgentHandlerOf(`team:a, ${voiceTargetLabel('support-agent')}`)).toBe('support-agent');
-    expect(linkedAgentHandlerOf(['team:a'])).toBeNull();
-    expect(linkedAgentHandlerOf(undefined)).toBeNull();
+describe('voiceTesterUnavailableReason', () => {
+  const ready = { hasDeployment: true, deploymentStatus: 'ACTIVE', endpointsFailed: false, tokenServiceUrl: 'https://token.example' };
+
+  it('allows a session only for an active voice agent with a token service URL', () => {
+    expect(voiceTesterUnavailableReason(ready)).toBeUndefined();
+  });
+
+  it('says what to do for each state that blocks a session', () => {
+    expect(voiceTesterUnavailableReason({ ...ready, hasDeployment: false })).toBe('Deploy the voice agent to this environment to test it.');
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'IN_PROGRESS' })).toBe('The voice agent is starting. You can test it once it is active.');
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'ERROR' })).toBe('The voice agent failed to start. Check its logs, then redeploy it.');
+    expect(voiceTesterUnavailableReason({ ...ready, deploymentStatus: 'SUSPENDED', tokenServiceUrl: null })).toBe('The voice agent is stopped. Start it to test it.');
+    expect(voiceTesterUnavailableReason({ ...ready, endpointsFailed: true })).toBe("Couldn't load the voice agent's endpoints. Refresh the page to try again.");
+    expect(voiceTesterUnavailableReason({ ...ready, tokenServiceUrl: null })).toBe('The voice agent is active, but its token service has no public URL yet.');
   });
 });
 

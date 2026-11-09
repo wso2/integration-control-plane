@@ -18,13 +18,13 @@
 
 import { useMutation, useQueries, useQueryClient } from '@tanstack/react-query';
 import { useComponents } from './useComponents';
-import { deleteComponent, fetchComponents, updateComponent } from '../api/components';
+import { deleteComponent, fetchComponents } from '../api/components';
 import { checkNameAvailability } from '../api/prebuilt';
 import { createVoiceAgentComponent, deployVoiceAgent, VOICE_AGENT_COMPONENT_TYPE } from '../api/voiceAgents';
 import type { Component } from '../types/component';
 import type { Project } from '../types/project';
 import type { CreateVoiceAgentInput } from '../types/voiceAgent';
-import { buildVoiceAgentDeployment, effectiveVoiceAgentHandler, linkedAgentHandlerOf, voiceTargetLabel } from '../utils/voiceAgent';
+import { buildVoiceAgentDeployment, effectiveVoiceAgentHandler } from '../utils/voiceAgent';
 
 export interface VoiceAgentRow {
   component: Component;
@@ -45,7 +45,7 @@ export function useOrgVoiceAgents(orgHandler: string, projects: Project[]) {
       rows: results.flatMap((r, i) => {
         const components = r.data ?? [];
         return components.filter(isVoiceAgent).map((component) => {
-          const agentHandler = linkedAgentHandlerOf(component.labels);
+          const agentHandler = component.voiceTargetAgent;
           return { component, project: projects[i], targetAgent: agentHandler ? components.find((c) => c.handler === agentHandler) : undefined };
         });
       }),
@@ -61,15 +61,8 @@ export function useCreateVoiceAgent() {
   return useMutation({
     mutationFn: async ({ orgHandler, projectId, settings }: CreateVoiceAgentInput): Promise<Component> => {
       const name = await checkNameAvailability(projectId, effectiveVoiceAgentHandler(settings));
-      const labels = settings.targetMode === 'platform' && settings.targetAgentHandler ? [voiceTargetLabel(settings.targetAgentHandler)] : [];
-      const component = await createVoiceAgentComponent({ projectId, name, displayName: settings.displayName.trim(), description: settings.description.trim() });
-      if (labels.length > 0) {
-        try {
-          await updateComponent({ id: component.id, handler: component.handler, projectId, displayName: component.displayName, description: component.description, version: component.version, labels });
-        } catch (err) {
-          console.warn('Failed to link the voice agent to its AI agent', { componentId: component.id, projectId }, err);
-        }
-      }
+      const targetAgentHandler = settings.targetMode === 'platform' && settings.targetAgentHandler ? settings.targetAgentHandler : undefined;
+      const component = await createVoiceAgentComponent({ projectId, name, displayName: settings.displayName.trim(), description: settings.description.trim(), targetAgentHandler });
       try {
         await deployVoiceAgent(component.id, buildVoiceAgentDeployment(settings));
       } catch (err) {
@@ -88,6 +81,6 @@ export function useCreateVoiceAgent() {
 
 export function useLinkedVoiceAgent(orgHandler: string, projectId: string, agentHandler: string) {
   const { data, isLoading, isError } = useComponents(orgHandler, projectId);
-  const voiceAgent = data?.find((c) => isVoiceAgent(c) && linkedAgentHandlerOf(c.labels) === agentHandler);
+  const voiceAgent = data?.find((c) => isVoiceAgent(c) && c.voiceTargetAgent === agentHandler);
   return { voiceAgent, isLoading, isError };
 }
