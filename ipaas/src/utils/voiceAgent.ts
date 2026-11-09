@@ -46,17 +46,21 @@ export const DEFAULT_VOICE_AGENT_SETTINGS: VoiceAgentSettings = {
   bargeInMode: 'always',
   bargeInMinDuration: 0.5,
   bargeInMinWords: 1,
+  discardAudioIfUninterruptible: false,
   endpointingMode: 'dynamic',
   endpointingMinDelay: 200,
   endpointingMaxDelay: 2000,
   textOutputEnabled: true,
   userAwayTimeout: 15,
+  minConsecutiveSpeechDelay: 200,
   closeOnParticipantDisconnect: true,
   noiseCancellationEnabled: false,
   vadActivationThreshold: 0.5,
   vadDeactivationThreshold: 0.35,
   vadMinSpeechDuration: 0.05,
   vadMinSilenceDuration: 0.55,
+  vadPrefixPaddingDuration: 0.5,
+  vadMaxBufferedSpeech: 60,
   corsAllowedOrigins: '*',
   tokenTtl: 3600,
 };
@@ -148,10 +152,13 @@ const NUMERIC_TUNING_FIELDS = [
   'endpointingMinDelay',
   'endpointingMaxDelay',
   'userAwayTimeout',
+  'minConsecutiveSpeechDelay',
   'vadActivationThreshold',
   'vadDeactivationThreshold',
   'vadMinSpeechDuration',
   'vadMinSilenceDuration',
+  'vadPrefixPaddingDuration',
+  'vadMaxBufferedSpeech',
   'tokenTtl',
 ] as const satisfies readonly (keyof VoiceAgentSettings)[];
 
@@ -165,6 +172,9 @@ export function validateTuningStep(s: VoiceAgentSettings): StepErrors {
   if (s.endpointingMaxDelay < s.endpointingMinDelay) errors.endpointingMaxDelay = 'Use a value no lower than the minimum delay.';
   if (s.userAwayTimeout <= 0) errors.userAwayTimeout = 'Use a value above 0.';
   if (s.tokenTtl <= 0) errors.tokenTtl = 'Use a value above 0.';
+  if (s.minConsecutiveSpeechDelay < 0) errors.minConsecutiveSpeechDelay = 'Use a value of 0 or more.';
+  if (s.vadPrefixPaddingDuration < 0) errors.vadPrefixPaddingDuration = 'Use a value of 0 or more.';
+  if (s.vadMaxBufferedSpeech <= 0) errors.vadMaxBufferedSpeech = 'Use a value above 0.';
   return errors;
 }
 
@@ -187,16 +197,20 @@ export function buildVoiceAgentDeployment(s: VoiceAgentSettings): VoiceAgentDepl
     BARGE_IN_MODE: s.bargeInMode,
     BARGE_IN_MIN_DURATION: String(s.bargeInMinDuration),
     BARGE_IN_MIN_WORDS: String(s.bargeInMinWords),
+    DISCARD_AUDIO_IF_UNINTERRUPTIBLE: String(s.discardAudioIfUninterruptible),
     VAD_ACTIVATION_THRESHOLD: String(s.vadActivationThreshold),
     VAD_DEACTIVATION_THRESHOLD: String(s.vadDeactivationThreshold),
     VAD_MIN_SPEECH_DURATION: String(s.vadMinSpeechDuration),
     VAD_MIN_SILENCE_DURATION: String(s.vadMinSilenceDuration),
+    VAD_PREFIX_PADDING_DURATION: String(s.vadPrefixPaddingDuration),
+    VAD_MAX_BUFFERED_SPEECH: String(s.vadMaxBufferedSpeech),
     ENDPOINTING_MODE: s.endpointingMode === 'static' ? 'fixed' : 'dynamic',
     ENDPOINTING_MIN_DELAY: seconds(s.endpointingMinDelay),
     ENDPOINTING_MAX_DELAY: seconds(s.endpointingMaxDelay),
     NOISE_CANCELLATION_ENABLED: String(s.noiseCancellationEnabled),
     TRANSCRIPTION_ENABLED: String(s.textOutputEnabled),
     USER_AWAY_TIMEOUT: String(s.userAwayTimeout),
+    MIN_CONSECUTIVE_SPEECH_DELAY: seconds(s.minConsecutiveSpeechDelay),
     CLOSE_ON_PARTICIPANT_DISCONNECT: String(s.closeOnParticipantDisconnect),
     CORS_ALLOWED_ORIGINS: s.corsAllowedOrigins.trim() || '*',
     LIVEKIT_TOKEN_TTL: String(s.tokenTtl),

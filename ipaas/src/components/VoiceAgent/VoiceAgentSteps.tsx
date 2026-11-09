@@ -16,9 +16,9 @@
  * under the License.
  */
 
-import { Accordion, AccordionDetails, AccordionSummary, Box, FormControlLabel, IconButton, Link, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
+import { Accordion, AccordionDetails, AccordionSummary, Box, FormControl, FormControlLabel, FormLabel, IconButton, InputAdornment, Link, Radio, RadioGroup, MenuItem, Stack, Switch, TextField, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, ExternalLink, Eye, EyeOff } from '@wso2/oxygen-ui-icons-react';
-import { useState, type JSX } from 'react';
+import { useState, type JSX, type ReactNode } from 'react';
 import { CUSTOM_VOICE_ID, STT_PROVIDERS, TTS_PROVIDERS } from '../../constants/voiceAgentProviders';
 import type { BargeInMode, EndpointingMode, TurnDetectionModel, VoiceAgentSettings } from '../../types/voiceAgent';
 import { withSttProvider, withTtsProvider, type StepErrors } from '../../utils/voiceAgent';
@@ -178,9 +178,9 @@ export function TtsStep({ settings, errors, onChange, onReplace }: VoiceAgentSte
 }
 
 const TURN_DETECTION_OPTIONS: { value: TurnDetectionModel; label: string }[] = [
-  { value: 'multilingual', label: 'Turn-detection model (multilingual)' },
-  { value: 'vad_only', label: 'Voice activity only' },
-  { value: 'stt_endpointing', label: 'Speech-to-text endpointing' },
+  { value: 'multilingual', label: 'Turn detector model - MultilingualModel' },
+  { value: 'vad_only', label: 'VAD only' },
+  { value: 'stt_endpointing', label: 'STT endpointing' },
 ];
 
 const BARGE_IN_OPTIONS: { value: BargeInMode; label: string }[] = [
@@ -194,84 +194,140 @@ const ENDPOINTING_OPTIONS: { value: EndpointingMode; label: string }[] = [
   { value: 'static', label: 'Fixed' },
 ];
 
+const TUNE_FORM_SX = { maxWidth: 1040 } as const;
+const PAIR_SX = { display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, columnGap: 2 } as const;
+const SHORT_FIELD_SX = { maxWidth: 240 } as const;
+
+type NumericField = {
+  [K in keyof VoiceAgentSettings]: VoiceAgentSettings[K] extends number ? K : never;
+}[keyof VoiceAgentSettings];
+
+type ToggleField = {
+  [K in keyof VoiceAgentSettings]: VoiceAgentSettings[K] extends boolean ? K : never;
+}[keyof VoiceAgentSettings];
+
+function Section({ title, children }: { title: string; children: ReactNode }): JSX.Element {
+  return (
+    <Stack gap={1.5}>
+      <Typography variant="subtitle1" fontWeight={600}>
+        {title}
+      </Typography>
+      {children}
+    </Stack>
+  );
+}
+
+function SubSection({ title, children }: { title: string; children: ReactNode }): JSX.Element {
+  return (
+    <Stack gap={1.5}>
+      <Typography variant="subtitle2" color="text.secondary">
+        {title}
+      </Typography>
+      {children}
+    </Stack>
+  );
+}
+
 export function TuningStep({ settings, errors, onChange }: VoiceAgentStepProps): JSX.Element {
-  const num = (field: keyof VoiceAgentSettings, label: string, hint = ' ') => (
+  const num = (field: NumericField, label: string, unit?: string, short = true) => (
     <TextField
       labelPlacement="top"
       label={label}
       type="number"
       fullWidth
-      value={Number.isNaN(settings[field] as number) ? '' : (settings[field] as number)}
+      sx={short ? SHORT_FIELD_SX : undefined}
+      value={Number.isNaN(settings[field]) ? '' : settings[field]}
       onChange={(e) => onChange({ [field]: numberValue(e.target.value) })}
       error={!!errors[field]}
-      helperText={help(errors[field], hint)}
+      helperText={help(errors[field])}
+      InputProps={unit ? { endAdornment: <InputAdornment position="end">{unit}</InputAdornment> } : undefined}
     />
   );
+  const toggle = (field: ToggleField, label: string) => (
+    <FormControlLabel labelPlacement="start" sx={{ ml: 0, alignSelf: 'flex-start', gap: 1 }} control={<Switch checked={settings[field]} onChange={(e) => onChange({ [field]: e.target.checked })} />} label={label} />
+  );
+  const select = <T extends string>(label: string, value: T, options: { value: T; label: string }[], set: (v: T) => void) => (
+    <TextField labelPlacement="top" select label={label} fullWidth value={value} onChange={(e) => set(e.target.value as T)} helperText=" ">
+      {options.map((o) => (
+        <MenuItem key={o.value} value={o.value}>
+          {o.label}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+
   return (
-    <Stack gap={2} sx={FIELD_STACK_SX}>
-      <TextField
-        labelPlacement="top"
-        select
-        label="Turn detection"
-        fullWidth
-        value={settings.turnDetectionModel}
-        onChange={(e) => onChange({ turnDetectionModel: e.target.value as TurnDetectionModel })}
-        helperText="How the agent decides the caller has finished speaking.">
-        {TURN_DETECTION_OPTIONS.map((o) => (
-          <MenuItem key={o.value} value={o.value}>
-            {o.label}
-          </MenuItem>
-        ))}
-      </TextField>
-      <TextField labelPlacement="top" select label="Interruptions" fullWidth value={settings.bargeInMode} onChange={(e) => onChange({ bargeInMode: e.target.value as BargeInMode })} helperText="Whether the caller can talk over the agent.">
-        {BARGE_IN_OPTIONS.map((o) => (
-          <MenuItem key={o.value} value={o.value}>
-            {o.label}
-          </MenuItem>
-        ))}
-      </TextField>
-      <TextField labelPlacement="top" select label="Endpointing" fullWidth value={settings.endpointingMode} onChange={(e) => onChange({ endpointingMode: e.target.value as EndpointingMode })} helperText=" ">
-        {ENDPOINTING_OPTIONS.map((o) => (
-          <MenuItem key={o.value} value={o.value}>
-            {o.label}
-          </MenuItem>
-        ))}
-      </TextField>
-      <Stack direction="row" gap={2}>
-        {num('endpointingMinDelay', 'Minimum delay (ms)')}
-        {num('endpointingMaxDelay', 'Maximum delay (ms)')}
-      </Stack>
-      {num('userAwayTimeout', 'Idle timeout (seconds)', 'Ends the call after this long without speech.')}
-      <FormControlLabel control={<Switch checked={settings.textOutputEnabled} onChange={(e) => onChange({ textOutputEnabled: e.target.checked })} />} label="Send transcripts to the caller" />
-      <FormControlLabel control={<Switch checked={settings.closeOnParticipantDisconnect} onChange={(e) => onChange({ closeOnParticipantDisconnect: e.target.checked })} />} label="End the session when the caller leaves" />
-      <FormControlLabel control={<Switch checked={settings.noiseCancellationEnabled} onChange={(e) => onChange({ noiseCancellationEnabled: e.target.checked })} />} label="Noise cancellation (LiveKit Cloud only)" />
-      <Accordion disableGutters>
+    <Stack gap={4} sx={TUNE_FORM_SX}>
+      <Section title="Text output">{toggle('textOutputEnabled', 'Text output / transcription')}</Section>
+
+      <Section title="User interaction and timing">
+        {num('userAwayTimeout', 'User away timeout', 's')}
+        {num('minConsecutiveSpeechDelay', 'Min consecutive speech delay', 'ms')}
+      </Section>
+
+      <Section title="Session cleanup and lifecycle">{toggle('closeOnParticipantDisconnect', 'Close on participant disconnect')}</Section>
+
+      <Section title="Security and access">
+        <TextField
+          labelPlacement="top"
+          label="CORS allowed origins"
+          fullWidth
+          value={settings.corsAllowedOrigins}
+          onChange={(e) => onChange({ corsAllowedOrigins: e.target.value })}
+          helperText="Comma-separated origins that may request a room token. * allows any."
+        />
+        {num('tokenTtl', 'Token time-to-live (TTL)', 's')}
+      </Section>
+
+      <Accordion disableGutters variant="outlined">
         <AccordionSummary expandIcon={<ChevronDown size={16} />}>
-          <Typography variant="subtitle2">Advanced</Typography>
+          <Typography variant="subtitle1" fontWeight={600}>
+            Advanced settings
+          </Typography>
         </AccordionSummary>
         <AccordionDetails>
-          <Stack gap={2}>
-            <Stack direction="row" gap={2}>
-              {num('vadActivationThreshold', 'Speech start threshold')}
-              {num('vadDeactivationThreshold', 'Speech end threshold')}
-            </Stack>
-            <Stack direction="row" gap={2}>
-              {num('vadMinSpeechDuration', 'Minimum speech (seconds)')}
-              {num('vadMinSilenceDuration', 'Minimum silence (seconds)')}
-            </Stack>
-            <Stack direction="row" gap={2}>
-              {num('bargeInMinDuration', 'Interruption minimum (seconds)')}
-              {num('bargeInMinWords', 'Interruption minimum words')}
-            </Stack>
-            <TextField
-              labelPlacement="top"
-              label="Allowed origins"
-              fullWidth
-              value={settings.corsAllowedOrigins}
-              onChange={(e) => onChange({ corsAllowedOrigins: e.target.value })}
-              helperText="Comma-separated origins that may request a room token. * allows any."
-            />
-            {num('tokenTtl', 'Room token lifetime (seconds)')}
+          <Stack gap={4}>
+            <SubSection title="Voice activity detection (VAD)">
+              <Box sx={PAIR_SX}>
+                {num('vadMinSpeechDuration', 'Min speech duration', 's')}
+                {num('vadMinSilenceDuration', 'Min silence duration', 's')}
+                {num('vadPrefixPaddingDuration', 'Prefix padding duration', 's')}
+                {num('vadActivationThreshold', 'Activation threshold', undefined, false)}
+                {num('vadDeactivationThreshold', 'Deactivation threshold', undefined, false)}
+                {num('vadMaxBufferedSpeech', 'Max buffered speech', 's')}
+              </Box>
+              {toggle('noiseCancellationEnabled', 'Noise cancellation')}
+            </SubSection>
+
+            <SubSection title="Turn detection and interruptions">
+              <FormControl>
+                <FormLabel id="turn-detection-label">Turn detection</FormLabel>
+                <RadioGroup aria-labelledby="turn-detection-label" value={settings.turnDetectionModel} onChange={(e) => onChange({ turnDetectionModel: e.target.value as TurnDetectionModel })}>
+                  {TURN_DETECTION_OPTIONS.map((o) => (
+                    <FormControlLabel key={o.value} value={o.value} control={<Radio size="small" />} label={o.label} />
+                  ))}
+                </RadioGroup>
+              </FormControl>
+
+              <Typography variant="body2" fontWeight={600}>
+                Barge-in / interruptions
+              </Typography>
+              {select('Mode', settings.bargeInMode, BARGE_IN_OPTIONS, (bargeInMode) => onChange({ bargeInMode }))}
+              <Box sx={PAIR_SX}>
+                {num('bargeInMinDuration', 'Min duration', 's')}
+                {num('bargeInMinWords', 'Min words', undefined, false)}
+              </Box>
+              {toggle('discardAudioIfUninterruptible', 'Discard audio if uninterruptible')}
+
+              <Typography variant="body2" fontWeight={600}>
+                Endpointing delay
+              </Typography>
+              {select('Mode', settings.endpointingMode, ENDPOINTING_OPTIONS, (endpointingMode) => onChange({ endpointingMode }))}
+              <Box sx={PAIR_SX}>
+                {num('endpointingMinDelay', 'Min delay', 'ms')}
+                {num('endpointingMaxDelay', 'Max delay', 'ms')}
+              </Box>
+            </SubSection>
           </Stack>
         </AccordionDetails>
       </Accordion>

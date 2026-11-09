@@ -142,7 +142,6 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
   const [settings, setSettings] = useState<VoiceAgentSettings>(initialSettings);
   const [projectId, setProjectId] = useState(handoff?.projectId && projects.some((p) => p.id === handoff.projectId) ? handoff.projectId : project.id);
   const [activeStep, setActiveStep] = useState(resumed ? 1 : 0);
-  const [attempted, setAttempted] = useState<Set<number>>(new Set());
   const allowLeave = useUnsavedChanges(settings !== initialSettings && !create.isSuccess);
   const targetProject = projects.find((p) => p.id === projectId) ?? project;
 
@@ -152,7 +151,8 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
 
   const step = steps[activeStep];
   const stepErrors = step.validate(resolvedSettings);
-  const visibleErrors = attempted.has(activeStep) ? stepErrors : {};
+  const stepComplete = Object.keys(stepErrors).length === 0;
+  const visibleErrors = step.key === 'tune' ? stepErrors : {};
   const isLastStep = activeStep === steps.length - 1;
 
   const onChange = (patch: Partial<VoiceAgentSettings>) => setSettings((prev) => ({ ...prev, ...patch }));
@@ -168,8 +168,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
   };
 
   const next = () => {
-    setAttempted((prev) => new Set(prev).add(activeStep));
-    if (Object.keys(stepErrors).length > 0) return;
+    if (!stepComplete) return;
     if (step.key === 'agent' && handOff()) return;
     if (!isLastStep) {
       setActiveStep(activeStep + 1);
@@ -252,7 +251,7 @@ function CreateVoiceAgentWizard({ org, mode, projects, project, agent }: WizardP
             <Button variant="outlined" onClick={back} disabled={create.isPending || (activeStep === 0 && !resumed)}>
               Back
             </Button>
-            <Button variant="contained" onClick={next} disabled={create.isPending || (isLastStep && agentBlocked)} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
+            <Button variant="contained" onClick={next} disabled={create.isPending || !stepComplete || (isLastStep && agentBlocked)} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}>
               {isLastStep ? (create.isPending ? 'Deploying' : 'Deploy voice agent') : 'Next'}
             </Button>
           </Stack>

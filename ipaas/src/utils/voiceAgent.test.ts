@@ -119,6 +119,12 @@ describe('step validation', () => {
     expect(validateTtsStep({ ...complete, ttsVoiceId: 'custom' })).toHaveProperty('ttsCustomVoiceId');
   });
 
+  it('rejects a negative padding or delay and an empty speech buffer', () => {
+    expect(validateTuningStep({ ...complete, vadPrefixPaddingDuration: -1 })).toHaveProperty('vadPrefixPaddingDuration');
+    expect(validateTuningStep({ ...complete, minConsecutiveSpeechDelay: -5 })).toHaveProperty('minConsecutiveSpeechDelay');
+    expect(validateTuningStep({ ...complete, vadMaxBufferedSpeech: 0 })).toHaveProperty('vadMaxBufferedSpeech');
+  });
+
   it('rejects a cleared number field', () => {
     expect(validateTuningStep({ ...complete, userAwayTimeout: Number.NaN })).toEqual({ userAwayTimeout: 'Enter a number.' });
   });
@@ -133,6 +139,14 @@ describe('buildVoiceAgentDeployment', () => {
     const { config, secrets } = buildVoiceAgentDeployment(complete);
     expect(secrets).toEqual({ LIVEKIT_API_KEY: 'lk-key', LIVEKIT_API_SECRET: 'lk-secret', STT_API_KEY: 'stt-key', TTS_API_KEY: 'tts-key' });
     for (const key of Object.keys(secrets)) expect(config).not.toHaveProperty(key);
+  });
+
+  it('sends the timing, VAD and interruption settings Devant sends, in the image’s units', () => {
+    const { config } = buildVoiceAgentDeployment({ ...complete, minConsecutiveSpeechDelay: 250, vadPrefixPaddingDuration: 0.4, vadMaxBufferedSpeech: 45, discardAudioIfUninterruptible: true });
+    expect(config.MIN_CONSECUTIVE_SPEECH_DELAY).toBe('0.25');
+    expect(config.VAD_PREFIX_PADDING_DURATION).toBe('0.4');
+    expect(config.VAD_MAX_BUFFERED_SPEECH).toBe('45');
+    expect(config.DISCARD_AUDIO_IF_UNINTERRUPTIBLE).toBe('true');
   });
 
   it('maps the form to the image’s names and units', () => {

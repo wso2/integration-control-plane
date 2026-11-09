@@ -71,17 +71,21 @@ export interface VoiceAgentSettings {
   bargeInMode: BargeInMode;
   bargeInMinDuration: number;
   bargeInMinWords: number;
+  discardAudioIfUninterruptible: boolean;
   endpointingMode: EndpointingMode;
   endpointingMinDelay: number;
   endpointingMaxDelay: number;
   textOutputEnabled: boolean;
   userAwayTimeout: number;
+  minConsecutiveSpeechDelay: number;
   closeOnParticipantDisconnect: boolean;
   noiseCancellationEnabled: boolean;
   vadActivationThreshold: number;
   vadDeactivationThreshold: number;
   vadMinSpeechDuration: number;
   vadMinSilenceDuration: number;
+  vadPrefixPaddingDuration: number;
+  vadMaxBufferedSpeech: number;
   corsAllowedOrigins: string;
   tokenTtl: number;
 }
