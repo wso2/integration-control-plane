@@ -235,7 +235,8 @@ statement for your chosen algorithm. Example connection commands:
 # H2 (default development database)
 # Connect via the H2 console or an H2-compatible JDBC client to:
 # JDBC URL: jdbc:h2:./database/credentials_db
-# User: icp_user  /  Password: icp_password
+# User / Password: the credentialsDbUser / credentialsDbPassword values in deployment.toml
+# (icp_user / icp_password for the bundled H2 quick-start database)
 
 # PostgreSQL
 psql -h localhost -U icp_user -d credentials_db

@@ -14,6 +14,8 @@ logLevel = "INFO"
 enableAuditLogging = true
 auditLogFilePath = "../logs/audit.log"
 enableMetrics = true
+credentialsDbUser = "{{CREDENTIALS_DB_USER}}"
+credentialsDbPassword = "{{CREDENTIALS_DB_PASSWORD}}"
 {{OPENSEARCH}}
 {{SSO}}
 
