@@ -21,6 +21,7 @@ import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import KnowledgeBases from './KnowledgeBases';
 import KnowledgeBaseDetails from './KnowledgeBaseDetails';
+import AddKnowledgeBaseDataSource from './AddKnowledgeBaseDataSource';
 import DeployButton from '../components/Overview/_shared/DeployButton';
 import WorkflowRuntimeRow from '../components/Deploy/DeployEnvironmentCard/WorkflowRuntimeRow';
 import { button, flush, reasonFor, renderWithScopes } from '../test/renderWithScopes';
@@ -47,6 +48,7 @@ vi.mock('../hooks/useKnowledgeBases', () => ({
   useKnowledgeBase: () => ({ data: kb, refetch: vi.fn() }),
   useUpdateKnowledgeBase: () => idle,
   useDeleteKnowledgeBase: () => idle,
+  useCreateKnowledgeBaseDataSource: () => idle,
   useRetrieveFromKnowledgeBase: () => ({ retrieve: idle, access: { keyError: null, needsApiKeyAuth: false, isUnavailable: false, gatewayUrl: 'https://gw/docs', isAuthorized: true } }),
 }));
 vi.mock('../hooks/useExecutions', () => ({ useTriggerComponent: () => idle, useTaskExecutions: () => ({ data: [] }) }));
@@ -101,6 +103,27 @@ describe('knowledge bases', () => {
 
   it('offers a Viewer nothing, and says why retrieval is unavailable', async () => {
     expect(await detailsWrites(VIEWER)).toEqual({ writes: [], refusedRetrieval: true });
+  });
+
+  it("holds back a knowledge base's delete on the list while its create runs", async () => {
+    kb.status = 'CREATING';
+    try {
+      const c = await open(<KnowledgeBases {...org} />, PLATFORM_ENGINEER);
+      const del = button(c, 'Delete Docs');
+      expect([del?.disabled, reasonFor(del)]).toEqual([true, 'The knowledge base is still being created. Try again once it is.']);
+    } finally {
+      kb.status = 'ACTIVE';
+    }
+  });
+
+  it('says in the Add Data Source wizard why a knowledge base being created takes no source yet', async () => {
+    kb.status = 'CREATING';
+    try {
+      const c = await open(<AddKnowledgeBaseDataSource {...org} />, PLATFORM_ENGINEER);
+      expect([...c.querySelectorAll('[role="alert"]')].map((a) => a.textContent)).toContain('The knowledge base is still being created. Try again once it is.');
+    } finally {
+      kb.status = 'ACTIVE';
+    }
   });
 
   // The BFF refuses these with 409 while the create runs, and once it failed all but the delete.

@@ -27,7 +27,7 @@ import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import { useCreateKnowledgeBaseDataSource, useKnowledgeBase } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, knowledgeBasesUrl, type OrgScope } from '../nav';
-import { buildDataSourceSettings, isNameValid, type NameFields } from '../utils/knowledgeBase';
+import { buildDataSourceSettings, isNameValid, knowledgeBaseWriteBlockedReason, type NameFields } from '../utils/knowledgeBase';
 import { isDatasourceValid } from '../utils/ragIngestion';
 import type { DatasourceConfig } from '../types/ragIngestion';
 import { isNotFoundError } from '../utils/apiErrors';
@@ -85,12 +85,13 @@ function DataSourceLoader({ scope, name }: { scope: OrgScope; name: string }): J
         <PageTitle.Header>Add Data Source</PageTitle.Header>
         <PageTitle.SubHeader>Load documents into {kb.displayName}.</PageTitle.SubHeader>
       </PageTitle>
-      <DataSourceWizard scope={scope} knowledgeBase={kb.name} />
+      <DataSourceWizard scope={scope} knowledgeBase={kb.name} blocked={knowledgeBaseWriteBlockedReason(kb, 'add-data-source')} />
     </>
   );
 }
 
-function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledgeBase: string }): JSX.Element {
+/** `blocked` says why the knowledge base takes no data source yet (its create runs, or failed); null when it does. */
+function DataSourceWizard({ scope, knowledgeBase, blocked }: { scope: OrgScope; knowledgeBase: string; blocked: string | null }): JSX.Element {
   const navigate = useAppNavigate();
   const create = useCreateKnowledgeBaseDataSource(knowledgeBase);
   const canManage = useCan()(Scopes.CONFIG_MANAGE);
@@ -121,6 +122,11 @@ function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledge
         <VerticalStepper activeStep={step} steps={STEPS} />
       </Box>
       <Box sx={wizardBodySx}>
+        {blocked && (
+          <Alert severity="info" sx={{ mb: 3 }}>
+            {blocked}
+          </Alert>
+        )}
         {create.error && (
           <Alert severity="error" variant="outlined" onClose={create.reset} sx={{ mb: 3 }}>
             {create.error.message}
@@ -140,7 +146,7 @@ function DataSourceWizard({ scope, knowledgeBase }: { scope: OrgScope; knowledge
               Next
             </Button>
           ) : (
-            <Button variant="contained" disabled={!canManage || !stepValid[step] || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
+            <Button variant="contained" disabled={!canManage || !!blocked || !stepValid[step] || create.isPending} startIcon={create.isPending ? <CircularProgress size={16} color="inherit" /> : undefined} onClick={submit}>
               {create.isPending ? 'Adding…' : 'Add Data Source'}
             </Button>
           )}

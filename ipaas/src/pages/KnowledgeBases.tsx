@@ -25,7 +25,7 @@ import { Scopes } from '../constants/permissions';
 import { useCan } from '../hooks/useCan';
 import { useKnowledgeBases } from '../hooks/useKnowledgeBases';
 import { knowledgeBaseUrl, newKnowledgeBaseUrl, type OrgScope } from '../nav';
-import { knowledgeBaseSummary } from '../utils/knowledgeBase';
+import { knowledgeBaseSummary, knowledgeBaseWriteBlockedReason } from '../utils/knowledgeBase';
 import type { KnowledgeBase } from '../types/knowledgeBase';
 import DataTable from '../components/DataTable';
 import EmptyListing from '../components/EmptyListing';
@@ -115,10 +115,13 @@ function KnowledgeBaseList({ scope }: { scope: OrgScope }): JSX.Element {
       String(kb.dataSources.length),
       <DeploymentStatusChip key="status" status={kb.status} error={kb.error} />,
       canManage ? (
-        <Tooltip key="delete" title="Delete">
-          <IconButton size="small" color="error" aria-label={`Delete ${kb.displayName}`} onClick={() => setDeleting(kb)}>
-            <Trash2 size={16} />
-          </IconButton>
+        // As on the knowledge base's page: a create still running takes no delete.
+        <Tooltip key="delete" title={knowledgeBaseWriteBlockedReason(kb, 'delete') ?? 'Delete'}>
+          <span>
+            <IconButton size="small" color="error" aria-label={`Delete ${kb.displayName}`} disabled={!!knowledgeBaseWriteBlockedReason(kb, 'delete')} onClick={() => setDeleting(kb)}>
+              <Trash2 size={16} />
+            </IconButton>
+          </span>
         </Tooltip>
       ) : (
         ''
