@@ -18,9 +18,12 @@
 
 import { Box, Button, CircularProgress, DrawerPanel } from '@wso2/oxygen-ui';
 import { useExecutionConfigs } from '../../../hooks/useExecutions';
+import { usePlanAccess } from '../../../hooks/useBillingOrg';
 import { useDeployDeploymentTrack } from '../../../hooks/useDeployments';
 import ScheduleFields from './ScheduleFields';
 import { buildScheduleDeployInput, useScheduleForm } from './useScheduleForm';
+import type { ScheduleKind } from '../../../types/schedule';
+import { SCHEDULE_POLICIES } from '../../../constants/scheduleLimits';
 
 interface ScheduleDialogProps {
   open: boolean;
@@ -36,9 +39,11 @@ interface ScheduleDialogProps {
   deploymentPipelineId: string;
   /** Save with no build: the BFF then releases the current workload. For image-only components such as knowledge base data sources. */
   allowWithoutBuild?: boolean;
+  /** A knowledge base data source is an ingestion, with its own timeout limit. */
+  kind?: ScheduleKind;
 }
 
-export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, buildId, versionId, deploymentPipelineId, allowWithoutBuild = false }: ScheduleDialogProps) {
+export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveError, envId, envName: _envName, componentId, releaseId, buildId, versionId, deploymentPipelineId, allowWithoutBuild = false, kind = 'automation' }: ScheduleDialogProps) {
   const handleClose = () => {
     (document.activeElement as HTMLElement)?.blur();
     onClose();
@@ -46,7 +51,7 @@ export default function ScheduleDialog({ open, onClose, onSaveSuccess, onSaveErr
 
   const { data: existingConfigs, isLoading: loadingConfigs } = useExecutionConfigs(componentId, releaseId, envId);
   const deployTrack = useDeployDeploymentTrack();
-  const form = useScheduleForm(existingConfigs);
+  const form = useScheduleForm(existingConfigs, usePlanAccess(), SCHEDULE_POLICIES[kind]);
 
   const handleSave = () => {
     deployTrack.mutate(buildScheduleDeployInput(form, { componentId, versionId, imageId: buildId ?? '', envId, deploymentPipelineId }), {
