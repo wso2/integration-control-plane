@@ -47,13 +47,17 @@ import TestKeyNotice from './TestKeyNotice';
 import { WorkflowContentSkeleton, WorkflowPageSkeleton } from './WorkflowPageSkeleton';
 import * as styles from './WorkflowPageShell.styles';
 
-/** What a workflow page's content gets once the management API answers. */
-export interface WorkflowPageSlotProps {
+/** What a workflow page's placeholder gets: the integration and the environment shown. */
+export interface WorkflowPagePlaceholderProps {
   scope: ComponentScope;
   component: Component;
   /** The environment shown; its id is what `?env=` links carry. */
   environment: Environment;
   environments: Environment[];
+}
+
+/** What a workflow page's content gets once the management API answers. */
+export interface WorkflowPageSlotProps extends WorkflowPagePlaceholderProps {
   /** The client and the ready connection, for this environment and deployment track. */
   api: ReadyWorkflowApi;
 }
@@ -65,6 +69,11 @@ interface WorkflowPageShellProps {
   purpose: Extract<NotDeployedPurpose, 'runWorkflows' | 'workOnTasks'>;
   /** The page's own content, rendered only once the connection is ready. */
   children: (slot: WorkflowPageSlotProps) => ReactNode;
+  /**
+   * What stands in for the page's content while the console can't serve it yet, for the environment shown. With one,
+   * the page makes no connection to the management API.
+   */
+  placeholder?: (slot: WorkflowPagePlaceholderProps) => ReactNode;
 }
 
 /** The auto-refresh switch and the refresh button for every read of the connection. */
@@ -123,7 +132,7 @@ function ConnectionBody({ api, purpose, children }: { api: WorkflowApi; purpose:
  * The environment shown is held in `?env=`, which links from the overview set; without one, the
  * first environment.
  */
-export default function WorkflowPageShell({ scope, title, purpose, children }: WorkflowPageShellProps): JSX.Element {
+export default function WorkflowPageShell({ scope, title, purpose, children, placeholder }: WorkflowPageShellProps): JSX.Element {
   const orgUuid = useOrgUuid() ?? '';
   const { projectId, isLoading: loadingProject, isError: projectError, refetch: refetchProject } = useProjectId(scope.project);
   const { data: component, isLoading: loadingComponent, error: componentError, refetch: refetchComponent } = useComponentByHandler(projectId, scope.component);
@@ -145,7 +154,8 @@ export default function WorkflowPageShell({ scope, title, purpose, children }: W
 
   const componentId = component?.id ?? '';
   const { data: deployment, isLoading: loadingDeployment } = useComponentDeployment(component ? scope.org : '', component ? orgUuid : '', componentId, trackId, environment?.id ?? '');
-  const api = useWorkflowApi({ componentId, environmentId: environment?.id ?? '', trackId, deployment, isDeploymentLoading: loadingDeployment });
+  // A placeholder needs no connection: with no deployment to connect to, none is made.
+  const api = useWorkflowApi({ componentId, environmentId: environment?.id ?? '', trackId, deployment: placeholder ? null : deployment, isDeploymentLoading: !placeholder && loadingDeployment });
 
   if (loadingProject || loadingComponent || loadingEnvironments) return <WorkflowPageSkeleton title={title} />;
   // A failed read is not a missing integration; only a 404 says it does not exist.
@@ -175,6 +185,8 @@ export default function WorkflowPageShell({ scope, title, purpose, children }: W
     );
   } else if (!environment) {
     body = <EmptyListing icon={<Layers size={48} />} title="No environments" description="This project has no environments yet, so there is nowhere this integration runs." />;
+  } else if (placeholder) {
+    body = placeholder({ scope, component, environment, environments });
   } else {
     body = (
       <ConnectionBody api={api} purpose={purpose}>

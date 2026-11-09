@@ -34,7 +34,7 @@ import * as styles from './WorkflowStatsStrip.styles';
 
 const COUNT_POLL_MS = 30_000;
 /** What a figure the console can't read yet says instead of a count, as the Human Tasks page does. */
-const HUMAN_TASKS_COMING_SOON = 'Human tasks are currently under development.';
+const HUMAN_TASKS_COMING_SOON = 'Human tasks are coming to the console. Until then, publish this workflow to the User Portal and work on its human tasks there.';
 /** The window of the Failed and Completed figures. */
 const CLOSED_WITHIN: WorkflowTimeRange = '24h';
 

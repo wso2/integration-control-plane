@@ -20,7 +20,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEnvEndpoints } from '../../../hooks/useDeployments';
 import { useEndpointTestAccess } from '../../../hooks/useEndpointTestAccess';
-import { useUserPortalPublications } from '../../../hooks/useUserPortal';
+import { useUserPortalPublications, useUserPortals } from '../../../hooks/useUserPortal';
 import type { EndpointRef } from '../../../types/consumers';
 import type { ComponentDeployment } from '../../../types/deployment';
 import { isUserPortalUnavailable } from '../../../utils/apiErrors';
@@ -139,6 +139,9 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   const publications = useUserPortalPublications(componentId, { enabled: isActive });
   const publishedHere = publications.data?.environments.includes(environmentId) ?? false;
   const publicationsKnown = publications.data !== undefined || (publications.isError && isUserPortalUnavailable(publications.error));
+  // Where the User Portal it is published to runs, to open it from the notice.
+  const [portal] = useUserPortals(publishedHere ? [environmentId] : []);
+  const portalUrl = portal?.data?.url;
 
   const ref = useMemo<EndpointRef | null>(() => (endpointName ? { componentName: componentId, environmentName: environmentId, endpointName, deploymentTrackId: trackId } : null), [componentId, environmentId, endpointName, trackId]);
   // Release-scoped discovery already returns the gateway's public URL; the security read may too. A
@@ -238,7 +241,8 @@ export function useWorkflowConnection({ componentId, environmentId, trackId, dep
   }
   if (publications.isPending) return LOADING;
   if (publishedHere) {
-    return { status: 'unavailable', reason: 'published-to-user-portal', notice: PUBLISHED, action: null };
+    const action = portalUrl ? { label: 'Open User Portal', run: () => void window.open(portalUrl, '_blank', 'noopener,noreferrer'), pending: false } : null;
+    return { status: 'unavailable', reason: 'published-to-user-portal', notice: PUBLISHED, action };
   }
   if (!publicationsKnown) {
     return { status: 'error', message: 'Could not check whether this workflow is published to the User Portal.', retry: () => void publications.refetch() };

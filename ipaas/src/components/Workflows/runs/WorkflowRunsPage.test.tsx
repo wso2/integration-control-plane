@@ -80,6 +80,8 @@ async function flush() {
 
 async function renderPage(url: string, client: WorkflowClient) {
   const slot = {
+    scope: { org: 'acme', project: 'shop', component: 'orders' },
+    component: { id: 'orders' },
     environment: { id: 'development', name: 'Development' },
     api: { client, connection: { status: 'ready', scopeId: 'scope', runtime: { taskQueue: 'orders' } } },
   } as unknown as WorkflowPageSlotProps;

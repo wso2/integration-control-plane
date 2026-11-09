@@ -242,7 +242,7 @@ describe('WorkflowRunDetailDrawer without caller roles', () => {
     await renderDrawer(api);
     expect(text()).toContain('order-42');
     expect(text()).toContain('Coming soon');
-    expect(text()).toContain('The execution graph and the activity tree are currently under development.');
+    expect(text()).toContain('The execution graph, activity tree and timeline are coming to the console. Until then, publish this workflow to the User Portal to see them there.');
     expect(instances.get).not.toHaveBeenCalled();
     expect(instances.history).not.toHaveBeenCalled();
     expect(instances.activityTree).not.toHaveBeenCalled();

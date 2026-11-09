@@ -17,20 +17,32 @@
  */
 
 import type { JSX } from 'react';
+import UserPortalPrompt from '../components/UserPortal/UserPortalPrompt';
 import { CALLS_CARRY_ROLES } from '../components/Workflows/connection/workflowCredential';
-import WorkflowPageShell from '../components/Workflows/shared/WorkflowPageShell';
+import WorkflowPageShell, { type WorkflowPagePlaceholderProps } from '../components/Workflows/shared/WorkflowPageShell';
 import HumanTasksPage from '../components/Workflows/tasks/HumanTasksPage';
 import type { ComponentScope } from '../nav';
-import ComingSoon from './ComingSoon';
+import { ComingSoonInline } from './ComingSoon';
+
+/**
+ * Human tasks as the console can't serve them yet, for the environment shown, with the way to them in the User
+ * Portal there: enable it, publish the workflow to it, or open it.
+ */
+function HumanTasksComingSoon({ scope, component, environment }: WorkflowPagePlaceholderProps): JSX.Element {
+  return (
+    <ComingSoonInline
+      description="Human tasks are coming to the console. Until then, publish this workflow to the User Portal and work on its human tasks there."
+      action={<UserPortalPrompt orgHandler={scope.org} componentId={component.id} environment={environment} />}
+    />
+  );
+}
 
 /** The work queue of a workflow integration, under Operate at `.../human-tasks`: everything waiting on a person. */
 export default function ComponentHumanTasks(scope: ComponentScope): JSX.Element {
   // The engine serves the tasks a role is named for only to a caller with roles (CALLS_CARRY_ROLES).
-  if (!CALLS_CARRY_ROLES) {
-    return <ComingSoon description="Human tasks are currently under development." />;
-  }
+  // The User Portal calls with its users' tokens, which carry them, so it serves these tasks already.
   return (
-    <WorkflowPageShell scope={scope} title="Human Tasks" purpose="workOnTasks">
+    <WorkflowPageShell scope={scope} title="Human Tasks" purpose="workOnTasks" placeholder={CALLS_CARRY_ROLES ? undefined : (slot) => <HumanTasksComingSoon {...slot} />}>
       {/* Keyed on the connection: an item open or selected in one environment's queue is not another's. */}
       {(slot) => <HumanTasksPage key={slot.api.connection.scopeId} {...slot} />}
     </WorkflowPageShell>

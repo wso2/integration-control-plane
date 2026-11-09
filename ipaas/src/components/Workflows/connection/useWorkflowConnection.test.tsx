@@ -51,7 +51,7 @@ const access = vi.hoisted(() => {
 const testAccessCalls = vi.hoisted(() => [] as unknown[][]);
 const endpoints = vi.hoisted(() => ({ list: [] as EnvEndpoint[], releaseIds: [] as string[] }));
 // The environments the integration is published to the User Portal in, or what reading them failed with.
-const publications = vi.hoisted(() => ({ environments: [] as string[], error: null as unknown, refetch: vi.fn() }));
+const publications = vi.hoisted(() => ({ environments: [] as string[], error: null as unknown, refetch: vi.fn(), portalUrl: undefined as string | undefined }));
 
 vi.mock('../../../hooks/useDeployments', () => ({
   useEnvEndpoints: (_componentId: string, _trackId: string | undefined, releaseId: string) => {
@@ -64,6 +64,7 @@ vi.mock('../../../hooks/useUserPortal', () => ({
     publications.error
       ? { data: undefined, isPending: false, isError: true, error: publications.error, refetch: publications.refetch }
       : { data: { environments: publications.environments }, isPending: false, isError: false, error: null, refetch: publications.refetch },
+  useUserPortals: (environments: string[]) => environments.map((environment) => ({ data: { environment, state: 'active', url: publications.portalUrl } })),
 }));
 vi.mock('../../../hooks/useEndpointTestAccess', () => ({
   useEndpointTestAccess: (...args: unknown[]) => {
@@ -171,6 +172,7 @@ beforeEach(() => {
   publications.environments = [];
   publications.error = null;
   publications.refetch.mockReset();
+  publications.portalUrl = undefined;
   rendered = undefined;
   access.reset(keyAccess());
   fetchMock.mockReset();
@@ -207,6 +209,18 @@ describe('useWorkflowConnection', () => {
     await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', notice: { severity: 'info' }, action: null }));
     expect(testAccessCalls.every(([, options]) => (options as { enabled: boolean }).enabled === false)).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('offers to open the User Portal a workflow is published to', async () => {
+    publications.environments = ['development'];
+    publications.portalUrl = 'https://portal.example/acme';
+    const open = vi.spyOn(window, 'open').mockReturnValue(null);
+    mount();
+    await vi.waitFor(() => expect(current().connection).toMatchObject({ status: 'unavailable', reason: 'published-to-user-portal', action: { label: 'Open User Portal' } }));
+    const { connection } = current();
+    if (connection.status !== 'unavailable' || !connection.action) throw new Error('expected an action');
+    connection.action.run();
+    expect(open).toHaveBeenCalledWith('https://portal.example/acme', '_blank', 'noopener,noreferrer');
   });
 
   it('connects as before to a workflow published to the User Portal only in another environment', async () => {

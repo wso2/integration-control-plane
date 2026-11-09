@@ -16,20 +16,17 @@
  * under the License.
  */
 
-import { Box, Button, Chip, Link, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
-import { CircleAlert } from '@wso2/oxygen-ui-icons-react';
+import { Box, Button, Chip, Skeleton, Stack, Tooltip, Typography } from '@wso2/oxygen-ui';
 import { useState, type JSX } from 'react';
-import { Link as RouterLink } from 'react-router';
 import { Scopes } from '../../constants/permissions';
 import { useCan } from '../../hooks/useCan';
-import { usePublishToUserPortal, useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
-import { userPortalUrl } from '../../nav';
-import type { UserPortalRefusal } from '../../types/userPortal';
+import { useUnpublishFromUserPortal, useUserPortalPublishability } from '../../hooks/useUserPortal';
 import { isUserPortalUnavailable } from '../../utils/apiErrors';
-import { refusalText, shownRefusals, USER_PORTAL_NOT_ENABLED, userPortalErrorText } from '../../utils/userPortal';
+import { shownRefusals, userPortalErrorText } from '../../utils/userPortal';
 import ConfirmDeleteDialog from '../ConfirmDeleteDialog';
-import PublishWorkflowDialog from './PublishWorkflowDialog';
+import PublishRefusals from './PublishRefusals';
 import * as styles from './UserPortal.styles';
+import { usePublishFlow } from './usePublishFlow';
 
 const DEPLOY_REFUSAL = "Your role can't publish integrations to the User Portal.";
 
@@ -50,13 +47,21 @@ interface UserPortalRowProps {
  */
 export default function UserPortalRow({ orgHandler, componentId, environment, envName }: UserPortalRowProps): JSX.Element | null {
   const { data, isLoading, isError, error, refetch, isFetching } = useUserPortalPublishability(componentId, environment);
-  const publish = usePublishToUserPortal();
   const unpublish = useUnpublishFromUserPortal();
   const canDeploy = useCan()(Scopes.INTEGRATION_DEPLOY);
   const [confirmUnpublish, setConfirmUnpublish] = useState(false);
-  const [confirmPublish, setConfirmPublish] = useState(false);
   // Scopes the last publish's endpoints require that the portal's users' tokens can't carry.
   const [rejectedScopes, setRejectedScopes] = useState<string[]>([]);
+  const publish = usePublishFlow({
+    componentId,
+    environment,
+    envName,
+    onStart: () => {
+      setRejectedScopes([]);
+      unpublish.reset();
+    },
+    onPublished: (out) => setRejectedScopes(out.rejectedScopes),
+  });
 
   if (isLoading) return <Skeleton variant="rounded" height={40} sx={styles.rowSx} />;
   // A BFF that serves no User Portal has nothing to publish to.
@@ -76,31 +81,6 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
 
   const reasons = shownRefusals(data.reasons);
   const pending = publish.isPending || unpublish.isPending;
-  const startPublish = () => {
-    setRejectedScopes([]);
-    unpublish.reset();
-    publish.mutate(
-      { componentId, environment },
-      {
-        onSuccess: (out) => {
-          setRejectedScopes(out.rejectedScopes);
-          setConfirmPublish(false);
-        },
-      },
-    );
-  };
-  const requestPublish = () => {
-    if (!data.redeploys) {
-      startPublish();
-      return;
-    }
-    publish.reset();
-    setConfirmPublish(true);
-  };
-  const closePublish = () => {
-    publish.reset();
-    setConfirmPublish(false);
-  };
   const closeUnpublish = () => {
     unpublish.reset();
     setConfirmUnpublish(false);
@@ -122,7 +102,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
   ) : (
     <Tooltip title={!canDeploy ? DEPLOY_REFUSAL : data.publishable ? '' : 'Fix what is listed below to publish.'}>
       <span>
-        <Button size="small" onClick={requestPublish} disabled={!canDeploy || !data.publishable || pending || isFetching}>
+        <Button size="small" onClick={() => publish.request(data.redeploys)} disabled={!canDeploy || !data.publishable || pending || isFetching}>
           {publish.isPending ? 'Publishing…' : 'Publish'}
         </Button>
       </span>
@@ -141,18 +121,12 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
         {action}
       </Stack>
 
-      {!data.published && reasons.length > 0 && (
-        <Stack gap={0.5} sx={styles.rowNoteSx} role="group" aria-label="Why it can't be published">
-          {reasons.map((reason) => (
-            <Reason key={reason.code + reason.message} reason={reason} envName={envName} orgHandler={orgHandler} />
-          ))}
-        </Stack>
-      )}
+      {!data.published && reasons.length > 0 && <PublishRefusals reasons={reasons} envName={envName} orgHandler={orgHandler} />}
 
       {/* An unpublish failure shows in its confirm dialog, and so does a publish that was confirmed; each stays open on it. */}
-      {publish.isError && !confirmPublish && (
+      {publish.error && (
         <Typography variant="caption" color="error" component="p" sx={styles.rowNoteSx}>
-          {userPortalErrorText(publish.error, envName)}
+          {publish.error}
         </Typography>
       )}
       {rejectedScopes.length > 0 && (
@@ -161,7 +135,7 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
         </Typography>
       )}
 
-      {confirmPublish && <PublishWorkflowDialog envName={envName} onConfirm={startPublish} onClose={closePublish} isPending={publish.isPending} error={publish.isError ? userPortalErrorText(publish.error, envName) : null} />}
+      {publish.dialog}
 
       {confirmUnpublish && (
         <ConfirmDeleteDialog title={`Unpublish from the User Portal in ${envName}?`} onConfirm={startUnpublish} onClose={closeUnpublish} isPending={unpublish.isPending} confirmLabel="Unpublish" pendingLabel="Unpublishing…" maxWidth="xs">
@@ -173,28 +147,6 @@ export default function UserPortalRow({ orgHandler, componentId, environment, en
           )}
         </ConfirmDeleteDialog>
       )}
-    </Box>
-  );
-}
-
-/** One publishing rule the integration breaks. The portal not being enabled is fixed on the User Portal page, so that one links there. */
-function Reason({ reason, envName, orgHandler }: { reason: UserPortalRefusal; envName: string; orgHandler: string }): JSX.Element {
-  return (
-    <Box sx={styles.reasonSx}>
-      <Box component="span" sx={styles.reasonIconSx}>
-        <CircleAlert size={12} />
-      </Box>
-      <Typography variant="caption" color="text.secondary">
-        {refusalText(reason, envName)}
-        {reason.code === USER_PORTAL_NOT_ENABLED && (
-          <>
-            {' '}
-            <Link component={RouterLink} to={userPortalUrl({ org: orgHandler })}>
-              Enable it
-            </Link>
-          </>
-        )}
-      </Typography>
     </Box>
   );
 }
