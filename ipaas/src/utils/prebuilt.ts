@@ -53,7 +53,7 @@ const VALID_HANDLER = /^[a-z0-9][a-z0-9-]*[a-z0-9]$/;
  * Prefers the last path segment of componentPath when it is a valid handler;
  * falls back to a sanitised version of displayName.
  */
-export function derivePrebuiltSlug(integration: PrebuiltIntegration): string {
+export function derivePrebuiltSlug(integration: Pick<PrebuiltIntegration, 'componentPath' | 'displayName'>): string {
   const fromPath = integration.componentPath.split('/').pop() ?? '';
   if (fromPath.length >= 3 && VALID_HANDLER.test(fromPath)) {
     return fromPath.slice(0, 25);
