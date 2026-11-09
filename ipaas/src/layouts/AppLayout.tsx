@@ -38,6 +38,7 @@ import {
   Sidebar,
   Tooltip,
   TrialBadge,
+  type Theme,
   type TrialBadgeUsage,
   Typography,
   UserMenu,
@@ -115,6 +116,14 @@ import { local } from '../utils/storage';
 import { expandedMenusFrom } from '../utils/sidebar';
 
 // Matches Agent Manager's level switcher arrow.
+// The theme's paper is 78% opaque and relies on a backdrop blur, which the trial usage panel (inside the header's own
+// blur) doesn't get, so the page showed through.
+const trialPanelSx = (theme: Theme) => ({
+  backgroundColor: '#ffffff',
+  backdropFilter: 'none',
+  ...theme.applyStyles('dark', { backgroundColor: '#0B1633' }),
+});
+
 const nextScopeArrowSx = {
   p: 1,
   color: 'text.primary',
@@ -289,7 +298,8 @@ export default function AppLayout(): JSX.Element {
   return (
     <AppShell>
       <AppShell.Navbar>
-        <Header>
+        {/* Static by default, so the trial usage panel (rendered inside it) would sit under the page. */}
+        <Header sx={{ position: 'relative', zIndex: 'appBar' }}>
           {/* Platforms lead the bar, as in the WSO2 Cloud console; the sidebar collapses from its own foot. */}
           <PlatformSwitcher />
           <Header.Brand>
@@ -633,8 +643,11 @@ export default function AppLayout(): JSX.Element {
           <Header.Spacer />
           <Header.Actions>
             {billingTrial && (
-              // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title.
-              <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} upgradeHref={cloudConsoleSubscriptionsUrl()} usage={trialUsage} title={trialEndLabel} />
+              // TrialBadge forwards no ref for a MUI Tooltip, so the end date rides on the native title. Its usage panel
+              // renders inside this Box (no portal), so its card is made opaque here.
+              <Box sx={(theme) => ({ display: 'contents', '& .MuiPopper-root .MuiCard-root': trialPanelSx(theme) })}>
+                <TrialBadge daysLeft={billingTrial.days_remaining} totalDays={trialLengthDays(billingOrg)} upgradeHref={cloudConsoleSubscriptionsUrl()} usage={trialUsage} title={trialEndLabel} />
+              </Box>
             )}
             {/* A plain link: the WSO2 Cloud console serves this path, not this console's router. */}
             <Tooltip title="Organization settings">
