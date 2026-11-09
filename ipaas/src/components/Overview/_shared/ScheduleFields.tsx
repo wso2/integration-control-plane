@@ -54,6 +54,7 @@ function PlanLimitWarning({ message, sx }: { message: string; sx?: object }): JS
 export default function ScheduleFields({ form, executionSettings = true }: { form: ScheduleFormApi; executionSettings?: boolean }): JSX.Element {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const { tab, setTab, intervalCount, setIntervalCount, intervalUnit, setIntervalUnit, cronFields, setCronFields, cron, description, errors, plan, policy } = form;
+  // The warning says what the plan allows, so "Executes every minute" would contradict it.
   const frequencyError = errors.frequency && <PlanLimitWarning message={errors.frequency} />;
 
   return (
@@ -103,7 +104,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
               ))}
             </Select>
           </Stack>
-          {description && (
+          {description && !errors.frequency && (
             <Typography variant="body2" color="text.secondary">
               {description}
             </Typography>
@@ -115,7 +116,7 @@ export default function ScheduleFields({ form, executionSettings = true }: { for
           <Typography variant="body1" sx={{ fontFamily: 'monospace', textAlign: 'center', py: 0.5 }}>
             {cron}
           </Typography>
-          {description && (
+          {description && !errors.frequency && (
             <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
               {description}
             </Typography>
