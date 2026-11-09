@@ -24,6 +24,7 @@ import { useIntegrationLinks, useLinkWrite } from '../../hooks/useConfiguration'
 import type { IntegrationLinks, LinkTarget } from '../../types/configuration';
 import { configKey, configurableId, formLinkView, targetName } from '../../utils/integrationLinks';
 import { ConnectionLink } from './ConnectionLink';
+import { LinkingNote } from './LinkingNote';
 import { OrphanedLinks } from './OrphanedLinks';
 import type { FormGroup } from '../SchemaConfigForm/ConfigForm';
 import type { FieldLinks } from '../SchemaConfigForm/linkedFrom';
@@ -86,6 +87,7 @@ export function useLinkedForm(projectId: string, componentId: string, env: strin
 
   const top: ReactNode = (
     <>
+      {write.isPending && <LinkingNote />}
       {read.isError && (
         <Alert
           severity="error"

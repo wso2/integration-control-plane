@@ -161,11 +161,12 @@ describe('the MI Configure form', () => {
     expect(Array.from(document.querySelectorAll('button')).find((b) => b.textContent === 'Save')?.disabled).toBe(true);
   });
 
-  it('offers no link action while a link write is on its way', async () => {
+  it('offers no link action while a link write is on its way, and says it is linking', async () => {
     answer.pending = true;
     await render('development');
     const disabled = (label: string) => (document.querySelector(`[aria-label="${label}"]`) as HTMLButtonElement).disabled;
     expect(['Link GITHUB_TOKEN', 'Link DB_URL', 'Remove GITHUB_TOKEN'].map(disabled)).toEqual([true, true, true]);
+    expect(document.querySelector('[role="status"]')?.textContent).toBe('Linking…');
   });
 
   it("says the links couldn't be read, with Try again, in place of the rows", async () => {

@@ -33,6 +33,7 @@ import { isEmptyMiConfigSavePlan, MI_ENV_VARS_GROUP, MI_SECRETS_GROUP, planMiCon
 import { EndpointCardList } from '../EndpointCardList';
 import { FieldLinkPicker } from '../SchemaConfigForm/FieldLinkPicker';
 import { fromText } from '../SchemaConfigForm/linkedFrom';
+import { LinkingNote } from './LinkingNote';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
 import { useLeaveGuard, useUnsavedChanges } from '../../contexts/UnsavedChangesContext';
@@ -324,6 +325,7 @@ export default function MiConfigureDrawer({ open, onClose, onSaved, projectId, c
           {linkView?.editable === false ? `Links apply to all environments. Change links in ${envName(links?.environments[0]?.name)}.` : 'Links apply to all environments; values are per environment.'}
         </Typography>
       )}
+      {kind === 'env' && linkWrite.isPending && <LinkingNote />}
       {kind === 'env' && linkWrite.isError && (
         <Alert severity="error" sx={{ mt: 1 }}>
           {linkWrite.error instanceof Error ? linkWrite.error.message : "Linking didn't finish."}

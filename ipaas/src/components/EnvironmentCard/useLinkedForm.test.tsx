@@ -168,7 +168,7 @@ describe('the Configure form with links', () => {
     }
   });
 
-  it('offers no link action while a link write is on its way', async () => {
+  it('offers no link action while a link write is on its way, and says it is linking', async () => {
     answer.pending = true;
     await act(async () => root.render(<Form />));
     const actions = ['Link githubAuthToken', 'Link ordersDatabaseUrl', 'Unlink github', 'Move', 'Remove'].map(button);
@@ -180,6 +180,7 @@ describe('the Configure form with links', () => {
       ['Remove', true],
     ]);
     expect(container.querySelector('[aria-label="Link backup"]')?.getAttribute('aria-disabled')).toBe('true');
+    expect(container.querySelector('[role="status"]')?.textContent).toBe('Linking…');
   });
 
   it("says the links couldn't be read, with Try again, and offers no link action or save", async () => {
