@@ -26,11 +26,14 @@ import type { EnvEndpoint } from '../../types/component';
 import type { SchemaConfigItem, CertGroup, CertMapping, CertMappingConfig } from '../../types/configuration';
 import { useGenerateComponentEndpoints } from '../../hooks/useComponents';
 import { useSaveSchemaConfig, usePostCertificateMappings } from '../../hooks/useConfiguration';
+import { useLinkedForm } from './useLinkedForm';
+import { savedValue } from '../../utils/savedConfig';
 import { useDeployDeploymentTrack } from '../../hooks/useDeployments';
 import ApiSettingsDrawer from '../Overview/integration-as-api/ApiSettingsDrawer';
 import { toEndpointOptions } from '../../utils/endpoints';
 import { EndpointCardList } from '../EndpointCardList';
 import { ConfigForm, type BaseType, type LinkingInfo, type JSONSchema } from '../SchemaConfigForm';
+import { linkableFields } from '../SchemaConfigForm/schemaUtils';
 import ImportConfigTomlButton from '../ImportConfigTomlButton';
 import MiConfigureDrawer from './MiConfigureDrawer';
 import { ManageEndpoint, StepIndicator } from './ConfigureSteps';
@@ -326,6 +329,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return null;
     }
   }, [data?.jsonSchema]);
+  const linked = useLinkedForm(projectId, componentId, envId, open, parsedSchema ? linkableFields(parsedSchema) : []);
 
   // Seed values only on open; avoid clobbering edits on background refetches.
   const seededRef = useRef(false);
@@ -341,8 +345,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       const initSensitive = new Map<string, boolean>();
       const initLinking = new Map<string, LinkingInfo>();
       for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+        const val = savedValue(cfg);
+        if (val !== undefined) initValues.set(cfg.key, val);
         if (cfg.isSensitive) initSensitive.set(cfg.key, true);
         if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
           initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -365,8 +369,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -442,8 +446,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -461,6 +465,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       setSaveError(null);
       const configurations: SchemaConfigItem[] = [];
       valueMap.forEach((value, key) => {
+        // A link supplies it; a value of the form's own would compete with the link's.
+        if (linked.linkedKeys.has(key)) return;
         if (value !== '' && value !== undefined && value !== null) {
           const linking = linkingMap.get(key);
           const isSensitive = sensitiveMap.get(key) || false;
@@ -545,7 +551,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   };
 
   const renderConfigurations = () => {
-    if (isLoading) {
+    if (isLoading || linked.linksLoading) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress size={32} color="primary" />
@@ -556,11 +562,13 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Configuration schema is not available for this component.
+            {linked.unread ?? 'Configuration schema is not available for this component.'}
           </Typography>
         </Box>
       );
     }
+    // Without the links, linked fields would read as empty value boxes.
+    if (linked.linksMissing) return linked.top;
     if (!data?.jsonSchema || !parsedSchema) {
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
@@ -572,6 +580,7 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
     }
     return (
       <>
+        {linked.top}
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -583,6 +592,8 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          groups={linked.groups}
+          fieldLinks={linked.fieldLinks}
           managedKeys={managedConfigKeys(data?.configurations)}
         />
         {saveError && (
@@ -597,12 +608,13 @@ function AutomationConfigureDrawer({ open, onClose, onSaved, projectId, componen
   const renderCertificateMount = () => <CertificateMountStep projectId={projectId} componentId={componentId} envId={envId} deploymentTrackId={deploymentTrackId} open={open} linkedCerts={linkedCerts} onChange={setLinkedCerts} />;
 
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
-  const hasValidationErrors = Array.from(validationMap.values()).some((v) => !v);
+  // A field marked invalid before its link loaded is no longer the form's to fill.
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
   const isApplying = save.isPending || saveCertMappings.isPending || deployTrack.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === 2 ? (isApplying ? 'Updating…' : 'Update') : 'Next';
-  const nextDisabled = step === 1 ? hasValidationErrors || isLoading : isApplying || hasCertPathErrors;
+  const nextDisabled = step === 1 ? hasValidationErrors || isLoading || linked.linksUnread : isApplying || hasCertPathErrors;
 
   return (
     <DrawerPanel open={open} onClose={handleClose}>
@@ -788,6 +800,7 @@ function GenericServiceConfigureDrawer({
       return null;
     }
   }, [data?.jsonSchema]);
+  const linked = useLinkedForm(projectId, componentId, schemaEnvId, open, parsedSchema ? linkableFields(parsedSchema) : []);
 
   // Reset UI state on open; seed immediately if data is already cached.
   useEffect(() => {
@@ -803,8 +816,8 @@ function GenericServiceConfigureDrawer({
       const initSensitive = new Map<string, boolean>();
       const initLinking = new Map<string, LinkingInfo>();
       for (const cfg of data?.configurations ?? []) {
-        const val = cfg.values?.[0]?.value;
-        if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+        const val = savedValue(cfg);
+        if (val !== undefined) initValues.set(cfg.key, val);
         if (cfg.isSensitive) initSensitive.set(cfg.key, true);
         if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
           initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -828,8 +841,8 @@ function GenericServiceConfigureDrawer({
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -901,8 +914,8 @@ function GenericServiceConfigureDrawer({
     const initSensitive = new Map<string, boolean>();
     const initLinking = new Map<string, LinkingInfo>();
     for (const cfg of data?.configurations ?? []) {
-      const val = cfg.values?.[0]?.value;
-      if (val !== undefined && val !== '') initValues.set(cfg.key, val);
+      const val = savedValue(cfg);
+      if (val !== undefined) initValues.set(cfg.key, val);
       if (cfg.isSensitive) initSensitive.set(cfg.key, true);
       if (cfg.configGroupId || cfg.configKeyId || cfg.isDynamic) {
         initLinking.set(cfg.key, { configGroupId: cfg.configGroupId, configKeyId: cfg.configKeyId, isDynamic: cfg.isDynamic });
@@ -917,6 +930,8 @@ function GenericServiceConfigureDrawer({
     setSaveError(null);
     const configurations: SchemaConfigItem[] = [];
     valueMap.forEach((value, key) => {
+      // A link supplies it; a value of the form's own would compete with the link's.
+      if (linked.linkedKeys.has(key)) return;
       if (value !== '' && value !== undefined && value !== null) {
         const linking = linkingMap.get(key);
         const isSensitive = sensitiveMap.get(key) || false;
@@ -1019,7 +1034,7 @@ function GenericServiceConfigureDrawer({
   };
 
   const renderConfigurations = () => {
-    if (isLoading) {
+    if (isLoading || linked.linksLoading) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
           <CircularProgress size={32} color="primary" />
@@ -1030,11 +1045,13 @@ function GenericServiceConfigureDrawer({
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
           <Typography variant="body2" color="text.secondary">
-            Configuration schema is not available for this component.
+            {linked.unread ?? 'Configuration schema is not available for this component.'}
           </Typography>
         </Box>
       );
     }
+    // Without the links, linked fields would read as empty value boxes.
+    if (linked.linksMissing) return linked.top;
     if (!data?.jsonSchema || !parsedSchema) {
       return (
         <Box sx={{ py: 4, px: 2, textAlign: 'center' }}>
@@ -1046,6 +1063,7 @@ function GenericServiceConfigureDrawer({
     }
     return (
       <>
+        {linked.top}
         <ConfigForm
           schema={parsedSchema}
           valueMap={valueMap}
@@ -1057,6 +1075,8 @@ function GenericServiceConfigureDrawer({
           configGroups={configGroups}
           handleValueChange={handleValueChange}
           handleValidationChange={handleValidationChange}
+          groups={linked.groups}
+          fieldLinks={linked.fieldLinks}
           managedKeys={managedConfigKeys(data?.configurations)}
         />
         {saveError && (
@@ -1088,12 +1108,13 @@ function GenericServiceConfigureDrawer({
 
   const stepContent = step === 1 ? renderConfigurations() : step === 2 ? renderCertificateMount() : renderEndpoints();
   const hasSchema = !isLoading && !isError && data !== null && !!data?.jsonSchema && !!parsedSchema;
-  const hasValidationErrors = Array.from(validationMap.values()).some((v) => !v);
+  // A field marked invalid before its link loaded is no longer the form's to fill.
+  const hasValidationErrors = Array.from(validationMap).some(([key, valid]) => !valid && !linked.linkedKeys.has(key));
   const hasCertPathErrors = linkedCerts.some((c) => c.mountPath && !c.mountPath.startsWith('/'));
   const isApplying = save.isPending || saveCertMappings.isPending;
   const prevLabel = step === 1 ? 'Cancel' : 'Back';
   const nextLabel = step === lastStep ? (isApplying ? 'Applying…' : 'Apply') : step === 1 && generateEp.isPending ? 'Loading…' : 'Next';
-  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
+  const nextDisabled = (step === 1 && (hasValidationErrors || isLoading || generateEp.isPending || linked.linksUnread)) || (step === 2 && hasCertPathErrors) || (step === lastStep && isApplying);
   const showFooter = !(step === lastStep && managingEp !== null);
 
   return (

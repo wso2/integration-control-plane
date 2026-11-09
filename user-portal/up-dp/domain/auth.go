@@ -18,12 +18,14 @@
 
 package domain
 
-// TokenService reads the caller from a bearer token's claims.
+import "context"
+
+// TokenService verifies a bearer token and reads the caller from its claims.
 type TokenService interface {
-	Read(rawToken string) (*TokenIdentity, error)
+	Read(ctx context.Context, rawToken string) (*TokenIdentity, error)
 }
 
-// TokenIdentity is who the caller is, as the access token's claims say.
+// TokenIdentity is who the caller is, as the verified access token's claims say.
 type TokenIdentity struct {
 	UserID string
 	Scopes []string

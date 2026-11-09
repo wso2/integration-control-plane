@@ -22,7 +22,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRetrieveFromKnowledgeBase } from '../../hooks/useKnowledgeBases';
 import { DEFAULT_RETRIEVAL_QUERY } from '../../constants/ragIngestion';
 import { httpStatusOf } from '../../utils/apiErrors';
+import { retrievalAccessReason } from '../../utils/knowledgeBase';
 import { generateUUID } from '../../utils/string';
+import type { KnowledgeBase } from '../../types/knowledgeBase';
 import type { RetrievedChunk } from '../../types/ragIngestion';
 
 /** Inline chat shows only this many chunks; the rest open in a paginated modal. */
@@ -92,7 +94,7 @@ function ChunksModal({ chunks, onClose }: { chunks: RetrievedChunk[] | null; onC
 }
 
 interface RetrievalChatProps {
-  knowledgeBase: string;
+  knowledgeBase: Pick<KnowledgeBase, 'name' | 'environment' | 'apiStatus'>;
   /** The integration the query is made from, sent as `rag_component_id`. */
   componentId: string;
   /** Why queries cannot be sent yet (e.g. the KB Service is still deploying); null when they can. */
@@ -108,20 +110,25 @@ interface ChatEntry {
 }
 
 function retrieveErrorMessage(err: unknown): string {
-  // 503: the KB Service is not routed or still starting.
   const status = httpStatusOf(err);
-  if (status === 503) return 'The knowledge base service is not ready yet. Try again in a moment.';
+  // The gateway answers 404 until the API reaches it, and 502/503 while the service starts.
+  if (status === 404 || status === 502 || status === 503) return 'The knowledge base service is not ready yet. Try again in a moment.';
+  if (status === 401 || status === 403) return 'The gateway refused the test key. Try again in a moment.';
   if (err instanceof DOMException && err.name === 'TimeoutError') return 'The knowledge base did not answer in time. Please try again.';
+  // fetch rejects with a TypeError when the gateway can't be reached at all.
+  if (err instanceof TypeError) return 'Could not reach the knowledge base on the API gateway. Please try again.';
   return 'Failed to retrieve chunks. Please try again.';
 }
 
 /**
  * A chat window that queries a knowledge base for the chunks most relevant to a
- * question. The query goes through the BFF to the knowledge base's service,
- * which embeds it with the knowledge base's own settings.
+ * question. The query goes to the knowledge base's API on the API Platform gateway
+ * with a test key, and its service embeds it with the knowledge base's own settings.
  */
-export default function RetrievalChat({ knowledgeBase, componentId, unavailableReason }: RetrievalChatProps): ReactNode {
-  const retrieve = useRetrieveFromKnowledgeBase(knowledgeBase, componentId);
+export default function RetrievalChat({ knowledgeBase, componentId, unavailableReason: refusal }: RetrievalChatProps): ReactNode {
+  // No key is minted while the service can't be queried anyway.
+  const { retrieve, access } = useRetrieveFromKnowledgeBase(knowledgeBase, componentId, !refusal);
+  const unavailableReason = refusal ?? retrievalAccessReason(access, knowledgeBase.apiStatus);
   const [messages, setMessages] = useState<ChatEntry[]>([]);
   const [input, setInput] = useState('');
   const [inputFocused, setInputFocused] = useState(false);

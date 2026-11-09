@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Permissions } from './permissions';
+import { Permissions, Scopes } from './permissions';
 
 /** A single org-Settings section: the tab label, its route, and the permissions that reveal it. */
 export interface SettingsSectionDef {
@@ -31,9 +31,13 @@ export interface SettingsSectionDef {
 
 /**
  * Org Settings sections, in display order. User management and the security sections
- * aren't backed by the BFF yet, so Settings carries only the package registries.
+ * aren't backed by the BFF yet. An environment's User Portal is part of the environment,
+ * so its tab takes the environment's read scope.
  */
-export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [{ id: 'package-registries', label: 'Package registries', path: 'package-registries', permissions: [Permissions.ENVIRONMENT_MANAGE] }];
+export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = [
+  { id: 'package-registries', label: 'Package registries', path: 'package-registries', permissions: [Permissions.ENVIRONMENT_MANAGE] },
+  { id: 'user-portal', label: 'User Portal', path: 'user-portal', permissions: [Scopes.ENVIRONMENT_READ] },
+];
 
 /** A section is visible if it has no gate or the user holds one of its permissions. */
 export function isSettingsSectionVisible(s: SettingsSectionDef, hasAnyPermission: (perms: string[]) => boolean): boolean {

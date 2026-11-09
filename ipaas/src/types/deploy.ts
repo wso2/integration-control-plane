@@ -69,6 +69,8 @@ export interface DeployEnvironmentCardProps {
   displayType?: string;
   /** A workflow integration: shows the workflow runtime it runs on, and promotes only once the runtime is ready. */
   isWorkflow?: boolean;
+  /** An AI agent, automation or workflow: shows whether it is published to the environment's User Portal, with Publish or Unpublish. */
+  publishesToUserPortal?: boolean;
   env: Environment;
   branch: string;
   componentName: string;
@@ -111,6 +113,8 @@ export interface DeployEnvironmentCardBodyProps {
   endpointCount?: number;
   configurablesCount?: number;
   scaleToZeroEnabled?: boolean;
+  /** Why the environment can't start until configured; the card then offers "Configure to Continue". */
+  missingConfigsReason?: string;
   /** Absent when the user's role can't change configuration here: the card hides the control. */
   onConfigClick?: () => void;
   onJobConfigClick?: () => void;

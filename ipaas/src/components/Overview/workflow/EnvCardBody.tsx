@@ -23,17 +23,16 @@ import type { EnvCardBodyProps } from '../../../types/integration';
 import { isDeploymentHealthy } from '../../../utils/deploymentStatus';
 import WorkflowEnvCardContent from '../../Workflows/overview/WorkflowEnvCardContent';
 import EnvCardSkeleton from '../_shared/EnvCardSkeleton';
-import DeployedBody from '../webhook/EnvCardBody';
 
 const notDeployedSx = { textAlign: 'center', py: 2 } as const;
 const notActiveSx = { py: 3 } as const;
 const notActiveIconStyle = { opacity: 0.4 } as const;
 
 /**
- * Workflow body: a deployed environment shows its endpoints and insights, as a
- * webhook's does (a workflow publishes no API contract), with the workflow
- * content between them. That content needs the workflow runtime, so it shows
- * only once the deployment is active; until then the card says so.
+ * Workflow body: a deployed environment shows its workflows alone. Its endpoints
+ * are not listed: the business ones are reached through the workflows, and the
+ * management API is the platform's own. The content needs the workflow runtime,
+ * so it shows only once the deployment is active; until then the card says so.
  */
 export default function EnvCardBody(props: EnvCardBodyProps): ReactNode {
   const { component, env, versionId, releaseId, hasDeployment, loadingDeployment, deploymentStatusV2 } = props;
@@ -51,7 +50,8 @@ export default function EnvCardBody(props: EnvCardBodyProps): ReactNode {
   }
 
   return (
-    <DeployedBody {...props}>
+    <>
+      <Divider sx={{ my: 2 }} />
       {isDeploymentHealthy(deploymentStatusV2) ? (
         <WorkflowEnvCardContent target={{ componentId: component.id, environmentId: env.id, trackId: versionId, deployment: { releaseId, deploymentStatusV2 }, isDeploymentLoading: false }} />
       ) : (
@@ -63,6 +63,6 @@ export default function EnvCardBody(props: EnvCardBodyProps): ReactNode {
           </Typography>
         </Stack>
       )}
-    </DeployedBody>
+    </>
   );
 }

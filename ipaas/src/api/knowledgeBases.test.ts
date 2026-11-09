@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const post = vi.hoisted(() => vi.fn());
 
@@ -45,6 +45,11 @@ describe('toKnowledgeBase', () => {
     });
   });
 
+  it('keeps how publishing the service on the gateway is going', () => {
+    const apiStatus = { status: 'FAILED', error: 'GATEWAY_UNAVAILABLE', nextRetryAt: '2026-11-08T10:00:00Z' };
+    expect(toKnowledgeBase({ name: 'docs-kb', projectName: 'ai-services', environment: 'development', apiStatus }).apiStatus).toEqual(apiStatus);
+  });
+
   it('maps data sources, keeping a stopped schedule as none', () => {
     const kb = toKnowledgeBase({
       name: 'docs-kb',
@@ -66,19 +71,35 @@ describe('toKnowledgeBaseDataSource', () => {
 });
 
 describe('retrieveFromKnowledgeBase', () => {
-  it('sends the query form-encoded, with a deadline', async () => {
-    post.mockResolvedValue({ retrieved_chunks: [{ chunk: 'a' }] });
-    await expect(retrieveFromKnowledgeBase('docs kb', 'orders', { userQuery: 'leave & pay', maxChunks: 5, minSimilarity: 0.4 })).resolves.toEqual([{ chunk: 'a' }]);
-    const [path, body, headers, signal] = post.mock.calls[0];
-    expect(path).toBe('/knowledge-bases/docs%20kb/retrieve');
-    expect(body).toBeInstanceOf(URLSearchParams);
-    expect((body as URLSearchParams).toString()).toBe('rag_component_id=orders&user_query=leave+%26+pay&max_retrieve_chunks=5&min_similarity_threshold=0.4');
-    expect(headers).toBeUndefined();
-    expect(signal).toBeInstanceOf(AbortSignal);
+  const fetchMock = vi.fn();
+  beforeEach(() => {
+    fetchMock.mockReset();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+  const answer = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+  const key = { header: 'X-API-Key', apiKey: 'test-key' };
+
+  it('sends the query form-encoded to the gateway with the test key, never through the BFF', async () => {
+    fetchMock.mockResolvedValue(answer(200, { retrieved_chunks: [{ chunk: 'a' }] }));
+    await expect(retrieveFromKnowledgeBase('https://gw.example.com/docs-kb/', key, 'orders', { userQuery: 'leave & pay', maxChunks: 5, minSimilarity: 0.4 })).resolves.toEqual([{ chunk: 'a' }]);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('https://gw.example.com/docs-kb/retrieve');
+    expect(init.method).toBe('POST');
+    expect(init.headers).toEqual({ 'Content-Type': 'application/x-www-form-urlencoded', 'X-API-Key': 'test-key' });
+    expect((init.body as URLSearchParams).toString()).toBe('rag_component_id=orders&user_query=leave+%26+pay&max_retrieve_chunks=5&min_similarity_threshold=0.4');
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(post).not.toHaveBeenCalled();
   });
 
-  it('reads a response without chunks as none', async () => {
-    post.mockResolvedValue({});
-    await expect(retrieveFromKnowledgeBase('docs-kb', 'orders', { userQuery: 'q', maxChunks: 5, minSimilarity: 0 })).resolves.toEqual([]);
+  it('sends no key header for an API that takes none', async () => {
+    fetchMock.mockResolvedValue(answer(200, {}));
+    await expect(retrieveFromKnowledgeBase('https://gw.example.com/docs-kb', { header: 'X-API-Key', apiKey: null }, 'orders', { userQuery: 'q', maxChunks: 5, minSimilarity: 0 })).resolves.toEqual([]);
+    expect((fetchMock.mock.calls[0] as [string, RequestInit])[1].headers).toEqual({ 'Content-Type': 'application/x-www-form-urlencoded' });
+  });
+
+  it('rejects a refusal with its status', async () => {
+    fetchMock.mockResolvedValue(answer(401, { message: 'invalid key' }));
+    await expect(retrieveFromKnowledgeBase('https://gw.example.com/docs-kb', key, 'orders', { userQuery: 'q', maxChunks: 5, minSimilarity: 0 })).rejects.toMatchObject({ status: 401 });
   });
 });

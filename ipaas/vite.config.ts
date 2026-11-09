@@ -24,12 +24,31 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 // Path prefix the console is served under (e.g. BASE_PATH=/integration-platform); the root by default.
 const basePath = (process.env.BASE_PATH ?? '').replace(/^\/+|\/+$/g, '');
 
+// The deployed console whose gateway sign-in `pnpm dev` borrows (DEV_PROXY_TARGET overrides it).
+// public/config.json points the console at same-origin /_auth and /_api, and the dev server passes
+// them on with the browser's session cookies, copied from that console onto https://localhost:3000.
+// The session cookies are __Host- ones, which a browser keeps only on https: hence server.https.
+const devProxyTarget = (process.env.DEV_PROXY_TARGET ?? 'https://cloud-console-development.gateway.dev.cloud.wso2.com').replace(/\/+$/, '');
+const gatewayProxy = {
+  target: devProxyTarget,
+  changeOrigin: true,
+  secure: true,
+  // The gateway checks the origin of a state-changing call against its own.
+  headers: { Origin: devProxyTarget, Referer: `${devProxyTarget}/` },
+  // A refreshed session is set with the gateway's own domain, if any; keep it on localhost.
+  cookieDomainRewrite: { '*': '' },
+};
+
 // https://vite.dev/config/
 export default defineConfig({
   base: basePath ? `/${basePath}/` : '/',
   server: {
     port: 3000,
     https: {},
+    proxy: {
+      '/_auth': gatewayProxy,
+      '/_api': gatewayProxy,
+    },
   },
   // Preview mirrors the dev server: the IDP only accepts redirects on :3000, and
   // `vite preview` reads none of `server`, so the port is repeated here.

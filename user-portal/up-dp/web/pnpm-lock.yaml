@@ -12,11 +12,11 @@ importers:
         specifier: ^5.90.20
         version: 5.105.0(@types/react@19.2.2)(react@19.2.3)
       '@wso2/oxygen-ui':
-        specifier: ^0.15.0
-        version: 0.15.0(@mui/system@7.3.11(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(@wso2/oxygen-ui-icons-react@0.15.0(react@19.2.3))(luxon@3.7.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        specifier: ^0.20.0
+        version: 0.20.0(@mui/system@7.3.11(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(@wso2/oxygen-ui-icons-react@0.20.0(react@19.2.3))(luxon@3.7.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@wso2/oxygen-ui-icons-react':
-        specifier: ^0.15.0
-        version: 0.15.0(react@19.2.3)
+        specifier: ^0.20.0
+        version: 0.20.0(react@19.2.3)
       cron-parser:
         specifier: ^4.9.0
         version: 4.9.0
@@ -33,8 +33,8 @@ importers:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.2.2)(react@19.2.3)
       react-router:
-        specifier: 7.9.4
-        version: 7.9.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
+        specifier: 7.18.5
+        version: 7.18.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
@@ -331,6 +331,9 @@ packages:
 
   '@fontsource-variable/inter@5.2.8':
     resolution: {integrity: sha512-kOfP2D+ykbcX/P3IFnokOhVRNoTozo5/JxhAIVYLpea/UBmCQ/YWPBfWIDuBImXX/15KH+eKh4xpEUyS2sQQGQ==}
+
+  '@fontsource-variable/sora@5.3.0':
+    resolution: {integrity: sha512-h8kHta4Z8SkfUGeI82TUy1n3rbrKpBRGwuk4t4qCwto5oEHxlbOFD2yGP+Df5fbmTXwKGn+o667vYp0E4K8Whw==}
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -827,13 +830,13 @@ packages:
     peerDependencies:
       vite: ^4 || ^5 || ^6 || ^7
 
-  '@wso2/oxygen-ui-icons-react@0.15.0':
-    resolution: {integrity: sha512-7XZ4UDFDN8dwU63YqrmazfstOqus0qEqMg9Po8xHk0mpwZOU1ix38PcuFcPBPue7jSk09JLyrQa70eXS6+YcaQ==}
+  '@wso2/oxygen-ui-icons-react@0.20.0':
+    resolution: {integrity: sha512-hQbXELqdvto4fnLGuBklAIaUTx7KfKrPFZ8+GLM9X5+Bqr0JPoE+aGvOrTUCVf4OifR70OQ642He5I+z1CBgFQ==}
     peerDependencies:
       react: 19.2.3
 
-  '@wso2/oxygen-ui@0.15.0':
-    resolution: {integrity: sha512-sRC00C82K8RUyj3verIgaMHKyg09SAOAlp5/ZvN/4ArGCWSdebBcDeS9+nHZ5yHuMETt/0mfGmPkOI4HkYqNog==}
+  '@wso2/oxygen-ui@0.20.0':
+    resolution: {integrity: sha512-QHgnR0CjcmTnIi23uImb1//FpgNc2jVxjG4Vagequ8tHb//oAEs/74LWehBKTy0Hb5tovS6eA0LmIooVAYNseA==}
     hasBin: true
     peerDependencies:
       '@wso2/oxygen-ui-icons-react': '>=0.1.0'
@@ -1247,8 +1250,8 @@ packages:
       '@types/react': '>=18'
       react: '>=18'
 
-  react-router@7.9.4:
-    resolution: {integrity: sha512-SD3G8HKviFHg9xj7dNODUKDFgpG4xqD5nhyd0mYoB5iISepuZAvzSr8ywxgxKJ52yRzf/HWtVHc9AWwoTbljvA==}
+  react-router@7.18.5:
+    resolution: {integrity: sha512-dTgvcXDOrLPrlLHrcZAqWveiK1hMSqN+rGAJzegP8HtmNkfRxOoshGWBNX3ZJ0cZjOHkRdlUJtaIhZMLLyGyPw==}
     engines: {node: '>=20.0.0'}
     peerDependencies:
       react: '>=18'
@@ -1653,6 +1656,8 @@ snapshots:
   '@floating-ui/utils@0.2.12': {}
 
   '@fontsource-variable/inter@5.2.8': {}
+
+  '@fontsource-variable/sora@5.3.0': {}
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -2063,23 +2068,24 @@ snapshots:
     transitivePeerDependencies:
       - '@swc/helpers'
 
-  '@wso2/oxygen-ui-icons-react@0.15.0(react@19.2.3)':
+  '@wso2/oxygen-ui-icons-react@0.20.0(react@19.2.3)':
     dependencies:
       lucide-react: 1.16.0(react@19.2.3)
       react: 19.2.3
 
-  '@wso2/oxygen-ui@0.15.0(@mui/system@7.3.11(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(@wso2/oxygen-ui-icons-react@0.15.0(react@19.2.3))(luxon@3.7.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
+  '@wso2/oxygen-ui@0.20.0(@mui/system@7.3.11(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(@wso2/oxygen-ui-icons-react@0.20.0(react@19.2.3))(luxon@3.7.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)':
     dependencies:
       '@emotion/cache': 11.14.0
       '@emotion/react': 11.14.0(@types/react@19.2.2)(react@19.2.3)
       '@emotion/styled': 11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3)
       '@fontsource-variable/inter': 5.2.8
+      '@fontsource-variable/sora': 5.3.0
       '@mui/material': 7.3.4(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@mui/utils': 9.0.0(@types/react@19.2.2)(react@19.2.3)
       '@mui/x-data-grid': 8.16.0(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@mui/material@7.3.4(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@mui/system@7.3.11(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@mui/x-date-pickers': 8.16.0(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@mui/material@7.3.4(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@mui/system@7.3.11(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(date-fns@4.1.0)(luxon@3.7.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
       '@mui/x-tree-view': 8.14.0(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@mui/material@7.3.4(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(@mui/system@7.3.11(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@emotion/styled@11.14.1(@emotion/react@11.14.0(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react@19.2.3))(@types/react@19.2.2)(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@wso2/oxygen-ui-icons-react': 0.15.0(react@19.2.3)
+      '@wso2/oxygen-ui-icons-react': 0.20.0(react@19.2.3)
       date-fns: 4.1.0
       prismjs: 1.30.0
       react: 19.2.3
@@ -2727,7 +2733,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-router@7.9.4(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
+  react-router@7.18.5(react-dom@19.2.3(react@19.2.3))(react@19.2.3):
     dependencies:
       cookie: 1.1.1
       react: 19.2.3

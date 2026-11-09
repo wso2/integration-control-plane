@@ -19,6 +19,7 @@
 import {
   AcrylicOrangeTheme,
   AcrylicPurpleTheme,
+  ChoreoLabsTheme,
   ClassicTheme,
   createOxygenTheme,
   darken,
@@ -33,8 +34,9 @@ import {
   WSO2Theme,
 } from '@wso2/oxygen-ui';
 
-/** The Oxygen UI themes `PORTAL_THEME` can name. `acrylicOrange`, the WSO2 Cloud consoles' theme, is the default. */
+/** The Oxygen UI themes `PORTAL_THEME` can name. `choreoLabs`, the integration console's blue theme, is the default. */
 export const THEMES: Record<string, Theme> = {
+  choreoLabs: ChoreoLabsTheme,
   oxygen: OxygenTheme,
   acrylicOrange: AcrylicOrangeTheme,
   acrylicPurple: AcrylicPurpleTheme,
@@ -46,7 +48,7 @@ export const THEMES: Record<string, Theme> = {
   paleIndigo: PaleIndigoTheme,
 };
 
-const DEFAULT_THEME = 'acrylicOrange';
+const DEFAULT_THEME = 'choreoLabs';
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
 
 function primary(main: string, tone: 'light' | 'dark') {

@@ -18,8 +18,8 @@
 
 import { Card, CardContent, CircularProgress, Collapse, IconButton, Stack, Typography } from '@wso2/oxygen-ui';
 import { ChevronDown, ChevronUp, GitBranch } from '@wso2/oxygen-ui-icons-react';
-import { CellDiagram, DiagramLayer } from '@wso2/cell-diagram';
-import type { Project as DiagramProject } from '@wso2/cell-diagram';
+import { CellDiagram, DiagramLayer } from '@openchoreo/cell-diagram';
+import type { Project as DiagramProject } from '@openchoreo/cell-diagram';
 import { memo, useMemo, useState } from 'react';
 import type { Component } from '../types/component';
 import { buildProjectModel } from './Observability/diagramUtils';

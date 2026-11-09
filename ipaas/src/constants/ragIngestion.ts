@@ -16,7 +16,6 @@
  * under the License.
  */
 
-import type { ExecutionConfigs } from '../types/executions';
 import type { AutomationConfig, ChunkingConfig, ChunkingStrategy, DatasourceConfig, DatasourceType, EmbeddingConfig, EmbeddingProvider, GdriveAuthType, VectorStoreConfig, VectorStoreProvider } from '../types/ragIngestion';
 
 const RAG_LOGO_BASE = 'assets/images/rag/';
@@ -94,12 +93,6 @@ export const CHUNKING_STRATEGIES: { value: ChunkingStrategy; label: string }[] =
 ];
 
 export const DEFAULT_CHUNKING: ChunkingConfig = { strategy: 'recursive', maxSegmentSize: 1000, maxOverlapSize: 200 };
-
-/**
- * Ingestion re-reads the whole source, so a new data source starts daily rather than at the every-minute schedule default.
- * Written as the interval form ("every 1 day") so the schedule form opens on By Interval; `0 0 * * *` would open on By Cron.
- */
-export const DAILY_INGESTION: ExecutionConfigs = { cronjobFrequency: '0 0 */1 * *', cronjobTimezone: 'UTC' };
 
 // ── Retrieval ───────────────────────────────────────────────────────────────
 
