@@ -25,7 +25,9 @@ import UserPortalAction from '../../UserPortal/UserPortalAction';
  * The env card's User Portal action, in the card's footer: Publish, Unpublish, or
  * "User Portal off" while the environment has none. For the types the portal shows.
  */
-const footerSx = { mt: 2 } as const;
+// The action renders nothing where ipaas-service serves no User Portal; the footer then takes no
+// space, so the card doesn't end in an empty gap.
+const footerSx = { mt: 2, '&:empty': { display: 'none' } } as const;
 
 export default function UserPortalSharedAction({ component, env, orgHandler, onNotify }: EnvCardSharedActionProps): JSX.Element {
   return (

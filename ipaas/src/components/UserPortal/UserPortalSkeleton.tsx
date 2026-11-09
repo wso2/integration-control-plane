@@ -16,7 +16,7 @@
  * under the License.
  */
 
-import { Alert, Box, Card, CardContent, Skeleton, Stack } from '@wso2/oxygen-ui';
+import { Box, Card, CardContent, Skeleton, Stack } from '@wso2/oxygen-ui';
 import type { JSX } from 'react';
 import * as styles from './UserPortal.styles';
 
@@ -44,9 +44,4 @@ export default function UserPortalSkeleton(): JSX.Element {
       ))}
     </Box>
   );
-}
-
-/** Says the BFF serves no User Portal, so there is nothing to enable here. */
-export function UserPortalUnavailable(): JSX.Element {
-  return <Alert severity="info">The User Portal is not available in this deployment.</Alert>;
 }
