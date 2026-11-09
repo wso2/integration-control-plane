@@ -1082,7 +1082,7 @@ test.describe('07 page availability @smoke', () => {
 test.describe('07b marketing consent prompt @smoke', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('TC_IP_MC_001 a person who has not answered is asked, and Decline records Unsubscribed and closes the prompt', async ({ browser }, testInfo) => {
+  test('TC_IP_MC_001 a person who has not answered is asked, and No thanks records Unsubscribed and closes the prompt', async ({ browser }, testInfo) => {
     const own = await newConsoleContext(browser, { storageState: AUTH_STATE_PATH, baseURL: testInfo.project.use.baseURL });
     try {
       const sent = await answerConsentReadAs(own, { optoutOfEmails: false, consentStatus: 'No Opt-in' });
@@ -1094,7 +1094,7 @@ test.describe('07b marketing consent prompt @smoke', () => {
       const dialog = tab.getByRole('dialog', { name: CONSENT_DIALOG_TITLE });
       await expect(dialog, 'a person who has not answered was not asked').toBeVisible({ timeout: 60_000 });
       await expect(dialog.getByRole('link', { name: 'privacy policy' })).toHaveAttribute('href', 'https://wso2.com/privacy-policy');
-      await dialog.getByRole('button', { name: 'Decline', exact: true }).click();
+      await dialog.getByRole('button', { name: 'No thanks', exact: true }).click();
       await expect(dialog, 'the prompt stayed open after an answer').toBeHidden({ timeout: 30_000 });
       expect(sent).toEqual([{ consentstatus: 'Unsubscribed' }]);
 

@@ -40,27 +40,26 @@ export default function MarketingConsentDialog(): JSX.Element | null {
 
   return (
     <Dialog open disableEscapeKeyDown maxWidth="sm" fullWidth aria-labelledby="marketing-consent-title">
-      <DialogTitle id="marketing-consent-title">Welcome to WSO2 Cloud!</DialogTitle>
+      <DialogTitle id="marketing-consent-title">Welcome to WSO2 Cloud</DialogTitle>
       <DialogContent>
         <Stack spacing={2}>
-          <Typography variant="subtitle1">Don&apos;t miss out on our latest updates and events</Typography>
-          <DialogContentText>Send me product updates, resources, and event invites for WSO2 Cloud.</DialogContentText>
-          <DialogContentText>
-            Our usage is always subject to our{' '}
+          <DialogContentText>Want to stay in the loop? Get product updates, resources, and event invites by email. You can unsubscribe at any time.</DialogContentText>
+          <Typography variant="body2">
+            Learn how we handle your data in our{' '}
             <Link href={privacyPolicyUrl()} target="_blank" rel="noopener noreferrer">
               privacy policy
             </Link>
             .
-          </DialogContentText>
+          </Typography>
           {record.isError && <Alert severity="error">Could not save your choice. Please try again.</Alert>}
         </Stack>
       </DialogContent>
       <DialogActions>
-        <Button onClick={() => record.mutate('Unsubscribed')} disabled={record.isPending}>
-          Decline
+        <Button variant="outlined" onClick={() => record.mutate('Unsubscribed')} disabled={record.isPending}>
+          No thanks
         </Button>
         <Button variant="contained" onClick={() => record.mutate('Confirmed')} disabled={record.isPending}>
-          Confirm
+          Subscribe
         </Button>
       </DialogActions>
     </Dialog>
