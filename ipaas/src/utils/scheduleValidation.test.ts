@@ -169,16 +169,16 @@ describe('validatePlanSchedule', () => {
   it('holds an automation on a free plan to runs 5 minutes apart and 300 seconds', () => {
     expect(validatePlanSchedule('*/5 * * * *', '300', true, none, automationFree, true)).toEqual({});
     const errors = validatePlanSchedule('*/4 * * * *', '301', false, none, automationFree, true);
-    expect(errors.frequency).toBe('The free plan supports intervals of 5 minutes or longer. Upgrade for shorter intervals.');
-    expect(errors.timeout).toBe('The free plan allows a timeout of up to 300 seconds (5 minutes). Upgrade for longer timeouts.');
+    expect(errors.frequency).toBe('The free plan supports intervals of 5 minutes or longer. Upgrade to save this schedule.');
+    expect(errors.timeout).toBe('The free plan allows a timeout of up to 300 seconds (5 minutes). Upgrade to save this schedule.');
   });
 
   it('holds an ingestion on a free plan to one run a day, 1 hour, and no overlap', () => {
     expect(validatePlanSchedule('0 0 */1 * *', '3600', false, none, ingestionFree, true)).toEqual({});
     const errors = validatePlanSchedule('0 0,12 * * *', '3601', true, none, ingestionFree, true);
-    expect(errors.frequency).toBe('The free plan supports intervals of 1 day or longer. Upgrade for shorter intervals.');
-    expect(errors.timeout).toBe('The free plan allows a timeout of up to 3600 seconds (1 hour). Upgrade for longer timeouts.');
-    expect(errors.overlap).toBe('Overlapping executions are available on paid plans. Upgrade to turn this on.');
+    expect(errors.frequency).toBe('The free plan supports intervals of 1 day or longer. Upgrade to save this schedule.');
+    expect(errors.timeout).toBe('The free plan allows a timeout of up to 3600 seconds (1 hour). Upgrade to save this schedule.');
+    expect(errors.overlap).toBe('Overlapping executions are available on paid plans. Upgrade to save this schedule.');
   });
 
   it('lets a paid plan run an ingestion every minute, for any time, overlapping', () => {
